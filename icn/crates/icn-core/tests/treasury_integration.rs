@@ -1176,6 +1176,7 @@ async fn test_ledger_entry_carries_decision_provenance() -> Result<()> {
         expected_nonce: Some(0),
         decision_receipt_id: decision_receipt_id.clone(),
         decision_hash: decision_hash.clone(),
+        distributions: Vec::new(),
     };
 
     // Execute the treasury operation
@@ -1309,6 +1310,7 @@ async fn test_decision_to_ledger_provenance_end_to_end() -> Result<()> {
         memo: "E2E provenance test payment".to_string(),
         expected_nonce: Some(0),
         decision_hash: Some(decision_hash.clone()),
+        distributions: Vec::new(),
     };
 
     // Execute via the executor trait (this is the real kernel path)

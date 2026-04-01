@@ -158,6 +158,7 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
         memo: "Pilot equipment purchase".to_string(),
         expected_nonce: Some(0),
         decision_hash: Some(decision_hash.clone()),
+        distributions: Vec::new(),
     };
 
     let outcome_a = executor_a
@@ -207,6 +208,7 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
         memo: "Pilot equipment purchase".to_string(),
         expected_nonce: Some(0),
         decision_hash: Some(decision_hash.clone()),
+        distributions: Vec::new(),
     };
 
     let outcome_b = executor_b

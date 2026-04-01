@@ -300,22 +300,22 @@ impl KernelGovernanceExecutor {
                 }
             }
 
-            // Surplus distribution: multi-recipient settlement is not implemented in the kernel
-            // treasury → ledger bridge (single `TreasuryEntryRequest` per operation). Do not map
-            // through `treasury_effect_to_operation` placeholder (that path could report success
-            // with no ledger mutation when `decision_hash` is absent).
+            // Surplus distribution: fan-out payment to N members in a single journal entry.
+            //
+            // Routes through treasury_effect_to_operation → TreasuryOperation::DistributeSurplus
+            // → execute_treasury_operation → submit_treasury_entry (DistributeSurplus arm).
+            // All N debit/credit deltas land in one JournalEntry so the one-receipt-one-entry
+            // idempotency invariant is preserved across retries.
             TreasuryEffect::DistributeSurplus { .. } => {
-                warn!(
-                    "DistributeSurplus received: multi-recipient surplus settlement is not implemented in the kernel executor; no ledger mutation"
-                );
-                Ok(EffectResult {
-                    effect_id: decision_receipt_id.to_string(),
-                    success: false,
-                    message: "DistributeSurplus: multi-recipient surplus distribution is not implemented in the kernel treasury executor (no balances changed)".to_string(),
-                    state_change_hash: None,
-                    ledger_entry_id: None,
-                    not_executed: true,
-                })
+                let operation = treasury_effect_to_operation(&treasury_effect);
+                let outcome = self
+                    .treasury
+                    .execute_treasury_operation(receipt_id, operation)
+                    .await?;
+                Ok(execution_outcome_to_effect_result(
+                    outcome,
+                    decision_receipt_id,
+                ))
             }
 
             // RedeemShares and IssueBond: not yet implemented in this executor.
@@ -797,6 +797,7 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
                 recipient: operation.recipient.clone(),
                 memo: operation.memo.clone(),
                 expected_nonce: operation.expected_nonce,
+                distributions: operation.distributions.clone(),
                 decision_receipt_id: receipt_id.to_string(),
                 decision_hash: decision_hash.clone(),
             };
@@ -873,6 +874,7 @@ fn convert_operation_type(
         GovOp::Allocate => SvcOp::Allocate,
         GovOp::Reserve => SvcOp::Allocate, // Map Reserve to Allocate
         GovOp::Release => SvcOp::Transfer, // Map Release to Transfer
+        GovOp::DistributeSurplus => SvcOp::DistributeSurplus,
     }
 }
 
@@ -2091,6 +2093,7 @@ mod tests {
             memo: "Test payment".to_string(),
             expected_nonce: Some(0),
             decision_hash: Some("sha256:abc123".to_string()),
+            distributions: Vec::new(),
         };
 
         let result = executor
@@ -2151,6 +2154,7 @@ mod tests {
             memo: "Test payment".to_string(),
             expected_nonce: Some(0),
             decision_hash: None,
+            distributions: Vec::new(),
         };
 
         let result = executor
@@ -2603,11 +2607,12 @@ mod tests {
         );
         assert!(
             effect_result.not_executed,
-            "DistributeSurplus should be structurally not executed until ledger support exists"
+            "DistributeSurplus without ledger service must defer (not_executed=true): {}",
+            effect_result.message
         );
         assert!(
-            effect_result.message.contains("DistributeSurplus"),
-            "message should name the effect: {}",
+            effect_result.message.starts_with("Deferred:"),
+            "message must be a Deferred reason when ledger service is not configured: {}",
             effect_result.message
         );
     }

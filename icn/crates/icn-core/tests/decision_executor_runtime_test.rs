@@ -1146,3 +1146,162 @@ async fn test_deferred_outcome_sled_persists_not_executed() {
     assert_eq!(reread.retries, 0);
     assert!(reread.error.as_deref().unwrap_or("").contains("Deferred:"));
 }
+
+/// Test 15: DistributeSurplus execution produces a single ledger entry with 2*N account deltas.
+///
+/// This proves:
+/// 1. TreasuryEffect::DistributeSurplus no longer hits the `not_executed: true` wall
+/// 2. N-recipient fan-out is a single JournalEntry (one-receipt-one-entry invariant)
+/// 3. Each recipient gets a debit-from-treasury + credit-to-member pair
+/// 4. Governance provenance is recorded on the entry
+#[tokio::test(flavor = "multi_thread")]
+async fn test_distribute_surplus_executes_single_entry_with_n_deltas() {
+    use icn_core::supervisor::decision_executor::DecisionExecutor;
+    use icn_core::supervisor::effect_dispatcher::EffectDispatcher;
+    use icn_core::supervisor::governance_executor::KernelGovernanceExecutor;
+
+    let tmp = TempDir::new().unwrap();
+    let ledger_store_path = tmp.path().join("ledger");
+    let exec_store_path = tmp.path().join("execution");
+    std::fs::create_dir_all(&ledger_store_path).unwrap();
+    std::fs::create_dir_all(&exec_store_path).unwrap();
+
+    let decision_hash = "hash-distribute-surplus-executes-1";
+    let decision_receipt_id = "receipt-distribute-surplus-executes-1";
+    let treasury_did = RT_TEST_TREASURY;
+
+    // Two recipients with known valid multibase DIDs
+    let member_a = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+    let member_b = "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse";
+    let distributions = vec![
+        (member_a.to_string(), 300_i64),
+        (member_b.to_string(), 200_i64),
+    ];
+    let total_amount = 500_i64;
+
+    let ledger_store = Arc::new(SledStore::open(&ledger_store_path).unwrap());
+    let ledger = Arc::new(TokioRwLock::new(
+        icn_ledger::Ledger::new(ledger_store).unwrap(),
+    ));
+
+    let ledger_service = Arc::new(LedgerServiceImpl::new(
+        ledger.clone(),
+        Arc::new(AllowAllOracle::wildcard()),
+        treasury_did.parse().unwrap(),
+    ));
+    let kernel_executor =
+        KernelGovernanceExecutor::new(Arc::new(StubParamStore)).with_ledger_service(ledger_service);
+
+    let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
+    let exec_backend = Arc::new(SledStore::open(&exec_store_path).unwrap());
+    let exec_store = Arc::new(SledExecutionStore::new(exec_backend));
+    let executor = DecisionExecutor::new(dispatcher, exec_store.clone());
+
+    let effects = vec![KernelEffect::Treasury(TreasuryEffect::DistributeSurplus {
+        treasury_did: treasury_did.to_string(),
+        total_amount,
+        currency: "HOURS".to_string(),
+        distributions: distributions.clone(),
+        decision_receipt_id: decision_receipt_id.to_string(),
+        decision_hash: decision_hash.to_string(),
+    })];
+
+    let results = executor
+        .execute(
+            effects,
+            decision_receipt_id,
+            decision_hash,
+            "proposal-distribute-surplus-1",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(results.len(), 1, "expected one EffectResult");
+    assert!(
+        results[0].success,
+        "DistributeSurplus must succeed (not hit not_executed wall), got: {:?}",
+        results[0].message
+    );
+    assert!(
+        !results[0].not_executed,
+        "DistributeSurplus must not be marked not_executed when decision_hash is present"
+    );
+    assert!(
+        !results[0].message.contains("Deferred"),
+        "expected no Deferred message, got: {:?}",
+        results[0].message
+    );
+
+    // One-receipt-one-entry invariant: N recipients → 1 JournalEntry
+    let record = exec_store.get(decision_hash).unwrap().unwrap();
+    assert_eq!(
+        record.status,
+        ExecutionStatus::Confirmed,
+        "execution record must be Confirmed after DistributeSurplus"
+    );
+    assert_eq!(
+        record.ledger_entry_ids.len(),
+        1,
+        "exactly one ledger entry expected for DistributeSurplus regardless of recipient count"
+    );
+
+    // Verify the single entry has 2*N account deltas
+    let entry_hash = content_hash_from_hex(&record.ledger_entry_ids[0]).unwrap();
+    let ledger_guard = ledger.read().await;
+    let entry = ledger_guard.get_entry(&entry_hash).unwrap().unwrap();
+
+    assert!(
+        matches!(
+            &entry.provenance,
+            ProvenanceRef::Governance { receipt_id, decision_hash: dh }
+                if receipt_id == decision_receipt_id && dh == decision_hash
+        ),
+        "ledger entry provenance must carry governance receipt_id and decision_hash"
+    );
+
+    // 2 recipients × 2 deltas (debit treasury + credit member) = 4 account deltas
+    assert_eq!(
+        entry.accounts.len(),
+        4,
+        "DistributeSurplus with 2 recipients must produce 4 account deltas (debit+credit per member)"
+    );
+
+    let debits: Vec<_> = entry
+        .accounts
+        .iter()
+        .filter(|a| a.debit.is_some())
+        .collect();
+    let credits: Vec<_> = entry
+        .accounts
+        .iter()
+        .filter(|a| a.credit.is_some())
+        .collect();
+    assert_eq!(debits.len(), 2, "must have 2 treasury debits");
+    assert_eq!(credits.len(), 2, "must have 2 member credits");
+
+    // All debits from treasury
+    for debit in &debits {
+        assert_eq!(
+            debit.account_id.as_str(),
+            treasury_did,
+            "all debits must come from treasury"
+        );
+    }
+
+    // Credits go to member DIDs, total = total_amount
+    let credit_total: i64 = credits.iter().filter_map(|a| a.credit).sum();
+    assert_eq!(
+        credit_total, total_amount,
+        "total credits must equal total_amount"
+    );
+    let credit_dids: std::collections::HashSet<&str> =
+        credits.iter().map(|a| a.account_id.as_str()).collect();
+    assert!(
+        credit_dids.contains(member_a),
+        "member_a must appear in credits"
+    );
+    assert!(
+        credit_dids.contains(member_b),
+        "member_b must appear in credits"
+    );
+}

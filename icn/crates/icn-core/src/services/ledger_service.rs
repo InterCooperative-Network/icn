@@ -190,6 +190,76 @@ impl LedgerServiceImpl {
                     AccountDelta::credit(recipient_did, req.currency.clone(), req.amount),
                 ])
             }
+            TreasuryOperationType::DistributeSurplus => {
+                // Fan-out: one debit per distribution, one credit per member.
+                // All deltas land in a single JournalEntry so the one-receipt-one-entry
+                // idempotency invariant is preserved across retries.
+                if req.distributions.is_empty() {
+                    return Err(
+                        "DistributeSurplus requires at least one distribution (empty list)"
+                            .to_string(),
+                    );
+                }
+
+                // Validate individual amounts are positive (zero/negative inverts
+                // debit/credit semantics and violates AccountDelta type contract).
+                if req.amount <= 0 {
+                    return Err(format!(
+                        "DistributeSurplus: total amount must be positive, got {}",
+                        req.amount
+                    ));
+                }
+                for (did, amount) in &req.distributions {
+                    if *amount <= 0 {
+                        return Err(format!(
+                            "DistributeSurplus: distribution amount for '{did}' must be \
+                             positive, got {amount}"
+                        ));
+                    }
+                }
+
+                // Validate: sum of individual amounts must equal req.amount to prevent
+                // the logged total from diverging from actual ledger mutations.
+                // Use checked arithmetic to surface overflow before it corrupts ledger state.
+                let distribution_sum: i64 = req
+                    .distributions
+                    .iter()
+                    .try_fold(0i64, |acc, (_, amt)| acc.checked_add(*amt))
+                    .ok_or_else(|| {
+                        "DistributeSurplus: distribution amounts overflow i64".to_string()
+                    })?;
+                if distribution_sum != req.amount {
+                    return Err(format!(
+                        "DistributeSurplus: distribution sum ({distribution_sum}) \
+                         does not equal total amount ({})",
+                        req.amount
+                    ));
+                }
+
+                // Sort by recipient DID string to canonicalize delta ordering.
+                // The ledger entry hash covers the AccountDelta sequence, so ordering
+                // must be deterministic across all nodes processing the same decision.
+                let mut sorted: Vec<&(String, i64)> = req.distributions.iter().collect();
+                sorted.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+                let mut deltas = Vec::with_capacity(req.distributions.len() * 2);
+                for (member_did_str, amount) in sorted {
+                    let member_did: icn_identity::Did = member_did_str
+                        .parse()
+                        .map_err(|e| format!("Invalid member DID in distribution: {e}"))?;
+                    deltas.push(AccountDelta::debit(
+                        self.treasury_did.clone(),
+                        req.currency.clone(),
+                        *amount,
+                    ));
+                    deltas.push(AccountDelta::credit(
+                        member_did,
+                        req.currency.clone(),
+                        *amount,
+                    ));
+                }
+                Ok(deltas)
+            }
             _ => {
                 // Other operation types can be added as needed
                 Err(format!(
@@ -717,6 +787,7 @@ mod tests {
             expected_nonce: Some(0),
             decision_receipt_id: "gov:proposal:2024-001:receipt:abc".to_string(),
             decision_hash: "sha256:deadbeef".to_string(),
+            distributions: Vec::new(),
         };
 
         // These must be non-empty for pilot invariant
@@ -749,6 +820,7 @@ mod tests {
             expected_nonce: Some(0),
             decision_receipt_id: "gov:proposal:pr3:idempotency:001".to_string(),
             decision_hash: "decision-hash-pr3-001".to_string(),
+            distributions: Vec::new(),
         };
 
         let first = service.submit_treasury_entry(request.clone()).unwrap();
@@ -794,6 +866,7 @@ mod tests {
             expected_nonce: Some(0),
             decision_receipt_id: "gov:proposal:pr3:idempotency:restart".to_string(),
             decision_hash: "decision-hash-pr3-restart".to_string(),
+            distributions: Vec::new(),
         };
 
         let first_hash = {
@@ -859,6 +932,7 @@ mod tests {
             expected_nonce: Some(0),
             decision_receipt_id: "gov:proposal:pr3:idempotency:concurrent".to_string(),
             decision_hash: "decision-hash-pr3-concurrent".to_string(),
+            distributions: Vec::new(),
         };
 
         let req_a = request.clone();
@@ -908,6 +982,7 @@ mod tests {
             expected_nonce: Some(0),
             decision_receipt_id: "gov:proposal:pr4:nonce:first".to_string(),
             decision_hash: "decision-hash-pr4-nonce-first".to_string(),
+            distributions: Vec::new(),
         };
         service.submit_treasury_entry(first).unwrap();
 
@@ -926,6 +1001,7 @@ mod tests {
             expected_nonce: Some(0),
             decision_receipt_id: "gov:proposal:pr4:nonce:stale".to_string(),
             decision_hash: "decision-hash-pr4-nonce-stale".to_string(),
+            distributions: Vec::new(),
         };
         let err = service.submit_treasury_entry(stale).unwrap_err();
         assert!(
@@ -974,6 +1050,7 @@ mod tests {
             expected_nonce: Some(baseline),
             decision_receipt_id: "gov:proposal:pr5:nonce:coherence".to_string(),
             decision_hash: "decision-hash-pr5-nonce-coherence".to_string(),
+            distributions: Vec::new(),
         };
         service.submit_treasury_entry(request).unwrap();
 

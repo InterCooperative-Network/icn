@@ -135,6 +135,7 @@ fn run_write(sled_path: PathBuf) -> i32 {
         expected_nonce: Some(0),
         decision_receipt_id: RECEIPT_ID.to_string(),
         decision_hash: "proof-decision-hash-layer4".to_string(),
+        distributions: Vec::new(),
     };
 
     let result = match service.submit_treasury_entry(request) {
