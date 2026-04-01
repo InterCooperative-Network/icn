@@ -339,4 +339,156 @@ mod tests {
         let result = manager.list_cooperatives().await;
         assert!(result.is_err());
     }
+
+    /// Gateway API federation state must survive across restarts when using persistent storage.
+    ///
+    /// Architectural invariant (ADR 0011 / Option B): the gateway's own FederationManager
+    /// serves as the truth for API-originated federation state (agreements created via direct
+    /// API, not governance effects). This state must be durable — ephemeral temp store was the
+    /// root cause of the state-loss gap identified in the audit.
+    ///
+    /// This test proves that `new_with_storage()` gives independent manager instances access
+    /// to the same persisted cooperative registry data — simulating a restart scenario.
+    #[tokio::test]
+    async fn test_persistent_storage_survives_manager_reconstruction() {
+        let data_dir = tempfile::tempdir().expect("tempdir");
+        let path = data_dir.path().to_path_buf();
+
+        // First instance: create and initialize
+        {
+            let mgr = FederationManager::new_with_storage(path.clone()).expect("new_with_storage");
+            let own_info = CooperativeInfo::new(
+                "alpha-coop".to_string(),
+                "Alpha Cooperative".to_string(),
+                test_did(),
+                FederationPolicy::default(),
+            );
+            mgr.init_registry(own_info).await.unwrap();
+            let peer = CooperativeInfo::new(
+                "beta-coop".to_string(),
+                "Beta Cooperative".to_string(),
+                test_did(),
+                FederationPolicy::default(),
+            );
+            mgr.register_cooperative(peer).await.unwrap();
+        }
+
+        // Second instance at the same path — simulates daemon restart
+        {
+            let mgr2 = FederationManager::new_with_storage(path.clone())
+                .expect("new_with_storage after restart");
+            // The registry is lazily loaded — re-init from the same store
+            let own_info = CooperativeInfo::new(
+                "alpha-coop".to_string(),
+                "Alpha Cooperative".to_string(),
+                test_did(),
+                FederationPolicy::default(),
+            );
+            mgr2.init_registry(own_info).await.unwrap();
+
+            let coops = mgr2.list_cooperatives().await.unwrap();
+            let found_beta = coops.iter().any(|c| c.coop_id == "beta-coop");
+            assert!(
+                found_beta,
+                "beta-coop registered in first instance must be visible after restart"
+            );
+        }
+    }
+
+    /// Gateway coop list reflects ONLY gateway-registered cooperatives — not governance state.
+    ///
+    /// Architectural invariant (ADR 0012 / Model C): the two federation origin paths are
+    /// intentionally isolated. `FederationManager::list_cooperatives()` returns only state
+    /// written via the gateway API path. Governance-registered cooperatives (written by
+    /// `FederationServiceImpl`) are invisible here — this is correct, not a bug.
+    ///
+    /// If this test starts failing because `list_cooperatives` returns cooperatives registered
+    /// through other means, the parallel model has been violated and ADR 0012 requires review.
+    #[tokio::test]
+    async fn test_gateway_coop_list_reflects_only_gateway_registered_coops() {
+        let mgr = FederationManager::new();
+
+        let own_info = CooperativeInfo::new(
+            "gateway-coop".to_string(),
+            "Gateway Cooperative".to_string(),
+            test_did(),
+            FederationPolicy::default(),
+        );
+        mgr.init_registry(own_info).await.unwrap();
+
+        // Register one peer via the gateway path
+        let gateway_peer = CooperativeInfo::new(
+            "gateway-peer".to_string(),
+            "Gateway Peer".to_string(),
+            test_did(),
+            FederationPolicy::default(),
+        );
+        mgr.register_cooperative(gateway_peer).await.unwrap();
+
+        let coops = mgr.list_cooperatives().await.unwrap();
+
+        // Exactly gateway-registered coops visible — no governance-originated coops
+        let coop_ids: Vec<&str> = coops.iter().map(|c| c.coop_id.as_str()).collect();
+        assert!(
+            coop_ids.contains(&"gateway-coop") || coop_ids.contains(&"gateway-peer"),
+            "Expected gateway-registered coops to be visible"
+        );
+        // The list should only contain what was registered via this manager instance
+        assert!(
+            coops.len() <= 2,
+            "Expected at most 2 coops (own + 1 peer); got {} — governance state may have leaked in",
+            coops.len()
+        );
+    }
+
+    /// Gateway clearing agreements are stored in a separate store from governance-originated ones.
+    ///
+    /// Architectural invariant (ADR 0012 / Model C): agreements created via `POST /federation/clearing`
+    /// live in the gateway's FederationManager store. Governance-established clearing agreements
+    /// live in the supervisor's ClearingManager. These stores are intentionally isolated.
+    ///
+    /// This test verifies that the gateway's ClearingManager only surfaces gateway-created agreements.
+    /// If it starts returning supervisor-state agreements, the parallel model has been violated.
+    #[tokio::test]
+    async fn test_gateway_clearing_list_does_not_surface_supervisor_agreements() {
+        let mgr = FederationManager::new();
+
+        let own_info = CooperativeInfo::new(
+            "alpha-coop".to_string(),
+            "Alpha Cooperative".to_string(),
+            test_did(),
+            FederationPolicy::default(),
+        );
+        mgr.init_registry(own_info).await.unwrap();
+
+        // No agreements created — list should be empty
+        let agreements = mgr.list_agreements().await.unwrap();
+        assert!(
+            agreements.is_empty(),
+            "Expected no gateway-created agreements in a fresh manager; supervisor state must not leak"
+        );
+
+        // Create one gateway-path agreement
+        let partner_did = test_did();
+        use icn_federation::{BilateralClearingAgreement, SettlementInterval};
+        let mut agr = BilateralClearingAgreement::new(
+            "agr-gw-001".to_string(),
+            "alpha-coop".to_string(),
+            test_did(),
+            "beta-coop".to_string(),
+            partner_did,
+        );
+        agr.settlement_interval = SettlementInterval::Manual;
+        let id = mgr.create_agreement(agr).await.unwrap();
+        assert_eq!(id, "agr-gw-001");
+
+        let agreements_after = mgr.list_agreements().await.unwrap();
+        assert_eq!(
+            agreements_after.len(),
+            1,
+            "Expected exactly 1 agreement (gateway-created); got {}",
+            agreements_after.len()
+        );
+        assert_eq!(agreements_after[0].agreement_id, "agr-gw-001");
+    }
 }

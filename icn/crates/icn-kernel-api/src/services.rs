@@ -967,6 +967,20 @@ pub trait FederationService: Send + Sync {
         request: FederationClearingSettleRequest,
     ) -> Result<FederationClearingSettleResult, anyhow::Error>;
 
+    /// Query the current clearing position for a bilateral agreement.
+    ///
+    /// Returns a party-level view of the inter-entity clearing state: what
+    /// each party owes the other, the net position, and pending transfer count.
+    /// Uses party/entity vocabulary — coop-specific internals are adapted at
+    /// the service boundary and do not leak into this response.
+    ///
+    /// Returns `Err` if the agreement does not exist or the clearing manager
+    /// is not configured on this node.
+    fn get_clearing_position(
+        &self,
+        agreement_id: &str,
+    ) -> Result<ClearingPositionView, anyhow::Error>;
+
     /// Check if a cooperative is registered in the federation.
     fn is_registered(&self, coop_did: &str) -> bool;
 
@@ -974,6 +988,161 @@ pub trait FederationService: Send + Sync {
     ///
     /// Returns (decision_receipt_id, decision_hash) if available.
     fn get_registration_provenance(&self, coop_did: &str) -> Option<(String, String)>;
+
+    // ── Read surface (ADR 0012 Step 1) ─────────────────────────────────────
+
+    /// List all cooperatives registered in the supervisor's federation registry.
+    ///
+    /// Returns only governance-originated state (cooperatives registered via
+    /// `join_federation` governance effects). Gateway-API-registered cooperatives
+    /// live in a separate store and are NOT included here (ADR 0012 / Model C).
+    ///
+    /// Returns an empty vec if the registry has no cooperatives yet.
+    fn list_cooperatives(&self) -> Result<Vec<CooperativeView>, anyhow::Error>;
+
+    /// Get a specific cooperative from the supervisor's federation registry.
+    ///
+    /// Returns `None` if the cooperative is not registered in the supervisor's
+    /// store. Gateway-API-registered cooperatives are not visible here.
+    fn get_cooperative(&self, coop_id: &str) -> Result<Option<CooperativeView>, anyhow::Error>;
+
+    /// Get vouches recorded for a cooperative in the supervisor's registry.
+    ///
+    /// Returns voucher DID strings from governance-originated vouch records
+    /// (`vouch_for_cooperative` effects). Does not include vouches created via
+    /// the gateway API path.
+    fn get_vouches_for(&self, coop_id: &str) -> Result<Vec<String>, anyhow::Error>;
+
+    /// List all clearing agreements in the supervisor's clearing store.
+    ///
+    /// Returns only governance-originated agreements (created via `establish_clearing`
+    /// governance effects). Gateway-API-created agreements live in a separate store and
+    /// are NOT included (ADR 0012 / Model C).
+    ///
+    /// Returns an empty vec if the clearing manager is not configured or has no agreements.
+    fn list_agreements(&self) -> Result<Vec<ClearingAgreementView>, anyhow::Error>;
+
+    /// Get a specific clearing agreement from the supervisor's clearing store.
+    ///
+    /// Returns `None` if the agreement does not exist in the supervisor's store.
+    /// Gateway-API-created agreements are not visible here.
+    fn get_agreement(
+        &self,
+        agreement_id: &str,
+    ) -> Result<Option<ClearingAgreementView>, anyhow::Error>;
+}
+
+// ============================================================================
+// Clearing Position View
+// ============================================================================
+
+/// Party-level view of a bilateral inter-entity clearing position.
+///
+/// Uses `party_a`/`party_b` vocabulary to remain entity-type-agnostic.
+/// The underlying clearing internals may use cooperative-specific naming,
+/// but that is adapted at the service boundary and never appears here.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ClearingPositionView {
+    /// The agreement this position belongs to.
+    pub agreement_id: String,
+    /// Identifier of the first party (entity ID / org ID, not a DID).
+    pub party_a: String,
+    /// Identifier of the second party.
+    pub party_b: String,
+    /// Amount party_a currently owes party_b (confirmed, unsettled).
+    pub party_a_owes: i64,
+    /// Amount party_b currently owes party_a (confirmed, unsettled).
+    pub party_b_owes: i64,
+    /// Net position: positive means party_a is net debtor; negative means party_b is net debtor.
+    pub net_position: i64,
+    /// Number of transfers proposed but not yet confirmed.
+    pub pending_count: usize,
+    /// Unix timestamp of the last settlement that cleared this position.
+    pub last_settlement_ts: u64,
+}
+
+// ============================================================================
+// Cooperative View (ADR 0012 Step 1 read DTO)
+// ============================================================================
+
+/// Kernel-API view of a registered cooperative.
+///
+/// A pruned, boundary-clean representation of a cooperative registration that
+/// does not expose federation-internal types (`FederationPolicy`, `CurrencyInfo`,
+/// `Did`, `Vouch`) across the service boundary.
+///
+/// Contains only the fields a gateway or consuming service needs for routing,
+/// display, and capability discovery. The `CooperativeInfo` storage type in
+/// `icn-federation` is richer but must not cross this boundary.
+///
+/// # Origin note
+///
+/// Values returned via `FederationService::list_cooperatives()` originate from
+/// governance execution (ADR 0012 / Model C). They represent the supervisor's
+/// canonical registry, not the gateway's direct-management state.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CooperativeView {
+    /// Unique identifier for the cooperative.
+    pub coop_id: String,
+    /// Human-readable name.
+    pub name: String,
+    /// The cooperative's institutional DID (string form, not the icn-identity Did type).
+    pub public_did: String,
+    /// Known gateway API endpoints for this cooperative.
+    pub gateway_endpoints: Vec<String>,
+    /// Capability flags (e.g. "clearing", "attestations", "compute").
+    pub capabilities: Vec<String>,
+    /// Unix timestamp of the last observed announcement.
+    pub last_seen: u64,
+    /// Origin of this record: `"governance"` (from supervisor-owned FederationService, written
+    /// by governance execution) or `"direct-management"` (from the gateway's own registry,
+    /// written via the direct-management API path). ADR 0012 / Model C.
+    pub origin: String,
+}
+
+// ============================================================================
+// Clearing Agreement View (ADR 0012 Step 1b read DTO)
+// ============================================================================
+
+/// Kernel-API view of a bilateral clearing agreement.
+///
+/// A boundary-clean representation that does not expose `icn-federation` internal
+/// types (`Did`, `SettlementInterval`, raw signature bytes) across the service
+/// boundary. Uses string representations for enum and identity fields.
+///
+/// Fields intentionally omitted:
+/// - `signatures` — raw cryptographic material, not useful to API consumers
+///
+/// # Origin note
+///
+/// Values returned via `FederationService::list_agreements()` originate from
+/// governance execution (`establish_clearing` effects). They represent the
+/// supervisor's canonical clearing store, not the gateway's direct-management state
+/// (ADR 0012 / Model C).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ClearingAgreementView {
+    /// Unique identifier for the agreement.
+    pub agreement_id: String,
+    /// Identifier of the first cooperative.
+    pub coop_a: String,
+    /// DID of the first cooperative (string form).
+    pub coop_a_did: String,
+    /// Identifier of the second cooperative.
+    pub coop_b: String,
+    /// DID of the second cooperative (string form).
+    pub coop_b_did: String,
+    /// Settlement schedule: "daily", "weekly", "monthly", or "manual".
+    pub settlement_interval: String,
+    /// Maximum allowed imbalance before forced settlement.
+    pub max_imbalance: i64,
+    /// Unix timestamp when the agreement was created.
+    pub created_at: u64,
+    /// Exchange rates between currencies: "from:to" -> rate.
+    pub exchange_rates: std::collections::HashMap<String, f64>,
+    /// Origin of this record: `"governance"` (from supervisor-owned FederationService, written
+    /// by governance execution) or `"direct-management"` (from the gateway's own clearing store,
+    /// written via the direct-management API path). ADR 0012 / Model C.
+    pub origin: String,
 }
 
 // ============================================================================

@@ -485,6 +485,7 @@ impl FederationService for FederationServiceImpl {
                             expected_nonce: None,
                             decision_receipt_id: request.decision_receipt_id.clone(),
                             decision_hash: request.decision_hash.clone(),
+                            distributions: Vec::new(),
                         };
                         match ledger.submit_treasury_entry(entry_req) {
                             Ok(entry_result) => {
@@ -559,6 +560,39 @@ impl FederationService for FederationServiceImpl {
         }
     }
 
+    fn get_clearing_position(
+        &self,
+        agreement_id: &str,
+    ) -> Result<icn_kernel_api::ClearingPositionView> {
+        let clearing = self.clearing.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Clearing manager not configured on this node — federation clearing is disabled"
+            )
+        })?;
+
+        // Fetch the agreement to get the party identifiers (coop IDs — adapted here at boundary).
+        let agreement = clearing
+            .get_agreement(agreement_id)
+            .map_err(|e| anyhow::anyhow!("Failed to read agreement '{}': {}", agreement_id, e))?
+            .ok_or_else(|| anyhow::anyhow!("Agreement '{}' not found", agreement_id))?;
+
+        let position = clearing.calculate_position(agreement_id).map_err(|e| {
+            anyhow::anyhow!("Failed to read position for '{}': {}", agreement_id, e)
+        })?;
+
+        Ok(icn_kernel_api::ClearingPositionView {
+            agreement_id: agreement_id.to_string(),
+            // Adapt from coop-specific internal naming to party-level external vocabulary.
+            party_a: agreement.coop_a.clone(),
+            party_b: agreement.coop_b.clone(),
+            party_a_owes: position.coop_a_owes_b,
+            party_b_owes: position.coop_b_owes_a,
+            net_position: position.net_position(),
+            pending_count: position.pending_transfers.len(),
+            last_settlement_ts: position.last_settlement,
+        })
+    }
+
     fn is_registered(&self, coop_did: &str) -> bool {
         // Check if the DID (as coop_id) is in the registry
         self.registry.get(coop_did).ok().flatten().is_some()
@@ -568,6 +602,106 @@ impl FederationService for FederationServiceImpl {
         let prov = self.provenance.read().ok()?;
         prov.get(coop_did)
             .map(|p| (p.decision_receipt_id.clone(), p.decision_hash.clone()))
+    }
+
+    fn list_cooperatives(&self) -> Result<Vec<icn_kernel_api::CooperativeView>> {
+        let coops = self.registry.list()?;
+        Ok(coops
+            .into_iter()
+            .map(|c| icn_kernel_api::CooperativeView {
+                coop_id: c.coop_id,
+                name: c.name,
+                public_did: c.public_did.to_string(),
+                gateway_endpoints: c.gateway_endpoints,
+                capabilities: c.capabilities,
+                last_seen: c.last_seen,
+                // This record came from governance execution (join_federation effect).
+                origin: "governance".to_string(),
+            })
+            .collect())
+    }
+
+    fn get_cooperative(&self, coop_id: &str) -> Result<Option<icn_kernel_api::CooperativeView>> {
+        Ok(self
+            .registry
+            .get(coop_id)?
+            .map(|c| icn_kernel_api::CooperativeView {
+                coop_id: c.coop_id,
+                name: c.name,
+                public_did: c.public_did.to_string(),
+                gateway_endpoints: c.gateway_endpoints,
+                capabilities: c.capabilities,
+                last_seen: c.last_seen,
+                // This record came from governance execution (join_federation effect).
+                origin: "governance".to_string(),
+            }))
+    }
+
+    fn get_vouches_for(&self, coop_id: &str) -> Result<Vec<String>> {
+        self.registry
+            .get_vouches(coop_id)
+            .map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    fn list_agreements(&self) -> Result<Vec<icn_kernel_api::ClearingAgreementView>> {
+        let clearing = match self.clearing.as_ref() {
+            Some(c) => c,
+            None => return Ok(vec![]),
+        };
+        Ok(clearing
+            .list_agreements()
+            .into_iter()
+            .map(|a| icn_kernel_api::ClearingAgreementView {
+                agreement_id: a.agreement_id,
+                coop_a: a.coop_a,
+                coop_a_did: a.coop_a_did.to_string(),
+                coop_b: a.coop_b,
+                coop_b_did: a.coop_b_did.to_string(),
+                settlement_interval: match a.settlement_interval {
+                    icn_federation::SettlementInterval::Daily => "daily",
+                    icn_federation::SettlementInterval::Weekly => "weekly",
+                    icn_federation::SettlementInterval::Monthly => "monthly",
+                    icn_federation::SettlementInterval::Manual => "manual",
+                }
+                .to_string(),
+                max_imbalance: a.max_imbalance,
+                created_at: a.created_at,
+                exchange_rates: a.exchange_rates,
+                // This record came from governance execution (establish_clearing effect).
+                origin: "governance".to_string(),
+            })
+            .collect())
+    }
+
+    fn get_agreement(
+        &self,
+        agreement_id: &str,
+    ) -> Result<Option<icn_kernel_api::ClearingAgreementView>> {
+        let clearing = match self.clearing.as_ref() {
+            Some(c) => c,
+            None => return Ok(None),
+        };
+        Ok(clearing
+            .get_agreement(agreement_id)?
+            .map(|a| icn_kernel_api::ClearingAgreementView {
+                agreement_id: a.agreement_id,
+                coop_a: a.coop_a,
+                coop_a_did: a.coop_a_did.to_string(),
+                coop_b: a.coop_b,
+                coop_b_did: a.coop_b_did.to_string(),
+                settlement_interval: match a.settlement_interval {
+                    icn_federation::SettlementInterval::Daily => "daily",
+                    icn_federation::SettlementInterval::Weekly => "weekly",
+                    icn_federation::SettlementInterval::Monthly => "monthly",
+                    icn_federation::SettlementInterval::Manual => "manual",
+                }
+                .to_string(),
+                max_imbalance: a.max_imbalance,
+                created_at: a.created_at,
+                exchange_rates: a.exchange_rates,
+                // This record came from governance execution (establish_clearing effect).
+                origin: "governance".to_string(),
+            }))
     }
 }
 

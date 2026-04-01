@@ -106,13 +106,14 @@ pub use receipts::{
 };
 pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
-    AddMemberRequest, AddMemberResult, CellService, ControlService, FederationClearingRequest,
-    FederationClearingResult, FederationClearingSettleRequest, FederationClearingSettleResult,
-    FederationJoinRequest, FederationJoinResult, FederationService, FederationVouchRequest,
-    FederationVouchResult, ForceCloseProposalRequest, ForceCloseProposalResult,
-    FreezeMemberRequest, FreezeMemberResult, GovernanceEvent, GovernanceService, LedgerEvent,
-    LedgerService, MembershipService, RemoveMemberRequest, RemoveMemberResult, SecurityService,
-    SecurityViolation, ServiceRegistry, TreasuryEntryRequest, TreasuryEntryResult,
+    AddMemberRequest, AddMemberResult, CellService, ClearingAgreementView, ClearingPositionView,
+    ControlService, CooperativeView, FederationClearingRequest, FederationClearingResult,
+    FederationClearingSettleRequest, FederationClearingSettleResult, FederationJoinRequest,
+    FederationJoinResult, FederationService, FederationVouchRequest, FederationVouchResult,
+    ForceCloseProposalRequest, ForceCloseProposalResult, FreezeMemberRequest, FreezeMemberResult,
+    GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, MembershipService,
+    RemoveMemberRequest, RemoveMemberResult, SecurityService, SecurityViolation, ServiceRegistry,
+    TreasuryEntryRequest, TreasuryEntryResult,
     TreasuryOperationType as ServicesTreasuryOperationType, TrustClass, TrustEvent, TrustService,
     UnfreezeMemberRequest, UnfreezeMemberResult, UpdateMemberRequest, UpdateMemberResult,
     VetoProposalRequest, VetoProposalResult, TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN,

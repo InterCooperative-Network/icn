@@ -50,6 +50,10 @@ pub struct GatewayHandles {
     pub commons: Option<icn_commons::CommonsHandle>,
     /// Hook invoked when a Charter proposal is accepted.
     pub charter_accepted_hook: Option<Arc<dyn Fn(String, String) + Send + Sync>>,
+    /// Federation service for clearing position queries and settlement.
+    /// When provided, the gateway uses this service-owned clearing state rather
+    /// than its own divergent ClearingManager instance.
+    pub federation_service: Option<Arc<dyn icn_kernel_api::FederationService>>,
 }
 
 /// Spawn the Gateway API server if enabled
@@ -114,6 +118,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let naming_service = handles.naming_service;
     let commons_handle = handles.commons;
     let charter_accepted_hook = handles.charter_accepted_hook;
+    let federation_service_handle = handles.federation_service;
     let default_trust_score = config.default_trust_score;
 
     // Spawn gateway in a dedicated thread (actix-web has its own runtime)
@@ -196,6 +201,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(hook) = charter_accepted_hook {
                 gateway_server = gateway_server.with_charter_accepted_hook(hook);
+            }
+
+            if let Some(service) = federation_service_handle {
+                gateway_server = gateway_server.with_federation_service(service);
             }
 
             if let Err(e) = gateway_server.run().await {

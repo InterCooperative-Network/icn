@@ -93,6 +93,10 @@ pub struct GatewayServer {
     trust_service_handle: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// Optional LedgerService for treasury nonce queries
     ledger_service_handle: Option<Arc<dyn icn_kernel_api::services::LedgerService>>,
+    /// Optional FederationService for clearing position queries.
+    /// When provided, position queries use the supervisor-owned clearing state rather
+    /// than the gateway's own divergent ClearingManager instance.
+    federation_service_handle: Option<Arc<dyn icn_kernel_api::services::FederationService>>,
     /// Optional handle to daemon's GovernanceActor (for actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
     /// Optional handle to daemon's ContractRegistryActor (for contract management)
@@ -143,6 +147,7 @@ impl GatewayServer {
             coop_handle: None,
             trust_service_handle: None,
             ledger_service_handle: None,
+            federation_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
@@ -187,6 +192,7 @@ impl GatewayServer {
             coop_handle: None,
             trust_service_handle: None,
             ledger_service_handle: None,
+            federation_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
@@ -232,6 +238,7 @@ impl GatewayServer {
             coop_handle: None,
             trust_service_handle: None,
             ledger_service_handle: None,
+            federation_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
@@ -333,6 +340,18 @@ impl GatewayServer {
         service: Arc<dyn icn_kernel_api::services::LedgerService>,
     ) -> Self {
         self.ledger_service_handle = Some(service);
+        self
+    }
+
+    /// Set federation service for clearing position queries.
+    ///
+    /// When set, the `GET /v1/federation/clearing/{id}/position` endpoint queries the
+    /// supervisor-owned clearing state rather than the gateway's own divergent instance.
+    pub fn with_federation_service(
+        mut self,
+        service: Arc<dyn icn_kernel_api::services::FederationService>,
+    ) -> Self {
+        self.federation_service_handle = Some(service);
         self
     }
 
@@ -706,7 +725,37 @@ impl GatewayServer {
         let _service_expiry_handle =
             crate::service_discovery_mgr::start_expiry_task(service_discovery_manager.clone(), 300);
 
-        let federation_manager = Arc::new(FederationManager::new());
+        // FederationManager: uses persistent sled storage when data_dir is available, temp
+        // store otherwise (tests / no-data-dir deployments).
+        //
+        // ARCHITECTURE NOTE (ADR 0011):
+        // This store holds federation state that originates from gateway API calls
+        // (POST /clearing, POST /coops, POST /attestations, etc.).  It is intentionally
+        // SEPARATE from the supervisor-owned FederationService stores (populated by
+        // governance effects and compute-layer clearing callbacks).
+        //
+        // Production deployments should create agreements through governance (which writes
+        // to the supervisor's ClearingManager).  Gateway API federation endpoints are the
+        // standalone / direct-management path and serve as the truth for that origin path.
+        //
+        // Read paths for supervisor-owned state (e.g. clearing positions) prefer
+        // federation_service_for_routes below; see get_position() handler.
+        let federation_manager = if let Some(ref data_dir) = self.data_dir {
+            let mgr = FederationManager::new_with_storage(data_dir.clone())?;
+            info!(
+                "FederationManager: using persistent sled store at {:?}",
+                data_dir.join("federation_store")
+            );
+            Arc::new(mgr)
+        } else {
+            info!("FederationManager: using temporary in-memory store (no data_dir)");
+            Arc::new(FederationManager::new())
+        };
+        // Wrap the optional FederationService handle so route handlers can get it from app_data.
+        // When Some, route handlers MUST prefer this over federation_manager for reads.
+        let federation_service_for_routes: Arc<
+            Option<Arc<dyn icn_kernel_api::services::FederationService>>,
+        > = Arc::new(self.federation_service_handle.clone());
         let commons_manager: Arc<CommonsManager> = if let Some(handle) = self.commons_handle {
             // Canonical path: daemon injected a shared CommonsHandle.
             // CommonsManager is a thin facade over this handle — no second sled store opened.
@@ -1487,6 +1536,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(trust_manager.as_oracle()))
                 .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(federation_manager.clone()))
+                .app_data(web::Data::new(federation_service_for_routes.clone()))
                 .app_data(web::Data::new(commons_manager.clone()))
                 .app_data(web::Data::new(entity_manager.clone()))
                 .app_data(web::Data::new(entity_audit_manager.clone()))

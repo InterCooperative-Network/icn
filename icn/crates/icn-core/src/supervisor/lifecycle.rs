@@ -146,6 +146,7 @@ pub async fn run_supervisor(
             naming_service: gateway_handles.naming_service,
             commons: commons_handle,
             charter_accepted_hook: gateway_handles.charter_accepted_hook,
+            federation_service: gateway_handles.federation_service,
         },
     );
 
@@ -733,6 +734,9 @@ async fn spawn_actors_with_identity(
             }
             let federation_service = Arc::new(federation_service);
             kernel_executor = kernel_executor.with_federation_service(federation_service.clone());
+            // Also expose via gateway so position queries call through the correct service-owned
+            // clearing state rather than the gateway's own divergent ClearingManager instance.
+            gateway_handles.federation_service = Some(federation_service.clone());
             info!("✓ Federation service wired to governance executor");
 
             // Spawn the operational clearing settlement scheduler.
