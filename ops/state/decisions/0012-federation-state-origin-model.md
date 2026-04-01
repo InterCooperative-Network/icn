@@ -346,11 +346,16 @@ This is a long-term path, not a current requirement.
 | 1a. `list/get_cooperative`, `get_vouches_for`, `CooperativeView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ✅ Done (2026-03-31) |
 | 1b. `list/get_agreement`, `ClearingAgreementView` DTO | None | Low | `icn-kernel-api` + `icn-core` + `icn-gateway` | ✅ Done (2026-04-01) |
 | 2. Add origin labeling to response DTOs | Steps 1a+1b | Medium | Cross-crate | ✅ Done (2026-04-01) |
-| 3. Implement CCL adoption contract | Step 2 + CCL work | High | `icn-ccl`, `icn-governance` | ⏳ Future |
+| 3a. Terms propagation fix + source reference fields | Steps 1-2 + store-isolation tests | Low | `icn-kernel-api` + `icn-core` | ⏳ Designed (ADR 0013) |
+| 3b. Adoption provenance persistence (Sled) | Step 3a | Low | `icn-core` | ⏳ Designed (ADR 0013) |
+| 3c. `source_agreement_id` in ClearingAgreementView | Step 3b | Low | `icn-kernel-api` + `icn-gateway` | ⏳ Designed (ADR 0013) |
+| 3d. Adoption proposal endpoint | Steps 3a-3c + governance plumbing | High | `icn-gateway` + governance | ⏳ Future (ADR 0013) |
 
 Step 2 is the origin labeling pass — adds `origin: "governance" | "direct-management"` to view DTOs and gateway fallback paths. See Phase 4d below.
 
-Step 3 is full lifecycle unification (future work).
+Step 3 (ADR 0013) is the adoption contract / lifecycle unification. Steps 3a-3c are
+independently implementable (terms fix + reference fields). Step 3d (adoption proposal
+endpoint) requires governance plumbing and is the final piece. See ADR 0013 for full design.
 
 ---
 
