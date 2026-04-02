@@ -26,6 +26,7 @@ use crate::api::devices::{
     ApiListDevicesResponse, ApiRegisterDeviceRequest, ApiRegisterDeviceResponse,
     ApiRevokeDeviceRequest,
 };
+use crate::api::federation::{ProposeAdoptionRequest, ProposeAdoptionResponse};
 use crate::api::governance_dashboard::{
     ActivityEvent, AmendmentsBreakdown, AppealsBreakdown, GovernanceDashboard,
 };
@@ -47,6 +48,7 @@ use crate::notification_store::{InAppNotification, Platform};
 /// OpenAPI documentation for ICN Gateway
 #[derive(OpenApi)]
 #[openapi(
+    paths(crate::api::federation::propose_clearing_adoption),
     info(
         title = "ICN Gateway API",
         version = "0.1.0",
@@ -113,6 +115,8 @@ use crate::notification_store::{InAppNotification, Platform};
             // Notifications
             NotifRegisterDeviceRequest, RegisterDeviceResponse,
             ListNotificationsResponse, NotificationCountResponse, MarkReadResponse,
+            // Federation
+            ProposeAdoptionRequest, ProposeAdoptionResponse,
             // Shared types
             DeviceInfo, Platform, InAppNotification,
         )

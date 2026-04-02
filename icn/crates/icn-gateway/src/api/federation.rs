@@ -85,6 +85,13 @@ pub struct ProposeAdoptionRequest {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+pub struct ProposeAdoptionResponse {
+    pub status: String,
+    pub proposal_id: String,
+    pub source_agreement_id: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
 pub struct FederationStatusResponse {
     pub initialized: bool,
     pub own_coop_id: Option<String>,
@@ -661,6 +668,22 @@ pub async fn create_agreement(
 /// Returns 404 if the agreement is not found in the direct-management registry (the
 /// governance-backed store is authoritative for already-adopted agreements and is not searched
 /// here — you cannot propose to adopt what is already adopted).
+#[utoipa::path(
+    post,
+    path = "/federation/clearing/{id}/propose-adoption",
+    tag = "Federation",
+    params(
+        ("id" = String, Path, description = "Direct-management clearing agreement ID to propose for adoption")
+    ),
+    request_body = ProposeAdoptionRequest,
+    responses(
+        (status = 201, description = "Adoption proposal created", body = ProposeAdoptionResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Source agreement not found in direct-management registry"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
 #[post("/clearing/{id}/propose-adoption")]
 pub async fn propose_clearing_adoption(
     http_req: HttpRequest,
@@ -726,11 +749,11 @@ pub async fn propose_clearing_adoption(
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
-    Ok(HttpResponse::Created().json(serde_json::json!({
-        "status": "proposed",
-        "proposal_id": proposal_id.0,
-        "source_agreement_id": agreement_id,
-    })))
+    Ok(HttpResponse::Created().json(ProposeAdoptionResponse {
+        status: "proposed".to_string(),
+        proposal_id: proposal_id.0,
+        source_agreement_id: agreement_id,
+    }))
 }
 
 /// GET /federation/clearing/{agreement_id}/position - Get current inter-party clearing position
