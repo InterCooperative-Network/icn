@@ -15,9 +15,6 @@ use icn_federation::{
     BilateralClearingAgreement, CooperativeInfo, FederatedTrustAttestation, FederationPolicy,
     SettlementInterval, SettlementReport, TrustContext, Vouch,
 };
-use icn_governance::{
-    FederationProposal, GovernanceDomainId, ProposalId, ProposalPayload, ProposalScope,
-};
 use icn_identity::Did;
 use icn_kernel_api::{
     ClearingAgreementView, ClearingPositionView, CooperativeView, FederationService,
@@ -711,47 +708,24 @@ pub async fn propose_clearing_adoption(
         .parse()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid proposer DID in token: {e}")))?;
 
-    // Build the proposal payload from the source agreement's terms.
-    // source_agreement_id carries provenance so the governance record can be
-    // linked back to its direct-management origin (ADR 0013 Model B).
-    let payload = ProposalPayload::Federation(FederationProposal::EstablishClearing {
-        partner_coop_id: agreement.coop_b.clone(),
-        partner_coop_did: agreement.coop_b_did.clone(),
-        max_imbalance: agreement.max_imbalance,
-        settlement_interval: agreement.settlement_interval,
-        currency: {
-            // Extract the primary currency from exchange_rates keys (format "from:to")
-            // or fall back to "HOURS" as the cooperative default.
-            agreement
-                .exchange_rates
-                .keys()
-                .next()
-                .and_then(|k| k.split(':').next())
-                .unwrap_or("HOURS")
-                .to_string()
-        },
-        source_agreement_id: Some(agreement_id.clone()),
-    });
-
-    let suggested_id = ProposalId(format!("prop-adoption-{}", uuid::Uuid::new_v4()));
-    let domain_id = GovernanceDomainId(req.domain_id.clone());
-
+    // Delegate payload construction and proposal creation to the governance app layer.
+    // icn_governance types are constructed inside GovernanceManager::propose_clearing_adoption,
+    // keeping the meaning firewall boundary intact (no icn_governance imports in gateway).
     let proposal_id = governance_manager
-        .create_proposal(
-            suggested_id,
-            domain_id,
+        .propose_clearing_adoption(
+            &req.domain_id,
             proposer,
             req.title.clone(),
             req.description.clone(),
-            payload,
-            ProposalScope::Local,
+            &agreement,
+            agreement_id.clone(),
         )
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     Ok(HttpResponse::Created().json(ProposeAdoptionResponse {
         status: "proposed".to_string(),
-        proposal_id: proposal_id.0,
+        proposal_id,
         source_agreement_id: agreement_id,
     }))
 }
@@ -1925,9 +1899,6 @@ mod tests {
         use crate::governance_mgr::GovernanceManager;
         use actix_web::HttpMessage;
         use icn_federation::{CooperativeInfo, FederationPolicy};
-        use icn_governance::{
-            GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource,
-        };
         use icn_identity::KeyPair;
 
         let member_kp = KeyPair::generate().unwrap();
@@ -1950,22 +1921,9 @@ mod tests {
 
         let gov_mgr = Arc::new(GovernanceManager::new());
 
-        // Seed the governance domain so create_proposal doesn't fail.
-        let domain_id = GovernanceDomainId("gov-domain-1".to_string());
+        // Seed the governance domain so propose_clearing_adoption doesn't fail.
         gov_mgr
-            .create_domain(
-                domain_id,
-                "Test Domain".to_string(),
-                "default".to_string(),
-                GovernanceParams {
-                    quorum_percentage: 1,
-                    approval_threshold_percentage: 51,
-                    ..GovernanceParams::default()
-                },
-                MembershipConfig {
-                    source: MembershipSource::StaticList(vec![member_did.clone()]),
-                },
-            )
+            .create_domain_simple("gov-domain-1", "Test Domain", vec![member_did.clone()])
             .await
             .expect("domain creation must succeed");
 

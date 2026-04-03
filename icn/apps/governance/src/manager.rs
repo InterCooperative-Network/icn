@@ -8,6 +8,7 @@
 
 use crate::receipt_backend::GovernanceReceiptBackend;
 use anyhow::Result;
+use icn_federation::BilateralClearingAgreement;
 use icn_governance::{
     scopes_overlap, ActionItem, ActionItemFilter, ActionItemId, ActionItemPriority,
     ActionItemStatus, ActionItemStoreBackend, Comment, CommentId, Delegation, DelegationId,
@@ -537,6 +538,81 @@ impl GovernanceManager {
 
         proposals.insert(proposal_id.clone(), proposal);
         Ok(proposal_id)
+    }
+
+    /// Convenience wrapper for the `POST /federation/clearing/{id}/propose-adoption` flow.
+    ///
+    /// Constructs a `ProposalPayload::Federation(FederationProposal::EstablishClearing)`
+    /// from the source agreement's fields, keeping icn_governance type construction
+    /// inside the app layer (meaning firewall boundary).
+    ///
+    /// Returns the created proposal ID as a plain `String`.
+    pub async fn propose_clearing_adoption(
+        &self,
+        domain_id_str: &str,
+        proposer: Did,
+        title: String,
+        description: String,
+        agreement: &BilateralClearingAgreement,
+        source_agreement_id: String,
+    ) -> Result<String> {
+        let currency = agreement
+            .exchange_rates
+            .keys()
+            .next()
+            .and_then(|k| k.split(':').next())
+            .unwrap_or("HOURS")
+            .to_string();
+
+        let payload =
+            ProposalPayload::Federation(icn_governance::FederationProposal::EstablishClearing {
+                partner_coop_id: agreement.coop_b.clone(),
+                partner_coop_did: agreement.coop_b_did.clone(),
+                max_imbalance: agreement.max_imbalance,
+                settlement_interval: agreement.settlement_interval,
+                currency,
+                source_agreement_id: Some(source_agreement_id.clone()),
+            });
+
+        let proposal_id_str = format!("prop-adoption-{}", uuid::Uuid::new_v4());
+        let proposed_id = ProposalId(proposal_id_str);
+        let domain_id = GovernanceDomainId(domain_id_str.to_string());
+
+        let created_id = self
+            .create_proposal(
+                proposed_id,
+                domain_id,
+                proposer,
+                title,
+                description,
+                payload,
+                ProposalScope::Local,
+            )
+            .await?;
+        Ok(created_id.0)
+    }
+
+    /// Convenience wrapper for `create_domain` that accepts primitive types.
+    ///
+    /// Uses `GovernanceParams::default()` and a static-list membership sourced from
+    /// the provided DIDs. Intended for tests and simple integrations that do not
+    /// need fine-grained governance parameter control.
+    pub async fn create_domain_simple(
+        &self,
+        domain_id_str: &str,
+        name: &str,
+        members: Vec<Did>,
+    ) -> Result<()> {
+        self.create_domain(
+            GovernanceDomainId(domain_id_str.to_string()),
+            name.to_string(),
+            "default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(members),
+            },
+        )
+        .await
     }
 
     /// Get a specific proposal
