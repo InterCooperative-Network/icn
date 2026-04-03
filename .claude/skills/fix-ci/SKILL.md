@@ -19,6 +19,16 @@ truth_contract:
 
 Fix CI failures for the current branch. Scope-locked. Output: cause, fix, proof.
 
+## Step 0 — Preflight
+
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash "${REPO_ROOT}/ops/scripts/drift-check.sh" 2>/dev/null | tail -3 || true
+```
+
+If drift-check reports FAIL → note it. Agent tooling drift may itself be causing CI failures
+(e.g., stale required-check set in a skill). Fix drift before fixing CI if related.
+
 ## Scope Rules (non-negotiable)
 
 - **Only touch files changed on this branch** vs its base. Get the list: `git diff --name-only $(git merge-base HEAD origin/main)..HEAD`

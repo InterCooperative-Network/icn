@@ -18,6 +18,16 @@ truth_contract:
 Own the full lifecycle of safely integrating a batch of PRs into `main`. This is not a thin wrapper
 around `gh pr merge`. It is the standard integration pipeline for ICN sprint closes.
 
+## Step 0 — Preflight (run first, always)
+
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash "${REPO_ROOT}/ops/scripts/what-matters-now.sh" 2>/dev/null || true
+```
+
+If `what-matters-now.sh` reports drift errors → **stop and fix drift before proceeding**.
+Drift in agent files means the tooling you're running may itself encode stale policy.
+
 ## The Problem This Solves
 
 The transcript improvised rebase sequencing, rediscovered branch names mid-flight, and had to
@@ -43,15 +53,12 @@ gh api repos/InterCooperative-Network/icn/branches/main/protection \
 
 Then for each PR:
 ```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 gh pr checks <N> --json name,state,conclusion \
   | python3 -c "
 import sys, json
-required = {
-    'Build Release','Test','Clippy','Format Check',
-    'Meaning Firewall Check','Kernel Forbidden Dependencies',
-    'Firewall Contract Enforcement','TypeScript SDK',
-    'Accessibility Tests','Regulatory Compliance Linter'
-}
+# Load required checks from canonical source — never hardcode
+required = set(json.load(open('${REPO_ROOT}/ops/state/truth/policy.json'))['merge']['required_checks'])
 checks = json.load(sys.stdin)
 req = [(c['name'],c['state'],c['conclusion']) for c in checks if c['name'] in required]
 opt = [(c['name'],c['state'],c['conclusion']) for c in checks if c['name'] not in required and c['conclusion']=='failure']

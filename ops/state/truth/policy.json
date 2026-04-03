@@ -14,7 +14,8 @@
       "Firewall Contract Enforcement",
       "TypeScript SDK",
       "Accessibility Tests",
-      "Regulatory Compliance Linter"
+      "Regulatory Compliance Linter",
+      "Agent Tooling Drift Check"
     ],
     "agent_tooling_check": "Agent Tooling Drift Check",
     "agent_tooling_check_note": "Runs on all PRs via .github/workflows/agent-drift-check.yml. Add to GitHub branch protection via: gh api repos/InterCooperative-Network/icn/branches/main/protection to make merge-blocking.",
@@ -58,7 +59,7 @@
     }
   },
   "readiness_definition": [
-    "All 10 required CI checks passed",
+    "All 11 required CI checks passed (includes Agent Tooling Drift Check)",
     "No CHANGES_REQUESTED reviews outstanding",
     "All PR comment threads resolved",
     "Branch is up-to-date with main (strict mode)",

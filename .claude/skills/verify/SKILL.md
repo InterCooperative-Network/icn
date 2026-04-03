@@ -15,6 +15,15 @@ truth_contract:
 
 Run verification checks appropriate to the files changed in the current branch.
 
+## Step 0 — Preflight
+
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash "${REPO_ROOT}/ops/scripts/drift-check.sh" 2>/dev/null | tail -3 || true
+```
+
+If drift-check reports FAIL → note it before running verification checks.
+
 ## Steps
 
 1. Determine what changed by running `git diff --name-only origin/main...HEAD` (or `git diff --name-only HEAD` for uncommitted changes)

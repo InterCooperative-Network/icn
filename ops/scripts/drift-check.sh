@@ -16,8 +16,8 @@ VERBOSE="${1:-}"
 ERRORS=0
 WARNINGS=0
 
-fail() { echo "FAIL: $*" >&2; ((ERRORS++)); }
-warn() { echo "WARN: $*" >&2; ((WARNINGS++)); }
+fail() { echo "FAIL: $*" >&2; ERRORS=$((ERRORS + 1)); }
+warn() { echo "WARN: $*" >&2; WARNINGS=$((WARNINGS + 1)); }
 ok()   { [[ "${VERBOSE}" == "--verbose" ]] && echo "OK:   $*" || true; }
 
 # ─── Check 1: Canonical truth files must exist ──────────────────────────────
@@ -43,7 +43,16 @@ done
 
 PROJECT_SKILLS="${REPO_ROOT}/../.claude/skills"
 CANONICAL_SKILLS="${REPO_ROOT}/ops/automation/skills"
+ICN_SKILLS="${REPO_ROOT}/.claude/skills"
+
+# ops/automation/skills canonical skills — must be symlinked from project-level
 SYMLINK_SKILLS=("status" "sync-and-build" "worktree")
+
+# icn-level canonical skills that also exist in project-level — must be symlinks there
+declare -A ICN_SYMLINK_SKILLS
+ICN_SYMLINK_SKILLS["fix-ci"]="${ICN_SKILLS}/fix-ci"
+ICN_SYMLINK_SKILLS["icn-preflight"]="${ICN_SKILLS}/icn-preflight"
+ICN_SYMLINK_SKILLS["merge-prs"]="${ICN_SKILLS}/merge-prs"
 
 for skill in "${SYMLINK_SKILLS[@]}"; do
   link="${PROJECT_SKILLS}/${skill}"
@@ -57,9 +66,28 @@ for skill in "${SYMLINK_SKILLS[@]}"; do
       fail "Symlink wrong target: .claude/skills/${skill} → ${resolved} (expected ${canonical})"
     fi
   elif [[ -d "${link}" ]]; then
-    fail "Skill is plain directory, not symlink (drift risk): .claude/skills/${skill} — run: bash ops/scripts/setup-skill-symlinks.sh"
+    fail "Skill is plain directory, not symlink (duplicate writable source): .claude/skills/${skill} — fix: rm -rf ${link} && ln -s ${canonical} ${link}"
   else
-    warn "Skill symlink missing (run setup-skill-symlinks.sh): .claude/skills/${skill}"
+    fail "Skill symlink missing: .claude/skills/${skill} — fix: ln -s ${canonical} ${link}"
+  fi
+done
+
+# Check icn-level skill symlinks at project level
+for skill in "${!ICN_SYMLINK_SKILLS[@]}"; do
+  link="${PROJECT_SKILLS}/${skill}"
+  canonical="${ICN_SYMLINK_SKILLS[$skill]}"
+
+  if [[ -L "${link}" ]]; then
+    resolved="$(readlink -f "${link}" 2>/dev/null || echo "BROKEN")"
+    if [[ "${resolved}" == "${canonical}" ]]; then
+      ok "Symlink valid: .claude/skills/${skill} → icn/.claude/skills/${skill}"
+    else
+      fail "Symlink wrong target: .claude/skills/${skill} → ${resolved} (expected ${canonical})"
+    fi
+  elif [[ -d "${link}" ]]; then
+    fail "Duplicate writable skill: .claude/skills/${skill} is a directory (must be symlink to ${canonical}) — fix: rm -rf ${link} && ln -s ${canonical} ${link}"
+  else
+    fail "Skill symlink missing: .claude/skills/${skill} — fix: ln -s ${canonical} ${link}"
   fi
 done
 
@@ -135,52 +163,54 @@ for dir in "${MACHINE_PATH_SCAN[@]}"; do
       done || true)
   if [[ -n "${hits}" ]]; then
     while IFS= read -r line; do
-      warn "Machine-specific path in skill/agent file: ${dir}: ${line}"
+      fail "Machine-specific path in skill/agent file: ${dir}: ${line} — use REPO_ROOT=\$(git rev-parse --show-toplevel) instead"
     done <<< "${hits}"
   else
     ok "No machine-specific paths in ${dir}"
   fi
 done
 
-# ─── Check 4b: Required-check set completeness ────────────────────────────────
+# ─── Check 4b: HARD BAN on hardcoded required-check sets ─────────────────────
 
-# Skills that hardcode a required-check set must include all 10 checks from policy.json.
-# If a file has 'Build Release' in a required set but is missing one of the rarer checks
-# (Meaning Firewall, Kernel Forbidden Dependencies, etc.), it's an incomplete list.
+# NO skill may contain 'required = {' in code sections. Required checks must ALWAYS
+# be loaded from ops/state/truth/policy.json at runtime. This prevents stale-policy bugs.
+#
+# Pattern banned: required = {   (in any SKILL.md, in any executable context)
+# Correct pattern: load from policy.json via python3 or jq
 
-REQUIRED_RARE_CHECKS=(
-  "Meaning Firewall Check"
-  "Kernel Forbidden Dependencies"
-  "Firewall Contract Enforcement"
-  "Accessibility Tests"
-  "Regulatory Compliance Linter"
-)
-
-SKILL_FILES_TO_SCAN=(
+HARDCODE_BAN_DIRS=(
   ".claude/skills"
   ".claude/agents"
   "ops/automation/skills"
 )
 
-for dir in "${SKILL_FILES_TO_SCAN[@]}"; do
+for dir in "${HARDCODE_BAN_DIRS[@]}"; do
   full="${REPO_ROOT}/${dir}"
   if [[ ! -e "${full}" ]]; then continue; fi
 
-  # Find files that hardcode a required-check set (contains 'Build Release')
   while IFS= read -r -d '' f; do
-    if grep -q "'Build Release'" "$f" && grep -q "required\s*=\s*{" "$f"; then
-      # Check that all rare checks are also present
-      missing=""
-      for check in "${REQUIRED_RARE_CHECKS[@]}"; do
-        if ! grep -qF "${check}" "$f"; then
-          missing="${missing} '${check}'"
-        fi
-      done
-      if [[ -n "${missing}" ]]; then
-        fail "Incomplete required-check set in $(basename $(dirname $f))/$(basename $f) — missing:${missing} — load from policy.json instead of hardcoding"
-      else
-        ok "Required-check set complete in $(basename $(dirname $f))/$(basename $f)"
-      fi
+    # Detect hardcoded required-check set assignment in code sections
+    # The pattern 'required = {' or 'required = [' with CI check names is banned
+    # Allow in truth_contract YAML sections only (they document, not execute)
+    # Ban 1: Python dict/set literal with check names
+    banned_lines=$(grep -n "required\s*=\s*{" "$f" 2>/dev/null \
+      | grep -v "truth_contract:\|canonical_sources:\|live_load_required:\|never_hardcode:\|examples_only:" \
+      | grep -v "^[[:space:]]*#" \
+      || true)
+    if [[ -n "${banned_lines}" ]]; then
+      while IFS= read -r bline; do
+        fail "Hardcoded required-check set (required = {) in $(basename $(dirname $f))/$(basename $f): ${bline} — load from policy.json"
+      done <<< "${banned_lines}"
+    fi
+
+    # Ban 2: jq IN() with hardcoded "Build Release" (catches the other form of check set hardcoding)
+    banned_jq=$(grep -n 'IN("Build Release"' "$f" 2>/dev/null \
+      | grep -v "^[[:space:]]*#\|truth_contract:\|examples_only:\|<!-- examples_only" \
+      || true)
+    if [[ -n "${banned_jq}" ]]; then
+      while IFS= read -r bline; do
+        fail "Hardcoded required-check set (jq IN pattern) in $(basename $(dirname $f))/$(basename $f): ${bline} — use dynamic REQUIRED var from policy.json"
+      done <<< "${banned_jq}"
     fi
   done < <(find -L "${full}" -name "*.md" -print0 2>/dev/null)
 done
@@ -199,10 +229,10 @@ except Exception as e:
     print(0)
 " 2>/dev/null || echo "0")
 
-  if [[ "${REQUIRED_CHECK_COUNT}" -ge 10 ]]; then
+  if [[ "${REQUIRED_CHECK_COUNT}" -ge 11 ]]; then
     ok "policy.json has ${REQUIRED_CHECK_COUNT} required checks"
   else
-    fail "policy.json has fewer than 10 required checks (found ${REQUIRED_CHECK_COUNT}) — verify merge policy is complete"
+    fail "policy.json has fewer than 11 required checks (found ${REQUIRED_CHECK_COUNT}) — verify merge policy is complete (must include Agent Tooling Drift Check)"
   fi
 fi
 
@@ -252,50 +282,7 @@ for dir in "${SKILL_TRUTH_DIRS[@]}"; do
   done < <(find -L "${full}" -name "SKILL.md" -print0 2>/dev/null)
 done
 
-# ─── Check 8: No hardcoded required-check NAMES outside truth_contract ────────
-
-# Skills must not hardcode individual check names like 'Build Release' or 'Clippy'
-# outside of a truth_contract block (where they're documented as policy references).
-# Hardcoded check names in executable sections cause stale-policy bugs.
-#
-# Exception: integrate-pr-stack is allowed because it embeds the full canonical 10-check set.
-# Exception: merge-prs/merge-pr allowed because they list all 10 checks for reference.
-# ALL other files: must not embed check names in code blocks.
-
-HARDCODE_EXEMPT_SKILLS=(
-  "integrate-pr-stack"
-  "merge-prs"
-  "merge-pr"
-  "watch-ci-and-advance"  # uses policy.json load pattern now
-)
-
-HARDCODE_SCAN_DIRS=(
-  ".claude/skills"
-  ".claude/agents"
-  "ops/automation/skills"
-)
-
-for dir in "${HARDCODE_SCAN_DIRS[@]}"; do
-  full="${REPO_ROOT}/${dir}"
-  if [[ ! -e "${full}" ]]; then continue; fi
-
-  while IFS= read -r -d '' f; do
-    skill_name=$(basename $(dirname "$f"))
-    # Skip exempted skills
-    exempt=0
-    for ex in "${HARDCODE_EXEMPT_SKILLS[@]}"; do
-      [[ "${skill_name}" == "${ex}" ]] && exempt=1 && break
-    done
-    [[ "${exempt}" -eq 1 ]] && continue
-
-    # Look for hardcoded check names in non-truth_contract contexts
-    # These are check names that appear in python set literals or similar
-    # (truth_contract blocks use them as documentation, not as code)
-    if grep -q "'Build Release'" "$f" && ! grep -q "truth_contract\|examples_only\|never_hardcode" "$f"; then
-      fail "Hardcoded required-check name 'Build Release' in ${dir}/$(basename $(dirname $f))/$(basename $f) — load from policy.json"
-    fi
-  done < <(find -L "${full}" -name "*.md" -print0 2>/dev/null)
-done
+# (Check 8 merged into Check 4b — hardcoded check sets now caught by the required = { ban)
 
 # ─── Summary ──────────────────────────────────────────────────────────────────
 

@@ -24,6 +24,17 @@ merge ordering, post-merge rebases, local verification, and main sync.
 For single quick merges when you already know the state is clean, this still works. For sprint
 batch closes, use `/integrate-pr-stack` instead (same logic, more verbose output).
 
+## Step 0 — Preflight (run first, always)
+
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash "${REPO_ROOT}/ops/scripts/what-matters-now.sh" 2>/dev/null || true
+```
+
+If `what-matters-now.sh` reports drift errors → **stop and fix drift before merging**.
+Drift in agent files (stale paths, missing truth_contracts, hardcoded check sets) means
+the tooling you're running may itself be unreliable.
+
 ## Steps
 
 1. **Resolve PRs to merge**:
@@ -37,15 +48,12 @@ batch closes, use `/integrate-pr-stack` instead (same logic, more verbose output
      --jq '{pr:.number, head:.headRefName, base:.baseRefName, mergeable:.mergeable, state:.mergeStateStatus}'
    ```
 
-3. **Classify check state** (required gates only):
+3. **Classify check state** (required gates only — load from policy.json, never hardcode):
    ```bash
+   REPO_ROOT="$(git rev-parse --show-toplevel)"
+   REQUIRED=$(python3 -c "import json; p=json.load(open('${REPO_ROOT}/ops/state/truth/policy.json')); print(','.join('\"'+c+'\"' for c in p['merge']['required_checks']))")
    gh pr view <N> --json statusCheckRollup \
-     --jq '.statusCheckRollup[] | select(.name | IN(
-       "Build Release","Test","Clippy","Format Check",
-       "Meaning Firewall Check","Kernel Forbidden Dependencies",
-       "Firewall Contract Enforcement","TypeScript SDK",
-       "Accessibility Tests","Regulatory Compliance Linter"
-     )) | {name:.name, result:.conclusion}' 2>/dev/null
+     --jq ".statusCheckRollup[] | select(.name | IN(${REQUIRED})) | {name:.name, result:.conclusion}" 2>/dev/null
    ```
 
    - `UNSTABLE` mergeStateStatus + all required conclusions `SUCCESS` → treat as GREEN, safe to merge
@@ -92,14 +100,10 @@ batch closes, use `/integrate-pr-stack` instead (same logic, more verbose output
 - **Always resolve head branch from GitHub.** Never use plan-doc branch names directly.
 - **After each merge, rebase remaining branches.** Verify locally before force-push.
 
-## Required checks (all 10 — verified via branch protection API)
+## Required checks reference (illustrative — canonical source is policy.json)
 
-`Build Release`, `Test`, `Clippy`, `Format Check`, `Meaning Firewall Check`,
-`Kernel Forbidden Dependencies`, `Firewall Contract Enforcement`, `TypeScript SDK`,
-`Accessibility Tests`, `Regulatory Compliance Linter`
+<!-- examples_only: this list is a snapshot. Always read ops/state/truth/policy.json for authoritative list. -->
 
-**Non-blocking** (never block on these): `claude-review`, `Compare Against Base`,
-`Test Coverage`, `Benchmarks`, `Backup Validation`, `Security Audit`, `Web UI`,
-`Save Benchmark Baseline`, `Pilot Provenance Invariant`, `Check API Types Drift`
+Verify live: `gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'`
 
-Verify anytime: `gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'`
+Or read canonical: `python3 -c "import json; print(json.load(open('$(git rev-parse --show-toplevel)/ops/state/truth/policy.json'))['merge']['required_checks'])"`
