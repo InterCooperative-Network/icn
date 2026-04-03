@@ -20,7 +20,7 @@ jobs:
           # Full history needed for git log --merges fallback in gen-stats.mjs
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
 
