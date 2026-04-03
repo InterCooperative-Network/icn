@@ -1,7 +1,7 @@
 ---
 id: "0013"
 title: "Federation Clearing Adoption Contract — Step 3 Architecture Design"
-status: "proposed"
+status: "accepted"
 date: "2026-04-01"
 context: "federation-clearing-position-api / ADR 0012 Step 3 design pass"
 deciders: ["Matt Faherty"]

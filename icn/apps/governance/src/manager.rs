@@ -559,10 +559,10 @@ impl GovernanceManager {
         let currency = agreement
             .exchange_rates
             .keys()
-            .next()
+            .min()
             .and_then(|k| k.split(':').next())
             .unwrap_or("HOURS")
-            .to_string();
+            .to_ascii_uppercase();
 
         let payload =
             ProposalPayload::Federation(icn_governance::FederationProposal::EstablishClearing {
