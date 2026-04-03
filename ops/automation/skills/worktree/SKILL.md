@@ -2,9 +2,21 @@
 name: worktree
 description: "Manage ICN git worktrees: create, status, cleanup, rebase. Usage: /worktree [status|create <name>|cleanup|rebase <name>]"
 disable-model-invocation: true
+truth_contract:
+  canonical_sources:
+    - ops/state/config/repo-map.json  # worktrees.root
+  live_load_required:
+    - git worktree list
+  examples_only: []
 ---
 
-Manage worktrees in `/home/ubuntu/projects/icn-wt/`. These are full checkouts of the `icn` repo on separate branches.
+Manage ICN git worktrees. Worktrees live at `<REPO_ROOT>/../icn-wt/` (from `repo-map.json#worktrees.root`).
+
+**Always resolve paths dynamically — never assume an absolute path:**
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+WORKTREE_ROOT="${REPO_ROOT}/../icn-wt"
+```
 
 Parse the argument to determine the subcommand. If no argument or unrecognized, default to `status`.
 
@@ -23,21 +35,23 @@ If MCP is available, format output as:
 Worktrees (N)
 | Name                   | Branch       | Behind Main | Claimed By        |
 |------------------------|-------------|-------------|-------------------|
-| 1084-names-gateway-a   | feat/1084   | 2           | Agent1 (naming)   |
 | main                   | main        | current     | —                 |
-| 1120-auth-semantics-b  | feat/1120   | 15  ⚠️      | —                 |
+| 1234-feature-name      | feat/1234   | 2           | —                 |
+| 1120-example           | feat/1120   | 15  ⚠️      | —                 |
 ```
 
 Flag ⚠️ if behind main > 10 commits.
 
 If MCP unavailable, fall back to:
 ```bash
-ls /home/ubuntu/projects/icn-wt/
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+WORKTREE_ROOT="${REPO_ROOT}/../icn-wt"
+ls "${WORKTREE_ROOT}/" 2>/dev/null || echo "no worktrees"
 ```
 Then for each directory:
 ```bash
-git -C /home/ubuntu/projects/icn-wt/<name>/icn rev-parse --abbrev-ref HEAD 2>/dev/null
-git -C /home/ubuntu/projects/icn-wt/<name>/icn log -1 --format="%cr: %s" 2>/dev/null
+git -C "${WORKTREE_ROOT}/<name>/icn" rev-parse --abbrev-ref HEAD 2>/dev/null
+git -C "${WORKTREE_ROOT}/<name>/icn" log -1 --format="%cr: %s" 2>/dev/null
 ```
 
 ---
@@ -47,19 +61,22 @@ git -C /home/ubuntu/projects/icn-wt/<name>/icn log -1 --format="%cr: %s" 2>/dev/
 Creates a new worktree and branch for feature work.
 
 ```bash
-git -C /home/ubuntu/projects/icn worktree add \
-  /home/ubuntu/projects/icn-wt/<name>/icn \
-  -b feat/<name>
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+WORKTREE_ROOT="${REPO_ROOT}/../icn-wt"
+git -C "${REPO_ROOT}" worktree add "${WORKTREE_ROOT}/<name>/icn" -b feat/<name>
 ```
 
 On success, report:
 ```
-Created worktree: /home/ubuntu/projects/icn-wt/<name>/icn
+Created worktree: <WORKTREE_ROOT>/<name>/icn
 Branch: feat/<name>
-To start working: cd /home/ubuntu/projects/icn-wt/<name>/icn
+To start working: cd <WORKTREE_ROOT>/<name>/icn
 ```
 
-On failure (e.g. branch exists), show the git error and suggest: `git -C /home/ubuntu/projects/icn worktree list` to see existing worktrees.
+On failure (e.g. branch exists), show the git error and suggest:
+```bash
+git -C "${REPO_ROOT}" worktree list
+```
 
 ---
 
@@ -69,30 +86,31 @@ Remove stale worktrees that are no longer needed.
 
 **Step 1**: Check what's stale
 ```bash
-git -C /home/ubuntu/projects/icn worktree list
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+git -C "${REPO_ROOT}" worktree list
 ```
 
-**Step 2**: For each worktree, check if its branch is merged into main:
+**Step 2**: Check merged branches (note: squash-merged branches won't appear here — check PR state via `gh`):
 ```bash
-git -C /home/ubuntu/projects/icn branch --merged origin/main | grep feat/
+git -C "${REPO_ROOT}" branch --merged origin/main | grep feat/
 ```
 
-**Step 3**: For each merged branch that has a worktree, ask for confirmation before removing:
+**Step 3**: For each merged branch with a worktree, confirm before removing:
 "Remove worktree `<name>` (branch `feat/<name>` is merged to main)? [y/N]"
 
 If confirmed:
 ```bash
-git -C /home/ubuntu/projects/icn worktree remove /home/ubuntu/projects/icn-wt/<name>/icn
+git -C "${REPO_ROOT}" worktree remove "${WORKTREE_ROOT}/<name>/icn"
 ```
 
-**Step 4**: Prune stale worktree references:
+**Step 4**: Prune stale references:
 ```bash
-git -C /home/ubuntu/projects/icn worktree prune
+git -C "${REPO_ROOT}" worktree prune
 ```
 
 Report: N worktrees removed, N pruned.
 
-**Safety**: Never remove a worktree that has uncommitted changes or that is claimed by an active session (check MCP `list_sessions` first if available).
+**Safety**: Never remove a worktree with uncommitted changes or claimed by an active session (check MCP `list_sessions` first if available).
 
 ---
 
@@ -101,8 +119,10 @@ Report: N worktrees removed, N pruned.
 Rebase a worktree's branch onto latest origin/main.
 
 ```bash
-git -C /home/ubuntu/projects/icn-wt/<name>/icn fetch origin
-git -C /home/ubuntu/projects/icn-wt/<name>/icn rebase origin/main
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+WORKTREE_ROOT="${REPO_ROOT}/../icn-wt"
+git -C "${WORKTREE_ROOT}/<name>/icn" fetch origin
+git -C "${WORKTREE_ROOT}/<name>/icn" rebase origin/main
 ```
 
 Report:
@@ -111,6 +131,6 @@ Report:
 
 If the worktree has uncommitted changes, warn and stop:
 ```bash
-git -C /home/ubuntu/projects/icn-wt/<name>/icn status --porcelain
+git -C "${WORKTREE_ROOT}/<name>/icn" status --porcelain
 ```
 "⚠️ Worktree has uncommitted changes — stash or commit before rebasing."

@@ -1,0 +1,77 @@
+{
+  "schema": "icn-policy/v1",
+  "description": "Canonical merge, CI, and branch policy for the ICN monorepo. Agents must not hardcode these values — read this file.",
+  "merge": {
+    "default_strategy": "squash",
+    "exception": "Subtree merge commits (git subtree add --squash) must use --merge. State reason explicitly.",
+    "required_checks": [
+      "Build Release",
+      "Test",
+      "Clippy",
+      "Format Check",
+      "Meaning Firewall Check",
+      "Kernel Forbidden Dependencies",
+      "Firewall Contract Enforcement",
+      "TypeScript SDK",
+      "Accessibility Tests",
+      "Regulatory Compliance Linter"
+    ],
+    "non_blocking_checks": [
+      "claude-review",
+      "Compare Against Base",
+      "Test Coverage",
+      "Benchmarks",
+      "Backup Validation",
+      "Security Audit",
+      "Web UI",
+      "Save Benchmark Baseline",
+      "Pilot Provenance Invariant",
+      "Check API Types Drift"
+    ],
+    "unstable_is_mergeable": true,
+    "admin_bypass": {
+      "allowed": true,
+      "condition": "Required checks are green AND mergeStateStatus=MERGEABLE but runner is queue-stalled (pending >30min with 0s duration)",
+      "never_for": "Bypassing genuinely failing required checks"
+    },
+    "auto_merge": {
+      "command": "gh pr merge <N> --auto --squash",
+      "use_when": "Required checks are still pending (not failed)"
+    },
+    "verify_required_checks": "gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'"
+  },
+  "branch": {
+    "primary": "main",
+    "protected": true,
+    "no_direct_push": true,
+    "strict_up_to_date": true,
+    "required_approvals": 0,
+    "enforce_admins": false,
+    "naming": {
+      "feature": "feat/<slug>",
+      "bugfix": "fix/<slug>",
+      "refactor": "refactor/<slug>",
+      "docs": "docs/<slug>",
+      "chore": "chore/<slug>"
+    }
+  },
+  "readiness_definition": [
+    "All 10 required CI checks passed",
+    "No CHANGES_REQUESTED reviews outstanding",
+    "All PR comment threads resolved",
+    "Branch is up-to-date with main (strict mode)",
+    "mergeStateStatus is MERGEABLE or UNSTABLE (UNSTABLE = non-blocking checks only)"
+  ],
+  "workspace": {
+    "rust_commands_run_from": "icn/icn/",
+    "monorepo_root": "icn/",
+    "note": "Never run cargo from the monorepo root — Cargo.toml is in icn/icn/"
+  },
+  "validation_ladder": [
+    "cargo fmt --all -- --check",
+    "cargo check --workspace",
+    "cargo clippy --workspace --all-targets -- -D warnings",
+    "cargo test -p <touched-crates>",
+    "cargo test --workspace (for broad/integration changes)"
+  ]
+}

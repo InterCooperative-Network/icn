@@ -23,7 +23,9 @@ the operational layer that observes, coordinates, and automates.
 | `state/decisions/` | Architecture Decision Records (ADRs) — numbered, use `template.md` |
 | `state/sprint/` | Sprint plans: `current.json` is the active sprint |
 | `state/config/` | `repo-map.json` (repo locations/relationships), `conventions.md` |
+| `state/truth/` | **Canonical truth spine** — sources.json, policy.json, agents.json, skills.json |
 | `docs/plans/` | Design documents (dated: `YYYY-MM-DD-<topic>-design.md`) |
+| `scripts/` | Operational scripts — `what-matters-now.sh`, `drift-check.sh`, `setup-skill-symlinks.sh` |
 
 ## MCP Server Commands
 
@@ -61,6 +63,28 @@ Format: `NNNN-kebab-case-title.md`
 - Website content or Astro components → `website/`
 - K8s deployment manifests → `deploy/k8s/`
 - Homelab infrastructure mutations → external `homelab-inventory` repo
+
+## Anti-Drift Truth Architecture
+
+The `state/truth/` directory is the canonical truth spine. It owns the authoritative answer for:
+
+| Question | Canonical Source |
+|----------|----------------|
+| What is the repo layout? | `state/config/repo-map.json` |
+| What are the required CI checks? | `state/truth/policy.json` |
+| What agents exist and what do they route to? | `state/truth/agents.json` |
+| What skills exist and where are they canonical? | `state/truth/skills.json` |
+| What is the current sprint? | `state/sprint/current.json` |
+| What is the canonical source for fact X? | `state/truth/sources.json` |
+
+**Critical rules:**
+- Never hardcode sprint numbers, PR numbers, branch names, or blockers in skills or agents.
+- Never hardcode cluster IPs in agent files — read from `repo-map.json#infrastructure`.
+- `ops/automation/skills/` is the canonical source for shared operational skills.
+- `.claude/skills/{status,sync-and-build,worktree}` must be symlinks to `ops/automation/skills/` — run `bash ops/scripts/setup-skill-symlinks.sh` to create/verify.
+- Run `bash ops/scripts/what-matters-now.sh` at session start for live truth synthesis.
+- Run `bash ops/scripts/drift-check.sh` to detect drift before committing changes to agent files.
+- The `Agent Drift Check` CI workflow enforces these rules automatically on every push.
 
 ## Monorepo Layout
 

@@ -12,7 +12,8 @@ Run the ICN website build pipeline. Execute each step and report results.
 ## Step 1: Check what changed in icn/docs/
 
 ```bash
-git -C /home/ubuntu/projects/icn log --oneline -5 -- docs/
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+git -C "${REPO_ROOT}" log --oneline -5 -- docs/
 ```
 
 Report: last 5 commits that touched docs/ (or "no recent doc changes" if empty).
@@ -20,7 +21,7 @@ Report: last 5 commits that touched docs/ (or "no recent doc changes" if empty).
 ## Step 2: Install dependencies (if needed)
 
 ```bash
-cd /home/ubuntu/projects/icn/website && npm ci 2>&1 | tail -5
+cd "${REPO_ROOT}/website" && npm ci 2>&1 | tail -5
 ```
 
 Skip if `node_modules/` already exists and no `package.json` changes.
@@ -28,7 +29,7 @@ Skip if `node_modules/` already exists and no `package.json` changes.
 ## Step 3: Build the website
 
 ```bash
-cd /home/ubuntu/projects/icn/website && npm run build 2>&1
+cd "${REPO_ROOT}/website" && npm run build 2>&1
 ```
 
 Report:
@@ -40,7 +41,7 @@ If build fails, stop here and report the error. Do not proceed to step 4.
 ## Step 4: Check for broken internal links (informational)
 
 ```bash
-grep -r 'href="/' /home/ubuntu/projects/icn/website/src --include="*.astro" -l 2>/dev/null | head -10
+grep -r 'href="/' "${REPO_ROOT}/website/src" --include="*.astro" -l 2>/dev/null | head -10
 ```
 
 Report: list of pages with absolute hrefs (informational only, not blocking).

@@ -39,7 +39,7 @@ Every ICN request passes through three questions:
 
 ```bash
 # Sprint state
-cat /home/ubuntu/projects/icn/ops/state/sprint/current.json
+cat "$(git rev-parse --show-toplevel)/ops/state/sprint/current.json"
 
 # Open PRs
 gh pr list --repo InterCooperative-Network/icn --json number,title,headRefName,mergeable

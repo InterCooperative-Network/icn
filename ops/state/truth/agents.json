@@ -1,0 +1,105 @@
+{
+  "schema": "icn-agents/v1",
+  "description": "Registry of all available specialist agents. Routing table for orchestrator and icn-dev skill. Edit here — do not maintain separate lists in prompt files.",
+  "agents": [
+    {
+      "name": "icn-architect",
+      "path": ".claude/agents/icn-architect.md",
+      "color": "purple",
+      "routing_triggers": ["crate boundary", "cross-crate refactor", "public API", "kernel/app separation", "ADR", "protocol shape", "concurrency", "architecture"],
+      "not_for": ["economics/ledger (use icn-economist)", "deployment/ops (use icn-ops)"]
+    },
+    {
+      "name": "icn-code-reviewer",
+      "path": ".claude/agents/icn-code-reviewer.md",
+      "routing_triggers": ["PR review", "diff review", "staged changes", "invariant check"],
+      "not_for": []
+    },
+    {
+      "name": "icn-economics-advisor",
+      "path": ".claude/agents/icn-economics-advisor.md",
+      "routing_triggers": ["icn-ledger", "apps/ledger", "commons credit", "JournalEntry", "settlement flow", "EarningTracker", "credit ceiling", "commons earn", "commons spend"],
+      "not_for": []
+    },
+    {
+      "name": "icn-economist",
+      "path": ".claude/agents/icn-economist.md",
+      "color": "green",
+      "routing_triggers": ["ledger logic", "CCL contracts", "mutual credit", "treasury", "mana", "settlement", "regulatory terminology", "payment->settlement renaming"],
+      "not_for": ["protocol architecture (use icn-architect)", "deployment (use icn-ops)"]
+    },
+    {
+      "name": "icn-gossip-net",
+      "path": ".claude/agents/icn-gossip-net.md",
+      "routing_triggers": ["icn-gossip", "icn-net", "icn-protocol", "gossip", "anti-entropy", "QUIC", "TLS", "mDNS", "SignedEnvelope", "topic subscription"],
+      "not_for": []
+    },
+    {
+      "name": "icn-governance-advisor",
+      "path": ".claude/agents/icn-governance-advisor.md",
+      "routing_triggers": ["icn-governance", "icn-ccl", "icn-community", "icn-coop", "icn-entity", "apps/governance", "proposal", "voting", "CCL semantics", "civic engine", "cooperative constitution"],
+      "not_for": []
+    },
+    {
+      "name": "icn-identity-iam-advisor",
+      "path": ".claude/agents/icn-identity-iam-advisor.md",
+      "routing_triggers": ["icn-identity", "icn-naming", "DID", "keystore", "key rotation", "capability token", "DID-TLS", "bearer token", "IAM"],
+      "not_for": []
+    },
+    {
+      "name": "icn-invariants-guardian",
+      "path": ".claude/agents/icn-invariants-guardian.md",
+      "routing_triggers": ["invariant check", "safety review", "pre-merge review", "adversarial-by-default", "determinism", "canonical encodings"],
+      "not_for": []
+    },
+    {
+      "name": "icn-mobile-advisor",
+      "path": ".claude/agents/icn-mobile-advisor.md",
+      "routing_triggers": ["sdk/react-native", "mobile", "React Native", "CoopWallet", "five-tab navigation", "mobile SDK", "offline-first", "mobile identity"],
+      "not_for": []
+    },
+    {
+      "name": "icn-ops",
+      "path": ".claude/agents/icn-ops.md",
+      "color": "orange",
+      "routing_triggers": ["K3s", "cluster", "demo flow", "CI/CD health", "pod", "release readiness", "pre-deployment", "ops/mcp", "disk space", "icn-dev VM"],
+      "not_for": ["protocol design (use icn-architect)", "economics (use icn-economist)"]
+    },
+    {
+      "name": "icn-planner",
+      "path": ".claude/agents/icn-planner.md",
+      "routing_triggers": ["planning", "task breakdown", "dependency analysis", "merge ordering", "sprint planning"],
+      "not_for": ["implementation (plans only)"]
+    },
+    {
+      "name": "icn-rust-core",
+      "path": ".claude/agents/icn-rust-core.md",
+      "routing_triggers": ["Rust implementation", "crate change", "daemon", "kernel interface", "actor runtime", "storage", "encoding", "protocol implementation"],
+      "not_for": []
+    },
+    {
+      "name": "icn-security-reviewer",
+      "path": ".claude/agents/icn-security-reviewer.md",
+      "routing_triggers": ["cryptography", "authentication", "key handling", "replay attack", "JWT", "signed envelope", "rate limiting", "security review"],
+      "not_for": []
+    },
+    {
+      "name": "icn-test-generator",
+      "path": ".claude/agents/icn-test-generator.md",
+      "routing_triggers": ["icn-testkit", "write tests", "integration test", "multi-node", "property-based test", "TestNode", "convergence test"],
+      "not_for": []
+    },
+    {
+      "name": "icn-trust-federation-advisor",
+      "path": ".claude/agents/icn-trust-federation-advisor.md",
+      "routing_triggers": ["icn-trust", "icn-federation", "TrustPolicyOracle", "trust score", "trust-gated", "federation treaty", "cross-coop", "bottleneck algorithm"],
+      "not_for": []
+    }
+  ],
+  "orchestrator": {
+    "name": "orchestrator",
+    "path": "../../../.claude/agents/orchestrator.md",
+    "note": "Lives at project-level .claude/agents/. Cross-repo coordinator.",
+    "routing_triggers": ["cross-repo task", "birds-eye view", "unfamiliar area", "multiple repos"]
+  }
+}

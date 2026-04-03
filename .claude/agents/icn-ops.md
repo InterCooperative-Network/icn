@@ -47,7 +47,7 @@ You are a specialist in ICN's deployment infrastructure, K3s cluster state, demo
 
 Read current flow status before acting:
 ```bash
-cat /home/ubuntu/projects/icn/ops/state/sprint/current.json
+cat "$(git rev-parse --show-toplevel)/ops/state/sprint/current.json"
 gh run list --repo InterCooperative-Network/icn --branch main --limit 3
 ```
 

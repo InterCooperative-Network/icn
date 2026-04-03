@@ -13,7 +13,7 @@ If empty, skip this section. Otherwise show each session as:
 
 **2. Sprint state** — read the sprint file:
 ```bash
-cat /home/ubuntu/projects/icn/ops/state/sprint/current.json
+cat "$(git rev-parse --show-toplevel)/ops/state/sprint/current.json"
 ```
 (Canonical copy is `icn/ops/` — the standalone `icn-ops/` repo is stale.)
 Show: sprint number + name, goals, task counts by status (pending/in-progress/in-review/done).

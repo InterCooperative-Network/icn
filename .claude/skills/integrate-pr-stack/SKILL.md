@@ -4,6 +4,15 @@ description: Full sprint-batch or stacked-PR integration pipeline. Owns merge or
 argument-hint: "[PR numbers...] [--admin] [--dry-run]"
 user-invocable: true
 allowed-tools: "Bash, Read"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # required checks, merge strategy
+  live_load_required:
+    - "gh pr list --json number,title,headRefName,baseRefName,mergeable,mergeStateStatus"
+    - "gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'"
+  examples_only: []
+  never_hardcode:
+    - PR numbers, branches, or merge order — resolve from GitHub at runtime
 ---
 
 Own the full lifecycle of safely integrating a batch of PRs into `main`. This is not a thin wrapper

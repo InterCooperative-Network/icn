@@ -4,6 +4,13 @@ description: Run the correct verification commands for files changed in the curr
 argument-hint: "[crate-name or --all]"
 user-invocable: true
 allowed-tools: "Bash, Read, Grep, Glob"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # validation_ladder
+    - ops/state/config/repo-map.json    # workspace root (rust commands run from icn/icn/)
+  live_load_required:
+    - "git diff --name-only origin/main...HEAD"
+  examples_only: []
 ---
 
 Run verification checks appropriate to the files changed in the current branch.

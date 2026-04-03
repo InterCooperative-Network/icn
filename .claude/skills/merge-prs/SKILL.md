@@ -4,6 +4,18 @@ description: Merge one or more PRs with full stack-integration pipeline. Resolve
 argument-hint: "[PR numbers...] [--admin] [--dry-run]"
 user-invocable: true
 allowed-tools: "Bash"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # merge strategy, required checks, admin bypass rules
+    - ops/state/truth/sources.json      # truth ownership map
+  live_load_required:
+    - "gh pr view <N> --json number,headRefName,baseRefName,mergeable,mergeStateStatus"
+    - "gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'"
+  examples_only: []
+  never_hardcode:
+    - PR numbers or branch names
+    - required check lists (query live or read policy.json)
+    - sprint state
 ---
 
 Stack-integration merge pipeline. Not a thin `gh pr merge` wrapper. Owns branch resolution,
