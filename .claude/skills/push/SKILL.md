@@ -4,6 +4,18 @@ description: Resolve targets, run scoped local gates, then push. The only sancti
 argument-hint: "[--skip-test] [--force-with-lease]"
 user-invocable: true
 allowed-tools: "Bash"
+truth_contract:
+  canonical_sources:
+    - ops/state/config/repo-map.json    # workspace root (cargo commands run from icn/)
+    - ops/state/truth/policy.json       # validation_ladder, required gate sequence
+  live_load_required:
+    - "git branch --show-current"
+    - "git diff --name-only $(git merge-base HEAD origin/main)..HEAD"
+    - "cargo metadata --no-deps --format-version 1"   # package name resolution
+  examples_only: []
+  never_hardcode:
+    - package names (always resolve via cargo metadata)
+    - branch name
 ---
 
 Gated push with scoped verification. Resolves affected packages first, runs the minimum sufficient

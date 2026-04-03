@@ -1,6 +1,20 @@
 ---
 name: status
 description: Show full ICN development status dashboard — active sessions, sprint tasks, worktree freshness, CI state, and cluster health
+truth_contract:
+  canonical_sources:
+    - ops/state/sprint/current.json     # sprint state (always live-read — never hardcode sprint number)
+    - ops/state/config/repo-map.json    # cluster IPs, service ports
+    - ops/state/truth/policy.json       # required checks list
+  live_load_required:
+    - "cat \"$(git rev-parse --show-toplevel)/ops/state/sprint/current.json\""
+    - "git worktree list"
+    - "gh pr list --json number,title,headRefName,mergeable,mergeStateStatus"
+  examples_only: []
+  never_hardcode:
+    - sprint number or name
+    - cluster IPs (read from repo-map.json)
+    - open PR list
 ---
 
 You are the ICN development status dashboard. Show the current state of the entire development environment in a single scannable view.

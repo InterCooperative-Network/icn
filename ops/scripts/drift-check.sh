@@ -105,28 +105,84 @@ for dir in "${SCAN_DIRS[@]}"; do
   done
 done
 
-# ─── Check 4: Machine-specific absolute paths in agent configs ───────────────
+# ─── Check 4: Machine-specific absolute paths in agent/skill files ───────────
 
 # .mcp.json is exempted (intentionally machine-tied).
-# Agent/skill files must not contain /home/ubuntu or similar machine paths.
+# Agent and skill files must not contain /home/ubuntu or similar machine paths
+# in executable code blocks — only in examples clearly marked as illustrative.
 
-AGENT_FILES=(
+MACHINE_PATH_SCAN=(
+  ".claude/agents"
+  ".claude/skills"
+  "ops/automation/skills"
+)
+
+for dir in "${MACHINE_PATH_SCAN[@]}"; do
+  full="${REPO_ROOT}/${dir}"
+  if [[ ! -e "${full}" ]]; then continue; fi
+
+  # Follow symlinks so we scan the canonical files, not just symlink metadata
+  hits=$(find -L "${full}" -name "*.md" -exec grep -ln "/home/ubuntu" {} \; 2>/dev/null \
+    | while read -r f; do
+        # Allow paths in Markdown table rows (lines starting with |)
+        # Allow paths after ubuntu@ (SSH targets - legitimate)
+        # Allow lines marked as examples/illustrative
+        grep -n "/home/ubuntu" "$f" \
+          | grep -v "ubuntu@" \
+          | grep -Pv "^[^:]*:[[:space:]]*\|" \
+          | grep -v "# example\|# machine\|# illustrative\|# topology\|examples_only" \
+          && true || true
+      done || true)
+  if [[ -n "${hits}" ]]; then
+    while IFS= read -r line; do
+      warn "Machine-specific path in skill/agent file: ${dir}: ${line}"
+    done <<< "${hits}"
+  else
+    ok "No machine-specific paths in ${dir}"
+  fi
+done
+
+# ─── Check 4b: Required-check set completeness ────────────────────────────────
+
+# Skills that hardcode a required-check set must include all 10 checks from policy.json.
+# If a file has 'Build Release' in a required set but is missing one of the rarer checks
+# (Meaning Firewall, Kernel Forbidden Dependencies, etc.), it's an incomplete list.
+
+REQUIRED_RARE_CHECKS=(
+  "Meaning Firewall Check"
+  "Kernel Forbidden Dependencies"
+  "Firewall Contract Enforcement"
+  "Accessibility Tests"
+  "Regulatory Compliance Linter"
+)
+
+SKILL_FILES_TO_SCAN=(
+  ".claude/skills"
   ".claude/agents"
   "ops/automation/skills"
 )
 
-for dir in "${AGENT_FILES[@]}"; do
+for dir in "${SKILL_FILES_TO_SCAN[@]}"; do
   full="${REPO_ROOT}/${dir}"
   if [[ ! -e "${full}" ]]; then continue; fi
 
-  # Exemptions: examples in icn-preflight skill (it explicitly shows paths)
-  hits=$(grep -rn "/home/ubuntu" "${full}" 2>/dev/null | grep -v ".pyc" | grep -v "Binary" \
-    | grep -v "# example\|# machine\|10\.8\.\|ubuntu@" || true)
-  if [[ -n "${hits}" ]]; then
-    while IFS= read -r line; do
-      warn "Machine-specific path in agent file: ${line}"
-    done <<< "${hits}"
-  fi
+  # Find files that hardcode a required-check set (contains 'Build Release')
+  while IFS= read -r -d '' f; do
+    if grep -q "'Build Release'" "$f" && grep -q "required\s*=\s*{" "$f"; then
+      # Check that all rare checks are also present
+      missing=""
+      for check in "${REQUIRED_RARE_CHECKS[@]}"; do
+        if ! grep -qF "${check}" "$f"; then
+          missing="${missing} '${check}'"
+        fi
+      done
+      if [[ -n "${missing}" ]]; then
+        warn "Incomplete required-check set in $(basename $(dirname $f))/$(basename $f) — missing:${missing} — use policy.json instead of hardcoding"
+      else
+        ok "Required-check set complete in $(basename $(dirname $f))/$(basename $f)"
+      fi
+    fi
+  done < <(find -L "${full}" -name "*.md" -print0 2>/dev/null)
 done
 
 # ─── Check 5: Required CI policy fields present in policy.json ───────────────
