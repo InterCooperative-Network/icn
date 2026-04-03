@@ -35,31 +35,22 @@ Every ICN request passes through three questions:
 
 ## Project State (load on every ICN session)
 
-### Current Sprint: Sprint 26 -- Pilot Genesis
+**Always read live state — never trust hardcoded snapshots in this file.**
 
-**Cluster:** 3/3 nodes Ready, K3s v1.34.4+k3s1, ~21-day uptime (as of Mar 21)
+```bash
+# Sprint state
+cat /home/ubuntu/projects/icn/ops/state/sprint/current.json
 
-**Demo Flows:**
-- Flow 1A (Governance): OPERATIONAL
-- Flow 1B (Governance + Provenance): BLOCKED (signing key not configured)
-- Flow 2 (Patronage): OPERATIONAL
-- Flow 3 (Federation): STRUCTURALLY BLOCKED (P2P address bug, PR #1381 needed)
-- Flow 4 (Reporting): BLOCKED (depends on Flow 3)
+# Open PRs
+gh pr list --repo InterCooperative-Network/icn --json number,title,headRefName,mergeable
 
-**Phase 1 Compliance Sprint (urgent before grant applications):**
-- Rename: `payment` -> `settlement`, `currency` -> `unit`, `balance` -> `position`
-- Make `JournalEntry.provenance` required
-- Add `Obligation` type with lifecycle states
-- Extract commons credit formula to CCL
-- CI linter for regulatory terminology
+# Recent CI
+gh run list --repo InterCooperative-Network/icn --branch main --limit 3 --json status,conclusion,name
+```
 
-**Critical blockers:**
-- PR #1381 (service discovery persistence) — needs review/merge
-- ExecutionReceiptGate signing key — not configured in K3s secrets
-- ops/mcp: 4 modified + 10 untracked files uncommitted on icn-dev
-- Villain CI broken since Mar 8 (separate project, same Zentith infra)
-
-**Target:** v1.0.0 tag when vertical slice integration test passes (~Apr 15)
+**Cluster endpoints** (post Feb-2026 VLAN 30 migration):
+- Control: `10.8.30.40`, Workers: `10.8.30.41`, `10.8.30.42`, Dev VM: `10.8.30.45`
+- Gateway: `10.8.30.40:30080`, Pilot UI: `10.8.30.40:30030`, Metrics: `10.8.30.40:30090`
 
 ## Convention Enforcement
 
@@ -83,12 +74,17 @@ icn-ledger, icn-ccl, icn-compute, icn-gateway, icn-governance, icn-federation, i
 
 ## Reference Files
 
-Load these when needed:
-- Crate detail: `~/.claude_launchpad/projects/icn/icn-crate-reference.md`
-- Current state: `~/.claude_launchpad/projects/icn/icn-state-2026-03-21.md`
-- Forward plan: `~/.claude_launchpad/projects/icn/icn-forward-plan.md`
-- Ecosystem map: `~/.claude_launchpad/projects/icn/icn-ecosystem-map.md`
-- Demo flows: `~/.claude_launchpad/projects/icn/SPRINT-DEMO-READY.md`
+**In-repo sources (authoritative):**
+- Sprint state: `icn/ops/state/sprint/current.json`
+- ADRs: `icn/ops/state/decisions/`
+- Architecture: `icn/docs/ARCHITECTURE.md`
+- Current state: `icn/docs/STATE.md`
+- Planning: `icn/docs/planning/` and `icn/docs/strategy/`
+
+**Launchpad docs** (on Zentith / Launchpad HQ — not on this dev VM):
+- `~/.claude_launchpad/projects/icn/icn-crate-reference.md`
+- `~/.claude_launchpad/projects/icn/icn-forward-plan.md`
+- Only accessible if SSH'd to Zentith (10.8.10.100) or running locally there.
 
 ## Commands
 
@@ -99,7 +95,7 @@ Load these when needed:
 
 ## Operating Rules
 
-1. **State before action.** Read the current state doc before making architectural recommendations. The project is at Sprint 19, not at the beginning.
+1. **State before action.** Read `ops/state/sprint/current.json` before making architectural recommendations. The project is deep into Sprint 26+ — do not reason from first principles about what's been built.
 2. **Regulatory framing is not optional.** The Sovereign Tech Fund grant and cooperative framing depend on clean terminology. Flag violations in code review even when they seem cosmetic.
 3. **The economists and architects don't talk to each other by default.** When a change spans economics AND protocol shape (e.g. changing how the ledger Merkle-DAG is structured), explicitly involve both icn-architect and icn-economist.
 4. **ops/mcp dirty state blocks session continuity.** If icn-dev has uncommitted ops/mcp changes, recommend committing before doing other work. The event bus and decision log aren't trustworthy with dirty state.

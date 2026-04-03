@@ -27,26 +27,26 @@ batch closes, use `/integrate-pr-stack` instead (same logic, more verbose output
 
 3. **Classify check state** (required gates only):
    ```bash
-   gh pr checks <N> --json name,state,conclusion \
-     | python3 -c "
-   import sys, json
-   required = {'Build Release','Test','Clippy','Format Check'}
-   checks = json.load(sys.stdin)
-   req_states = {c['name']:c['conclusion'] or c['state'] for c in checks if c['name'] in required}
-   all_pass = all(v in ('SUCCESS','success') for v in req_states.values())
-   print('required:', req_states, '→', 'GREEN' if all_pass else 'NOT READY')
-   " 2>/dev/null || echo "checks unavailable"
+   gh pr view <N> --json statusCheckRollup \
+     --jq '.statusCheckRollup[] | select(.name | IN(
+       "Build Release","Test","Clippy","Format Check",
+       "Meaning Firewall Check","Kernel Forbidden Dependencies",
+       "Firewall Contract Enforcement","TypeScript SDK",
+       "Accessibility Tests","Regulatory Compliance Linter"
+     )) | {name:.name, result:.conclusion}' 2>/dev/null
    ```
 
-   - `UNSTABLE` + required all pass → treat as GREEN, safe to merge
-   - `MERGEABLE` + required pending → use `--auto` or wait
+   - `UNSTABLE` mergeStateStatus + all required conclusions `SUCCESS` → treat as GREEN, safe to merge
+   - Any required conclusion empty/pending → use `--auto` or wait
+   - `claude-review`, `Compare Against Base`, `Test Coverage` failures → **never block**, ignore
 
-4. **Merge** (in order provided; smallest/safest first for batch):
+4. **Merge** (in order provided; smallest/safest first for batch). This repo uses **squash merge**:
    ```bash
-   gh pr merge <N> --merge              # green required checks
-   gh pr merge <N> --merge --admin      # if $ARGUMENTS includes --admin (queue-stalled)
-   gh pr merge <N> --auto --merge       # pending required checks
+   gh pr merge <N> --squash             # green required checks (default)
+   gh pr merge <N> --squash --admin     # if $ARGUMENTS includes --admin (queue-stalled)
+   gh pr merge <N> --auto --squash      # pending required checks
    ```
+   Exception: subtree merge commits require `--merge` — note the reason explicitly.
 
 5. **After each merge**:
    ```bash
@@ -80,8 +80,14 @@ batch closes, use `/integrate-pr-stack` instead (same logic, more verbose output
 - **Always resolve head branch from GitHub.** Never use plan-doc branch names directly.
 - **After each merge, rebase remaining branches.** Verify locally before force-push.
 
-## Required checks (from branch protection)
+## Required checks (all 10 — verified via branch protection API)
 
-`Build Release`, `Test`, `Clippy`, `Format Check`
+`Build Release`, `Test`, `Clippy`, `Format Check`, `Meaning Firewall Check`,
+`Kernel Forbidden Dependencies`, `Firewall Contract Enforcement`, `TypeScript SDK`,
+`Accessibility Tests`, `Regulatory Compliance Linter`
 
-Non-blocking (don't block merge): `Test Coverage`, `Compare Against Base`, `Benchmarks`, `claude-review`
+**Non-blocking** (never block on these): `claude-review`, `Compare Against Base`,
+`Test Coverage`, `Benchmarks`, `Backup Validation`, `Security Audit`, `Web UI`,
+`Save Benchmark Baseline`, `Pilot Provenance Invariant`, `Check API Types Drift`
+
+Verify anytime: `gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'`

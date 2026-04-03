@@ -37,7 +37,12 @@ Then for each PR:
 gh pr checks <N> --json name,state,conclusion \
   | python3 -c "
 import sys, json
-required = {'Build Release','Test','Clippy','Format Check'}
+required = {
+    'Build Release','Test','Clippy','Format Check',
+    'Meaning Firewall Check','Kernel Forbidden Dependencies',
+    'Firewall Contract Enforcement','TypeScript SDK',
+    'Accessibility Tests','Regulatory Compliance Linter'
+}
 checks = json.load(sys.stdin)
 req = [(c['name'],c['state'],c['conclusion']) for c in checks if c['name'] in required]
 opt = [(c['name'],c['state'],c['conclusion']) for c in checks if c['name'] not in required and c['conclusion']=='failure']
@@ -76,10 +81,10 @@ Stop if `mergeable != MERGEABLE`.
 **b. Merge**
 ```bash
 # Green required checks → direct merge
-gh pr merge <N> --merge          # or --merge --admin if $ARGUMENTS includes --admin
+gh pr merge <N> --squash          # or --squash --admin if $ARGUMENTS includes --admin
 
 # Pending required checks → auto-merge (prefer --auto over waiting in a loop)
-gh pr merge <N> --auto --merge
+gh pr merge <N> --auto --squash
 ```
 
 **c. Pull main**

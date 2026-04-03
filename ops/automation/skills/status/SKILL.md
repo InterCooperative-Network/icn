@@ -13,12 +13,13 @@ If empty, skip this section. Otherwise show each session as:
 
 **2. Sprint state** — read the sprint file:
 ```bash
-cat /home/ubuntu/projects/icn-ops/state/sprint/current.json
+cat /home/ubuntu/projects/icn/ops/state/sprint/current.json
 ```
+(Canonical copy is `icn/ops/` — the standalone `icn-ops/` repo is stale.)
 Show: sprint number + name, goals, task counts by status (pending/in-progress/in-review/done).
 
 **3. Repository status** — call MCP tool `repo_status`
-Show branch, dirty/clean, ahead/behind for icn, icn-website, icn-ops.
+Show branch, dirty/clean, ahead/behind for icn and homelab-inventory.
 
 **4. Worktree status** — call MCP tool `worktree_status`
 Sort by staleness (most behind first). Flag stale (>10 commits behind) with ⚠️.
@@ -39,28 +40,23 @@ Use this structure with ✅ ⏳ ❌ ⚠️ symbols:
 ```
 **Active Sessions** (N)
   Agent1 → icn:1084-names-gateway-a — implementing naming service
-  Agent2 → icn-website — updating docs
+  Agent2 → icn:website — updating docs
 
-**Sprint 7 — Naming & Pilot Hardening**
-  Goals: [1] Land names API, [2] Pilot vertical slice, [3] icn-ops
-  Tasks: 2 done · 1 in-review · 3 pending
+**Sprint 26 — (theme from current.json)**
+  Tasks: 2 done · 1 in-progress · 3 pending
 
 **Repos**
-  icn          feat/sprint7-naming-1083  ✅ clean  (0↑ 0↓)
-  icn-website  main                      ✅ clean
-  icn-ops      main                      ✅ clean
+  icn   main  ✅ clean  (0↑ 0↓)
 
-**Worktrees** (4)
-  1084-names-gateway-a   feat/1084  ✅  2 behind main
+**Worktrees** (2)
   main                   main       ✅  current
-  1120-auth-semantics-b  feat/1120  ⚠️  15 behind main
-  1051-timestamp-resp-c  feat/1051  ⚠️  18 behind main
+  1234-example-feature   feat/1234  ⚠️  12 behind main
 
-**CI** (icn · feat/sprint7-naming-1083)
+**CI** (icn · main)
   ✅ ci · 3 min ago
   ✅ ci · 2 hrs ago
 
-**Cluster** 10.8.10.40
+**Cluster** 10.8.30.40
   ✅ 3/3 pods healthy · gateway ✅ · pilot-ui ✅ · metrics ✅
 
 **Build Cache** sccache hit rate: 74%

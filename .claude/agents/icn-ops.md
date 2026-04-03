@@ -43,7 +43,15 @@ You are a specialist in ICN's deployment infrastructure, K3s cluster state, demo
 - `icn_kubectl` — kubectl against the cluster
 - `icn_icn_status` — quick nodes + pods + disk summary
 
-## Demo Flows (current state as of Sprint 19)
+## Demo Flows (check live state — do not trust this snapshot)
+
+Read current flow status before acting:
+```bash
+cat /home/ubuntu/projects/icn/ops/state/sprint/current.json
+gh run list --repo InterCooperative-Network/icn --branch main --limit 3
+```
+
+**Flow reference (may be stale — verify before demo):**
 
 Four flows for the Pilot Genesis demo:
 
