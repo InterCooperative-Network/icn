@@ -16,6 +16,8 @@
       "Accessibility Tests",
       "Regulatory Compliance Linter"
     ],
+    "agent_tooling_check": "Agent Tooling Drift Check",
+    "agent_tooling_check_note": "Runs on all PRs via .github/workflows/agent-drift-check.yml. Add to GitHub branch protection via: gh api repos/InterCooperative-Network/icn/branches/main/protection to make merge-blocking.",
     "non_blocking_checks": [
       "claude-review",
       "Compare Against Base",
