@@ -15,12 +15,16 @@ The orchestration plane for ICN development. This repo is the "nervous system" t
 
 ## Quick Start
 
-### Start the MCP server (for Claude Code orchestration)
+### Start the MCP server (for Claude Code or Cursor)
 
 ```bash
 cd mcp && npm install && npm run build
-# Claude Code picks it up via the root .claude/settings.json MCP registration
+# Built runtime entrypoint: mcp/dist/index.js
 ```
+
+Claude-side repo MCP registration lives in the root `./.mcp.json`.
+Cursor-side project MCP registration belongs in `./.cursor/mcp.json`.
+See `docs/guides/developer/cursor-mcp-setup.md` for the worktree-local Cursor setup flow.
 
 ### Check current sprint state
 

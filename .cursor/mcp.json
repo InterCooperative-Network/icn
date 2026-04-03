@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "icn-ops": {
+      "command": "node",
+      "args": [
+        "./ops/mcp/dist/index.js"
+      ]
+    }
+  }
+}
