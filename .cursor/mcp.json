@@ -3,11 +3,8 @@
     "icn-ops": {
       "command": "node",
       "args": [
-        "/home/ubuntu/projects/icn-wt/cursor-mcp-setup/ops/mcp/dist/index.js"
-      ],
-      "env": {
-        "ICN_ROOT": "/home/ubuntu/projects/icn-wt/cursor-mcp-setup"
-      }
+        "./ops/mcp/dist/index.js"
+      ]
     }
   }
 }
