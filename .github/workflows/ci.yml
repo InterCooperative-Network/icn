@@ -443,7 +443,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: hashFiles('./icn/lcov.info') != ''
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./icn/lcov.info
           fail_ci_if_error: false
