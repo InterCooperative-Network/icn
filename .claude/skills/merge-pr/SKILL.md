@@ -4,6 +4,16 @@ description: Merge a PR after confirming CI is green. Fast, correct, no ceremony
 argument-hint: "[PR number] [--admin]"
 user-invocable: true
 allowed-tools: "Bash"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # required_checks, merge_strategy, admin_bypass rules
+  live_load_required:
+    - "gh pr view <N> --json mergeable,mergeStateStatus,statusCheckRollup"
+    - "gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'"
+  examples_only: []
+  never_hardcode:
+    - required check list (always query live or read policy.json)
+    - PR number or branch name
 ---
 
 Merge a PR. Fast, correct, no ceremony.

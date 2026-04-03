@@ -4,6 +4,16 @@ description: Check for documentation drift — crate inventory vs workspace, GOL
 argument-hint: "[--fix-index]"
 user-invocable: true
 allowed-tools: "Bash, Read, Grep, Glob"
+truth_contract:
+  canonical_sources:
+    - ops/state/config/repo-map.json    # workspace root
+  live_load_required:
+    - "cargo metadata --no-deps --format-version 1"   # authoritative crate list
+    - "git log --oneline -1 docs/GOLDEN_PROMPT.md 2>/dev/null || echo 'no golden prompt'"
+  examples_only: []
+  never_hardcode:
+    - crate list (always derive from cargo metadata)
+    - doc freshness dates
 ---
 
 Audit documentation drift. Reports problems; does not auto-fix (unless --fix-index).

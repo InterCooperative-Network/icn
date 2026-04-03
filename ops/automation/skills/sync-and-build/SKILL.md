@@ -2,6 +2,16 @@
 name: sync-and-build
 description: Build and verify the ICN website. The website reads docs directly from icn/docs/ — no sync step needed.
 disable-model-invocation: true
+truth_contract:
+  canonical_sources:
+    - ops/state/config/repo-map.json    # workspace root, website path
+  live_load_required:
+    - "git diff --name-only HEAD~1 -- docs/"    # what changed in docs
+    - "cd ${REPO_ROOT}/website && npm run build 2>&1 | tail -5"
+  examples_only: []
+  never_hardcode:
+    - workspace paths (use git rev-parse --show-toplevel)
+    - sync scripts (there are none — website reads docs/ via path.resolve directly)
 ---
 
 Run the ICN website build pipeline. Execute each step and report results.

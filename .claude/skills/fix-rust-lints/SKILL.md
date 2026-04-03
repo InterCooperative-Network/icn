@@ -4,6 +4,16 @@ description: Classify clippy/compiler failures by lint family and apply canonica
 argument-hint: "[lint output | --scan]"
 user-invocable: true
 allowed-tools: "Bash, Read, Edit, Grep"
+truth_contract:
+  canonical_sources:
+    - ops/state/config/repo-map.json    # workspace root (cargo commands from icn/)
+  live_load_required:
+    - "cargo clippy --workspace --all-targets -- -D warnings 2>&1"
+    - "git diff --name-only $(git merge-base HEAD origin/main)..HEAD"
+  examples_only: []
+  never_hardcode:
+    - toolchain version (read from rust-toolchain.toml)
+    - branch name or changed file list (always live-query)
 ---
 
 Turn recurring Rust lint failures into known remediation classes. Never debug clippy from scratch.

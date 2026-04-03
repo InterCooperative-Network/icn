@@ -4,6 +4,16 @@ description: Resolve PR↔branch identity from GitHub. Never trust plan docs or 
 argument-hint: "[PR number | branch name]"
 user-invocable: true
 allowed-tools: "Bash"
+truth_contract:
+  canonical_sources: []
+  live_load_required:
+    - "gh pr view <N> --json number,headRefName,baseRefName,mergeable,mergeStateStatus"
+    - "gh pr list --json number,headRefName,baseRefName"
+  examples_only: []
+  never_hardcode:
+    - branch names (always resolve from GitHub — never trust plan docs or memory)
+    - PR numbers
+    - base branch assumptions
 ---
 
 Resolve PR and branch identity from GitHub as the authoritative source. Use this before any

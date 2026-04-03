@@ -4,6 +4,18 @@ description: Write a session summary to docs/dev-journal/ capturing branch state
 argument-hint: "[--push]"
 user-invocable: true
 allowed-tools: "Bash, Read, Write, Grep"
+truth_contract:
+  canonical_sources:
+    - ops/state/sprint/current.json     # sprint state (read live — never hardcode sprint number)
+  live_load_required:
+    - "git branch --show-current"
+    - "git log --oneline -10"
+    - "gh pr list --json number,title,headRefName --limit 5"
+  examples_only: []
+  never_hardcode:
+    - sprint number
+    - PR numbers or branch names
+    - session date (read from system)
 ---
 
 Write a session handoff note so the next session (or next agent) can resume without context loss.

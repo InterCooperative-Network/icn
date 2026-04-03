@@ -9,6 +9,20 @@ description: >
   "gossip", "K3s", "icn-dev", "ops/mcp", "Sprint", "demo flow", "CCL", "federation",
   "DID", "ledger", "trust graph", "icnd", "icnctl".
 version: 0.1.0
+truth_contract:
+  canonical_sources:
+    - ops/state/sprint/current.json     # sprint number, tasks, goals (ALWAYS live-read)
+    - ops/state/truth/agents.json       # agent routing table
+    - ops/state/config/repo-map.json    # cluster topology, workspace structure
+  live_load_required:
+    - "cat \"$(git rev-parse --show-toplevel)/ops/state/sprint/current.json\""
+    - "git branch --show-current"
+  examples_only: []
+  never_hardcode:
+    - sprint number (always read from current.json)
+    - cluster IPs (read from repo-map.json)
+    - PR numbers or branch names
+    - demo flow status (live-read from sprint/current.json or kubectl)
 ---
 
 # ICN Dev Skill — Routing and Context Layer

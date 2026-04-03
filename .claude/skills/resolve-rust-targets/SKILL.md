@@ -4,6 +4,16 @@ description: Resolve Rust package names and verification scope from cargo metada
 argument-hint: "[file-path | package-name | --touched]"
 user-invocable: true
 allowed-tools: "Bash"
+truth_contract:
+  canonical_sources:
+    - ops/state/config/repo-map.json    # workspace root (cargo commands from icn/)
+  live_load_required:
+    - "cargo metadata --no-deps --format-version 1"
+    - "git diff --name-only $(git merge-base HEAD origin/main)..HEAD"
+  examples_only: []
+  never_hardcode:
+    - package names (always resolve via cargo metadata — human labels ≠ cargo IDs)
+    - changed file list (always live-query from git)
 ---
 
 Use `cargo metadata` as the authoritative source for package names, manifests, and verification scope.

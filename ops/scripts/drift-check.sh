@@ -177,7 +177,7 @@ for dir in "${SKILL_FILES_TO_SCAN[@]}"; do
         fi
       done
       if [[ -n "${missing}" ]]; then
-        warn "Incomplete required-check set in $(basename $(dirname $f))/$(basename $f) — missing:${missing} — use policy.json instead of hardcoding"
+        fail "Incomplete required-check set in $(basename $(dirname $f))/$(basename $f) — missing:${missing} — load from policy.json instead of hardcoding"
       else
         ok "Required-check set complete in $(basename $(dirname $f))/$(basename $f)"
       fi
@@ -222,12 +222,80 @@ print('\n'.join(sorted(names)))
   for agent_file in "${AGENTS_DIR}"/*.md; do
     agent_name=$(basename "${agent_file}" .md)
     if ! echo "${registered}" | grep -qx "${agent_name}"; then
-      warn "Agent not in registry: ${agent_name} (add to ops/state/truth/agents.json)"
+      fail "Agent not in registry: ${agent_name} (add to ops/state/truth/agents.json)"
     else
       ok "Agent registered: ${agent_name}"
     fi
   done
 fi
+
+# ─── Check 7: All SKILL.md files must have truth_contract ────────────────────
+
+# truth_contract is required in every skill — it makes drift detectable.
+# Missing it means the skill can silently encode volatile state.
+
+SKILL_TRUTH_DIRS=(
+  ".claude/skills"
+  "ops/automation/skills"
+)
+
+for dir in "${SKILL_TRUTH_DIRS[@]}"; do
+  full="${REPO_ROOT}/${dir}"
+  if [[ ! -e "${full}" ]]; then continue; fi
+
+  while IFS= read -r -d '' f; do
+    if ! grep -q "^truth_contract:" "$f"; then
+      fail "Missing truth_contract in $(basename $(dirname $f))/$(basename $f)"
+    else
+      ok "truth_contract present: $(basename $(dirname $f))/$(basename $f)"
+    fi
+  done < <(find -L "${full}" -name "SKILL.md" -print0 2>/dev/null)
+done
+
+# ─── Check 8: No hardcoded required-check NAMES outside truth_contract ────────
+
+# Skills must not hardcode individual check names like 'Build Release' or 'Clippy'
+# outside of a truth_contract block (where they're documented as policy references).
+# Hardcoded check names in executable sections cause stale-policy bugs.
+#
+# Exception: integrate-pr-stack is allowed because it embeds the full canonical 10-check set.
+# Exception: merge-prs/merge-pr allowed because they list all 10 checks for reference.
+# ALL other files: must not embed check names in code blocks.
+
+HARDCODE_EXEMPT_SKILLS=(
+  "integrate-pr-stack"
+  "merge-prs"
+  "merge-pr"
+  "watch-ci-and-advance"  # uses policy.json load pattern now
+)
+
+HARDCODE_SCAN_DIRS=(
+  ".claude/skills"
+  ".claude/agents"
+  "ops/automation/skills"
+)
+
+for dir in "${HARDCODE_SCAN_DIRS[@]}"; do
+  full="${REPO_ROOT}/${dir}"
+  if [[ ! -e "${full}" ]]; then continue; fi
+
+  while IFS= read -r -d '' f; do
+    skill_name=$(basename $(dirname "$f"))
+    # Skip exempted skills
+    exempt=0
+    for ex in "${HARDCODE_EXEMPT_SKILLS[@]}"; do
+      [[ "${skill_name}" == "${ex}" ]] && exempt=1 && break
+    done
+    [[ "${exempt}" -eq 1 ]] && continue
+
+    # Look for hardcoded check names in non-truth_contract contexts
+    # These are check names that appear in python set literals or similar
+    # (truth_contract blocks use them as documentation, not as code)
+    if grep -q "'Build Release'" "$f" && ! grep -q "truth_contract\|examples_only\|never_hardcode" "$f"; then
+      fail "Hardcoded required-check name 'Build Release' in ${dir}/$(basename $(dirname $f))/$(basename $f) — load from policy.json"
+    fi
+  done < <(find -L "${full}" -name "*.md" -print0 2>/dev/null)
+done
 
 # ─── Summary ──────────────────────────────────────────────────────────────────
 

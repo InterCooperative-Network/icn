@@ -4,6 +4,17 @@ description: Diagnose and fix GitHub Actions failures with branch protection, to
 argument-hint: "[workflow name | run ID | --main]"
 user-invocable: true
 allowed-tools: "Bash, Read, Edit"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # required checks, merge strategy (source of truth for CI policy)
+  live_load_required:
+    - "gh run view <RUN_ID> --log-failed"
+    - "gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks'"
+    - "gh api repos/InterCooperative-Network/icn/actions/runners --jq '.runners[]'"
+  examples_only: []
+  never_hardcode:
+    - required check list (always live-query branch protection API)
+    - GITHUB_TOKEN capabilities (derive from actual workflow context)
 ---
 
 Diagnose GitHub Actions failures that involve branch protection, token permissions, or workflow design.
