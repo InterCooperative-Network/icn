@@ -9,6 +9,7 @@ use utoipa::ToSchema;
 
 use crate::error::{GatewayError, Result};
 use crate::federation_mgr::FederationManager;
+use crate::governance_mgr::GovernanceManager;
 use crate::middleware::{get_claims, require_scope};
 use icn_federation::{
     BilateralClearingAgreement, CooperativeInfo, FederatedTrustAttestation, FederationPolicy,
@@ -62,6 +63,29 @@ pub struct CreateAgreementRequest {
     pub partner_did: String,
     pub max_imbalance: i64,
     pub settlement: String, // daily, weekly, monthly, manual
+}
+
+/// Request body for `POST /federation/clearing/{id}/propose-adoption`
+///
+/// Proposes that a direct-management bilateral clearing agreement be ratified
+/// through the governance voting path (ADR 0013 Model B).  The agreement's
+/// existing terms are copied verbatim into the proposal; the caller supplies
+/// only the governance context (domain, title, description).
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ProposeAdoptionRequest {
+    /// Governance domain to submit the proposal to.
+    pub domain_id: String,
+    /// Short title for the governance proposal.
+    pub title: String,
+    /// Descriptive body for the governance proposal.
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ProposeAdoptionResponse {
+    pub status: String,
+    pub proposal_id: String,
+    pub source_agreement_id: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -622,6 +646,88 @@ pub async fn create_agreement(
         "status": "created",
         "agreement_id": id
     })))
+}
+
+/// POST /federation/clearing/{id}/propose-adoption
+///
+/// Proposes that an existing direct-management bilateral clearing agreement be adopted through
+/// the governance voting path (ADR 0013 Model B — ratified re-instantiation).
+///
+/// The agreement's existing terms (partner coop, DIDs, max_imbalance, settlement_interval,
+/// currency) are copied verbatim into the `EstablishClearing` governance proposal so that
+/// members vote on the exact terms already in use.  The source agreement ID is carried in
+/// `source_agreement_id` for full provenance.
+///
+/// **This handler does NOT execute the clearing effect directly** and does NOT write to the
+/// governance-backed clearing store.  Execution only happens when/if the proposal passes and
+/// the governance actor dispatches the resulting `FederationEffect::EstablishClearing`.
+///
+/// Returns 404 if the agreement is not found in the direct-management registry (the
+/// governance-backed store is authoritative for already-adopted agreements and is not searched
+/// here — you cannot propose to adopt what is already adopted).
+#[utoipa::path(
+    post,
+    path = "/federation/clearing/{id}/propose-adoption",
+    tag = "Federation",
+    params(
+        ("id" = String, Path, description = "Direct-management clearing agreement ID to propose for adoption")
+    ),
+    request_body = ProposeAdoptionRequest,
+    responses(
+        (status = 201, description = "Adoption proposal created", body = ProposeAdoptionResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Source agreement not found in direct-management registry"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+#[post("/clearing/{id}/propose-adoption")]
+pub async fn propose_clearing_adoption(
+    http_req: HttpRequest,
+    fed_mgr: web::Data<Arc<FederationManager>>,
+    governance_manager: web::Data<Arc<GovernanceManager>>,
+    path: web::Path<String>,
+    req: web::Json<ProposeAdoptionRequest>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "federation:write")?;
+
+    let agreement_id = path.into_inner();
+
+    // Read source agreement from the direct-management registry.
+    // The governance-backed store is intentionally NOT searched here.
+    let agreement = fed_mgr.get_agreement(&agreement_id).await?.ok_or_else(|| {
+        GatewayError::NotFound(format!(
+            "Clearing agreement not found in direct-management registry: {agreement_id}"
+        ))
+    })?;
+
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let proposer: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid proposer DID in token: {e}")))?;
+
+    // Delegate payload construction and proposal creation to the governance app layer.
+    // icn_governance types are constructed inside GovernanceManager::propose_clearing_adoption,
+    // keeping the meaning firewall boundary intact (no icn_governance imports in gateway).
+    let proposal_id = governance_manager
+        .propose_clearing_adoption(
+            &req.domain_id,
+            proposer,
+            req.title.clone(),
+            req.description.clone(),
+            &agreement,
+            agreement_id.clone(),
+        )
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    Ok(HttpResponse::Created().json(ProposeAdoptionResponse {
+        status: "proposed".to_string(),
+        proposal_id,
+        source_agreement_id: agreement_id,
+    }))
 }
 
 /// GET /federation/clearing/{agreement_id}/position - Get current inter-party clearing position
@@ -1718,6 +1824,189 @@ mod tests {
             body["origin"], "governance",
             "service-backed agreement must carry origin = governance"
         );
+    }
+
+    // ── propose-adoption tests (ADR 0013 Step 3d) ─────────────────────────────
+
+    /// Returns 404 when the agreement ID is not in the direct-management registry.
+    ///
+    /// The FederationManager is initialized (so calls reach the agreement lookup)
+    /// but contains no agreements — the handler must distinguish "not found" from
+    /// "not initialized" and return 404.
+    #[actix_web::test]
+    async fn test_propose_adoption_404_for_unknown_agreement() {
+        use crate::governance_mgr::GovernanceManager;
+        use actix_web::HttpMessage;
+        use icn_federation::{CooperativeInfo, FederationPolicy};
+        use icn_identity::KeyPair;
+
+        let kp = KeyPair::generate().unwrap();
+        let own_did = kp.did().clone();
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        // Initialize the registry so get_agreement returns None, not "not initialized" 400.
+        fed_mgr
+            .init_registry(CooperativeInfo::new(
+                "test-coop".to_string(),
+                "Test Coop".to_string(),
+                own_did.clone(),
+                FederationPolicy::default(),
+            ))
+            .await
+            .expect("registry init must succeed");
+
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let no_service: Arc<Option<Arc<dyn FederationService>>> = Arc::new(None);
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(no_service))
+                .service(web::scope("/v1/federation").service(propose_clearing_adoption)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: own_did.to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:write".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::post()
+            .uri("/v1/federation/clearing/does-not-exist/propose-adoption")
+            .set_json(serde_json::json!({
+                "domain_id": "gov-domain-1",
+                "title": "Adopt clearing with farm-coop",
+                "description": "Governance ratification of the direct-management agreement"
+            }))
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(
+            resp.status().as_u16(),
+            404,
+            "Must return 404 for an unknown agreement ID"
+        );
+    }
+
+    /// Happy path: seeded direct-management agreement → proposal created with correct
+    /// provenance (source_agreement_id present, proposal stored, direct-management store unchanged).
+    #[actix_web::test]
+    async fn test_propose_adoption_happy_path_copies_terms_and_sets_provenance() {
+        use crate::governance_mgr::GovernanceManager;
+        use actix_web::HttpMessage;
+        use icn_federation::{CooperativeInfo, FederationPolicy};
+        use icn_identity::KeyPair;
+
+        let member_kp = KeyPair::generate().unwrap();
+        let member_did = member_kp.did().clone();
+
+        let partner_kp = KeyPair::generate().unwrap();
+        let partner_did = partner_kp.did().clone();
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        // Initialize the registry so agreement creation and lookup work.
+        fed_mgr
+            .init_registry(CooperativeInfo::new(
+                "coop-alpha".to_string(),
+                "Coop Alpha".to_string(),
+                member_did.clone(),
+                FederationPolicy::default(),
+            ))
+            .await
+            .expect("registry init must succeed");
+
+        let gov_mgr = Arc::new(GovernanceManager::new());
+
+        // Seed the governance domain so propose_clearing_adoption doesn't fail.
+        gov_mgr
+            .create_domain_simple("gov-domain-1", "Test Domain", vec![member_did.clone()])
+            .await
+            .expect("domain creation must succeed");
+
+        // Seed a direct-management clearing agreement.
+        let own_did = member_did.clone();
+        let mut agreement = BilateralClearingAgreement::new(
+            "agr-dm-001".to_string(),
+            "coop-alpha".to_string(),
+            own_did,
+            "coop-beta".to_string(),
+            partner_did,
+        );
+        agreement.max_imbalance = 25_000;
+        agreement.settlement_interval = SettlementInterval::Monthly;
+        fed_mgr
+            .create_agreement(agreement)
+            .await
+            .expect("agreement creation must succeed");
+
+        // Verify the direct-management store is not empty before the call.
+        let before = fed_mgr.list_agreements().await.expect("list must succeed");
+        assert_eq!(
+            before.len(),
+            1,
+            "should have exactly one agreement pre-adoption"
+        );
+
+        let no_service: Arc<Option<Arc<dyn FederationService>>> = Arc::new(None);
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(no_service))
+                .service(web::scope("/v1/federation").service(propose_clearing_adoption)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: member_did.to_string(),
+            iat: 1_000_000_000,
+            coop_id: "coop-alpha".to_string(),
+            scopes: vec!["federation:write".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::post()
+            .uri("/v1/federation/clearing/agr-dm-001/propose-adoption")
+            .set_json(serde_json::json!({
+                "domain_id": "gov-domain-1",
+                "title": "Adopt clearing with coop-beta",
+                "description": "Ratify the existing direct-management agreement via governance."
+            }))
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(
+            resp.status().as_u16(),
+            201,
+            "Must return 201 Created for a known agreement"
+        );
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["status"], "proposed");
+        assert_eq!(
+            body["source_agreement_id"], "agr-dm-001",
+            "Response must carry back the source agreement ID for provenance"
+        );
+        let proposal_id = body["proposal_id"]
+            .as_str()
+            .expect("proposal_id must be a string");
+        assert!(
+            proposal_id.starts_with("prop-adoption-"),
+            "Proposal ID must use the adoption prefix, got: {proposal_id}"
+        );
+
+        // Direct-management store must be unchanged — adoption does NOT modify the source.
+        let after = fed_mgr.list_agreements().await.expect("list must succeed");
+        assert_eq!(
+            after.len(),
+            1,
+            "Direct-management store must be unchanged after propose-adoption"
+        );
+        assert_eq!(after[0].agreement_id, "agr-dm-001");
     }
 
     /// Verify that empty scopes placed AFTER named scopes don't steal routes.

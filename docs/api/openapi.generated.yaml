@@ -31,7 +31,57 @@ info:
     name: MIT OR Apache-2.0
     url: https://opensource.org/licenses/MIT
   version: 0.1.0
-paths: {}
+paths:
+  /federation/clearing/{id}/propose-adoption:
+    post:
+      tags:
+      - Federation
+      summary: POST /federation/clearing/{id}/propose-adoption
+      description: |-
+        Proposes that an existing direct-management bilateral clearing agreement be adopted through
+        the governance voting path (ADR 0013 Model B — ratified re-instantiation).
+
+        The agreement's existing terms (partner coop, DIDs, max_imbalance, settlement_interval,
+        currency) are copied verbatim into the `EstablishClearing` governance proposal so that
+        members vote on the exact terms already in use.  The source agreement ID is carried in
+        `source_agreement_id` for full provenance.
+
+        **This handler does NOT execute the clearing effect directly** and does NOT write to the
+        governance-backed clearing store.  Execution only happens when/if the proposal passes and
+        the governance actor dispatches the resulting `FederationEffect::EstablishClearing`.
+
+        Returns 404 if the agreement is not found in the direct-management registry (the
+        governance-backed store is authoritative for already-adopted agreements and is not searched
+        here — you cannot propose to adopt what is already adopted).
+      operationId: propose_clearing_adoption
+      parameters:
+      - name: id
+        in: path
+        description: Direct-management clearing agreement ID to propose for adoption
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProposeAdoptionRequest'
+        required: true
+      responses:
+        '201':
+          description: Adoption proposal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposeAdoptionResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Source agreement not found in direct-management registry
+        '500':
+          description: Internal server error
+      security:
+      - bearer_auth: []
 components:
   schemas:
     AccountDeltaResponse:
@@ -1205,6 +1255,42 @@ components:
             enum:
             - federation
       description: Scope for a proposal (local or federation-wide)
+    ProposeAdoptionRequest:
+      type: object
+      description: |-
+        Request body for `POST /federation/clearing/{id}/propose-adoption`
+
+        Proposes that a direct-management bilateral clearing agreement be ratified
+        through the governance voting path (ADR 0013 Model B).  The agreement's
+        existing terms are copied verbatim into the proposal; the caller supplies
+        only the governance context (domain, title, description).
+      required:
+      - domain_id
+      - title
+      - description
+      properties:
+        description:
+          type: string
+          description: Descriptive body for the governance proposal.
+        domain_id:
+          type: string
+          description: Governance domain to submit the proposal to.
+        title:
+          type: string
+          description: Short title for the governance proposal.
+    ProposeAdoptionResponse:
+      type: object
+      required:
+      - status
+      - proposal_id
+      - source_agreement_id
+      properties:
+        proposal_id:
+          type: string
+        source_agreement_id:
+          type: string
+        status:
+          type: string
     RecordTransferRequest:
       type: object
       description: Record a transfer between participants (user-signed obligation exchange)

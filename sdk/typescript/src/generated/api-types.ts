@@ -3,7 +3,42 @@
  * Do not make direct changes to the file.
  */
 
-export type paths = Record<string, never>;
+export interface paths {
+    "/federation/clearing/{id}/propose-adoption": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * POST /federation/clearing/{id}/propose-adoption
+         * @description Proposes that an existing direct-management bilateral clearing agreement be adopted through
+         *     the governance voting path (ADR 0013 Model B — ratified re-instantiation).
+         *
+         *     The agreement's existing terms (partner coop, DIDs, max_imbalance, settlement_interval,
+         *     currency) are copied verbatim into the `EstablishClearing` governance proposal so that
+         *     members vote on the exact terms already in use.  The source agreement ID is carried in
+         *     `source_agreement_id` for full provenance.
+         *
+         *     **This handler does NOT execute the clearing effect directly** and does NOT write to the
+         *     governance-backed clearing store.  Execution only happens when/if the proposal passes and
+         *     the governance actor dispatches the resulting `FederationEffect::EstablishClearing`.
+         *
+         *     Returns 404 if the agreement is not found in the direct-management registry (the
+         *     governance-backed store is authoritative for already-adopted agreements and is not searched
+         *     here — you cannot propose to adopt what is already adopted).
+         */
+        post: operations["propose_clearing_adoption"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
@@ -507,6 +542,27 @@ export interface components {
             /** @enum {string} */
             type: "federation";
         };
+        /**
+         * @description Request body for `POST /federation/clearing/{id}/propose-adoption`
+         *
+         *     Proposes that a direct-management bilateral clearing agreement be ratified
+         *     through the governance voting path (ADR 0013 Model B).  The agreement's
+         *     existing terms are copied verbatim into the proposal; the caller supplies
+         *     only the governance context (domain, title, description).
+         */
+        ProposeAdoptionRequest: {
+            /** @description Descriptive body for the governance proposal. */
+            description: string;
+            /** @description Governance domain to submit the proposal to. */
+            domain_id: string;
+            /** @description Short title for the governance proposal. */
+            title: string;
+        };
+        ProposeAdoptionResponse: {
+            proposal_id: string;
+            source_agreement_id: string;
+            status: string;
+        };
         /** @description Record a transfer between participants (user-signed obligation exchange) */
         RecordTransferRequest: {
             /** Format: int64 */
@@ -737,4 +793,53 @@ export interface components {
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export interface operations {
+    propose_clearing_adoption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Direct-management clearing agreement ID to propose for adoption */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeAdoptionRequest"];
+            };
+        };
+        responses: {
+            /** @description Adoption proposal created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposeAdoptionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Source agreement not found in direct-management registry */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+}
