@@ -10,6 +10,7 @@ description = "Shared API service layer for ICN"
 # ICN crates
 icn-compute = { path = "../icn-compute" }
 icn-identity = { path = "../icn-identity" }
+icn-kernel-api = { path = "../icn-kernel-api" }
 icn-time = { path = "../icn-time" }
 icn-governance = { path = "../icn-governance" }
 icn-ledger = { path = "../icn-ledger" }

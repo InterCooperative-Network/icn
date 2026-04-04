@@ -6,6 +6,7 @@ use icn_compute::{
     ComputeHandle, ComputeTask, DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass,
     ResourceProfile, TaskCode, TaskPriority, TaskStatus,
 };
+use icn_kernel_api::ScopeLevel;
 
 // ============================================================================
 // Validation Constants
@@ -171,7 +172,7 @@ impl ComputeService {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
-            scope: Default::default(),
+            scope: params.scope.unwrap_or_default(),
         };
 
         // Submit the task
@@ -235,6 +236,12 @@ pub struct SubmitTaskParams {
     pub payment_currency: Option<String>,
     pub coop_id: Option<String>,
     pub resource_profile: Option<ResourceProfileParam>,
+    /// Scope level for the task. Defaults to `ScopeLevel::Local` (org-local compute).
+    ///
+    /// Set to `ScopeLevel::Commons` to access shared cooperative commons compute.
+    /// Commons-scoped tasks are subject to credit balance and standing checks in addition
+    /// to the base trust gate. See `icn_compute::ComputeActor::handle_submit`.
+    pub scope: Option<ScopeLevel>,
 }
 
 impl SubmitTaskParams {
@@ -486,6 +493,7 @@ fn convert_task_status(task_id: &TaskId, status: TaskStatus) -> TaskStatusRespon
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     #[test]
     fn test_task_priority_from_str() {
@@ -518,6 +526,7 @@ mod tests {
             payment_currency: None,
             coop_id: None,
             resource_profile: None,
+            scope: None,
         };
 
         // Valid task ID should pass
@@ -548,6 +557,7 @@ mod tests {
             payment_currency: None,
             coop_id: None,
             resource_profile: None,
+            scope: None,
         };
 
         // Valid fuel limit
@@ -578,6 +588,7 @@ mod tests {
             payment_currency: None,
             coop_id: None,
             resource_profile: None,
+            scope: None,
         };
 
         // Valid payment rate
@@ -655,6 +666,7 @@ mod tests {
             payment_currency: None,
             coop_id: None,
             resource_profile: None,
+            scope: None,
         };
 
         // Exactly MIN_FUEL_LIMIT should pass
@@ -705,6 +717,7 @@ mod tests {
             payment_currency: None,
             coop_id: None,
             resource_profile: None,
+            scope: None,
         };
 
         // Currently passes - document this behavior
@@ -738,6 +751,7 @@ mod tests {
             payment_currency: None,
             coop_id: None,
             resource_profile: None,
+            scope: None,
         };
         assert!(params.validate().is_ok());
     }
@@ -787,6 +801,7 @@ mod tests {
             payment_currency: None,
             coop_id: None,
             resource_profile: None,
+            scope: None,
         };
         assert!(params.validate().is_ok());
 
@@ -799,5 +814,78 @@ mod tests {
             ..params
         };
         assert!(bad_hash_params.validate().is_ok()); // validate() is format-agnostic
+    }
+
+    /// Proves that `scope: Some(ScopeLevel::Commons)` in `SubmitTaskParams` is propagated
+    /// through `ComputeService::submit_task()` to the actor, activating the commons credit
+    /// gate and rejecting a zero-balance submitter before execution begins.
+    ///
+    /// Negative path: zero balance → `ComputeError::InsufficientCommonsCredits`.
+    /// Positive path: sufficient balance → task accepted (Ok).
+    ///
+    /// This test is the API-layer counterpart to `test_scheduling_enforces_credits`
+    /// in `icn-compute/tests/commons_integration.rs`, which tests the actor in isolation.
+    /// Together they prove the scope field is wired end-to-end.
+    #[tokio::test]
+    #[allow(clippy::unwrap_used)]
+    async fn test_commons_scope_credit_gate_via_service() {
+        use icn_compute::{BalanceCallback, ComputeActor, TrustCallback};
+        use icn_kernel_api::ScopeLevel;
+
+        fn make_service_with_balance(balance: i64) -> (ComputeService, BalanceCallback) {
+            let trust_cb: TrustCallback = Arc::new(|_| 1.0); // above MIN_TRUST_SUBMIT
+            let balance_cb: BalanceCallback = Arc::new(move |_| balance);
+            let mut actor = ComputeActor::new("did:icn:node".into(), trust_cb);
+            actor.set_balance_callback(balance_cb.clone());
+            let handle = actor.spawn();
+            (ComputeService::new(handle), balance_cb)
+        }
+
+        fn commons_params() -> SubmitTaskParams {
+            SubmitTaskParams {
+                task_id: "test-commons-gate".into(),
+                code: Some(r#"{"name":"t","participants":[],"currency":null,"state_vars":[],"rules":[{"name":"main","params":[],"requires":[],"body":[{"Return":{"value":{"Literal":{"String":"ok"}}}}]}],"triggers":[]}"#.into()),
+                wasm_bytes: None,
+                wasm_hash: None,
+                code_type: CodeTypeParam::Ccl,
+                inputs: serde_json::Value::Null,
+                fuel_limit: 10_000,
+                priority: TaskPriorityParam::Normal,
+                deadline_ms: None,
+                payment_rate: None,
+                payment_currency: None,
+                coop_id: None,
+                resource_profile: None,
+                scope: Some(ScopeLevel::Commons),
+            }
+        }
+
+        let ctx = ApiContext {
+            caller_did: "did:icn:submitter".into(),
+            coop_id: None,
+        };
+
+        // --- Negative path: balance 0 → rejected before execution ---
+        let (svc_broke, _cb) = make_service_with_balance(0);
+        let result = svc_broke.submit_task(&ctx, commons_params()).await;
+        assert!(
+            result.is_err(),
+            "zero-balance commons task must be rejected; got: {result:?}"
+        );
+        let err_str = result.unwrap_err().to_string();
+        assert!(
+            err_str.contains("credit")
+                || err_str.contains("Credit")
+                || err_str.contains("InsufficientCommons"),
+            "error must mention credits, got: {err_str}"
+        );
+
+        // --- Positive path: sufficient balance → accepted ---
+        let (svc_funded, _cb2) = make_service_with_balance(10_000);
+        let result2 = svc_funded.submit_task(&ctx, commons_params()).await;
+        assert!(
+            result2.is_ok(),
+            "funded commons submitter must be accepted; got: {result2:?}"
+        );
     }
 }

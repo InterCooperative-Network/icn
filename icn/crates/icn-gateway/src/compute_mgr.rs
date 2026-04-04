@@ -184,6 +184,7 @@ impl ComputeManager {
                 network_mbps: rp.network_mbps,
                 duration_estimate_secs: rp.duration_estimate_secs,
             }),
+            scope: None, // Gateway defaults to Local; Commons scope not yet exposed in REST API
         };
 
         compute_service

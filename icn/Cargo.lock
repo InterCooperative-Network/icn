@@ -2802,6 +2802,7 @@ dependencies = [
  "icn-compute",
  "icn-governance",
  "icn-identity",
+ "icn-kernel-api",
  "icn-ledger",
  "icn-time",
  "serde",
