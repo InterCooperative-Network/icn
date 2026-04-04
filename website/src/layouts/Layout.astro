@@ -8,7 +8,7 @@ export interface Props {
   activeNav?: string;
 }
 
-const { title, description = 'Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs.', activeNav = '' } = Astro.props;
+const { title, description = 'Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.', activeNav = '' } = Astro.props;
 const currentPath = Astro.url.pathname;
 
 const jsonLd = {
@@ -125,7 +125,7 @@ const jsonLd = {
             </svg>
             <span>InterCooperative Network</span>
           </a>
-          <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p>
+          <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p>
         </div>
 
         <div class="footer-col">
@@ -160,8 +160,8 @@ const jsonLd = {
       </div>
 
       <div class="footer-bottom">
-        <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span>
-        <span>Built with cooperation, not extraction</span>
+        <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span>
+        <span>Open source. Open governance.</span>
       </div>
     </div>
   </footer>
