@@ -118,6 +118,51 @@ pub struct SettlementQueryResult {
     pub scope: Option<String>,
 }
 
+/// Settlement lookup result keyed by receipt hash.
+///
+/// Returned by `SettlementEngine::query_by_receipt_hash()`.
+/// The receipt hash is always the canonical durable audit key.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettlementReceiptResult {
+    /// Hex-encoded receipt hash that was queried.
+    pub receipt_hash: String,
+    /// Task identifier associated with this receipt, if known.
+    ///
+    /// Populated when the settlement was recorded with a `task_id` and a sled store is present.
+    /// `None` if no task_id was provided at settlement time, or if the task_index was not
+    /// persisted (process-local-only mode, no store configured).
+    pub task_id: Option<String>,
+    /// Settlement status: `"settled"` or `"not_found"`.
+    pub status: String,
+    /// Scope of the settled receipt, if determinable.
+    ///
+    /// `"commons"` when the receipt is found in the task_index (only commons settlements
+    /// write to the task_index). `None` when settled but scope is indeterminate (either a
+    /// commons settlement with no task_id, or a non-commons bilateral settlement).
+    pub scope: Option<String>,
+}
+
+impl SettlementReceiptResult {
+    pub fn settled(receipt_hash: [u8; 32], task_id: Option<String>, scope: Option<String>) -> Self {
+        Self {
+            receipt_hash: hex::encode(receipt_hash),
+            task_id,
+            status: "settled".to_string(),
+            scope,
+        }
+    }
+
+    pub fn not_found(receipt_hash: [u8; 32]) -> Self {
+        Self {
+            receipt_hash: hex::encode(receipt_hash),
+            task_id: None,
+            status: "not_found".to_string(),
+            scope: None,
+        }
+    }
+}
+
 impl SettlementQueryResult {
     pub fn settled(task_id: &str, receipt_hash: [u8; 32]) -> Self {
         Self {
@@ -617,6 +662,43 @@ impl SettlementEngine {
             Err(_) => SettlementQueryResult::not_found(task_id),
         }
     }
+
+    /// Query settlement status by receipt hash — the canonical durable audit key.
+    ///
+    /// Returns a `SettlementReceiptResult` indicating whether the receipt has been settled,
+    /// along with any known task_id and scope.
+    ///
+    /// ## Scope detection
+    ///
+    /// Scope is `"commons"` when the receipt is found in the task_index (only
+    /// `settle_commons_receipt()` writes task_index entries). If the receipt is settled but
+    /// absent from the task_index, scope is `None` — this covers commons settlements that
+    /// had no task_id, and bilateral (non-commons) settlements.
+    ///
+    /// ## Restart stability
+    ///
+    /// `is_settled()` is always restart-stable when a sled store is wired.
+    /// The associated task_id is also restart-stable when the store is present and the
+    /// settlement included a task_id (see `query_by_task` for details).
+    pub fn query_by_receipt_hash(&self, receipt_hash: &[u8; 32]) -> SettlementReceiptResult {
+        if !self.is_settled(receipt_hash) {
+            return SettlementReceiptResult::not_found(*receipt_hash);
+        }
+        // Settled — try to find associated task_id via reverse scan of task_index.
+        // O(n) but acceptable: task_index is small and this is an audit/operator path.
+        let (task_id, scope) = match self.task_index.read() {
+            Ok(idx) => {
+                let found = idx
+                    .iter()
+                    .find(|(_, &h)| &h == receipt_hash)
+                    .map(|(id, _)| id.clone());
+                let scope = found.as_ref().map(|_| "commons".to_string());
+                (found, scope)
+            }
+            Err(_) => (None, None),
+        };
+        SettlementReceiptResult::settled(*receipt_hash, task_id, scope)
+    }
 }
 
 #[cfg(test)]
@@ -742,6 +824,75 @@ mod commons_tests {
             assert_eq!(result.receipt_hash, Some(hex::encode(receipt_hash)));
             assert_eq!(result.scope, Some("commons".to_string()));
         }
+    }
+
+    #[test]
+    fn test_query_by_receipt_hash_returns_settled_with_scope_and_task_id() {
+        // Prove: settled commons receipt → query by hash → settled + scope=commons + task_id
+        let engine = SettlementEngine::new();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+        let receipt_hash = [0xC1; 32];
+
+        let req = CommonsSettlementRequest {
+            receipt_hash,
+            contributor: contributor.did().clone(),
+            consumer: consumer.did().clone(),
+            scope: ScopeLevel::Commons,
+            amount: 150,
+            consumer_balance: 1_000,
+            executor_verified: true,
+            task_id: Some("task-receipt-probe".to_string()),
+        };
+        engine.settle_commons_receipt(&req).unwrap();
+
+        let result = engine.query_by_receipt_hash(&receipt_hash);
+        assert_eq!(result.status, "settled");
+        assert_eq!(result.receipt_hash, hex::encode(receipt_hash));
+        assert_eq!(result.scope, Some("commons".to_string()));
+        assert_eq!(result.task_id, Some("task-receipt-probe".to_string()));
+    }
+
+    #[test]
+    fn test_query_by_receipt_hash_returns_not_found_for_unknown() {
+        // Prove: unknown receipt hash → not_found, no scope, no task_id
+        let engine = SettlementEngine::new();
+        let unknown_hash = [0xFF; 32];
+
+        let result = engine.query_by_receipt_hash(&unknown_hash);
+        assert_eq!(result.status, "not_found");
+        assert_eq!(result.receipt_hash, hex::encode(unknown_hash));
+        assert_eq!(result.scope, None);
+        assert_eq!(result.task_id, None);
+    }
+
+    #[test]
+    fn test_query_by_receipt_hash_settled_without_task_id_has_unknown_scope() {
+        // Prove: settled commons receipt with no task_id → settled but scope=None (indeterminate)
+        let engine = SettlementEngine::new();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+        let receipt_hash = [0xC2; 32];
+
+        let req = CommonsSettlementRequest {
+            receipt_hash,
+            contributor: contributor.did().clone(),
+            consumer: consumer.did().clone(),
+            scope: ScopeLevel::Commons,
+            amount: 75,
+            consumer_balance: 500,
+            executor_verified: true,
+            task_id: None, // no task_id — scope becomes indeterminate
+        };
+        engine.settle_commons_receipt(&req).unwrap();
+
+        let result = engine.query_by_receipt_hash(&receipt_hash);
+        assert_eq!(result.status, "settled");
+        assert_eq!(
+            result.scope, None,
+            "scope must be None when no task_id was recorded"
+        );
+        assert_eq!(result.task_id, None);
     }
 
     #[test]

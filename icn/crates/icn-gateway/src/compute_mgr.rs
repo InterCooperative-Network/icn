@@ -80,6 +80,25 @@ impl ComputeManager {
         }
     }
 
+    /// Query settlement status by receipt hash — the canonical durable audit key.
+    ///
+    /// Accepts a 64-character hex string. Returns `None` if the hex is malformed.
+    pub fn query_settlement_by_receipt(
+        &self,
+        receipt_hash_hex: &str,
+    ) -> Option<icn_ledger::SettlementReceiptResult> {
+        let bytes = hex::decode(receipt_hash_hex).ok()?;
+        if bytes.len() != 32 {
+            return None;
+        }
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&bytes);
+        Some(match &self.settlement_engine {
+            Some(engine) => engine.query_by_receipt_hash(&hash),
+            None => icn_ledger::SettlementReceiptResult::not_found(hash),
+        })
+    }
+
     /// Set compute service (for late binding)
     pub fn set_service(&mut self, service: Arc<icn_api::ComputeService>) {
         self.compute_service = Some(service);
