@@ -697,7 +697,7 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
                     submitter_coop: notification.from_entity_id.clone(),
                     cost: notification.amount,
                     currency: notification.currency.clone(),
-                    scope: icn_kernel_api::ScopeLevel::Federation,
+                    scope: notification.scope,
                     created_at: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
