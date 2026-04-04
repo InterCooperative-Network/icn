@@ -105,7 +105,9 @@ pub use progressive_limits::{
     FnCommonsHolderLookup, ProgressiveLimitConfig, ProgressiveLimitManager, VelocityLimitConfig,
 };
 pub use quarantine::QuarantineStore;
-pub use settlement::{CommonsSettlementRequest, SettlementEngine, SettlementRequest};
+pub use settlement::{
+    CommonsSettlementRequest, SettlementEngine, SettlementQueryResult, SettlementRequest,
+};
 pub use sync::{deserialize_sync_message, ledger_topic, serialize_sync_message, LedgerSyncMessage};
 pub use treasury::{
     ApprovalType, BudgetStatus, PaginatedAuditTrail, SpendingRule, Treasury, TreasuryAuditRecord,

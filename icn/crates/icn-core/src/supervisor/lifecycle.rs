@@ -147,6 +147,7 @@ pub async fn run_supervisor(
             commons: commons_handle,
             charter_accepted_hook: gateway_handles.charter_accepted_hook,
             federation_service: gateway_handles.federation_service,
+            settlement_engine: gateway_handles.settlement_engine,
         },
     );
 
@@ -985,6 +986,7 @@ async fn spawn_actors_with_identity(
         background_tasks,
     );
     gateway_handles.compute = Some(rpc_compute_handle);
+    gateway_handles.settlement_engine = Some(compute_services.settlement_engine.clone());
 
     // Extract LedgerService for background tasks (resource enforcer)
     let ledger_service_for_bg: Option<Arc<dyn icn_kernel_api::services::LedgerService>> =

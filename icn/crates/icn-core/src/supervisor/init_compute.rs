@@ -59,6 +59,8 @@ pub struct ComputeServices {
     pub broadcaster: Arc<icn_gateway::EventBroadcaster>,
     /// Policy manager for cooperative scheduling
     pub policy_manager: Arc<icn_compute::PolicyManager>,
+    /// Settlement engine — shared handle for audit queries (task_id → settled status).
+    pub settlement_engine: Arc<icn_ledger::SettlementEngine>,
 }
 
 /// Create the trust callback for compute actor
@@ -189,6 +191,7 @@ pub fn create_commons_settlement_callback(
                 consumer_balance,
                 // We are the executor — task completed on this node, no external sig needed.
                 executor_verified: true,
+                task_id: Some(req.task_id.clone()),
             };
 
             // 6. Run through settlement engine (dedup + invariant checks)
@@ -561,7 +564,7 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
     // Keyed by receipt hash — survives daemon restart so the same receipt cannot
     // produce duplicate ledger entries across process boundaries.
     let settlement_dedup_path = deps.store_path.join("settlement_dedup");
-    let settlement_engine = {
+    let settlement_engine: Arc<icn_ledger::SettlementEngine> = {
         let store = Arc::new(icn_store::SledStore::open(&settlement_dedup_path)?);
         match icn_ledger::SettlementEngine::with_store(store) {
             Ok(e) => Arc::new(e),
@@ -578,7 +581,7 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
     // Set up commons settlement callback — posts earn+spend journal entries to the ledger
     // when a commons-scope task completes successfully (closes the durability gap).
     let commons_settlement_callback =
-        create_commons_settlement_callback(deps.ledger.clone(), settlement_engine);
+        create_commons_settlement_callback(deps.ledger.clone(), settlement_engine.clone());
     compute_actor.set_commons_settlement_callback(commons_settlement_callback);
 
     // Create event broadcaster
@@ -742,6 +745,7 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
         dispute_handle,
         broadcaster,
         policy_manager,
+        settlement_engine: settlement_engine.clone(),
     })
 }
 

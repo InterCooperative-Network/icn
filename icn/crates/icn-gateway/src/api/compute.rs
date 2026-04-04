@@ -557,6 +557,24 @@ pub async fn get_wasm_metadata(
     }
 }
 
+/// GET /compute/settlement/{task_id} — Query settlement status for a task
+///
+/// Returns the settlement status of a compute task by its task identifier.
+/// An operator who submitted a task can query whether it was settled in the
+/// commons pool, along with the receipt hash and scope for audit purposes.
+#[get("/settlement/{task_id}")]
+pub async fn query_settlement(
+    http_req: HttpRequest,
+    compute_mgr: web::Data<Arc<ComputeManager>>,
+    path: web::Path<String>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "compute:read")?;
+
+    let task_id = path.into_inner();
+    let result = compute_mgr.query_settlement(&task_id);
+    Ok(HttpResponse::Ok().json(result))
+}
+
 /// Configure compute routes
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -564,6 +582,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(submit_task)
             .service(cancel_task)
             .service(get_status)
+            .service(query_settlement)
             .service(upload_wasm)
             .service(list_wasm)
             .service(get_wasm_metadata),

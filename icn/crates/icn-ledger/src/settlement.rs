@@ -31,7 +31,7 @@ use crate::types::JournalEntry;
 use icn_identity::Did;
 use icn_kernel_api::scope::ScopeLevel;
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 /// Domain-separation prefix for settlement dedup keys.
@@ -44,6 +44,15 @@ const DEDUP_PREFIX: &[u8] = b"icn-ledger:settlement:v1:";
 /// Keys stored: `DEDUP_STORE_PREFIX || dedup_key_bytes` (32-byte hex-encoded dedup key).
 /// Value: single byte `0x01` (presence marker).
 const DEDUP_STORE_PREFIX: &[u8] = b"icn:settlement:dedup:commons:v1:";
+
+/// Sled key prefix for persisted task_id → receipt_hash index.
+///
+/// Keys stored: `TASK_INDEX_STORE_PREFIX || task_id` (UTF-8 task identifier string).
+/// Value: 32 raw bytes of receipt_hash.
+///
+/// Written alongside the dedup key on every successful `settle_commons_receipt()`
+/// where `task_id` is `Some`. Loaded back into `task_index` on `with_store()`.
+const TASK_INDEX_STORE_PREFIX: &[u8] = b"icn:settlement:task_index:v1:";
 
 /// A settlement request DTO.
 ///
@@ -95,6 +104,40 @@ pub struct SettlementRequest {
 /// ## Restart-safe deduplication
 ///
 /// When constructed with `SettlementEngine::with_store()`, dedup keys for
+/// Settlement status returned by `SettlementEngine::query_by_task`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettlementQueryResult {
+    /// The task identifier queried.
+    pub task_id: String,
+    /// Hex-encoded receipt hash if settlement was recorded.
+    pub receipt_hash: Option<String>,
+    /// Settlement status: `"settled"`, `"not_found"`.
+    pub status: String,
+    /// Scope of the settled receipt (always `"commons"` for now).
+    pub scope: Option<String>,
+}
+
+impl SettlementQueryResult {
+    pub fn settled(task_id: &str, receipt_hash: [u8; 32]) -> Self {
+        Self {
+            task_id: task_id.to_string(),
+            receipt_hash: Some(hex::encode(receipt_hash)),
+            status: "settled".to_string(),
+            scope: Some("commons".to_string()),
+        }
+    }
+
+    pub fn not_found(task_id: &str) -> Self {
+        Self {
+            task_id: task_id.to_string(),
+            receipt_hash: None,
+            status: "not_found".to_string(),
+            scope: None,
+        }
+    }
+}
+
 /// commons receipts are persisted to sled. On construction the engine loads
 /// all existing keys from the store so re-settlements attempted after a daemon
 /// restart are rejected identically to in-process duplicates.
@@ -104,6 +147,13 @@ pub struct SettlementEngine {
     /// In-memory dedup set of settled receipt keys.
     /// Each key is `sha256(DEDUP_PREFIX || receipt_hash)`.
     settled: RwLock<HashSet<[u8; 32]>>,
+
+    /// Index: task_id → receipt_hash. Populated on successful `settle_commons_receipt()`.
+    ///
+    /// When a sled `store` is present the mapping is also written to
+    /// `TASK_INDEX_STORE_PREFIX || task_id` and reloaded on `with_store()`, making
+    /// `query_by_task()` restart-stable. Without a store the index is process-local only.
+    task_index: RwLock<HashMap<String, [u8; 32]>>,
 
     /// Optional sled-backed store for persisting commons dedup keys across restart.
     ///
@@ -121,6 +171,7 @@ impl SettlementEngine {
     pub fn new() -> Self {
         SettlementEngine {
             settled: RwLock::new(HashSet::new()),
+            task_index: RwLock::new(HashMap::new()),
             store: None,
         }
     }
@@ -165,8 +216,31 @@ impl SettlementEngine {
             "SettlementEngine: loaded persisted commons dedup keys"
         );
 
+        // Load persisted task_id → receipt_hash mappings.
+        let mut task_index = HashMap::new();
+        let task_pairs = store
+            .scan(TASK_INDEX_STORE_PREFIX)
+            .map_err(|e| LedgerError::Internal(format!("task index scan failed: {e}")))?;
+
+        for (raw_key, value) in task_pairs {
+            if raw_key.len() > TASK_INDEX_STORE_PREFIX.len() && value.len() == 32 {
+                let task_id_bytes = &raw_key[TASK_INDEX_STORE_PREFIX.len()..];
+                if let Ok(task_id) = std::str::from_utf8(task_id_bytes) {
+                    let mut hash = [0u8; 32];
+                    hash.copy_from_slice(&value);
+                    task_index.insert(task_id.to_string(), hash);
+                }
+            }
+        }
+
+        tracing::debug!(
+            loaded = task_index.len(),
+            "SettlementEngine: loaded persisted task_index entries"
+        );
+
         Ok(SettlementEngine {
             settled: RwLock::new(settled),
+            task_index: RwLock::new(task_index),
             store: Some(store),
         })
     }
@@ -299,6 +373,16 @@ impl SettlementEngine {
         k.extend_from_slice(hex::encode(dedup_key).as_bytes());
         k
     }
+
+    /// Build the sled store key for a task_id → receipt_hash index entry.
+    ///
+    /// Format: `TASK_INDEX_STORE_PREFIX || task_id` (task_id is raw UTF-8 bytes).
+    fn task_index_store_key(task_id: &str) -> Vec<u8> {
+        let mut k = Vec::with_capacity(TASK_INDEX_STORE_PREFIX.len() + task_id.len());
+        k.extend_from_slice(TASK_INDEX_STORE_PREFIX);
+        k.extend_from_slice(task_id.as_bytes());
+        k
+    }
 }
 
 impl Default for SettlementEngine {
@@ -364,6 +448,12 @@ pub struct CommonsSettlementRequest {
     /// Whether the caller has verified the executor's signature.
     /// The engine rejects requests where this is false.
     pub executor_verified: bool,
+
+    /// Task identifier for audit index (optional).
+    ///
+    /// When provided, recorded in the in-process task index so operators can
+    /// query settlement status by task_id via `SettlementEngine::query_by_task()`.
+    pub task_id: Option<String>,
 }
 
 impl SettlementEngine {
@@ -484,12 +574,48 @@ impl SettlementEngine {
             }
         }
 
+        // 10. Record task_id → receipt_hash in the task index (in-memory + sled when available).
+        //     Best-effort: any failure degrades gracefully — settlement already succeeded.
+        if let Some(ref task_id) = request.task_id {
+            if let Ok(mut idx) = self.task_index.write() {
+                idx.insert(task_id.clone(), request.receipt_hash);
+            }
+            // Persist to sled when a store is wired — makes query_by_task restart-stable.
+            if let Some(ref store) = self.store {
+                let store_key = Self::task_index_store_key(task_id);
+                if let Err(e) = store.put(&store_key, &request.receipt_hash) {
+                    tracing::warn!(
+                        task_id = %task_id,
+                        "commons settlement: failed to persist task_index entry \
+                         (query_by_task will not survive restart): {e}"
+                    );
+                }
+            }
+        }
+
         // ── Emit settlement metrics (only on guaranteed success, after dedup gate) ──
         icn_obs::metrics::compute::receipt_settlement_inc("commons");
         icn_obs::metrics::compute::commons_credits_earned_add(request.amount as u64);
         icn_obs::metrics::compute::commons_credits_spent_add(request.amount as u64);
 
         Ok((earn_entry, spend_entry))
+    }
+
+    /// Query settlement status by task identifier.
+    ///
+    /// Returns `SettlementQueryResult` with `status = "settled"` if the task was
+    /// settled in this process lifetime, or `status = "not_found"` otherwise.
+    ///
+    /// Note: the task index is in-process only (not persisted). A daemon restart
+    /// clears the index. Use `is_settled(receipt_hash)` for restart-safe dedup checks.
+    pub fn query_by_task(&self, task_id: &str) -> SettlementQueryResult {
+        match self.task_index.read() {
+            Ok(idx) => match idx.get(task_id) {
+                Some(&receipt_hash) => SettlementQueryResult::settled(task_id, receipt_hash),
+                None => SettlementQueryResult::not_found(task_id),
+            },
+            Err(_) => SettlementQueryResult::not_found(task_id),
+        }
     }
 }
 
@@ -513,6 +639,7 @@ mod commons_tests {
             amount,
             consumer_balance,
             executor_verified: true,
+            task_id: None,
         }
     }
 
@@ -539,6 +666,85 @@ mod commons_tests {
     }
 
     #[test]
+    fn test_query_by_task_returns_settled_after_commons_settlement() {
+        let engine = SettlementEngine::new();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+
+        let receipt_hash = [0xA1; 32];
+        let req = CommonsSettlementRequest {
+            receipt_hash,
+            contributor: contributor.did().clone(),
+            consumer: consumer.did().clone(),
+            scope: ScopeLevel::Commons,
+            amount: 200,
+            consumer_balance: 1_000,
+            executor_verified: true,
+            task_id: Some("task-audit-1".to_string()),
+        };
+        engine.settle_commons_receipt(&req).unwrap();
+
+        let result = engine.query_by_task("task-audit-1");
+        assert_eq!(result.status, "settled");
+        assert_eq!(result.receipt_hash, Some(hex::encode(receipt_hash)));
+        assert_eq!(result.scope, Some("commons".to_string()));
+        assert_eq!(result.task_id, "task-audit-1");
+    }
+
+    #[test]
+    fn test_query_by_task_returns_not_found_for_unknown() {
+        let engine = SettlementEngine::new();
+
+        let result = engine.query_by_task("task-that-does-not-exist");
+        assert_eq!(result.status, "not_found");
+        assert_eq!(result.receipt_hash, None);
+        assert_eq!(result.scope, None);
+        assert_eq!(result.task_id, "task-that-does-not-exist");
+    }
+
+    #[test]
+    fn test_query_by_task_survives_restart() {
+        use icn_store::SledStore;
+        let tmpdir = tempfile::tempdir().unwrap();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+        let receipt_hash = [0xB2; 32];
+
+        // Engine A: settle with task_id — persists task index entry to sled
+        {
+            let store = Arc::new(SledStore::open(tmpdir.path()).unwrap());
+            let engine_a = SettlementEngine::with_store(store).unwrap();
+            let req = CommonsSettlementRequest {
+                receipt_hash,
+                contributor: contributor.did().clone(),
+                consumer: consumer.did().clone(),
+                scope: ScopeLevel::Commons,
+                amount: 100,
+                consumer_balance: 500,
+                executor_verified: true,
+                task_id: Some("task-restart-probe".to_string()),
+            };
+            engine_a.settle_commons_receipt(&req).unwrap();
+            // engine_a and store Arc drop here — simulates daemon shutdown
+        }
+
+        // Engine B: fresh engine loading from same sled path — simulates daemon restart
+        {
+            let store = Arc::new(SledStore::open(tmpdir.path()).unwrap());
+            let engine_b = SettlementEngine::with_store(store).unwrap();
+
+            // task_index must have been reloaded from sled
+            let result = engine_b.query_by_task("task-restart-probe");
+            assert_eq!(
+                result.status, "settled",
+                "query_by_task must return 'settled' after restart"
+            );
+            assert_eq!(result.receipt_hash, Some(hex::encode(receipt_hash)));
+            assert_eq!(result.scope, Some("commons".to_string()));
+        }
+    }
+
+    #[test]
     fn test_commons_settle_wrong_scope_rejected() {
         let engine = SettlementEngine::new();
         let contributor = KeyPair::generate().unwrap();
@@ -558,6 +764,7 @@ mod commons_tests {
                 amount: 100,
                 consumer_balance: 1000,
                 executor_verified: true,
+                task_id: None,
             };
             let result = engine.settle_commons_receipt(&req);
             assert!(result.is_err(), "scope {scope} should be rejected");
@@ -580,6 +787,7 @@ mod commons_tests {
             amount: 100,
             consumer_balance: 1000,
             executor_verified: false,
+            task_id: None,
         };
         let result = engine.settle_commons_receipt(&req);
         assert!(result.is_err());
@@ -721,6 +929,7 @@ mod commons_tests {
             amount: 100,
             consumer_balance: 1000,
             executor_verified: true,
+            task_id: None,
         };
         let result = engine.settle_commons_receipt(&req);
         assert!(result.is_err());
@@ -1082,6 +1291,7 @@ mod metric_tests {
             amount,
             consumer_balance: 100_000,
             executor_verified: true,
+            task_id: None,
         }
     }
 
@@ -1212,6 +1422,7 @@ mod metric_tests {
                 amount: 999,
                 consumer_balance: 10, // far below amount
                 executor_verified: true,
+                task_id: None,
             };
             assert!(
                 engine.settle_commons_receipt(&req2).is_err(),

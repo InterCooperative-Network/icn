@@ -38,6 +38,8 @@ pub struct GatewayActorHandles {
     /// When provided, the gateway uses this service-owned clearing state rather
     /// than its own divergent ClearingManager instance.
     pub federation_service: Option<Arc<dyn icn_kernel_api::services::FederationService>>,
+    /// Settlement engine for compute audit queries (task_id → settled status).
+    pub settlement_engine: Option<Arc<icn_ledger::SettlementEngine>>,
 }
 
 /// Core actor handles returned from initialization

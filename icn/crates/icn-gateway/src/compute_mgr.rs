@@ -19,6 +19,8 @@ pub struct ComputeManager {
     compute_service: Option<Arc<icn_api::ComputeService>>,
     /// WASM registry for module management
     wasm_registry: Option<Arc<icn_compute::WasmRegistry>>,
+    /// Settlement engine for task audit queries
+    settlement_engine: Option<Arc<icn_ledger::SettlementEngine>>,
 }
 
 impl ComputeManager {
@@ -27,6 +29,7 @@ impl ComputeManager {
         ComputeManager {
             compute_service: None,
             wasm_registry: None,
+            settlement_engine: None,
         }
     }
 
@@ -35,6 +38,7 @@ impl ComputeManager {
         ComputeManager {
             compute_service: Some(service),
             wasm_registry: None,
+            settlement_engine: None,
         }
     }
 
@@ -46,6 +50,7 @@ impl ComputeManager {
         ComputeManager {
             compute_service: Some(service),
             wasm_registry: Some(registry),
+            settlement_engine: None,
         }
     }
 
@@ -54,6 +59,24 @@ impl ComputeManager {
         ComputeManager {
             compute_service: None,
             wasm_registry: Some(registry),
+            settlement_engine: None,
+        }
+    }
+
+    /// Attach the settlement engine for task audit queries
+    pub fn with_settlement_engine(mut self, engine: Arc<icn_ledger::SettlementEngine>) -> Self {
+        self.settlement_engine = Some(engine);
+        self
+    }
+
+    /// Query settlement status by task_id.
+    ///
+    /// Returns a `SettlementQueryResult` indicating whether the task has been settled,
+    /// along with the receipt hash and scope when available.
+    pub fn query_settlement(&self, task_id: &str) -> icn_ledger::SettlementQueryResult {
+        match &self.settlement_engine {
+            Some(engine) => engine.query_by_task(task_id),
+            None => icn_ledger::SettlementQueryResult::not_found(task_id),
         }
     }
 
