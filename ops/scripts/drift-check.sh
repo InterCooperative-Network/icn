@@ -40,56 +40,64 @@ for f in "${TRUTH_FILES[@]}"; do
 done
 
 # ─── Check 2: Skill symlinks must be valid ───────────────────────────────────
+#
+# PROJECT_SKILLS lives outside the repo (project-level .claude/skills on dev machines).
+# This directory does not exist in CI checkouts — the check is skipped when absent.
+# To verify symlinks locally: bash ops/scripts/setup-skill-symlinks.sh
 
 PROJECT_SKILLS="${REPO_ROOT}/../.claude/skills"
 CANONICAL_SKILLS="${REPO_ROOT}/ops/automation/skills"
 ICN_SKILLS="${REPO_ROOT}/.claude/skills"
 
-# ops/automation/skills canonical skills — must be symlinked from project-level
-SYMLINK_SKILLS=("status" "sync-and-build" "worktree")
+if [[ -d "${PROJECT_SKILLS}" ]]; then
+  # ops/automation/skills canonical skills — must be symlinked from project-level
+  SYMLINK_SKILLS=("status" "sync-and-build" "worktree")
 
-# icn-level canonical skills that also exist in project-level — must be symlinks there
-declare -A ICN_SYMLINK_SKILLS
-ICN_SYMLINK_SKILLS["fix-ci"]="${ICN_SKILLS}/fix-ci"
-ICN_SYMLINK_SKILLS["icn-preflight"]="${ICN_SKILLS}/icn-preflight"
-ICN_SYMLINK_SKILLS["merge-prs"]="${ICN_SKILLS}/merge-prs"
+  # icn-level canonical skills that also exist in project-level — must be symlinks there
+  declare -A ICN_SYMLINK_SKILLS
+  ICN_SYMLINK_SKILLS["fix-ci"]="${ICN_SKILLS}/fix-ci"
+  ICN_SYMLINK_SKILLS["icn-preflight"]="${ICN_SKILLS}/icn-preflight"
+  ICN_SYMLINK_SKILLS["merge-prs"]="${ICN_SKILLS}/merge-prs"
 
-for skill in "${SYMLINK_SKILLS[@]}"; do
-  link="${PROJECT_SKILLS}/${skill}"
-  canonical="${CANONICAL_SKILLS}/${skill}"
+  for skill in "${SYMLINK_SKILLS[@]}"; do
+    link="${PROJECT_SKILLS}/${skill}"
+    canonical="${CANONICAL_SKILLS}/${skill}"
 
-  if [[ -L "${link}" ]]; then
-    resolved="$(readlink -f "${link}" 2>/dev/null || echo "BROKEN")"
-    if [[ "${resolved}" == "${canonical}" ]]; then
-      ok "Symlink valid: .claude/skills/${skill}"
+    if [[ -L "${link}" ]]; then
+      resolved="$(readlink -f "${link}" 2>/dev/null || echo "BROKEN")"
+      if [[ "${resolved}" == "${canonical}" ]]; then
+        ok "Symlink valid: .claude/skills/${skill}"
+      else
+        fail "Symlink wrong target: .claude/skills/${skill} → ${resolved} (expected ${canonical})"
+      fi
+    elif [[ -d "${link}" ]]; then
+      fail "Skill is plain directory, not symlink (duplicate writable source): .claude/skills/${skill} — fix: rm -rf ${link} && ln -s ${canonical} ${link}"
     else
-      fail "Symlink wrong target: .claude/skills/${skill} → ${resolved} (expected ${canonical})"
+      fail "Skill symlink missing: .claude/skills/${skill} — fix: ln -s ${canonical} ${link}"
     fi
-  elif [[ -d "${link}" ]]; then
-    fail "Skill is plain directory, not symlink (duplicate writable source): .claude/skills/${skill} — fix: rm -rf ${link} && ln -s ${canonical} ${link}"
-  else
-    fail "Skill symlink missing: .claude/skills/${skill} — fix: ln -s ${canonical} ${link}"
-  fi
-done
+  done
 
-# Check icn-level skill symlinks at project level
-for skill in "${!ICN_SYMLINK_SKILLS[@]}"; do
-  link="${PROJECT_SKILLS}/${skill}"
-  canonical="${ICN_SYMLINK_SKILLS[$skill]}"
+  # Check icn-level skill symlinks at project level
+  for skill in "${!ICN_SYMLINK_SKILLS[@]}"; do
+    link="${PROJECT_SKILLS}/${skill}"
+    canonical="${ICN_SYMLINK_SKILLS[$skill]}"
 
-  if [[ -L "${link}" ]]; then
-    resolved="$(readlink -f "${link}" 2>/dev/null || echo "BROKEN")"
-    if [[ "${resolved}" == "${canonical}" ]]; then
-      ok "Symlink valid: .claude/skills/${skill} → icn/.claude/skills/${skill}"
+    if [[ -L "${link}" ]]; then
+      resolved="$(readlink -f "${link}" 2>/dev/null || echo "BROKEN")"
+      if [[ "${resolved}" == "${canonical}" ]]; then
+        ok "Symlink valid: .claude/skills/${skill} → icn/.claude/skills/${skill}"
+      else
+        fail "Symlink wrong target: .claude/skills/${skill} → ${resolved} (expected ${canonical})"
+      fi
+    elif [[ -d "${link}" ]]; then
+      fail "Duplicate writable skill: .claude/skills/${skill} is a directory (must be symlink to ${canonical}) — fix: rm -rf ${link} && ln -s ${canonical} ${link}"
     else
-      fail "Symlink wrong target: .claude/skills/${skill} → ${resolved} (expected ${canonical})"
+      fail "Skill symlink missing: .claude/skills/${skill} — fix: ln -s ${canonical} ${link}"
     fi
-  elif [[ -d "${link}" ]]; then
-    fail "Duplicate writable skill: .claude/skills/${skill} is a directory (must be symlink to ${canonical}) — fix: rm -rf ${link} && ln -s ${canonical} ${link}"
-  else
-    fail "Skill symlink missing: .claude/skills/${skill} — fix: ln -s ${canonical} ${link}"
-  fi
-done
+  done
+else
+  ok "PROJECT_SKILLS (${PROJECT_SKILLS}) not present — skipping project-level symlink check (CI-only path)"
+fi
 
 # ─── Check 3: Stale path patterns must not appear in agent tooling files ─────
 

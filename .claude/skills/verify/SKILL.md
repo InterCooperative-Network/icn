@@ -40,7 +40,7 @@ If drift-check reports FAIL → note it before running verification checks.
 
 | Changed files | Required checks |
 |---|---|
-| `icn/crates/**/*.rs` or `icn/apps/**/*.rs` | `cd icn/icn && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test -p <touched-crates>` |
+| `icn/crates/**/*.rs` or `icn/apps/**/*.rs` | `cd icn && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test -p <touched-crates>` |
 | `icn/crates/icn-gateway/**` | Also run: `cargo test -p icn-gateway` |
 | `icn/crates/icn-kernel-api/**` | Also run: `cargo test -p icn-kernel-api` |
 | `sdk/typescript/**` | `cd sdk/typescript && npm ci && npm run build && npm test && npm run lint` |
@@ -54,7 +54,7 @@ If drift-check reports FAIL → note it before running verification checks.
 
 ## Important
 
-- **Rust commands run from `icn/icn/`** (the Cargo workspace root), not from `icn/`.
+- **Rust commands run from `icn/`** (the Cargo workspace root, contains `Cargo.toml`), not from the repo root.
 - `sdk/typescript/` and `web/pilot-ui/` commands run from the monorepo root's subdirectories.
 - If gateway API behavior changed, remind about OpenAPI + TS type regeneration (`cd sdk/typescript && npm run generate-types`).
 - Never weaken checks to make them pass.

@@ -555,8 +555,8 @@ impl SettlementEngine {
                 if let Err(e) = store.put(&store_key, &request.receipt_hash) {
                     tracing::warn!(
                         task_id = %task_id,
-                        "commons settlement: failed to persist task_index entry \
-                         (query_by_task will not survive restart): {e}"
+                        "commons settlement: failed to persist task_index entry to store; \
+                         query_by_task result for this task will not survive restart: {e}"
                     );
                 }
             }
@@ -573,10 +573,14 @@ impl SettlementEngine {
     /// Query settlement status by task identifier.
     ///
     /// Returns `SettlementQueryResult` with `status = "settled"` if the task was
-    /// settled in this process lifetime, or `status = "not_found"` otherwise.
+    /// settled, or `status = "not_found"` otherwise.
     ///
-    /// Note: the task index is in-process only (not persisted). A daemon restart
-    /// clears the index. Use `is_settled(receipt_hash)` for restart-safe dedup checks.
+    /// **Persistence behavior:**
+    /// - `SettlementEngine::new()` — in-memory only; the task index is cleared on restart.
+    /// - `SettlementEngine::with_store()` — task index entries are persisted to sled and
+    ///   reloaded on startup; `query_by_task` survives daemon restarts.
+    ///
+    /// Use `is_settled(receipt_hash)` when you only need restart-safe dedup without task lookup.
     pub fn query_by_task(&self, task_id: &str) -> SettlementQueryResult {
         match self.task_index.read() {
             Ok(idx) => match idx.get(task_id) {

@@ -76,10 +76,15 @@ pub fn create_balance_callback(ledger: LedgerHandle) -> icn_compute::BalanceCall
                 -guard.get_balance(&did, icn_ledger::commons_credits::COMMONS_CREDIT_CURRENCY)
             }
             Err(_) => {
-                // Lock contended; skip advisory check — authoritative gate handles races.
+                // Lock contended — fail-open for this advisory check only.
+                // This callback is NOT the authoritative gate; it is used for an advisory
+                // credit floor check only. The authoritative enforcement gate is the
+                // CommonsReserveCallback, which must handle races independently.
+                // Returning i64::MAX passes the advisory check rather than blocking on
+                // a contended write lock. This is intentional fail-open for advisory use.
                 tracing::debug!(
                     did = did_str,
-                    "balance_callback: ledger read-contended, skipping advisory check"
+                    "balance_callback: ledger read-contended, skipping advisory check (fail-open)"
                 );
                 i64::MAX
             }
@@ -244,11 +249,18 @@ pub fn create_commons_settlement_callback(
                 task_id: Some(req.task_id.clone()),
             };
 
-            // 6. Run through settlement engine (dedup + invariant checks)
+            // 6. Run through settlement engine (dedup + invariant checks).
+            //
+            // KNOWN LIMITATION: dedup is recorded inside settle_commons_receipt() before
+            // the ledger appends below complete. If append_entry() fails after this point,
+            // the receipt is permanently marked settled and retries will return DuplicateEntry.
+            // True atomicity requires batch-append support in the ledger (not yet available).
+            // On partial failure (earn ok, spend fails), manual recovery is required.
             let (earn_entry, spend_entry) = match engine.settle_commons_receipt(&settlement_req) {
                 Ok(entries) => entries,
                 Err(icn_ledger::LedgerError::DuplicateEntry(_)) => {
-                    // Idempotent — already settled, not an error
+                    // Idempotent — receipt already settled (or a prior partial settlement
+                    // recorded dedup before ledger appends completed — check audit logs).
                     return;
                 }
                 Err(e) => {
@@ -261,7 +273,10 @@ pub fn create_commons_settlement_callback(
                 }
             };
 
-            // 7. Append both entries to the ledger (double-entry: earn + spend)
+            // 7. Append both entries to the ledger (double-entry: earn + spend).
+            //    These two appends are NOT atomic. If spend fails after earn succeeds,
+            //    the ledger has a one-sided entry and the receipt dedup is already committed.
+            //    This constitutes a partial settlement requiring manual operator intervention.
             let mut ledger = ledger.write().await;
             if let Err(e) = ledger.append_entry(earn_entry).await {
                 warn!(
@@ -279,9 +294,17 @@ pub fn create_commons_settlement_callback(
                     );
                 }
                 Err(e) => {
+                    // Earn entry committed but spend entry failed — PARTIAL SETTLEMENT.
+                    // Dedup is already recorded; retries will be silently ignored.
+                    // Manual operator recovery required: inspect receipt {} and
+                    // task {} in audit logs.
                     warn!(
-                        "commons_settlement: failed to append spend entry for task {}: {}",
-                        req.task_id, e
+                        "commons_settlement: PARTIAL SETTLEMENT for task {} \
+                         (earn committed, spend failed): {} — receipt {} will not retry; \
+                         manual recovery required",
+                        req.task_id,
+                        e,
+                        hex::encode(req.receipt_hash),
                     );
                 }
             }

@@ -66,9 +66,9 @@
     "mergeStateStatus is MERGEABLE or UNSTABLE (UNSTABLE = non-blocking checks only)"
   ],
   "workspace": {
-    "rust_commands_run_from": "icn/icn/",
-    "monorepo_root": "icn/",
-    "note": "Never run cargo from the monorepo root — Cargo.toml is in icn/icn/"
+    "rust_commands_run_from": "icn/",
+    "monorepo_root": "./",
+    "note": "Run cargo from icn/ (the Cargo workspace root, contains Cargo.toml). The repo root itself has no Cargo.toml."
   },
   "validation_ladder": [
     "cargo fmt --all -- --check",

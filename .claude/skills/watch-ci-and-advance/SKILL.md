@@ -12,9 +12,9 @@ truth_contract:
     - "gh run list --limit 5 --json databaseId,status,name,conclusion,createdAt"
     - "gh api repos/InterCooperative-Network/icn/actions/runners --jq '.runners[]'"
   examples_only:
-    - "The 4-check example in Phase 3 is illustrative — always use all 10 required checks from policy.json"
+    - "The 4-check example in Phase 3 is illustrative — always use all required checks from policy.json"
   never_hardcode:
-    - required check set (always 10 — verify via policy.json or branch protection API)
+    - required check set or count (read from ops/state/truth/policy.json#merge.required_checks or branch protection API)
     - runner IP (read from ops/state/config/repo-map.json#infrastructure.k3s.ci_runner)
 ---
 
@@ -68,12 +68,12 @@ gh pr list --json number,headRefName,statusCheckRollup \
 Instead of printing the full check table every poll, track which gates changed:
 
 ```bash
-# Snapshot required gates only (all 10 — read policy.json for the canonical list)
+# Snapshot required gates only (read policy.json for the canonical list — never hardcode)
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 REQUIRED=$(python3 -c "
 import json
 p = json.load(open('${REPO_ROOT}/ops/state/truth/policy.json'))
-print(repr(set(p['required_checks'])))
+print(repr(set(p['merge']['required_checks'])))
 ")
 gh pr checks <N> --json name,state,conclusion \
   | python3 -c "

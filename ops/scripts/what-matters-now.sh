@@ -55,32 +55,36 @@ for f in "${TRUTH_FILES[@]}"; do
 done
 
 # ─── Phase 2: symlink verification ──────────────────────────────────────────
+# PROJECT_SKILLS is the project-level .claude/skills (outside the repo checkout).
+# It only exists on developer machines, not in CI. Skip when absent.
 
 PROJECT_SKILLS="${REPO_ROOT}/../.claude/skills"
 SYMLINK_SKILLS=("status" "sync-and-build" "worktree")
 SYMLINKS_OK=true
 SYMLINK_WARNINGS=""
 
-for skill in "${SYMLINK_SKILLS[@]}"; do
-  link="${PROJECT_SKILLS}/${skill}"
-  if [[ -L "${link}" ]]; then
-    resolved="$(readlink -f "${link}" 2>/dev/null || echo "BROKEN")"
-    canonical="${REPO_ROOT}/ops/automation/skills/${skill}"
-    if [[ "${resolved}" != "${canonical}" ]]; then
+if [[ -d "${PROJECT_SKILLS}" ]]; then
+  for skill in "${SYMLINK_SKILLS[@]}"; do
+    link="${PROJECT_SKILLS}/${skill}"
+    if [[ -L "${link}" ]]; then
+      resolved="$(readlink -f "${link}" 2>/dev/null || echo "BROKEN")"
+      canonical="${REPO_ROOT}/ops/automation/skills/${skill}"
+      if [[ "${resolved}" != "${canonical}" ]]; then
+        SYMLINKS_OK=false
+        SYMLINK_WARNINGS+="  WRONG TARGET: .claude/skills/${skill} → ${resolved}\n"
+        ((DRIFT_ERRORS++))
+      fi
+    elif [[ -d "${link}" ]]; then
       SYMLINKS_OK=false
-      SYMLINK_WARNINGS+="  WRONG TARGET: .claude/skills/${skill} → ${resolved}\n"
+      SYMLINK_WARNINGS+="  NOT SYMLINK: .claude/skills/${skill} is a plain directory (run ops/scripts/setup-skill-symlinks.sh)\n"
+      ((DRIFT_ERRORS++))
+    else
+      SYMLINKS_OK=false
+      SYMLINK_WARNINGS+="  MISSING: .claude/skills/${skill} (run ops/scripts/setup-skill-symlinks.sh)\n"
       ((DRIFT_ERRORS++))
     fi
-  elif [[ -d "${link}" ]]; then
-    SYMLINKS_OK=false
-    SYMLINK_WARNINGS+="  NOT SYMLINK: .claude/skills/${skill} is a plain directory (run ops/scripts/setup-skill-symlinks.sh)\n"
-    ((DRIFT_ERRORS++))
-  else
-    SYMLINKS_OK=false
-    SYMLINK_WARNINGS+="  MISSING: .claude/skills/${skill} (run ops/scripts/setup-skill-symlinks.sh)\n"
-    ((DRIFT_ERRORS++))
-  fi
-done
+  done
+fi
 
 # ─── Phase 3: stale path detection ──────────────────────────────────────────
 
