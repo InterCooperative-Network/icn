@@ -4,10 +4,29 @@ description: Full sprint-batch or stacked-PR integration pipeline. Owns merge or
 argument-hint: "[PR numbers...] [--admin] [--dry-run]"
 user-invocable: true
 allowed-tools: "Bash, Read"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # required checks, merge strategy
+  live_load_required:
+    - "gh pr list --json number,title,headRefName,baseRefName,mergeable,mergeStateStatus"
+    - "gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'"
+  examples_only: []
+  never_hardcode:
+    - PR numbers, branches, or merge order — resolve from GitHub at runtime
 ---
 
 Own the full lifecycle of safely integrating a batch of PRs into `main`. This is not a thin wrapper
 around `gh pr merge`. It is the standard integration pipeline for ICN sprint closes.
+
+## Step 0 — Preflight (run first, always)
+
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash "${REPO_ROOT}/ops/scripts/what-matters-now.sh" 2>/dev/null || true
+```
+
+If `what-matters-now.sh` reports drift errors → **stop and fix drift before proceeding**.
+Drift in agent files means the tooling you're running may itself encode stale policy.
 
 ## The Problem This Solves
 
@@ -34,10 +53,12 @@ gh api repos/InterCooperative-Network/icn/branches/main/protection \
 
 Then for each PR:
 ```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 gh pr checks <N> --json name,state,conclusion \
   | python3 -c "
 import sys, json
-required = {'Build Release','Test','Clippy','Format Check'}
+# Load required checks from canonical source — never hardcode
+required = set(json.load(open('${REPO_ROOT}/ops/state/truth/policy.json'))['merge']['required_checks'])
 checks = json.load(sys.stdin)
 req = [(c['name'],c['state'],c['conclusion']) for c in checks if c['name'] in required]
 opt = [(c['name'],c['state'],c['conclusion']) for c in checks if c['name'] not in required and c['conclusion']=='failure']
@@ -76,10 +97,10 @@ Stop if `mergeable != MERGEABLE`.
 **b. Merge**
 ```bash
 # Green required checks → direct merge
-gh pr merge <N> --merge          # or --merge --admin if $ARGUMENTS includes --admin
+gh pr merge <N> --squash          # or --squash --admin if $ARGUMENTS includes --admin
 
 # Pending required checks → auto-merge (prefer --auto over waiting in a loop)
-gh pr merge <N> --auto --merge
+gh pr merge <N> --auto --squash
 ```
 
 **c. Pull main**

@@ -147,6 +147,7 @@ pub async fn run_supervisor(
             commons: commons_handle,
             charter_accepted_hook: gateway_handles.charter_accepted_hook,
             federation_service: gateway_handles.federation_service,
+            settlement_engine: gateway_handles.settlement_engine,
         },
     );
 
@@ -366,6 +367,10 @@ async fn spawn_actors_with_identity(
     let protocol_parameter_store_from_daemon = handles.protocol_parameter_store;
     let effect_subscription_factory = handles.effect_subscription_factory;
     gateway_handles.charter_accepted_hook = handles.charter_accepted_hook;
+    let compute_balance_callback = handles.balance_callback;
+    let compute_payment_callback = handles.payment_callback;
+    let compute_commons_settlement_callback = handles.commons_settlement_callback;
+    let compute_settlement_query_engine = handles.settlement_query_engine;
 
     // Wire runtime handles into the pre-initialized Ledger.
     // These depend on gossip/trust which are only available after gossip init.
@@ -944,7 +949,6 @@ async fn spawn_actors_with_identity(
     let compute_services =
         super::init_compute::init_compute_services(super::init_compute::ComputeDeps {
             trust_service: trust_service_for_compute,
-            ledger: ledger_handle.clone(),
             gossip_handle: gossip_handle.clone(),
             own_did: did.clone(),
             compute_handle_holder: compute_handle_holder.clone(),
@@ -956,6 +960,10 @@ async fn spawn_actors_with_identity(
             contract_registry: Some(contract_registry_handle.clone()),
             policy_config: config.compute.policy.clone(),
             federation_clearing_handle: federation_clearing_handle_for_compute,
+            balance_callback: compute_balance_callback,
+            payment_callback: compute_payment_callback,
+            commons_settlement_callback: compute_commons_settlement_callback,
+            settlement_query_engine: compute_settlement_query_engine,
         })
         .await?;
 
@@ -985,6 +993,7 @@ async fn spawn_actors_with_identity(
         background_tasks,
     );
     gateway_handles.compute = Some(rpc_compute_handle);
+    gateway_handles.settlement_engine = Some(compute_services.settlement_engine.clone());
 
     // Extract LedgerService for background tasks (resource enforcer)
     let ledger_service_for_bg: Option<Arc<dyn icn_kernel_api::services::LedgerService>> =

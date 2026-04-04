@@ -4,6 +4,15 @@ description: Generate a CHANGELOG.md entry from commits since the last git tag. 
 argument-hint: "[version] [--dry-run]"
 user-invocable: true
 allowed-tools: "Bash, Read, Edit"
+truth_contract:
+  canonical_sources: []
+  live_load_required:
+    - "git tag --sort=-version:refname | head -1"
+    - "git log <last-tag>..HEAD --oneline"
+  examples_only: []
+  never_hardcode:
+    - version numbers
+    - commit ranges
 ---
 
 Generate a Keep-a-Changelog entry from commits since the last git tag and prepend it to CHANGELOG.md.

@@ -1175,12 +1175,14 @@ impl ComputeActor {
                             .unwrap_or_else(|| "credits".to_string());
                         let submitter_did = task.submitter.clone();
                         let task_id = task.id.clone();
+                        let scope = task.scope;
                         Some((
                             amount,
                             currency,
                             submitter_did,
                             task_id,
                             submitter_entity_id,
+                            scope,
                         ))
                     } else {
                         tracing::warn!(
@@ -1191,8 +1193,14 @@ impl ComputeActor {
                     }
                 };
 
-                if let Some((amount, currency, submitter_did, task_id_str, submitter_entity_id)) =
-                    task_fields
+                if let Some((
+                    amount,
+                    currency,
+                    submitter_did,
+                    task_id_str,
+                    submitter_entity_id,
+                    scope,
+                )) = task_fields
                 {
                     // Only record a clearing obligation when there is a non-zero amount.
                     // Zero-amount tasks are informational and don't create economic obligations.
@@ -1206,6 +1214,7 @@ impl ComputeActor {
                             currency,
                             task_id: task_id_str,
                             attestation_hash,
+                            scope,
                         };
                         cb(notification);
                         tracing::debug!(
@@ -1402,5 +1411,59 @@ mod tests {
             !fired.load(std::sync::atomic::Ordering::SeqCst),
             "callback should not fire on failure"
         );
+    }
+
+    /// Verify that a commons-scoped federated task produces a notification with
+    /// scope=Commons — ensuring the clearing layer defers it instead of routing
+    /// it through bilateral federation clearing (incorrect for mint/burn pool).
+    #[tokio::test]
+    async fn test_federated_task_result_commons_scope_propagated() {
+        let (own_did, _) = make_keypair();
+        let (executor_did, executor_sk) = make_keypair();
+        let (submitter_did, _) = make_keypair();
+
+        let mut actor = make_actor(&own_did);
+
+        let captured: Arc<Mutex<Option<FederationClearingNotification>>> =
+            Arc::new(Mutex::new(None));
+        let captured_clone = captured.clone();
+        let cb: crate::actor::types::FederationClearingCallback = Arc::new(move |notification| {
+            *captured_clone.lock().unwrap() = Some(notification);
+        });
+        actor.set_federation_clearing_callback(cb);
+
+        let mut task = make_task(&submitter_did, 100);
+        task.scope = icn_kernel_api::ScopeLevel::Commons;
+        let task_hash = {
+            let mut mgr = actor.task_manager.lock().await;
+            mgr.submit(task).expect("task submit failed")
+        };
+
+        let result = make_signed_result(
+            task_hash,
+            "test-task-001",
+            &executor_did,
+            &executor_sk,
+            ExecutionOutcome::Success(vec![]),
+            5_000,
+        );
+
+        actor
+            .on_federated_task_result(result, "beta-coop".to_string(), [0xBB; 32])
+            .await
+            .expect("on_federated_task_result failed");
+
+        let guard = captured.lock().unwrap();
+        let notification = guard
+            .as_ref()
+            .expect("callback must fire for commons cross-coop task");
+        assert_eq!(
+            notification.scope,
+            icn_kernel_api::ScopeLevel::Commons,
+            "commons-scoped task must produce scope=Commons in clearing notification"
+        );
+        // Confirm economic fields are still populated correctly.
+        assert_eq!(notification.amount, 500); // 100 * 5000 / 1000
+        assert_eq!(notification.from_did, submitter_did);
     }
 }

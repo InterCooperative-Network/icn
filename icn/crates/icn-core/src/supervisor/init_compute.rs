@@ -9,8 +9,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
-/// Type aliases for common handle types
-pub type LedgerHandle = super::actors::LedgerHandle;
+/// Type alias for common handle types
 pub type GossipHandle = Arc<RwLock<icn_gossip::GossipActor>>;
 pub type ComputeHandleHolder = Arc<RwLock<Option<icn_compute::ComputeHandle>>>;
 pub type DisputeHandleHolder = Arc<RwLock<Option<icn_ccl::DisputeActorHandle>>>;
@@ -20,8 +19,6 @@ pub type DisputeHandleHolder = Arc<RwLock<Option<icn_ccl::DisputeActorHandle>>>;
 pub struct ComputeDeps {
     /// Trust service for trust score lookups (kernel/app separated)
     pub trust_service: Arc<dyn TrustService>,
-    /// Ledger for payment settlement
-    pub ledger: LedgerHandle,
     /// Gossip handle for message routing
     pub gossip_handle: GossipHandle,
     /// This node's DID
@@ -47,6 +44,18 @@ pub struct ComputeDeps {
     /// completions are queued for periodic batch settlement.
     pub federation_clearing_handle:
         Option<std::sync::Arc<tokio::sync::RwLock<Option<icn_federation::ReceiptClearingManager>>>>,
+    /// Pre-built balance callback (built by daemon composition root).
+    /// When None, the balance gate is skipped (advisory check only).
+    pub balance_callback: Option<icn_compute::BalanceCallback>,
+    /// Pre-built payment callback (built by daemon composition root).
+    /// When None, ledger payment entries are not posted on task completion.
+    pub payment_callback: Option<icn_compute::PaymentCallback>,
+    /// Pre-built commons settlement callback (built by daemon composition root).
+    /// When None, commons-scope task completions do not produce ledger entries.
+    pub commons_settlement_callback: Option<icn_compute::CommonsSettlementCallback>,
+    /// Pre-built settlement query engine (built by daemon composition root).
+    /// When None, the settlement audit surface returns not_found for all queries.
+    pub settlement_query_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
 }
 
 /// Services returned from compute initialization
@@ -59,6 +68,8 @@ pub struct ComputeServices {
     pub broadcaster: Arc<icn_gateway::EventBroadcaster>,
     /// Policy manager for cooperative scheduling
     pub policy_manager: Arc<icn_compute::PolicyManager>,
+    /// Settlement engine — shared handle for audit queries (task_id → settled status).
+    pub settlement_engine: Arc<dyn icn_kernel_api::services::SettlementQueryService>,
 }
 
 /// Create the trust callback for compute actor
@@ -161,83 +172,6 @@ fn get_message_topic_and_data(
             icn_encoding::encode(compute_msg),
         ),
     }
-}
-
-/// Create the payment callback for settling compute payments via ledger
-pub fn create_payment_callback(ledger: LedgerHandle) -> icn_compute::PaymentCallback {
-    Arc::new(move |req| {
-        let ledger = ledger.clone();
-        tokio::spawn(async move {
-            // Parse DIDs
-            let from_did: Did =
-                match serde_json::from_value(serde_json::Value::String(req.from.clone())) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        warn!("Failed to parse payer DID: {}", e);
-                        return;
-                    }
-                };
-            let to_did: Did =
-                match serde_json::from_value(serde_json::Value::String(req.to.clone())) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        warn!("Failed to parse payee DID: {}", e);
-                        return;
-                    }
-                };
-
-            // Security (#1342): `req.from` originates from `claimed_task.submitter`, which is
-            // set by the task submitter at submission time. When tasks arrive via the gateway
-            // REST API the submitter DID is extracted from the JWT (authenticated). However,
-            // when a TaskSubmitted message is received via gossip, the submitter field comes
-            // from the gossip payload and could be spoofed by a malicious peer to name a
-            // victim DID as payer.
-            //
-            // Full fix requires the gossip layer to verify `entry.author == task.submitter`
-            // before calling `on_task_submitted` (tracked in #1342). Until that is in place,
-            // we record the payer DID in the provenance reason so audit logs can detect
-            // mismatches. We intentionally do NOT use system provenance without the payer DID
-            // to avoid hiding who was charged.
-            let amount_i64 = match i64::try_from(req.amount) {
-                Ok(v) => v,
-                Err(_) => {
-                    warn!(
-                        "Payment amount overflow: cannot convert {} to i64 for compute payment \
-                         (task {}, from {}, to {})",
-                        req.amount, req.task_id, req.from, req.to
-                    );
-                    return;
-                }
-            };
-            let provenance_reason = format!("compute-payment:payer={}", req.from);
-            let entry = match icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
-                .debit(from_did, req.currency.clone(), amount_i64)
-                .credit(to_did, req.currency.clone(), amount_i64)
-                .with_system_provenance(provenance_reason)
-                .build()
-            {
-                Ok(e) => e,
-                Err(e) => {
-                    warn!("Failed to build payment entry: {}", e);
-                    return;
-                }
-            };
-
-            // Append to ledger
-            let mut ledger = ledger.write().await;
-            match ledger.append_entry(entry).await {
-                Ok(_) => {
-                    info!(
-                        "Compute payment settled: {} {} from {} to {} for task {}",
-                        req.amount, req.currency, req.from, req.to, req.task_id
-                    );
-                }
-                Err(e) => {
-                    warn!("Failed to settle compute payment: {}", e);
-                }
-            }
-        });
-    })
 }
 
 /// Create the event callback for task status changes
@@ -379,9 +313,29 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
     let send_callback = create_send_callback(deps.gossip_handle.clone());
     compute_actor.set_send_callback(send_callback);
 
-    // Set up payment callback
-    let payment_callback = create_payment_callback(deps.ledger.clone());
-    compute_actor.set_payment_callback(payment_callback);
+    // Set up payment callback (pre-built by daemon composition root).
+    // When present, fires on task completion and posts a ledger debit/credit entry.
+    if let Some(payment_callback) = deps.payment_callback {
+        compute_actor.set_payment_callback(payment_callback);
+    }
+
+    // Set up balance callback for commons credit gate checks (advisory floor + ceiling).
+    // Must be registered before the actor spawns so handle_submit sees it immediately.
+    if let Some(balance_callback) = deps.balance_callback {
+        compute_actor.set_balance_callback(balance_callback);
+    }
+
+    // Resolve settlement query engine: use the pre-built one from deps when available,
+    // otherwise fall back to a no-op in-memory engine (test/standalone mode).
+    let settlement_engine: Arc<dyn icn_kernel_api::services::SettlementQueryService> = deps
+        .settlement_query_engine
+        .unwrap_or_else(|| Arc::new(icn_kernel_api::services::NoOpSettlementQueryService));
+
+    // Set up commons settlement callback — posts earn+spend journal entries to the ledger
+    // when a commons-scope task completes successfully (closes the durability gap).
+    if let Some(commons_settlement_callback) = deps.commons_settlement_callback {
+        compute_actor.set_commons_settlement_callback(commons_settlement_callback);
+    }
 
     // Create event broadcaster
     let broadcaster = Arc::new(icn_gateway::EventBroadcaster::new());
@@ -499,7 +453,7 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
                     submitter_coop: notification.from_entity_id.clone(),
                     cost: notification.amount,
                     currency: notification.currency.clone(),
-                    scope: icn_kernel_api::ScopeLevel::Federation,
+                    scope: notification.scope,
                     created_at: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
@@ -544,6 +498,7 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
         dispute_handle,
         broadcaster,
         policy_manager,
+        settlement_engine: settlement_engine.clone(),
     })
 }
 

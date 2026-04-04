@@ -123,6 +123,7 @@ async fn test_commons_settlement_produces_balanced_entries() {
             // Pre-fund the consumer with enough balance.
             consumer_balance: 100_000,
             executor_verified: true,
+            task_id: Some(req.task_id.clone()),
         };
 
         let (earn, spend) = engine_cb
@@ -201,6 +202,7 @@ async fn test_commons_settlement_is_idempotent() {
         amount: 100,
         consumer_balance: 10_000,
         executor_verified: true,
+        task_id: None,
     };
 
     let first = engine.settle_commons_receipt(&req);
@@ -233,6 +235,7 @@ async fn test_commons_settlement_rejects_non_commons_scope() {
             amount: 50,
             consumer_balance: 10_000,
             executor_verified: true,
+            task_id: None,
         };
         let result = engine.settle_commons_receipt(&req);
         assert!(
@@ -258,6 +261,7 @@ async fn test_commons_settlement_rejects_insufficient_balance() {
         amount: 500,
         consumer_balance: 10, // far below amount
         executor_verified: true,
+        task_id: None,
     };
 
     let result = engine.settle_commons_receipt(&req);

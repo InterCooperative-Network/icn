@@ -557,6 +557,49 @@ pub async fn get_wasm_metadata(
     }
 }
 
+/// GET /compute/settlement/{task_id} — Query settlement status for a task
+///
+/// Returns the settlement status of a compute task by its task identifier.
+/// An operator who submitted a task can query whether it was settled in the
+/// commons pool, along with the receipt hash and scope for audit purposes.
+#[get("/settlement/{task_id}")]
+pub async fn query_settlement(
+    http_req: HttpRequest,
+    compute_mgr: web::Data<Arc<ComputeManager>>,
+    path: web::Path<String>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "compute:read")?;
+
+    let task_id = path.into_inner();
+    let result = compute_mgr.query_settlement(&task_id);
+    Ok(HttpResponse::Ok().json(result))
+}
+
+/// GET /compute/settlement/receipt/{hash} — Query settlement by receipt hash
+///
+/// Accepts a 64-character hex-encoded receipt hash — the canonical durable audit key.
+/// Returns settled/not_found status, scope (when determinable), and associated task_id
+/// (when the settlement was recorded with one and a sled store is present).
+///
+/// This is the receipt-first audit path. Use this when you have a receipt hash from
+/// a journal entry, peer audit, or receipt chain and need to verify settlement.
+#[get("/settlement/receipt/{hash}")]
+pub async fn query_settlement_by_receipt(
+    http_req: HttpRequest,
+    compute_mgr: web::Data<Arc<ComputeManager>>,
+    path: web::Path<String>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "compute:read")?;
+
+    let hash_hex = path.into_inner();
+    match compute_mgr.query_settlement_by_receipt(&hash_hex) {
+        Some(result) => Ok(HttpResponse::Ok().json(result)),
+        None => Err(crate::error::GatewayError::BadRequest(
+            "receipt hash must be 64 hex characters (32 bytes)".to_string(),
+        )),
+    }
+}
+
 /// Configure compute routes
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -564,6 +607,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(submit_task)
             .service(cancel_task)
             .service(get_status)
+            .service(query_settlement_by_receipt)
+            .service(query_settlement)
             .service(upload_wasm)
             .service(list_wasm)
             .service(get_wasm_metadata),

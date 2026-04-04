@@ -19,6 +19,8 @@ pub struct ComputeManager {
     compute_service: Option<Arc<icn_api::ComputeService>>,
     /// WASM registry for module management
     wasm_registry: Option<Arc<icn_compute::WasmRegistry>>,
+    /// Settlement engine for task audit queries
+    settlement_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
 }
 
 impl ComputeManager {
@@ -27,6 +29,7 @@ impl ComputeManager {
         ComputeManager {
             compute_service: None,
             wasm_registry: None,
+            settlement_engine: None,
         }
     }
 
@@ -35,6 +38,7 @@ impl ComputeManager {
         ComputeManager {
             compute_service: Some(service),
             wasm_registry: None,
+            settlement_engine: None,
         }
     }
 
@@ -46,6 +50,7 @@ impl ComputeManager {
         ComputeManager {
             compute_service: Some(service),
             wasm_registry: Some(registry),
+            settlement_engine: None,
         }
     }
 
@@ -54,7 +59,50 @@ impl ComputeManager {
         ComputeManager {
             compute_service: None,
             wasm_registry: Some(registry),
+            settlement_engine: None,
         }
+    }
+
+    /// Attach the settlement engine for task audit queries
+    pub fn with_settlement_engine(
+        mut self,
+        engine: Arc<dyn icn_kernel_api::services::SettlementQueryService>,
+    ) -> Self {
+        self.settlement_engine = Some(engine);
+        self
+    }
+
+    /// Query settlement status by task_id.
+    ///
+    /// Returns a `SettlementQueryResult` indicating whether the task has been settled,
+    /// along with the receipt hash and scope when available.
+    pub fn query_settlement(
+        &self,
+        task_id: &str,
+    ) -> icn_kernel_api::services::SettlementQueryResult {
+        match &self.settlement_engine {
+            Some(engine) => engine.query_by_task(task_id),
+            None => icn_kernel_api::services::SettlementQueryResult::not_found(task_id),
+        }
+    }
+
+    /// Query settlement status by receipt hash — the canonical durable audit key.
+    ///
+    /// Accepts a 64-character hex string. Returns `None` if the hex is malformed.
+    pub fn query_settlement_by_receipt(
+        &self,
+        receipt_hash_hex: &str,
+    ) -> Option<icn_kernel_api::services::SettlementReceiptResult> {
+        let bytes = hex::decode(receipt_hash_hex).ok()?;
+        if bytes.len() != 32 {
+            return None;
+        }
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&bytes);
+        Some(match &self.settlement_engine {
+            Some(engine) => engine.query_by_receipt_hash(&hash),
+            None => icn_kernel_api::services::SettlementReceiptResult::not_found(hash),
+        })
     }
 
     /// Set compute service (for late binding)
@@ -184,6 +232,7 @@ impl ComputeManager {
                 network_mbps: rp.network_mbps,
                 duration_estimate_secs: rp.duration_estimate_secs,
             }),
+            scope: None, // Gateway defaults to Local; Commons scope not yet exposed in REST API
         };
 
         compute_service
@@ -282,6 +331,103 @@ pub struct ComputeResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_kernel_api::services::{SettlementQueryResult, SettlementReceiptResult};
+    use std::collections::HashMap;
+
+    // ---------------------------------------------------------------------------
+    // Stub SettlementQueryService for manager-level tests.
+    // Backed by a HashMap<[u8;32], (task_id, scope)>.
+    // ---------------------------------------------------------------------------
+    struct StubSettlement {
+        settled: HashMap<[u8; 32], (Option<String>, Option<String>)>,
+    }
+
+    impl icn_kernel_api::services::SettlementQueryService for StubSettlement {
+        fn query_by_task(&self, _task_id: &str) -> SettlementQueryResult {
+            unimplemented!("not under test")
+        }
+
+        fn query_by_receipt_hash(&self, hash: &[u8; 32]) -> SettlementReceiptResult {
+            match self.settled.get(hash) {
+                Some((task_id, scope)) => {
+                    SettlementReceiptResult::settled(*hash, task_id.clone(), scope.clone())
+                }
+                None => SettlementReceiptResult::not_found(*hash),
+            }
+        }
+    }
+
+    fn mgr_with_stub(stub: StubSettlement) -> ComputeManager {
+        ComputeManager::new().with_settlement_engine(
+            Arc::new(stub) as Arc<dyn icn_kernel_api::services::SettlementQueryService>
+        )
+    }
+
+    // ---------------------------------------------------------------------------
+    // Receipt-hash query proof tests
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn test_query_by_receipt_settled_returns_status_scope_task_id() {
+        let receipt_hash = [0xABu8; 32];
+        let receipt_hex = hex::encode(receipt_hash);
+        let mut settled = HashMap::new();
+        settled.insert(
+            receipt_hash,
+            (Some("task-abc".to_string()), Some("commons".to_string())),
+        );
+        let mgr = mgr_with_stub(StubSettlement { settled });
+
+        let result = mgr
+            .query_settlement_by_receipt(&receipt_hex)
+            .expect("known receipt_hash must return Some");
+
+        assert_eq!(result.status, "settled");
+        assert_eq!(result.receipt_hash, receipt_hex);
+        assert_eq!(result.task_id.as_deref(), Some("task-abc"));
+        assert_eq!(result.scope.as_deref(), Some("commons"));
+    }
+
+    #[test]
+    fn test_query_by_receipt_not_found_returns_not_found_status() {
+        let mgr = mgr_with_stub(StubSettlement {
+            settled: HashMap::new(),
+        });
+        let unknown_hex = hex::encode([0x00u8; 32]);
+
+        let result = mgr
+            .query_settlement_by_receipt(&unknown_hex)
+            .expect("well-formed hex must return Some even for unknown hashes");
+
+        assert_eq!(result.status, "not_found");
+        assert_eq!(result.receipt_hash, unknown_hex);
+        assert!(result.task_id.is_none());
+        assert!(result.scope.is_none());
+    }
+
+    #[test]
+    fn test_query_by_receipt_malformed_hex_returns_none() {
+        let mgr = mgr_with_stub(StubSettlement {
+            settled: HashMap::new(),
+        });
+        assert!(mgr.query_settlement_by_receipt("not-hex-at-all").is_none());
+        assert!(mgr
+            .query_settlement_by_receipt("zz".repeat(32).as_str())
+            .is_none());
+    }
+
+    #[test]
+    fn test_query_by_receipt_wrong_byte_length_returns_none() {
+        let mgr = mgr_with_stub(StubSettlement {
+            settled: HashMap::new(),
+        });
+        // Valid hex but only 16 bytes (32 hex chars) — too short
+        let short_hex = hex::encode([0xAAu8; 16]);
+        assert!(mgr.query_settlement_by_receipt(&short_hex).is_none());
+        // Valid hex but 64 bytes (128 hex chars) — too long
+        let long_hex = hex::encode([0xBBu8; 64]);
+        assert!(mgr.query_settlement_by_receipt(&long_hex).is_none());
+    }
 
     #[test]
     fn test_compute_manager_new() {

@@ -1,0 +1,42 @@
+name: Agent Drift Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.claude/**'
+      - 'ops/automation/skills/**'
+      - 'ops/state/truth/**'
+      - 'ops/scripts/drift-check.sh'
+  pull_request:
+    # No paths filter: run on ALL PRs so any new skill/agent is checked for truth_contract
+    # and registry entries. The check is fast (~5s) and catches silent drift early.
+    branches: [main]
+  schedule:
+    - cron: '0 9 * * 1'
+
+jobs:
+  drift-check:
+    name: Agent Tooling Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify canonical truth files exist
+        run: bash ops/scripts/drift-check.sh
+
+      - name: Validate JSON truth files are parseable
+        run: |
+          set -e
+          for f in \
+            ops/state/truth/sources.json \
+            ops/state/truth/policy.json \
+            ops/state/truth/agents.json \
+            ops/state/truth/skills.json \
+            ops/state/config/repo-map.json \
+            ops/state/sprint/current.json; do
+            python3 -c "import json; json.load(open('${f}'))" && echo "OK: ${f}"
+          done
+
+      - name: Verify what-matters-now script runs without errors
+        run: bash ops/scripts/what-matters-now.sh --drift

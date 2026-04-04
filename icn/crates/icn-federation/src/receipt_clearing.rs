@@ -691,6 +691,51 @@ mod tests {
         assert_eq!(mgr.pending_count(), 0);
     }
 
+    /// Proves the full path: FederationClearingNotification(scope=Commons)
+    /// → ClearingReceipt(scope=Commons) [as init_compute.rs builds it post-fix]
+    /// → submit_receipt → flush_to_clearing → commons_deferred.
+    ///
+    /// Before the fix, init_compute.rs hardcoded scope=Federation, so the same
+    /// task would produce federation_flushed=1 (misrouted through bilateral clearing).
+    #[test]
+    fn test_commons_notification_routes_to_deferred_not_bilateral() {
+        // Simulate what init_compute.rs does when it receives a
+        // FederationClearingNotification from on_federated_task_result.
+        // Post-fix: scope comes from notification.scope, not hardcoded Federation.
+        let notification_scope = ScopeLevel::Commons;
+
+        let receipt = ClearingReceipt {
+            receipt_hash: [0xCC; 32],
+            executor_did: test_did(),
+            executor_coop: "tech-coop".into(),
+            submitter_did: test_did(),
+            submitter_coop: "food-coop".into(),
+            cost: 300,
+            currency: "credits".into(),
+            scope: notification_scope, // ← the fix: use notification.scope
+            created_at: current_timestamp(),
+            disputed: false,
+            dispute_reason: None,
+        };
+
+        let mgr = ReceiptClearingManager::new(BatchClearingConfig::default());
+        let clearing = make_clearing_manager();
+
+        mgr.submit_receipt(receipt).unwrap();
+        let report = mgr.flush_to_clearing(&clearing).unwrap();
+
+        // Commons receipts must be deferred — never fed into bilateral clearing.
+        assert_eq!(
+            report.commons_deferred, 1,
+            "commons receipt must be deferred, not bilaterally cleared"
+        );
+        assert_eq!(
+            report.federation_flushed, 0,
+            "commons receipt must not create a bilateral transfer"
+        );
+        assert_eq!(mgr.pending_count(), 0, "receipt must be drained from queue");
+    }
+
     #[test]
     fn test_flush_federation_creates_transfer() {
         use crate::clearing::BilateralClearingAgreement;

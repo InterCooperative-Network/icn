@@ -118,6 +118,10 @@ pub struct FederationClearingNotification {
     pub task_id: String,
     /// Attestation hash — used as the clearing receipt's dedup key
     pub attestation_hash: [u8; 32],
+    /// Scope of the task — used to route commons vs. federation receipts correctly.
+    /// Commons-scoped federated tasks are deferred (Epic 6 #925); federation-scoped
+    /// tasks proceed through bilateral clearing.
+    pub scope: icn_kernel_api::ScopeLevel,
 }
 
 /// Callback for recording cross-cooperative clearing obligations.

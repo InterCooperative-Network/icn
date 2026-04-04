@@ -31,9 +31,7 @@
     "root": "../icn-wt",
     "managed_by": "scripts/worktrees.sh",
     "base_branch": "origin/main",
-    "active": [
-      "1310-execution-receipt-gate"
-    ]
+    "active": []
   },
   "relationships": [
     {
@@ -64,6 +62,7 @@
       "control": "10.8.30.40",
       "workers": ["10.8.30.41", "10.8.30.42"],
       "icn_dev": "10.8.30.45",
+      "ci_runner": "10.8.30.46",
       "services": {
         "gateway": "10.8.30.40:30080",
         "pilot_ui": "10.8.30.40:30030",

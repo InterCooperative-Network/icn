@@ -1,0 +1,79 @@
+{
+  "schema": "icn-truth-sources/v1",
+  "description": "Canonical truth ownership for all important operational facts. One source per domain. If two files claim the same fact, this file wins.",
+  "domains": {
+    "repo_topology": {
+      "owner": "ops/state/config/repo-map.json",
+      "sections": ["repos", "worktrees", "relationships", "infrastructure"],
+      "stability": "slow-changing",
+      "description": "Monorepo layout, subdirectory purposes, worktree root, K3s cluster IPs"
+    },
+    "sprint_state": {
+      "owner": "ops/state/sprint/current.json",
+      "stability": "volatile",
+      "description": "Active sprint number, tasks, status, blockers. Changes every 1-2 weeks."
+    },
+    "merge_policy": {
+      "owner": "ops/state/truth/policy.json",
+      "stability": "slow-changing",
+      "description": "Required CI checks, merge strategy, readiness definition, admin bypass rules"
+    },
+    "agent_registry": {
+      "owner": "ops/state/truth/agents.json",
+      "stability": "slow-changing",
+      "description": "All available agents, their paths, and routing triggers"
+    },
+    "skill_registry": {
+      "owner": "ops/state/truth/skills.json",
+      "stability": "slow-changing",
+      "description": "All available skills, their canonical paths, and ownership"
+    },
+    "adr_decisions": {
+      "owner": "ops/state/decisions/",
+      "stability": "slow-changing",
+      "description": "Architecture Decision Records. Never delete; use status: superseded."
+    },
+    "cluster_topology": {
+      "owner": "ops/state/config/repo-map.json#infrastructure",
+      "stability": "slow-changing",
+      "description": "K3s node IPs, service ports. Source: repo-map.json .infrastructure.k3s"
+    },
+    "invariants": {
+      "owner": "AGENTS.md",
+      "sections": ["ICN Invariants"],
+      "stability": "constant",
+      "description": "The 5 non-negotiable protocol invariants. Never override."
+    },
+    "ci_exceptions": {
+      "owner": "ops/state/ci-exceptions.md",
+      "stability": "slow-changing",
+      "description": "Documented CI exemptions with rationale and expiry"
+    },
+    "live_branch_state": {
+      "owner": "git",
+      "query": "git branch --show-current && git status --short",
+      "stability": "volatile",
+      "description": "Current branch, dirty files, uncommitted changes. NEVER hardcode."
+    },
+    "live_pr_state": {
+      "owner": "github-api",
+      "query": "gh pr list --json number,title,headRefName,mergeable,mergeStateStatus",
+      "stability": "volatile",
+      "description": "Open PRs and their CI state. NEVER hardcode."
+    },
+    "live_ci_state": {
+      "owner": "github-api",
+      "query": "gh run list --branch main --limit 5 --json status,conclusion,name",
+      "stability": "volatile",
+      "description": "CI run state. NEVER hardcode."
+    }
+  },
+  "forbidden": [
+    "Do NOT hardcode sprint numbers in skills or agents — read ops/state/sprint/current.json",
+    "Do NOT hardcode PR numbers or branch lists — query via gh",
+    "Do NOT hardcode cluster IPs — read from repo-map.json#infrastructure",
+    "Do NOT use icn-ops/state paths — canonical is ops/state/ (inside monorepo)",
+    "Do NOT use icn-website/ paths — canonical is website/ (inside monorepo)",
+    "Do NOT reference sync-from-icn.sh — the website reads docs directly"
+  ]
+}

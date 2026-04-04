@@ -130,6 +130,8 @@ pub struct GatewayServer {
     /// When provided, CommonsManager uses this shared handle instead of opening its own sled store.
     /// This is the canonical path for preventing dual sled ownership over commons state.
     commons_handle: Option<icn_commons::CommonsHandle>,
+    /// Settlement engine for compute audit queries (task_id → settled status).
+    settlement_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
 }
 
 impl GatewayServer {
@@ -163,6 +165,7 @@ impl GatewayServer {
             default_trust_score: None,
             charter_accepted_hook: None,
             commons_handle: None,
+            settlement_engine: None,
         }
     }
 
@@ -208,6 +211,7 @@ impl GatewayServer {
             default_trust_score: None,
             charter_accepted_hook: None,
             commons_handle: None,
+            settlement_engine: None,
         }
     }
 
@@ -254,6 +258,7 @@ impl GatewayServer {
             default_trust_score: None,
             charter_accepted_hook: None,
             commons_handle: None,
+            settlement_engine: None,
         }
     }
 
@@ -460,6 +465,15 @@ impl GatewayServer {
         self
     }
 
+    /// Attach settlement engine for compute audit queries.
+    pub fn with_settlement_engine(
+        mut self,
+        engine: Arc<dyn icn_kernel_api::services::SettlementQueryService>,
+    ) -> Self {
+        self.settlement_engine = Some(engine);
+        self
+    }
+
     /// Run the gateway server
     pub async fn run(self) -> Result<()> {
         info!("Starting ICN Gateway on {}", self.bind_addr);
@@ -661,21 +675,29 @@ impl GatewayServer {
             Arc::new(mgr)
         };
 
-        let compute_manager = if let Some(handle) = self.compute_handle {
-            info!("Compute manager connected to daemon");
-            let service = Arc::new(icn_api::ComputeService::new(handle));
-            if let Some(registry) = wasm_registry {
-                Arc::new(ComputeManager::with_service_and_registry(service, registry))
+        let compute_manager = {
+            let mgr = if let Some(handle) = self.compute_handle {
+                info!("Compute manager connected to daemon");
+                let service = Arc::new(icn_api::ComputeService::new(handle));
+                if let Some(registry) = wasm_registry {
+                    ComputeManager::with_service_and_registry(service, registry)
+                } else {
+                    ComputeManager::with_service(service)
+                }
             } else {
-                Arc::new(ComputeManager::with_service(service))
-            }
-        } else {
-            info!("Compute manager running standalone (no daemon connection)");
-            if let Some(registry) = wasm_registry {
-                Arc::new(ComputeManager::with_registry(registry))
+                info!("Compute manager running standalone (no daemon connection)");
+                if let Some(registry) = wasm_registry {
+                    ComputeManager::with_registry(registry)
+                } else {
+                    ComputeManager::new()
+                }
+            };
+            let mgr = if let Some(engine) = self.settlement_engine {
+                mgr.with_settlement_engine(engine)
             } else {
-                Arc::new(ComputeManager::new())
-            }
+                mgr
+            };
+            Arc::new(mgr)
         };
 
         // Create contract registry handle for contract management API

@@ -4,6 +4,18 @@ description: Create a PR following ICN conventions with invariants checklist, pr
 argument-hint: "[base-branch]"
 user-invocable: true
 allowed-tools: "Bash, Read, Grep, Glob"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # required checks, branch naming conventions
+    - ops/state/config/repo-map.json    # workspace root
+  live_load_required:
+    - "git branch --show-current"
+    - "git diff --name-only $(git merge-base HEAD origin/main)..HEAD"
+  examples_only: []
+  never_hardcode:
+    - branch name
+    - base branch (always confirm with git)
+    - required check list
 ---
 
 Create a pull request following ICN conventions.

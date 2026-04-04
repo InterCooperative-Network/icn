@@ -90,6 +90,7 @@ pub async fn handle_compute_submit(
         payment_currency: request.payment_currency,
         coop_id: None, // Already in api_ctx
         resource_profile,
+        scope: None, // RPC layer defaults to Local scope; Commons scope not yet exposed via RPC
     };
 
     // Submit via service

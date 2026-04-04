@@ -4,6 +4,15 @@ description: Run criterion benchmarks locally for one or all ICN crates. CI runs
 argument-hint: "[crate-name | all]"
 user-invocable: true
 allowed-tools: "Bash"
+truth_contract:
+  canonical_sources:
+    - ops/state/config/repo-map.json    # workspace root (cargo commands from icn/)
+  live_load_required:
+    - "cargo metadata --no-deps --format-version 1"   # package name resolution
+  examples_only: []
+  never_hardcode:
+    - package names (resolve via cargo metadata)
+    - workspace paths (resolve via git rev-parse --show-toplevel)
 ---
 
 Run criterion benchmarks for the specified crate, or all six targets.

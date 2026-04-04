@@ -1,0 +1,49 @@
+{
+  "schema": "icn-skills/v1",
+  "description": "Registry of all skills with canonical paths and ownership. Generated indexes and routing tables should derive from here. Do not maintain separate skill lists in prompt files.",
+  "canonical_skill_sources": {
+    "ops_automation": "ops/automation/skills/",
+    "icn_level": ".claude/skills/",
+    "project_level": "../../../.claude/skills/"
+  },
+  "note_on_duplication": "ops/automation/skills/ is the canonical source for shared operational skills. The project-level .claude/skills/ for {status, sync-and-build, worktree} MUST be symlinks to ops/automation/skills/. Run ops/scripts/setup-skill-symlinks.sh to create/verify.",
+  "skills": {
+    "ops_automation_canonical": [
+      {
+        "name": "status",
+        "canonical_path": "ops/automation/skills/status/SKILL.md",
+        "symlinked_at": ["../../../.claude/skills/status/SKILL.md"],
+        "description": "Full development status dashboard — MCP-powered"
+      },
+      {
+        "name": "sync-and-build",
+        "canonical_path": "ops/automation/skills/sync-and-build/SKILL.md",
+        "symlinked_at": ["../../../.claude/skills/sync-and-build/SKILL.md"],
+        "description": "Website build pipeline — no sync script needed"
+      },
+      {
+        "name": "worktree",
+        "canonical_path": "ops/automation/skills/worktree/SKILL.md",
+        "symlinked_at": ["../../../.claude/skills/worktree/SKILL.md"],
+        "description": "Git worktree management"
+      }
+    ],
+    "icn_level": [
+      "bench", "changelog", "demo-validate", "devnet", "diag-infra",
+      "firewall-check", "fix-ci", "fix-rust-lints", "handoff", "icn-dev",
+      "icn-preflight", "integrate-pr-stack", "merge-pr", "merge-prs",
+      "pr-create", "preflight", "push", "repair-gh-workflow",
+      "resolve-pr-branch", "resolve-rust-targets", "review-apply",
+      "sync-docs", "verify", "watch-ci-and-advance"
+    ],
+    "project_level_only": [
+      "close-sprint", "existing-tool-inventory", "preflight-repo",
+      "resume-session", "rust-verify", "update-session-state"
+    ],
+    "overlapping_ownership_notes": {
+      "fix-ci": "Both icn-level and project-level have this. icn/.claude/skills/fix-ci is authoritative for ICN-specific CI work.",
+      "icn-preflight": "Both levels have this. icn/.claude/skills/icn-preflight is authoritative — it uses the ICN-specific change routing matrix.",
+      "merge-prs": "Both levels have this. icn/.claude/skills/merge-prs is authoritative for ICN — has the correct squash policy and 10 required checks."
+    }
+  }
+}

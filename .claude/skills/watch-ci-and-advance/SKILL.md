@@ -4,6 +4,18 @@ description: Monitor CI as a queue system. Advance other ready work while waitin
 argument-hint: "[PR number | run ID]"
 user-invocable: true
 allowed-tools: "Bash"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # required_checks, non_blocking_checks, admin_bypass
+    - ops/state/config/repo-map.json    # infrastructure.k3s.ci_runner IP
+  live_load_required:
+    - "gh run list --limit 5 --json databaseId,status,name,conclusion,createdAt"
+    - "gh api repos/InterCooperative-Network/icn/actions/runners --jq '.runners[]'"
+  examples_only:
+    - "The 4-check example in Phase 3 is illustrative — always use all required checks from policy.json"
+  never_hardcode:
+    - required check set or count (read from ops/state/truth/policy.json#merge.required_checks or branch protection API)
+    - runner IP (read from ops/state/config/repo-map.json#infrastructure.k3s.ci_runner)
 ---
 
 Treat CI as a queue system. While the runner is busy, do useful work. Report only meaningful
@@ -56,11 +68,17 @@ gh pr list --json number,headRefName,statusCheckRollup \
 Instead of printing the full check table every poll, track which gates changed:
 
 ```bash
-# Snapshot required gates only
+# Snapshot required gates only (read policy.json for the canonical list — never hardcode)
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+REQUIRED=$(python3 -c "
+import json
+p = json.load(open('${REPO_ROOT}/ops/state/truth/policy.json'))
+print(repr(set(p['merge']['required_checks'])))
+")
 gh pr checks <N> --json name,state,conclusion \
   | python3 -c "
 import sys, json
-required = {'Build Release','Test','Clippy','Format Check'}
+required = $REQUIRED
 checks = {c['name']:c for c in json.load(sys.stdin) if c['name'] in required}
 for name, c in sorted(checks.items()):
     status = c['conclusion'] if c['state'] == 'COMPLETED' else c['state']
@@ -94,7 +112,7 @@ When required gates resolve:
 
 ## ICN-specific notes
 
-- ICN has one self-hosted runner (`ci-runner`, 10.8.30.46). Parallel PR merges cause queue.
+- ICN has one self-hosted runner (`ci-runner`). IP in `ops/state/config/repo-map.json#infrastructure.k3s.ci_runner`. Parallel PR merges cause queue.
 - Full workspace test suite runs ~14 min on the self-hosted runner.
 - Build Release + Clippy + Test tend to run sequentially on the same runner job.
 - `Test Coverage` and `Compare Against Base` often tail the required gates — ignore them for merge decisions.

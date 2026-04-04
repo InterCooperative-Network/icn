@@ -63,6 +63,7 @@ async fn test_commons_settlement_replicates_to_second_node() {
         amount,
         consumer_balance: 10_000,
         executor_verified: true,
+        task_id: None,
     };
 
     // Settle on node A.
@@ -143,6 +144,7 @@ async fn test_commons_settlement_replicates_to_three_nodes() {
         amount: 1_000,
         consumer_balance: 50_000,
         executor_verified: true,
+        task_id: None,
     };
 
     let (earn_entry, spend_entry) = engine.settle_commons_receipt(&req).unwrap();
@@ -197,6 +199,7 @@ fn test_commons_settlement_dedup_rejects_replay() {
         amount: 250,
         consumer_balance: 5_000,
         executor_verified: true,
+        task_id: None,
     };
 
     // First submission: must succeed.
@@ -234,6 +237,7 @@ fn test_commons_settlement_rejects_non_commons_scope() {
             amount: 100,
             consumer_balance: 1_000,
             executor_verified: true,
+            task_id: None,
         };
         assert!(
             engine.settle_commons_receipt(&req).is_err(),
@@ -266,6 +270,7 @@ async fn test_commons_multiple_contributions_accumulate() {
             amount,
             consumer_balance: 100_000,
             executor_verified: true,
+            task_id: None,
         };
         let (earn_entry, spend_entry) = engine.settle_commons_receipt(&req).unwrap();
         let h_earn = ledger_a.append_entry(earn_entry.clone()).await.unwrap();

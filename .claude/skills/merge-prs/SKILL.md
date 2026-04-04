@@ -4,6 +4,18 @@ description: Merge one or more PRs with full stack-integration pipeline. Resolve
 argument-hint: "[PR numbers...] [--admin] [--dry-run]"
 user-invocable: true
 allowed-tools: "Bash"
+truth_contract:
+  canonical_sources:
+    - ops/state/truth/policy.json       # merge strategy, required checks, admin bypass rules
+    - ops/state/truth/sources.json      # truth ownership map
+  live_load_required:
+    - "gh pr view <N> --json number,headRefName,baseRefName,mergeable,mergeStateStatus"
+    - "gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'"
+  examples_only: []
+  never_hardcode:
+    - PR numbers or branch names
+    - required check lists (query live or read policy.json)
+    - sprint state
 ---
 
 Stack-integration merge pipeline. Not a thin `gh pr merge` wrapper. Owns branch resolution,
@@ -11,6 +23,17 @@ merge ordering, post-merge rebases, local verification, and main sync.
 
 For single quick merges when you already know the state is clean, this still works. For sprint
 batch closes, use `/integrate-pr-stack` instead (same logic, more verbose output).
+
+## Step 0 — Preflight (run first, always)
+
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+bash "${REPO_ROOT}/ops/scripts/what-matters-now.sh" 2>/dev/null || true
+```
+
+If `what-matters-now.sh` reports drift errors → **stop and fix drift before merging**.
+Drift in agent files (stale paths, missing truth_contracts, hardcoded check sets) means
+the tooling you're running may itself be unreliable.
 
 ## Steps
 
@@ -25,28 +48,25 @@ batch closes, use `/integrate-pr-stack` instead (same logic, more verbose output
      --jq '{pr:.number, head:.headRefName, base:.baseRefName, mergeable:.mergeable, state:.mergeStateStatus}'
    ```
 
-3. **Classify check state** (required gates only):
+3. **Classify check state** (required gates only — load from policy.json, never hardcode):
    ```bash
-   gh pr checks <N> --json name,state,conclusion \
-     | python3 -c "
-   import sys, json
-   required = {'Build Release','Test','Clippy','Format Check'}
-   checks = json.load(sys.stdin)
-   req_states = {c['name']:c['conclusion'] or c['state'] for c in checks if c['name'] in required}
-   all_pass = all(v in ('SUCCESS','success') for v in req_states.values())
-   print('required:', req_states, '→', 'GREEN' if all_pass else 'NOT READY')
-   " 2>/dev/null || echo "checks unavailable"
+   REPO_ROOT="$(git rev-parse --show-toplevel)"
+   REQUIRED=$(python3 -c "import json; p=json.load(open('${REPO_ROOT}/ops/state/truth/policy.json')); print(','.join('\"'+c+'\"' for c in p['merge']['required_checks']))")
+   gh pr view <N> --json statusCheckRollup \
+     --jq ".statusCheckRollup[] | select(.name | IN(${REQUIRED})) | {name:.name, result:.conclusion}" 2>/dev/null
    ```
 
-   - `UNSTABLE` + required all pass → treat as GREEN, safe to merge
-   - `MERGEABLE` + required pending → use `--auto` or wait
+   - `UNSTABLE` mergeStateStatus + all required conclusions `SUCCESS` → treat as GREEN, safe to merge
+   - Any required conclusion empty/pending → use `--auto` or wait
+   - `claude-review`, `Compare Against Base`, `Test Coverage` failures → **never block**, ignore
 
-4. **Merge** (in order provided; smallest/safest first for batch):
+4. **Merge** (in order provided; smallest/safest first for batch). This repo uses **squash merge**:
    ```bash
-   gh pr merge <N> --merge              # green required checks
-   gh pr merge <N> --merge --admin      # if $ARGUMENTS includes --admin (queue-stalled)
-   gh pr merge <N> --auto --merge       # pending required checks
+   gh pr merge <N> --squash             # green required checks (default)
+   gh pr merge <N> --squash --admin     # if $ARGUMENTS includes --admin (queue-stalled)
+   gh pr merge <N> --auto --squash      # pending required checks
    ```
+   Exception: subtree merge commits require `--merge` — note the reason explicitly.
 
 5. **After each merge**:
    ```bash
@@ -80,8 +100,10 @@ batch closes, use `/integrate-pr-stack` instead (same logic, more verbose output
 - **Always resolve head branch from GitHub.** Never use plan-doc branch names directly.
 - **After each merge, rebase remaining branches.** Verify locally before force-push.
 
-## Required checks (from branch protection)
+## Required checks reference (illustrative — canonical source is policy.json)
 
-`Build Release`, `Test`, `Clippy`, `Format Check`
+<!-- examples_only: this list is a snapshot. Always read ops/state/truth/policy.json for authoritative list. -->
 
-Non-blocking (don't block merge): `Test Coverage`, `Compare Against Base`, `Benchmarks`, `claude-review`
+Verify live: `gh api repos/InterCooperative-Network/icn/branches/main/protection --jq '.required_status_checks.contexts'`
+
+Or read canonical: `python3 -c "import json; print(json.load(open('$(git rev-parse --show-toplevel)/ops/state/truth/policy.json'))['merge']['required_checks'])"`
