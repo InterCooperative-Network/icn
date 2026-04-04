@@ -107,7 +107,6 @@ pub struct SettlementRequest {
 /// ## Restart-safe deduplication
 ///
 /// When constructed with `SettlementEngine::with_store()`, dedup keys for
-
 /// commons receipts are persisted to sled. On construction the engine loads
 /// all existing keys from the store so re-settlements attempted after a daemon
 /// restart are rejected identically to in-process duplicates.

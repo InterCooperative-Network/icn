@@ -1965,3 +1965,16 @@ pub trait SettlementQueryService: Send + Sync {
     fn query_by_task(&self, task_id: &str) -> SettlementQueryResult;
     fn query_by_receipt_hash(&self, hash: &[u8; 32]) -> SettlementReceiptResult;
 }
+
+/// No-op implementation for use in test/standalone contexts where no settlement engine
+/// is wired. All queries return `not_found`.
+pub struct NoOpSettlementQueryService;
+
+impl SettlementQueryService for NoOpSettlementQueryService {
+    fn query_by_task(&self, task_id: &str) -> SettlementQueryResult {
+        SettlementQueryResult::not_found(task_id)
+    }
+    fn query_by_receipt_hash(&self, hash: &[u8; 32]) -> SettlementReceiptResult {
+        SettlementReceiptResult::not_found(*hash)
+    }
+}

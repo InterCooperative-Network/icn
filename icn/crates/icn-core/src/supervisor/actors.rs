@@ -121,4 +121,17 @@ pub struct BootstrapHandles {
     /// Type-erased so `icn-core` stays domain-agnostic (no `icn-charter-app` import).
     /// The daemon builds this closure from `Arc<CharterPolicyOracle>`.
     pub charter_accepted_hook: Option<Arc<dyn Fn(String, String) + Send + Sync>>,
+    /// Pre-built balance callback for commons credit gate checks.
+    /// Built by the daemon (composition root) to keep `icn-ledger` out of `icn-core`.
+    pub balance_callback: Option<icn_compute::BalanceCallback>,
+    /// Pre-built payment callback for compute task payment settlement.
+    /// Built by the daemon (composition root) to keep `icn-ledger` out of `icn-core`.
+    pub payment_callback: Option<icn_compute::PaymentCallback>,
+    /// Pre-built commons settlement callback for commons-scope task completion.
+    /// Built by the daemon (composition root) to keep `icn-ledger` out of `icn-core`.
+    pub commons_settlement_callback: Option<icn_compute::CommonsSettlementCallback>,
+    /// Pre-built settlement query engine for task audit queries.
+    /// The concrete `SettlementEngine` (from `icn-ledger`) is built in the daemon and
+    /// injected here as a trait object so `icn-core` never imports `icn-ledger`.
+    pub settlement_query_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
 }

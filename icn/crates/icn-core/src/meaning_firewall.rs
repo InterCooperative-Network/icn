@@ -381,14 +381,17 @@ mod tests {
     /// Tracked for extraction in #914 (ledger extraction).
     #[test]
     fn strict_core_ledger_reference_ratchet() {
-        // actors.rs: 3 refs (LedgerHandle, DisputeManagerHandle, TreasuryManagerHandle).
+        // actors.rs: 3 refs (LedgerHandle, DisputeManagerHandle, TreasuryManagerHandle type aliases).
         // ledger_service.rs: 1 ref — composition root.
         // bin/ledger_restart_helper.rs: 1 ref — test infrastructure.
-        // init_compute.rs: 16 refs — settlement engine construction + commons settlement
-        //   callback + journal entry building (the legitimate compute→ledger boundary).
+        //
+        // init_compute.rs: 0 refs — factory functions (balance/payment/commons settlement) and
+        //   settlement engine construction moved to bins/icnd/src/compute_wiring.rs (daemon
+        //   composition root). Callbacks are injected via BootstrapHandles as type-erased
+        //   icn_compute callback types, keeping the kernel/app boundary intact.
         // Passthrough structs (GatewayActorHandles, GatewayHandles, ComputeServices)
-        // now use Arc<dyn SettlementQueryService> — concrete SettlementEngine removed.
-        let expected: usize = 21;
+        //   use Arc<dyn SettlementQueryService> — concrete SettlementEngine fully removed.
+        let expected: usize = 5;
         let actual = count_imports_in_crate("icn-core", "icn_ledger::");
 
         assert!(

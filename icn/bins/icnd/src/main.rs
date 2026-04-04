@@ -7,6 +7,8 @@
 // Allow cfg checks for optional HSM/TPM features defined in Cargo.toml
 #![allow(unexpected_cfgs)]
 
+mod compute_wiring;
+
 use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
@@ -283,6 +285,20 @@ async fn build_services(
         },
     );
 
+    // Build settlement engine and compute callbacks at the composition root.
+    // These bridge the kernel compute actor with the domain ledger; they live here
+    // so neither icn-core nor icn-compute imports icn-ledger.
+    let settlement_dedup_path = config.store_path().join("settlement_dedup");
+    let settlement_engine = compute_wiring::build_settlement_engine(settlement_dedup_path);
+    let balance_callback = compute_wiring::create_balance_callback(ledger_handle.clone());
+    let payment_callback = compute_wiring::create_payment_callback(ledger_handle.clone());
+    let commons_settlement_callback = compute_wiring::create_commons_settlement_callback(
+        ledger_handle.clone(),
+        settlement_engine.clone(),
+    );
+    let settlement_query_engine: Arc<dyn icn_kernel_api::services::SettlementQueryService> =
+        settlement_engine;
+
     let bootstrap_handles = icn_core::supervisor::BootstrapHandles {
         ledger: ledger_handle,
         ledger_store,
@@ -298,6 +314,10 @@ async fn build_services(
             })
         })),
         charter_accepted_hook: Some(charter_accepted_hook),
+        balance_callback: Some(balance_callback),
+        payment_callback: Some(payment_callback),
+        commons_settlement_callback: Some(commons_settlement_callback),
+        settlement_query_engine: Some(settlement_query_engine),
     };
 
     Ok((registry, Some(bootstrap_handles)))

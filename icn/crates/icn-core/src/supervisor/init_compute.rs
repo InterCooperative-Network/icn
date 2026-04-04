@@ -9,8 +9,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
-/// Type aliases for common handle types
-pub type LedgerHandle = super::actors::LedgerHandle;
+/// Type alias for common handle types
 pub type GossipHandle = Arc<RwLock<icn_gossip::GossipActor>>;
 pub type ComputeHandleHolder = Arc<RwLock<Option<icn_compute::ComputeHandle>>>;
 pub type DisputeHandleHolder = Arc<RwLock<Option<icn_ccl::DisputeActorHandle>>>;
@@ -20,8 +19,6 @@ pub type DisputeHandleHolder = Arc<RwLock<Option<icn_ccl::DisputeActorHandle>>>;
 pub struct ComputeDeps {
     /// Trust service for trust score lookups (kernel/app separated)
     pub trust_service: Arc<dyn TrustService>,
-    /// Ledger for payment settlement
-    pub ledger: LedgerHandle,
     /// Gossip handle for message routing
     pub gossip_handle: GossipHandle,
     /// This node's DID
@@ -47,6 +44,18 @@ pub struct ComputeDeps {
     /// completions are queued for periodic batch settlement.
     pub federation_clearing_handle:
         Option<std::sync::Arc<tokio::sync::RwLock<Option<icn_federation::ReceiptClearingManager>>>>,
+    /// Pre-built balance callback (built by daemon composition root).
+    /// When None, the balance gate is skipped (advisory check only).
+    pub balance_callback: Option<icn_compute::BalanceCallback>,
+    /// Pre-built payment callback (built by daemon composition root).
+    /// When None, ledger payment entries are not posted on task completion.
+    pub payment_callback: Option<icn_compute::PaymentCallback>,
+    /// Pre-built commons settlement callback (built by daemon composition root).
+    /// When None, commons-scope task completions do not produce ledger entries.
+    pub commons_settlement_callback: Option<icn_compute::CommonsSettlementCallback>,
+    /// Pre-built settlement query engine (built by daemon composition root).
+    /// When None, the settlement audit surface returns not_found for all queries.
+    pub settlement_query_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
 }
 
 /// Services returned from compute initialization
@@ -66,176 +75,6 @@ pub struct ComputeServices {
 /// Create the trust callback for compute actor
 pub fn create_trust_callback(trust_service: Arc<dyn TrustService>) -> icn_compute::TrustCallback {
     Arc::new(move |did_str: &str| trust_service.trust_score(&did_str.to_string()))
-}
-
-/// Create the balance callback for commons credit gate checks.
-///
-/// Returns the caller's commons credit balance (`"commons-capacity"` currency).
-/// Used for the advisory credit floor check and the `CommonsPoolPolicy` credit
-/// ceiling check inside `ComputeActor::handle_submit`.
-///
-/// Uses `try_read()` (non-blocking). On lock contention the callback returns
-/// `i64::MAX` so the advisory check passes — the authoritative gate is the
-/// `CommonsReserveCallback`, which must be wired separately for race-free
-/// credit enforcement.
-pub fn create_balance_callback(ledger: LedgerHandle) -> icn_compute::BalanceCallback {
-    Arc::new(move |did_str: &str| {
-        let did: Did = match did_str.parse() {
-            Ok(d) => d,
-            Err(_) => {
-                warn!(
-                    "balance_callback: unparseable DID '{}', returning 0",
-                    did_str
-                );
-                return 0;
-            }
-        };
-        match ledger.try_read() {
-            Ok(guard) => {
-                // The ICN ledger uses net_change = debit - credit, so `credit` entries
-                // (which record earnings) produce a NEGATIVE raw balance. Negate to convert
-                // "earned credit balance" → "spendable capacity" (positive = can spend).
-                // Example: earn 1000 → raw balance = -1000 → capacity = +1000.
-                -guard.get_balance(&did, icn_ledger::commons_credits::COMMONS_CREDIT_CURRENCY)
-            }
-            Err(_) => {
-                // Lock contended; skip advisory check — authoritative gate handles races.
-                tracing::debug!(
-                    did = did_str,
-                    "balance_callback: ledger read-contended, skipping advisory check"
-                );
-                i64::MAX
-            }
-        }
-    })
-}
-
-/// Create the commons settlement callback for posting completed-task journal entries.
-///
-/// When a commons-scope task completes successfully, the compute actor fires this callback
-/// with a `CommonsPaymentRequest`. This function:
-///
-/// 1. Fetches the consumer's current commons credit balance (for the balance-floor invariant).
-/// 2. Converts the compute-layer `CommonsPaymentRequest` into a ledger-layer
-///    `CommonsSettlementRequest` and runs it through `SettlementEngine::settle_commons_receipt()`.
-/// 3. Appends the resulting `(earn_entry, spend_entry)` to the ledger.
-///
-/// `engine` must be pre-created by the caller. Use `SettlementEngine::with_store()` for
-/// restart-safe idempotence; `SettlementEngine::new()` for process-local-only dedup.
-///
-/// Duplicate receipts (`LedgerError::DuplicateEntry`) are silently ignored. All other
-/// errors are logged as warnings; task completion is not rolled back.
-pub fn create_commons_settlement_callback(
-    ledger: LedgerHandle,
-    engine: Arc<icn_ledger::SettlementEngine>,
-) -> icn_compute::CommonsSettlementCallback {
-    Arc::new(move |req: icn_compute::CommonsPaymentRequest| {
-        let ledger = ledger.clone();
-        let engine = engine.clone();
-
-        tokio::spawn(async move {
-            // 1. Parse contributor DID (executor — earns credits)
-            let contributor: icn_identity::Did = match req.contributor.parse() {
-                Ok(d) => d,
-                Err(e) => {
-                    warn!(
-                        "commons_settlement: unparseable contributor DID '{}': {}",
-                        req.contributor, e
-                    );
-                    return;
-                }
-            };
-
-            // 2. Parse consumer DID (submitter — spends credits)
-            let consumer: icn_identity::Did = match req.consumer.parse() {
-                Ok(d) => d,
-                Err(e) => {
-                    warn!(
-                        "commons_settlement: unparseable consumer DID '{}': {}",
-                        req.consumer, e
-                    );
-                    return;
-                }
-            };
-
-            // 3. Fetch consumer balance for the balance-floor invariant.
-            //    Negate: ledger credit entries give negative raw balance; negate to get
-            //    spendable capacity (positive = can spend). Matches BalanceCallback convention.
-            let consumer_balance = {
-                let guard = ledger.read().await;
-                -guard.get_balance(
-                    &consumer,
-                    icn_ledger::commons_credits::COMMONS_CREDIT_CURRENCY,
-                )
-            };
-
-            // 4. Convert amount: u64 → i64 (SettlementEngine uses i64)
-            let amount_i64 = match i64::try_from(req.amount) {
-                Ok(v) => v,
-                Err(_) => {
-                    warn!(
-                        "commons_settlement: amount {} overflows i64 for task {}",
-                        req.amount, req.task_id
-                    );
-                    return;
-                }
-            };
-
-            // 5. Build settlement request DTO
-            let settlement_req = icn_ledger::CommonsSettlementRequest {
-                receipt_hash: req.receipt_hash,
-                contributor,
-                consumer,
-                scope: icn_kernel_api::ScopeLevel::Commons,
-                amount: amount_i64,
-                consumer_balance,
-                // We are the executor — task completed on this node, no external sig needed.
-                executor_verified: true,
-                task_id: Some(req.task_id.clone()),
-            };
-
-            // 6. Run through settlement engine (dedup + invariant checks)
-            let (earn_entry, spend_entry) = match engine.settle_commons_receipt(&settlement_req) {
-                Ok(entries) => entries,
-                Err(icn_ledger::LedgerError::DuplicateEntry(_)) => {
-                    // Idempotent — already settled, not an error
-                    return;
-                }
-                Err(e) => {
-                    warn!(
-                        "commons_settlement: engine rejected receipt {}: {}",
-                        hex::encode(req.receipt_hash),
-                        e
-                    );
-                    return;
-                }
-            };
-
-            // 7. Append both entries to the ledger (double-entry: earn + spend)
-            let mut ledger = ledger.write().await;
-            if let Err(e) = ledger.append_entry(earn_entry).await {
-                warn!(
-                    "commons_settlement: failed to append earn entry for task {}: {}",
-                    req.task_id, e
-                );
-                return;
-            }
-            match ledger.append_entry(spend_entry).await {
-                Ok(_) => {
-                    info!(
-                        "commons_settlement: settled {} credits, consumer='{}', contributor='{}', task={}",
-                        req.amount, req.consumer, req.contributor, req.task_id
-                    );
-                }
-                Err(e) => {
-                    warn!(
-                        "commons_settlement: failed to append spend entry for task {}: {}",
-                        req.task_id, e
-                    );
-                }
-            }
-        });
-    })
 }
 
 /// Create the send callback for routing compute messages through gossip
@@ -333,83 +172,6 @@ fn get_message_topic_and_data(
             icn_encoding::encode(compute_msg),
         ),
     }
-}
-
-/// Create the payment callback for settling compute payments via ledger
-pub fn create_payment_callback(ledger: LedgerHandle) -> icn_compute::PaymentCallback {
-    Arc::new(move |req| {
-        let ledger = ledger.clone();
-        tokio::spawn(async move {
-            // Parse DIDs
-            let from_did: Did =
-                match serde_json::from_value(serde_json::Value::String(req.from.clone())) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        warn!("Failed to parse payer DID: {}", e);
-                        return;
-                    }
-                };
-            let to_did: Did =
-                match serde_json::from_value(serde_json::Value::String(req.to.clone())) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        warn!("Failed to parse payee DID: {}", e);
-                        return;
-                    }
-                };
-
-            // Security (#1342): `req.from` originates from `claimed_task.submitter`, which is
-            // set by the task submitter at submission time. When tasks arrive via the gateway
-            // REST API the submitter DID is extracted from the JWT (authenticated). However,
-            // when a TaskSubmitted message is received via gossip, the submitter field comes
-            // from the gossip payload and could be spoofed by a malicious peer to name a
-            // victim DID as payer.
-            //
-            // Full fix requires the gossip layer to verify `entry.author == task.submitter`
-            // before calling `on_task_submitted` (tracked in #1342). Until that is in place,
-            // we record the payer DID in the provenance reason so audit logs can detect
-            // mismatches. We intentionally do NOT use system provenance without the payer DID
-            // to avoid hiding who was charged.
-            let amount_i64 = match i64::try_from(req.amount) {
-                Ok(v) => v,
-                Err(_) => {
-                    warn!(
-                        "Payment amount overflow: cannot convert {} to i64 for compute payment \
-                         (task {}, from {}, to {})",
-                        req.amount, req.task_id, req.from, req.to
-                    );
-                    return;
-                }
-            };
-            let provenance_reason = format!("compute-payment:payer={}", req.from);
-            let entry = match icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
-                .debit(from_did, req.currency.clone(), amount_i64)
-                .credit(to_did, req.currency.clone(), amount_i64)
-                .with_system_provenance(provenance_reason)
-                .build()
-            {
-                Ok(e) => e,
-                Err(e) => {
-                    warn!("Failed to build payment entry: {}", e);
-                    return;
-                }
-            };
-
-            // Append to ledger
-            let mut ledger = ledger.write().await;
-            match ledger.append_entry(entry).await {
-                Ok(_) => {
-                    info!(
-                        "Compute payment settled: {} {} from {} to {} for task {}",
-                        req.amount, req.currency, req.from, req.to, req.task_id
-                    );
-                }
-                Err(e) => {
-                    warn!("Failed to settle compute payment: {}", e);
-                }
-            }
-        });
-    })
 }
 
 /// Create the event callback for task status changes
@@ -551,38 +313,29 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
     let send_callback = create_send_callback(deps.gossip_handle.clone());
     compute_actor.set_send_callback(send_callback);
 
-    // Set up payment callback
-    let payment_callback = create_payment_callback(deps.ledger.clone());
-    compute_actor.set_payment_callback(payment_callback);
+    // Set up payment callback (pre-built by daemon composition root).
+    // When present, fires on task completion and posts a ledger debit/credit entry.
+    if let Some(payment_callback) = deps.payment_callback {
+        compute_actor.set_payment_callback(payment_callback);
+    }
 
     // Set up balance callback for commons credit gate checks (advisory floor + ceiling).
     // Must be registered before the actor spawns so handle_submit sees it immediately.
-    let balance_callback = create_balance_callback(deps.ledger.clone());
-    compute_actor.set_balance_callback(balance_callback);
+    if let Some(balance_callback) = deps.balance_callback {
+        compute_actor.set_balance_callback(balance_callback);
+    }
 
-    // Set up commons settlement engine with sled-backed dedup store.
-    // Keyed by receipt hash — survives daemon restart so the same receipt cannot
-    // produce duplicate ledger entries across process boundaries.
-    let settlement_dedup_path = deps.store_path.join("settlement_dedup");
-    let settlement_engine: Arc<icn_ledger::SettlementEngine> = {
-        let store = Arc::new(icn_store::SledStore::open(&settlement_dedup_path)?);
-        match icn_ledger::SettlementEngine::with_store(store) {
-            Ok(e) => Arc::new(e),
-            Err(e) => {
-                warn!(
-                    "Failed to load commons settlement dedup store ({e}); \
-                     falling back to in-memory-only dedup"
-                );
-                Arc::new(icn_ledger::SettlementEngine::new())
-            }
-        }
-    };
+    // Resolve settlement query engine: use the pre-built one from deps when available,
+    // otherwise fall back to a no-op in-memory engine (test/standalone mode).
+    let settlement_engine: Arc<dyn icn_kernel_api::services::SettlementQueryService> = deps
+        .settlement_query_engine
+        .unwrap_or_else(|| Arc::new(icn_kernel_api::services::NoOpSettlementQueryService));
 
     // Set up commons settlement callback — posts earn+spend journal entries to the ledger
     // when a commons-scope task completes successfully (closes the durability gap).
-    let commons_settlement_callback =
-        create_commons_settlement_callback(deps.ledger.clone(), settlement_engine.clone());
-    compute_actor.set_commons_settlement_callback(commons_settlement_callback);
+    if let Some(commons_settlement_callback) = deps.commons_settlement_callback {
+        compute_actor.set_commons_settlement_callback(commons_settlement_callback);
+    }
 
     // Create event broadcaster
     let broadcaster = Arc::new(icn_gateway::EventBroadcaster::new());
@@ -745,8 +498,7 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
         dispute_handle,
         broadcaster,
         policy_manager,
-        settlement_engine: settlement_engine.clone()
-            as Arc<dyn icn_kernel_api::services::SettlementQueryService>,
+        settlement_engine: settlement_engine.clone(),
     })
 }
 
@@ -767,127 +519,5 @@ mod tests {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<Arc<icn_gateway::EventBroadcaster>>();
         assert_send_sync::<Arc<icn_compute::PolicyManager>>();
-    }
-
-    /// Proof test: completed commons compute task produces durable ledger entries.
-    ///
-    /// This test closes the durability gap identified in the settlement path trace:
-    /// `CommonsSettlementCallback` was wired to `None` in the daemon, so completed commons
-    /// tasks produced no ledger consequence. After this fix, the callback fires
-    /// `SettlementEngine::settle_commons_receipt()` and appends both earn/spend journal
-    /// entries to the ledger — making the economic consequence auditable.
-    ///
-    /// Flow exercised:
-    ///   CommonsPaymentRequest → create_commons_settlement_callback → SettlementEngine
-    ///   → (earn_entry, spend_entry) → Ledger::append_entry x2
-    ///   → get_balance returns updated values
-    #[tokio::test]
-    #[allow(clippy::unwrap_used)]
-    async fn test_commons_settlement_callback_posts_ledger_entries() {
-        use icn_identity::KeyPair;
-        use std::time::Duration;
-        use tokio::sync::RwLock;
-
-        let tmpdir = tempfile::tempdir().unwrap();
-        let store = Arc::new(icn_store::SledStore::open(tmpdir.path()).unwrap());
-        let ledger = Arc::new(RwLock::new(icn_ledger::Ledger::new(store).unwrap()));
-
-        let executor_kp = KeyPair::generate().unwrap();
-        let submitter_kp = KeyPair::generate().unwrap();
-
-        let executor_did = executor_kp.did().clone();
-        let submitter_did = submitter_kp.did().clone();
-
-        // Give the consumer (submitter) an initial commons credit balance.
-        // build_earn_entry credits the consumer (net_change = -amount → raw balance = -10_000).
-        // The BalanceCallback negates this to produce spendable capacity = +10_000.
-        let initial_credit =
-            icn_ledger::commons_credits::build_earn_entry(&submitter_did, 10_000).unwrap();
-        ledger
-            .write()
-            .await
-            .append_entry(initial_credit)
-            .await
-            .unwrap();
-
-        // Verify initial raw ledger balance (negative = credits received)
-        let initial_raw = ledger.read().await.get_balance(
-            &submitter_did,
-            icn_ledger::commons_credits::COMMONS_CREDIT_CURRENCY,
-        );
-        assert_eq!(
-            initial_raw, -10_000,
-            "raw balance after earn should be -10_000"
-        );
-
-        // Wire the callback (the unit under test) — in-memory engine for this unit test;
-        // restart-safe persistence is proven separately in test_settlement_dedup_survives_restart.
-        let engine = Arc::new(icn_ledger::SettlementEngine::new());
-        let cb = create_commons_settlement_callback(ledger.clone(), engine);
-
-        // Fire the callback as the compute actor does on commons task completion
-        let receipt_hash = [0xAB_u8; 32];
-        let settlement_amount = 500_u64;
-        cb(icn_compute::CommonsPaymentRequest {
-            contributor: executor_did.to_string(),
-            consumer: submitter_did.to_string(),
-            amount: settlement_amount,
-            receipt_hash,
-            task_id: "test-task-001".to_string(),
-        });
-
-        // Yield to let the spawned async task run and append to the ledger.
-        // Two yields ensure the task is polled and the write lock is acquired/released.
-        tokio::time::sleep(Duration::from_millis(50)).await;
-
-        // --- Assertions: the economic consequence is now a durable ledger fact ---
-        //
-        // Ledger raw balance convention: net_change = debit - credit.
-        // earn_entry_with_receipt: credit(executor, 500) → executor raw = -500
-        // spend_entry_with_receipt: debit(consumer, 500) → consumer raw = -10_000 + 500 = -9_500
-        //
-        // Spendable capacity = -raw_balance (as returned by create_balance_callback).
-
-        let executor_raw = ledger.read().await.get_balance(
-            &executor_did,
-            icn_ledger::commons_credits::COMMONS_CREDIT_CURRENCY,
-        );
-        assert_eq!(
-            executor_raw,
-            -(settlement_amount as i64),
-            "executor raw balance after earning: expected -{} (credit entry)",
-            settlement_amount
-        );
-
-        let submitter_raw = ledger.read().await.get_balance(
-            &submitter_did,
-            icn_ledger::commons_credits::COMMONS_CREDIT_CURRENCY,
-        );
-        // submitter started at -10_000 (earn entry), then spend_entry debits +500 → -9_500
-        assert_eq!(
-            submitter_raw,
-            -(10_000 - settlement_amount as i64),
-            "submitter raw balance after spending: expected {} (earn -10_000 + debit +500)",
-            -(10_000 - settlement_amount as i64)
-        );
-
-        // Idempotency: firing the same receipt again must not double-settle
-        cb(icn_compute::CommonsPaymentRequest {
-            contributor: executor_did.to_string(),
-            consumer: submitter_did.to_string(),
-            amount: settlement_amount,
-            receipt_hash,
-            task_id: "test-task-001".to_string(),
-        });
-        tokio::time::sleep(Duration::from_millis(50)).await;
-
-        let executor_raw_after_dupe = ledger.read().await.get_balance(
-            &executor_did,
-            icn_ledger::commons_credits::COMMONS_CREDIT_CURRENCY,
-        );
-        assert_eq!(
-            executor_raw_after_dupe, executor_raw,
-            "duplicate receipt must not double-settle the executor balance"
-        );
     }
 }
