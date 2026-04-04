@@ -1,11 +1,14 @@
 # icn.zone Domain Routing Plan
 
+**Status:** Plan — not yet implemented
+**Last Updated:** 2026-04-04
+
 ## Domain Distinction
 
 | Domain | Role | Status |
 |--------|------|--------|
 | `intercooperative.network` | Canonical public website | Live (GitHub Pages + CNAME) |
-| `icn.zone` | Utility / short-link domain | Subdomains active; root unresolved |
+| `icn.zone` | Utility / short-link domain | Subdomains active; root redirect planned (Phase 1) |
 | `api.icn.zone` | Gateway REST + WebSocket (K3s) | Active |
 | `pilot.icn.zone` | Pilot UI (K3s) | Active |
 | `metrics.icn.zone` | Prometheus / Grafana (K3s) | Active |
@@ -24,7 +27,7 @@ Root `icn.zone` (no subdomain, any path) redirects to `intercooperative.network`
 ```
 Zone:    icn.zone
 Match:   hostname eq "icn.zone"
-Action:  301 redirect → https://intercooperative.network${path}
+Action:  301 redirect → https://intercooperative.network${uri.path}
 ```
 
 Path-preserving: `icn.zone/docs` → `intercooperative.network/docs`.
