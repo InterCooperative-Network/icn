@@ -106,8 +106,8 @@ pub use progressive_limits::{
 };
 pub use quarantine::QuarantineStore;
 pub use settlement::{
-    CommonsSettlementRequest, SettlementEngine, SettlementQueryResult, SettlementReceiptResult,
-    SettlementRequest,
+    CommonsSettlementRequest, SettlementEngine, SettlementQueryResult, SettlementQueryService,
+    SettlementReceiptResult, SettlementRequest,
 };
 pub use sync::{deserialize_sync_message, ledger_topic, serialize_sync_message, LedgerSyncMessage};
 pub use treasury::{

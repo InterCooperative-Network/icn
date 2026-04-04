@@ -60,7 +60,7 @@ pub struct ComputeServices {
     /// Policy manager for cooperative scheduling
     pub policy_manager: Arc<icn_compute::PolicyManager>,
     /// Settlement engine — shared handle for audit queries (task_id → settled status).
-    pub settlement_engine: Arc<icn_ledger::SettlementEngine>,
+    pub settlement_engine: Arc<dyn icn_kernel_api::services::SettlementQueryService>,
 }
 
 /// Create the trust callback for compute actor
@@ -745,7 +745,8 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
         dispute_handle,
         broadcaster,
         policy_manager,
-        settlement_engine: settlement_engine.clone(),
+        settlement_engine: settlement_engine.clone()
+            as Arc<dyn icn_kernel_api::services::SettlementQueryService>,
     })
 }
 

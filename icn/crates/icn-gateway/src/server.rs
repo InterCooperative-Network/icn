@@ -131,7 +131,7 @@ pub struct GatewayServer {
     /// This is the canonical path for preventing dual sled ownership over commons state.
     commons_handle: Option<icn_commons::CommonsHandle>,
     /// Settlement engine for compute audit queries (task_id → settled status).
-    settlement_engine: Option<Arc<icn_ledger::SettlementEngine>>,
+    settlement_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
 }
 
 impl GatewayServer {
@@ -466,7 +466,10 @@ impl GatewayServer {
     }
 
     /// Attach settlement engine for compute audit queries.
-    pub fn with_settlement_engine(mut self, engine: Arc<icn_ledger::SettlementEngine>) -> Self {
+    pub fn with_settlement_engine(
+        mut self,
+        engine: Arc<dyn icn_kernel_api::services::SettlementQueryService>,
+    ) -> Self {
         self.settlement_engine = Some(engine);
         self
     }

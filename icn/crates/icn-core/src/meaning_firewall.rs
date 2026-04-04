@@ -359,25 +359,36 @@ mod tests {
     ///
     /// Target state: 0 after ledger extraction completes (#914).
     ///
-    /// Current state (2026-03-28):
+    /// Current state (2026-04-04):
     /// - actors.rs: 3 refs — consolidated type aliases (LedgerHandle, DisputeManagerHandle, TreasuryManagerHandle)
     /// - services/ledger_service.rs: 1 ref — composition root for LedgerService
-    /// - init_compute.rs: 1 ref — JournalEntryBuilder for payment settlement
     /// - src/bin/ledger_restart_helper.rs: 1 ref — Layer 4 cross-process
-    ///   persistence proof helper; test infrastructure only, not wired into
-    ///   the daemon. Scanned here because src/bin/ is part of the crate source.
+    ///   persistence proof helper; test infrastructure only.
+    /// - init_compute.rs: 16 refs — settlement engine construction + commons settlement
+    ///   callback + journal entry building. These are the legitimate compute→ledger
+    ///   wiring points that remain until #914 (ledger extraction).
     ///
-    /// All other refs removed: doc-comment cleanups, alias consolidation,
-    /// lifecycle/init_rpc/init_notifications now import from actors.rs.
+    /// Boundary improvement (2026-04-04): passthrough structs (GatewayActorHandles,
+    /// GatewayHandles, ComputeServices) no longer hold concrete `icn_ledger::SettlementEngine`.
+    /// They now use `Arc<dyn icn_kernel_api::services::SettlementQueryService>` — reducing
+    /// the count from 24 → 21. Settlement query result types moved to icn-kernel-api.
+    ///
+    /// Remaining hotspots out of scope here:
+    /// - init_compute.rs construction of SettlementEngine (must be concrete at creation)
+    /// - init_compute.rs commons_credits references (ledger domain, no kernel-api equivalent)
+    /// - actors.rs type aliases (BootstrapHandles, pre-existing, requires full extraction)
     ///
     /// Tracked for extraction in #914 (ledger extraction).
     #[test]
     fn strict_core_ledger_reference_ratchet() {
-        // actors.rs defines consolidated type aliases (3 refs).
-        // ledger_service.rs is the composition root (1 ref).
-        // init_compute.rs uses JournalEntryBuilder for payment settlement (1 ref).
-        // src/bin/ledger_restart_helper.rs is Layer 4 test infrastructure (1 ref).
-        let expected: usize = 6;
+        // actors.rs: 3 refs (LedgerHandle, DisputeManagerHandle, TreasuryManagerHandle).
+        // ledger_service.rs: 1 ref — composition root.
+        // bin/ledger_restart_helper.rs: 1 ref — test infrastructure.
+        // init_compute.rs: 16 refs — settlement engine construction + commons settlement
+        //   callback + journal entry building (the legitimate compute→ledger boundary).
+        // Passthrough structs (GatewayActorHandles, GatewayHandles, ComputeServices)
+        // now use Arc<dyn SettlementQueryService> — concrete SettlementEngine removed.
+        let expected: usize = 21;
         let actual = count_imports_in_crate("icn-core", "icn_ledger::");
 
         assert!(

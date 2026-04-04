@@ -30,6 +30,9 @@ use crate::error::LedgerError;
 use crate::types::JournalEntry;
 use icn_identity::Did;
 use icn_kernel_api::scope::ScopeLevel;
+pub use icn_kernel_api::services::{
+    SettlementQueryResult, SettlementQueryService, SettlementReceiptResult,
+};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
@@ -104,84 +107,6 @@ pub struct SettlementRequest {
 /// ## Restart-safe deduplication
 ///
 /// When constructed with `SettlementEngine::with_store()`, dedup keys for
-/// Settlement status returned by `SettlementEngine::query_by_task`.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SettlementQueryResult {
-    /// The task identifier queried.
-    pub task_id: String,
-    /// Hex-encoded receipt hash if settlement was recorded.
-    pub receipt_hash: Option<String>,
-    /// Settlement status: `"settled"`, `"not_found"`.
-    pub status: String,
-    /// Scope of the settled receipt (always `"commons"` for now).
-    pub scope: Option<String>,
-}
-
-/// Settlement lookup result keyed by receipt hash.
-///
-/// Returned by `SettlementEngine::query_by_receipt_hash()`.
-/// The receipt hash is always the canonical durable audit key.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SettlementReceiptResult {
-    /// Hex-encoded receipt hash that was queried.
-    pub receipt_hash: String,
-    /// Task identifier associated with this receipt, if known.
-    ///
-    /// Populated when the settlement was recorded with a `task_id` and a sled store is present.
-    /// `None` if no task_id was provided at settlement time, or if the task_index was not
-    /// persisted (process-local-only mode, no store configured).
-    pub task_id: Option<String>,
-    /// Settlement status: `"settled"` or `"not_found"`.
-    pub status: String,
-    /// Scope of the settled receipt, if determinable.
-    ///
-    /// `"commons"` when the receipt is found in the task_index (only commons settlements
-    /// write to the task_index). `None` when settled but scope is indeterminate (either a
-    /// commons settlement with no task_id, or a non-commons bilateral settlement).
-    pub scope: Option<String>,
-}
-
-impl SettlementReceiptResult {
-    pub fn settled(receipt_hash: [u8; 32], task_id: Option<String>, scope: Option<String>) -> Self {
-        Self {
-            receipt_hash: hex::encode(receipt_hash),
-            task_id,
-            status: "settled".to_string(),
-            scope,
-        }
-    }
-
-    pub fn not_found(receipt_hash: [u8; 32]) -> Self {
-        Self {
-            receipt_hash: hex::encode(receipt_hash),
-            task_id: None,
-            status: "not_found".to_string(),
-            scope: None,
-        }
-    }
-}
-
-impl SettlementQueryResult {
-    pub fn settled(task_id: &str, receipt_hash: [u8; 32]) -> Self {
-        Self {
-            task_id: task_id.to_string(),
-            receipt_hash: Some(hex::encode(receipt_hash)),
-            status: "settled".to_string(),
-            scope: Some("commons".to_string()),
-        }
-    }
-
-    pub fn not_found(task_id: &str) -> Self {
-        Self {
-            task_id: task_id.to_string(),
-            receipt_hash: None,
-            status: "not_found".to_string(),
-            scope: None,
-        }
-    }
-}
 
 /// commons receipts are persisted to sled. On construction the engine loads
 /// all existing keys from the store so re-settlements attempted after a daemon
@@ -698,6 +623,16 @@ impl SettlementEngine {
             Err(_) => (None, None),
         };
         SettlementReceiptResult::settled(*receipt_hash, task_id, scope)
+    }
+}
+
+impl SettlementQueryService for SettlementEngine {
+    fn query_by_task(&self, task_id: &str) -> SettlementQueryResult {
+        self.query_by_task(task_id)
+    }
+
+    fn query_by_receipt_hash(&self, hash: &[u8; 32]) -> SettlementReceiptResult {
+        self.query_by_receipt_hash(hash)
     }
 }
 

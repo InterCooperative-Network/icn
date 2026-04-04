@@ -1876,3 +1876,92 @@ mod tests {
         assert!(request.memo.contains(&expected_allocation_hex));
     }
 }
+
+// ============================================================================
+// Settlement Query Service
+// ============================================================================
+
+/// Result of querying settlement status by task_id.
+///
+/// Returned by `SettlementQueryService::query_by_task()`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettlementQueryResult {
+    /// The task identifier queried.
+    pub task_id: String,
+    /// Hex-encoded receipt hash if settlement was recorded.
+    pub receipt_hash: Option<String>,
+    /// Settlement status: `"settled"` or `"not_found"`.
+    pub status: String,
+    /// Scope of the settled receipt (e.g. `"commons"`), or `None` if not determinable.
+    pub scope: Option<String>,
+}
+
+impl SettlementQueryResult {
+    pub fn settled(task_id: &str, receipt_hash: [u8; 32]) -> Self {
+        Self {
+            task_id: task_id.to_string(),
+            receipt_hash: Some(hex::encode(receipt_hash)),
+            status: "settled".to_string(),
+            scope: Some("commons".to_string()),
+        }
+    }
+
+    pub fn not_found(task_id: &str) -> Self {
+        Self {
+            task_id: task_id.to_string(),
+            receipt_hash: None,
+            status: "not_found".to_string(),
+            scope: None,
+        }
+    }
+}
+
+/// Result of querying settlement status by receipt hash.
+///
+/// Returned by `SettlementQueryService::query_by_receipt_hash()`.
+/// The receipt hash is the canonical durable audit key.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettlementReceiptResult {
+    /// Hex-encoded receipt hash that was queried.
+    pub receipt_hash: String,
+    /// Task identifier associated with this receipt, if known.
+    pub task_id: Option<String>,
+    /// Settlement status: `"settled"` or `"not_found"`.
+    pub status: String,
+    /// Scope of the settled receipt, if determinable.
+    pub scope: Option<String>,
+}
+
+impl SettlementReceiptResult {
+    pub fn settled(receipt_hash: [u8; 32], task_id: Option<String>, scope: Option<String>) -> Self {
+        Self {
+            receipt_hash: hex::encode(receipt_hash),
+            task_id,
+            status: "settled".to_string(),
+            scope,
+        }
+    }
+
+    pub fn not_found(receipt_hash: [u8; 32]) -> Self {
+        Self {
+            receipt_hash: hex::encode(receipt_hash),
+            task_id: None,
+            status: "not_found".to_string(),
+            scope: None,
+        }
+    }
+}
+
+/// Kernel-api boundary trait for querying settlement status.
+///
+/// `icn-core` passes settlement engine handles as `Arc<dyn SettlementQueryService>`
+/// through its passthrough structs (`GatewayActorHandles`, `GatewayHandles`,
+/// `ComputeServices`), keeping concrete `icn-ledger` types out of the core wiring path.
+///
+/// `icn-ledger::SettlementEngine` implements this trait.
+pub trait SettlementQueryService: Send + Sync {
+    fn query_by_task(&self, task_id: &str) -> SettlementQueryResult;
+    fn query_by_receipt_hash(&self, hash: &[u8; 32]) -> SettlementReceiptResult;
+}

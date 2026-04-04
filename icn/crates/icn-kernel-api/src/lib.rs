@@ -113,11 +113,11 @@ pub use services::{
     ForceCloseProposalRequest, ForceCloseProposalResult, FreezeMemberRequest, FreezeMemberResult,
     GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, MembershipService,
     RemoveMemberRequest, RemoveMemberResult, SecurityService, SecurityViolation, ServiceRegistry,
-    TreasuryEntryRequest, TreasuryEntryResult,
-    TreasuryOperationType as ServicesTreasuryOperationType, TrustClass, TrustEvent, TrustService,
-    UnfreezeMemberRequest, UnfreezeMemberResult, UpdateMemberRequest, UpdateMemberResult,
-    VetoProposalRequest, VetoProposalResult, TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN,
-    TRUST_THRESHOLD_PARTNER,
+    SettlementQueryResult, SettlementQueryService, SettlementReceiptResult, TreasuryEntryRequest,
+    TreasuryEntryResult, TreasuryOperationType as ServicesTreasuryOperationType, TrustClass,
+    TrustEvent, TrustService, UnfreezeMemberRequest, UnfreezeMemberResult, UpdateMemberRequest,
+    UpdateMemberResult, VetoProposalRequest, VetoProposalResult, TRUST_THRESHOLD_FEDERATED,
+    TRUST_THRESHOLD_KNOWN, TRUST_THRESHOLD_PARTNER,
 };
 pub use state::{
     BlobService, KvService, LogService, ObjectReplication, ReplicationPolicy, StateBackend,

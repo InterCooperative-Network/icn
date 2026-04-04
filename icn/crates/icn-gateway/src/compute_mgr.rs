@@ -20,7 +20,7 @@ pub struct ComputeManager {
     /// WASM registry for module management
     wasm_registry: Option<Arc<icn_compute::WasmRegistry>>,
     /// Settlement engine for task audit queries
-    settlement_engine: Option<Arc<icn_ledger::SettlementEngine>>,
+    settlement_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
 }
 
 impl ComputeManager {
@@ -64,7 +64,10 @@ impl ComputeManager {
     }
 
     /// Attach the settlement engine for task audit queries
-    pub fn with_settlement_engine(mut self, engine: Arc<icn_ledger::SettlementEngine>) -> Self {
+    pub fn with_settlement_engine(
+        mut self,
+        engine: Arc<dyn icn_kernel_api::services::SettlementQueryService>,
+    ) -> Self {
         self.settlement_engine = Some(engine);
         self
     }
@@ -73,10 +76,13 @@ impl ComputeManager {
     ///
     /// Returns a `SettlementQueryResult` indicating whether the task has been settled,
     /// along with the receipt hash and scope when available.
-    pub fn query_settlement(&self, task_id: &str) -> icn_ledger::SettlementQueryResult {
+    pub fn query_settlement(
+        &self,
+        task_id: &str,
+    ) -> icn_kernel_api::services::SettlementQueryResult {
         match &self.settlement_engine {
             Some(engine) => engine.query_by_task(task_id),
-            None => icn_ledger::SettlementQueryResult::not_found(task_id),
+            None => icn_kernel_api::services::SettlementQueryResult::not_found(task_id),
         }
     }
 
@@ -86,7 +92,7 @@ impl ComputeManager {
     pub fn query_settlement_by_receipt(
         &self,
         receipt_hash_hex: &str,
-    ) -> Option<icn_ledger::SettlementReceiptResult> {
+    ) -> Option<icn_kernel_api::services::SettlementReceiptResult> {
         let bytes = hex::decode(receipt_hash_hex).ok()?;
         if bytes.len() != 32 {
             return None;
@@ -95,7 +101,7 @@ impl ComputeManager {
         hash.copy_from_slice(&bytes);
         Some(match &self.settlement_engine {
             Some(engine) => engine.query_by_receipt_hash(&hash),
-            None => icn_ledger::SettlementReceiptResult::not_found(hash),
+            None => icn_kernel_api::services::SettlementReceiptResult::not_found(hash),
         })
     }
 
