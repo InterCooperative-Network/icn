@@ -14,8 +14,10 @@
 //!
 //! Each receipt is deduplicated by `sha256("icn-ledger:settlement:v1:" || receipt_hash)`.
 //! The domain-separation prefix prevents cross-feature sha256 collisions.
-//! The engine tracks settled receipts in an in-memory `HashSet` (sled persistence is
-//! future work).
+//! The engine tracks settled receipts in an in-memory `HashSet` backed by optional sled
+//! persistence. When a `Store` is provided via `SettlementEngine::with_store()`, dedup
+//! keys survive daemon restart: they are loaded on construction and written on each
+//! settlement. Without a store the engine falls back to in-memory-only behaviour.
 //!
 //! # Design
 //!
@@ -30,12 +32,18 @@ use icn_identity::Did;
 use icn_kernel_api::scope::ScopeLevel;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 /// Domain-separation prefix for settlement dedup keys.
 ///
 /// Prevents accidental collision with other sha256 usages in the codebase.
 const DEDUP_PREFIX: &[u8] = b"icn-ledger:settlement:v1:";
+
+/// Sled key prefix for persisted settlement dedup records.
+///
+/// Keys stored: `DEDUP_STORE_PREFIX || dedup_key_bytes` (32-byte hex-encoded dedup key).
+/// Value: single byte `0x01` (presence marker).
+const DEDUP_STORE_PREFIX: &[u8] = b"icn:settlement:dedup:commons:v1:";
 
 /// A settlement request DTO.
 ///
@@ -83,18 +91,84 @@ pub struct SettlementRequest {
 ///
 /// Handles deduplication, scope validation, and invariant checking, then
 /// delegates to `JournalEntryBuilder` for balanced double-entry creation.
+///
+/// ## Restart-safe deduplication
+///
+/// When constructed with `SettlementEngine::with_store()`, dedup keys for
+/// commons receipts are persisted to sled. On construction the engine loads
+/// all existing keys from the store so re-settlements attempted after a daemon
+/// restart are rejected identically to in-process duplicates.
+///
+/// Without a store (created via `new()`) behaviour is process-local only.
 pub struct SettlementEngine {
     /// In-memory dedup set of settled receipt keys.
     /// Each key is `sha256(DEDUP_PREFIX || receipt_hash)`.
     settled: RwLock<HashSet<[u8; 32]>>,
+
+    /// Optional sled-backed store for persisting commons dedup keys across restart.
+    ///
+    /// When `Some`, every successful commons settlement writes the dedup key to
+    /// `DEDUP_STORE_PREFIX || hex(key)`. On `with_store()` construction all existing
+    /// keys are loaded into `settled` so the in-memory set is always authoritative.
+    store: Option<Arc<dyn icn_store::Store>>,
 }
 
 impl SettlementEngine {
-    /// Create a new settlement engine with an empty dedup set.
+    /// Create a new settlement engine with an empty, in-memory-only dedup set.
+    ///
+    /// Dedup state is process-local; a fresh engine after restart cannot detect
+    /// previously settled receipts. Use [`with_store`] for restart-safe idempotence.
     pub fn new() -> Self {
         SettlementEngine {
             settled: RwLock::new(HashSet::new()),
+            store: None,
         }
+    }
+
+    /// Create a settlement engine backed by `store` for durable dedup.
+    ///
+    /// Loads all previously persisted commons dedup keys from `store` into the
+    /// in-memory set before returning. After construction, every successful
+    /// `settle_commons_receipt()` call also writes the dedup key to `store` so
+    /// the idempotence guarantee survives daemon restarts.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the initial scan of the store fails.
+    pub fn with_store(store: Arc<dyn icn_store::Store>) -> Result<Self, LedgerError> {
+        let mut settled = HashSet::new();
+
+        // Load all previously persisted dedup keys.
+        let pairs = store
+            .scan(DEDUP_STORE_PREFIX)
+            .map_err(|e| LedgerError::Internal(format!("settlement dedup scan failed: {e}")))?;
+
+        for (raw_key, _) in pairs {
+            // Key format: DEDUP_STORE_PREFIX (32 bytes) + 32-byte hex-encoded dedup key (64 bytes)
+            // Strip the prefix to get the hex-encoded key.
+            if raw_key.len() == DEDUP_STORE_PREFIX.len() + 64 {
+                let hex_part = &raw_key[DEDUP_STORE_PREFIX.len()..];
+                if let Ok(hex_str) = std::str::from_utf8(hex_part) {
+                    if let Ok(bytes) = hex::decode(hex_str) {
+                        if bytes.len() == 32 {
+                            let mut key = [0u8; 32];
+                            key.copy_from_slice(&bytes);
+                            settled.insert(key);
+                        }
+                    }
+                }
+            }
+        }
+
+        tracing::debug!(
+            loaded = settled.len(),
+            "SettlementEngine: loaded persisted commons dedup keys"
+        );
+
+        Ok(SettlementEngine {
+            settled: RwLock::new(settled),
+            store: Some(store),
+        })
     }
 
     /// Settle a verified receipt, creating a balanced journal entry.
@@ -214,6 +288,16 @@ impl SettlementEngine {
         let mut key = [0u8; 32];
         key.copy_from_slice(&result);
         key
+    }
+
+    /// Build the sled store key for a dedup entry.
+    ///
+    /// Format: `DEDUP_STORE_PREFIX || hex(dedup_key)` — 32 prefix bytes + 64 hex bytes.
+    fn dedup_store_key(dedup_key: &[u8; 32]) -> Vec<u8> {
+        let mut k = Vec::with_capacity(DEDUP_STORE_PREFIX.len() + 64);
+        k.extend_from_slice(DEDUP_STORE_PREFIX);
+        k.extend_from_slice(hex::encode(dedup_key).as_bytes());
+        k
     }
 }
 
@@ -386,6 +470,20 @@ impl SettlementEngine {
             settled.insert(dedup_key);
         }
 
+        // 9. Persist dedup key to sled (if a store is configured).
+        //    Written after the in-memory insert so an in-process restart is still
+        //    caught even if the store write fails.  Store failure is logged but does
+        //    not fail the settlement — the caller already received the entries.
+        if let Some(ref store) = self.store {
+            let store_key = Self::dedup_store_key(&dedup_key);
+            if let Err(e) = store.put(&store_key, &[0x01]) {
+                tracing::warn!(
+                    receipt_hash = hex::encode(request.receipt_hash),
+                    "commons settlement: failed to persist dedup key (dedup is in-memory only): {e}"
+                );
+            }
+        }
+
         // ── Emit settlement metrics (only on guaranteed success, after dedup gate) ──
         icn_obs::metrics::compute::receipt_settlement_inc("commons");
         icn_obs::metrics::compute::commons_credits_earned_add(request.amount as u64);
@@ -524,6 +622,89 @@ mod commons_tests {
                 assert!(msg.contains("already settled"), "got: {msg}");
             }
             other => panic!("expected DuplicateEntry, got: {other}"),
+        }
+    }
+
+    /// Prove the pre-fix failure: in-memory-only engine does NOT survive restart.
+    ///
+    /// This test documents the exact bug: `SettlementEngine::new()` starts with an empty
+    /// HashSet, so after a simulated restart (drop + reconstruct with no store) the same
+    /// receipt hash re-settles and produces a second pair of journal entries.
+    #[test]
+    fn test_commons_settle_dedup_does_not_survive_restart_without_store() {
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+        let receipt_hash = [0xDE_u8; 32];
+
+        // Engine A: settle once
+        let engine_a = SettlementEngine::new();
+        let req = make_commons_request(&contributor, &consumer, receipt_hash, 100, 500);
+        assert!(
+            engine_a.settle_commons_receipt(&req).is_ok(),
+            "first settlement must succeed"
+        );
+
+        // Engine B: fresh in-memory engine (simulates daemon restart with no persistence)
+        let engine_b = SettlementEngine::new();
+        // B does NOT know about the prior settlement — same receipt settles again
+        let result = engine_b.settle_commons_receipt(&req);
+        assert!(
+            result.is_ok(),
+            "WITHOUT store, restart resets dedup — same receipt re-settles: this is the bug"
+        );
+    }
+
+    /// Prove the fix: `SettlementEngine::with_store()` makes dedup survive restart.
+    ///
+    /// Engine A settles receipt H and writes the dedup key to sled.
+    /// Engine B is constructed from the same sled path (simulating daemon restart).
+    /// Engine B loads the persisted key on startup and rejects receipt H as duplicate.
+    #[test]
+    fn test_commons_settle_dedup_survives_restart_with_store() {
+        use icn_store::SledStore;
+        let tmpdir = tempfile::tempdir().unwrap();
+
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+        let receipt_hash = [0xAF_u8; 32];
+
+        // Engine A: settle once with a store-backed engine
+        {
+            let store = Arc::new(SledStore::open(tmpdir.path()).unwrap());
+            let engine_a = SettlementEngine::with_store(store).unwrap();
+            let req = make_commons_request(&contributor, &consumer, receipt_hash, 100, 500);
+            assert!(
+                engine_a.settle_commons_receipt(&req).is_ok(),
+                "first settlement must succeed"
+            );
+            assert_eq!(engine_a.settled_count(), 1);
+            // engine_a and its store Arc drop here — simulates daemon shutdown
+        }
+
+        // Engine B: reconstruct from the same sled path (simulates daemon restart)
+        {
+            let store = Arc::new(SledStore::open(tmpdir.path()).unwrap());
+            let engine_b = SettlementEngine::with_store(store).unwrap();
+
+            // B must load the persisted key — settled_count reflects the prior session
+            assert_eq!(
+                engine_b.settled_count(),
+                1,
+                "engine B must pre-load the dedup key persisted by engine A"
+            );
+
+            let req = make_commons_request(&contributor, &consumer, receipt_hash, 100, 500);
+            let result = engine_b.settle_commons_receipt(&req);
+            assert!(
+                result.is_err(),
+                "re-settlement after restart must be rejected as duplicate"
+            );
+            match result.unwrap_err() {
+                LedgerError::DuplicateEntry(msg) => {
+                    assert!(msg.contains("already settled"), "got: {msg}");
+                }
+                other => panic!("expected DuplicateEntry, got: {other}"),
+            }
         }
     }
 

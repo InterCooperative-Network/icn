@@ -118,17 +118,15 @@ pub fn create_balance_callback(ledger: LedgerHandle) -> icn_compute::BalanceCall
 ///    `CommonsSettlementRequest` and runs it through `SettlementEngine::settle_commons_receipt()`.
 /// 3. Appends the resulting `(earn_entry, spend_entry)` to the ledger.
 ///
-/// The `SettlementEngine` is owned by this callback (wrapped in `Arc`) and tracks dedup state
-/// for the process lifetime, preventing double-settlement if the callback fires more than once
-/// for the same receipt hash.
+/// `engine` must be pre-created by the caller. Use `SettlementEngine::with_store()` for
+/// restart-safe idempotence; `SettlementEngine::new()` for process-local-only dedup.
 ///
-/// Duplicate receipts (`LedgerError::DuplicateEntry`) are silently ignored — idempotent by
-/// design. All other errors are logged as warnings; task completion is not rolled back.
+/// Duplicate receipts (`LedgerError::DuplicateEntry`) are silently ignored. All other
+/// errors are logged as warnings; task completion is not rolled back.
 pub fn create_commons_settlement_callback(
     ledger: LedgerHandle,
+    engine: Arc<icn_ledger::SettlementEngine>,
 ) -> icn_compute::CommonsSettlementCallback {
-    let engine = Arc::new(icn_ledger::SettlementEngine::new());
-
     Arc::new(move |req: icn_compute::CommonsPaymentRequest| {
         let ledger = ledger.clone();
         let engine = engine.clone();
@@ -559,9 +557,28 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
     let balance_callback = create_balance_callback(deps.ledger.clone());
     compute_actor.set_balance_callback(balance_callback);
 
+    // Set up commons settlement engine with sled-backed dedup store.
+    // Keyed by receipt hash — survives daemon restart so the same receipt cannot
+    // produce duplicate ledger entries across process boundaries.
+    let settlement_dedup_path = deps.store_path.join("settlement_dedup");
+    let settlement_engine = {
+        let store = Arc::new(icn_store::SledStore::open(&settlement_dedup_path)?);
+        match icn_ledger::SettlementEngine::with_store(store) {
+            Ok(e) => Arc::new(e),
+            Err(e) => {
+                warn!(
+                    "Failed to load commons settlement dedup store ({e}); \
+                     falling back to in-memory-only dedup"
+                );
+                Arc::new(icn_ledger::SettlementEngine::new())
+            }
+        }
+    };
+
     // Set up commons settlement callback — posts earn+spend journal entries to the ledger
     // when a commons-scope task completes successfully (closes the durability gap).
-    let commons_settlement_callback = create_commons_settlement_callback(deps.ledger.clone());
+    let commons_settlement_callback =
+        create_commons_settlement_callback(deps.ledger.clone(), settlement_engine);
     compute_actor.set_commons_settlement_callback(commons_settlement_callback);
 
     // Create event broadcaster
@@ -798,8 +815,10 @@ mod tests {
             "raw balance after earn should be -10_000"
         );
 
-        // Wire the callback (the unit under test)
-        let cb = create_commons_settlement_callback(ledger.clone());
+        // Wire the callback (the unit under test) — in-memory engine for this unit test;
+        // restart-safe persistence is proven separately in test_settlement_dedup_survives_restart.
+        let engine = Arc::new(icn_ledger::SettlementEngine::new());
+        let cb = create_commons_settlement_callback(ledger.clone(), engine);
 
         // Fire the callback as the compute actor does on commons task completion
         let receipt_hash = [0xAB_u8; 32];
