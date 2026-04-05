@@ -2653,8 +2653,8 @@ mod tests {
         assert!(
             effect_result
                 .message
-                .contains("Resource effect not implemented in kernel executor"),
-            "Failure message should explain missing kernel implementation: {}",
+                .contains("Resource access store not wired"),
+            "Failure message should explain missing resource store: {}",
             effect_result.message
         );
     }
