@@ -944,6 +944,19 @@ pub async fn open_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         )));
     }
 
+    // Suspension gate: suspended members may not advance governance proceedings
+    // by opening a proposal's voting period. This prevents a frozen member from
+    // controlling vote timing even on proposals they authored before suspension.
+    if let Some(ref checker) = ctx.suspension_checker {
+        if checker(requester_did.clone(), proposal.domain_id.0.clone()).await {
+            return Err(err_forbidden(format!(
+                "requester {} is suspended in domain {}; \
+                 suspended members may not open proposals",
+                requester_did, proposal.domain_id.0
+            )));
+        }
+    }
+
     let voting_period_seconds = if let Some(period) = req.voting_period_seconds {
         if period == 0 {
             return Err(err_bad("Voting period must be greater than 0"));
