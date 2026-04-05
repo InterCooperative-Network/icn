@@ -24,7 +24,7 @@
 //! - Full atomic suspension (best-effort hook, not transactional).
 //! - Auto-expiration testing (separate gap, not in scope here).
 //! - Ledger enforcement (covered in e2e_ledger_freeze_enforcement.rs).
-//! - Vote-casting enforcement (covered in e2e_close_time_revalidation.rs).
+//! - Vote-casting enforcement (covered in e2e_vote_standing_gate.rs).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -301,10 +301,22 @@ async fn test_suspended_member_cannot_submit_proposals() {
         "close_proposal must return 200"
     );
 
-    // ── Allow tokio::spawn in hook to complete ───────────────────────────────
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    // ── Wait deterministically for the async acceptance hook to complete ─────
+    // The hook spawns a tokio task; poll with a short sleep rather than a
+    // fixed 200ms so the test doesn't fail on a loaded CI runner.
+    let expected_suspension = (target_did_str.clone(), DOMAIN_ID.to_string());
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if suspended.read().await.contains(&expected_suspension) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("timed out waiting for FreezeMember acceptance hook to suspend target");
 
-    // ── Assert: target is now in the suspended set ────────────────────────────
+    // ── Assert: target is now in the suspended set ─────────────────────��──────
     {
         let s = suspended.read().await;
         assert!(
