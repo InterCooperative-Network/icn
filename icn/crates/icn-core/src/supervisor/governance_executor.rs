@@ -1817,14 +1817,22 @@ impl KernelMembershipExecutor {
                     member_did,
                     role,
                     tier,
+                    decision_hash: effect_decision_hash,
                 } => {
+                    // Use the content hash carried in the effect when available;
+                    // fall back to blake3(receipt_id) for effects without one.
+                    let resolved_hash = if effect_decision_hash.is_empty() {
+                        compute_decision_hash(receipt_id)
+                    } else {
+                        effect_decision_hash
+                    };
                     let request = icn_kernel_api::AddMemberRequest {
                         entity_id: entity_id.clone(),
                         member_did: member_did.clone(),
                         role,
                         tier,
                         decision_receipt_id: receipt_id.to_string(),
-                        decision_hash: compute_decision_hash(receipt_id),
+                        decision_hash: resolved_hash,
                     };
 
                     let result = service.add_member(request)?;

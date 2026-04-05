@@ -191,6 +191,11 @@ pub enum MembershipEffect {
         member_did: String,
         role: String,
         tier: String,
+        /// Canonical content hash of the governance decision payload.
+        /// Carried here so executors can store it as verifiable provenance
+        /// without recomputing from the receipt_id string.
+        #[serde(default)]
+        decision_hash: String,
     },
     /// Remove a member
     RemoveMember {
@@ -680,6 +685,7 @@ mod tests {
                 member_did: "did:icn:bob".into(),
                 role: "worker".into(),
                 tier: "standard".into(),
+                decision_hash: String::new(),
             }),
             KernelEffect::Membership(MembershipEffect::UpdateMember {
                 entity_id: "coop-1".into(),
@@ -848,6 +854,7 @@ mod tests {
                 member_did: "did:icn:m1".into(),
                 role: "worker".into(),
                 tier: "standard".into(),
+                decision_hash: String::new(),
             },
             MembershipEffect::RemoveMember {
                 entity_id: "e1".into(),

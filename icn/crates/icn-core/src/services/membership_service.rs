@@ -158,7 +158,21 @@ impl MembershipService for MembershipServiceImpl {
         // Start as Active (governance already approved via proposal)
         member.status = MemberStatus::Active;
 
-        // Store the member
+        // Embed governance provenance into the member record's metadata so it
+        // survives sled round-trips (in-memory provenance HashMap is non-durable).
+        member.metadata.insert(
+            "gov_decision_receipt_id".to_string(),
+            request.decision_receipt_id.clone(),
+        );
+        member.metadata.insert(
+            "gov_decision_hash".to_string(),
+            request.decision_hash.clone(),
+        );
+        member
+            .metadata
+            .insert("gov_operation".to_string(), "add".to_string());
+
+        // Store the member (with provenance baked into metadata)
         match self.store.save_member(&member) {
             Ok(()) => {
                 let state_change_hash = Self::compute_state_change_hash(
@@ -169,7 +183,7 @@ impl MembershipService for MembershipServiceImpl {
                     timestamp,
                 );
 
-                // Store provenance
+                // Also maintain in-memory provenance index for fast lookups
                 let key = Self::provenance_key(&request.entity_id, &request.member_did);
                 self.store_provenance(
                     key,
@@ -662,10 +676,25 @@ impl MembershipService for MembershipServiceImpl {
         entity_id: &str,
         member_did: &str,
     ) -> Option<(String, String)> {
+        // 1. Fast path: in-memory cache (populated at add/update/freeze time)
         let key = Self::provenance_key(entity_id, member_did);
-        let prov = self.provenance.read().ok()?;
-        prov.get(&key)
-            .map(|p| (p.decision_receipt_id.clone(), p.decision_hash.clone()))
+        if let Ok(prov) = self.provenance.read() {
+            if let Some(p) = prov.get(&key) {
+                return Some((p.decision_receipt_id.clone(), p.decision_hash.clone()));
+            }
+        }
+
+        // 2. Durable fallback: read from sled-persisted member metadata.
+        //    This path fires after a restart when the in-memory cache is cold.
+        let did = Self::parse_did(member_did).ok()?;
+        match self.store.get_member(entity_id, &did) {
+            Ok(member) => {
+                let receipt_id = member.metadata.get("gov_decision_receipt_id")?.clone();
+                let decision_hash = member.metadata.get("gov_decision_hash")?.clone();
+                Some((receipt_id, decision_hash))
+            }
+            Err(_) => None,
+        }
     }
 }
 

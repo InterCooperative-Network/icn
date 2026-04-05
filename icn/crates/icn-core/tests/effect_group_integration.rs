@@ -180,6 +180,7 @@ async fn test_membership_add_member_provenance_chain() -> Result<()> {
         member_did: member_did_str.clone(),
         role: "Worker".to_string(),
         tier: "Standard".to_string(),
+        decision_hash: String::new(),
     };
 
     // Execute the membership operation

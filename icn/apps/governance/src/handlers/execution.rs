@@ -97,7 +97,7 @@ pub fn translate_payload_to_effects(
 
         // Membership proposals
         ProposalPayload::Membership { action, member } => {
-            translate_membership_action(action, member, domain_id)
+            translate_membership_action(action, member, domain_id, decision_hash)
         }
 
         ProposalPayload::FreezeMember {
@@ -399,6 +399,7 @@ fn translate_membership_action(
     action: &icn_governance::MembershipAction,
     member: &icn_identity::Did,
     domain_id: &str,
+    decision_hash: &str,
 ) -> Result<Vec<KernelEffect>, TranslationError> {
     use icn_governance::MembershipAction;
 
@@ -409,6 +410,7 @@ fn translate_membership_action(
                 member_did: member.to_string(),
                 role: String::new(),
                 tier: String::new(),
+                decision_hash: decision_hash.to_string(),
             },
         )]),
         MembershipAction::Remove => Ok(vec![KernelEffect::Membership(
