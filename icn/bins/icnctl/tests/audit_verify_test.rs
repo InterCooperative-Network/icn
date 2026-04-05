@@ -396,3 +396,70 @@ fn test_journal_entry_with_wrong_hash_fails_provenance_check() {
         "Journal provenance check must fail on hash mismatch"
     );
 }
+
+/// Forced-accept honesty: governance=None (no stored receipt), but journal
+/// cross-reference succeeded because the caller supplied domain_id.
+///
+/// This is the expected state after `icnctl audit verify --domain-id <id>` is
+/// used for a forced-accept decision where the gateway found journal entries
+/// but has no stored governance receipt.
+///
+/// Check 1 (governance present) must FAIL — the absence of a receipt is truth.
+/// Checks 12+13 (journal present + provenance matched) must PASS.
+///
+/// This proves the CLI output is honest about the forced-accept distinction:
+/// economic execution is visible and verifiable, but no voted receipt exists.
+#[test]
+fn test_forced_accept_audit_output_is_honest() {
+    // Simulate a chain returned when the gateway found journal entries via
+    // ?domain_id= but had no stored governance receipt (forced-accept path).
+    let chain = ReceiptChainResponse {
+        decision_hash: DECISION_HASH.to_string(),
+        governance: None, // No stored voted governance receipt — forced accept
+        allocations: vec![],
+        intents: vec![],
+        journal_entries: vec![make_journal_entry(DECISION_HASH)],
+        structural_complete: false, // no governance receipt → structural incomplete
+        execution_complete: true,
+        chain_complete: false,
+        execution: DecisionExecutionTruthResponse {
+            execution_record_present: true,
+            status: None,
+            total_effects: 1,
+            executed_effects: 1,
+            not_executed_effects: 0,
+            hard_failed_effects: 0,
+            execution_complete: true,
+        },
+    };
+    let checks = verify_receipt_chain(&chain, DECISION_HASH);
+
+    // Check 1: governance absent → FAIL (truthful — no stored receipt)
+    assert!(
+        !checks[0].1,
+        "Governance check must FAIL for forced-accept (no stored receipt)"
+    );
+    assert_eq!(
+        checks[0].2, "No governance decision receipt found",
+        "Detail must state absence, not a misleading message"
+    );
+
+    // Check 11 (chain complete contract): structural_complete=false,
+    // execution_complete=true → chain_complete=false → contract holds
+    assert!(
+        checks[10].1,
+        "Chain complete contract must still hold for forced-accept"
+    );
+
+    // Check 12: journal entries present → PASS
+    assert!(
+        checks[11].1,
+        "Journal entries check must PASS when domain_id hint surfaced entries"
+    );
+
+    // Check 13: provenance matches → PASS
+    assert!(
+        checks[12].1,
+        "Journal provenance check must PASS when entries carry the correct decision hash"
+    );
+}

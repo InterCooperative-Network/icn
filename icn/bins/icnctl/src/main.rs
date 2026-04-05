@@ -285,6 +285,17 @@ enum AuditCommands {
         /// Output as JSON
         #[arg(long)]
         json: bool,
+
+        /// Cooperative/domain ID hint for forced-accept decisions.
+        ///
+        /// For normal voted decisions the domain_id is stored in the governance receipt
+        /// and this flag is unnecessary. For forced-accept decisions (no stored receipt),
+        /// supplying this allows journal cross-reference to succeed.
+        ///
+        /// Does not imply a governance receipt exists. Check 1 will still report FAIL
+        /// for forced accepts even when journal entries are successfully found.
+        #[arg(long, value_name = "ID")]
+        domain_id: Option<String>,
     },
 }
 
@@ -10469,13 +10480,20 @@ async fn handle_audit_command(cmd: AuditCommands) -> Result<()> {
             decision_hash,
             gateway,
             json,
+            domain_id,
         } => {
             if decision_hash.len() != 64 || !decision_hash.chars().all(|c| c.is_ascii_hexdigit()) {
                 bail!("Invalid decision hash: expected 64 hex characters");
             }
 
             let client = reqwest::Client::new();
-            let url = format!("{}/v1/receipts/chain/{}", gateway, decision_hash);
+            let url = match &domain_id {
+                Some(id) => format!(
+                    "{}/v1/receipts/chain/{}?domain_id={}",
+                    gateway, decision_hash, id
+                ),
+                None => format!("{}/v1/receipts/chain/{}", gateway, decision_hash),
+            };
             let resp = client
                 .get(&url)
                 .send()
