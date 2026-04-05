@@ -633,6 +633,20 @@ pub async fn create_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         }
     }
 
+    // Suspension gate: proposer must not be suspended. An accepted FreezeMember
+    // proposal sets MemberStatus::Suspended in CoopStore. Suspended members may
+    // retain commons standing (member_checker can pass) but may not initiate
+    // governance actions until unfrozen.
+    if let Some(ref checker) = ctx.suspension_checker {
+        if checker(proposer_did.clone(), req.domain_id.clone()).await {
+            return Err(err_forbidden(format!(
+                "proposer {} is suspended in domain {}; \
+                 suspended members may not submit proposals",
+                proposer_did, req.domain_id
+            )));
+        }
+    }
+
     let payload = match &req.payload {
         ProposalPayloadRequest::Text { body } => {
             if body.is_empty() || body.trim().is_empty() {
