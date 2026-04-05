@@ -184,6 +184,14 @@ pub enum GovernanceCommand {
         /// Votes from members who lost commons standing after casting are excluded.
         /// When `None`, all cast votes are counted (no eligibility filter applied).
         eligible_voters: Option<std::collections::HashSet<Did>>,
+        /// Optional set of member DIDs to exclude from close-time delegation expansion.
+        ///
+        /// When `Some`, members in this set will not have their vote weight flow via
+        /// any existing delegation at close time. Specifically: if a suspended member
+        /// did not vote directly, their absent weight is NOT applied via delegation,
+        /// preventing indirect governance influence after a FreezeMember proposal.
+        /// When `None`, all non-voter members may have delegation applied (default).
+        excluded_delegators: Option<std::collections::HashSet<Did>>,
     },
     /// Emergency veto - marks a proposal as vetoed
     VetoProposal {
@@ -343,6 +351,25 @@ impl GovernanceHandle {
         self.submit(GovernanceCommand::RevokeDelegation {
             id: id.clone(),
             revoked_at,
+        })
+        .await
+    }
+
+    /// Close a proposal with standing revalidation and suspension-based delegation exclusion.
+    ///
+    /// Members in `excluded_delegators` are excluded from the close-time delegation
+    /// expansion: their vote weight will not flow via any active delegation.
+    /// Pass `eligible_voters: None` and `excluded_delegators: None` for standard close behavior.
+    pub async fn close_proposal_with_suspension(
+        &self,
+        proposal_id: ProposalId,
+        eligible_voters: Option<std::collections::HashSet<Did>>,
+        excluded_delegators: Option<std::collections::HashSet<Did>>,
+    ) -> Result<()> {
+        self.submit(GovernanceCommand::CloseProposal {
+            proposal_id,
+            eligible_voters,
+            excluded_delegators,
         })
         .await
     }
@@ -970,6 +997,7 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
         self.submit(GovernanceCommand::CloseProposal {
             proposal_id,
             eligible_voters: None,
+            excluded_delegators: None,
         })
         .await
     }
@@ -982,6 +1010,7 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
         self.submit(GovernanceCommand::CloseProposal {
             proposal_id,
             eligible_voters: Some(eligible_voters.clone()),
+            excluded_delegators: None,
         })
         .await
     }
@@ -1211,6 +1240,7 @@ impl GovernanceActor {
                                     if let Err(e) = handle_clone.submit(GovernanceCommand::CloseProposal {
                                         proposal_id: proposal_id.clone(),
                                         eligible_voters: None,
+                                        excluded_delegators: None,
                                     }).await {
                                         // May fail if proposal was manually closed (race condition - expected)
                                         warn!("Scheduled close for proposal {} skipped: {}", proposal_id.0, e);
@@ -1644,6 +1674,7 @@ impl GovernanceActor {
             GovernanceCommand::CloseProposal {
                 proposal_id,
                 eligible_voters,
+                excluded_delegators,
             } => {
                 info!("Closing proposal: {}", proposal_id.0);
 
@@ -1717,6 +1748,7 @@ impl GovernanceActor {
                     &proposal.domain_id,
                     &proposal_id,
                     &mut tally,
+                    excluded_delegators.as_ref(),
                 );
 
                 // Get proposal-type-specific thresholds (Issue #477)
@@ -2733,6 +2765,7 @@ impl GovernanceActor {
         domain_id: &icn_governance::GovernanceDomainId,
         proposal_id: &ProposalId,
         tally: &mut VoteTally,
+        excluded_delegators: Option<&std::collections::HashSet<Did>>,
     ) {
         // Build a fast lookup of who voted directly
         let direct_voters: std::collections::HashSet<&Did> =
@@ -2744,6 +2777,14 @@ impl GovernanceActor {
         for member in eligible_members {
             if direct_voters.contains(member) {
                 continue; // voted directly — no delegation needed
+            }
+
+            // Suspension exclusion: a suspended member's weight must not flow
+            // via delegation. Their absence contributes to quorum pressure instead.
+            if let Some(excluded) = excluded_delegators {
+                if excluded.contains(member) {
+                    continue;
+                }
             }
 
             let delegate = self.resolve_delegate_from_store(member, domain_id, proposal_id);

@@ -141,6 +141,7 @@ async fn lifecycle_proposal(
         .submit(GovernanceCommand::CloseProposal {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
+            excluded_delegators: None,
         })
         .await?;
 
@@ -346,6 +347,7 @@ async fn test_lost_standing_member_delegation_blocked() -> Result<()> {
         .submit(GovernanceCommand::CloseProposal {
             proposal_id: proposal_id.clone(),
             eligible_voters: Some(eligible),
+            excluded_delegators: None,
         })
         .await?;
 
@@ -356,6 +358,174 @@ async fn test_lost_standing_member_delegation_blocked() -> Result<()> {
         0,
         "Member who lost standing must not have delegation applied — their absence \
          should contribute to quorum failure, not be covered by a pre-existing delegation"
+    );
+
+    Ok(())
+}
+
+/// Prove that a suspended member's vote weight does not flow via delegation at close time.
+///
+/// Setup:
+/// - Alice, Bob, Carol in a 3-member domain (quorum=1%, approval=50%)
+/// - Bob delegates to Alice (created before Bob is "suspended")
+/// - Alice votes For, Carol votes Against
+/// - Bob does NOT vote (he is suspended)
+///
+/// Without the suspension exclusion: Bob is a non-voter with an active delegation
+/// to Alice. At close time, Bob's weight would flow to Alice's For vote.
+/// Result: 2 For (Alice + Bob via delegation) vs 1 Against (Carol).
+/// approval = for_votes > (total_votes * 50) / 100 → 2 > 1 → Accepted.
+///
+/// With `excluded_delegators: Some({bob})`: Bob is excluded from delegation scope.
+/// His weight does NOT flow. Only Alice's direct For + Carol's Against count.
+/// Result: 1 For vs 1 Against.
+/// approval = for_votes > (total_votes * 50) / 100 → 1 > 1 → false → Rejected.
+#[tokio::test]
+async fn test_suspended_delegator_weight_excluded_at_close_time() -> Result<()> {
+    let (actor, captured, _sub, alice_did, bob_did, carol_did, domain_id) =
+        make_three_member_actor(1, 50).await?;
+
+    let proposal_id = ProposalId::generate();
+
+    // Bob creates a delegation to Alice before "suspension"
+    actor
+        .submit(GovernanceCommand::CreateDelegation {
+            delegation: Delegation::new(
+                bob_did.clone(),
+                alice_did.clone(),
+                DelegationScope::Blanket,
+            ),
+        })
+        .await?;
+
+    actor
+        .submit(GovernanceCommand::CreateProposal {
+            proposal_id: proposal_id.clone(),
+            domain_id: domain_id.clone(),
+            title: "Suspension delegation gate proof".to_string(),
+            description: "Bob delegated before suspension; his weight must not flow.".to_string(),
+            payload: ProposalPayload::Text {
+                body: "Motion text.".to_string(),
+            },
+            scope: ProposalScope::Local,
+        })
+        .await?;
+
+    actor
+        .submit(GovernanceCommand::OpenProposal {
+            proposal_id: proposal_id.clone(),
+            voting_period_seconds: 3600,
+        })
+        .await?;
+
+    // Alice votes For; Carol votes Against; Bob is suspended and does not vote.
+    actor
+        .submit(GovernanceCommand::CastVote {
+            proposal_id: proposal_id.clone(),
+            voter: alice_did.clone(),
+            choice: VoteChoice::For,
+            comment: None,
+        })
+        .await?;
+
+    actor
+        .submit(GovernanceCommand::CastVote {
+            proposal_id: proposal_id.clone(),
+            voter: carol_did.clone(),
+            choice: VoteChoice::Against,
+            comment: None,
+        })
+        .await?;
+
+    // Close with Bob in excluded_delegators — his delegation must not apply.
+    let mut excluded = std::collections::HashSet::new();
+    excluded.insert(bob_did.clone());
+
+    actor
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: Some(excluded),
+        })
+        .await?;
+
+    // 1 For (Alice) vs 1 Against (Carol): for_votes > (2 * 50)/100 → 1 > 1 → false → Rejected.
+    // If Bob's delegation had applied: 2 For vs 1 Against → 2 > 1 → Accepted.
+    assert_eq!(
+        accepted_count(&captured),
+        0,
+        "Suspended delegator's weight must not flow via delegation — proposal must be \
+         Rejected (1 For vs 1 Against, strict majority fails) not Accepted"
+    );
+
+    // Sanity check: if Bob is NOT excluded, his delegation DOES flow and proposal passes.
+    let (actor2, captured2, _sub2, alice_did2, bob_did2, carol_did2, domain_id2) =
+        make_three_member_actor(1, 50).await?;
+
+    let proposal_id2 = ProposalId::generate();
+
+    actor2
+        .submit(GovernanceCommand::CreateDelegation {
+            delegation: Delegation::new(
+                bob_did2.clone(),
+                alice_did2.clone(),
+                DelegationScope::Blanket,
+            ),
+        })
+        .await?;
+
+    actor2
+        .submit(GovernanceCommand::CreateProposal {
+            proposal_id: proposal_id2.clone(),
+            domain_id: domain_id2.clone(),
+            title: "Baseline: non-excluded delegation flows".to_string(),
+            description: "Bob not excluded — delegation should apply normally.".to_string(),
+            payload: ProposalPayload::Text {
+                body: "Motion text.".to_string(),
+            },
+            scope: ProposalScope::Local,
+        })
+        .await?;
+
+    actor2
+        .submit(GovernanceCommand::OpenProposal {
+            proposal_id: proposal_id2.clone(),
+            voting_period_seconds: 3600,
+        })
+        .await?;
+
+    actor2
+        .submit(GovernanceCommand::CastVote {
+            proposal_id: proposal_id2.clone(),
+            voter: alice_did2.clone(),
+            choice: VoteChoice::For,
+            comment: None,
+        })
+        .await?;
+
+    // carol_did2 votes Against — same setup as primary test, but Bob is NOT excluded.
+    actor2
+        .submit(GovernanceCommand::CastVote {
+            proposal_id: proposal_id2.clone(),
+            voter: carol_did2.clone(),
+            choice: VoteChoice::Against,
+            comment: None,
+        })
+        .await?;
+
+    // Close WITHOUT exclusion — Bob's delegation flows: 2 For vs 1 Against → 2 > 1 → Accepted.
+    actor2
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id2.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+        })
+        .await?;
+
+    assert_eq!(
+        accepted_count(&captured2),
+        1,
+        "Non-excluded delegation must still flow normally — 2 For vs 1 Against → Accepted"
     );
 
     Ok(())

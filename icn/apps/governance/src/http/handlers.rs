@@ -1061,18 +1061,41 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
             None
         };
 
-    match eligible_voters {
-        Some(ref eligible) => ctx
-            .manager
-            .close_proposal_filtered(proposal_id.clone(), eligible)
-            .await
-            .map_err(anyhow_to_api)?,
-        None => ctx
-            .manager
-            .close_proposal(proposal_id.clone())
-            .await
-            .map_err(anyhow_to_api)?,
-    }
+    // Suspension-based delegation exclusion: if a suspension_checker is configured,
+    // identify suspended members across all domain members (not just voters) so their
+    // vote weight cannot flow via pre-existing delegations at close time. This closes
+    // the indirect-influence loophole: a suspended member cannot proxy their governance
+    // weight through a delegate they appointed before being frozen.
+    //
+    // Only StaticList membership domains can enumerate members here; TrustThreshold
+    // domains cannot, so their delegation suspension exclusion is a known gap.
+    let excluded_delegators: Option<std::collections::HashSet<Did>> =
+        if let Some(ref checker) = ctx.suspension_checker {
+            match &domain.config.membership.source {
+                icn_governance::MembershipSource::StaticList(members) => {
+                    let domain_id = proposal.domain_id.0.clone();
+                    let mut excluded = std::collections::HashSet::new();
+                    for member in members {
+                        if checker(member.clone(), domain_id.clone()).await {
+                            excluded.insert(member.clone());
+                        }
+                    }
+                    if excluded.is_empty() {
+                        None
+                    } else {
+                        Some(excluded)
+                    }
+                }
+                icn_governance::MembershipSource::TrustThreshold(_) => None,
+            }
+        } else {
+            None
+        };
+
+    ctx.manager
+        .close_proposal_with_suspension(proposal_id.clone(), eligible_voters, excluded_delegators)
+        .await
+        .map_err(anyhow_to_api)?;
 
     let proposal = ctx
         .manager

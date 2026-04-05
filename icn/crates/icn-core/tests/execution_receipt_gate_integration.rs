@@ -137,6 +137,7 @@ async fn run_proposal(
         .submit(GovernanceCommand::CloseProposal {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
+            excluded_delegators: None,
         })
         .await?;
 

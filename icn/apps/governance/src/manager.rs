@@ -714,6 +714,29 @@ impl GovernanceManager {
         self.close_proposal_inner(proposal_id, Some(eligible_voters))
     }
 
+    /// Close a proposal with both standing revalidation and suspension-based
+    /// delegation exclusion. Passes both filters through to the actor when the
+    /// actor path is active. In the in-memory path, suspension exclusion is
+    /// a no-op (no delegation expansion occurs in-memory).
+    pub async fn close_proposal_with_suspension(
+        &self,
+        proposal_id: ProposalId,
+        eligible_voters: Option<HashSet<Did>>,
+        excluded_delegators: Option<HashSet<Did>>,
+    ) -> Result<()> {
+        if let Some(ref handle) = self.governance_handle {
+            return handle
+                .close_proposal_with_suspension(proposal_id, eligible_voters, excluded_delegators)
+                .await;
+        }
+        // In-memory path: no delegation expansion, so suspension exclusion is a no-op.
+        // Just apply the eligible_voters filter if present.
+        match eligible_voters.as_ref() {
+            Some(eligible) => self.close_proposal_inner(proposal_id, Some(eligible)),
+            None => self.close_proposal_inner(proposal_id, None),
+        }
+    }
+
     fn close_proposal_inner(
         &self,
         proposal_id: ProposalId,
