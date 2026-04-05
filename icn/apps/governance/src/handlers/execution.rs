@@ -420,6 +420,7 @@ fn translate_membership_action(
                 entity_id: domain_id.to_string(),
                 member_did: member.to_string(),
                 reason: String::new(),
+                decision_hash: decision_hash.to_string(),
             },
         )]),
     }

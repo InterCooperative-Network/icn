@@ -202,6 +202,9 @@ pub enum MembershipEffect {
         entity_id: String,
         member_did: String,
         reason: String,
+        /// Canonical content hash of the governance decision payload.
+        #[serde(default)]
+        decision_hash: String,
     },
     /// Change member role/tier
     UpdateMember {
@@ -868,6 +871,7 @@ mod tests {
                 entity_id: "e1".into(),
                 member_did: "did:icn:m1".into(),
                 reason: "Voluntary exit".into(),
+                decision_hash: String::new(),
             },
             MembershipEffect::UpdateMember {
                 entity_id: "e1".into(),

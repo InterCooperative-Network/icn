@@ -1860,13 +1860,19 @@ impl KernelMembershipExecutor {
                     entity_id,
                     member_did,
                     reason,
+                    decision_hash: effect_decision_hash,
                 } => {
+                    let resolved_hash = if effect_decision_hash.is_empty() {
+                        compute_decision_hash(receipt_id)
+                    } else {
+                        effect_decision_hash
+                    };
                     let request = icn_kernel_api::RemoveMemberRequest {
                         entity_id: entity_id.clone(),
                         member_did: member_did.clone(),
                         reason,
                         decision_receipt_id: receipt_id.to_string(),
-                        decision_hash: compute_decision_hash(receipt_id),
+                        decision_hash: resolved_hash,
                     };
 
                     let result = service.remove_member(request)?;

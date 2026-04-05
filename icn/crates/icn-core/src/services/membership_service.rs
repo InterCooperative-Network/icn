@@ -258,6 +258,18 @@ impl MembershipService for MembershipServiceImpl {
                 member
                     .metadata
                     .insert("removed_at".to_string(), timestamp.to_string());
+                // Governance provenance — enables cold-cache recovery after restart
+                member.metadata.insert(
+                    "gov_decision_receipt_id".to_string(),
+                    request.decision_receipt_id.clone(),
+                );
+                member.metadata.insert(
+                    "gov_decision_hash".to_string(),
+                    request.decision_hash.clone(),
+                );
+                member
+                    .metadata
+                    .insert("gov_operation".to_string(), "remove".to_string());
 
                 // Save updated member
                 match self.store.save_member(&member) {
