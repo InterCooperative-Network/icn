@@ -2034,13 +2034,33 @@ impl GovernanceActor {
                                 let canonical_payload_hash = serde_json::to_string(&payload)
                                     .ok()
                                     .map(|s| blake3::hash(s.as_bytes()).to_hex().to_string());
+                                // Compute a canonical governance decision hash for the forced
+                                // accept using the same GovernanceDecisionReceipt encoding as
+                                // voted accepts.  VoteTally{0,0,0} accurately represents
+                                // "forced by authority — no votes were cast."
+                                //
+                                // NOTE: no GovernanceDecisionReceipt is stored in the receipt
+                                // backend for forced accepts (the actor has no receipt_store).
+                                // Audit verify will find journal entries via this hash but will
+                                // report "No governance receipt present" — which is honest.
+                                use icn_governance::proof::ProofOutcome;
+                                let forced_decision_hash = {
+                                    let receipt = GovernanceDecisionReceipt::new(
+                                        proposal_id.0.clone(),
+                                        proposal.domain_id.0.clone(),
+                                        ProofOutcome::Accepted,
+                                        VoteTally::empty(),
+                                        &[],
+                                    );
+                                    Some(hex::encode(receipt.decision_hash))
+                                };
                                 SystemEvent::ProposalAccepted {
                                     proposal_id: proposal_id.0.clone(),
                                     domain_id: proposal.domain_id.0.clone(),
                                     payload,
                                     decided_at: now,
                                     canonical_payload_hash,
-                                    governance_decision_hash: None,
+                                    governance_decision_hash: forced_decision_hash,
                                 }
                             }
                             Err(e) => {
