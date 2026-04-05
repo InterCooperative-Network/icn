@@ -1616,6 +1616,38 @@ pub async fn create_delegation<E: GovernanceEventEmitter + Clone + 'static>(
     let delegate_did = parse_did(&req.delegate, "Invalid delegate DID")?;
     let scope = parse_delegation_scope(&req.scope)?;
 
+    // Suspension gate: suspended members may not proxy their voting influence
+    // by creating delegations in domains where they are frozen.
+    //
+    // Scope resolution:
+    // - Domain(id)   → domain is known directly; checked below.
+    // - Proposal(id) → domain is resolved via manager lookup; checked below.
+    // - Blanket       → spans all domains; no single domain to check against
+    //                   the per-(did, domain) suspension index. Known gap:
+    //                   blanket delegations by suspended members are not blocked
+    //                   in this tranche.
+    if let Some(ref checker) = ctx.suspension_checker {
+        let domain_id_opt: Option<String> = match &scope {
+            DelegationScope::Domain(d) => Some(d.0.clone()),
+            DelegationScope::Proposal(p) => ctx
+                .manager
+                .get_proposal(p)
+                .await
+                .unwrap_or(None)
+                .map(|prop| prop.domain_id.0.clone()),
+            DelegationScope::Blanket => None,
+        };
+        if let Some(domain_id) = domain_id_opt {
+            if checker(delegator_did.clone(), domain_id.clone()).await {
+                return Err(err_forbidden(format!(
+                    "delegator {} is suspended in domain {}; \
+                     suspended members may not create delegations",
+                    delegator_did, domain_id
+                )));
+            }
+        }
+    }
+
     let mut delegation = Delegation::new(delegator_did, delegate_did, scope);
     if let Some(expires_at) = req.expires_at {
         delegation = delegation.with_expiry(expires_at);
