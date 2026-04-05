@@ -69,14 +69,39 @@ impl TestCluster {
 
         for i in 0..self.nodes.len() {
             for j in (i + 1)..self.nodes.len() {
+                // Skip pairs that are already connected — re-dialing an existing
+                // QUIC connection causes simultaneous-handshake races where both
+                // sides abort each other's TLS negotiation mid-handshake.
+                if self.nodes[i].is_connected_to(&self.nodes[j].did).await {
+                    continue;
+                }
+
                 // Add delay between connection attempts to avoid overwhelming TLS handshakes
                 if i > 0 || j > 1 {
                     tokio::time::sleep(Duration::from_millis(50)).await;
                 }
-                self.nodes[i]
-                    .connect(&self.nodes[j])
-                    .await
-                    .with_context(|| format!("Failed to connect node {i} to node {j}"))?;
+
+                // Single retry: transient handshake failures (e.g. simultaneous
+                // dial from the remote side) are possible on CI runners under load.
+                let result = self.nodes[i].connect(&self.nodes[j]).await;
+                if let Err(ref e) = result {
+                    // Only retry on handshake / connection-level errors, not on
+                    // permanent failures (bad address, etc.).
+                    let msg = format!("{e:#}");
+                    if msg.contains("handshake")
+                        || msg.contains("aborted by peer")
+                        || msg.contains("dial failed")
+                    {
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                        self.nodes[i]
+                            .connect(&self.nodes[j])
+                            .await
+                            .with_context(|| format!("Failed to connect node {i} to node {j}"))?;
+                    } else {
+                        result
+                            .with_context(|| format!("Failed to connect node {i} to node {j}"))?;
+                    }
+                }
             }
         }
 
