@@ -232,6 +232,7 @@ async fn test_e2e_freeze_member_suspends_commons_affiliation() {
         on_proposal_accepted: Some(on_proposal_accepted),
         member_checker: None,
         steward_checker: None,
+        suspension_checker: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
@@ -483,6 +484,7 @@ async fn test_e2e_unfreeze_member_reinstates_commons_affiliation() {
         on_proposal_accepted: Some(on_proposal_accepted),
         member_checker: None,
         steward_checker: None,
+        suspension_checker: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
@@ -725,6 +727,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
         on_proposal_accepted: Some(on_proposal_accepted),
         member_checker: None,
         steward_checker: None,
+        suspension_checker: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);

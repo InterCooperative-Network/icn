@@ -152,6 +152,23 @@ pub type MemberStandingChecker = Arc<
         + Sync,
 >;
 
+/// Async predicate: is `did` currently suspended in cooperative `domain_id`?
+///
+/// Called by `cast_vote` before recording a vote. Returns `true` if the member
+/// holds `MemberStatus::Suspended` (set by an accepted `FreezeMember` proposal).
+/// A `true` result causes `403 Forbidden` — suspended members may not vote.
+///
+/// `None` disables the gate (useful in tests that do not wire a coop store).
+///
+/// The gateway wires this against `CoopManager::is_member_suspended()`.
+/// The governance app never imports `icn-coop` types — the closure is the
+/// only crossing point, preserving the kernel/app boundary.
+pub type SuspensionChecker = Arc<
+    dyn Fn(Did, String) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>>
+        + Send
+        + Sync,
+>;
+
 /// Shared application context for governance HTTP handlers.
 ///
 /// Stored as `web::Data<GovernanceContext<E>>`. Using a single struct keeps
@@ -175,6 +192,11 @@ pub struct GovernanceContext<E> {
     /// Returns `true` if the caller is an active steward; `false` → 403 Forbidden.
     /// Steward standing is a strictly higher bar than Member standing.
     pub steward_checker: Option<StewardStandingChecker>,
+    /// Optional gate: if set, `cast_vote` calls this before recording the vote.
+    /// Returns `true` if the voter is suspended (`MemberStatus::Suspended`) in the
+    /// proposal's domain — i.e., a `FreezeMember` proposal was accepted for them.
+    /// A `true` result → 403 Forbidden. `None` disables the gate.
+    pub suspension_checker: Option<SuspensionChecker>,
 }
 
 /// Register all governance routes on `cfg`.

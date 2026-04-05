@@ -1293,6 +1293,17 @@ impl GatewayServer {
                 Box::pin(async move { commons.is_active_steward(&did).await.unwrap_or(false) })
             });
 
+        // Suspension gate: voters with MemberStatus::Suspended (set by an accepted
+        // FreezeMember proposal) are blocked from casting votes. Wired here so the
+        // governance app never imports icn-coop types — the closure is the only
+        // crossing point, same pattern as member_checker and steward_checker.
+        let coop_manager_for_suspension = coop_manager.clone();
+        let suspension_checker: icn_governance_actor::http::configure::SuspensionChecker =
+            std::sync::Arc::new(move |did, domain_id| {
+                let mgr = coop_manager_for_suspension.clone();
+                Box::pin(async move { mgr.is_member_suspended(&domain_id, &did).await })
+            });
+
         let gov_ctx = GovernanceContext {
             manager: governance_manager.clone(),
             emitter: GatewayEventAdapter::new(event_broadcaster.clone()),
@@ -1300,6 +1311,7 @@ impl GatewayServer {
             on_proposal_accepted: Some(on_proposal_accepted),
             member_checker: Some(member_checker),
             steward_checker: Some(steward_checker),
+            suspension_checker: Some(suspension_checker),
         };
 
         // Create rate limiter with configured or default config

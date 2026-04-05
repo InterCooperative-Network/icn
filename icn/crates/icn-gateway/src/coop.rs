@@ -355,6 +355,28 @@ impl CoopManager {
         Ok(coops.values().cloned().collect())
     }
 
+    /// Returns `true` if `did` is currently suspended (`MemberStatus::Suspended`)
+    /// in cooperative `coop_id`.
+    ///
+    /// Queries the `CoopActor` (sled-backed) when a daemon handle is present.
+    /// Returns `false` in standalone (no-handle) mode — suspension is never set
+    /// without a live `MembershipService`, so failing open is correct.
+    ///
+    /// Fails open on store errors to avoid blocking all governance operations
+    /// due to a transient read failure.
+    pub async fn is_member_suspended(&self, coop_id: &str, did: &icn_identity::Did) -> bool {
+        use icn_coop::MemberStatus;
+        let Some(ref handle) = self.coop_handle else {
+            return false;
+        };
+        match handle.list_members(coop_id.to_string()).await {
+            Ok(members) => members
+                .iter()
+                .any(|m| &m.did == did && m.status == MemberStatus::Suspended),
+            Err(_) => false,
+        }
+    }
+
     /// List all cooperative IDs (for cleanup tasks)
     pub fn list_all_coop_ids(&self) -> Result<Vec<CoopId>> {
         let coops = self
