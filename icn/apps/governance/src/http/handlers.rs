@@ -1643,30 +1643,67 @@ pub async fn create_delegation<E: GovernanceEventEmitter + Clone + 'static>(
     // by creating delegations in domains where they are frozen.
     //
     // Scope resolution:
-    // - Domain(id)   → domain is known directly; checked below.
-    // - Proposal(id) → domain is resolved via manager lookup; checked below.
-    // - Blanket       → spans all domains; no single domain to check against
-    //                   the per-(did, domain) suspension index. Known gap:
-    //                   blanket delegations by suspended members are not blocked
-    //                   in this tranche.
+    // - Domain(id)   → domain is known directly; suspension checked against it.
+    // - Proposal(id) → domain resolved via manager lookup; suspension checked.
+    // - Blanket       → applies to all domains globally; the gate enumerates
+    //                   every StaticList domain the delegator belongs to and
+    //                   denies if suspended in any. TrustThreshold domains are
+    //                   intentionally skipped (member set is not enumerable
+    //                   without the trust graph at this layer).
     if let Some(ref checker) = ctx.suspension_checker {
-        let domain_id_opt: Option<String> = match &scope {
-            DelegationScope::Domain(d) => Some(d.0.clone()),
-            DelegationScope::Proposal(p) => ctx
-                .manager
-                .get_proposal(p)
-                .await
-                .unwrap_or(None)
-                .map(|prop| prop.domain_id.0.clone()),
-            DelegationScope::Blanket => None,
-        };
-        if let Some(domain_id) = domain_id_opt {
-            if checker(delegator_did.clone(), domain_id.clone()).await {
-                return Err(err_forbidden(format!(
-                    "delegator {} is suspended in domain {}; \
-                     suspended members may not create delegations",
-                    delegator_did, domain_id
-                )));
+        match &scope {
+            DelegationScope::Blanket => {
+                // A blanket delegation affects all domains globally. Enumerate
+                // every domain the delegator belongs to via StaticList and deny
+                // if suspended in any. Errors from list_domains are fail-open:
+                // if enumeration fails, we do not deny (prevents spurious 403s
+                // and preserves behaviour for non-suspended callers).
+                if let Ok(all_domains) = ctx.manager.list_domains().await {
+                    for domain in &all_domains {
+                        if domain
+                            .config
+                            .membership
+                            .source
+                            .contains_static(&delegator_did)
+                        {
+                            let domain_id = domain.id.0.clone();
+                            if checker(delegator_did.clone(), domain_id.clone()).await {
+                                return Err(err_forbidden(format!(
+                                    "delegator {} is suspended in domain {}; \
+                                     suspended members may not create blanket delegations",
+                                    delegator_did, domain_id
+                                )));
+                            }
+                        }
+                    }
+                }
+            }
+            DelegationScope::Domain(d) => {
+                let domain_id = d.0.clone();
+                if checker(delegator_did.clone(), domain_id.clone()).await {
+                    return Err(err_forbidden(format!(
+                        "delegator {} is suspended in domain {}; \
+                         suspended members may not create delegations",
+                        delegator_did, domain_id
+                    )));
+                }
+            }
+            DelegationScope::Proposal(p) => {
+                if let Some(domain_id) = ctx
+                    .manager
+                    .get_proposal(p)
+                    .await
+                    .unwrap_or(None)
+                    .map(|prop| prop.domain_id.0.clone())
+                {
+                    if checker(delegator_did.clone(), domain_id.clone()).await {
+                        return Err(err_forbidden(format!(
+                            "delegator {} is suspended in domain {}; \
+                             suspended members may not create delegations",
+                            delegator_did, domain_id
+                        )));
+                    }
+                }
             }
         }
     }
