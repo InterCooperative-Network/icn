@@ -134,6 +134,7 @@ async fn build_app(
         on_proposal_accepted: None,
         member_checker: Some(make_member_checker(commons_mgr.clone())),
         steward_checker: Some(make_steward_checker(commons_mgr)),
+        suspension_checker: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);

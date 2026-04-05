@@ -1190,6 +1190,19 @@ pub async fn cast_vote<E: GovernanceEventEmitter + Clone + 'static>(
         }
     }
 
+    // Suspension gate: voter must not be suspended (MemberStatus::Suspended) in
+    // the proposal's domain. Suspension is set by an accepted FreezeMember proposal.
+    // A suspended member may not influence governance decisions until unfrozen.
+    if let Some(ref checker) = ctx.suspension_checker {
+        if checker(voter_did.clone(), proposal.domain_id.0.clone()).await {
+            return Err(err_forbidden(format!(
+                "voter {} is suspended in domain {}; \
+                 suspended members may not cast votes",
+                voter_did, proposal.domain_id.0
+            )));
+        }
+    }
+
     ctx.manager
         .cast_vote(
             proposal_id.clone(),
@@ -2446,6 +2459,7 @@ mod tests {
             on_proposal_accepted: Some(hook),
             member_checker: None,
             steward_checker: None,
+            suspension_checker: None,
         };
 
         let app = test_app!(ctx, member_did);
@@ -2523,6 +2537,7 @@ mod tests {
             on_proposal_accepted: Some(hook),
             member_checker: None,
             steward_checker: None,
+            suspension_checker: None,
         };
 
         let app = test_app!(ctx, member_did);

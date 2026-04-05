@@ -29,7 +29,7 @@ use icn_governance::{
 };
 use icn_governance_actor::{
     events::NoopEventEmitter,
-    http::configure::{GovernanceContext, MemberStandingChecker},
+    http::configure::{GovernanceContext, MemberStandingChecker, SuspensionChecker},
     manager::GovernanceManager,
 };
 use icn_identity::{
@@ -157,6 +157,7 @@ async fn build_app_with_open_proposal(
         on_proposal_accepted: None,
         member_checker: Some(make_checker(commons_mgr)),
         steward_checker: None,
+        suspension_checker: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
@@ -337,5 +338,160 @@ async fn test_suspended_member_cannot_vote() {
         resp.status().as_u16(),
         403,
         "Suspended member must be rejected with 403"
+    );
+}
+
+/// Build an app with no commons member_checker but with a custom suspension_checker.
+///
+/// Used to isolate the suspension gate from the commons affiliation gate.
+/// The member_checker is omitted so only the suspension_checker is exercised.
+async fn build_app_with_suspension_checker(
+    actor_did: &Did,
+    is_suspended: bool,
+) -> (
+    impl actix_web::dev::Service<
+        actix_http::Request,
+        Response = actix_web::dev::ServiceResponse,
+        Error = actix_web::Error,
+    >,
+    String,
+) {
+    let governance_manager = Arc::new(GovernanceManager::new());
+
+    governance_manager
+        .create_domain(
+            GovernanceDomainId(DOMAIN_ID.to_string()),
+            "Suspension Gate Test Coop".to_string(),
+            "cooperative".to_string(),
+            GovernanceParams::new(50, 50, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![actor_did.clone()]),
+            },
+        )
+        .await
+        .expect("create_domain");
+
+    let proposal_id_val = ProposalId("suspension-gate-prop-1".to_string());
+    governance_manager
+        .create_proposal(
+            proposal_id_val.clone(),
+            GovernanceDomainId(DOMAIN_ID.to_string()),
+            actor_did.clone(),
+            "Suspension gate test proposal".to_string(),
+            "Testing that suspension blocks voting.".to_string(),
+            ProposalPayload::Text {
+                body: "Suspension gate test body.".to_string(),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create_proposal");
+
+    governance_manager
+        .open_proposal(proposal_id_val.clone(), 3600)
+        .await
+        .expect("open_proposal");
+
+    let suspension_checker: SuspensionChecker =
+        Arc::new(move |_did, _domain| Box::pin(async move { is_suspended }));
+
+    let jwt_secret = b"suspension-gate-test-jwt-secret32".to_vec();
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
+
+    let gov_ctx = GovernanceContext {
+        manager: governance_manager,
+        emitter: NoopEventEmitter,
+        on_charter_accepted: None,
+        on_proposal_accepted: None,
+        member_checker: None, // omit commons gate — isolate suspension gate
+        steward_checker: None,
+        suspension_checker: Some(suspension_checker),
+    };
+
+    let auth_mw = HttpAuthentication::bearer(jwt_auth);
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(auth_manager))
+            .app_data(web::Data::new(ip_limiter))
+            .service(
+                web::scope("/v1")
+                    .service(api::auth::challenge)
+                    .service(api::auth::verify)
+                    .service(
+                        web::scope("/gov")
+                            .configure({
+                                let ctx = gov_ctx.clone();
+                                move |cfg| {
+                                    icn_governance_actor::http::configure::configure(
+                                        cfg,
+                                        ctx.clone(),
+                                    )
+                                }
+                            })
+                            .wrap(auth_mw),
+                    ),
+            ),
+    )
+    .await;
+
+    (app, proposal_id_val.0)
+}
+
+/// Proves: when suspension_checker returns true (member is suspended in coop store),
+/// cast_vote is rejected with 403 Forbidden.
+///
+/// This gate is distinct from the commons member_checker: it reflects
+/// MemberStatus::Suspended set by an accepted FreezeMember governance proposal,
+/// not a commons affiliation status. A frozen member may not cast votes.
+#[actix_web::test]
+async fn test_coopstore_suspended_member_blocked_by_suspension_checker() {
+    let actor_bundle = IdentityBundle::generate().expect("IdentityBundle");
+    let actor_did = actor_bundle.did().clone();
+
+    let (app, proposal_id) = build_app_with_suspension_checker(&actor_did, true).await;
+    let token = get_jwt(&app, &actor_did.to_string(), &actor_bundle).await;
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri(&format!("/v1/gov/proposals/{proposal_id}/vote"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({ "choice": "for" }))
+            .to_request(),
+    )
+    .await;
+
+    assert_eq!(
+        resp.status().as_u16(),
+        403,
+        "suspension_checker=true must block vote with 403"
+    );
+}
+
+/// Proves backward compatibility: when suspension_checker returns false
+/// (member is not suspended), votes proceed normally.
+#[actix_web::test]
+async fn test_non_suspended_member_passes_suspension_checker() {
+    let actor_bundle = IdentityBundle::generate().expect("IdentityBundle");
+    let actor_did = actor_bundle.did().clone();
+
+    let (app, proposal_id) = build_app_with_suspension_checker(&actor_did, false).await;
+    let token = get_jwt(&app, &actor_did.to_string(), &actor_bundle).await;
+
+    let resp = test::call_service(
+        &app,
+        test::TestRequest::post()
+            .uri(&format!("/v1/gov/proposals/{proposal_id}/vote"))
+            .insert_header(("Authorization", format!("Bearer {token}")))
+            .set_json(json!({ "choice": "for" }))
+            .to_request(),
+    )
+    .await;
+
+    assert_eq!(
+        resp.status().as_u16(),
+        200,
+        "non-suspended member must pass suspension_checker and vote successfully"
     );
 }
