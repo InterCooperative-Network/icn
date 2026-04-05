@@ -184,6 +184,7 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
             domain_id: "test-domain".to_string(),
             payload: payload.clone(),
             decided_at: now,
+            canonical_payload_hash: None,
         })
         .await;
 
@@ -226,6 +227,7 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
             })
             .unwrap(),
             decided_at: now,
+            canonical_payload_hash: None,
         })
         .await;
 
@@ -341,6 +343,7 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
             })
             .unwrap(),
             decided_at: now,
+            canonical_payload_hash: None,
         })
         .await;
 

@@ -1898,12 +1898,18 @@ impl GovernanceActor {
                     let event = match outcome_result {
                         DecisionOutcome::Accepted => {
                             match serde_json::to_value(&proposal.payload) {
-                                Ok(payload) => SystemEvent::ProposalAccepted {
-                                    proposal_id: proposal_id.0.clone(),
-                                    domain_id: proposal.domain_id.0.clone(),
-                                    payload,
-                                    decided_at: now,
-                                },
+                                Ok(payload) => {
+                                    let canonical_payload_hash = serde_json::to_string(&payload)
+                                        .ok()
+                                        .map(|s| blake3::hash(s.as_bytes()).to_hex().to_string());
+                                    SystemEvent::ProposalAccepted {
+                                        proposal_id: proposal_id.0.clone(),
+                                        domain_id: proposal.domain_id.0.clone(),
+                                        payload,
+                                        decided_at: now,
+                                        canonical_payload_hash,
+                                    }
+                                }
                                 Err(e) => {
                                     warn!(
                                         "Failed to serialize payload for accepted proposal {}: {e}",
@@ -2011,12 +2017,18 @@ impl GovernanceActor {
                     let now = now_seconds();
                     let event = match forced_outcome {
                         ForcedOutcome::Accept => match serde_json::to_value(&proposal.payload) {
-                            Ok(payload) => SystemEvent::ProposalAccepted {
-                                proposal_id: proposal_id.0.clone(),
-                                domain_id: proposal.domain_id.0.clone(),
-                                payload,
-                                decided_at: now,
-                            },
+                            Ok(payload) => {
+                                let canonical_payload_hash = serde_json::to_string(&payload)
+                                    .ok()
+                                    .map(|s| blake3::hash(s.as_bytes()).to_hex().to_string());
+                                SystemEvent::ProposalAccepted {
+                                    proposal_id: proposal_id.0.clone(),
+                                    domain_id: proposal.domain_id.0.clone(),
+                                    payload,
+                                    decided_at: now,
+                                    canonical_payload_hash,
+                                }
+                            }
                             Err(e) => {
                                 warn!(
                                         "Failed to serialize payload for force-accepted proposal {}: {e}",

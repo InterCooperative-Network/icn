@@ -1817,14 +1817,22 @@ impl KernelMembershipExecutor {
                     member_did,
                     role,
                     tier,
+                    decision_hash: effect_decision_hash,
                 } => {
+                    // Use the content hash carried in the effect when available;
+                    // fall back to blake3(receipt_id) for effects without one.
+                    let resolved_hash = if effect_decision_hash.is_empty() {
+                        compute_decision_hash(receipt_id)
+                    } else {
+                        effect_decision_hash
+                    };
                     let request = icn_kernel_api::AddMemberRequest {
                         entity_id: entity_id.clone(),
                         member_did: member_did.clone(),
                         role,
                         tier,
                         decision_receipt_id: receipt_id.to_string(),
-                        decision_hash: compute_decision_hash(receipt_id),
+                        decision_hash: resolved_hash,
                     };
 
                     let result = service.add_member(request)?;
@@ -1852,13 +1860,19 @@ impl KernelMembershipExecutor {
                     entity_id,
                     member_did,
                     reason,
+                    decision_hash: effect_decision_hash,
                 } => {
+                    let resolved_hash = if effect_decision_hash.is_empty() {
+                        compute_decision_hash(receipt_id)
+                    } else {
+                        effect_decision_hash
+                    };
                     let request = icn_kernel_api::RemoveMemberRequest {
                         entity_id: entity_id.clone(),
                         member_did: member_did.clone(),
                         reason,
                         decision_receipt_id: receipt_id.to_string(),
-                        decision_hash: compute_decision_hash(receipt_id),
+                        decision_hash: resolved_hash,
                     };
 
                     let result = service.remove_member(request)?;
@@ -1923,14 +1937,20 @@ impl KernelMembershipExecutor {
                     member_did,
                     reason,
                     duration_secs,
+                    decision_hash: effect_decision_hash,
                 } => {
+                    let resolved_hash = if effect_decision_hash.is_empty() {
+                        compute_decision_hash(receipt_id)
+                    } else {
+                        effect_decision_hash
+                    };
                     let request = icn_kernel_api::FreezeMemberRequest {
                         entity_id: entity_id.clone(),
                         member_did: member_did.clone(),
                         reason,
                         duration_secs,
                         decision_receipt_id: receipt_id.to_string(),
-                        decision_hash: compute_decision_hash(receipt_id),
+                        decision_hash: resolved_hash,
                     };
 
                     let result = service.freeze_member(request)?;
@@ -1958,12 +1978,18 @@ impl KernelMembershipExecutor {
                 MembershipEffect::UnfreezeMember {
                     entity_id,
                     member_did,
+                    decision_hash: effect_decision_hash,
                 } => {
+                    let resolved_hash = if effect_decision_hash.is_empty() {
+                        compute_decision_hash(receipt_id)
+                    } else {
+                        effect_decision_hash
+                    };
                     let request = icn_kernel_api::UnfreezeMemberRequest {
                         entity_id: entity_id.clone(),
                         member_did: member_did.clone(),
                         decision_receipt_id: receipt_id.to_string(),
-                        decision_hash: compute_decision_hash(receipt_id),
+                        decision_hash: resolved_hash,
                     };
 
                     let result = service.unfreeze_member(request)?;

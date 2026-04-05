@@ -97,7 +97,7 @@ pub fn translate_payload_to_effects(
 
         // Membership proposals
         ProposalPayload::Membership { action, member } => {
-            translate_membership_action(action, member, domain_id)
+            translate_membership_action(action, member, domain_id, decision_hash)
         }
 
         ProposalPayload::FreezeMember {
@@ -110,6 +110,7 @@ pub fn translate_payload_to_effects(
                 member_did: member.to_string(),
                 reason: reason.clone(),
                 duration_secs: *duration_seconds,
+                decision_hash: decision_hash.to_string(),
             },
         )]),
 
@@ -118,6 +119,7 @@ pub fn translate_payload_to_effects(
                 MembershipEffect::UnfreezeMember {
                     entity_id: domain_id.to_string(),
                     member_did: member.to_string(),
+                    decision_hash: decision_hash.to_string(),
                 },
             )])
         }
@@ -399,6 +401,7 @@ fn translate_membership_action(
     action: &icn_governance::MembershipAction,
     member: &icn_identity::Did,
     domain_id: &str,
+    decision_hash: &str,
 ) -> Result<Vec<KernelEffect>, TranslationError> {
     use icn_governance::MembershipAction;
 
@@ -409,6 +412,7 @@ fn translate_membership_action(
                 member_did: member.to_string(),
                 role: String::new(),
                 tier: String::new(),
+                decision_hash: decision_hash.to_string(),
             },
         )]),
         MembershipAction::Remove => Ok(vec![KernelEffect::Membership(
@@ -416,6 +420,7 @@ fn translate_membership_action(
                 entity_id: domain_id.to_string(),
                 member_did: member.to_string(),
                 reason: String::new(),
+                decision_hash: decision_hash.to_string(),
             },
         )]),
     }

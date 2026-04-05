@@ -302,6 +302,7 @@ async fn test_two_node_membership_add_determinism() -> Result<()> {
         member_did: member_did.to_string(),
         role: "Worker".to_string(),
         tier: "Standard".to_string(),
+        decision_hash: String::new(),
     };
 
     // === Node A Setup ===
@@ -691,6 +692,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
             member_did: member_did.to_string(),
             role: "Coordinator".to_string(),
             tier: "Founding".to_string(),
+            decision_hash: String::new(),
         }),
         KernelEffect::NoOp {
             reason: "Resolution text recorded".to_string(),
@@ -874,6 +876,7 @@ async fn test_two_node_federation_reload_durability() -> Result<()> {
         member_did: member_did.to_string(),
         role: "Worker".to_string(),
         tier: "Standard".to_string(),
+        decision_hash: String::new(),
     };
 
     // === Create persistent tempdirs for both nodes ===

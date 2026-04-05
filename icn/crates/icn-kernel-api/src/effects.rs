@@ -191,12 +191,20 @@ pub enum MembershipEffect {
         member_did: String,
         role: String,
         tier: String,
+        /// Canonical content hash of the governance decision payload.
+        /// Carried here so executors can store it as verifiable provenance
+        /// without recomputing from the receipt_id string.
+        #[serde(default)]
+        decision_hash: String,
     },
     /// Remove a member
     RemoveMember {
         entity_id: String,
         member_did: String,
         reason: String,
+        /// Canonical content hash of the governance decision payload.
+        #[serde(default)]
+        decision_hash: String,
     },
     /// Change member role/tier
     UpdateMember {
@@ -211,11 +219,17 @@ pub enum MembershipEffect {
         member_did: String,
         reason: String,
         duration_secs: Option<u64>,
+        /// Canonical content hash of the governance decision payload.
+        #[serde(default)]
+        decision_hash: String,
     },
     /// Unfreeze member (restore rights)
     UnfreezeMember {
         entity_id: String,
         member_did: String,
+        /// Canonical content hash of the governance decision payload.
+        #[serde(default)]
+        decision_hash: String,
     },
 }
 
@@ -582,6 +596,7 @@ mod tests {
             member_did: "did:icn:bob".into(),
             reason: "Policy violation".into(),
             duration_secs: Some(86400),
+            decision_hash: String::new(),
         };
 
         let json = serde_json::to_string(&effect).unwrap();
@@ -680,6 +695,7 @@ mod tests {
                 member_did: "did:icn:bob".into(),
                 role: "worker".into(),
                 tier: "standard".into(),
+                decision_hash: String::new(),
             }),
             KernelEffect::Membership(MembershipEffect::UpdateMember {
                 entity_id: "coop-1".into(),
@@ -692,6 +708,7 @@ mod tests {
                 member_did: "did:icn:carol".into(),
                 reason: "Policy violation".into(),
                 duration_secs: Some(86400),
+                decision_hash: String::new(),
             }),
             KernelEffect::Protocol(ProtocolEffect::SetParameter {
                 parameter_name: "voting_period".into(),
@@ -848,11 +865,13 @@ mod tests {
                 member_did: "did:icn:m1".into(),
                 role: "worker".into(),
                 tier: "standard".into(),
+                decision_hash: String::new(),
             },
             MembershipEffect::RemoveMember {
                 entity_id: "e1".into(),
                 member_did: "did:icn:m1".into(),
                 reason: "Voluntary exit".into(),
+                decision_hash: String::new(),
             },
             MembershipEffect::UpdateMember {
                 entity_id: "e1".into(),
@@ -865,10 +884,12 @@ mod tests {
                 member_did: "did:icn:m1".into(),
                 reason: "Investigation".into(),
                 duration_secs: Some(3600),
+                decision_hash: String::new(),
             },
             MembershipEffect::UnfreezeMember {
                 entity_id: "e1".into(),
                 member_did: "did:icn:m1".into(),
+                decision_hash: String::new(),
             },
         ];
 
