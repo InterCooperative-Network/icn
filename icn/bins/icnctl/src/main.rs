@@ -11036,7 +11036,7 @@ mod audit_verify_tests {
         let decision_hash = "a".repeat(64);
         let journal_entries = vec![JournalEntryProvenanceResponse {
             entry_id: "entry-1".to_string(),
-            decision_receipt_id: format!("gov:domain-1:prop-1:receipt"),
+            decision_receipt_id: "gov:domain-1:prop-1:receipt".to_string(),
             decision_hash: decision_hash.clone(),
             account_count: 2,
             timestamp: 1_700_000_000,
