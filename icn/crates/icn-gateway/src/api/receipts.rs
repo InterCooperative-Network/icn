@@ -424,11 +424,11 @@ pub async fn get_full_chain(
     // Query journal entries whose ProvenanceRef::Governance.decision_hash matches.
     // domain_id is derived from the governance receipt when present; for forced-accept
     // decisions (no stored receipt) the caller may supply it as a query parameter.
+    let receipt_domain_id = governance.as_ref().map(|g| g.domain_id.as_str());
     let journal_entries = query_journal_entries_for_decision(
         &ledger_mgr,
-        &governance,
+        receipt_domain_id.or(query.domain_id.as_deref()),
         &normalized_decision_hash,
-        query.domain_id.as_deref(),
     )
     .await;
 
@@ -468,22 +468,15 @@ pub async fn get_full_chain(
 /// Query ledger journal entries whose `ProvenanceRef::Governance.decision_hash` matches
 /// the supplied hex-encoded decision hash.
 ///
-/// `domain_id_hint` is used when no governance receipt is stored (forced-accept path).
-/// When a governance receipt is present, its `domain_id` takes precedence.
-/// Returns an empty vec when neither source provides a domain_id, or when the
-/// LedgerManager is unavailable.
+/// `domain_id` is the resolved cooperative domain — governance receipt domain_id
+/// takes precedence over any query parameter hint; callers resolve this before calling.
+/// Returns an empty vec when no domain_id is available or LedgerManager is unavailable.
 async fn query_journal_entries_for_decision(
     ledger_mgr: &Option<web::Data<Arc<LedgerManager>>>,
-    governance: &Option<icn_governance::GovernanceDecisionReceipt>,
+    domain_id: Option<&str>,
     decision_hash_hex: &str,
-    domain_id_hint: Option<&str>,
 ) -> Vec<JournalEntryProvenanceResponse> {
-    // Governance receipt domain_id takes precedence; hint only used when receipt absent.
-    let domain_id = governance
-        .as_ref()
-        .map(|g| g.domain_id.as_str())
-        .or(domain_id_hint)
-        .map(str::to_owned);
+    let domain_id = domain_id.map(str::to_owned);
 
     let (mgr, domain_id) = match (ledger_mgr, domain_id) {
         (Some(m), Some(d)) => (m, d),

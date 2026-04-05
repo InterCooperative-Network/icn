@@ -109,6 +109,7 @@ async fn add_member_accepted_proposal_produces_durable_record_with_governance_pr
             payload: payload_value,
             decided_at: 1_700_000_000,
             canonical_payload_hash: Some(canonical_payload_hash),
+            governance_decision_hash: None,
         };
 
         subscription(event);
