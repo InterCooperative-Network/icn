@@ -17,7 +17,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use icn_kernel_api::budget::{BeginSpendOutcome, BudgetRecord, BudgetSpendError, BudgetStore};
 use icn_kernel_api::effects::{
-    ControlEffect, EffectResult, KernelEffect, MembershipEffect, TreasuryEffect,
+    ControlEffect, EffectResult, KernelEffect, MembershipEffect, ResourceEffect, TreasuryEffect,
 };
 use icn_kernel_api::escrow::{BeginReleaseOutcome, EscrowReleaseError, EscrowStore};
 use icn_kernel_api::governance::{
@@ -26,6 +26,7 @@ use icn_kernel_api::governance::{
     ProtocolChange, ProtocolExecutor, TreasuryExecutor, TreasuryOperation,
 };
 use icn_kernel_api::protocol_params::ProtocolParameterStore;
+use icn_kernel_api::resource::{ResourceAccessRecord, ResourceAccessStore};
 use icn_kernel_api::{ControlService, ForceCloseProposalRequest, VetoProposalRequest};
 use sha2::{Digest, Sha256};
 use tracing::{info, warn};
@@ -47,6 +48,8 @@ pub struct KernelGovernanceExecutor {
     escrow_store: Option<Arc<dyn EscrowStore>>,
     /// Budget store for budget enforcement.
     budget_store: Option<Arc<dyn BudgetStore>>,
+    /// Resource access store for governance-authorized grants and revocations.
+    resource_store: Option<Arc<dyn ResourceAccessStore>>,
 }
 
 impl KernelGovernanceExecutor {
@@ -64,6 +67,7 @@ impl KernelGovernanceExecutor {
             membership: Arc::new(KernelMembershipExecutor::new()),
             escrow_store: None,
             budget_store: None,
+            resource_store: None,
         }
     }
 
@@ -108,6 +112,12 @@ impl KernelGovernanceExecutor {
     /// Set the budget store for budget enforcement.
     pub fn with_budget_store(mut self, store: Arc<dyn BudgetStore>) -> Self {
         self.budget_store = Some(store);
+        self
+    }
+
+    /// Set the resource access store for governance-authorized grant/revocation.
+    pub fn with_resource_access_store(mut self, store: Arc<dyn ResourceAccessStore>) -> Self {
+        self.resource_store = Some(store);
         self
     }
 
@@ -692,21 +702,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                 })
             }
             KernelEffect::Resource(resource_effect) => {
-                info!(
-                    ?resource_effect,
-                    "Executing resource effect (not implemented in kernel executor)"
-                );
-                Ok(EffectResult {
-                    effect_id: decision_receipt_id.to_string(),
-                    success: false,
-                    message: format!(
-                        "Resource effect not implemented in kernel executor: {:?}",
-                        resource_effect
-                    ),
-                    state_change_hash: None,
-                    ledger_entry_id: None,
-                    not_executed: false,
-                })
+                self.execute_resource_effect(&resource_effect, decision_receipt_id)
             }
             KernelEffect::Sdis(sdis_effect) => {
                 info!(
@@ -724,6 +720,117 @@ impl EffectExecutor for KernelGovernanceExecutor {
                     ledger_entry_id: None,
                     not_executed: false,
                 })
+            }
+        }
+    }
+}
+
+impl KernelGovernanceExecutor {
+    /// Execute a resource access effect: grant or revoke access in the resource store.
+    ///
+    /// If no `resource_store` is wired, the effect is rejected with an explicit failure
+    /// (not `not_executed`) so the decision executor can log it as a hard failure and
+    /// surface it in monitoring rather than silently dropping it.
+    fn execute_resource_effect(
+        &self,
+        effect: &ResourceEffect,
+        decision_receipt_id: &str,
+    ) -> Result<EffectResult> {
+        let store = match &self.resource_store {
+            Some(s) => s,
+            None => {
+                return Ok(EffectResult {
+                    effect_id: decision_receipt_id.to_string(),
+                    success: false,
+                    message: "Resource access store not wired — cannot persist grant/revoke"
+                        .to_string(),
+                    state_change_hash: None,
+                    ledger_entry_id: None,
+                    not_executed: false,
+                });
+            }
+        };
+
+        // Use wall-clock time for `granted_at` / `revoked_at`.
+        // The kernel does not own authoritative time; this is advisory metadata.
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        match effect {
+            ResourceEffect::GrantAccess {
+                grantee_did,
+                resource_type,
+                access_model_hash,
+            } => {
+                info!(
+                    grantee_did = %grantee_did,
+                    resource_type = %resource_type,
+                    "Granting resource access via governance decision"
+                );
+                let record = ResourceAccessRecord {
+                    resource_type: resource_type.clone(),
+                    grantee_did: grantee_did.clone(),
+                    access_model_hash: access_model_hash.clone(),
+                    granted_at: now_secs,
+                    decision_hash: decision_receipt_id.to_string(),
+                    is_revoked: false,
+                    revoked_at: None,
+                    revocation_reason: None,
+                };
+                match store.grant(&record) {
+                    Ok(()) => Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: true,
+                        message: format!(
+                            "Resource access granted: {} → {}",
+                            grantee_did, resource_type
+                        ),
+                        state_change_hash: Some(access_model_hash.clone()),
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    }),
+                    Err(e) => Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: false,
+                        message: format!("Failed to persist resource grant: {}", e),
+                        state_change_hash: None,
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    }),
+                }
+            }
+            ResourceEffect::RevokeAccess {
+                grantee_did,
+                resource_type,
+            } => {
+                info!(
+                    grantee_did = %grantee_did,
+                    resource_type = %resource_type,
+                    "Revoking resource access via governance decision"
+                );
+                match store.revoke(resource_type, grantee_did, now_secs, "governance decision") {
+                    Ok(()) => Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: true,
+                        message: format!(
+                            "Resource access revoked: {} → {}",
+                            grantee_did, resource_type
+                        ),
+                        state_change_hash: None,
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    }),
+                    Err(e) => Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: false,
+                        message: format!("Failed to persist resource revocation: {}", e),
+                        state_change_hash: None,
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    }),
+                }
             }
         }
     }
