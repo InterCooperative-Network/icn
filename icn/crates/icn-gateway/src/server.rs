@@ -951,31 +951,36 @@ impl GatewayServer {
                         duration_seconds,
                     } => {
                         // Side-effect 1: freeze member in ledger journal.
+                        // Applied synchronously (block_in_place) so the freeze is durable
+                        // before this hook returns — prevents a race window where the
+                        // member could transact between proposal close and ledger freeze.
                         let ledger_mgr = ledger_mgr_for_gov.clone();
                         let domain_id_for_ledger = domain_id.clone();
                         let member_for_ledger = member.clone();
                         let reason_for_ledger = reason.clone();
                         let proposal_id_for_ledger = proposal_id.clone();
-                        tokio::spawn(async move {
-                            match ledger_mgr.get_ledger(&domain_id_for_ledger).await {
-                                Ok(ledger_arc) => {
-                                    let mut ledger = ledger_arc.write().await;
-                                    ledger.freeze_member_with_metadata(
-                                        member_for_ledger,
-                                        reason_for_ledger,
-                                        duration_seconds,
-                                        Some(proposal_id_for_ledger),
-                                        None,
-                                    );
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(async move {
+                                match ledger_mgr.get_ledger(&domain_id_for_ledger).await {
+                                    Ok(ledger_arc) => {
+                                        let mut ledger = ledger_arc.write().await;
+                                        ledger.freeze_member_with_metadata(
+                                            member_for_ledger,
+                                            reason_for_ledger,
+                                            duration_seconds,
+                                            Some(proposal_id_for_ledger),
+                                            None,
+                                        );
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            coop_id = %domain_id_for_ledger,
+                                            error = %e,
+                                            "FreezeMember governance effect: ledger not found for domain"
+                                        );
+                                    }
                                 }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        coop_id = %domain_id_for_ledger,
-                                        error = %e,
-                                        "FreezeMember governance effect: ledger not found for domain"
-                                    );
-                                }
-                            }
+                            })
                         });
 
                         // Side-effect 2: suspend commons affiliation for the frozen member.
@@ -1039,25 +1044,27 @@ impl GatewayServer {
                         let member_for_ledger = member.clone();
                         let reason_for_ledger = reason.clone();
                         let proposal_id_for_ledger = proposal_id.clone();
-                        tokio::spawn(async move {
-                            match ledger_mgr.get_ledger(&domain_id_for_ledger).await {
-                                Ok(ledger_arc) => {
-                                    let mut ledger = ledger_arc.write().await;
-                                    ledger.unfreeze_member_with_metadata(
-                                        &member_for_ledger,
-                                        reason_for_ledger,
-                                        Some(proposal_id_for_ledger),
-                                        None,
-                                    );
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(async move {
+                                match ledger_mgr.get_ledger(&domain_id_for_ledger).await {
+                                    Ok(ledger_arc) => {
+                                        let mut ledger = ledger_arc.write().await;
+                                        ledger.unfreeze_member_with_metadata(
+                                            &member_for_ledger,
+                                            reason_for_ledger,
+                                            Some(proposal_id_for_ledger),
+                                            None,
+                                        );
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            coop_id = %domain_id_for_ledger,
+                                            error = %e,
+                                            "UnfreezeMember governance effect: ledger not found for domain"
+                                        );
+                                    }
                                 }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        coop_id = %domain_id_for_ledger,
-                                        error = %e,
-                                        "UnfreezeMember governance effect: ledger not found for domain"
-                                    );
-                                }
-                            }
+                            })
                         });
 
                         // Side-effect 2: reinstate commons affiliation to Member standing.
