@@ -126,6 +126,31 @@ pub trait GovernanceOps: Send + Sync {
         self.close_proposal(proposal_id).await
     }
 
+    /// Close a proposal with both standing revalidation and suspension-based
+    /// delegation exclusion.
+    ///
+    /// `excluded_delegators` is the set of suspended members whose vote weight
+    /// must not flow via delegation at close time. Suspension prevents indirect
+    /// governance influence through pre-existing delegations after a FreezeMember
+    /// proposal is accepted.
+    ///
+    /// The default implementation ignores `excluded_delegators` and delegates to
+    /// `close_proposal_filtered` (or `close_proposal` if no eligible filter).
+    /// Backends that support delegation expansion (e.g., `GovernanceActor`) should
+    /// override this method.
+    async fn close_proposal_with_suspension(
+        &self,
+        proposal_id: ProposalId,
+        eligible_voters: Option<std::collections::HashSet<Did>>,
+        excluded_delegators: Option<std::collections::HashSet<Did>>,
+    ) -> Result<()> {
+        let _ = excluded_delegators;
+        match eligible_voters.as_ref() {
+            Some(eligible) => self.close_proposal_filtered(proposal_id, eligible).await,
+            None => self.close_proposal(proposal_id).await,
+        }
+    }
+
     /// Add or remove a member from a governance domain
     ///
     /// Only works for domains with static-list membership. For trust-based
