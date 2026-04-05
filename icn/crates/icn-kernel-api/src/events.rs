@@ -25,11 +25,26 @@ pub enum SystemEvent {
         decided_at: u64,
         /// Canonical content hash of the accepted proposal payload.
         ///
-        /// When present, this is used as `decision_hash` in journal provenance, enabling
+        /// A BLAKE3 hash of the serialized proposal payload JSON. Allows
         /// third-party verification against the original proposal content.
-        /// When absent, `create_effect_subscription` falls back to `blake3(receipt_id)`.
-        /// Introduced in sprint 26 to close the treasury-spend provenance seam.
+        /// Superseded by `governance_decision_hash` when present.
+        /// When both are absent, `create_effect_subscription` falls back to `blake3(receipt_id)`.
         canonical_payload_hash: Option<String>,
+        /// Canonical governance decision hash.
+        ///
+        /// Hex-encoded SHA3/BLAKE3 hash computed by `GovernanceDecisionReceipt` from
+        /// (proposal_id + domain_id + outcome + vote_tally + vote_hash). This is the
+        /// same hash that keys the governance receipt, allocation receipts, execution
+        /// record, and GovernanceProofV2 — making it the authoritative cross-reference
+        /// for `icnctl audit verify`.
+        ///
+        /// When present, `create_effect_subscription` uses this as `decision_hash` in
+        /// journal entry provenance, enabling hash-level verification of the journal
+        /// entry against the governance receipt chain without trusting the operator.
+        ///
+        /// Introduced in sprint 27 to close the treasury-spend provenance seam at the
+        /// canonical hash level (superseding `canonical_payload_hash` for provenance).
+        governance_decision_hash: Option<String>,
     },
 
     /// A governance proposal was rejected or failed to reach quorum

@@ -114,6 +114,7 @@ async fn freeze_member_accepted_proposal_produces_durable_record_with_governance
             payload: payload_value,
             decided_at: 1_700_000_010,
             canonical_payload_hash: Some(canonical_payload_hash.clone()),
+            governance_decision_hash: None,
         };
 
         subscription(event);
@@ -234,6 +235,7 @@ async fn unfreeze_member_accepted_proposal_produces_durable_record_with_governan
                 payload: serde_json::to_value(&freeze_payload).unwrap(),
                 decided_at: 1_700_000_020,
                 canonical_payload_hash: Some("sha256:freeze-pre-hash".to_string()),
+                governance_decision_hash: None,
             });
             tokio::time::sleep(std::time::Duration::from_millis(300)).await;
 
@@ -274,6 +276,7 @@ async fn unfreeze_member_accepted_proposal_produces_durable_record_with_governan
             payload: payload_value,
             decided_at: 1_700_000_030,
             canonical_payload_hash: Some(unfreeze_canonical_hash.clone()),
+            governance_decision_hash: None,
         });
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
 
@@ -383,6 +386,7 @@ async fn freeze_without_canonical_hash_falls_back_to_receipt_hash() -> Result<()
         payload: serde_json::to_value(&payload)?,
         decided_at: 1_700_000_040,
         canonical_payload_hash: None, // legacy: no canonical hash
+        governance_decision_hash: None,
     });
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
 

@@ -1782,7 +1782,15 @@ impl GovernanceActor {
                 // ProposalAccepted event fires without a receipt that is (a) Accepted and
                 // (b) internally consistent (verify() passes). Non-Accepted outcomes skip
                 // the gate entirely; they never produce resource-allocation effects.
-                if matches!(outcome_result, DecisionOutcome::Accepted) {
+                //
+                // The canonical governance decision hash (gate_receipt.decision_hash) is
+                // propagated to the ProposalAccepted event so that journal entries created
+                // by create_effect_subscription carry the same hash that keys the
+                // governance receipt chain — enabling hash-level audit verification.
+                let governance_decision_hash: Option<String> = if matches!(
+                    outcome_result,
+                    DecisionOutcome::Accepted
+                ) {
                     use icn_governance::proof::ProofOutcome;
                     let gate_receipt = GovernanceDecisionReceipt::new(
                         proposal_id.0.clone(),
@@ -1802,12 +1810,16 @@ impl GovernanceActor {
                             proposal_id.0
                         );
                     }
+                    let decision_hash_hex = hex::encode(gate_receipt.decision_hash);
                     info!(
                         proposal_id = %proposal_id.0,
-                        decision_hash = %hex::encode(gate_receipt.decision_hash),
+                        decision_hash = %decision_hash_hex,
                         "Invariant 7 gate passed"
                     );
-                }
+                    Some(decision_hash_hex)
+                } else {
+                    None
+                };
 
                 // Generate GovernanceProofV2 if signing key is available
                 let proof_bytes = if let Some(ref signing_key) = self.signing_key {
@@ -1908,6 +1920,7 @@ impl GovernanceActor {
                                         payload,
                                         decided_at: now,
                                         canonical_payload_hash,
+                                        governance_decision_hash: governance_decision_hash.clone(),
                                     }
                                 }
                                 Err(e) => {
@@ -2027,6 +2040,7 @@ impl GovernanceActor {
                                     payload,
                                     decided_at: now,
                                     canonical_payload_hash,
+                                    governance_decision_hash: None,
                                 }
                             }
                             Err(e) => {

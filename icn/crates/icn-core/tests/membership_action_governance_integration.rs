@@ -234,6 +234,7 @@ async fn add_member_without_canonical_hash_falls_back_to_receipt_hash() -> Resul
         payload: serde_json::to_value(&payload)?,
         decided_at: 1_700_000_001,
         canonical_payload_hash: None, // legacy: no canonical hash
+        governance_decision_hash: None,
     };
 
     subscription(event);

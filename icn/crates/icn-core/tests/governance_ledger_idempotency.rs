@@ -146,6 +146,7 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
         .unwrap(),
         decided_at: 1234567890,
         canonical_payload_hash: None,
+        governance_decision_hash: None,
     };
 
     // Emit event ONCE

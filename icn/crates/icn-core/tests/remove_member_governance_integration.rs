@@ -112,6 +112,7 @@ async fn remove_member_accepted_proposal_produces_durable_record_with_governance
             payload: payload_value,
             decided_at: 1_700_000_050,
             canonical_payload_hash: Some(canonical_payload_hash.clone()),
+            governance_decision_hash: None,
         });
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
 
@@ -220,6 +221,7 @@ async fn remove_member_without_canonical_hash_falls_back_to_receipt_hash() -> Re
         payload: serde_json::to_value(&payload)?,
         decided_at: 1_700_000_060,
         canonical_payload_hash: None, // legacy: no canonical hash
+        governance_decision_hash: None,
     });
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
 

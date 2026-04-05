@@ -123,15 +123,19 @@ where
             payload,
             domain_id,
             canonical_payload_hash,
+            governance_decision_hash,
             ..
         } = &event
         {
             // Generate decision_receipt_id from proposal_id and domain
             let decision_receipt_id = format!("gov:{domain_id}:{proposal_id}:receipt");
-            // Use canonical content hash when provided; fall back to hash-of-receipt-id
-            // for backward compatibility with events emitted before sprint 26.
-            let decision_hash = canonical_payload_hash
+            // Prefer governance_decision_hash (canonical GovernanceDecisionReceipt hash,
+            // includes votes + tally + outcome) when provided by actor.rs Invariant 7 gate.
+            // Fall back to canonical_payload_hash (content hash) for sprint 26 compatibility,
+            // then to blake3(receipt_id) for legacy events with no hash at all.
+            let decision_hash = governance_decision_hash
                 .clone()
+                .or_else(|| canonical_payload_hash.clone())
                 .unwrap_or_else(|| compute_decision_hash(&decision_receipt_id));
 
             // Deserialize payload
@@ -244,6 +248,7 @@ mod tests {
             payload: serde_json::to_value(payload).expect("serialize payload"),
             decided_at: 1_700_000_000,
             canonical_payload_hash: None,
+            governance_decision_hash: None,
         };
 
         subscription(event);
@@ -287,6 +292,7 @@ mod tests {
             payload: serde_json::to_value(payload).expect("serialize payload"),
             decided_at: 1_700_000_001,
             canonical_payload_hash: None,
+            governance_decision_hash: None,
         };
 
         subscription(event);
