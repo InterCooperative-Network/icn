@@ -52,6 +52,7 @@ pub mod naming;
 pub mod proofs;
 pub mod protocol_params;
 pub mod receipts;
+pub mod resource;
 pub mod scope;
 pub mod services;
 pub mod state;
@@ -104,6 +105,7 @@ pub use proofs::ArtifactReceipt;
 pub use receipts::{
     compute_canonical_hash, AllocationReceipt, CanonicalReceipt, Hash, ProvenanceAnchors, ReceiptId,
 };
+pub use resource::{ResourceAccessRecord, ResourceAccessStore};
 pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
     AddMemberRequest, AddMemberResult, CellService, ClearingAgreementView, ClearingPositionView,

@@ -829,7 +829,9 @@ async fn spawn_actors_with_identity(
         let escrow_store = ledger_stores.escrow_store;
         kernel_executor = kernel_executor.with_escrow_store(escrow_store.clone());
         kernel_executor = kernel_executor.with_budget_store(ledger_stores.budget_store);
-        info!("✓ Escrow and budget stores wired to governance executor");
+        kernel_executor =
+            kernel_executor.with_resource_access_store(ledger_stores.resource_access_store);
+        info!("✓ Escrow, budget, and resource access stores wired to governance executor");
 
         // Create effect dispatcher
         let effect_dispatcher = Arc::new(super::effect_dispatcher::EffectDispatcher::new(

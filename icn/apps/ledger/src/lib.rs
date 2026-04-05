@@ -6,3 +6,4 @@
 pub mod budget;
 pub mod escrow;
 pub mod init;
+pub mod resource_access;
