@@ -286,6 +286,7 @@ async fn test_membership_freeze_member_provenance_chain() -> Result<()> {
         member_did: member_did_str.clone(),
         reason: "Policy violation under review".to_string(),
         duration_secs: Some(86400), // 24 hours
+        decision_hash: String::new(),
     };
 
     let outcome = executor
@@ -382,6 +383,7 @@ async fn test_membership_unfreeze_member_provenance_chain() -> Result<()> {
     let effect = MembershipEffect::UnfreezeMember {
         entity_id: "coop-unfreeze-test".to_string(),
         member_did: member_did_str.clone(),
+        decision_hash: String::new(),
     };
 
     let outcome = executor

@@ -469,6 +469,18 @@ impl MembershipService for MembershipServiceImpl {
                 member
                     .metadata
                     .insert("frozen_at".to_string(), timestamp.to_string());
+                // Governance provenance — enables cold-cache recovery after restart
+                member.metadata.insert(
+                    "gov_decision_receipt_id".to_string(),
+                    request.decision_receipt_id.clone(),
+                );
+                member.metadata.insert(
+                    "gov_decision_hash".to_string(),
+                    request.decision_hash.clone(),
+                );
+                member
+                    .metadata
+                    .insert("gov_operation".to_string(), "freeze".to_string());
 
                 // Calculate expiration if duration specified
                 let expires_at = request.duration_secs.map(|d| timestamp + d);
@@ -587,6 +599,18 @@ impl MembershipService for MembershipServiceImpl {
                     .metadata
                     .insert("unfrozen_at".to_string(), timestamp.to_string());
                 member.metadata.remove("freeze_expires_at");
+                // Governance provenance — enables cold-cache recovery after restart
+                member.metadata.insert(
+                    "gov_decision_receipt_id".to_string(),
+                    request.decision_receipt_id.clone(),
+                );
+                member.metadata.insert(
+                    "gov_decision_hash".to_string(),
+                    request.decision_hash.clone(),
+                );
+                member
+                    .metadata
+                    .insert("gov_operation".to_string(), "unfreeze".to_string());
 
                 // Save updated member
                 match self.store.save_member(&member) {

@@ -110,6 +110,7 @@ pub fn translate_payload_to_effects(
                 member_did: member.to_string(),
                 reason: reason.clone(),
                 duration_secs: *duration_seconds,
+                decision_hash: decision_hash.to_string(),
             },
         )]),
 
@@ -118,6 +119,7 @@ pub fn translate_payload_to_effects(
                 MembershipEffect::UnfreezeMember {
                     entity_id: domain_id.to_string(),
                     member_did: member.to_string(),
+                    decision_hash: decision_hash.to_string(),
                 },
             )])
         }
