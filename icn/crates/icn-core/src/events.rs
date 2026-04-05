@@ -163,6 +163,7 @@ mod tests {
                 "Text": { "body": "Test proposal" }
             }),
             decided_at: 1234567890,
+            canonical_payload_hash: None,
         };
 
         bus.emit(event).await;
@@ -257,6 +258,7 @@ mod tests {
                 "Text": { "body": "test" }
             }),
             decided_at: 1234567890,
+            canonical_payload_hash: None,
         };
 
         bus.emit(event).await;
@@ -319,6 +321,7 @@ mod tests {
             domain_id: "test".to_string(),
             payload: serde_json::json!({"NotAValidVariant": true}),
             decided_at: 0,
+            canonical_payload_hash: None,
         })
         .await;
 

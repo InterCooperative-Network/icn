@@ -220,6 +220,7 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
         })
         .unwrap(),
         decided_at: now,
+        canonical_payload_hash: None,
     };
 
     info!("Emitting ProposalAccepted event...");

@@ -23,6 +23,13 @@ pub enum SystemEvent {
         payload: serde_json::Value,
         /// Unix timestamp when the proposal was decided
         decided_at: u64,
+        /// Canonical content hash of the accepted proposal payload.
+        ///
+        /// When present, this is used as `decision_hash` in journal provenance, enabling
+        /// third-party verification against the original proposal content.
+        /// When absent, `create_effect_subscription` falls back to `blake3(receipt_id)`.
+        /// Introduced in sprint 26 to close the treasury-spend provenance seam.
+        canonical_payload_hash: Option<String>,
     },
 
     /// A governance proposal was rejected or failed to reach quorum
