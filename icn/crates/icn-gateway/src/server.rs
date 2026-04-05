@@ -1319,6 +1319,11 @@ impl GatewayServer {
             member_checker: Some(member_checker),
             steward_checker: Some(steward_checker),
             suspension_checker: Some(suspension_checker),
+            // TrustThreshold membership resolution requires a trust graph that lives
+            // outside the governance layer. Until the gateway wires a resolver here,
+            // TrustThreshold domains fall through with excluded_delegators: None
+            // (fail-open). Wire a TrustMembershipResolver here to close that gap.
+            membership_resolver: None,
         };
 
         // Create rate limiter with configured or default config

@@ -14,6 +14,7 @@
 use std::sync::Arc;
 
 use actix_web::web;
+use icn_governance::MembershipResolver;
 use icn_identity::Did;
 
 use crate::events::GovernanceEventEmitter;
@@ -197,6 +198,17 @@ pub struct GovernanceContext<E> {
     /// proposal's domain — i.e., a `FreezeMember` proposal was accepted for them.
     /// A `true` result → 403 Forbidden. `None` disables the gate.
     pub suspension_checker: Option<SuspensionChecker>,
+    /// Optional resolver for enumerating eligible voters in `TrustThreshold` domains.
+    ///
+    /// `StaticList` domains enumerate members from the source directly at close time.
+    /// `TrustThreshold` domains cannot: membership is derived from a trust graph that
+    /// lives outside the governance layer. When this resolver is set, `close_proposal`
+    /// calls `resolve_members()` to obtain the current eligible set and checks each
+    /// against `suspension_checker` to build `excluded_delegators`.
+    ///
+    /// If `None`, `TrustThreshold` domains fall through with `excluded_delegators: None`
+    /// (fail-open — delegations from suspended members may still flow).
+    pub membership_resolver: Option<Arc<dyn MembershipResolver>>,
 }
 
 /// Register all governance routes on `cfg`.

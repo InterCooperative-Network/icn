@@ -135,6 +135,7 @@ async fn build_app(
         member_checker: Some(make_member_checker(commons_mgr.clone())),
         steward_checker: Some(make_steward_checker(commons_mgr)),
         suspension_checker: None,
+        membership_resolver: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
