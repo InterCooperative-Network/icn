@@ -7,10 +7,12 @@ use actix_web::{get, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::ledger_mgr::LedgerManager;
 use crate::receipt_store::ReceiptStore;
 use icn_kernel_api::economics::SettlementIntent;
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus};
 use icn_kernel_api::receipts::{AllocationReceipt, CanonicalReceipt, Hash};
+use icn_ledger::types::ProvenanceRef;
 use icn_store::Store;
 
 /// Query parameters for listing by decision hash.
@@ -20,6 +22,23 @@ use icn_store::Store;
 pub struct ByDecisionQuery {
     /// Hex-encoded decision hash (optional — omit to list all)
     pub decision_hash: Option<String>,
+}
+
+/// Query parameters for `GET /v1/receipts/chain/{decision_hash}`.
+#[derive(Debug, Deserialize, Default)]
+pub struct ChainQuery {
+    /// Optional cooperative/domain ID for forced-accept chains where no governance
+    /// receipt is stored in the backend.
+    ///
+    /// For normal voted decisions, `domain_id` is derived from the stored governance
+    /// receipt and this parameter is ignored.
+    ///
+    /// For forced-accept decisions (no stored receipt), providing this parameter
+    /// enables journal cross-reference. Without it, `journal_entries` is empty.
+    ///
+    /// The caller always knows the domain_id (it is part of the proposal record).
+    /// This parameter does not imply that a governance receipt exists.
+    pub domain_id: Option<String>,
 }
 
 /// Response for allocation receipt
@@ -141,6 +160,26 @@ pub struct GovernanceVoteTallyResponse {
     pub abstain_votes: usize,
 }
 
+/// Minimal journal entry provenance reference for audit cross-check.
+///
+/// Carries only the fields needed to verify that a ledger journal entry
+/// was authorized by the originating governance decision: the receipt_id
+/// and the decision_hash stored in `ProvenanceRef::Governance`.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JournalEntryProvenanceResponse {
+    /// Ledger-assigned entry ID (blake3 hex or empty if not yet assigned)
+    pub entry_id: String,
+    /// Governance receipt ID stored in the journal entry's provenance
+    pub decision_receipt_id: String,
+    /// Decision hash stored in the journal entry's provenance
+    pub decision_hash: String,
+    /// Number of account deltas in this entry
+    pub account_count: usize,
+    /// Entry timestamp (Unix seconds)
+    pub timestamp: u64,
+}
+
 /// Response for the full receipt chain (governance + economic artifacts).
 ///
 /// Returned by `GET /v1/receipts/chain/{decision_hash}`.
@@ -155,6 +194,9 @@ pub struct ReceiptChainResponse {
     pub allocations: Vec<AllocationReceiptResponse>,
     /// Settlement intents for this decision
     pub intents: Vec<SettlementIntentResponse>,
+    /// Journal entries whose ProvenanceRef::Governance.decision_hash matches.
+    /// Populated when a LedgerManager is available and governance.domain_id resolves a ledger.
+    pub journal_entries: Vec<JournalEntryProvenanceResponse>,
     /// Structural chain completeness (receipt-link integrity only).
     pub structural_complete: bool,
     /// Execution completeness for milestone scope.
@@ -319,15 +361,26 @@ pub async fn get_chain(
     }
 }
 
-/// GET /v1/receipts/chain/{decision_hash}
+/// GET /v1/receipts/chain/{decision_hash}[?domain_id=<coop-id>]
 ///
 /// Returns the full receipt chain for a decision: governance receipt,
-/// allocation receipts, and settlement intents.
+/// allocation receipts, settlement intents, and journal entry provenance refs.
+///
+/// Journal entries are populated when a `LedgerManager` is registered in app data
+/// and a domain_id can be resolved. For normal voted decisions the domain_id comes
+/// from the stored governance receipt. For forced-accept decisions (no stored
+/// governance receipt), the caller may supply `?domain_id=<id>` as a hint;
+/// without it `journal_entries` remains empty.
+///
+/// Providing `domain_id` never implies a governance receipt is present — the
+/// `governance` field reflects actual receipt-store state.
 #[get("/chain/{decision_hash}")]
 pub async fn get_full_chain(
     receipt_store: web::Data<Arc<ReceiptStore>>,
     execution_store: web::Data<Arc<dyn Store>>,
+    ledger_mgr: Option<web::Data<Arc<LedgerManager>>>,
     path: web::Path<String>,
+    query: web::Query<ChainQuery>,
 ) -> HttpResponse {
     let hash_hex = path.into_inner();
     let hash = match parse_hash(&hash_hex) {
@@ -368,6 +421,17 @@ pub async fn get_full_chain(
         }
     };
 
+    // Query journal entries whose ProvenanceRef::Governance.decision_hash matches.
+    // domain_id is derived from the governance receipt when present; for forced-accept
+    // decisions (no stored receipt) the caller may supply it as a query parameter.
+    let receipt_domain_id = governance.as_ref().map(|g| g.domain_id.as_str());
+    let journal_entries = query_journal_entries_for_decision(
+        &ledger_mgr,
+        receipt_domain_id.or(query.domain_id.as_deref()),
+        &normalized_decision_hash,
+    )
+    .await;
+
     let structural_complete =
         governance.is_some() && allocations.iter().all(|a| !a.intents.is_empty());
     let execution_complete = execution.execution_complete;
@@ -392,12 +456,54 @@ pub async fn get_full_chain(
             .map(AllocationReceiptResponse::from)
             .collect(),
         intents: intents.iter().map(SettlementIntentResponse::from).collect(),
+        journal_entries,
         structural_complete,
         execution_complete,
         chain_complete,
         execution,
     };
     HttpResponse::Ok().json(response)
+}
+
+/// Query ledger journal entries whose `ProvenanceRef::Governance.decision_hash` matches
+/// the supplied hex-encoded decision hash.
+///
+/// `domain_id` is the resolved cooperative domain — governance receipt domain_id
+/// takes precedence over any query parameter hint; callers resolve this before calling.
+/// Returns an empty vec when no domain_id is available or LedgerManager is unavailable.
+async fn query_journal_entries_for_decision(
+    ledger_mgr: &Option<web::Data<Arc<LedgerManager>>>,
+    domain_id: Option<&str>,
+    decision_hash_hex: &str,
+) -> Vec<JournalEntryProvenanceResponse> {
+    let domain_id = domain_id.map(str::to_owned);
+
+    let (mgr, domain_id) = match (ledger_mgr, domain_id) {
+        (Some(m), Some(d)) => (m, d),
+        _ => return Vec::new(),
+    };
+
+    let entries = match mgr.get_history(&domain_id, None, 0, 100).await {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
+
+    entries
+        .into_iter()
+        .filter_map(|entry| match &entry.provenance {
+            ProvenanceRef::Governance {
+                receipt_id,
+                decision_hash: dh,
+            } if dh.as_str() == decision_hash_hex => Some(JournalEntryProvenanceResponse {
+                entry_id: entry.id.map(|h| h.to_hex()).unwrap_or_default(),
+                decision_receipt_id: receipt_id.clone(),
+                decision_hash: dh.clone(),
+                account_count: entry.accounts.len(),
+                timestamp: entry.timestamp,
+            }),
+            _ => None,
+        })
+        .collect()
 }
 
 /// GET /v1/receipts/allocations[?decision_hash=<hex>]
@@ -582,5 +688,201 @@ mod tests {
         assert!(resp.execution_complete);
         assert!(resp.chain_complete);
         assert_eq!(resp.execution.executed_effects, 1);
+    }
+
+    // --- domain_id query param tests (forced-accept read path) ---
+
+    /// Helper: build a minimal actix App with the given stores and optional LedgerManager.
+    async fn build_chain_app(
+        receipt_store: Arc<ReceiptStore>,
+        execution_store: Arc<dyn Store>,
+        ledger_mgr: Option<Arc<LedgerManager>>,
+    ) -> impl actix_web::dev::Service<
+        actix_http::Request,
+        Response = actix_web::dev::ServiceResponse,
+        Error = actix_web::Error,
+    > {
+        let mut app = App::new()
+            .app_data(web::Data::new(receipt_store))
+            .app_data(web::Data::new(execution_store))
+            .service(web::scope("/v1/receipts").service(get_full_chain));
+
+        if let Some(mgr) = ledger_mgr {
+            app = app.app_data(web::Data::new(mgr));
+        }
+
+        test::init_service(app).await
+    }
+
+    /// Forced-accept chain without domain_id hint: journal_entries stays empty.
+    /// governance is None (no stored receipt), no domain_id query param.
+    #[actix_web::test]
+    async fn forced_accept_without_domain_id_hint_returns_empty_journal() {
+        let db = sled::Config::new().temporary(true).open().expect("temp db");
+        let receipt_store = Arc::new(ReceiptStore::new(db));
+        let execution_store: Arc<dyn Store> =
+            Arc::new(SledStore::temporary().expect("temp exec db"));
+
+        // Use a well-formed 32-byte hash for a forced-accept with no stored receipt.
+        let decision_hash_hex = "a1".repeat(32);
+        let decision_hash_bytes = hex::decode(&decision_hash_hex).expect("valid hex");
+        let mut hash_arr = [0u8; 32];
+        hash_arr.copy_from_slice(&decision_hash_bytes);
+
+        // Register a LedgerManager with an entry in "test-domain" carrying this hash.
+        let mgr = Arc::new(LedgerManager::new());
+        {
+            use icn_identity::KeyPair;
+            use icn_ledger::entry::JournalEntryBuilder;
+            let ledger_arc = mgr
+                .get_ledger(&"test-domain".to_string())
+                .await
+                .expect("get ledger");
+            let author = KeyPair::generate().expect("keypair").did().clone();
+            let entry = JournalEntryBuilder::new(author.clone())
+                .debit(author.clone(), "credits".to_string(), 10)
+                .credit(
+                    KeyPair::generate().expect("keypair").did().clone(),
+                    "credits".to_string(),
+                    10,
+                )
+                .with_governance_provenance(
+                    "gov:test-domain:forced-001:receipt",
+                    &decision_hash_hex,
+                )
+                .build()
+                .expect("entry");
+            ledger_arc
+                .write()
+                .await
+                .append_entry(entry)
+                .await
+                .expect("append");
+        }
+
+        // No ?domain_id= query param supplied.
+        let app = build_chain_app(receipt_store, execution_store, Some(mgr)).await;
+        let uri = format!("/v1/receipts/chain/{decision_hash_hex}");
+        let req = test::TestRequest::get().uri(&uri).to_request();
+        let resp: ReceiptChainResponse = test::call_and_read_body_json(&app, req).await;
+
+        assert!(
+            resp.governance.is_none(),
+            "forced accept must not invent a governance receipt"
+        );
+        assert!(
+            resp.journal_entries.is_empty(),
+            "without domain_id hint, journal cross-reference must return empty"
+        );
+    }
+
+    /// Forced-accept chain with correct domain_id hint: journal_entries populated.
+    /// governance is None, but ?domain_id=test-domain resolves the ledger.
+    #[actix_web::test]
+    async fn forced_accept_with_domain_id_hint_finds_journal_entries() {
+        let db = sled::Config::new().temporary(true).open().expect("temp db");
+        let receipt_store = Arc::new(ReceiptStore::new(db));
+        let execution_store: Arc<dyn Store> =
+            Arc::new(SledStore::temporary().expect("temp exec db"));
+
+        let decision_hash_hex = "b2".repeat(32);
+        let mgr = Arc::new(LedgerManager::new());
+        {
+            use icn_identity::KeyPair;
+            use icn_ledger::entry::JournalEntryBuilder;
+            let ledger_arc = mgr
+                .get_ledger(&"test-domain".to_string())
+                .await
+                .expect("get ledger");
+            let author = KeyPair::generate().expect("keypair").did().clone();
+            let entry = JournalEntryBuilder::new(author.clone())
+                .debit(author.clone(), "credits".to_string(), 5)
+                .credit(
+                    KeyPair::generate().expect("keypair").did().clone(),
+                    "credits".to_string(),
+                    5,
+                )
+                .with_governance_provenance(
+                    "gov:test-domain:forced-002:receipt",
+                    &decision_hash_hex,
+                )
+                .build()
+                .expect("entry");
+            ledger_arc
+                .write()
+                .await
+                .append_entry(entry)
+                .await
+                .expect("append");
+        }
+
+        let app = build_chain_app(receipt_store, execution_store, Some(mgr)).await;
+        // Provide the correct domain_id hint.
+        let uri = format!("/v1/receipts/chain/{decision_hash_hex}?domain_id=test-domain");
+        let req = test::TestRequest::get().uri(&uri).to_request();
+        let resp: ReceiptChainResponse = test::call_and_read_body_json(&app, req).await;
+
+        assert!(
+            resp.governance.is_none(),
+            "domain_id hint must not invent a governance receipt"
+        );
+        assert_eq!(
+            resp.journal_entries.len(),
+            1,
+            "correct domain_id hint must surface the journal entry"
+        );
+        assert_eq!(resp.journal_entries[0].decision_hash, decision_hash_hex);
+    }
+
+    /// Forced-accept chain with wrong domain_id hint: journal_entries remains empty.
+    /// No match should be returned for an unrelated domain.
+    #[actix_web::test]
+    async fn wrong_domain_id_hint_returns_empty_journal() {
+        let db = sled::Config::new().temporary(true).open().expect("temp db");
+        let receipt_store = Arc::new(ReceiptStore::new(db));
+        let execution_store: Arc<dyn Store> =
+            Arc::new(SledStore::temporary().expect("temp exec db"));
+
+        let decision_hash_hex = "c3".repeat(32);
+        let mgr = Arc::new(LedgerManager::new());
+        {
+            use icn_identity::KeyPair;
+            use icn_ledger::entry::JournalEntryBuilder;
+            let ledger_arc = mgr
+                .get_ledger(&"correct-domain".to_string())
+                .await
+                .expect("get ledger");
+            let author = KeyPair::generate().expect("keypair").did().clone();
+            let entry = JournalEntryBuilder::new(author.clone())
+                .debit(author.clone(), "credits".to_string(), 3)
+                .credit(
+                    KeyPair::generate().expect("keypair").did().clone(),
+                    "credits".to_string(),
+                    3,
+                )
+                .with_governance_provenance(
+                    "gov:correct-domain:forced-003:receipt",
+                    &decision_hash_hex,
+                )
+                .build()
+                .expect("entry");
+            ledger_arc
+                .write()
+                .await
+                .append_entry(entry)
+                .await
+                .expect("append");
+        }
+
+        // Provide the WRONG domain_id hint — entry lives in "correct-domain".
+        let app = build_chain_app(receipt_store, execution_store, Some(mgr)).await;
+        let uri = format!("/v1/receipts/chain/{decision_hash_hex}?domain_id=wrong-domain");
+        let req = test::TestRequest::get().uri(&uri).to_request();
+        let resp: ReceiptChainResponse = test::call_and_read_body_json(&app, req).await;
+
+        assert!(
+            resp.journal_entries.is_empty(),
+            "wrong domain_id hint must not produce false matches"
+        );
     }
 }

@@ -123,15 +123,19 @@ where
             payload,
             domain_id,
             canonical_payload_hash,
+            governance_decision_hash,
             ..
         } = &event
         {
             // Generate decision_receipt_id from proposal_id and domain
             let decision_receipt_id = format!("gov:{domain_id}:{proposal_id}:receipt");
-            // Use canonical content hash when provided; fall back to hash-of-receipt-id
-            // for backward compatibility with events emitted before sprint 26.
-            let decision_hash = canonical_payload_hash
+            // Prefer governance_decision_hash (canonical GovernanceDecisionReceipt hash,
+            // includes votes + tally + outcome) when provided by actor.rs Invariant 7 gate.
+            // Fall back to canonical_payload_hash (content hash) for sprint 26 compatibility,
+            // then to blake3(receipt_id) for legacy events with no hash at all.
+            let decision_hash = governance_decision_hash
                 .clone()
+                .or_else(|| canonical_payload_hash.clone())
                 .unwrap_or_else(|| compute_decision_hash(&decision_receipt_id));
 
             // Deserialize payload
@@ -244,6 +248,7 @@ mod tests {
             payload: serde_json::to_value(payload).expect("serialize payload"),
             decided_at: 1_700_000_000,
             canonical_payload_hash: None,
+            governance_decision_hash: None,
         };
 
         subscription(event);
@@ -287,6 +292,7 @@ mod tests {
             payload: serde_json::to_value(payload).expect("serialize payload"),
             decided_at: 1_700_000_001,
             canonical_payload_hash: None,
+            governance_decision_hash: None,
         };
 
         subscription(event);
@@ -312,5 +318,127 @@ mod tests {
             }
             other => panic!("expected classified NoOp fallback, got {other:?}"),
         }
+    }
+
+    /// Prove forced-accept provenance: the governance_decision_hash produced by the
+    /// forced-accept path is a canonical GovernanceDecisionReceipt hash (not a content
+    /// hash), is deterministic, and is distinct from canonical_payload_hash.
+    ///
+    /// This validates the actor.rs forced-accept fix without requiring the full actor
+    /// to be spawned: we construct the event exactly as the actor would and verify that
+    /// create_effect_subscription forwards the governance_decision_hash (not the content
+    /// hash fallback) as the decision_hash in the captured effect receipt_id.
+    #[test]
+    fn forced_accept_emits_canonical_governance_decision_hash_not_content_hash() {
+        use icn_governance::proof::{GovernanceDecisionReceipt, ProofOutcome};
+        use icn_governance::tally::VoteTally;
+
+        let domain_id = "test-forced-domain";
+        let proposal_id = "forced-prop-001";
+
+        // Replicate the exact hash computation from the actor's forced-accept path.
+        let forced_decision_hash = {
+            let receipt = GovernanceDecisionReceipt::new(
+                proposal_id.to_string(),
+                domain_id.to_string(),
+                ProofOutcome::Accepted,
+                VoteTally::empty(),
+                &[],
+            );
+            hex::encode(receipt.decision_hash)
+        };
+
+        // The content hash is different — compute it so we can prove non-equality.
+        let payload = ProposalPayload::Treasury {
+            operation: TreasuryProposalOperation::Spend {
+                treasury_did: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+                    .parse::<Did>()
+                    .expect("valid did"),
+                amount: 10,
+                currency: "HOURS".to_string(),
+                recipient: "did:icn:z8eQZfY3RY75YwQ6MrFCHt9phbi3HGx1caFXE3291ow8t"
+                    .parse::<Did>()
+                    .expect("valid did"),
+                memo: "forced-accept test".to_string(),
+                nonce: 0,
+            },
+        };
+        let payload_value = serde_json::to_value(&payload).expect("serialize payload");
+        let canonical_payload_hash = serde_json::to_string(&payload_value)
+            .ok()
+            .map(|s| blake3::hash(s.as_bytes()).to_hex().to_string())
+            .expect("content hash");
+
+        // Invariant: forced_decision_hash must differ from canonical_payload_hash.
+        assert_ne!(
+            forced_decision_hash, canonical_payload_hash,
+            "governance decision hash must not equal content hash — they encode different things"
+        );
+
+        // Invariant: forced_decision_hash is 64 hex chars (canonical receipt hash format).
+        assert_eq!(
+            forced_decision_hash.len(),
+            64,
+            "forced decision hash must be 64 hex chars"
+        );
+        assert!(
+            forced_decision_hash.chars().all(|c| c.is_ascii_hexdigit()),
+            "forced decision hash must be valid hex"
+        );
+
+        // Invariant: deterministic — same inputs produce the same hash.
+        let second_hash = {
+            let receipt = GovernanceDecisionReceipt::new(
+                proposal_id.to_string(),
+                domain_id.to_string(),
+                ProofOutcome::Accepted,
+                VoteTally::empty(),
+                &[],
+            );
+            hex::encode(receipt.decision_hash)
+        };
+        assert_eq!(
+            forced_decision_hash, second_hash,
+            "forced decision hash must be deterministic"
+        );
+
+        // Prove create_effect_subscription uses governance_decision_hash (not content hash)
+        // when governance_decision_hash is present — which is what the fixed actor now sets.
+        let captured: CapturedEffects = Arc::new(Mutex::new(vec![]));
+        let sink = captured.clone();
+        let subscription = create_effect_subscription(move |effects, receipt_id| {
+            sink.lock().expect("lock").push((effects, receipt_id));
+        });
+
+        let expected_receipt_id = format!("gov:{domain_id}:{proposal_id}:receipt");
+
+        subscription(SystemEvent::ProposalAccepted {
+            proposal_id: proposal_id.to_string(),
+            domain_id: domain_id.to_string(),
+            payload: payload_value,
+            decided_at: 1_700_000_099,
+            canonical_payload_hash: Some(canonical_payload_hash.clone()),
+            governance_decision_hash: Some(forced_decision_hash.clone()),
+        });
+
+        let got = captured.lock().expect("lock");
+        assert_eq!(got.len(), 1, "subscription must fire exactly once");
+        assert_eq!(
+            got[0].1, expected_receipt_id,
+            "receipt_id must use standard gov:domain:proposal:receipt format"
+        );
+
+        // The effect carries the forced_decision_hash as its provenance reference.
+        // For treasury spend, this means TreasuryEffect::Spend.decision_hash == forced_hash.
+        assert!(
+            matches!(
+                got[0].0.first(),
+                Some(KernelEffect::Treasury(TreasuryEffect::Spend { decision_hash, .. }))
+                    if decision_hash == &forced_decision_hash
+            ),
+            "TreasuryEffect::Spend must carry forced decision hash, not content hash. \
+             Got effect: {:?}",
+            got[0].0.first()
+        );
     }
 }

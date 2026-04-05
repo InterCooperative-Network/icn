@@ -285,6 +285,17 @@ enum AuditCommands {
         /// Output as JSON
         #[arg(long)]
         json: bool,
+
+        /// Cooperative/domain ID hint for forced-accept decisions.
+        ///
+        /// For normal voted decisions the domain_id is stored in the governance receipt
+        /// and this flag is unnecessary. For forced-accept decisions (no stored receipt),
+        /// supplying this allows journal cross-reference to succeed.
+        ///
+        /// Does not imply a governance receipt exists. Check 1 will still report FAIL
+        /// for forced accepts even when journal entries are successfully found.
+        #[arg(long, value_name = "ID")]
+        domain_id: Option<String>,
     },
 }
 
@@ -10418,6 +10429,42 @@ fn verify_receipt_chain(
         },
     });
 
+    // Check 12: Journal entries present for this decision.
+    // An accepted treasury spend must produce at least one ledger journal entry.
+    // Absence here means the economic effect was either not executed or the ledger
+    // manager was unavailable at query time (informational when empty, not a hard failure).
+    let has_journal = !chain.journal_entries.is_empty();
+    checks.push(AuditCheck {
+        name: "Journal entries present".to_string(),
+        passed: has_journal,
+        detail: format!(
+            "{} journal entry/entries found",
+            chain.journal_entries.len()
+        ),
+    });
+
+    // Check 13: All journal entries carry governance provenance matching this decision.
+    // This proves the economic artifact was created by THIS decision, not coincidentally
+    // referencing the same hash.
+    let all_journal_linked = chain
+        .journal_entries
+        .iter()
+        .all(|j| j.decision_hash == decision_hash);
+    checks.push(AuditCheck {
+        name: "Journal provenance matches decision".to_string(),
+        passed: !has_journal || all_journal_linked,
+        detail: if !has_journal {
+            "No journal entries to verify".to_string()
+        } else if all_journal_linked {
+            format!(
+                "All {} journal entries carry matching governance provenance",
+                chain.journal_entries.len()
+            )
+        } else {
+            "Some journal entries carry mismatched decision hash".to_string()
+        },
+    });
+
     checks
 }
 
@@ -10433,13 +10480,20 @@ async fn handle_audit_command(cmd: AuditCommands) -> Result<()> {
             decision_hash,
             gateway,
             json,
+            domain_id,
         } => {
             if decision_hash.len() != 64 || !decision_hash.chars().all(|c| c.is_ascii_hexdigit()) {
                 bail!("Invalid decision hash: expected 64 hex characters");
             }
 
             let client = reqwest::Client::new();
-            let url = format!("{}/v1/receipts/chain/{}", gateway, decision_hash);
+            let url = match &domain_id {
+                Some(id) => format!(
+                    "{}/v1/receipts/chain/{}?domain_id={}",
+                    gateway, decision_hash, id
+                ),
+                None => format!("{}/v1/receipts/chain/{}", gateway, decision_hash),
+            };
             let resp = client
                 .get(&url)
                 .send()
@@ -10896,10 +10950,18 @@ mod audit_verify_tests {
     use super::verify_receipt_chain;
     use icn_gateway::api::receipts::{
         DecisionExecutionTruthResponse, GovernanceReceiptResponse, GovernanceVoteTallyResponse,
-        ReceiptChainResponse,
+        JournalEntryProvenanceResponse, ReceiptChainResponse,
     };
 
     fn sample_chain(execution_complete: bool, not_executed: usize) -> ReceiptChainResponse {
+        sample_chain_with_journal(execution_complete, not_executed, vec![])
+    }
+
+    fn sample_chain_with_journal(
+        execution_complete: bool,
+        not_executed: usize,
+        journal_entries: Vec<JournalEntryProvenanceResponse>,
+    ) -> ReceiptChainResponse {
         ReceiptChainResponse {
             decision_hash: "a".repeat(64),
             governance: Some(GovernanceReceiptResponse {
@@ -10916,6 +10978,7 @@ mod audit_verify_tests {
             }),
             allocations: vec![],
             intents: vec![],
+            journal_entries,
             structural_complete: true,
             execution_complete,
             chain_complete: execution_complete,
@@ -10952,6 +11015,66 @@ mod audit_verify_tests {
                 .iter()
                 .any(|c| c.name == "Execution complete" && c.passed),
             "full execution must pass execution-complete check"
+        );
+    }
+
+    #[test]
+    fn missing_journal_entries_fails_journal_present_check() {
+        // journal_entries is empty → check 12 must fail
+        let chain = sample_chain_with_journal(true, 0, vec![]);
+        let checks = verify_receipt_chain(&chain, &"a".repeat(64));
+        assert!(
+            checks
+                .iter()
+                .any(|c| c.name == "Journal entries present" && !c.passed),
+            "empty journal_entries must fail check 12"
+        );
+    }
+
+    #[test]
+    fn journal_entries_with_matching_hash_passes_both_journal_checks() {
+        let decision_hash = "a".repeat(64);
+        let journal_entries = vec![JournalEntryProvenanceResponse {
+            entry_id: "entry-1".to_string(),
+            decision_receipt_id: "gov:domain-1:prop-1:receipt".to_string(),
+            decision_hash: decision_hash.clone(),
+            account_count: 2,
+            timestamp: 1_700_000_000,
+        }];
+        let chain = sample_chain_with_journal(true, 0, journal_entries);
+        let checks = verify_receipt_chain(&chain, &decision_hash);
+        assert!(
+            checks
+                .iter()
+                .any(|c| c.name == "Journal entries present" && c.passed),
+            "present journal entry must pass check 12"
+        );
+        assert!(
+            checks
+                .iter()
+                .any(|c| c.name == "Journal provenance matches decision" && c.passed),
+            "matching decision_hash must pass check 13"
+        );
+    }
+
+    #[test]
+    fn journal_entry_with_wrong_hash_fails_provenance_check() {
+        let decision_hash = "a".repeat(64);
+        let wrong_hash = "b".repeat(64);
+        let journal_entries = vec![JournalEntryProvenanceResponse {
+            entry_id: "entry-bad".to_string(),
+            decision_receipt_id: "gov:domain-1:prop-1:receipt".to_string(),
+            decision_hash: wrong_hash, // mismatched — provenance check must fail
+            account_count: 2,
+            timestamp: 1_700_000_001,
+        }];
+        let chain = sample_chain_with_journal(true, 0, journal_entries);
+        let checks = verify_receipt_chain(&chain, &decision_hash);
+        assert!(
+            checks
+                .iter()
+                .any(|c| c.name == "Journal provenance matches decision" && !c.passed),
+            "mismatched decision_hash must fail check 13"
         );
     }
 }

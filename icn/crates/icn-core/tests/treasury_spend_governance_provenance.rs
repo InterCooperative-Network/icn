@@ -134,6 +134,7 @@ async fn treasury_spend_accepted_proposal_produces_journal_entry_with_governance
         payload: payload_value,
         decided_at: 1_700_000_000,
         canonical_payload_hash: Some(canonical_payload_hash),
+        governance_decision_hash: None,
     };
 
     // ── Fire the event ────────────────────────────────────────────────────────
@@ -251,6 +252,7 @@ async fn treasury_spend_without_canonical_hash_falls_back_to_receipt_hash() -> R
         payload: payload_value,
         decided_at: 1_700_000_001,
         canonical_payload_hash: None,
+        governance_decision_hash: None,
     };
 
     // Expected: receipt_id is deterministic; decision_hash is the blake3-of-receipt-id fallback
@@ -290,6 +292,121 @@ async fn treasury_spend_without_canonical_hash_falls_back_to_receipt_hash() -> R
             "✅ PROOF: legacy path (no canonical_hash) produces journal entry with fallback provenance"
         );
     }
+
+    Ok(())
+}
+
+/// Prove that `governance_decision_hash` (canonical GovernanceDecisionReceipt hash)
+/// takes priority over `canonical_payload_hash` (content hash) when both are present.
+///
+/// This is the end-to-end proof that the sprint 26 seam is fully closed:
+/// the journal entry now carries the SAME hash that keys the governance receipt chain,
+/// enabling `icnctl audit verify <decision_hash>` to cross-reference ledger entries.
+#[tokio::test(flavor = "multi_thread")]
+async fn governance_decision_hash_takes_priority_over_canonical_payload_hash() -> Result<()> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== PROOF: governance_decision_hash > canonical_payload_hash ===");
+
+    let tmp = TempDir::new()?;
+
+    let treasury_kp = KeyPair::generate()?;
+    let treasury_did = treasury_kp.did().clone();
+    let recipient_kp = KeyPair::generate()?;
+    let recipient_did = recipient_kp.did().clone();
+
+    let ledger_store = Arc::new(SledStore::open(tmp.path().join("ledger"))?);
+    let ledger = Arc::new(RwLock::new(Ledger::new(ledger_store.clone())?));
+    let ledger_service = Arc::new(LedgerServiceImpl::new(
+        ledger.clone(),
+        Arc::new(AllowAllOracle::wildcard()),
+        treasury_did.clone(),
+    ));
+    let kernel_executor =
+        KernelGovernanceExecutor::new(Arc::new(StubParamStore)).with_ledger_service(ledger_service);
+    let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
+
+    let dispatcher_for_sub = dispatcher.clone();
+    let subscription = create_effect_subscription(move |effects, decision_receipt_id| {
+        let disp = dispatcher_for_sub.clone();
+        let dr_id = decision_receipt_id.clone();
+        tokio::task::spawn(async move {
+            let _ = disp.execute_effects(effects, &dr_id).await;
+        });
+    });
+
+    let domain_id = "test-coop-priority";
+    let proposal_id = "priority-prop-001";
+
+    let payload = ProposalPayload::Treasury {
+        operation: TreasuryProposalOperation::Spend {
+            treasury_did: treasury_did.clone(),
+            amount: 75,
+            currency: "HOURS".to_string(),
+            recipient: recipient_did.clone(),
+            memo: "priority hash proof".to_string(),
+            nonce: 0,
+        },
+    };
+    let payload_value = serde_json::to_value(&payload)?;
+
+    // Both hashes present — governance_decision_hash must win.
+    let canonical_payload_hash = "sha256:payload-hash-should-be-ignored".to_string();
+    let governance_decision_hash = "sha256:governance-receipt-hash-should-win".to_string();
+    let expected_receipt_id = format!("gov:{domain_id}:{proposal_id}:receipt");
+
+    subscription(SystemEvent::ProposalAccepted {
+        proposal_id: proposal_id.to_string(),
+        domain_id: domain_id.to_string(),
+        payload: payload_value,
+        decided_at: 1_700_000_002,
+        canonical_payload_hash: Some(canonical_payload_hash.clone()),
+        governance_decision_hash: Some(governance_decision_hash.clone()),
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+    let ledger_guard = ledger.read().await;
+    let entries = ledger_guard.get_all_entries()?;
+
+    let governance_entry = entries.iter().find(|e| {
+        matches!(
+            &e.provenance,
+            ProvenanceRef::Governance { receipt_id, decision_hash }
+                if receipt_id.as_str() == expected_receipt_id
+                    && decision_hash.as_str() == governance_decision_hash.as_str()
+        )
+    });
+
+    assert!(
+        governance_entry.is_some(),
+        "Expected journal entry with governance_decision_hash {:?} as decision_hash, \
+         but got: {:#?}",
+        governance_decision_hash,
+        entries.iter().map(|e| &e.provenance).collect::<Vec<_>>()
+    );
+
+    // Also prove canonical_payload_hash is NOT used when governance_decision_hash is present.
+    let payload_hash_entry = entries.iter().find(|e| {
+        matches!(
+            &e.provenance,
+            ProvenanceRef::Governance { decision_hash, .. }
+                if decision_hash.as_str() == canonical_payload_hash.as_str()
+        )
+    });
+    assert!(
+        payload_hash_entry.is_none(),
+        "canonical_payload_hash must NOT appear in journal when governance_decision_hash is set"
+    );
+
+    info!(
+        receipt_id = %expected_receipt_id,
+        winning_hash = %governance_decision_hash,
+        suppressed_hash = %canonical_payload_hash,
+        "✅ PROOF: governance_decision_hash wins; canonical_payload_hash correctly suppressed"
+    );
 
     Ok(())
 }

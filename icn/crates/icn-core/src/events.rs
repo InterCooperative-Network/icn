@@ -164,6 +164,7 @@ mod tests {
             }),
             decided_at: 1234567890,
             canonical_payload_hash: None,
+            governance_decision_hash: None,
         };
 
         bus.emit(event).await;
@@ -259,6 +260,7 @@ mod tests {
             }),
             decided_at: 1234567890,
             canonical_payload_hash: None,
+            governance_decision_hash: None,
         };
 
         bus.emit(event).await;
@@ -322,6 +324,7 @@ mod tests {
             payload: serde_json::json!({"NotAValidVariant": true}),
             decided_at: 0,
             canonical_payload_hash: None,
+            governance_decision_hash: None,
         })
         .await;
 

@@ -109,6 +109,7 @@ async fn add_member_accepted_proposal_produces_durable_record_with_governance_pr
             payload: payload_value,
             decided_at: 1_700_000_000,
             canonical_payload_hash: Some(canonical_payload_hash),
+            governance_decision_hash: None,
         };
 
         subscription(event);
@@ -234,6 +235,7 @@ async fn add_member_without_canonical_hash_falls_back_to_receipt_hash() -> Resul
         payload: serde_json::to_value(&payload)?,
         decided_at: 1_700_000_001,
         canonical_payload_hash: None, // legacy: no canonical hash
+        governance_decision_hash: None,
     };
 
     subscription(event);

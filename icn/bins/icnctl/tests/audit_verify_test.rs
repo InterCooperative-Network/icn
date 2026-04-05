@@ -7,7 +7,8 @@
 
 use icn_gateway::api::receipts::{
     AllocationReceiptResponse, DecisionExecutionTruthResponse, GovernanceReceiptResponse,
-    GovernanceVoteTallyResponse, ReceiptChainResponse, SettlementIntentResponse,
+    GovernanceVoteTallyResponse, JournalEntryProvenanceResponse, ReceiptChainResponse,
+    SettlementIntentResponse,
 };
 
 const DECISION_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -54,6 +55,16 @@ fn make_allocation(intent_hashes: Vec<String>) -> AllocationReceiptResponse {
     }
 }
 
+fn make_journal_entry(decision_hash: &str) -> JournalEntryProvenanceResponse {
+    JournalEntryProvenanceResponse {
+        entry_id: "entry-1".to_string(),
+        decision_receipt_id: "gov:test-domain:prop-1:receipt".to_string(),
+        decision_hash: decision_hash.to_string(),
+        account_count: 2,
+        timestamp: 1_700_000_000,
+    }
+}
+
 fn make_complete_chain() -> ReceiptChainResponse {
     let intent_hash = "dd".repeat(32);
     ReceiptChainResponse {
@@ -61,6 +72,7 @@ fn make_complete_chain() -> ReceiptChainResponse {
         governance: Some(make_governance()),
         allocations: vec![make_allocation(vec![intent_hash.clone()])],
         intents: vec![make_intent(&intent_hash)],
+        journal_entries: vec![make_journal_entry(DECISION_HASH)],
         structural_complete: true,
         execution_complete: true,
         chain_complete: true,
@@ -194,6 +206,28 @@ fn verify_receipt_chain(
         String::new(),
     ));
 
+    // 12: Journal entries present
+    let has_journal = !chain.journal_entries.is_empty();
+    checks.push((
+        "Journal entries present".to_string(),
+        has_journal,
+        format!(
+            "{} journal entry/entries found",
+            chain.journal_entries.len()
+        ),
+    ));
+
+    // 13: Journal provenance matches decision
+    let all_journal_linked = chain
+        .journal_entries
+        .iter()
+        .all(|j| j.decision_hash == decision_hash);
+    checks.push((
+        "Journal provenance matches decision".to_string(),
+        !has_journal || all_journal_linked,
+        String::new(),
+    ));
+
     checks
 }
 
@@ -202,7 +236,7 @@ fn test_complete_chain_passes_all_checks() {
     let chain = make_complete_chain();
     let checks = verify_receipt_chain(&chain, DECISION_HASH);
 
-    assert_eq!(checks.len(), 11);
+    assert_eq!(checks.len(), 13);
     for (name, passed, _) in &checks {
         assert!(passed, "Check '{}' should pass on complete chain", name);
     }
@@ -216,6 +250,7 @@ fn test_missing_governance_fails() {
         governance: None,
         allocations: vec![make_allocation(vec![intent_hash.clone()])],
         intents: vec![make_intent(&intent_hash)],
+        journal_entries: vec![],
         structural_complete: false,
         execution_complete: false,
         chain_complete: false,
@@ -256,6 +291,7 @@ fn test_orphaned_intent_detected() {
         governance: Some(make_governance()),
         allocations: vec![make_allocation(vec![intent_hash.clone()])],
         intents: vec![make_intent(&intent_hash), make_intent(&orphan_hash)],
+        journal_entries: vec![make_journal_entry(DECISION_HASH)],
         structural_complete: true,
         execution_complete: true,
         chain_complete: true,
@@ -281,6 +317,7 @@ fn test_empty_chain_reports_missing() {
         governance: None,
         allocations: vec![],
         intents: vec![],
+        journal_entries: vec![],
         structural_complete: false,
         execution_complete: false,
         chain_complete: false,
@@ -305,6 +342,12 @@ fn test_empty_chain_reports_missing() {
     assert!(checks[5].1, "Intent provenance vacuously passes");
     assert!(checks[6].1, "Orphan check vacuously passes");
     assert!(checks[10].1, "Chain complete contract should hold");
+    // Journal checks: empty journal fails present check, provenance passes vacuously
+    assert!(!checks[11].1, "Journal entries should fail when absent");
+    assert!(
+        checks[12].1,
+        "Journal provenance vacuously passes when empty"
+    );
 }
 
 #[test]
@@ -316,5 +359,107 @@ fn test_serde_roundtrip_of_chain_response() {
     assert_eq!(chain.chain_complete, deserialized.chain_complete);
     assert_eq!(chain.allocations.len(), deserialized.allocations.len());
     assert_eq!(chain.intents.len(), deserialized.intents.len());
+    assert_eq!(
+        chain.journal_entries.len(),
+        deserialized.journal_entries.len()
+    );
     assert!(deserialized.governance.is_some());
+}
+
+#[test]
+fn test_journal_entry_with_wrong_hash_fails_provenance_check() {
+    let wrong_hash = "bb".repeat(32);
+    let chain = ReceiptChainResponse {
+        decision_hash: DECISION_HASH.to_string(),
+        governance: Some(make_governance()),
+        allocations: vec![],
+        intents: vec![],
+        journal_entries: vec![make_journal_entry(&wrong_hash)], // wrong decision hash
+        structural_complete: false,
+        execution_complete: true,
+        chain_complete: false,
+        execution: DecisionExecutionTruthResponse {
+            execution_record_present: true,
+            status: None,
+            total_effects: 1,
+            executed_effects: 1,
+            not_executed_effects: 0,
+            hard_failed_effects: 0,
+            execution_complete: true,
+        },
+    };
+    let checks = verify_receipt_chain(&chain, DECISION_HASH);
+
+    assert!(checks[11].1, "Journal entry present check should pass");
+    assert!(
+        !checks[12].1,
+        "Journal provenance check must fail on hash mismatch"
+    );
+}
+
+/// Forced-accept honesty: governance=None (no stored receipt), but journal
+/// cross-reference succeeded because the caller supplied domain_id.
+///
+/// This is the expected state after `icnctl audit verify --domain-id <id>` is
+/// used for a forced-accept decision where the gateway found journal entries
+/// but has no stored governance receipt.
+///
+/// Check 1 (governance present) must FAIL — the absence of a receipt is truth.
+/// Checks 12+13 (journal present + provenance matched) must PASS.
+///
+/// This proves the CLI output is honest about the forced-accept distinction:
+/// economic execution is visible and verifiable, but no voted receipt exists.
+#[test]
+fn test_forced_accept_audit_output_is_honest() {
+    // Simulate a chain returned when the gateway found journal entries via
+    // ?domain_id= but had no stored governance receipt (forced-accept path).
+    let chain = ReceiptChainResponse {
+        decision_hash: DECISION_HASH.to_string(),
+        governance: None, // No stored voted governance receipt — forced accept
+        allocations: vec![],
+        intents: vec![],
+        journal_entries: vec![make_journal_entry(DECISION_HASH)],
+        structural_complete: false, // no governance receipt → structural incomplete
+        execution_complete: true,
+        chain_complete: false,
+        execution: DecisionExecutionTruthResponse {
+            execution_record_present: true,
+            status: None,
+            total_effects: 1,
+            executed_effects: 1,
+            not_executed_effects: 0,
+            hard_failed_effects: 0,
+            execution_complete: true,
+        },
+    };
+    let checks = verify_receipt_chain(&chain, DECISION_HASH);
+
+    // Check 1: governance absent → FAIL (truthful — no stored receipt)
+    assert!(
+        !checks[0].1,
+        "Governance check must FAIL for forced-accept (no stored receipt)"
+    );
+    assert_eq!(
+        checks[0].2, "No governance decision receipt found",
+        "Detail must state absence, not a misleading message"
+    );
+
+    // Check 11 (chain complete contract): structural_complete=false,
+    // execution_complete=true → chain_complete=false → contract holds
+    assert!(
+        checks[10].1,
+        "Chain complete contract must still hold for forced-accept"
+    );
+
+    // Check 12: journal entries present → PASS
+    assert!(
+        checks[11].1,
+        "Journal entries check must PASS when domain_id hint surfaced entries"
+    );
+
+    // Check 13: provenance matches → PASS
+    assert!(
+        checks[12].1,
+        "Journal provenance check must PASS when entries carry the correct decision hash"
+    );
 }
