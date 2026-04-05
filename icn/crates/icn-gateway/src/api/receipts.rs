@@ -7,10 +7,12 @@ use actix_web::{get, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::ledger_mgr::LedgerManager;
 use crate::receipt_store::ReceiptStore;
 use icn_kernel_api::economics::SettlementIntent;
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus};
 use icn_kernel_api::receipts::{AllocationReceipt, CanonicalReceipt, Hash};
+use icn_ledger::types::ProvenanceRef;
 use icn_store::Store;
 
 /// Query parameters for listing by decision hash.
@@ -141,6 +143,26 @@ pub struct GovernanceVoteTallyResponse {
     pub abstain_votes: usize,
 }
 
+/// Minimal journal entry provenance reference for audit cross-check.
+///
+/// Carries only the fields needed to verify that a ledger journal entry
+/// was authorized by the originating governance decision: the receipt_id
+/// and the decision_hash stored in `ProvenanceRef::Governance`.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JournalEntryProvenanceResponse {
+    /// Ledger-assigned entry ID (blake3 hex or empty if not yet assigned)
+    pub entry_id: String,
+    /// Governance receipt ID stored in the journal entry's provenance
+    pub decision_receipt_id: String,
+    /// Decision hash stored in the journal entry's provenance
+    pub decision_hash: String,
+    /// Number of account deltas in this entry
+    pub account_count: usize,
+    /// Entry timestamp (Unix seconds)
+    pub timestamp: u64,
+}
+
 /// Response for the full receipt chain (governance + economic artifacts).
 ///
 /// Returned by `GET /v1/receipts/chain/{decision_hash}`.
@@ -155,6 +177,9 @@ pub struct ReceiptChainResponse {
     pub allocations: Vec<AllocationReceiptResponse>,
     /// Settlement intents for this decision
     pub intents: Vec<SettlementIntentResponse>,
+    /// Journal entries whose ProvenanceRef::Governance.decision_hash matches.
+    /// Populated when a LedgerManager is available and governance.domain_id resolves a ledger.
+    pub journal_entries: Vec<JournalEntryProvenanceResponse>,
     /// Structural chain completeness (receipt-link integrity only).
     pub structural_complete: bool,
     /// Execution completeness for milestone scope.
@@ -322,11 +347,15 @@ pub async fn get_chain(
 /// GET /v1/receipts/chain/{decision_hash}
 ///
 /// Returns the full receipt chain for a decision: governance receipt,
-/// allocation receipts, and settlement intents.
+/// allocation receipts, settlement intents, and journal entry provenance refs.
+///
+/// Journal entries are populated when a `LedgerManager` is registered in app data
+/// and the governance receipt carries a `domain_id` that resolves to a coop ledger.
 #[get("/chain/{decision_hash}")]
 pub async fn get_full_chain(
     receipt_store: web::Data<Arc<ReceiptStore>>,
     execution_store: web::Data<Arc<dyn Store>>,
+    ledger_mgr: Option<web::Data<Arc<LedgerManager>>>,
     path: web::Path<String>,
 ) -> HttpResponse {
     let hash_hex = path.into_inner();
@@ -368,6 +397,12 @@ pub async fn get_full_chain(
         }
     };
 
+    // Query journal entries whose ProvenanceRef::Governance.decision_hash matches.
+    // Requires both a LedgerManager and a domain_id from the governance receipt.
+    let journal_entries =
+        query_journal_entries_for_decision(&ledger_mgr, &governance, &normalized_decision_hash)
+            .await;
+
     let structural_complete =
         governance.is_some() && allocations.iter().all(|a| !a.intents.is_empty());
     let execution_complete = execution.execution_complete;
@@ -392,12 +427,51 @@ pub async fn get_full_chain(
             .map(AllocationReceiptResponse::from)
             .collect(),
         intents: intents.iter().map(SettlementIntentResponse::from).collect(),
+        journal_entries,
         structural_complete,
         execution_complete,
         chain_complete,
         execution,
     };
     HttpResponse::Ok().json(response)
+}
+
+/// Query ledger journal entries whose `ProvenanceRef::Governance.decision_hash` matches
+/// the supplied hex-encoded decision hash.
+///
+/// Returns an empty vec when the LedgerManager is unavailable or the governance
+/// receipt carries no domain_id (standalone / test mode).
+async fn query_journal_entries_for_decision(
+    ledger_mgr: &Option<web::Data<Arc<LedgerManager>>>,
+    governance: &Option<icn_governance::GovernanceDecisionReceipt>,
+    decision_hash_hex: &str,
+) -> Vec<JournalEntryProvenanceResponse> {
+    let (mgr, domain_id) = match (ledger_mgr, governance.as_ref()) {
+        (Some(m), Some(g)) => (m, g.domain_id.clone()),
+        _ => return Vec::new(),
+    };
+
+    let entries = match mgr.get_history(&domain_id, None, 0, 100).await {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
+
+    entries
+        .into_iter()
+        .filter_map(|entry| match &entry.provenance {
+            ProvenanceRef::Governance {
+                receipt_id,
+                decision_hash: dh,
+            } if dh.as_str() == decision_hash_hex => Some(JournalEntryProvenanceResponse {
+                entry_id: entry.id.map(|h| h.to_hex()).unwrap_or_default(),
+                decision_receipt_id: receipt_id.clone(),
+                decision_hash: dh.clone(),
+                account_count: entry.accounts.len(),
+                timestamp: entry.timestamp,
+            }),
+            _ => None,
+        })
+        .collect()
 }
 
 /// GET /v1/receipts/allocations[?decision_hash=<hex>]
