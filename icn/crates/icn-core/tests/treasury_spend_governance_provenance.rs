@@ -67,8 +67,8 @@ async fn treasury_spend_accepted_proposal_produces_journal_entry_with_governance
     ));
 
     // ── KernelGovernanceExecutor (with ledger wired) ─────────────────────────
-    let kernel_executor = KernelGovernanceExecutor::new(Arc::new(StubParamStore))
-        .with_ledger_service(ledger_service);
+    let kernel_executor =
+        KernelGovernanceExecutor::new(Arc::new(StubParamStore)).with_ledger_service(ledger_service);
 
     let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
 
@@ -148,7 +148,10 @@ async fn treasury_spend_accepted_proposal_produces_journal_entry_with_governance
     let ledger_guard = ledger.read().await;
     let get_all_entries = ledger_guard.get_all_entries()?;
 
-    info!(entry_count = get_all_entries.len(), "Entries in ledger after effect dispatch");
+    info!(
+        entry_count = get_all_entries.len(),
+        "Entries in ledger after effect dispatch"
+    );
 
     let governance_entry = get_all_entries.iter().find(|e| {
         matches!(
@@ -174,9 +177,10 @@ async fn treasury_spend_accepted_proposal_produces_journal_entry_with_governance
         !entry.accounts.is_empty(),
         "Journal entry must have account deltas"
     );
-    let has_debit = entry.accounts.iter().any(|a| {
-        a.account_id.as_str() == treasury_did.as_str() && a.debit.is_some()
-    });
+    let has_debit = entry
+        .accounts
+        .iter()
+        .any(|a| a.account_id.as_str() == treasury_did.as_str() && a.debit.is_some());
     assert!(has_debit, "Treasury account must be debited");
 
     info!(
@@ -212,8 +216,8 @@ async fn treasury_spend_without_canonical_hash_falls_back_to_receipt_hash() -> R
         Arc::new(AllowAllOracle::wildcard()),
         treasury_did.clone(),
     ));
-    let kernel_executor = KernelGovernanceExecutor::new(Arc::new(StubParamStore))
-        .with_ledger_service(ledger_service);
+    let kernel_executor =
+        KernelGovernanceExecutor::new(Arc::new(StubParamStore)).with_ledger_service(ledger_service);
     let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
 
     let dispatcher_for_sub = dispatcher.clone();
@@ -275,8 +279,10 @@ async fn treasury_spend_without_canonical_hash_falls_back_to_receipt_hash() -> R
         get_all_entries.iter().map(|e| &e.provenance).collect::<Vec<_>>()
     );
 
-    if let Some(ProvenanceRef::Governance { receipt_id, decision_hash }) =
-        governance_entry.map(|e| &e.provenance)
+    if let Some(ProvenanceRef::Governance {
+        receipt_id,
+        decision_hash,
+    }) = governance_entry.map(|e| &e.provenance)
     {
         info!(
             receipt_id = %receipt_id,
