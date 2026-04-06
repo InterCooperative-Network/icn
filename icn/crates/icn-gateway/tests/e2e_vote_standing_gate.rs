@@ -159,6 +159,7 @@ async fn build_app_with_open_proposal(
         steward_checker: None,
         suspension_checker: None,
         membership_resolver: None,
+        sdis_service: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
@@ -409,6 +410,7 @@ async fn build_app_with_suspension_checker(
         steward_checker: None,
         suspension_checker: Some(suspension_checker),
         membership_resolver: None,
+        sdis_service: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);

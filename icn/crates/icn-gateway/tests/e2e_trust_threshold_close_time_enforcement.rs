@@ -178,6 +178,7 @@ async fn build_app_with_trust_resolver(
         suspension_checker: Some(suspension_checker),
         // Live production resolver — NOT a TrackingResolver mock
         membership_resolver: Some(resolver),
+        sdis_service: None,
     };
 
     let auth_mw = actix_web_httpauth::middleware::HttpAuthentication::bearer(jwt_auth);

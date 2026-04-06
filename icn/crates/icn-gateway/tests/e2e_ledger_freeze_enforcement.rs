@@ -150,6 +150,7 @@ async fn test_freeze_member_blocks_ledger_entries_after_governance_acceptance() 
         steward_checker: None,
         suspension_checker: None,
         membership_resolver: None,
+        sdis_service: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);

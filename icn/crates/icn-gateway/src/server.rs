@@ -1334,6 +1334,9 @@ impl GatewayServer {
                     std::sync::Arc::new(TrustServiceMembershipResolver::new(svc))
                 })
             },
+            // Daemon mode: SDIS execution goes through the actor event system
+            // (KernelGovernanceExecutor → SdisServiceImpl). HTTP path leaves this None.
+            sdis_service: None,
         };
 
         // Create rate limiter with configured or default config

@@ -85,6 +85,25 @@ pub async fn run_supervisor(
     let mut event_subscriptions = EventSubscriptionHandles::default();
     let mut shutdown_handles = ShutdownHandles::default();
 
+    // Initialize commons handle early so both the kernel executor (SDIS service)
+    // and the gateway (CommonsManager) share the same sled-backed CommonsHandle.
+    {
+        let commons_path = config.data_dir.join("commons.sled");
+        match icn_commons::CommonsHandle::with_sled_path(&commons_path) {
+            Ok(handle) => {
+                info!("CommonsHandle opened at {:?}", commons_path);
+                gateway_handles.commons = Some(handle);
+            }
+            Err(e) => {
+                warn!(
+                    "CommonsHandle: failed to open sled store at {:?}: {}; \
+                     gateway will fall back to in-memory commons state",
+                    commons_path, e
+                );
+            }
+        }
+    }
+
     // Spawn actors (requires identity bundle from unlocked keystore)
     let core_handles = if let Some(identity_bundle) = &identity_bundle {
         spawn_actors_with_identity(
@@ -103,29 +122,8 @@ pub async fn run_supervisor(
         spawn_without_identity(&config, &shutdown_tx, &mut background_tasks).await
     };
 
-    // Initialize commons handle — open once here so gateway and any future
-    // commons-aware actors all share a single sled-backed CommonsHandle.
-    // This prevents the dual-ownership problem where gateway would open its
-    // own sled store at the same path.
-    let commons_handle: Option<icn_commons::CommonsHandle> = {
-        let commons_path = config.data_dir.join("commons.sled");
-        match icn_commons::CommonsHandle::with_sled_path(&commons_path) {
-            Ok(handle) => {
-                info!("CommonsHandle opened at {:?}", commons_path);
-                Some(handle)
-            }
-            Err(e) => {
-                warn!(
-                    "CommonsHandle: failed to open sled store at {:?}: {}; \
-                     gateway will fall back to in-memory commons state",
-                    commons_path, e
-                );
-                None
-            }
-        }
-    };
-
     // Spawn Gateway API server if enabled
+    // commons is taken from gateway_handles (populated above, shared with kernel executor)
     super::init_gateway::spawn_gateway(
         &config.gateway,
         config.data_dir.clone(),
@@ -144,7 +142,7 @@ pub async fn run_supervisor(
             agreement_manager: gateway_handles.agreement_manager,
             service_discovery_manager: gateway_handles.service_discovery_manager,
             naming_service: gateway_handles.naming_service,
-            commons: commons_handle,
+            commons: gateway_handles.commons,
             charter_accepted_hook: gateway_handles.charter_accepted_hook,
             federation_service: gateway_handles.federation_service,
             settlement_engine: gateway_handles.settlement_engine,
@@ -824,6 +822,20 @@ async fn spawn_actors_with_identity(
         ));
         kernel_executor = kernel_executor.with_membership_service(membership_service);
         info!("✓ Membership service wired to governance executor");
+
+        // Wire SDIS service adapter (steward appointment/revocation)
+        if let Some(ref commons) = gateway_handles.commons {
+            let sdis_service = Arc::new(crate::services::SdisServiceImpl::new(Arc::new(
+                commons.clone(),
+            )));
+            kernel_executor = kernel_executor.with_sdis_service(sdis_service);
+            info!("✓ SDIS service wired to governance executor");
+        } else {
+            info!(
+                "SDIS service not wired (no commons handle) — \
+                 steward proposals will fail with explicit error"
+            );
+        }
 
         // Create escrow and budget stores via the ledger app crate
         let ledger_stores = icn_ledger_actor::init::create_stores(&config.store_path())?;

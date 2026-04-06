@@ -2036,3 +2036,67 @@ impl SettlementQueryService for NoOpSettlementQueryService {
         SettlementReceiptResult::not_found(*hash)
     }
 }
+
+// =============================================================================
+// SDIS Service
+// =============================================================================
+
+/// Request to appoint a steward through the governance dispatch path.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AppointStewardRequest {
+    /// DID of the candidate being appointed
+    pub steward_did: String,
+    /// Governance domain / jurisdiction that approved the appointment
+    pub jurisdiction_id: String,
+    /// Term length in seconds
+    pub term_length_seconds: i64,
+    /// Bond posted by the candidate
+    pub bond_amount: i64,
+    /// Geographic region (optional)
+    pub region: Option<String>,
+    /// Proposal receipt ID for audit linkage
+    pub proposal_id: String,
+}
+
+/// Result of an appoint-steward operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AppointStewardResult {
+    pub success: bool,
+    /// Stable hash of the steward record (for audit)
+    pub state_change_hash: String,
+    pub error: Option<String>,
+}
+
+/// Request to revoke a steward appointment.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RevokeStewardRequest {
+    /// DID of the steward to revoke
+    pub steward_did: String,
+    /// Reason for revocation
+    pub reason: String,
+}
+
+/// Result of a revoke-steward operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RevokeStewardResult {
+    pub success: bool,
+    pub state_change_hash: String,
+    pub error: Option<String>,
+}
+
+/// Trait for SDIS steward appointment and revocation.
+///
+/// Implementations live in `icn-core/src/services/sdis_service.rs` backed by
+/// `icn_commons::CommonsHandle`. The kernel executor calls this through the
+/// trait boundary; it never imports CommonsHandle directly.
+pub trait SdisService: Send + Sync {
+    fn appoint_steward(
+        &self,
+        request: AppointStewardRequest,
+    ) -> Result<AppointStewardResult, anyhow::Error>;
+
+    fn revoke_steward(
+        &self,
+        request: RevokeStewardRequest,
+    ) -> Result<RevokeStewardResult, anyhow::Error>;
+}

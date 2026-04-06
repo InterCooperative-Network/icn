@@ -1183,32 +1183,13 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                         charter_id: charter_id.clone(),
                     }
                 }
-                icn_governance::ProposalPayload::Sdis { proposal: ref sdis } => match sdis {
-                    icn_governance::sdis::SdisProposal::AppointSteward {
-                        candidate,
-                        region,
-                        bond_amount,
-                        term_length,
-                        ..
-                    } => GovernanceEffect::AppointSteward {
-                        proposal_id: proposal.id.0.clone(),
-                        domain_id: proposal.domain_id.0.clone(),
-                        candidate: candidate.clone(),
-                        region: region.clone(),
-                        bond_amount: *bond_amount,
-                        term_length_seconds: *term_length,
-                    },
-                    icn_governance::sdis::SdisProposal::RemoveSteward {
-                        steward, reason, ..
-                    } => GovernanceEffect::RevokeSteward {
-                        proposal_id: proposal.id.0.clone(),
-                        steward: steward.clone(),
-                        reason: reason.clone(),
-                    },
-                    _ => GovernanceEffect::Unhandled {
-                        proposal_id: proposal.id.0.clone(),
-                        payload_type: proposal.payload.type_name().to_owned(),
-                    },
+                // SDIS steward proposals are handled via ctx.sdis_service when set (test
+                // path). In daemon mode sdis_service is None — the actor event system
+                // handles execution (KernelGovernanceExecutor → SdisServiceImpl). Emit
+                // Unhandled so the hook is a no-op for SDIS in both paths.
+                icn_governance::ProposalPayload::Sdis { .. } => GovernanceEffect::Unhandled {
+                    proposal_id: proposal.id.0.clone(),
+                    payload_type: proposal.payload.type_name().to_owned(),
                 },
                 _ => GovernanceEffect::Unhandled {
                     proposal_id: proposal.id.0.clone(),
@@ -1216,6 +1197,79 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                 },
             };
             hook(effect);
+        }
+
+        // SDIS service dispatch (test path only — daemon uses actor event system).
+        // When sdis_service is wired and the accepted payload is an SDIS proposal,
+        // call the service directly so tests can prove steward creation without an
+        // actor runtime.
+        if let Some(ref svc) = ctx.sdis_service {
+            use icn_kernel_api::{AppointStewardRequest, RevokeStewardRequest};
+            if let icn_governance::ProposalPayload::Sdis {
+                proposal: ref sdis_proposal,
+            } = proposal.payload
+            {
+                match sdis_proposal {
+                    icn_governance::sdis::SdisProposal::AppointSteward {
+                        candidate,
+                        bond_amount,
+                        term_length,
+                        ..
+                    } => {
+                        let req = AppointStewardRequest {
+                            steward_did: candidate.to_string(),
+                            jurisdiction_id: proposal.domain_id.0.clone(),
+                            term_length_seconds: *term_length as i64,
+                            bond_amount: *bond_amount,
+                            region: None,
+                            proposal_id: proposal.id.0.clone(),
+                        };
+                        match svc.appoint_steward(req) {
+                            Ok(result) if !result.success => {
+                                tracing::warn!(
+                                    proposal_id = %proposal.id.0,
+                                    error = ?result.error,
+                                    "SDIS test-path: appoint_steward returned success=false"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    proposal_id = %proposal.id.0,
+                                    error = %e,
+                                    "SDIS test-path: appoint_steward call failed"
+                                );
+                            }
+                            Ok(_) => {}
+                        }
+                    }
+                    icn_governance::sdis::SdisProposal::RemoveSteward {
+                        steward, reason, ..
+                    } => {
+                        let req = RevokeStewardRequest {
+                            steward_did: steward.to_string(),
+                            reason: reason.clone(),
+                        };
+                        match svc.revoke_steward(req) {
+                            Ok(result) if !result.success => {
+                                tracing::warn!(
+                                    proposal_id = %proposal.id.0,
+                                    error = ?result.error,
+                                    "SDIS test-path: revoke_steward returned success=false"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    proposal_id = %proposal.id.0,
+                                    error = %e,
+                                    "SDIS test-path: revoke_steward call failed"
+                                );
+                            }
+                            Ok(_) => {}
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 
@@ -2610,6 +2664,7 @@ mod tests {
             steward_checker: None,
             suspension_checker: None,
             membership_resolver: None,
+            sdis_service: None,
         };
 
         let app = test_app!(ctx, member_did);
@@ -2689,6 +2744,7 @@ mod tests {
             steward_checker: None,
             suspension_checker: None,
             membership_resolver: None,
+            sdis_service: None,
         };
 
         let app = test_app!(ctx, member_did);
@@ -2807,6 +2863,7 @@ mod tests {
             steward_checker: None,
             suspension_checker: Some(suspension_checker),
             membership_resolver: Some(resolver),
+            sdis_service: None,
         };
 
         let app = test_app!(ctx, alice_did);
