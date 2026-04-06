@@ -963,6 +963,63 @@ impl TrustManager {
     pub fn edge_count(&self) -> usize {
         self.edges.len()
     }
+
+    /// Enumerate all DIDs whose trust score meets or exceeds `threshold`.
+    ///
+    /// Used by `TrustManagerMembershipResolver` to resolve eligible members for
+    /// `TrustThreshold` governance domains at proposal close time.
+    ///
+    /// - **TrustService mode** (production): delegates to the service.
+    /// - **TrustGraph handle mode** (deprecated): reads the graph directly.
+    /// - **Standalone mode** (no service, no graph): enumerates known target DIDs
+    ///   from the in-memory `self.edges` DashMap, computes trust scores from the
+    ///   `own_did` perspective, and returns those meeting the threshold. Returns
+    ///   `Ok(vec![])` only when `own_did` is not configured (perspective not set).
+    pub fn get_dids_above_threshold(&self, threshold: f64) -> Result<Vec<Did>, String> {
+        if let Some(ref svc) = self.trust_service {
+            let kernel_dids = svc.get_dids_above_threshold(threshold)?;
+            let mut dids = Vec::with_capacity(kernel_dids.len());
+            for s in kernel_dids {
+                let did = s
+                    .parse::<Did>()
+                    .map_err(|e| format!("trust service returned unparseable DID '{s}': {e}"))?;
+                dids.push(did);
+            }
+            Ok(dids)
+        } else if let Some(ref graph) = self.trust_graph {
+            tokio::task::block_in_place(|| {
+                graph
+                    .blocking_read()
+                    .get_dids_above_threshold(threshold)
+                    .map_err(|e| e.to_string())
+            })
+        } else {
+            // Standalone mode: enumerate all known target DIDs from self.edges,
+            // compute trust score from own_did perspective, and filter by threshold.
+            // This path is used in tests where no TrustService or TrustGraph is wired.
+            let Some(ref own_did) = self.own_did else {
+                return Ok(Vec::new());
+            };
+            let targets: std::collections::HashSet<String> = self
+                .edges
+                .iter()
+                .map(|e| e.value().target.to_string())
+                .collect();
+            let mut dids = Vec::new();
+            for target_str in targets {
+                if let Ok(target_did) = target_str.parse::<Did>() {
+                    // compute_trust_score is deprecated for async contexts but
+                    // this standalone path runs outside async (no block_in_place needed).
+                    #[allow(deprecated)]
+                    let score = self.compute_trust_score(own_did, &target_did);
+                    if score >= threshold {
+                        dids.push(target_did);
+                    }
+                }
+            }
+            Ok(dids)
+        }
+    }
 }
 
 /// A cached trust evaluation result with version-awareness.

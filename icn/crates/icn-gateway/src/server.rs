@@ -656,6 +656,9 @@ impl GatewayServer {
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
         let session_manager = Arc::new(crate::session::SessionManager::new());
 
+        // Keep a reference for governance membership resolution before consuming.
+        let trust_service_for_gov = self.trust_service_handle.clone();
+
         // Create trust manager (prefers TrustService, falls back to in-memory)
         let trust_manager: Arc<TrustManager> = if let Some(service) = self.trust_service_handle {
             info!("Trust manager connected to daemon (using TrustService, kernel/app separated)");
@@ -1319,11 +1322,18 @@ impl GatewayServer {
             member_checker: Some(member_checker),
             steward_checker: Some(steward_checker),
             suspension_checker: Some(suspension_checker),
-            // TrustThreshold membership resolution requires a trust graph that lives
-            // outside the governance layer. Until the gateway wires a resolver here,
-            // TrustThreshold domains fall through with excluded_delegators: None
-            // (fail-open). Wire a TrustMembershipResolver here to close that gap.
-            membership_resolver: None,
+            // Production TrustThreshold membership resolver.
+            // Uses TrustServiceMembershipResolver (icn-governance) so this stays
+            // outside the gateway's meaning-firewall domain-ref budget.
+            // In TrustService mode (daemon-backed): calls get_dids_above_threshold
+            // through the kernel/app boundary. In standalone mode: resolver is None,
+            // so TrustThreshold domains fail-open (excluded_delegators = None).
+            membership_resolver: {
+                use icn_governance::{MembershipResolver, TrustServiceMembershipResolver};
+                trust_service_for_gov.map(|svc| -> std::sync::Arc<dyn MembershipResolver> {
+                    std::sync::Arc::new(TrustServiceMembershipResolver::new(svc))
+                })
+            },
         };
 
         // Create rate limiter with configured or default config

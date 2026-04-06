@@ -131,7 +131,7 @@ pub use proposal::{
     ProposalPayload, ProposalScope, ProposalState, ResourceAccessAction, TreasuryApprovalType,
     TreasuryProposalOperation, Version,
 };
-pub use resolver::{MembershipResolver, StaticMembershipResolver};
+pub use resolver::{MembershipResolver, StaticMembershipResolver, TrustServiceMembershipResolver};
 pub use sdis::{
     AttestationType, InstitutionalAuthority, JurisdictionTier, RevocationTarget, SdisProposal,
     SdisVotingRequirements, StewardPenalty, StewardStats, ThresholdOp, ThresholdType,

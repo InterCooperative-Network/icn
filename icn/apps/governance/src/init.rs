@@ -19,7 +19,9 @@ use icn_kernel_api::events::EventEmitter;
 use icn_store::SledStore;
 
 use crate::actor::{GovernanceActor, GovernanceHandle};
-use icn_governance::{MembershipResolver, StaticMembershipResolver};
+use icn_governance::{
+    MembershipResolver, StaticMembershipResolver, TrustServiceMembershipResolver,
+};
 
 /// Dependencies required for governance actor initialization.
 ///
@@ -31,6 +33,13 @@ pub struct GovernanceActorDeps {
     pub event_bus: Arc<dyn EventEmitter>,
     /// Ed25519 signing key for GovernanceProof generation (None if keystore unavailable)
     pub signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
+    /// Optional TrustService for TrustThreshold membership resolution.
+    ///
+    /// When provided, the governance actor is initialized with a
+    /// `TrustServiceMembershipResolver` that can handle both `StaticList` and
+    /// `TrustThreshold` membership sources.  Without this, only `StaticList`
+    /// domains can be closed (TrustThreshold close will error at quorum calculation).
+    pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
 }
 
 /// Services returned from governance actor initialization.
@@ -71,9 +80,17 @@ pub async fn init_governance_actor(
     let gov_store_path = store_path.join("governance");
     let gov_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&gov_store_path)?);
 
-    // Create membership resolver
+    // Create membership resolver.
+    // When a TrustService is available, use TrustServiceMembershipResolver so that
+    // TrustThreshold domains can be closed (quorum denominator + delegation scope).
+    // Without a trust service, fall back to StaticMembershipResolver which only
+    // handles StaticList domains and errors on TrustThreshold.
     let gov_resolver: Arc<dyn MembershipResolver + Send + Sync> =
-        Arc::new(StaticMembershipResolver::new());
+        if let Some(trust_svc) = deps.trust_service {
+            Arc::new(TrustServiceMembershipResolver::new(trust_svc))
+        } else {
+            Arc::new(StaticMembershipResolver::new())
+        };
 
     // Spawn GovernanceActor
     let governance_handle = GovernanceActor::spawn(
