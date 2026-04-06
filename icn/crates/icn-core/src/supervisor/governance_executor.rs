@@ -328,10 +328,11 @@ impl KernelGovernanceExecutor {
                 ))
             }
 
-            // RedeemShares and IssueBond: not yet implemented in this executor.
+            // RedeemShares: not yet implemented in this executor (Tranche 11).
             // Return an honest non-deferred failure rather than falling through to
             // `treasury_effect_to_operation`'s `_ =>` placeholder which produces
             // zeroed-out operation data and a misleading "missing provenance" Deferred.
+            // IssueBond is wired (Tranche 10) and reaches Path 3 below.
             TreasuryEffect::RedeemShares { .. } => {
                 warn!("RedeemShares received: not yet implemented in the kernel treasury executor");
                 Ok(EffectResult {
