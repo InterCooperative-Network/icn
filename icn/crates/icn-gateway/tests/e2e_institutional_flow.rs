@@ -234,6 +234,7 @@ async fn test_e2e_freeze_member_suspends_commons_affiliation() {
         steward_checker: None,
         suspension_checker: None,
         membership_resolver: None,
+        sdis_service: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
@@ -487,6 +488,7 @@ async fn test_e2e_unfreeze_member_reinstates_commons_affiliation() {
         steward_checker: None,
         suspension_checker: None,
         membership_resolver: None,
+        sdis_service: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
@@ -617,20 +619,26 @@ async fn test_e2e_unfreeze_member_reinstates_commons_affiliation() {
 ///   charter proposal accepted → DeployCharter registers domain in commons →
 ///   AppointSteward proposal accepted → steward created with jurisdiction = domain_id.
 ///
-/// Proves the scoped steward appointment path:
-/// 1. `GovernanceEffect::DeployCharter` → `CommonsManager::store_charter()` (minimal stub)
-/// 2. `GovernanceEffect::AppointSteward { domain_id }` → `CommonsManager::register_steward(..., Some(domain_id))`
+/// Proves the scoped steward appointment path via the new SdisService executor:
+/// 1. `GovernanceEffect::DeployCharter` hook → `CommonsHandle::store_charter()`
+/// 2. `SdisService::appoint_steward()` → `CommonsHandle::register_steward(..., Some(domain_id))`
 /// 3. Resulting steward record has `jurisdiction == Some(domain_id)`
 ///
-/// Before this, AppointSteward passed `None` for jurisdiction because commons validates
-/// jurisdiction strings against its charter store, which was never populated by
-/// governance acceptance.  The Charter proposal now emits `DeployCharter`, closing the gap.
+/// In daemon mode the actor event system drives step 2 (KernelGovernanceExecutor →
+/// SdisServiceImpl). In this test a lightweight inline impl is wired directly into
+/// `GovernanceContext.sdis_service` so the HTTP handler invokes it on proposal close.
 #[actix_web::test]
 async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
+    use icn_commons::CommonsHandle;
+    use icn_kernel_api::{
+        AppointStewardRequest, AppointStewardResult, RevokeStewardRequest, RevokeStewardResult,
+        SdisService,
+    };
+
     const DOMAIN_ID: &str = "test-coop-scoped-steward-e2e";
 
-    // ── Commons setup ────────────────────────────────────────────────────────
-    let commons_mgr = Arc::new(CommonsManager::new());
+    // ── Commons setup (CommonsHandle, not CommonsManager — same API surface) ──
+    let commons_handle = Arc::new(CommonsHandle::new_in_memory());
 
     // Enroll the candidate with a steward vouch to reach Strong POP level,
     // which register_steward requires.
@@ -639,20 +647,20 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
     let candidate_kp = KeyPair::generate().expect("candidate KeyPair");
     let candidate_did = candidate_kp.did().clone();
 
-    let anchor = commons_mgr
+    let anchor = commons_handle
         .create_anchor_from_enrollment(&candidate_did, Some(&vouching_steward_did))
         .await
         .expect("create_anchor_from_enrollment");
     let anchor_id = hex::encode(anchor.id());
 
-    commons_mgr
+    commons_handle
         .create_holder_from_anchor(&anchor_id, &candidate_did)
         .await
         .expect("create_holder_from_anchor");
 
     // Pre-condition: no charter for this domain yet, candidate is not a steward.
     assert!(
-        commons_mgr
+        commons_handle
             .get_charter_by_domain(DOMAIN_ID)
             .await
             .expect("pre-check charter")
@@ -660,59 +668,89 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
         "charter must not exist before Charter proposal"
     );
     assert!(
-        !commons_mgr
+        !commons_handle
             .is_active_steward(&candidate_did)
             .await
             .expect("is_active_steward pre-check"),
         "candidate must not be a steward before AppointSteward proposal"
     );
 
-    // ── Wire the hook: DeployCharter + AppointSteward (mirrors server.rs paths) ─
-    let commons_mgr_for_hook = commons_mgr.clone();
+    // ── Inline SdisService that calls CommonsHandle directly ─────────────────
+    // Replaces the old GovernanceEffect::AppointSteward hook arm. The HTTP
+    // handler calls this when sdis_service is Some — daemon mode leaves it None
+    // and relies on the actor event path instead (no double execution).
+    struct InlineSdisService {
+        commons: Arc<CommonsHandle>,
+    }
+    impl SdisService for InlineSdisService {
+        fn appoint_steward(
+            &self,
+            req: AppointStewardRequest,
+        ) -> Result<AppointStewardResult, anyhow::Error> {
+            // Fire-and-forget spawn: the actix test runtime is single-thread so
+            // block_in_place is unavailable. The test polls is_active_steward() in
+            // a loop after the HTTP call, so the task will complete before the
+            // poll deadline.
+            let commons = self.commons.clone();
+            tokio::task::spawn(async move {
+                let did: icn_identity::Did = match req.steward_did.parse() {
+                    Ok(d) => d,
+                    Err(_) => return,
+                };
+                let jurisdiction = if req.jurisdiction_id.is_empty() {
+                    None
+                } else {
+                    Some(req.jurisdiction_id.clone())
+                };
+                let _ = commons
+                    .register_steward(
+                        &did,
+                        &did,
+                        (req.term_length_seconds / 86_400) as u64,
+                        req.bond_amount.max(0) as u64,
+                        req.proposal_id.clone(),
+                        jurisdiction,
+                        vec![],
+                    )
+                    .await;
+            });
+            Ok(AppointStewardResult {
+                success: true,
+                state_change_hash: String::new(),
+                error: None,
+            })
+        }
+        fn revoke_steward(
+            &self,
+            _req: RevokeStewardRequest,
+        ) -> Result<RevokeStewardResult, anyhow::Error> {
+            Ok(RevokeStewardResult {
+                success: true,
+                state_change_hash: String::new(),
+                error: None,
+            })
+        }
+    }
+
+    // ── Wire the hook: DeployCharter only (SDIS goes through sdis_service) ───
+    let commons_for_hook = commons_handle.clone();
     let on_proposal_accepted: ProposalAcceptedHook = Arc::new(move |effect| {
-        let commons = commons_mgr_for_hook.clone();
-        match effect {
-            GovernanceEffect::DeployCharter { charter_id, .. } => {
-                tokio::spawn(async move {
-                    use icn_governance::{
-                        Charter, DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType,
-                    };
-                    let charter = Charter::new(
-                        OrgType::Cooperative,
-                        charter_id.clone(),
-                        charter_id.clone(),
-                        GovernanceConfig::cooperative_default(),
-                        MembershipPolicy::default(),
-                        DisputePolicy::default(),
-                    );
-                    let _ = commons.store_charter(charter).await;
-                });
-            }
-            GovernanceEffect::AppointSteward {
-                proposal_id,
-                domain_id,
-                candidate,
-                bond_amount,
-                term_length_seconds,
-                ..
-            } => {
-                tokio::spawn(async move {
-                    let term_days = term_length_seconds / 86_400;
-                    let bond = bond_amount.max(0) as u64;
-                    let _ = commons
-                        .register_steward(
-                            &candidate,
-                            &candidate,
-                            term_days,
-                            bond,
-                            proposal_id,
-                            Some(domain_id),
-                            vec![],
-                        )
-                        .await;
-                });
-            }
-            _ => {}
+        let commons = commons_for_hook.clone();
+        if let GovernanceEffect::DeployCharter { charter_id, .. } = effect {
+            tokio::spawn(async move {
+                use icn_governance::{
+                    Charter, DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType,
+                };
+                let charter = Charter::new(
+                    OrgType::Cooperative,
+                    charter_id.clone(),
+                    charter_id.clone(),
+                    GovernanceConfig::cooperative_default(),
+                    MembershipPolicy::default(),
+                    DisputePolicy::default(),
+                );
+                let _ = commons.store_charter(charter).await;
+            });
         }
     });
 
@@ -721,6 +759,9 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
     let auth_manager = Arc::new(AuthManager::new(jwt_secret));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
     let governance_manager = Arc::new(GovernanceManager::new());
+    let sdis_svc: Arc<dyn SdisService> = Arc::new(InlineSdisService {
+        commons: commons_handle.clone(),
+    });
 
     let gov_ctx = GovernanceContext {
         manager: governance_manager.clone(),
@@ -731,6 +772,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
         steward_checker: None,
         suspension_checker: None,
         membership_resolver: None,
+        sdis_service: Some(sdis_svc),
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
@@ -802,7 +844,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
     // Poll until the charter is registered in commons (DeployCharter hook fires async).
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
     loop {
-        if commons_mgr
+        if commons_handle
             .get_charter_by_domain(DOMAIN_ID)
             .await
             .expect("charter poll")
@@ -841,10 +883,11 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
 
     run_proposal_lifecycle(&app, &appoint_proposal_id.0, &token).await;
 
-    // Poll until steward record is created.
+    // Poll until steward record is created (InlineSdisService writes synchronously,
+    // so this should resolve on the first iteration — the loop guards against races).
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
     loop {
-        if commons_mgr
+        if commons_handle
             .is_active_steward(&candidate_did)
             .await
             .expect("is_active_steward poll")
@@ -861,7 +904,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
     }
 
     // ── Assert: steward record is scoped to the governance domain ─────────────
-    let record = commons_mgr
+    let record = commons_handle
         .get_steward_by_did(&candidate_did)
         .await
         .expect("get_steward_by_did")

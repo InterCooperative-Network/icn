@@ -224,6 +224,7 @@ async fn build_app_with_proposal(
         steward_checker: None,
         suspension_checker: None,
         membership_resolver: None,
+        sdis_service: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);

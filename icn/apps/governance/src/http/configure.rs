@@ -209,6 +209,12 @@ pub struct GovernanceContext<E> {
     /// If `None`, `TrustThreshold` domains fall through with `excluded_delegators: None`
     /// (fail-open — delegations from suspended members may still flow).
     pub membership_resolver: Option<Arc<dyn MembershipResolver>>,
+    /// Optional SDIS service for direct steward dispatch in test environments.
+    ///
+    /// In daemon mode this is `None` — steward execution goes through the actor event
+    /// system (`SystemEvent::ProposalAccepted` → `KernelGovernanceExecutor` → `SdisService`).
+    /// Setting this in tests provides a synchronous wiring path without an actor runtime.
+    pub sdis_service: Option<Arc<dyn icn_kernel_api::SdisService>>,
 }
 
 /// Register all governance routes on `cfg`.

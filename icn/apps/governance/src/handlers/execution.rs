@@ -220,12 +220,25 @@ pub fn translate_payload_to_effects(
 
         // SDIS proposals
         ProposalPayload::Sdis { proposal } => match proposal {
-            icn_governance::sdis::SdisProposal::AppointSteward { candidate, .. } => {
-                Ok(vec![KernelEffect::Sdis(SdisEffect::ApproveSteward {
-                    steward_did: candidate.to_string(),
-                    capabilities_hash: String::new(),
-                })])
-            }
+            icn_governance::sdis::SdisProposal::AppointSteward {
+                candidate,
+                region,
+                bond_amount,
+                term_length,
+                ..
+            } => Ok(vec![KernelEffect::Sdis(SdisEffect::ApproveSteward {
+                steward_did: candidate.to_string(),
+                jurisdiction_id: domain_id.to_string(),
+                term_length_seconds: *term_length as i64,
+                bond_amount: *bond_amount,
+                region: if region.is_empty() {
+                    None
+                } else {
+                    Some(region.clone())
+                },
+                proposal_id: decision_receipt_id.to_string(),
+                capabilities_hash: String::new(),
+            })]),
             icn_governance::sdis::SdisProposal::RemoveSteward {
                 steward, reason, ..
             } => Ok(vec![KernelEffect::Sdis(SdisEffect::RevokeSteward {

@@ -409,6 +409,16 @@ pub enum SdisEffect {
     /// Approve steward for enrollment ceremonies
     ApproveSteward {
         steward_did: String,
+        /// Domain / jurisdiction that approved the appointment (governance domain_id)
+        jurisdiction_id: String,
+        /// Steward term length in seconds
+        term_length_seconds: i64,
+        /// Bond posted by the steward candidate
+        bond_amount: i64,
+        /// Geographic region the steward will serve (optional)
+        region: Option<String>,
+        /// Proposal receipt ID for governance audit linkage
+        proposal_id: String,
         capabilities_hash: String,
     },
     /// Revoke steward status

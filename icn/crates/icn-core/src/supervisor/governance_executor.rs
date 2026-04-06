@@ -44,6 +44,7 @@ pub struct KernelGovernanceExecutor {
     federation: Arc<KernelFederationExecutor>,
     control: Arc<KernelControlExecutor>,
     membership: Arc<KernelMembershipExecutor>,
+    sdis: Arc<KernelSdisExecutor>,
     /// Escrow store for domain-level idempotency on escrow releases.
     escrow_store: Option<Arc<dyn EscrowStore>>,
     /// Budget store for budget enforcement.
@@ -65,6 +66,7 @@ impl KernelGovernanceExecutor {
             federation: Arc::new(KernelFederationExecutor::new()),
             control: Arc::new(KernelControlExecutor::new()),
             membership: Arc::new(KernelMembershipExecutor::new()),
+            sdis: Arc::new(KernelSdisExecutor::new()),
             escrow_store: None,
             budget_store: None,
             resource_store: None,
@@ -118,6 +120,12 @@ impl KernelGovernanceExecutor {
     /// Set the resource access store for governance-authorized grant/revocation.
     pub fn with_resource_access_store(mut self, store: Arc<dyn ResourceAccessStore>) -> Self {
         self.resource_store = Some(store);
+        self
+    }
+
+    /// Set the SDIS service for steward appointment and revocation.
+    pub fn with_sdis_service(mut self, service: Arc<dyn icn_kernel_api::SdisService>) -> Self {
+        self.sdis = Arc::new(KernelSdisExecutor::with_service(service));
         self
     }
 
@@ -677,23 +685,9 @@ impl EffectExecutor for KernelGovernanceExecutor {
             KernelEffect::Resource(resource_effect) => {
                 self.execute_resource_effect(&resource_effect, decision_receipt_id)
             }
-            KernelEffect::Sdis(sdis_effect) => {
-                info!(
-                    ?sdis_effect,
-                    "Executing SDIS effect (not implemented in kernel executor)"
-                );
-                Ok(EffectResult {
-                    effect_id: decision_receipt_id.to_string(),
-                    success: false,
-                    message: format!(
-                        "SDIS effect not implemented in kernel executor: {:?}",
-                        sdis_effect
-                    ),
-                    state_change_hash: None,
-                    ledger_entry_id: None,
-                    not_executed: false,
-                })
-            }
+            KernelEffect::Sdis(sdis_effect) => self
+                .sdis
+                .execute_sdis_effect(&sdis_effect, decision_receipt_id),
         }
     }
 }
@@ -2031,6 +2025,140 @@ impl Default for KernelMembershipExecutor {
     }
 }
 
+// =============================================================================
+// SDIS Executor
+// =============================================================================
+
+/// Kernel executor for SDIS steward operations.
+pub struct KernelSdisExecutor {
+    service: Option<Arc<dyn icn_kernel_api::SdisService>>,
+}
+
+impl Default for KernelSdisExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl KernelSdisExecutor {
+    pub fn new() -> Self {
+        Self { service: None }
+    }
+
+    pub fn with_service(service: Arc<dyn icn_kernel_api::SdisService>) -> Self {
+        Self {
+            service: Some(service),
+        }
+    }
+
+    pub fn execute_sdis_effect(
+        &self,
+        effect: &icn_kernel_api::effects::SdisEffect,
+        decision_receipt_id: &str,
+    ) -> Result<EffectResult> {
+        use icn_kernel_api::effects::SdisEffect;
+
+        let Some(ref service) = self.service else {
+            return Ok(EffectResult {
+                effect_id: decision_receipt_id.to_string(),
+                success: false,
+                message: "SDIS service not wired — cannot execute steward operation".to_string(),
+                state_change_hash: None,
+                ledger_entry_id: None,
+                not_executed: false,
+            });
+        };
+
+        match effect {
+            SdisEffect::ApproveSteward {
+                steward_did,
+                jurisdiction_id,
+                term_length_seconds,
+                bond_amount,
+                region,
+                proposal_id,
+                ..
+            } => {
+                let request = icn_kernel_api::AppointStewardRequest {
+                    steward_did: steward_did.clone(),
+                    jurisdiction_id: jurisdiction_id.clone(),
+                    term_length_seconds: *term_length_seconds,
+                    bond_amount: *bond_amount,
+                    region: region.clone(),
+                    proposal_id: proposal_id.clone(),
+                };
+                let result = service.appoint_steward(request)?;
+                if result.success {
+                    info!(
+                        state_change_hash = %result.state_change_hash,
+                        "Steward appointed with durable state"
+                    );
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: true,
+                        message: format!(
+                            "Steward {} appointed in jurisdiction {} -> state_hash={}",
+                            steward_did, jurisdiction_id, result.state_change_hash
+                        ),
+                        state_change_hash: Some(result.state_change_hash),
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                } else {
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: false,
+                        message: result
+                            .error
+                            .unwrap_or_else(|| "Appointment failed".to_string()),
+                        state_change_hash: None,
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                }
+            }
+            SdisEffect::RevokeSteward {
+                steward_did,
+                reason,
+            } => {
+                let request = icn_kernel_api::RevokeStewardRequest {
+                    steward_did: steward_did.clone(),
+                    reason: reason.clone(),
+                };
+                let result = service.revoke_steward(request)?;
+                if result.success {
+                    info!(
+                        state_change_hash = %result.state_change_hash,
+                        "Steward revoked with durable state"
+                    );
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: true,
+                        message: format!(
+                            "Steward {} revoked -> state_hash={}",
+                            steward_did, result.state_change_hash
+                        ),
+                        state_change_hash: Some(result.state_change_hash),
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                } else {
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: false,
+                        message: result
+                            .error
+                            .unwrap_or_else(|| "Revocation failed".to_string()),
+                        state_change_hash: None,
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                }
+            }
+        }
+    }
+}
+
 /// Compute a decision hash from the receipt ID (placeholder implementation).
 fn compute_decision_hash(receipt_id: &DecisionReceiptId) -> String {
     let mut hasher = Sha256::new();
@@ -2693,6 +2821,11 @@ mod tests {
 
         let effect = KernelEffect::Sdis(SdisEffect::ApproveSteward {
             steward_did: "did:icn:steward".to_string(),
+            jurisdiction_id: "test-domain".to_string(),
+            term_length_seconds: 86400,
+            bond_amount: 0,
+            region: None,
+            proposal_id: "test-proposal".to_string(),
             capabilities_hash: "capabilities-hash".to_string(),
         });
 
@@ -2705,10 +2838,8 @@ mod tests {
             "SDIS effect must not report success when kernel executor has no implementation"
         );
         assert!(
-            effect_result
-                .message
-                .contains("SDIS effect not implemented in kernel executor"),
-            "Failure message should explain missing kernel implementation: {}",
+            effect_result.message.contains("SDIS service not wired"),
+            "Failure message should explain missing service wiring: {}",
             effect_result.message
         );
     }

@@ -135,6 +135,7 @@ async fn test_suspended_member_cannot_open_proposal() {
         steward_checker: None,
         suspension_checker: Some(suspension_checker),
         membership_resolver: None,
+        sdis_service: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
