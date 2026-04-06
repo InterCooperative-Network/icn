@@ -1224,7 +1224,23 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                             region: None,
                             proposal_id: proposal.id.0.clone(),
                         };
-                        let _ = svc.appoint_steward(req);
+                        match svc.appoint_steward(req) {
+                            Ok(result) if !result.success => {
+                                tracing::warn!(
+                                    proposal_id = %proposal.id.0,
+                                    error = ?result.error,
+                                    "SDIS test-path: appoint_steward returned success=false"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    proposal_id = %proposal.id.0,
+                                    error = %e,
+                                    "SDIS test-path: appoint_steward call failed"
+                                );
+                            }
+                            Ok(_) => {}
+                        }
                     }
                     icn_governance::sdis::SdisProposal::RemoveSteward {
                         steward, reason, ..
@@ -1233,7 +1249,23 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                             steward_did: steward.to_string(),
                             reason: reason.clone(),
                         };
-                        let _ = svc.revoke_steward(req);
+                        match svc.revoke_steward(req) {
+                            Ok(result) if !result.success => {
+                                tracing::warn!(
+                                    proposal_id = %proposal.id.0,
+                                    error = ?result.error,
+                                    "SDIS test-path: revoke_steward returned success=false"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    proposal_id = %proposal.id.0,
+                                    error = %e,
+                                    "SDIS test-path: revoke_steward call failed"
+                                );
+                            }
+                            Ok(_) => {}
+                        }
                     }
                     _ => {}
                 }
