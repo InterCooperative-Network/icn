@@ -76,6 +76,8 @@ pub enum TreasuryOperationType {
     /// Fan-out surplus settlement: N debits from treasury, N credits to member DIDs.
     /// The `distributions` field on `TreasuryOperation` carries the per-recipient amounts.
     DistributeSurplus,
+    /// Bond issuance: cooperative receives principal, incurs bond liability.
+    IssueBond,
 }
 
 /// Protocol parameter change request
@@ -455,6 +457,26 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
                 .map(|(did, amt)| (did.clone(), *amt))
                 .collect(),
         },
+        TreasuryEffect::IssueBond {
+            treasury_did,
+            bond_id,
+            principal,
+            currency,
+            decision_hash,
+            ..
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: TreasuryOperationType::IssueBond,
+            amount: *principal,
+            currency: currency.clone(),
+            // bond_id carried in recipient field for bond-payable DID derivation in ledger_service
+            recipient: Some(bond_id.clone()),
+            memo: format!("Bond issuance: {bond_id}"),
+            expected_nonce: None,
+            decision_hash: Some(decision_hash.clone()),
+            distributions: Vec::new(),
+        },
+
         // Other treasury effects mapped to basic operations
         _ => TreasuryOperation {
             treasury_id: String::new(),

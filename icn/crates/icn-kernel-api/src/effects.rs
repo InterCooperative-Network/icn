@@ -153,6 +153,8 @@ pub enum TreasuryEffect {
         interest_rate_bps: u32,
         maturity_date: u64,
         currency: String,
+        /// Governance decision hash for provenance tracking and idempotency.
+        decision_hash: String,
     },
     /// Release an escrow — governance decided, now move the money.
     ///
@@ -839,6 +841,7 @@ mod tests {
                 interest_rate_bps: 500,
                 maturity_date: 1750000000,
                 currency: "USD".into(),
+                decision_hash: "test-decision-hash".into(),
             },
             TreasuryEffect::ReleaseEscrow {
                 escrow_id: "esc-1".into(),
