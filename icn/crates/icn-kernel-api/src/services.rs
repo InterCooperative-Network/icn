@@ -219,6 +219,20 @@ pub trait TrustService: Send + Sync {
         self.trust_score(actor) >= min_score
     }
 
+    /// Enumerate all known DIDs whose trust score meets or exceeds `threshold`.
+    ///
+    /// Used by governance apps to determine eligible voters for `TrustThreshold`
+    /// membership domains without requiring direct access to the trust graph.
+    /// The governance app supplies the threshold value; this service returns the
+    /// current eligible set at the time of the call.
+    ///
+    /// Returns `Ok(Vec::new())` by default. Production implementations that back
+    /// `TrustThreshold` governance domains must override this.
+    fn get_dids_above_threshold(&self, threshold: f64) -> Result<Vec<Did>, String> {
+        let _ = threshold;
+        Ok(Vec::new())
+    }
+
     /// Record a trust-affecting event
     ///
     /// Called by the kernel when violations are detected. The trust service

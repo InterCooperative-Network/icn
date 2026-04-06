@@ -674,6 +674,7 @@ async fn spawn_actors_with_identity(
             shutdown_rx: shutdown_tx.subscribe(),
             protocol_parameter_store: protocol_parameter_store_from_daemon,
             signing_key: governance_signing_key,
+            trust_service: trust_service_from_registry.clone(),
         },
     )
     .await?;

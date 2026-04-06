@@ -724,6 +724,22 @@ impl TrustService for TrustServiceImplTokio {
             })
         })
     }
+
+    fn get_dids_above_threshold(
+        &self,
+        threshold: f64,
+    ) -> Result<Vec<icn_kernel_api::types::Did>, String> {
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let graph = self.graph.read().await;
+                graph
+                    .get_dids_above_threshold(threshold)
+                    .map(|dids| dids.into_iter().map(|d| d.to_string()).collect())
+                    .map_err(|e| e.to_string())
+            })
+        })
+    }
 }
 
 #[cfg(test)]

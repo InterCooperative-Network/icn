@@ -35,6 +35,13 @@ pub struct GovernanceDeps {
     pub protocol_parameter_store: Arc<dyn ProtocolParameterStore>,
     /// Ed25519 signing key for GovernanceProof generation (None if keystore unavailable)
     pub signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
+    /// Optional TrustService for TrustThreshold membership resolution.
+    ///
+    /// Passed through to `GovernanceActorDeps` so the governance actor is
+    /// initialized with a `TrustServiceMembershipResolver` instead of the
+    /// fallback `StaticMembershipResolver`.  Without this, TrustThreshold
+    /// domains cannot be closed (actor's quorum calculation errors).
+    pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
 }
 
 /// Services returned from governance initialization
@@ -74,6 +81,7 @@ pub async fn init_governance_services(
             gossip_handle: deps.gossip_handle.clone(),
             event_bus: deps.event_bus.clone(),
             signing_key: deps.signing_key,
+            trust_service: deps.trust_service,
         },
     )
     .await?;

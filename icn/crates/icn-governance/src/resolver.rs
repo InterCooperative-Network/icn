@@ -208,6 +208,44 @@ impl MembershipResolver for CompositeMembershipResolver {
     }
 }
 
+/// Membership resolver backed by the `TrustService` kernel API.
+///
+/// Handles both source variants:
+/// - `StaticList` — returned directly.
+/// - `TrustThreshold` — queries `TrustService::get_dids_above_threshold`, which
+///   crosses the kernel/app boundary cleanly and works with any runtime.
+///
+/// This resolver is the production-safe replacement for `TrustMembershipResolver`
+/// (which requires direct access to a raw `TrustGraph` lock).  Use this whenever
+/// the governance actor is running inside the daemon where a `TrustService` is
+/// registered in the `ServiceRegistry`.
+pub struct TrustServiceMembershipResolver {
+    trust_service: Arc<dyn icn_kernel_api::services::TrustService>,
+}
+
+impl TrustServiceMembershipResolver {
+    pub fn new(trust_service: Arc<dyn icn_kernel_api::services::TrustService>) -> Self {
+        Self { trust_service }
+    }
+}
+
+impl MembershipResolver for TrustServiceMembershipResolver {
+    fn resolve_members(&self, domain: &GovernanceDomain) -> Result<Vec<Did>> {
+        match &domain.config.membership.source {
+            MembershipSource::StaticList(members) => Ok(members.clone()),
+            MembershipSource::TrustThreshold(threshold) => self
+                .trust_service
+                .get_dids_above_threshold(*threshold)
+                .map(|dids| {
+                    dids.into_iter()
+                        .filter_map(|s| s.parse::<Did>().ok())
+                        .collect()
+                })
+                .map_err(|e| anyhow::anyhow!("TrustService threshold query failed: {e}")),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
