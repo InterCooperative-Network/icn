@@ -277,13 +277,10 @@ mod tests {
                 .push((effects, decision_receipt_id));
         });
 
-        let payload = ProposalPayload::ShareRedemption {
-            member: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
-                .parse()
-                .expect("valid did"),
-            share_ids: vec![],
-            payout_schedule: vec![],
-            reason: "unsupported in pilot path".to_string(),
+        // Charter is a still-unsupported payload; ShareRedemption is wired as of Tranche 11.
+        let payload = ProposalPayload::Charter {
+            charter_id: "test-coop-charter".to_string(),
+            charter_yaml: "schema_version: v0\nentity: coop\n".to_string(),
         };
 
         let event = SystemEvent::ProposalAccepted {

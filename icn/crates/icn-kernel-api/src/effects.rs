@@ -144,6 +144,8 @@ pub enum TreasuryEffect {
         share_count: u64,
         payout_amount: i64,
         currency: String,
+        /// Governance decision hash for provenance tracking and idempotency.
+        decision_hash: String,
     },
     /// Bond issuance
     IssueBond {
@@ -833,6 +835,7 @@ mod tests {
                 share_count: 10,
                 payout_amount: 1000,
                 currency: "USD".into(),
+                decision_hash: "test-decision-hash".into(),
             },
             TreasuryEffect::IssueBond {
                 treasury_did: "did:icn:t1".into(),

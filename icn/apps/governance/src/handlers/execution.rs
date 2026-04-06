@@ -328,6 +328,29 @@ pub fn translate_payload_to_effects(
             })])
         }
 
+        // Share redemption: member exchanges shares for payout from treasury.
+        //
+        // `payout_amount` is the sum of all approved installments. The payout
+        // schedule is governance-approved; only the financial effect lands in
+        // the ledger here. Installment tracking is out of scope for this tranche.
+        ProposalPayload::ShareRedemption {
+            member,
+            share_ids,
+            payout_schedule,
+            currency,
+            ..
+        } => {
+            let payout_amount: i64 = payout_schedule.iter().map(|s| s.amount).sum();
+            Ok(vec![KernelEffect::Treasury(TreasuryEffect::RedeemShares {
+                treasury_did: domain_id.to_string(),
+                member_did: member.to_string(),
+                share_count: share_ids.len() as u64,
+                payout_amount,
+                currency: currency.clone(),
+                decision_hash: decision_hash.to_string(),
+            })])
+        }
+
         // Fallback for unhandled types
         _ => Err(TranslationError::unsupported(
             "payload",
@@ -624,13 +647,11 @@ mod tests {
 
     #[test]
     fn test_translate_unhandled_payload_returns_explicit_error() {
-        let payload = icn_governance::ProposalPayload::ShareRedemption {
-            member: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
-                .parse()
-                .expect("valid did"),
-            share_ids: vec![],
-            payout_schedule: vec![],
-            reason: "voluntary departure".to_string(),
+        // Charter is an example of a still-unsupported payload (falls to `_ => Err(...)`).
+        // ShareRedemption was previously used here but is now wired (Tranche 11).
+        let payload = icn_governance::ProposalPayload::Charter {
+            charter_id: "test-coop-charter".to_string(),
+            charter_yaml: "schema_version: v0\nentity: coop\n".to_string(),
         };
         let effects = translate_payload_to_effects(
             &payload,
@@ -640,6 +661,57 @@ mod tests {
         );
         let err = effects.expect_err("unsupported payload must be explicit");
         assert_eq!(err.kind, "payload");
+    }
+
+    #[test]
+    fn test_translate_share_redemption_produces_redeem_shares_effect() {
+        let member_did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+        let payout_schedule = vec![
+            icn_ledger::ScheduledPayout::new(30 * 86400, 5_000),
+            icn_ledger::ScheduledPayout::new(60 * 86400, 5_000),
+        ];
+        let payload = icn_governance::ProposalPayload::ShareRedemption {
+            member: member_did.parse().expect("valid did"),
+            share_ids: vec![
+                icn_ledger::ShareId::new("share-001"),
+                icn_ledger::ShareId::new("share-002"),
+                icn_ledger::ShareId::new("share-003"),
+            ],
+            payout_schedule,
+            reason: "Voluntary departure".to_string(),
+            currency: "COOP".to_string(),
+        };
+
+        let effects = translate_payload_to_effects(
+            &payload,
+            "receipt-redeem-001",
+            "decision-hash-redeem-001",
+            "did:icn:zTreasury",
+        )
+        .expect("ShareRedemption must translate successfully");
+
+        assert_eq!(effects.len(), 1, "expected exactly one effect");
+        match &effects[0] {
+            KernelEffect::Treasury(TreasuryEffect::RedeemShares {
+                treasury_did,
+                member_did: effect_member_did,
+                share_count,
+                payout_amount,
+                currency,
+                decision_hash,
+            }) => {
+                assert_eq!(treasury_did, "did:icn:zTreasury");
+                assert_eq!(effect_member_did, member_did);
+                assert_eq!(*share_count, 3, "share_count from share_ids.len()");
+                assert_eq!(
+                    *payout_amount, 10_000,
+                    "payout_amount is sum of schedule: 5000+5000"
+                );
+                assert_eq!(currency, "COOP");
+                assert_eq!(decision_hash, "decision-hash-redeem-001");
+            }
+            other => panic!("expected RedeemShares treasury effect, got {other:?}"),
+        }
     }
 
     #[test]

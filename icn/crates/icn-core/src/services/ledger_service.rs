@@ -303,6 +303,30 @@ impl LedgerServiceImpl {
                 ])
             }
 
+            TreasuryOperationType::RedeemShares => {
+                // Share redemption: treasury pays out to departing member.
+                //
+                // In ICN mutual credit: debit(treasury) → treasury balance increases
+                // (same direction as Spend — treasury is the sending side);
+                // credit(member) → member receives payout (balance changes reflect settlement).
+                //
+                // `recipient` carries the member DID passed through from the governance effect.
+                let member = req.recipient.as_ref().ok_or_else(|| {
+                    "RedeemShares requires member DID in recipient field".to_string()
+                })?;
+                let member_did: icn_identity::Did = member
+                    .parse()
+                    .map_err(|e| format!("Invalid member DID in RedeemShares: {e}"))?;
+                Ok(vec![
+                    AccountDelta::debit(
+                        self.treasury_did.clone(),
+                        req.currency.clone(),
+                        req.amount,
+                    ),
+                    AccountDelta::credit(member_did, req.currency.clone(), req.amount),
+                ])
+            }
+
             _ => {
                 // Other operation types can be added as needed
                 Err(format!(

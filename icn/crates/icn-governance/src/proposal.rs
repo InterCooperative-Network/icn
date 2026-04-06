@@ -643,6 +643,8 @@ pub enum ProposalPayload {
         payout_schedule: Vec<icn_ledger::ScheduledPayout>,
         /// Reason for redemption (voluntary departure, retirement, etc.)
         reason: String,
+        /// Currency for the payout (e.g., "COOP", "hours")
+        currency: String,
     },
 
     /// Approve bond issuance for cooperative financing
@@ -1807,6 +1809,7 @@ mod tests {
                 ],
                 payout_schedule,
                 reason: "Voluntary departure".to_string(),
+                currency: "COOP".to_string(),
             },
         );
 
