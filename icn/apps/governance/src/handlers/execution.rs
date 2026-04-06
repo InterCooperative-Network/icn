@@ -308,6 +308,26 @@ pub fn translate_payload_to_effects(
             Ok(effects)
         }
 
+        // Bond issuance: governance-approved capital raise via cooperative bond.
+        //
+        // The bond_id is derived from the issuer and decision receipt to ensure
+        // uniqueness across proposals. `maturity_date` encodes term duration as
+        // seconds (term_days × 86400) — deterministic given the payload, not wall-clock.
+        // `interest_rate_bps` and full `BondOffering` terms are preserved in the
+        // governance decision payload; only the financial effect is recorded in the ledger.
+        ProposalPayload::BondIssuance { bond_offering } => {
+            let bond_id = format!("bond-{}-{decision_receipt_id}", bond_offering.issuer_id);
+            Ok(vec![KernelEffect::Treasury(TreasuryEffect::IssueBond {
+                treasury_did: domain_id.to_string(),
+                bond_id,
+                principal: bond_offering.principal_requested,
+                interest_rate_bps: bond_offering.interest_rate_bps as u32,
+                maturity_date: bond_offering.term_days as u64 * 86400,
+                currency: bond_offering.currency.clone(),
+                decision_hash: decision_hash.to_string(),
+            })])
+        }
+
         // Fallback for unhandled types
         _ => Err(TranslationError::unsupported(
             "payload",
@@ -548,6 +568,57 @@ mod tests {
                 assert_eq!(*expected_nonce, 7);
             }
             other => panic!("expected treasury spend effect, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_translate_bond_issuance_produces_issue_bond_effect() {
+        let bond_offering = icn_ledger::BondOffering {
+            issuer_id: "test-coop".to_string(),
+            principal_requested: 500_000,
+            interest_rate_bps: 300,
+            term_days: 365,
+            purpose: "Equipment purchase".to_string(),
+            payment_schedule: icn_ledger::PaymentSchedule::InterestOnly { interval_days: 90 },
+            currency: "COOP".to_string(),
+            collateral: vec![],
+        };
+        let payload = icn_governance::ProposalPayload::BondIssuance { bond_offering };
+        let effects = translate_payload_to_effects(
+            &payload,
+            "receipt-bond-001",
+            "decision-hash-bond-001",
+            "did:icn:zTreasury",
+        )
+        .expect("BondIssuance must translate successfully");
+
+        assert_eq!(effects.len(), 1, "expected exactly one effect");
+        match &effects[0] {
+            KernelEffect::Treasury(TreasuryEffect::IssueBond {
+                treasury_did,
+                bond_id,
+                principal,
+                interest_rate_bps,
+                maturity_date,
+                currency,
+                decision_hash,
+            }) => {
+                assert_eq!(treasury_did, "did:icn:zTreasury");
+                assert!(
+                    bond_id.starts_with("bond-test-coop-"),
+                    "bond_id must include issuer: {bond_id}"
+                );
+                assert_eq!(*principal, 500_000);
+                assert_eq!(*interest_rate_bps, 300);
+                assert_eq!(
+                    *maturity_date,
+                    365 * 86400,
+                    "maturity encodes term_days as seconds"
+                );
+                assert_eq!(currency, "COOP");
+                assert_eq!(decision_hash, "decision-hash-bond-001");
+            }
+            other => panic!("expected IssueBond treasury effect, got {other:?}"),
         }
     }
 

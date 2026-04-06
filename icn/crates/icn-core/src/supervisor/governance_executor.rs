@@ -328,10 +328,11 @@ impl KernelGovernanceExecutor {
                 ))
             }
 
-            // RedeemShares and IssueBond: not yet implemented in this executor.
+            // RedeemShares: not yet implemented in this executor (Tranche 11).
             // Return an honest non-deferred failure rather than falling through to
             // `treasury_effect_to_operation`'s `_ =>` placeholder which produces
             // zeroed-out operation data and a misleading "missing provenance" Deferred.
+            // IssueBond is wired (Tranche 10) and reaches Path 3 below.
             TreasuryEffect::RedeemShares { .. } => {
                 warn!("RedeemShares received: not yet implemented in the kernel treasury executor");
                 Ok(EffectResult {
@@ -344,19 +345,8 @@ impl KernelGovernanceExecutor {
                 })
             }
 
-            TreasuryEffect::IssueBond { .. } => {
-                warn!("IssueBond received: not yet implemented in the kernel treasury executor");
-                Ok(EffectResult {
-                    effect_id: decision_receipt_id.to_string(),
-                    success: false,
-                    message: "IssueBond: not yet implemented in the kernel treasury executor (no balances changed)".to_string(),
-                    state_change_hash: None,
-                    ledger_entry_id: None,
-                    not_executed: false,
-                })
-            }
-
             // Path 3: All other treasury effects → direct delegation
+            // Includes TreasuryEffect::IssueBond (wired in Tranche 10)
             _ => {
                 let operation = treasury_effect_to_operation(&treasury_effect);
                 let outcome = self
@@ -982,6 +972,7 @@ fn convert_operation_type(
         GovOp::Reserve => SvcOp::Allocate, // Map Reserve to Allocate
         GovOp::Release => SvcOp::Transfer, // Map Release to Transfer
         GovOp::DistributeSurplus => SvcOp::DistributeSurplus,
+        GovOp::IssueBond => SvcOp::IssueBond,
     }
 }
 

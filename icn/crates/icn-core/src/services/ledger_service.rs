@@ -60,6 +60,24 @@ fn budget_liability_did(treasury_id: &str, budget_key: &str, currency: &str) -> 
     icn_identity::Did::from_public_key(&signing.verifying_key())
 }
 
+/// Derive a deterministic synthetic DID representing the bond-payable liability account.
+///
+/// When a cooperative issues a bond, the bond principal is received as capital
+/// and a corresponding liability is tracked under this synthetic DID.  The same
+/// inputs always produce the same DID so the account is stable across replays.
+fn bond_payable_did(treasury_id: &str, bond_id: &str, currency: &str) -> icn_identity::Did {
+    let mut hasher = Sha256::new();
+    hasher.update(b"icn:bond:payable:v1\0");
+    hasher.update(treasury_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(bond_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(currency.as_bytes());
+    let seed: [u8; 32] = hasher.finalize().into();
+    let signing = SigningKey::from_bytes(&seed);
+    icn_identity::Did::from_public_key(&signing.verifying_key())
+}
+
 /// Concrete implementation of `LedgerService` backed by the mutual credit ledger.
 ///
 /// This is the production adapter that translates kernel-safe treasury
@@ -260,6 +278,31 @@ impl LedgerServiceImpl {
                 }
                 Ok(deltas)
             }
+            TreasuryOperationType::IssueBond => {
+                // Bond issuance: cooperative receives principal (treasury incurs liability,
+                // bond-payable liability account is credited with the capital extended).
+                //
+                // In ICN mutual credit: credit(treasury) → treasury balance decreases
+                // (it is in debt to bond holders); debit(bond_payable) → liability account
+                // balance increases (it has distributed capital).
+                //
+                // The bond_payable DID is derived deterministically so the same bond always
+                // maps to the same synthetic liability account (idempotency-safe).
+                let bond_id = req
+                    .recipient
+                    .as_ref()
+                    .ok_or_else(|| "IssueBond requires bond_id in recipient field".to_string())?;
+                let bond_payable = bond_payable_did(&req.treasury_id, bond_id, &req.currency);
+                Ok(vec![
+                    AccountDelta::credit(
+                        self.treasury_did.clone(),
+                        req.currency.clone(),
+                        req.amount,
+                    ),
+                    AccountDelta::debit(bond_payable, req.currency.clone(), req.amount),
+                ])
+            }
+
             _ => {
                 // Other operation types can be added as needed
                 Err(format!(
