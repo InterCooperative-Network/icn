@@ -425,7 +425,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     timeout-minutes: 30
-    runs-on: [self-hosted, linux, x64, coverage]
+    runs-on: [self-hosted, linux, x64, homelab]
     steps:
       - uses: actions/checkout@v6
 
