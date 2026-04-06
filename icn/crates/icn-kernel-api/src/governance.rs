@@ -78,6 +78,8 @@ pub enum TreasuryOperationType {
     DistributeSurplus,
     /// Bond issuance: cooperative receives principal, incurs bond liability.
     IssueBond,
+    /// Share redemption: member exchanges shares for payout from treasury.
+    RedeemShares,
 }
 
 /// Protocol parameter change request
@@ -477,16 +479,23 @@ pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperatio
             distributions: Vec::new(),
         },
 
-        // Other treasury effects mapped to basic operations
-        _ => TreasuryOperation {
-            treasury_id: String::new(),
-            operation_type: TreasuryOperationType::Reserve,
-            amount: 0,
-            currency: "UNKNOWN".to_string(),
-            recipient: None,
-            memo: "Unmapped treasury effect".to_string(),
+        TreasuryEffect::RedeemShares {
+            treasury_did,
+            member_did,
+            payout_amount,
+            currency,
+            decision_hash,
+            share_count,
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: TreasuryOperationType::RedeemShares,
+            amount: *payout_amount,
+            currency: currency.clone(),
+            // member_did carried in recipient for ledger credit entry
+            recipient: Some(member_did.clone()),
+            memo: format!("Share redemption: {share_count} shares"),
             expected_nonce: None,
-            decision_hash: None,
+            decision_hash: Some(decision_hash.clone()),
             distributions: Vec::new(),
         },
     }
