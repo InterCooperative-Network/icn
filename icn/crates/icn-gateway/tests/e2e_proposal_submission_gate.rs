@@ -168,6 +168,7 @@ async fn test_suspended_member_cannot_submit_proposals() {
         member_checker: None,
         steward_checker: None,
         suspension_checker: Some(suspension_checker),
+        membership_resolver: None,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);

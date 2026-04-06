@@ -1086,7 +1086,35 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                         Some(excluded)
                     }
                 }
-                icn_governance::MembershipSource::TrustThreshold(_) => None,
+                icn_governance::MembershipSource::TrustThreshold(_) => {
+                    // TrustThreshold domains cannot enumerate members from the
+                    // MembershipSource directly. If a resolver is wired into the
+                    // context, ask it for the current eligible set and check each
+                    // member against the suspension gate. Fail-open on resolver
+                    // errors: a spurious 403 is worse than a missed exclusion, and
+                    // a production resolver must be reliable.
+                    if let Some(ref resolver) = ctx.membership_resolver {
+                        match resolver.resolve_members(&domain) {
+                            Ok(members) => {
+                                let domain_id = proposal.domain_id.0.clone();
+                                let mut excluded = std::collections::HashSet::new();
+                                for member in &members {
+                                    if checker(member.clone(), domain_id.clone()).await {
+                                        excluded.insert(member.clone());
+                                    }
+                                }
+                                if excluded.is_empty() {
+                                    None
+                                } else {
+                                    Some(excluded)
+                                }
+                            }
+                            Err(_) => None,
+                        }
+                    } else {
+                        None
+                    }
+                }
             }
         } else {
             None
@@ -2466,7 +2494,9 @@ mod tests {
 
     use super::*;
     use crate::events::NoopEventEmitter;
-    use crate::http::configure::{GovernanceContext, GovernanceEffect, ProposalAcceptedHook};
+    use crate::http::configure::{
+        GovernanceContext, GovernanceEffect, ProposalAcceptedHook, SuspensionChecker,
+    };
     use crate::manager::GovernanceManager;
 
     fn test_did(seed: u8) -> Did {
@@ -2579,6 +2609,7 @@ mod tests {
             member_checker: None,
             steward_checker: None,
             suspension_checker: None,
+            membership_resolver: None,
         };
 
         let app = test_app!(ctx, member_did);
@@ -2657,6 +2688,7 @@ mod tests {
             member_checker: None,
             steward_checker: None,
             suspension_checker: None,
+            membership_resolver: None,
         };
 
         let app = test_app!(ctx, member_did);
@@ -2670,6 +2702,130 @@ mod tests {
         assert!(
             !*fired.lock().unwrap(),
             "hook must NOT fire when proposal is rejected"
+        );
+    }
+
+    /// Proves: the `close_proposal` HTTP handler invokes `membership_resolver` for
+    /// `TrustThreshold` domains and uses the resolved member list to build
+    /// `excluded_delegators`. This exercises the code path added in Tranche 8.
+    ///
+    /// Note: the in-memory `GovernanceManager` does not expand delegations at close time
+    /// (delegation expansion requires the full `GovernanceActor`). The behavioral
+    /// proof that excluded members' weight does not flow is covered by
+    /// `test_suspended_delegator_weight_excluded_at_close_time` in
+    /// `crates/icn-core/tests/delegation_tally_integration.rs`. This test verifies
+    /// the HTTP-layer integration: that the resolver is invoked and the handler succeeds.
+    #[tokio::test]
+    async fn trust_threshold_membership_resolver_invoked_at_close_time() {
+        use icn_governance::{GovernanceDomain, MembershipResolver};
+        use icn_identity::KeyPair;
+
+        // Test-only resolver: tracks whether `resolve_members` was called.
+        struct TrackingResolver {
+            members: Vec<Did>,
+            called: Arc<Mutex<bool>>,
+        }
+        impl MembershipResolver for TrackingResolver {
+            fn resolve_members(&self, _domain: &GovernanceDomain) -> anyhow::Result<Vec<Did>> {
+                *self.called.lock().unwrap() = true;
+                Ok(self.members.clone())
+            }
+        }
+
+        // Use real KeyPairs so parse_did succeeds (test_did(N) with high N can produce
+        // 32-byte patterns that are not valid Ed25519 points).
+        let alice_kp = KeyPair::generate().unwrap();
+        let bob_kp = KeyPair::generate().unwrap();
+        let alice_did = alice_kp.did().clone();
+        let bob_did = bob_kp.did().clone();
+
+        let mgr = Arc::new(GovernanceManager::new());
+        let domain_id = GovernanceDomainId("tt-resolver-test".to_string());
+
+        // TrustThreshold domain: members cannot be enumerated without a resolver
+        mgr.create_domain(
+            domain_id.clone(),
+            "TrustThreshold Coop".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 0, 86_400), // quorum=0, approval=0 → always Accepted
+            MembershipConfig {
+                source: MembershipSource::TrustThreshold(0.3),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = ProposalId("tt-resolver-proof-1".to_string());
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id.clone(),
+            alice_did.clone(),
+            "TrustThreshold resolver test".to_string(),
+            "Proves resolver is invoked for TrustThreshold domains".to_string(),
+            ProposalPayload::FreezeMember {
+                member: test_did(1), // target DID: use seed 1 which is a valid Ed25519 point
+                reason: "test".to_string(),
+                duration_seconds: Some(86_400),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+
+        mgr.cast_vote(
+            proposal_id.clone(),
+            alice_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+
+        // suspension_checker marks bob as suspended
+        let bob_did_for_checker = bob_did.clone();
+        let suspension_checker: SuspensionChecker = Arc::new(move |did, _domain_id| {
+            let bob = bob_did_for_checker.clone();
+            Box::pin(async move { did == bob })
+        });
+
+        let resolver_called = Arc::new(Mutex::new(false));
+        let resolver: Arc<dyn MembershipResolver> = Arc::new(TrackingResolver {
+            members: vec![alice_did.clone(), bob_did.clone()],
+            called: resolver_called.clone(),
+        });
+
+        let ctx = GovernanceContext {
+            manager: mgr.clone(),
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: Some(suspension_checker),
+            membership_resolver: Some(resolver),
+        };
+
+        let app = test_app!(ctx, alice_did);
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri(&format!("/proposals/{}/close", proposal_id.0))
+                .to_request(),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status().as_u16(),
+            200,
+            "close_proposal with TrustThreshold + resolver must succeed"
+        );
+        assert!(
+            *resolver_called.lock().unwrap(),
+            "membership_resolver.resolve_members() must be invoked for TrustThreshold domains"
         );
     }
 }
