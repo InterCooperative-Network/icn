@@ -971,18 +971,19 @@ impl TrustManager {
     ///
     /// - **TrustService mode** (production): delegates to the service.
     /// - **TrustGraph handle mode** (deprecated): reads the graph directly.
-    /// - **Standalone mode** (no service, no graph): returns empty vec.
+    /// - **Standalone mode** (no service, no graph): enumerates known target DIDs
+    ///   from the in-memory `self.edges` DashMap, computes trust scores from the
+    ///   `own_did` perspective, and returns those meeting the threshold. Returns
+    ///   `Ok(vec![])` only when `own_did` is not configured (perspective not set).
     pub fn get_dids_above_threshold(&self, threshold: f64) -> Result<Vec<Did>, String> {
         if let Some(ref svc) = self.trust_service {
             let kernel_dids = svc.get_dids_above_threshold(threshold)?;
             let mut dids = Vec::with_capacity(kernel_dids.len());
             for s in kernel_dids {
-                match s.parse::<Did>() {
-                    Ok(did) => dids.push(did),
-                    Err(e) => {
-                        warn!("Skipping unparseable DID from trust service: {e}");
-                    }
-                }
+                let did = s
+                    .parse::<Did>()
+                    .map_err(|e| format!("trust service returned unparseable DID '{s}': {e}"))?;
+                dids.push(did);
             }
             Ok(dids)
         } else if let Some(ref graph) = self.trust_graph {
@@ -1164,41 +1165,6 @@ impl TrustPolicyOracle {
     /// Get current cache size (for metrics/testing).
     pub fn cache_len(&self) -> usize {
         self.cache.len()
-    }
-}
-
-/// A [`MembershipResolver`] backed by the gateway's [`TrustManager`].
-///
-/// Resolves membership for governance domains:
-/// - `StaticList` domains: returns the static member list directly.
-/// - `TrustThreshold` domains: queries the trust manager for all DIDs whose
-///   trust score meets or exceeds the configured threshold.
-///
-/// This is the production-safe resolver that wires TrustThreshold membership
-/// into the governance close-time suspension exclusion path. Errors from the
-/// trust manager propagate as `Err` so the handler can apply its fail-open policy.
-pub struct TrustManagerMembershipResolver {
-    manager: Arc<TrustManager>,
-}
-
-impl TrustManagerMembershipResolver {
-    pub fn new(manager: Arc<TrustManager>) -> Self {
-        Self { manager }
-    }
-}
-
-impl icn_governance::MembershipResolver for TrustManagerMembershipResolver {
-    fn resolve_members(
-        &self,
-        domain: &icn_governance::GovernanceDomain,
-    ) -> anyhow::Result<Vec<Did>> {
-        match &domain.config.membership.source {
-            icn_governance::MembershipSource::StaticList(members) => Ok(members.clone()),
-            icn_governance::MembershipSource::TrustThreshold(threshold) => self
-                .manager
-                .get_dids_above_threshold(*threshold)
-                .map_err(|e| anyhow::anyhow!("TrustManager threshold resolution failed: {e}")),
-        }
     }
 }
 

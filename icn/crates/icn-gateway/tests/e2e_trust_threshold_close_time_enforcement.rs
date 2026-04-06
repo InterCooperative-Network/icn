@@ -67,16 +67,38 @@
 
 use actix_web::{test, web, App};
 use icn_gateway::{
-    api,
-    auth::AuthManager,
-    middleware::jwt_auth,
-    rate_limit::IpRateLimiter,
-    trust_mgr::{TrustManager, TrustManagerMembershipResolver},
+    api, auth::AuthManager, middleware::jwt_auth, rate_limit::IpRateLimiter,
+    trust_mgr::TrustManager,
 };
 use icn_governance::{
-    GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource, ProposalId,
-    ProposalPayload, ProposalScope,
+    GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipResolver,
+    MembershipSource, ProposalId, ProposalPayload, ProposalScope,
 };
+
+/// Test-local resolver backed by the gateway's [`TrustManager`].
+///
+/// Lives in `tests/` (not `src/`) so it doesn't count against the gateway's
+/// meaning-firewall `icn_governance::` reference budget. Production code uses
+/// `TrustServiceMembershipResolver` (icn-governance) via the kernel/app boundary.
+struct TrustManagerMembershipResolver {
+    manager: Arc<TrustManager>,
+}
+impl TrustManagerMembershipResolver {
+    fn new(manager: Arc<TrustManager>) -> Self {
+        Self { manager }
+    }
+}
+impl MembershipResolver for TrustManagerMembershipResolver {
+    fn resolve_members(&self, domain: &GovernanceDomain) -> anyhow::Result<Vec<Did>> {
+        match &domain.config.membership.source {
+            MembershipSource::StaticList(members) => Ok(members.clone()),
+            MembershipSource::TrustThreshold(threshold) => self
+                .manager
+                .get_dids_above_threshold(*threshold)
+                .map_err(|e| anyhow::anyhow!("TrustManager threshold resolution failed: {e}")),
+        }
+    }
+}
 use icn_governance_actor::{
     events::NoopEventEmitter,
     http::configure::{GovernanceContext, SuspensionChecker},
@@ -85,6 +107,7 @@ use icn_governance_actor::{
 use icn_identity::{Did, IdentityBundle};
 use icn_trust::{TrustEdge, TrustScore};
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{collections::HashSet, sync::Arc};
 use tokio::sync::RwLock;
 
@@ -302,10 +325,19 @@ async fn test_live_trust_threshold_resolver_excludes_suspended_delegators() {
         .await
         .insert((alice_did.to_string(), DOMAIN_ID.to_string()));
 
+    // Track which DIDs the suspension checker is called for. The resolver must
+    // enumerate threshold members and pass each through the checker — if the
+    // resolver is never invoked, checker_calls stays 0 and the assertion below fails.
+    let checker_calls = Arc::new(AtomicUsize::new(0));
+    let checker_calls_ref = checker_calls.clone();
     let suspended_for_checker = suspended.clone();
     let suspension_checker: SuspensionChecker = Arc::new(move |did: Did, domain_id: String| {
         let s = suspended_for_checker.clone();
-        Box::pin(async move { s.read().await.contains(&(did.to_string(), domain_id)) })
+        let ctr = checker_calls_ref.clone();
+        Box::pin(async move {
+            ctr.fetch_add(1, Ordering::Relaxed);
+            s.read().await.contains(&(did.to_string(), domain_id))
+        })
     });
 
     // ── Create governance domain and proposal ─────────────────────────────────
@@ -377,6 +409,11 @@ async fn test_live_trust_threshold_resolver_excludes_suspended_delegators() {
     .await;
     assert_eq!(vote_resp.status().as_u16(), 200, "vote must succeed");
 
+    // Snapshot calls BEFORE close. open_proposal and vote also invoke
+    // suspension_checker for the actor DID — we only want to assert on
+    // the close-time resolver invocations (alice + bob).
+    let calls_before_close = checker_calls.load(Ordering::Relaxed);
+
     // close_proposal invokes the live TrustManagerMembershipResolver,
     // which calls TrustManager::get_dids_above_threshold(0.3), gets {alice, bob},
     // checks suspension for each, and builds excluded_delegators = {alice}.
@@ -393,6 +430,19 @@ async fn test_live_trust_threshold_resolver_excludes_suspended_delegators() {
         200,
         "close_proposal with live TrustThreshold resolver must succeed (got {})",
         close_resp.status()
+    );
+
+    // ── Assert: suspension_checker was invoked for exactly the resolved threshold members ──
+    // Delta = calls added during close_proposal only.
+    // The resolver returned {alice, bob} (scores above 0.3); carol was below threshold
+    // and must never reach the checker.
+    let calls_after_close = checker_calls.load(Ordering::Relaxed);
+    let close_time_calls = calls_after_close - calls_before_close;
+    assert_eq!(
+        close_time_calls, 2,
+        "suspension_checker must be invoked exactly once per resolved threshold member \
+         at close time (alice + bob = 2 calls); got {close_time_calls} close-time calls \
+         ({calls_before_close} before + {calls_after_close} after) — resolver may not have been invoked"
     );
 
     // ── Assert: only alice was in the suspended set (resolver filtered correctly)

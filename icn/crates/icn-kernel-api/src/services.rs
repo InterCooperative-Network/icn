@@ -226,11 +226,19 @@ pub trait TrustService: Send + Sync {
     /// The governance app supplies the threshold value; this service returns the
     /// current eligible set at the time of the call.
     ///
-    /// Returns `Ok(Vec::new())` by default. Production implementations that back
-    /// `TrustThreshold` governance domains must override this.
+    /// Returns `Err` by default. Production implementations that back
+    /// `TrustThreshold` governance domains **must** override this method;
+    /// otherwise callers will receive an error instead of silently treating
+    /// unsupported threshold enumeration as "no eligible members", which
+    /// would silently alter quorum and suspension-exclusion semantics.
     fn get_dids_above_threshold(&self, threshold: f64) -> Result<Vec<Did>, String> {
         let _ = threshold;
-        Ok(Vec::new())
+        Err(
+            "TrustService::get_dids_above_threshold() is not implemented; \
+             production implementations for TrustThreshold governance domains \
+             must override this method"
+                .to_string(),
+        )
     }
 
     /// Record a trust-affecting event

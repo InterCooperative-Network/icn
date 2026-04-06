@@ -656,6 +656,9 @@ impl GatewayServer {
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
         let session_manager = Arc::new(crate::session::SessionManager::new());
 
+        // Keep a reference for governance membership resolution before consuming.
+        let trust_service_for_gov = self.trust_service_handle.clone();
+
         // Create trust manager (prefers TrustService, falls back to in-memory)
         let trust_manager: Arc<TrustManager> = if let Some(service) = self.trust_service_handle {
             info!("Trust manager connected to daemon (using TrustService, kernel/app separated)");
@@ -1319,14 +1322,18 @@ impl GatewayServer {
             member_checker: Some(member_checker),
             steward_checker: Some(steward_checker),
             suspension_checker: Some(suspension_checker),
-            // Production TrustThreshold membership resolver. In TrustService mode
-            // (daemon-backed), this calls TrustService::get_dids_above_threshold via
-            // the kernel/app boundary. In standalone mode (no trust graph wired),
-            // get_dids_above_threshold returns Ok(vec![]) so the handler falls open
-            // gracefully — no 403s, no panics.
-            membership_resolver: Some(std::sync::Arc::new(
-                crate::trust_mgr::TrustManagerMembershipResolver::new(trust_manager.clone()),
-            )),
+            // Production TrustThreshold membership resolver.
+            // Uses TrustServiceMembershipResolver (icn-governance) so this stays
+            // outside the gateway's meaning-firewall domain-ref budget.
+            // In TrustService mode (daemon-backed): calls get_dids_above_threshold
+            // through the kernel/app boundary. In standalone mode: resolver is None,
+            // so TrustThreshold domains fail-open (excluded_delegators = None).
+            membership_resolver: {
+                use icn_governance::{MembershipResolver, TrustServiceMembershipResolver};
+                trust_service_for_gov.map(|svc| -> std::sync::Arc<dyn MembershipResolver> {
+                    std::sync::Arc::new(TrustServiceMembershipResolver::new(svc))
+                })
+            },
         };
 
         // Create rate limiter with configured or default config

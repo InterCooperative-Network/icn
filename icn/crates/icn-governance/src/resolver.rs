@@ -236,12 +236,19 @@ impl MembershipResolver for TrustServiceMembershipResolver {
             MembershipSource::TrustThreshold(threshold) => self
                 .trust_service
                 .get_dids_above_threshold(*threshold)
-                .map(|dids| {
+                .map_err(|e| anyhow::anyhow!("TrustService threshold query failed: {e}"))
+                .and_then(|dids| {
                     dids.into_iter()
-                        .filter_map(|s| s.parse::<Did>().ok())
+                        .map(|s| {
+                            s.parse::<Did>().map_err(|e| {
+                                anyhow::anyhow!(
+                                    "TrustService returned invalid DID '{s}' for \
+                                     threshold membership resolution: {e}"
+                                )
+                            })
+                        })
                         .collect()
-                })
-                .map_err(|e| anyhow::anyhow!("TrustService threshold query failed: {e}")),
+                }),
         }
     }
 }
