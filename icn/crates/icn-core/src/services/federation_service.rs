@@ -16,8 +16,9 @@ use icn_identity::Did;
 use icn_kernel_api::services::TreasuryOperationType;
 use icn_kernel_api::{
     FederationClearingRequest, FederationClearingResult, FederationClearingSettleRequest,
-    FederationClearingSettleResult, FederationJoinRequest, FederationJoinResult, FederationService,
-    FederationVouchRequest, FederationVouchResult, LedgerService, TreasuryEntryRequest,
+    FederationClearingSettleResult, FederationJoinRequest, FederationJoinResult,
+    FederationLeaveRequest, FederationLeaveResult, FederationService, FederationVouchRequest,
+    FederationVouchResult, LedgerService, TreasuryEntryRequest,
 };
 use sha2::{Digest, Sha256};
 use tracing::info;
@@ -77,6 +78,18 @@ impl FederationServiceImpl {
     fn compute_join_hash(request: &FederationJoinRequest) -> String {
         let mut hasher = Sha256::new();
         hasher.update(b"federation:join:");
+        hasher.update(request.coop_did.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.federation_id.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.decision_receipt_id.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    /// Compute a state change hash for a leave operation.
+    fn compute_leave_hash(request: &FederationLeaveRequest) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"federation:leave:");
         hasher.update(request.coop_did.as_bytes());
         hasher.update(b":");
         hasher.update(request.federation_id.as_bytes());
@@ -180,6 +193,56 @@ impl FederationService for FederationServiceImpl {
                     "Failed to register cooperative"
                 );
                 Ok(FederationJoinResult {
+                    success: false,
+                    state_change_hash: String::new(),
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
+
+    fn leave_federation(&self, request: FederationLeaveRequest) -> Result<FederationLeaveResult> {
+        info!(
+            coop_did = %request.coop_did,
+            federation_id = %request.federation_id,
+            decision_receipt_id = %request.decision_receipt_id,
+            decision_hash = %request.decision_hash,
+            "Processing federation leave request"
+        );
+
+        // The registry key is the federation_id (coop_id in registry terms),
+        // not the DID — consistent with how join_federation registers via federation_id.
+        match self.registry.remove(&request.federation_id) {
+            Ok(()) => {
+                let state_change_hash = Self::compute_leave_hash(&request);
+
+                // Remove provenance record
+                #[allow(clippy::unwrap_used)]
+                {
+                    let mut prov = self.provenance.write().unwrap();
+                    prov.remove(&request.coop_did);
+                }
+
+                info!(
+                    coop_did = %request.coop_did,
+                    state_change_hash = %state_change_hash,
+                    decision_receipt_id = %request.decision_receipt_id,
+                    "Cooperative removed from federation registry"
+                );
+
+                Ok(FederationLeaveResult {
+                    success: true,
+                    state_change_hash,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                tracing::warn!(
+                    coop_did = %request.coop_did,
+                    error = %e,
+                    "Failed to remove cooperative from federation"
+                );
+                Ok(FederationLeaveResult {
                     success: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
@@ -1753,6 +1816,74 @@ mod tests {
             adopted_single.source_agreement_id.as_deref(),
             Some("agr-dm-source"),
             "get_agreement must expose source_agreement_id for adopted agreement"
+        );
+    }
+
+    /// Tranche 12 proof: LeaveFederation removes the cooperative from durable storage.
+    ///
+    /// Verifies:
+    /// - join → leave sequence succeeds
+    /// - cooperative is absent from registry after leave
+    /// - state_change_hash is populated
+    /// - leave is idempotent (second leave returns an error result, not a panic)
+    #[test]
+    fn test_leave_federation_removes_durable_record() {
+        let (registry, _temp) = make_test_registry();
+        let service = FederationServiceImpl::new(registry.clone());
+
+        // First join so there is something to leave
+        let join_req = FederationJoinRequest {
+            coop_did: "did:icn:zLeaveTest123456789012345678901234".to_string(),
+            coop_name: "Leave Test Coop".to_string(),
+            federation_id: "leave-test-coop".to_string(),
+            gateway_endpoints: vec![],
+            decision_receipt_id: "gov:receipt:join:leave-test-001".to_string(),
+            decision_hash: "sha256:join-hash-leave-test".to_string(),
+        };
+        let join_result = service.join_federation(join_req).unwrap();
+        assert!(join_result.success, "Join must succeed before leave test");
+
+        // Verify the record exists
+        assert!(
+            registry.get("leave-test-coop").unwrap().is_some(),
+            "Record must exist after join"
+        );
+
+        // Now leave
+        let leave_req = FederationLeaveRequest {
+            coop_did: "did:icn:zLeaveTest123456789012345678901234".to_string(),
+            federation_id: "leave-test-coop".to_string(),
+            decision_receipt_id: "gov:receipt:leave:leave-test-001".to_string(),
+            decision_hash: "sha256:leave-hash-leave-test".to_string(),
+        };
+        let leave_result = service.leave_federation(leave_req).unwrap();
+
+        assert!(leave_result.success, "Leave should succeed");
+        assert!(
+            !leave_result.state_change_hash.is_empty(),
+            "Should have state change hash"
+        );
+        assert!(leave_result.error.is_none(), "Should have no error");
+
+        // Verify the record is gone
+        let stored = registry.get("leave-test-coop").unwrap();
+        assert!(
+            stored.is_none(),
+            "Cooperative should be removed from registry after leave"
+        );
+
+        // Second leave is idempotent: registry.remove is a no-op on a missing key, so
+        // leave_federation returns success=true rather than an error.
+        let leave_req2 = FederationLeaveRequest {
+            coop_did: "did:icn:zLeaveTest123456789012345678901234".to_string(),
+            federation_id: "leave-test-coop".to_string(),
+            decision_receipt_id: "gov:receipt:leave:leave-test-002".to_string(),
+            decision_hash: "sha256:leave-hash-leave-test-2".to_string(),
+        };
+        let idempotent_result = service.leave_federation(leave_req2).unwrap();
+        assert!(
+            idempotent_result.success,
+            "Second leave should be idempotent (no-op delete returns success)"
         );
     }
 }

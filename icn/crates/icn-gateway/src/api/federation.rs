@@ -1061,6 +1061,12 @@ mod tests {
             ) -> anyhow::Result<FederationJoinResult> {
                 unimplemented!("test stub: join_federation should not be called")
             }
+            fn leave_federation(
+                &self,
+                _req: icn_kernel_api::FederationLeaveRequest,
+            ) -> anyhow::Result<icn_kernel_api::FederationLeaveResult> {
+                unimplemented!("test stub: leave_federation should not be called")
+            }
             fn vouch_for_cooperative(
                 &self,
                 _req: FederationVouchRequest,
@@ -1228,7 +1234,8 @@ mod tests {
         use icn_kernel_api::{
             FederationClearingRequest, FederationClearingResult, FederationClearingSettleRequest,
             FederationClearingSettleResult, FederationJoinRequest, FederationJoinResult,
-            FederationVouchRequest, FederationVouchResult,
+            FederationLeaveRequest, FederationLeaveResult, FederationVouchRequest,
+            FederationVouchResult,
         };
         struct Stub;
         impl FederationService for Stub {
@@ -1236,6 +1243,12 @@ mod tests {
                 &self,
                 _: FederationJoinRequest,
             ) -> anyhow::Result<FederationJoinResult> {
+                unimplemented!()
+            }
+            fn leave_federation(
+                &self,
+                _: FederationLeaveRequest,
+            ) -> anyhow::Result<FederationLeaveResult> {
                 unimplemented!()
             }
             fn vouch_for_cooperative(

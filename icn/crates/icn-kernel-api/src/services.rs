@@ -950,6 +950,33 @@ pub struct FederationClearingSettleResult {
     pub error: Option<String>,
 }
 
+/// Request to leave a federation.
+///
+/// Causes the cooperative's registry entry (and associated vouches) to be
+/// removed from the durable store.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationLeaveRequest {
+    /// DID of the cooperative leaving the federation
+    pub coop_did: String,
+    /// ID of the federation being left
+    pub federation_id: String,
+    /// Decision receipt ID that authorized this leave
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this leave
+    pub decision_hash: String,
+}
+
+/// Result of a federation leave operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationLeaveResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash (for verification)
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
 /// Abstract federation management service.
 ///
 /// The kernel uses this to register cooperatives, record vouches, and
@@ -970,6 +997,15 @@ pub trait FederationService: Send + Sync {
         &self,
         request: FederationJoinRequest,
     ) -> Result<FederationJoinResult, anyhow::Error>;
+
+    /// Remove a cooperative that is leaving a federation.
+    ///
+    /// Deletes the durable registry entry and associated vouches.
+    /// Returns state_change_hash for verification.
+    fn leave_federation(
+        &self,
+        request: FederationLeaveRequest,
+    ) -> Result<FederationLeaveResult, anyhow::Error>;
 
     /// Record a vouch from one cooperative to another.
     ///

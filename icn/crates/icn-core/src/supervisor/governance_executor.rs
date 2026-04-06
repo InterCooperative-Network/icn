@@ -1343,13 +1343,36 @@ impl FederationExecutor for KernelFederationExecutor {
                         effects,
                     })
                 }
-                // LeaveFederation not yet wired to service
                 FederationOperationType::LeaveFederation => {
-                    tracing::warn!("LeaveFederation not yet implemented with durable state");
-                    Ok(ExecutionOutcome::Failed {
-                        receipt_id: receipt_id.clone(),
-                        reason: "LeaveFederation not yet implemented".to_string(),
-                    })
+                    let request = icn_kernel_api::FederationLeaveRequest {
+                        coop_did: operation.coop_did.clone(),
+                        federation_id: operation.target_id.clone().unwrap_or_default(),
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: operation.decision_hash.clone().unwrap_or_default(),
+                    };
+
+                    let result = service.leave_federation(request)?;
+
+                    if result.success {
+                        tracing::info!(
+                            state_change_hash = %result.state_change_hash,
+                            "Cooperative removed from federation with durable state"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Coop {} left federation {} -> state_hash={}",
+                                operation.coop_did,
+                                operation.target_id.unwrap_or_default(),
+                                result.state_change_hash
+                            )],
+                        })
+                    } else {
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        })
+                    }
                 }
             }
         } else {
