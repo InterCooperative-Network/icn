@@ -66,6 +66,7 @@ fn approved_emitted_effects() -> BTreeSet<&'static str> {
         // SDIS effects
         "Sdis::ApproveSteward",
         "Sdis::RevokeSteward",
+        "Sdis::ReconfirmSteward",
         // Fallback (always allowed)
         "NoOp",
     ]
