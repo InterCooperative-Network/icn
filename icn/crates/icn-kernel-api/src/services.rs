@@ -2084,7 +2084,27 @@ pub struct RevokeStewardResult {
     pub error: Option<String>,
 }
 
-/// Trait for SDIS steward appointment and revocation.
+/// Request to reconfirm (extend the term of) an existing steward.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ReconfirmStewardRequest {
+    /// DID of the steward whose term is being extended
+    pub steward_did: String,
+    /// New term-end timestamp (Unix seconds). Must be ≥ current `term_end`.
+    pub new_term_end: u64,
+    /// Proposal receipt ID for audit linkage
+    pub proposal_id: String,
+}
+
+/// Result of a reconfirm-steward operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ReconfirmStewardResult {
+    pub success: bool,
+    /// Stable hash of the state change (for audit)
+    pub state_change_hash: String,
+    pub error: Option<String>,
+}
+
+/// Trait for SDIS steward appointment, revocation, and lifecycle management.
 ///
 /// Implementations live in `icn-core/src/services/sdis_service.rs` backed by
 /// `icn_commons::CommonsHandle`. The kernel executor calls this through the
@@ -2099,4 +2119,10 @@ pub trait SdisService: Send + Sync {
         &self,
         request: RevokeStewardRequest,
     ) -> Result<RevokeStewardResult, anyhow::Error>;
+
+    /// Extend an existing steward's term via a governance-ratified reconfirmation.
+    fn reconfirm_steward(
+        &self,
+        request: ReconfirmStewardRequest,
+    ) -> Result<ReconfirmStewardResult, anyhow::Error>;
 }
