@@ -423,6 +423,17 @@ pub enum SdisEffect {
     },
     /// Revoke steward status
     RevokeSteward { steward_did: String, reason: String },
+    /// Reconfirm an existing steward for a new term.
+    ///
+    /// On acceptance the steward's `term_end` is extended to `new_term_end`.
+    /// This is a governance-ratified extension, not a unilateral admin action.
+    ReconfirmSteward {
+        steward_did: String,
+        /// New term-end timestamp (Unix seconds). Must be ≥ current `term_end`.
+        new_term_end: u64,
+        /// Proposal receipt ID for audit linkage.
+        proposal_id: String,
+    },
 }
 
 // =============================================================================

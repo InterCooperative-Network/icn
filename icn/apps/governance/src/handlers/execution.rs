@@ -245,6 +245,15 @@ pub fn translate_payload_to_effects(
                 steward_did: steward.to_string(),
                 reason: reason.clone(),
             })]),
+            icn_governance::sdis::SdisProposal::ReconfirmSteward {
+                steward,
+                new_term_end,
+                ..
+            } => Ok(vec![KernelEffect::Sdis(SdisEffect::ReconfirmSteward {
+                steward_did: steward.to_string(),
+                new_term_end: *new_term_end,
+                proposal_id: decision_receipt_id.to_string(),
+            })]),
             _ => Err(TranslationError::unsupported(
                 "sdis",
                 format!(

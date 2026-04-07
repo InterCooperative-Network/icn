@@ -631,8 +631,8 @@ async fn test_e2e_unfreeze_member_reinstates_commons_affiliation() {
 async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
     use icn_commons::CommonsHandle;
     use icn_kernel_api::{
-        AppointStewardRequest, AppointStewardResult, RevokeStewardRequest, RevokeStewardResult,
-        SdisService,
+        AppointStewardRequest, AppointStewardResult, ReconfirmStewardRequest,
+        ReconfirmStewardResult, RevokeStewardRequest, RevokeStewardResult, SdisService,
     };
 
     const DOMAIN_ID: &str = "test-coop-scoped-steward-e2e";
@@ -725,6 +725,18 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
             _req: RevokeStewardRequest,
         ) -> Result<RevokeStewardResult, anyhow::Error> {
             Ok(RevokeStewardResult {
+                success: true,
+                state_change_hash: String::new(),
+                error: None,
+            })
+        }
+        fn reconfirm_steward(
+            &self,
+            _req: ReconfirmStewardRequest,
+        ) -> Result<ReconfirmStewardResult, anyhow::Error> {
+            // Stub: this test covers AppointSteward only.
+            // ReconfirmSteward is proven in sdis_service unit tests.
+            Ok(ReconfirmStewardResult {
                 success: true,
                 state_change_hash: String::new(),
                 error: None,

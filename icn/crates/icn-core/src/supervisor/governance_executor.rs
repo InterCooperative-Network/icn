@@ -2155,6 +2155,46 @@ impl KernelSdisExecutor {
                     })
                 }
             }
+            SdisEffect::ReconfirmSteward {
+                steward_did,
+                new_term_end,
+                proposal_id,
+            } => {
+                let request = icn_kernel_api::ReconfirmStewardRequest {
+                    steward_did: steward_did.clone(),
+                    new_term_end: *new_term_end,
+                    proposal_id: proposal_id.clone(),
+                };
+                let result = service.reconfirm_steward(request)?;
+                if result.success {
+                    info!(
+                        state_change_hash = %result.state_change_hash,
+                        "Steward term extended with durable state"
+                    );
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: true,
+                        message: format!(
+                            "Steward {} reconfirmed to term_end={} -> state_hash={}",
+                            steward_did, new_term_end, result.state_change_hash
+                        ),
+                        state_change_hash: Some(result.state_change_hash),
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                } else {
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: false,
+                        message: result
+                            .error
+                            .unwrap_or_else(|| "Reconfirmation failed".to_string()),
+                        state_change_hash: None,
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                }
+            }
         }
     }
 }

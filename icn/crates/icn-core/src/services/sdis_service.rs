@@ -6,8 +6,8 @@
 
 use anyhow::Result;
 use icn_kernel_api::{
-    AppointStewardRequest, AppointStewardResult, RevokeStewardRequest, RevokeStewardResult,
-    SdisService,
+    AppointStewardRequest, AppointStewardResult, ReconfirmStewardRequest, ReconfirmStewardResult,
+    RevokeStewardRequest, RevokeStewardResult, SdisService,
 };
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
@@ -39,6 +39,17 @@ impl SdisServiceImpl {
         hasher.update(request.steward_did.as_bytes());
         hasher.update(b":");
         hasher.update(request.reason.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    fn compute_reconfirm_hash(request: &ReconfirmStewardRequest) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"sdis:reconfirm:");
+        hasher.update(request.steward_did.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.new_term_end.to_le_bytes());
+        hasher.update(b":");
+        hasher.update(request.proposal_id.as_bytes());
         format!("{:x}", hasher.finalize())
     }
 }
@@ -165,6 +176,75 @@ impl SdisService for SdisServiceImpl {
                     "Failed to revoke steward in commons"
                 );
                 Ok(RevokeStewardResult {
+                    success: false,
+                    state_change_hash: String::new(),
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
+
+    fn reconfirm_steward(
+        &self,
+        request: ReconfirmStewardRequest,
+    ) -> Result<ReconfirmStewardResult> {
+        info!(
+            steward_did = %request.steward_did,
+            new_term_end = %request.new_term_end,
+            proposal_id = %request.proposal_id,
+            "Reconfirming steward term via governance dispatch"
+        );
+
+        let steward_did = icn_identity::Did::from_str(&request.steward_did)
+            .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
+
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                match self.commons.get_steward_by_did(&steward_did).await {
+                    Ok(Some(record)) => {
+                        let steward_id = record.id().to_hex();
+                        self.commons
+                            .extend_steward_term(&steward_id, request.new_term_end)
+                            .await
+                            .map(|_| true)
+                    }
+                    Ok(None) => {
+                        tracing::warn!(
+                            steward_did = %request.steward_did,
+                            "ReconfirmSteward: no active steward record found"
+                        );
+                        Err(anyhow::anyhow!(
+                            "Steward '{}' not found — cannot reconfirm",
+                            request.steward_did
+                        ))
+                    }
+                    Err(e) => Err(e),
+                }
+            })
+        });
+
+        match result {
+            Ok(_) => {
+                let state_change_hash = Self::compute_reconfirm_hash(&request);
+                info!(
+                    steward_did = %request.steward_did,
+                    new_term_end = %request.new_term_end,
+                    state_change_hash = %state_change_hash,
+                    "Steward term extended in commons"
+                );
+                Ok(ReconfirmStewardResult {
+                    success: true,
+                    state_change_hash,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                tracing::warn!(
+                    steward_did = %request.steward_did,
+                    error = %e,
+                    "Failed to reconfirm steward in commons"
+                );
+                Ok(ReconfirmStewardResult {
                     success: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
@@ -307,6 +387,93 @@ mod tests {
         assert!(
             idempotent.success,
             "second revoke is a no-op and must succeed"
+        );
+    }
+
+    /// ReconfirmSteward → `term_end` is extended in the durable commons record.
+    ///
+    /// Proves the full ReconfirmSteward dispatch chain:
+    /// `SdisService::reconfirm_steward` → `CommonsHandle::extend_steward_term`
+    /// → durable mutation visible via `get_steward_by_did`.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_reconfirm_steward_extends_term() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(5);
+        let sponsor = test_did(6);
+
+        // Commons setup: appoint a steward with a known initial term.
+        create_strong_holder(&commons, &holder, &sponsor).await;
+        let initial_term_days: u64 = 180;
+        let initial_term_end_secs: u64 = initial_term_days * 86_400;
+
+        let appoint_req = AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(), // global steward (no charter required)
+            term_length_seconds: initial_term_end_secs as i64,
+            bond_amount: 500,
+            region: None,
+            proposal_id: "gov:coop-gamma:prop-010:receipt".to_string(),
+        };
+        let appoint = svc.appoint_steward(appoint_req).unwrap();
+        assert!(appoint.success, "initial appointment must succeed");
+
+        // Record the initial term_end from the durable record.
+        let initial_record = commons
+            .get_steward_by_did(&holder)
+            .await
+            .expect("get_steward_by_did must not error")
+            .expect("steward must exist after appointment");
+        let initial_term_end = initial_record.term_end;
+
+        // Reconfirm with a term_end that is 365 days past the initial value.
+        let extended_term_end = initial_term_end + 365 * 86_400;
+        let reconfirm_req = ReconfirmStewardRequest {
+            steward_did: holder.to_string(),
+            new_term_end: extended_term_end,
+            proposal_id: "gov:coop-gamma:prop-011:receipt".to_string(),
+        };
+        let reconfirm = svc.reconfirm_steward(reconfirm_req).unwrap();
+        assert!(reconfirm.success, "reconfirm_steward must succeed");
+        assert!(
+            !reconfirm.state_change_hash.is_empty(),
+            "state_change_hash must be non-empty"
+        );
+        assert!(reconfirm.error.is_none());
+
+        // Verify the durable record has the extended term_end.
+        let updated_record = commons
+            .get_steward_by_did(&holder)
+            .await
+            .expect("get_steward_by_did must not error after reconfirmation")
+            .expect("steward must still exist after reconfirmation");
+        assert_eq!(
+            updated_record.term_end, extended_term_end,
+            "term_end must equal the new value after reconfirmation"
+        );
+        assert!(
+            updated_record.term_end > initial_term_end,
+            "term_end must be later than the initial value"
+        );
+    }
+
+    /// ReconfirmSteward fails when the steward DID is not found.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_reconfirm_steward_fails_for_unknown_did() {
+        let (svc, _commons) = make_service_with_commons();
+        let unknown_did = test_did(99);
+        let req = ReconfirmStewardRequest {
+            steward_did: unknown_did.to_string(),
+            new_term_end: 99_999_999,
+            proposal_id: "gov:unknown:prop-000:receipt".to_string(),
+        };
+        let result = svc.reconfirm_steward(req).unwrap();
+        assert!(
+            !result.success,
+            "reconfirm for unknown DID must return success=false"
+        );
+        assert!(
+            result.error.is_some(),
+            "error field must be populated on failure"
         );
     }
 }
