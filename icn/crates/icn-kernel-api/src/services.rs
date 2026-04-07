@@ -2125,4 +2125,34 @@ pub trait SdisService: Send + Sync {
         &self,
         request: ReconfirmStewardRequest,
     ) -> Result<ReconfirmStewardResult, anyhow::Error>;
+
+    /// Reinstate a suspended steward.
+    ///
+    /// If the steward was suspended, their status is restored to active.
+    /// Returns `success: true` in both the reinstated case and the no-op case.
+    fn reinstate_steward(
+        &self,
+        request: ReinstateStewardRequest,
+    ) -> Result<ReinstateStewardResult, anyhow::Error>;
+}
+
+/// Request to reinstate a previously suspended steward.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ReinstateStewardRequest {
+    /// DID of the steward to reinstate
+    pub steward_did: String,
+    /// Proposal receipt ID for audit linkage
+    pub proposal_id: String,
+}
+
+/// Result of a reinstate-steward operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ReinstateStewardResult {
+    pub success: bool,
+    /// True if the steward was actually suspended and is now active again.
+    /// False if the steward was not suspended (no-op path).
+    pub was_suspended: bool,
+    /// Stable hash of the state change (for audit); empty on no-op path.
+    pub state_change_hash: String,
+    pub error: Option<String>,
 }
