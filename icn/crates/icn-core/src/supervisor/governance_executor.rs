@@ -2237,7 +2237,7 @@ impl KernelSdisExecutor {
                             None
                         },
                         ledger_entry_id: None,
-                        not_executed: !result.was_suspended,
+                        not_executed: false,
                     })
                 } else {
                     Ok(EffectResult {
