@@ -280,19 +280,6 @@ mod tests {
             .expect("create holder");
     }
 
-    async fn create_charter(commons: &icn_commons::CommonsHandle, domain_id: &str) {
-        use icn_governance::{Charter, GovernanceConfig, OrgType};
-        let charter = Charter::new(
-            OrgType::Cooperative,
-            domain_id.to_string(),
-            format!("Test Coop for {domain_id}"),
-            GovernanceConfig::cooperative_default(),
-            Default::default(),
-            Default::default(),
-        );
-        commons.store_charter(charter).await.expect("store charter");
-    }
-
     fn make_service_with_commons() -> (SdisServiceImpl, Arc<icn_commons::CommonsHandle>) {
         let commons = Arc::new(icn_commons::CommonsHandle::new_in_memory());
         let svc = SdisServiceImpl::new(commons.clone());
@@ -306,14 +293,13 @@ mod tests {
         let holder = test_did(1);
         let sponsor = test_did(2);
 
-        // Commons setup: holder needs Strong POP for steward registration;
-        // jurisdiction needs an existing charter.
+        // Commons setup: holder needs Strong POP for steward registration.
+        // Empty jurisdiction_id → global steward (no charter required).
         create_strong_holder(&commons, &holder, &sponsor).await;
-        create_charter(&commons, "coop-alpha").await;
 
         let request = AppointStewardRequest {
             steward_did: holder.to_string(),
-            jurisdiction_id: "coop-alpha".to_string(),
+            jurisdiction_id: String::new(),
             term_length_seconds: 86400 * 365,
             bond_amount: 1000,
             region: Some("northeast".to_string()),
