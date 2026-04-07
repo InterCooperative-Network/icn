@@ -119,11 +119,11 @@ pub use services::{
     ReconfirmStewardResult, ReinstateStewardRequest, ReinstateStewardResult, RemoveMemberRequest,
     RemoveMemberResult, RevokeStewardRequest, RevokeStewardResult, SdisService, SecurityService,
     SecurityViolation, ServiceRegistry, SettlementQueryResult, SettlementQueryService,
-    SettlementReceiptResult, TreasuryEntryRequest, TreasuryEntryResult,
-    TreasuryOperationType as ServicesTreasuryOperationType, TrustClass, TrustEvent, TrustService,
-    UnfreezeMemberRequest, UnfreezeMemberResult, UpdateMemberRequest, UpdateMemberResult,
-    VetoProposalRequest, VetoProposalResult, TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN,
-    TRUST_THRESHOLD_PARTNER,
+    SettlementReceiptResult, SuspendStewardRequest, SuspendStewardResult, TreasuryEntryRequest,
+    TreasuryEntryResult, TreasuryOperationType as ServicesTreasuryOperationType, TrustClass,
+    TrustEvent, TrustService, UnfreezeMemberRequest, UnfreezeMemberResult, UpdateMemberRequest,
+    UpdateMemberResult, VetoProposalRequest, VetoProposalResult, TRUST_THRESHOLD_FEDERATED,
+    TRUST_THRESHOLD_KNOWN, TRUST_THRESHOLD_PARTNER,
 };
 pub use state::{
     BlobService, KvService, LogService, ObjectReplication, ReplicationPolicy, StateBackend,
