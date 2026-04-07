@@ -2195,6 +2195,63 @@ impl KernelSdisExecutor {
                     })
                 }
             }
+            SdisEffect::ReinstateSteward {
+                steward_did,
+                proposal_id,
+            } => {
+                let request = icn_kernel_api::ReinstateStewardRequest {
+                    steward_did: steward_did.clone(),
+                    proposal_id: proposal_id.clone(),
+                };
+                let result = service.reinstate_steward(request)?;
+                if result.success {
+                    if result.was_suspended {
+                        info!(
+                            steward_did = %steward_did,
+                            state_change_hash = %result.state_change_hash,
+                            "Suspended steward reinstated with durable state"
+                        );
+                    } else {
+                        info!(
+                            steward_did = %steward_did,
+                            "ReinstateSteward: steward was not suspended — no-op"
+                        );
+                    }
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: true,
+                        message: if result.was_suspended {
+                            format!(
+                                "Steward {} reinstated -> state_hash={}",
+                                steward_did, result.state_change_hash
+                            )
+                        } else {
+                            format!(
+                                "Steward {} reinstatement no-op (not suspended)",
+                                steward_did
+                            )
+                        },
+                        state_change_hash: if result.was_suspended {
+                            Some(result.state_change_hash)
+                        } else {
+                            None
+                        },
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                } else {
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: false,
+                        message: result
+                            .error
+                            .unwrap_or_else(|| "Reinstatement failed".to_string()),
+                        state_change_hash: None,
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                }
+            }
         }
     }
 }

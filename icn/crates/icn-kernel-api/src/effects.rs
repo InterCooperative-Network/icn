@@ -434,6 +434,15 @@ pub enum SdisEffect {
         /// Proposal receipt ID for audit linkage.
         proposal_id: String,
     },
+    /// Reinstate a suspended steward.
+    ///
+    /// If the steward was suspended, their status is restored to active.
+    /// If they were not suspended, this is a no-op (idempotent).
+    ReinstateSteward {
+        steward_did: String,
+        /// Proposal receipt ID for audit linkage.
+        proposal_id: String,
+    },
 }
 
 // =============================================================================

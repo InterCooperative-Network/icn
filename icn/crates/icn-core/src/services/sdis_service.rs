@@ -7,7 +7,8 @@
 use anyhow::Result;
 use icn_kernel_api::{
     AppointStewardRequest, AppointStewardResult, ReconfirmStewardRequest, ReconfirmStewardResult,
-    RevokeStewardRequest, RevokeStewardResult, SdisService,
+    ReinstateStewardRequest, ReinstateStewardResult, RevokeStewardRequest, RevokeStewardResult,
+    SdisService,
 };
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
@@ -48,6 +49,15 @@ impl SdisServiceImpl {
         hasher.update(request.steward_did.as_bytes());
         hasher.update(b":");
         hasher.update(request.new_term_end.to_le_bytes());
+        hasher.update(b":");
+        hasher.update(request.proposal_id.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    fn compute_reinstate_hash(request: &ReinstateStewardRequest) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"sdis:reinstate:");
+        hasher.update(request.steward_did.as_bytes());
         hasher.update(b":");
         hasher.update(request.proposal_id.as_bytes());
         format!("{:x}", hasher.finalize())
@@ -246,6 +256,81 @@ impl SdisService for SdisServiceImpl {
                 );
                 Ok(ReconfirmStewardResult {
                     success: false,
+                    state_change_hash: String::new(),
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
+
+    fn reinstate_steward(
+        &self,
+        request: ReinstateStewardRequest,
+    ) -> Result<ReinstateStewardResult> {
+        info!(
+            steward_did = %request.steward_did,
+            proposal_id = %request.proposal_id,
+            "Reinstating steward via governance dispatch"
+        );
+
+        let steward_did = icn_identity::Did::from_str(&request.steward_did)
+            .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
+
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                match self.commons.get_steward_by_did(&steward_did).await {
+                    Ok(Some(record)) => {
+                        let steward_id = record.id().to_hex();
+                        self.commons.reinstate_steward(&steward_id).await
+                    }
+                    Ok(None) => {
+                        tracing::warn!(
+                            steward_did = %request.steward_did,
+                            "ReinstateSteward: no steward record found"
+                        );
+                        Err(anyhow::anyhow!(
+                            "Steward '{}' not found — cannot reinstate",
+                            request.steward_did
+                        ))
+                    }
+                    Err(e) => Err(e),
+                }
+            })
+        });
+
+        match result {
+            Ok(was_suspended) => {
+                let state_change_hash = if was_suspended {
+                    let hash = Self::compute_reinstate_hash(&request);
+                    info!(
+                        steward_did = %request.steward_did,
+                        state_change_hash = %hash,
+                        "Suspended steward reinstated in commons"
+                    );
+                    hash
+                } else {
+                    info!(
+                        steward_did = %request.steward_did,
+                        "ReinstateSteward no-op: steward was not suspended"
+                    );
+                    String::new()
+                };
+                Ok(ReinstateStewardResult {
+                    success: true,
+                    was_suspended,
+                    state_change_hash,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                tracing::warn!(
+                    steward_did = %request.steward_did,
+                    error = %e,
+                    "Failed to reinstate steward in commons"
+                );
+                Ok(ReinstateStewardResult {
+                    success: false,
+                    was_suspended: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
                 })
@@ -456,6 +541,147 @@ mod tests {
         assert!(
             !result.success,
             "reconfirm for unknown DID must return success=false"
+        );
+        assert!(
+            result.error.is_some(),
+            "error field must be populated on failure"
+        );
+    }
+
+    /// ReinstateSteward → suspended steward becomes active again.
+    ///
+    /// Proves the full ReinstateSteward dispatch chain:
+    /// `SdisService::reinstate_steward` → `CommonsHandle::reinstate_steward`
+    /// → durable status change visible via `is_active_steward`.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_reinstate_steward_after_suspension() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(10);
+        let sponsor = test_did(11);
+
+        // Commons setup: appoint a steward, then suspend them directly.
+        create_strong_holder(&commons, &holder, &sponsor).await;
+
+        let appoint_req = AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86400 * 365,
+            bond_amount: 500,
+            region: None,
+            proposal_id: "gov:coop-delta:prop-020:receipt".to_string(),
+        };
+        let appoint = svc.appoint_steward(appoint_req).unwrap();
+        assert!(appoint.success, "initial appointment must succeed");
+
+        // Suspend directly via CommonsHandle (bypasses governance — test setup only).
+        let record = commons
+            .get_steward_by_did(&holder)
+            .await
+            .expect("lookup must not error")
+            .expect("steward must exist");
+        commons
+            .suspend_steward(&record.id().to_hex(), "test suspension".to_string())
+            .await
+            .expect("suspend must succeed");
+
+        // Verify steward is now inactive.
+        assert!(
+            !commons
+                .is_active_steward(&holder)
+                .await
+                .expect("is_active must not error"),
+            "steward must be inactive after suspension"
+        );
+
+        // Reinstate via governance dispatch.
+        let reinstate_req = ReinstateStewardRequest {
+            steward_did: holder.to_string(),
+            proposal_id: "gov:coop-delta:prop-021:receipt".to_string(),
+        };
+        let result = svc.reinstate_steward(reinstate_req).unwrap();
+
+        assert!(result.success, "reinstate_steward must succeed");
+        assert!(result.was_suspended, "was_suspended must be true");
+        assert!(
+            !result.state_change_hash.is_empty(),
+            "state_change_hash must be non-empty when suspended was true"
+        );
+        assert!(result.error.is_none());
+
+        // Verify the steward is now active again.
+        assert!(
+            commons
+                .is_active_steward(&holder)
+                .await
+                .expect("is_active must not error after reinstatement"),
+            "steward must be active after reinstatement"
+        );
+    }
+
+    /// ReinstateSteward on an active (not suspended) steward is a no-op.
+    ///
+    /// Proves idempotent behavior: `was_suspended = false`, `success = true`,
+    /// `state_change_hash` is empty.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_reinstate_steward_no_op_when_not_suspended() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(12);
+        let sponsor = test_did(13);
+
+        create_strong_holder(&commons, &holder, &sponsor).await;
+
+        let appoint_req = AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86400 * 180,
+            bond_amount: 200,
+            region: None,
+            proposal_id: "gov:coop-epsilon:prop-030:receipt".to_string(),
+        };
+        let appoint = svc.appoint_steward(appoint_req).unwrap();
+        assert!(appoint.success);
+
+        // Reinstate an active (not suspended) steward — must be idempotent.
+        let reinstate_req = ReinstateStewardRequest {
+            steward_did: holder.to_string(),
+            proposal_id: "gov:coop-epsilon:prop-031:receipt".to_string(),
+        };
+        let result = svc.reinstate_steward(reinstate_req).unwrap();
+
+        assert!(result.success, "reinstate no-op must return success=true");
+        assert!(
+            !result.was_suspended,
+            "was_suspended must be false for active steward"
+        );
+        assert!(
+            result.state_change_hash.is_empty(),
+            "state_change_hash must be empty on no-op path"
+        );
+        assert!(result.error.is_none());
+
+        // Steward still active.
+        assert!(
+            commons
+                .is_active_steward(&holder)
+                .await
+                .expect("is_active must not error"),
+            "steward must remain active after no-op reinstatement"
+        );
+    }
+
+    /// ReinstateSteward fails when the steward DID is not found.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_reinstate_steward_fails_for_unknown_did() {
+        let (svc, _commons) = make_service_with_commons();
+        let unknown_did = test_did(98);
+        let req = ReinstateStewardRequest {
+            steward_did: unknown_did.to_string(),
+            proposal_id: "gov:unknown:prop-000:receipt".to_string(),
+        };
+        let result = svc.reinstate_steward(req).unwrap();
+        assert!(
+            !result.success,
+            "reinstate for unknown DID must return success=false"
         );
         assert!(
             result.error.is_some(),
