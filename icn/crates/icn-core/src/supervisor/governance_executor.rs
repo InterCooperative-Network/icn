@@ -2252,6 +2252,51 @@ impl KernelSdisExecutor {
                     })
                 }
             }
+            SdisEffect::SuspendSteward {
+                steward_did,
+                reason,
+                duration_seconds,
+                proposal_id,
+            } => {
+                let request = icn_kernel_api::SuspendStewardRequest {
+                    steward_did: steward_did.clone(),
+                    reason: reason.clone(),
+                    duration_seconds: *duration_seconds,
+                    proposal_id: proposal_id.clone(),
+                };
+                let result = service.suspend_steward(request)?;
+                if result.success {
+                    info!(
+                        steward_did = %steward_did,
+                        state_change_hash = %result.state_change_hash,
+                        duration_seconds = %duration_seconds,
+                        "Steward suspended via governance dispatch \
+                         (duration advisory — timed reinstatement not enforced)"
+                    );
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: true,
+                        message: format!(
+                            "Steward {} suspended -> state_hash={}",
+                            steward_did, result.state_change_hash
+                        ),
+                        state_change_hash: Some(result.state_change_hash),
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                } else {
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: false,
+                        message: result
+                            .error
+                            .unwrap_or_else(|| "Suspension failed".to_string()),
+                        state_change_hash: None,
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                }
+            }
         }
     }
 }

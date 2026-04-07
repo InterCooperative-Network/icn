@@ -2134,6 +2134,37 @@ pub trait SdisService: Send + Sync {
         &self,
         request: ReinstateStewardRequest,
     ) -> Result<ReinstateStewardResult, anyhow::Error>;
+
+    /// Suspend a steward via a governance-ratified proposal.
+    ///
+    /// `duration_seconds` is preserved for audit but not enforced — CommonsHandle
+    /// stores `Suspended { reason }` only. Manual `ReinstateSteward` restores active status.
+    fn suspend_steward(
+        &self,
+        request: SuspendStewardRequest,
+    ) -> Result<SuspendStewardResult, anyhow::Error>;
+}
+
+/// Request to suspend a steward via governance dispatch.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SuspendStewardRequest {
+    /// DID of the steward to suspend
+    pub steward_did: String,
+    /// Reason for suspension (recorded in commons state)
+    pub reason: String,
+    /// Advisory duration from the governance proposal (not enforced by CommonsHandle)
+    pub duration_seconds: u64,
+    /// Proposal receipt ID for audit linkage
+    pub proposal_id: String,
+}
+
+/// Result of a suspend-steward operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SuspendStewardResult {
+    pub success: bool,
+    /// Stable hash of the state change (for audit); empty on failure.
+    pub state_change_hash: String,
+    pub error: Option<String>,
 }
 
 /// Request to reinstate a previously suspended steward.

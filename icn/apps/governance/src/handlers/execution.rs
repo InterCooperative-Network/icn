@@ -260,6 +260,17 @@ pub fn translate_payload_to_effects(
                     proposal_id: decision_receipt_id.to_string(),
                 })])
             }
+            icn_governance::sdis::SdisProposal::SuspendSteward {
+                steward,
+                reason,
+                duration,
+                ..
+            } => Ok(vec![KernelEffect::Sdis(SdisEffect::SuspendSteward {
+                steward_did: steward.to_string(),
+                reason: reason.clone(),
+                duration_seconds: *duration,
+                proposal_id: decision_receipt_id.to_string(),
+            })]),
             _ => Err(TranslationError::unsupported(
                 "sdis",
                 format!(

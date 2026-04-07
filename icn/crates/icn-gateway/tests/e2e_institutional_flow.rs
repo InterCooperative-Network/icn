@@ -633,7 +633,8 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
     use icn_kernel_api::{
         AppointStewardRequest, AppointStewardResult, ReconfirmStewardRequest,
         ReconfirmStewardResult, ReinstateStewardRequest, ReinstateStewardResult,
-        RevokeStewardRequest, RevokeStewardResult, SdisService,
+        RevokeStewardRequest, RevokeStewardResult, SdisService, SuspendStewardRequest,
+        SuspendStewardResult,
     };
 
     const DOMAIN_ID: &str = "test-coop-scoped-steward-e2e";
@@ -753,6 +754,19 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
             Ok(ReinstateStewardResult {
                 success: true,
                 was_suspended: false,
+                state_change_hash: String::new(),
+                error: None,
+            })
+        }
+
+        fn suspend_steward(
+            &self,
+            _req: SuspendStewardRequest,
+        ) -> Result<SuspendStewardResult, anyhow::Error> {
+            // Stub: this test covers AppointSteward only.
+            // SuspendSteward is proven in sdis_service unit tests.
+            Ok(SuspendStewardResult {
+                success: true,
                 state_change_hash: String::new(),
                 error: None,
             })

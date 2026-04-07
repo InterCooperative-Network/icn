@@ -8,11 +8,11 @@ use anyhow::Result;
 use icn_kernel_api::{
     AppointStewardRequest, AppointStewardResult, ReconfirmStewardRequest, ReconfirmStewardResult,
     ReinstateStewardRequest, ReinstateStewardResult, RevokeStewardRequest, RevokeStewardResult,
-    SdisService,
+    SdisService, SuspendStewardRequest, SuspendStewardResult,
 };
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
 pub struct SdisServiceImpl {
     commons: Arc<icn_commons::CommonsHandle>,
@@ -57,6 +57,15 @@ impl SdisServiceImpl {
     fn compute_reinstate_hash(request: &ReinstateStewardRequest) -> String {
         let mut hasher = Sha256::new();
         hasher.update(b"sdis:reinstate:");
+        hasher.update(request.steward_did.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.proposal_id.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    fn compute_suspend_hash(request: &SuspendStewardRequest) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"sdis:suspend:");
         hasher.update(request.steward_did.as_bytes());
         hasher.update(b":");
         hasher.update(request.proposal_id.as_bytes());
@@ -331,6 +340,62 @@ impl SdisService for SdisServiceImpl {
                 Ok(ReinstateStewardResult {
                     success: false,
                     was_suspended: false,
+                    state_change_hash: String::new(),
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
+
+    fn suspend_steward(&self, request: SuspendStewardRequest) -> Result<SuspendStewardResult> {
+        info!(
+            steward_did = %request.steward_did,
+            proposal_id = %request.proposal_id,
+            duration_seconds = %request.duration_seconds,
+            "Suspending steward via governance dispatch \
+             (duration advisory — timed reinstatement not enforced)"
+        );
+        let steward_did = icn_identity::Did::from_str(&request.steward_did)
+            .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                match self.commons.get_steward_by_did(&steward_did).await {
+                    Ok(Some(record)) => {
+                        let steward_id = record.id().to_hex();
+                        self.commons
+                            .suspend_steward(&steward_id, request.reason.clone())
+                            .await
+                    }
+                    Ok(None) => Err(anyhow::anyhow!(
+                        "Steward '{}' not found — cannot suspend",
+                        request.steward_did
+                    )),
+                    Err(e) => Err(e),
+                }
+            })
+        });
+        match result {
+            Ok(()) => {
+                let hash = Self::compute_suspend_hash(&request);
+                info!(
+                    steward_did = %request.steward_did,
+                    state_change_hash = %hash,
+                    "Steward suspended in commons"
+                );
+                Ok(SuspendStewardResult {
+                    success: true,
+                    state_change_hash: hash,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                warn!(
+                    steward_did = %request.steward_did,
+                    error = %e,
+                    "Failed to suspend steward in commons"
+                );
+                Ok(SuspendStewardResult {
+                    success: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
                 })
@@ -686,6 +751,166 @@ mod tests {
         assert!(
             result.error.is_some(),
             "error field must be populated on failure"
+        );
+    }
+
+    // ─── SuspendSteward proof tests ────────────────────────────────────────────
+
+    /// SuspendSteward → active steward becomes suspended with reason persisted.
+    ///
+    /// Proves the full SuspendSteward dispatch chain:
+    /// `SdisService::suspend_steward` → `CommonsHandle::suspend_steward`
+    /// → durable `Suspended { reason }` status visible via `is_active_steward`.
+    ///
+    /// Duration is advisory: it is carried through the request but CommonsHandle
+    /// stores `Suspended { reason }` only — no timed auto-reinstatement.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_suspend_active_steward() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(20);
+        let sponsor = test_did(21);
+
+        create_strong_holder(&commons, &holder, &sponsor).await;
+        let appoint_req = AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86_400,
+            bond_amount: 100,
+            region: None,
+            proposal_id: "gov:coop:prop-030:receipt".to_string(),
+        };
+        let appoint = svc.appoint_steward(appoint_req).unwrap();
+        assert!(
+            appoint.success,
+            "appointment must succeed before suspension test"
+        );
+
+        // Verify steward is active before suspending.
+        assert!(
+            commons
+                .is_active_steward(&holder)
+                .await
+                .expect("is_active must not error"),
+            "steward must be active before suspension"
+        );
+
+        // Suspend via governance dispatch.
+        let req = SuspendStewardRequest {
+            steward_did: holder.to_string(),
+            reason: "governance investigation".to_string(),
+            duration_seconds: 86_400, // advisory only — not enforced by CommonsHandle
+            proposal_id: "gov:coop:prop-031:receipt".to_string(),
+        };
+        let result = svc.suspend_steward(req).unwrap();
+        assert!(result.success, "suspension must succeed");
+        assert!(
+            !result.state_change_hash.is_empty(),
+            "state_change_hash must be populated on success"
+        );
+        assert!(result.error.is_none());
+
+        // Read back durable state — steward must now be inactive (suspended).
+        assert!(
+            !commons
+                .is_active_steward(&holder)
+                .await
+                .expect("is_active must not error"),
+            "steward must be inactive after governance suspension"
+        );
+
+        // Verify the record shows Suspended status (reason stored, not duration).
+        let record = commons
+            .get_steward_by_did(&holder)
+            .await
+            .expect("get_steward_by_did must not error")
+            .expect("steward record must exist");
+        assert!(
+            record.is_suspended(),
+            "steward record must show Suspended status after governance suspension"
+        );
+    }
+
+    /// SuspendSteward on an already-suspended steward is idempotent — updates reason.
+    ///
+    /// CommonsHandle::suspend_steward overwrites the reason on re-suspension.
+    /// This is safe and expected: no error is returned.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_suspend_already_suspended_is_idempotent() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(22);
+        let sponsor = test_did(23);
+
+        create_strong_holder(&commons, &holder, &sponsor).await;
+        let appoint_req = AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86_400,
+            bond_amount: 100,
+            region: None,
+            proposal_id: "gov:coop:prop-032:receipt".to_string(),
+        };
+        svc.appoint_steward(appoint_req).unwrap();
+
+        // First suspension via service.
+        let req1 = SuspendStewardRequest {
+            steward_did: holder.to_string(),
+            reason: "first suspension".to_string(),
+            duration_seconds: 3_600,
+            proposal_id: "gov:coop:prop-033:receipt".to_string(),
+        };
+        let r1 = svc.suspend_steward(req1).unwrap();
+        assert!(r1.success, "first suspension must succeed");
+
+        // Second suspension (already suspended) — must succeed and update reason.
+        let req2 = SuspendStewardRequest {
+            steward_did: holder.to_string(),
+            reason: "updated reason".to_string(),
+            duration_seconds: 7_200,
+            proposal_id: "gov:coop:prop-034:receipt".to_string(),
+        };
+        let r2 = svc.suspend_steward(req2).unwrap();
+        assert!(
+            r2.success,
+            "re-suspension of already-suspended steward must succeed"
+        );
+        assert!(
+            !r2.state_change_hash.is_empty(),
+            "state_change_hash must be populated on re-suspension"
+        );
+
+        // Steward remains suspended.
+        assert!(
+            !commons
+                .is_active_steward(&holder)
+                .await
+                .expect("is_active must not error"),
+            "steward must remain suspended after re-suspension"
+        );
+    }
+
+    /// SuspendSteward fails when the steward DID is not found.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_suspend_steward_fails_for_unknown_did() {
+        let (svc, _commons) = make_service_with_commons();
+        let unknown_did = test_did(97);
+        let req = SuspendStewardRequest {
+            steward_did: unknown_did.to_string(),
+            reason: "test".to_string(),
+            duration_seconds: 3_600,
+            proposal_id: "gov:unknown:prop-000:receipt".to_string(),
+        };
+        let result = svc.suspend_steward(req).unwrap();
+        assert!(
+            !result.success,
+            "suspend for unknown DID must return success=false"
+        );
+        assert!(
+            result.error.is_some(),
+            "error field must be populated on failure"
+        );
+        assert!(
+            result.state_change_hash.is_empty(),
+            "state_change_hash must be empty on failure"
         );
     }
 }

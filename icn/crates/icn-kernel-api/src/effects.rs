@@ -443,6 +443,24 @@ pub enum SdisEffect {
         /// Proposal receipt ID for audit linkage.
         proposal_id: String,
     },
+    /// Suspend a steward.
+    ///
+    /// The steward's status is changed to `Suspended { reason }`.
+    ///
+    /// # Duration semantics
+    ///
+    /// `duration_seconds` is preserved from the governance proposal for audit
+    /// context and traceability. `CommonsHandle` stores only the reason string
+    /// (`StewardStatus::Suspended { reason }`) — timed auto-reinstatement is not
+    /// yet enforced. Manual `ReinstateSteward` is required to restore active status.
+    SuspendSteward {
+        steward_did: String,
+        reason: String,
+        /// Advisory duration from the governance proposal (not enforced by CommonsHandle).
+        duration_seconds: u64,
+        /// Proposal receipt ID for audit linkage.
+        proposal_id: String,
+    },
 }
 
 // =============================================================================
