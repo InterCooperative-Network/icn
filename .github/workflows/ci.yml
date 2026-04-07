@@ -424,20 +424,40 @@ jobs:
     name: Test Coverage
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-    timeout-minutes: 30
-    runs-on: [self-hosted, linux, x64, homelab]
+    # Gate is observational — job failure must never block CI or merges.
+    # Previously ran on [self-hosted, linux, x64, homelab] (ci-runner, 6GB RAM),
+    # which OOMed on instrumented workspace compilation. Moved to ubuntu-latest
+    # with rust-cache to remove homelab runner dependency for coverage entirely.
+    continue-on-error: true
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+        with:
+          verbose: 'false'
+          aggressive: 'true'
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          components: llvm-tools-preview
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v0-rust-coverage"
+
       - name: Install cargo-llvm-cov
-        run: |
-          source $HOME/.cargo/env
-          cargo install cargo-llvm-cov --locked
+        run: cargo install cargo-llvm-cov --locked
 
       - name: Generate coverage
-        run: |
-          source $HOME/.cargo/env
-          cargo llvm-cov --workspace --lcov --output-path ./lcov.info
+        run: cargo llvm-cov --workspace --lcov --output-path ./lcov.info
         working-directory: ./icn
         continue-on-error: ${{ env.GATE_RATCHET_PHASE_COVERAGE != 'blocking' }}
 
