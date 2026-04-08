@@ -1,0 +1,283 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Gossip Proof Layers | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>testing</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>gossip proof layers</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/testing/gossip-proof-layers.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: layers 1-4 complete
+Canonical: no
+Last Reviewed: 2026-03-28</h2>
+<h1>Gossip Proof Layers</h1>
+<h2>Architecture: gossip persistence is NOT sled-based</h2>
+<p>Unlike ledger and governance, gossip state is persisted via the <code>icn-snapshot</code>
+JSON file mechanism:</p>
+<ul>
+<li>Write path: <code>GossipActor::export_state()</code> → <code>StateSnapshot { gossip_state }</code> →
+<code>save_snapshot(&amp;snapshot, data_dir)</code> → atomic JSON file on disk</li>
+<li>Read path: <code>load_snapshot(data_dir)</code> → <code>GossipActor::restore_state(state)</code></li>
+</ul>
+<p><strong>What is persisted:</strong></p>
+<ul>
+<li>Vector clock (causal ordering continuity across restart)</li>
+<li>Topic metadata (name, ACL, scope, max_entries)</li>
+<li>Topic subscriptions (which DIDs are subscribed to which topics)</li>
+</ul>
+<p><strong>What is NOT persisted by design:</strong></p>
+<ul>
+<li>Gossip entries — they are re-fetched from peers via anti-entropy after restart</li>
+</ul>
+<hr>
+<h2>Layer 1 — GossipActor State Snapshot Persistence ✅</h2>
+<p><strong>What it proves:</strong> Topic metadata, topic subscriptions, and the vector clock
+written through <code>GossipActor::export_state()</code> → <code>save_snapshot()</code> survive a
+drop-and-reload boundary with exact field values when restored via
+<code>restore_state()</code> into a fresh actor.</p>
+<p><strong>Artifact:</strong> <code>crates/icn-gossip/tests/gossip_persistence.rs</code> →
+<code>test_gossip_state_survives_export_snapshot_restore</code></p>
+<p><strong>Run:</strong></p>
+<pre><code class="language-bash">cargo test -p icn-gossip --test gossip_persistence
+</code></pre>
+<p><strong>What is asserted:</strong></p>
+<ul>
+<li>Topic name survives snapshot round-trip (exact string match)</li>
+<li>Subscriber DID survives in the topic&#39;s subscription list</li>
+<li>Vector clock count for own_did is exactly 1 after one publish</li>
+</ul>
+<p><strong>Key notes:</strong></p>
+<ul>
+<li>No oracle or keypair needed — exercises the pure state serialization path</li>
+<li><code>publish()</code> increments the clock without requiring a send_callback</li>
+<li><code>restore_state()</code> restores subscriptions without re-running ACL checks
+(trusts persisted state, same as production path)</li>
+</ul>
+<hr>
+<hr>
+<h2>Layer 2 — GossipHandle (Arc&lt;RwLock<GossipActor>&gt;) Snapshot Persistence ✅</h2>
+<p><strong>What it proves:</strong> Topic metadata, topic subscriptions, and the vector clock
+written and exported through the production handle path
+(<code>GossipActor::spawn()</code> → <code>Arc&lt;RwLock&lt;GossipActor&gt;&gt;</code>) survive the same
+export/snapshot/restore cycle as Layer 1. This is the real access pattern used
+by the supervisor for all gossip mutations and shutdown export.</p>
+<p><strong>Artifact:</strong> <code>crates/icn-gossip/tests/gossip_persistence.rs</code> →
+<code>test_gossip_handle_state_survives_snapshot_restore</code></p>
+<p><strong>Run:</strong></p>
+<pre><code class="language-bash">cargo test -p icn-gossip --test gossip_persistence
+</code></pre>
+<p><strong>Production path exercised:</strong></p>
+<ul>
+<li>Mutations: <code>gossip_handle.write().await.create_topic()</code> / <code>.publish()</code> / <code>.subscribe()</code></li>
+<li>Export: <code>gossip_handle.read().await.export_state()</code> (exactly as <code>supervisor/shutdown.rs</code>)</li>
+<li>Persist: <code>save_snapshot(&amp;snapshot, &amp;data_dir)</code></li>
+<li>Reload/restore: <code>load_snapshot()</code> → <code>restore_state()</code> into fresh actor</li>
+</ul>
+<p><strong>What is asserted:</strong></p>
+<ul>
+<li>Same three invariants as Layer 1: topic name, subscriber DID, vector clock count</li>
+<li>Proves no divergence between the &quot;direct struct test path&quot; and the &quot;production handle path&quot;</li>
+</ul>
+<hr>
+<hr>
+<h2>Layer 3 — Same-Runtime Handle Drop + Recreate Proof ✅</h2>
+<p><strong>What it proves:</strong> Gossip coordination state (vector clock, topic metadata,
+subscriptions) survives a same-runtime lifecycle boundary: the original
+<code>GossipHandle</code> is fully dropped (all <code>Arc</code> refs released, actor memory
+reclaimed), the snapshot on disk is the only bridge, and a brand-new
+<code>GossipHandle</code> created in the same Tokio runtime restores exact state.</p>
+<p>This is the real daemon restart cycle: shutdown drops the handle, a fresh
+<code>GossipActor::spawn()</code> is created at next boot, and <code>restore_gossip_snapshot</code>
+calls <code>gossip_handle.write().await.restore_state()</code> before accepting work.</p>
+<p><strong>What is NOT proven by this layer:</strong></p>
+<ul>
+<li>Entry durability: entries are intentionally not persisted — not a gap</li>
+<li>Cross-process memory isolation: requires subprocess (Layer 4)</li>
+</ul>
+<p><strong>Artifact:</strong> <code>crates/icn-gossip/tests/gossip_persistence.rs</code> →
+<code>test_gossip_handle_survives_same_runtime_drop_and_recreate</code></p>
+<p><strong>Run:</strong></p>
+<pre><code class="language-bash">cargo test -p icn-gossip --test gossip_persistence
+</code></pre>
+<p><strong>Lifecycle boundary exercised:</strong></p>
+<ol>
+<li><code>GossipHandle</code> mutated and exported (production path)</li>
+<li><code>save_snapshot()</code> persists to disk</li>
+<li>All <code>Arc</code> refs dropped — actor memory reclaimed</li>
+<li><code>load_snapshot()</code> reads from disk (no in-memory remnant)</li>
+<li><code>GossipActor::spawn()</code> creates a completely empty fresh actor</li>
+<li><code>handle2.write().await.restore_state()</code> — exact supervisor boot path</li>
+<li>Assertions via <code>handle2.read().await</code> — no hidden continuity</li>
+</ol>
+<p><strong>What is asserted:</strong></p>
+<ul>
+<li>Topic name survives the lifecycle boundary</li>
+<li>Subscriber DID survives</li>
+<li>Vector clock count is exactly preserved</li>
+</ul>
+<hr>
+<hr>
+<h2>Layer 4 — Cross-Process Restart Proof ✅</h2>
+<p><strong>What it proves:</strong> Gossip coordination state (vector clock, topic metadata,
+subscriptions) written through <code>GossipHandle</code> in one OS process is readable
+in a completely fresh OS process. No shared memory. No shared runtime. True
+process-boundary restart.</p>
+<p><strong>Persistence scope confirmed:</strong> Coordination state persists (clock,
+topics, subscriptions). Gossip entries do NOT persist — by design, they are
+re-fetched from peers via anti-entropy after restart.</p>
+<p><strong>Implementation:</strong></p>
+<ul>
+<li>Helper binary: <code>crates/icn-gossip/src/bin/gossip_restart_helper.rs</code><ul>
+<li><code>write &lt;data_dir&gt;</code> — builds state through <code>GossipHandle</code>, persists
+snapshot, prints <code>own_did,subscriber_did</code> to stdout, exits 0.</li>
+<li><code>read &lt;data_dir&gt; &lt;own_did&gt; &lt;subscriber_did&gt;</code> — loads snapshot, restores
+into fresh <code>GossipActor</code>, asserts exact invariants, exits 0 or 1.</li>
+</ul>
+</li>
+<li>Integration test: <code>crates/icn-gossip/tests/gossip_persistence.rs</code> →
+<code>test_gossip_state_survives_cross_process_restart</code></li>
+</ul>
+<p><strong>Key difference from ledger/governance restart helpers:</strong></p>
+<ul>
+<li>No sled file lock to release — JSON snapshot is written atomically, closed
+on drop. No sled between processes.</li>
+<li><code>new_current_thread()</code> runtime sufficient — gossip has no <code>block_in_place</code>.</li>
+</ul>
+<p><strong>Artifact:</strong> <code>crates/icn-gossip/tests/gossip_persistence.rs</code> →
+<code>test_gossip_state_survives_cross_process_restart</code></p>
+<p><strong>Run:</strong></p>
+<pre><code class="language-bash">cargo test -p icn-gossip --test gossip_persistence
+</code></pre>
+<p><strong>What is asserted (in read subprocess):</strong></p>
+<ul>
+<li>Topic name <code>&quot;layer-4-cross-process-proof&quot;</code> survives the OS process boundary</li>
+<li>Subscriber DID (passed from write subprocess via stdout) survives</li>
+<li>Vector clock for <code>own_did</code> is exactly 1 after one publish</li>
+</ul>
+<hr>
+<h2>What Is NOT Proven (by design)</h2>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>Why it matters</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Gossip entry re-gossip after restart</td>
+<td>Entries intentionally not persisted</td>
+<td>By design — anti-entropy handles this</td>
+</tr>
+<tr>
+<td>Anti-entropy resync after restart</td>
+<td>Requires multi-node test</td>
+<td>Multi-node integration test</td>
+</tr>
+<tr>
+<td>Snapshot checksum corruption detection</td>
+<td>Already tested in <code>icn-snapshot</code> unit tests</td>
+<td>Already covered</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Run Full Layer 1–4 Suite</h2>
+<pre><code class="language-bash">cargo test -p icn-gossip --test gossip_persistence
+</code></pre>
+<p>All four proof layers are in a single test file. All use the same <code>icn-snapshot</code> JSON mechanism.</p>
+<hr>
+<h2>Comparison with Ledger/Governance Proof Stacks</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Governance</th>
+<th>Ledger</th>
+<th>Gossip</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1 — Direct struct write + reopen</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅ <code>gossip_persistence.rs</code></td>
+</tr>
+<tr>
+<td>2 — Actor/handle-backed path</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅ <code>gossip_persistence.rs</code></td>
+</tr>
+<tr>
+<td>3 — Same-runtime close+reopen</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅ <code>gossip_persistence.rs</code></td>
+</tr>
+<tr>
+<td>4 — Cross-process restart</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅ <code>gossip_persistence.rs</code></td>
+</tr>
+</tbody></table>
+<p>Gossip is now fully verified across all four proof layers. Governance and ledger have full parity.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

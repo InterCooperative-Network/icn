@@ -1,0 +1,672 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0013: Federation Clearing Adoption Contract | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0013 federation clearing adoption contract</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0013-federation-clearing-adoption-contract.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>id: &quot;0013&quot;
+title: &quot;Federation Clearing Adoption Contract — Step 3 Architecture Design&quot;
+status: &quot;accepted&quot;
+date: &quot;2026-04-01&quot;
+context: &quot;federation-clearing-position-api / ADR 0012 Step 3 design pass&quot;
+deciders: [&quot;Matt Faherty&quot;]
+tags: [&quot;gateway&quot;, &quot;architecture&quot;, &quot;federation&quot;, &quot;clearing&quot;, &quot;governance&quot;, &quot;adoption&quot;, &quot;ccl&quot;]</h2>
+<h1>ADR 0013: Federation Clearing Adoption Contract</h1>
+<h2>Status</h2>
+<p><strong>Step 3d implemented (2026-04-01)</strong> — adoption proposal endpoint is live.</p>
+<p>Steps 3a (terms propagation), 3b (source reference), 3c (read surface), and 3d (adoption
+proposal endpoint) are all implemented. Step 3a/b/c landed in PRs #1478/#1479.
+Step 3d landed in this session (branch <code>feat/clearing-adoption-step3d</code>).</p>
+<p>Remaining open items from this design:</p>
+<ul>
+<li><code>FederationProvenance</code> still in-memory (not persisted to Sled) — open Q4</li>
+<li><code>establish_clearing()</code> coop_a_did is still <code>String::new()</code> — governance executor needs fixing</li>
+<li>Store-isolation tests (Phase 5) not yet written</li>
+</ul>
+<h2>Context</h2>
+<p>ADR 0012 established Model C (Explicit Parallel): two independent clearing paths —
+gateway/direct-management and governance/supervisor-owned — intentionally separate, with
+origin labeling at the read surface. Steps 1a, 1b, and 2 are complete.</p>
+<p>Step 3 was described as &quot;CCL adoption contract for promotion path — future work, high
+complexity.&quot; This ADR derives the exact Step 3 architecture from code reality, identifies
+a prerequisite capability gap in the existing governance path, and produces the design
+artifact that the next implementation pass can execute from.</p>
+<hr>
+<h2>Phase 1: Post-Merge Origin Path Map (as of 2026-04-01)</h2>
+<h3>Path 1: Direct-Management (gateway-local)</h3>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Creation trigger</td>
+<td><code>POST /v1/federation/clearing</code> (admin API caller)</td>
+</tr>
+<tr>
+<td>Handler</td>
+<td><code>create_agreement()</code> in <code>FederationManager</code></td>
+</tr>
+<tr>
+<td>Canonical owner</td>
+<td><code>FederationManager</code> (gateway-local)</td>
+</tr>
+<tr>
+<td>Persistence</td>
+<td><code>data_dir/federation_store</code> — Sled, per-gateway instance</td>
+</tr>
+<tr>
+<td>Object created</td>
+<td><code>BilateralClearingAgreement</code> with REAL terms (settlement_interval, max_imbalance from request)</td>
+</tr>
+<tr>
+<td>Provenance</td>
+<td>None — no <code>decision_receipt_id</code>, no <code>decision_hash</code></td>
+</tr>
+<tr>
+<td>Read surface</td>
+<td><code>GET /v1/federation/clearing</code>, <code>/clearing/{id}</code> — fallback path (origin = &quot;direct-management&quot;)</td>
+</tr>
+<tr>
+<td>Position read</td>
+<td>404 in daemon mode (ADR 0011) — agreement unknown to FederationService</td>
+</tr>
+<tr>
+<td>Settlement</td>
+<td><code>POST /clearing/{id}/settle</code> — gateway-local only</td>
+</tr>
+<tr>
+<td>Governance-actionable</td>
+<td>No</td>
+</tr>
+</tbody></table>
+<h3>Path 2: Governance (supervisor-owned)</h3>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Creation trigger</td>
+<td>CCL governance proposal → vote → <code>KernelEffect::Federation(FederationEffect::EstablishClearing)</code></td>
+</tr>
+<tr>
+<td>Handler</td>
+<td><code>FederationServiceImpl::establish_clearing(FederationClearingRequest)</code></td>
+</tr>
+<tr>
+<td>Canonical owner</td>
+<td><code>FederationServiceImpl</code> (supervisor-owned)</td>
+</tr>
+<tr>
+<td>Persistence</td>
+<td><code>store_path/clearing</code> — Sled, supervisor-controlled</td>
+</tr>
+<tr>
+<td>Object created</td>
+<td><code>BilateralClearingAgreement</code> with <strong>HARDCODED DEFAULTS</strong> (see critical gap below)</td>
+</tr>
+<tr>
+<td>Provenance</td>
+<td><code>decision_receipt_id</code> + <code>decision_hash</code> — carried on <code>FederationClearingRequest</code> but <strong>not yet persisted</strong> to <code>BilateralClearingAgreement</code>; <code>FederationProvenance</code> in-memory map tracks cooperative registration (join/registration) only, not clearing agreement establishment</td>
+</tr>
+<tr>
+<td>Read surface</td>
+<td><code>GET /v1/federation/clearing</code>, <code>/clearing/{id}</code> — preferred path (origin = &quot;governance&quot;)</td>
+</tr>
+<tr>
+<td>Position read</td>
+<td><code>GET /v1/federation/clearing/{id}/position</code> — supervisor-owned, works correctly</td>
+</tr>
+<tr>
+<td>Settlement</td>
+<td><code>FederationEffect::SettleClearing</code> — governance execution path</td>
+</tr>
+<tr>
+<td>Governance-actionable</td>
+<td>Yes — full audit trail</td>
+</tr>
+</tbody></table>
+<h3>Path 3: Compute/Receipt-Derived</h3>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Creation trigger</td>
+<td>Cross-coop compute task completion → <code>ComputeActor</code> emits <code>ClearingReceipt</code></td>
+</tr>
+<tr>
+<td>Handler</td>
+<td><code>ReceiptClearingManager::flush_to_clearing()</code></td>
+</tr>
+<tr>
+<td>Canonical owner</td>
+<td><code>ReceiptClearingManager</code> (supervisor-owned, fed by compute actor)</td>
+</tr>
+<tr>
+<td>Persistence</td>
+<td><code>store_path/clearing</code> — SAME ClearingManager as governance path</td>
+</tr>
+<tr>
+<td>Object created</td>
+<td>Position delta (<code>CrossCoopTransfer</code>) on existing agreement</td>
+</tr>
+<tr>
+<td>Provenance</td>
+<td><code>receipt_hash</code> from compute execution</td>
+</tr>
+<tr>
+<td>Read surface</td>
+<td>Via <code>FederationService::get_clearing_position()</code> — accumulates into governance-origin positions</td>
+</tr>
+<tr>
+<td>Requires</td>
+<td>Governance-established agreement must already exist (agreement ID match)</td>
+</tr>
+<tr>
+<td>Governance-actionable</td>
+<td>Position is observable; receipt is backing evidence</td>
+</tr>
+</tbody></table>
+<h3>Critical Gap: Terms Propagation (PREREQUISITE for Step 3)</h3>
+<p><strong>Discovery</strong>: <code>FederationEffect::EstablishClearing</code> carries only:</p>
+<pre><code class="language-rust">EstablishClearing {
+    coop_a_did: String,
+    coop_b_did: String,
+    agreement_hash: String,  // agreement_id, despite the name
+}
+</code></pre>
+<p><code>FederationClearingRequest</code> carries only:</p>
+<pre><code class="language-rust">pub struct FederationClearingRequest {
+    pub coop_a_did: String,
+    pub coop_b_did: String,
+    pub agreement_id: String,
+    pub decision_receipt_id: String,
+    pub decision_hash: String,
+}
+</code></pre>
+<p><code>FederationServiceImpl::establish_clearing()</code> calls <code>BilateralClearingAgreement::new()</code> which
+produces defaults:</p>
+<ul>
+<li><code>settlement_interval: SettlementInterval::Weekly</code> (hardcoded)</li>
+<li><code>max_imbalance: 10000</code> (hardcoded)</li>
+<li><code>exchange_rates: HashMap::new()</code> (empty — no exchange rates)</li>
+</ul>
+<p><strong>Consequence</strong>: Every governance-established clearing agreement has identical hardcoded terms,
+making governance clearing non-functional for production bilateral agreements. This is an
+existing correctness gap, not introduced by this design pass.</p>
+<p><strong>This gap MUST be fixed before or alongside Step 3</strong> — adoption cannot carry real terms
+through a path that ignores terms.</p>
+<hr>
+<h2>Phase 2: Adoption Model Selection</h2>
+<h3>The question</h3>
+<p>When a direct-management agreement is &quot;adopted&quot; into governance, what changes?</p>
+<h3>Options considered</h3>
+<p><strong>Option A: In-place promotion</strong></p>
+<p>The gateway-local agreement is mutated/moved to become the governance-owned canonical record.</p>
+<ul>
+<li><strong>Rejected</strong>: Violates ADR 0011/0012. The supervisor store must not be contaminated by
+gateway-local writes. Cross-store mutation creates split-brain risk and invalidates the
+&quot;canonical owner&quot; invariant. The gateway cannot be a write path to the supervisor store.</li>
+</ul>
+<p><strong>Option B: Ratified re-instantiation</strong> ← CHOSEN</p>
+<p>The direct-management agreement is <strong>input material</strong> for a governance proposal. If governance
+ratifies the terms, <code>FederationEffect::EstablishClearing</code> executes, creating a NEW canonical
+agreement in the supervisor store with governance provenance. Two records coexist:</p>
+<ul>
+<li>Source record: original direct-management agreement in gateway store (unchanged)</li>
+<li>Canonical record: new governance agreement in supervisor store with full provenance</li>
+</ul>
+<p>The canonical record carries <code>source_agreement_id</code> (referring to the source record for audit).
+The position read surface (<code>GET /clearing/{id}/position</code>) becomes live for the canonical record.
+Compute receipts can now accumulate against the canonical agreement&#39;s position.
+The read surface (<code>GET /clearing/{id}</code>) shows the governance version (origin = &quot;governance&quot;).</p>
+<ul>
+<li><strong>Accepted for these reasons</strong>:<ol>
+<li>No cross-store mutation — ADR 0011 preserved</li>
+<li>Governance always creates its own canonical record — ADR 0012 Model C preserved</li>
+<li>Full provenance on the canonical record (decision_receipt_id, decision_hash)</li>
+<li>The source record survives as historical context — audit trail preserved</li>
+<li>No split-brain: two different agreement_ids OR the canonical agreement explicitly
+references the source by ID</li>
+<li>Read surface naturally shows governance version because FederationService is preferred</li>
+<li>Clearing positions start fresh for the canonical agreement — no implicit position
+inheritance (which would blend two stores&#39; state)</li>
+</ol>
+</li>
+</ul>
+<p><strong>Option C: Reference-link adoption</strong></p>
+<p>Governance &quot;blesses&quot; the existing direct-management agreement by governance decision, leaving
+the record in the gateway store but marking it as ratified.</p>
+<ul>
+<li><strong>Rejected</strong>: The read surface (FederationService) cannot see gateway-local records. The
+position query (ADR 0011) still 404s for gateway-local agreements. Compute receipts still
+cannot accumulate. The blessed record is invisible to the canonical read path. This solves
+paperwork (provenance) but not operational correctness.</li>
+</ul>
+<p><strong>Option D: Shared identity (same agreement_id)</strong></p>
+<p>The governance-established agreement takes the same agreement_id as the direct-management
+source. Clients see a single ID, but under two different stores.</p>
+<ul>
+<li><strong>Rejected</strong>: Creates exactly the split-brain scenario ADR 0011/0012 guard against. Which
+record is canonical when both stores have the same ID? The read preference (FederationService
+over FederationManager) masks the conflict rather than resolving it. The two positions would
+accumulate separately and diverge.</li>
+</ul>
+<h3>Chosen model: B — Ratified Re-instantiation</h3>
+<p><strong>State transition</strong>:</p>
+<pre><code>Before adoption:
+  gateway store:     agreement_id = &quot;agr-001&quot; (direct-management, no provenance)
+  supervisor store:  [no entry for &quot;agr-001&quot;]
+
+After adoption:
+  gateway store:     agreement_id = &quot;agr-001&quot; (unchanged, origin = &quot;direct-management&quot;)
+  supervisor store:  agreement_id = &quot;agr-gov-001&quot; (governance-canonical,
+                                                    decision_receipt_id = &quot;rcpt-XYZ&quot;,
+                                                    source_agreement_id = &quot;agr-001&quot;)
+</code></pre>
+<p>The canonical agreement gets a new ID (governance assigns it) OR the same ID as source
+(see §Clearing Position Continuity below for the tradeoff).</p>
+<p><strong>Clearing position continuity</strong>: Positions do NOT carry over. The governance-canonical
+agreement starts with a clean position. If position transfer is needed, it requires explicit
+governance action (<code>FederationEffect::SettleClearing</code> on the source, then a new canonical
+agreement starts at zero). Silent position inheritance would violate the store-isolation
+invariant.</p>
+<hr>
+<h2>Phase 3: Contract Boundary Design</h2>
+<h3>Prerequisite 3a: Terms Propagation Fix</h3>
+<p>Before adoption can work, <code>FederationEffect::EstablishClearing</code> must carry agreement terms.
+These are the minimum term fields, validated against the direct-management creation path:</p>
+<p><strong>New fields for <code>FederationEffect::EstablishClearing</code></strong> (all with <code>#[serde(default)]</code> for
+backward wire compat):</p>
+<pre><code class="language-rust">EstablishClearing {
+    coop_a_did: String,
+    coop_b_did: String,
+    agreement_hash: String,                     // Keep for compat (= agreement_id)
+    // NEW with serde defaults:
+    #[serde(default = &quot;default_settlement_interval&quot;)]
+    settlement_interval: String,                // &quot;weekly&quot; | &quot;daily&quot; | &quot;monthly&quot; | &quot;manual&quot;
+    #[serde(default = &quot;default_max_imbalance&quot;)]
+    max_imbalance: i64,                         // = 10000 (existing runtime default)
+    #[serde(default)]
+    exchange_rates: HashMap&lt;String, f64&gt;,       // &quot;from:to&quot; -&gt; rate
+    #[serde(default)]
+    source_agreement_id: Option&lt;String&gt;,        // set only for adoption, None for fresh
+}
+</code></pre>
+<p><strong>New fields for <code>FederationClearingRequest</code></strong> (mirroring the effect):</p>
+<pre><code class="language-rust">pub struct FederationClearingRequest {
+    pub coop_a_did: String,
+    pub coop_b_did: String,
+    pub agreement_id: String,
+    pub decision_receipt_id: String,
+    pub decision_hash: String,
+    // NEW:
+    pub settlement_interval: String,
+    pub max_imbalance: i64,
+    pub exchange_rates: HashMap&lt;String, f64&gt;,
+    pub source_agreement_id: Option&lt;String&gt;,    // None = fresh establishment
+}
+</code></pre>
+<p><strong><code>FederationServiceImpl::establish_clearing()</code></strong> must be updated to use provided terms:</p>
+<pre><code class="language-rust">let agreement = BilateralClearingAgreement::new(...)
+    .with_interval(parse_settlement_interval(&amp;request.settlement_interval)?)
+    .with_max_imbalance(request.max_imbalance)
+// exchange_rates applied via iterator
+</code></pre>
+<h3>Step 3b: Source Reference in Provenance</h3>
+<p><code>FederationProvenance</code> (or a new <code>ClearingProvenance</code> struct) must be extended:</p>
+<pre><code class="language-rust">struct ClearingProvenance {
+    decision_receipt_id: String,
+    decision_hash: String,
+    source_agreement_id: Option&lt;String&gt;,    // for adopted agreements
+}
+</code></pre>
+<p>This is persisted alongside the clearing agreement in the supervisor store. The provenance
+map key is <code>agreement_id</code> (canonical id of the governance record).</p>
+<h3>Step 3c: Read Surface Honesty</h3>
+<p><code>ClearingAgreementView</code> gains one new field:</p>
+<pre><code class="language-rust">pub struct ClearingAgreementView {
+    // ... existing fields ...
+    pub origin: String,                         // &quot;governance&quot; | &quot;direct-management&quot;
+    pub source_agreement_id: Option&lt;String&gt;,    // Some(&quot;agr-001&quot;) for adopted, None otherwise
+}
+</code></pre>
+<p>When <code>origin == &quot;governance&quot;</code> and <code>source_agreement_id == Some(...)</code>, clients know this is
+an adopted agreement and can trace back to the source.</p>
+<h3>Step 3d: Adoption Proposal Endpoint</h3>
+<p>A gateway API endpoint that reads the direct-management agreement and forms a governance
+adoption proposal. This does NOT execute the effect directly — it prepares the proposal for
+the governance voting flow.</p>
+<p><strong>Candidate endpoint</strong>: <code>POST /v1/federation/clearing/{id}/propose-adoption</code></p>
+<p>Request (minimal):</p>
+<pre><code class="language-jsonc">{
+  &quot;proposed_canonical_id&quot;: &quot;agr-gov-001&quot;,   // governance ID for the new canonical record
+  &quot;rationale&quot;: &quot;Formalizing bilateral clearing agreement for institutional use&quot;
+}
+</code></pre>
+<p>The handler:</p>
+<ol>
+<li>Reads the source agreement from <code>FederationManager</code> (gateway-local)</li>
+<li>Extracts: <code>coop_a_did</code>, <code>coop_b_did</code>, settlement_interval, max_imbalance, exchange_rates</li>
+<li>Constructs a governance proposal payload with these terms</li>
+<li>Sets <code>source_agreement_id</code> to the source agreement&#39;s ID</li>
+<li>Submits to the governance voting path (returns proposal_id)</li>
+</ol>
+<p>The actual <code>FederationEffect::EstablishClearing</code> fires after governance approval — not
+immediately on proposal submission.</p>
+<h3>Lifecycle Sequence</h3>
+<pre><code>1. Direct-management agreement exists:
+   POST /v1/federation/clearing → &quot;agr-001&quot; in gateway store
+   (origin: &quot;direct-management&quot;, no provenance, no position query)
+
+2. Adoption proposed:
+   POST /v1/federation/clearing/agr-001/propose-adoption
+   → governance proposal created with terms from &quot;agr-001&quot; + proposed canonical id &quot;agr-gov-001&quot;
+   → proposal_id returned to caller
+
+3. Governance votes:
+   Members vote on the proposal through normal governance flow
+   → decision_receipt_id and decision_hash assigned
+
+4. Effect executes:
+   FederationEffect::EstablishClearing {
+     coop_a_did: ...,
+     coop_b_did: ...,
+     agreement_hash: &quot;agr-gov-001&quot;,
+     settlement_interval: &quot;weekly&quot;,    // from source
+     max_imbalance: 50000,             // from source
+     exchange_rates: {...},            // from source
+     source_agreement_id: Some(&quot;agr-001&quot;),
+   }
+   → FederationServiceImpl::establish_clearing() creates canonical agreement in supervisor store
+   → ClearingProvenance stored with decision_receipt_id + source reference
+
+5. Read surface updated:
+   GET /v1/federation/clearing → shows &quot;agr-gov-001&quot; (origin: &quot;governance&quot;, source: &quot;agr-001&quot;)
+   GET /v1/federation/clearing/agr-gov-001/position → live (supervisor store)
+   GET /v1/federation/clearing/agr-001 → still shows source (origin: &quot;direct-management&quot;)
+     (fallback path, gateway store, 404 on position)
+
+6. Compute receipts begin accumulating:
+   Cross-coop tasks reference &quot;agr-gov-001&quot;
+   → ReceiptClearingManager flush writes to supervisor store under &quot;agr-gov-001&quot;
+   → GET /v1/federation/clearing/agr-gov-001/position reflects accumulated transfers
+
+7. Settlement:
+   FederationEffect::SettleClearing { agreement_id: &quot;agr-gov-001&quot;, ... }
+   → nets position, emits ledger entry with full provenance
+</code></pre>
+<hr>
+<h2>Phase 4: Minimum Implementation-Ready Slice</h2>
+<h3>What is NOT yet ripe for implementation</h3>
+<p><strong>Step 3d (adoption proposal endpoint)</strong> requires:</p>
+<ul>
+<li>The governance voting flow to accept a clearing adoption proposal type</li>
+<li>The proposal payload to map cleanly to <code>FederationEffect::EstablishClearing</code></li>
+<li>Tested round-trip from proposal → vote → effect execution</li>
+<li>These are non-trivial and should not be rushed</li>
+</ul>
+<h3>What IS implementation-ready now</h3>
+<p><strong>Step 3a (terms propagation fix)</strong> is independently valuable and low-risk:</p>
+<ul>
+<li>Fix <code>FederationEffect::EstablishClearing</code> to carry terms (<code>#[serde(default)]</code> for compat)</li>
+<li>Fix <code>FederationClearingRequest</code> with same terms</li>
+<li>Fix <code>FederationServiceImpl::establish_clearing()</code> to use provided terms</li>
+<li>This alone makes the existing governance clearing path correct for production use</li>
+<li>No new API surface, no governance flow changes, no adoption mechanics needed</li>
+<li>Can be a standalone PR without Step 3 adoption</li>
+</ul>
+<p><strong>Step 3b (source reference in provenance)</strong> adds 1 optional field — can ship alongside 3a
+as part of the same minimal PR.</p>
+<p><strong>Step 3c (read surface)</strong> adds 1 optional field to <code>ClearingAgreementView</code> — can ship
+alongside 3a/3b.</p>
+<p><strong>Recommended implementation order</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Slice</th>
+<th>Name</th>
+<th>Prerequisite</th>
+<th>Risk</th>
+<th>Can ship standalone?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>3a</td>
+<td>Terms propagation fix</td>
+<td>Store-isolation tests (verify baseline)</td>
+<td>Low</td>
+<td>✅ Yes</td>
+</tr>
+<tr>
+<td>3b</td>
+<td>Source reference in provenance</td>
+<td>3a</td>
+<td>Low</td>
+<td>✅ Yes (same PR as 3a)</td>
+</tr>
+<tr>
+<td>3c</td>
+<td>ClearingAgreementView.source_agreement_id</td>
+<td>3b</td>
+<td>Low</td>
+<td>✅ Yes (same PR as 3a)</td>
+</tr>
+<tr>
+<td>3d</td>
+<td>Adoption proposal endpoint</td>
+<td>3a+3b+3c + governance plumbing</td>
+<td>High</td>
+<td>Separate PR</td>
+</tr>
+</tbody></table>
+<p><strong>The minimal PR ready to write today</strong>: 3a+3b+3c together — &quot;terms propagation + adoption
+reference fields.&quot; No governance flow changes, no new API endpoints, no CCL contract types.
+~5 files changed.</p>
+<hr>
+<h2>Phase 5: Verification Strategy</h2>
+<h3>Store-isolation tests (land BEFORE Step 3 implementation)</h3>
+<p>These tests must be green before any adoption mechanics are written. They establish the
+invariants that adoption must not violate:</p>
+<p><strong><code>test_gateway_clearing_and_governance_clearing_do_not_share_positions</code></strong></p>
+<ul>
+<li>Create agreement &quot;agr-dm&quot; via <code>FederationManager</code> (direct-management)</li>
+<li>Create agreement &quot;agr-gov&quot; via <code>FederationServiceImpl::establish_clearing()</code> (governance)</li>
+<li>Assert <code>FederationService::get_clearing_position(&quot;agr-dm&quot;)</code> returns Err (not found in supervisor)</li>
+<li>Assert <code>FederationService::get_clearing_position(&quot;agr-gov&quot;)</code> returns Ok (found in supervisor)</li>
+<li>Assert <code>FederationManager::get_position(&quot;agr-gov&quot;)</code> returns Err (not found in gateway store)</li>
+<li>Proves: stores are isolated — governance agreement invisible to gateway manager and vice versa</li>
+</ul>
+<p><strong><code>test_gateway_coop_list_reflects_only_gateway_registered_coops</code></strong></p>
+<ul>
+<li>Register &quot;coop-a&quot; via <code>FederationManager::register_own_info()</code> (gateway path)</li>
+<li>Register &quot;coop-b&quot; via <code>FederationServiceImpl::join_federation()</code> (governance path)</li>
+<li>Assert <code>FederationManager::list_cooperatives()</code> returns only &quot;coop-a&quot;</li>
+<li>Assert <code>FederationServiceImpl::list_cooperatives()</code> returns only &quot;coop-b&quot;</li>
+<li>Proves: cooperative registries are isolated — not merged, not visible cross-path</li>
+</ul>
+<h3>Step 3 adoption-specific tests (land with 3a/3b/3c PR)</h3>
+<p><strong><code>test_establish_clearing_uses_provided_terms_not_defaults</code></strong></p>
+<ul>
+<li>Call <code>FederationServiceImpl::establish_clearing()</code> with a request carrying explicit terms
+(Monthly, max_imbalance=25000, custom exchange_rates)</li>
+<li>Assert the stored agreement has <code>settlement_interval = Monthly</code>, <code>max_imbalance = 25000</code></li>
+<li>Proves: terms propagation fix works — defaults no longer hardcoded</li>
+</ul>
+<p><strong><code>test_establish_clearing_compat_with_missing_terms</code></strong></p>
+<ul>
+<li>Deserialize a legacy <code>FederationEffect::EstablishClearing</code> JSON that lacks the new fields</li>
+<li>Assert deserialization succeeds with defaults applied</li>
+<li>Proves: <code>#[serde(default)]</code> backward compat preserved</li>
+</ul>
+<p><strong><code>test_establish_clearing_with_source_agreement_id_stores_provenance</code></strong></p>
+<ul>
+<li>Call <code>establish_clearing()</code> with <code>source_agreement_id: Some(&quot;agr-001&quot;)</code></li>
+<li>Assert provenance for the new agreement carries <code>source_agreement_id = Some(&quot;agr-001&quot;)</code></li>
+<li>Proves: adoption reference chain is persisted</li>
+</ul>
+<p><strong><code>test_adopted_agreement_position_starts_fresh</code></strong></p>
+<ul>
+<li>Create source agreement via FederationManager, record some mock transfers</li>
+<li>Create governance canonical agreement via establish_clearing with source_agreement_id</li>
+<li>Assert canonical agreement&#39;s initial position is zero (no inherited transfers)</li>
+<li>Proves: position isolation — no silent position blending across stores</li>
+</ul>
+<p><strong><code>test_read_surface_shows_source_reference_for_adopted_agreement</code></strong></p>
+<ul>
+<li>Use FederationServiceImpl in a gateway test stub</li>
+<li>GET /v1/federation/clearing/{canonical_id}</li>
+<li>Assert response has <code>origin: &quot;governance&quot;</code> and <code>source_agreement_id: &quot;agr-001&quot;</code></li>
+<li>Proves: read surface exposes adoption lineage honestly</li>
+</ul>
+<h3>Timing of store-isolation tests vs. Step 3</h3>
+<p>Store-isolation tests MUST land before any Step 3 implementation begins. They are
+standalone tests against existing code — they require no new types or endpoints. If they
+fail, something is already broken and must be fixed before proceeding.</p>
+<p>Step 3a/b/c tests land in the same PR as the implementation changes.</p>
+<p>Step 3d tests land when the adoption proposal endpoint is implemented.</p>
+<hr>
+<h2>Phase 6: Open Questions Before Implementation</h2>
+<p>These must be resolved before writing Step 3a:</p>
+<p><strong>Q1: Agreement ID for adopted record</strong>
+Should the governance-canonical agreement use:</p>
+<ul>
+<li>A) A new ID assigned by governance (e.g., a UUID or a hash of the proposal)</li>
+<li>B) The same ID as the source agreement</li>
+</ul>
+<p>Recommendation: <strong>Option A (new ID)</strong>. Same-ID risks split-brain (two records, one ID, two
+stores). A new ID makes both records independently addressable and unambiguous. The
+<code>source_agreement_id</code> field in provenance provides the link.</p>
+<p><strong>Q2: What happens to positions when adoption occurs</strong>
+Should accumulated direct-management positions carry over?</p>
+<p>Answer: <strong>No — positions start fresh</strong>. Position carryover would blend two stores&#39; state.
+If parties need to account for pre-adoption transfers, that requires an explicit governance
+settlement of the source agreement first (resetting it to zero), followed by a fresh
+canonical agreement. The governance settlement produces a ledger entry. This is the
+correct audit-safe path.</p>
+<p><strong>Q3: Should the source agreement remain actionable after adoption?</strong>
+Can both parties continue settling the direct-management agreement after the governance
+canonical agreement exists?</p>
+<p>Answer: <strong>The source agreement remains in the gateway store and is not voided by adoption</strong>.
+ADR 0011 prohibits gateway mutation from governance execution. The source agreement&#39;s
+operational status is a policy decision above the kernel layer. The API can add a
+&quot;superseded_by&quot; field to the view DTO as a hint, but enforcement is the caller&#39;s
+responsibility.</p>
+<p><strong>Q4: Provenance storage gap</strong>
+Currently <code>FederationProvenance</code> is stored in a <code>RwLock&lt;HashMap&lt;...&gt;&gt;</code> — in-memory, not
+persisted to Sled. This means provenance is lost on daemon restart. This gap exists today
+for join_federation provenance too. Step 3 should persist provenance to Sled alongside the
+agreement as part of the 3b implementation.</p>
+<hr>
+<h2>Consequences</h2>
+<h3>What Step 3a/b/c locks in</h3>
+<ol>
+<li><code>FederationEffect::EstablishClearing</code> is the canonical governance effect for creating
+clearing agreements — fresh AND adopted. No new effect variant needed for adoption.</li>
+<li><code>source_agreement_id</code> is the adoption audit link — required when adoption is the trigger.</li>
+<li>Clearing positions start fresh at governance establishment. No implicit inheritance.</li>
+<li>Provenance is persisted to Sled (Step 3b fixes the in-memory gap).</li>
+</ol>
+<h3>What Step 3a/b/c does NOT do</h3>
+<ol>
+<li>Does not change the gateway write path (direct-management still works as-is).</li>
+<li>Does not add an adoption proposal endpoint (that is Step 3d).</li>
+<li>Does not modify the governance voting flow.</li>
+<li>Does not add CCL contract types.</li>
+<li>Does not void or supersede source agreements.</li>
+<li>Does not merge stores.</li>
+</ol>
+<h3>What Step 3d adds (implemented 2026-04-01)</h3>
+<ol>
+<li><code>POST /v1/federation/clearing/{id}/propose-adoption</code> endpoint — <strong>IMPLEMENTED</strong></li>
+<li>Proposal payload mapping to <code>FederationEffect::EstablishClearing</code> with terms + source_id — <strong>IMPLEMENTED</strong></li>
+<li><code>FederationProposal::EstablishClearing</code> gains <code>source_agreement_id: Option&lt;String&gt;</code> — <strong>IMPLEMENTED</strong></li>
+<li><code>execution.rs</code> now passes <code>settlement_interval</code>, <code>max_imbalance</code>, <code>source_agreement_id</code> through to the kernel effect — <strong>IMPLEMENTED</strong></li>
+<li>Two tests: 404 for unknown agreement, happy path verifying provenance + direct-management store unchanged — <strong>IMPLEMENTED</strong></li>
+</ol>
+<p>Not yet done (see open items in Status section):</p>
+<ul>
+<li>Round-trip integration test: proposal → vote → governance actor dispatch → canonical agreement in supervisor store</li>
+<li><code>establish_clearing()</code> in core supervisor populates <code>coop_a_did</code> correctly (currently <code>String::new()</code>)</li>
+</ul>
+<hr>
+<h2>References</h2>
+<ul>
+<li>ADR 0011: Canonical Truth Ownership — Gateway vs Supervisor</li>
+<li>ADR 0012: Federation State Origin Model (Step 1a/1b/2 complete; Step 3 here)</li>
+<li><code>crates/icn-kernel-api/src/effects.rs</code> — <code>FederationEffect::EstablishClearing</code> (needs terms extension)</li>
+<li><code>crates/icn-kernel-api/src/services.rs</code> — <code>FederationClearingRequest</code>, <code>ClearingAgreementView</code></li>
+<li><code>crates/icn-core/src/services/federation_service.rs</code> — <code>establish_clearing()</code> (uses hardcoded defaults)</li>
+<li><code>crates/icn-federation/src/clearing.rs</code> — <code>BilateralClearingAgreement::new()</code> (Weekly/10000 defaults)</li>
+<li><code>crates/icn-core/src/supervisor/governance_executor.rs</code> — federation_effect_to_operation()</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

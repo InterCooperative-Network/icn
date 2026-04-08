@@ -1,0 +1,398 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Institutional Operability Roadmap | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>strategy</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN Institutional Operability Roadmap</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/ICN-Institutional-Operability-Roadmap.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Institutional Operability Roadmap</h1>
+<blockquote>
+<p>From protocol-shaped architecture toward an accessible, executable operating
+system for cooperative institutions, starting with single-institution truth
+and growing into federation only after governance and economics are real locally.</p>
+</blockquote>
+<h2>Core Principle</h2>
+<p><strong>Build downward toward operable institutional reality, and upward only when the
+lower layer is honest.</strong></p>
+<p>The product is not &quot;a protocol.&quot; It is a <strong>cooperative operating environment</strong>.
+Not just identity. Not just governance. Not just payments. Not just contracts.
+The real thing is the composition of those parts into institutional workflows:</p>
+<ul>
+<li>join an institution</li>
+<li>prove membership / role / trust</li>
+<li>propose something</li>
+<li>deliberate and vote</li>
+<li>allocate resources</li>
+<li>record obligations</li>
+<li>execute an outcome</li>
+<li>audit what happened</li>
+<li>federate that process across groups</li>
+</ul>
+<p>Development is organized around <strong>institutional workflows</strong>, not subsystem elegance.</p>
+<h2>North Star</h2>
+<blockquote>
+<p>Make it easier to run a democratic, collectively owned institution than to patch
+one together with capitalist admin tools.</p>
+</blockquote>
+<p>Not ideology versus ideology. Infrastructure versus infrastructure.</p>
+<p>The moment ICN lets a cooperative run itself more clearly, more safely, and more
+democratically than the Google Docs + Stripe + Slack + bank account + treasurer
+spreadsheet mess, it stops being a theory project.</p>
+<hr>
+<h2>Phase 1: Make One Institution Real</h2>
+<p><strong>Threshold:</strong> One real organization can use ICN to run meaningful governance and
+economic coordination without falling back to Google Docs, Stripe, Discord, and a
+treasurer&#39;s spreadsheet.</p>
+<h3>Capabilities Required</h3>
+<ul>
+<li>Member identity exists</li>
+<li>Institution membership exists</li>
+<li>Roles and permissions exist</li>
+<li>Proposals can be created, discussed, voted, and finalized</li>
+<li>Passed proposals trigger real state changes</li>
+<li>Treasury or budget actions can be requested and approved</li>
+<li>Allocations, obligations, and settlements are durably recorded</li>
+<li>A user can inspect what happened and why</li>
+</ul>
+<h3>Done Means</h3>
+<p>A real institution can run:</p>
+<ul>
+<li>Member admission/removal</li>
+<li>One budget approval flow</li>
+<li>One allocation or settlement flow</li>
+<li>One policy change that actually changes permissions or behavior</li>
+</ul>
+<h3>Not Yet</h3>
+<ul>
+<li>Broad federation</li>
+<li>Advanced market logic</li>
+<li>Generalized treaty systems</li>
+<li>Multi-domain civilization abstractions</li>
+</ul>
+<p>Because if one institution cannot run cleanly, everything above it is theater.</p>
+<hr>
+<h2>Phase 2: Governance Must Compile Into System Behavior</h2>
+<p><strong>Goal:</strong> A passed proposal changes something real.</p>
+<h3>Priority Implementation Pattern</h3>
+<p>Every major proposal type maps to an executable state transition:</p>
+<table>
+<thead>
+<tr>
+<th>Proposal Type</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Add/remove member</td>
+<td>Membership roster changed</td>
+</tr>
+<tr>
+<td>Assign/revoke role</td>
+<td>Permissions altered</td>
+</tr>
+<tr>
+<td>Approve budget</td>
+<td>Budget line authorized</td>
+</tr>
+<tr>
+<td>Authorize disbursement</td>
+<td>Release executed</td>
+</tr>
+<tr>
+<td>Change treasury rule</td>
+<td>Policy updated</td>
+</tr>
+<tr>
+<td>Modify institution policy</td>
+<td>Constraints reconfigured</td>
+</tr>
+<tr>
+<td>Approve federation relationship</td>
+<td>Treaty activated</td>
+</tr>
+<tr>
+<td>Commons usage policy</td>
+<td>Access rules changed</td>
+</tr>
+</tbody></table>
+<h3>Required Architecture</h3>
+<ul>
+<li>Proposal types with explicit effect models</li>
+<li>Validation before voting closes</li>
+<li>Deterministic execution after passage</li>
+<li>Durable recording of execution result</li>
+<li>Failure handling that is legible, not silent</li>
+</ul>
+<h3>Done Means</h3>
+<p>The system can prove:</p>
+<ul>
+<li>Who proposed it</li>
+<li>Who voted</li>
+<li>Why it passed</li>
+<li>What state changed</li>
+<li>Whether execution succeeded or failed</li>
+<li>What the post-change state is</li>
+</ul>
+<h3>Not Yet</h3>
+<ul>
+<li>Highly dynamic arbitrary execution</li>
+<li>Universal contract engine replacing all domain logic at once</li>
+</ul>
+<p>Explicit, bounded proposal-effect types first. Generalization comes later.</p>
+<hr>
+<h2>Phase 3: Institutional Economics, Not Consumer Payments</h2>
+<p><strong>Goal:</strong> Make ICN useful for collective provisioning and accountable resource
+coordination. <strong>Avoid becoming left fintech.</strong></p>
+<h3>Core Economic Primitives</h3>
+<ul>
+<li>Treasury/budget lines</li>
+<li>Requests for allocation</li>
+<li>Approval and release conditions</li>
+<li>Recurring obligations</li>
+<li>Member dues or contribution commitments</li>
+<li>Mutual credit between actors or subgroups</li>
+<li>Escrow/release logic</li>
+<li>Durable settlement history</li>
+</ul>
+<h3>The Economic Layer Should Answer</h3>
+<ul>
+<li>What resources exist?</li>
+<li>What has been committed?</li>
+<li>Who approved what?</li>
+<li>What remains available?</li>
+<li>What obligations are outstanding?</li>
+<li>What conditions govern release?</li>
+<li>How do we coordinate provision without defaulting to commodity purchase?</li>
+</ul>
+<h3>First Bounded Tranche</h3>
+<p>One honest institutional treasury path:</p>
+<ol>
+<li>Create request</li>
+<li>Review request</li>
+<li>Governance approval</li>
+<li>Execute release or obligation creation</li>
+<li>Record result in ledger</li>
+<li>Expose via API/UI</li>
+</ol>
+<h3>Done Means</h3>
+<p>A real institution can manage shared funds or internal credits with governance-backed
+authorization and auditability.</p>
+<h3>Not Yet</h3>
+<ul>
+<li>Speculative tokenomics</li>
+<li>Retail wallet obsession</li>
+<li>Generalized exchange systems</li>
+<li>&quot;Economy layer&quot; abstractions without institutional use</li>
+</ul>
+<p>The first question is not &quot;can two strangers transact?&quot;
+It is &quot;can a cooperative govern and allocate common resources responsibly?&quot;</p>
+<hr>
+<h2>Phase 4: Design Everything for the Human Interface Now</h2>
+<p><strong>Goal:</strong> Backend structures support a future where most people interact through a
+phone, and many users are nontechnical or disabled.</p>
+<h3>Development Filter</h3>
+<p>Before adding backend complexity, ask:</p>
+<ul>
+<li>Can this be explained in plain language in the UI?</li>
+<li>Can a user understand what action they are authorizing?</li>
+<li>Can a user inspect why the system accepted or rejected something?</li>
+<li>Can this be represented accessibly on mobile?</li>
+<li>Does this create hidden operator dependency?</li>
+</ul>
+<h3>Priority Surfaces</h3>
+<ul>
+<li>Human-readable action summaries</li>
+<li>Plain-language proposal descriptions</li>
+<li>Explicit permission/state explanations</li>
+<li>Accessible audit history</li>
+<li>Notification/event model suitable for mobile</li>
+<li>Role-aware dashboards: member, steward, treasurer, delegate</li>
+</ul>
+<h3>Done Means</h3>
+<p>A user can: join, see what they can do, review a proposal, vote, view
+treasury-related actions, understand outcomes without reading code.</p>
+<h3>Not Yet</h3>
+<ul>
+<li>Pixel-perfect polished app</li>
+<li>Premature frontend expansion across every platform</li>
+</ul>
+<p>Legibility first, polish second.</p>
+<hr>
+<h2>Phase 5: Earn Federation</h2>
+<p><strong>Goal:</strong> Allow real institutions to interoperate without surrendering autonomy.</p>
+<h3>Order of Operations</h3>
+<ol>
+<li>Institution can govern itself</li>
+<li>Institution can manage internal economic actions</li>
+<li>Institution can expose legible state and rules</li>
+<li><strong>Then</strong> institutions can recognize and coordinate with one another</li>
+</ol>
+<h3>First Federation Capabilities</h3>
+<ul>
+<li>Institution identity</li>
+<li>Federation relationship records</li>
+<li>Shared recognition/trust rules</li>
+<li>Inter-institution agreements</li>
+<li>Scoped obligations across institutions</li>
+<li>Auditable cross-institution actions</li>
+</ul>
+<h3>Done Means</h3>
+<p>Two institutions can enter a governed relationship and execute a bounded shared
+workflow with durable records and clear permissions.</p>
+<h3>Not Yet</h3>
+<ul>
+<li>Global spontaneous federation</li>
+<li>Open-ended network complexity</li>
+<li>Abstract distributed choreography for its own sake</li>
+</ul>
+<p>Do not network illusions together.</p>
+<hr>
+<h2>Phase 6: CCL as Institutional Grammar</h2>
+<p><strong>Goal:</strong> CCL becomes the legible, executable expression layer for institutional rules,
+obligations, permissions, and coordination.</p>
+<h3>What CCL Should Eventually Express</h3>
+<ul>
+<li>Membership conditions</li>
+<li>Quorum rules</li>
+<li>Voting thresholds</li>
+<li>Treasury release policies</li>
+<li>Recurring obligations</li>
+<li>Steward permissions</li>
+<li>Resource access policies</li>
+<li>Federation agreements</li>
+<li>Conflict resolution paths</li>
+<li>Commons governance rules</li>
+</ul>
+<h3>Constraint</h3>
+<p>CCL must remain readable by serious non-programmer operators. If only
+priest-engineers can author or audit it, power recentralizes.</p>
+<h3>Done Means</h3>
+<p>An institution can inspect its own rules in both machine-executable form and
+human-readable civic form.</p>
+<h3>Not Yet</h3>
+<ul>
+<li>Universal everything-language</li>
+<li>Overpowered syntax before good authoring and review models</li>
+<li>Expressive complexity beyond operator comprehension</li>
+</ul>
+<p>CCL should become governance law you can run, not magical incantation syntax.</p>
+<hr>
+<h2>Development Spine</h2>
+<h3>Track A: Institutional Core</h3>
+<p>Members, roles, permissions, institution state, audit history</p>
+<h3>Track B: Governance Execution</h3>
+<p>Proposals, voting, tally/finalization, deterministic effect handlers, visible outcomes</p>
+<h3>Track C: Treasury / Resource Coordination</h3>
+<p>Requests, approvals, releases, obligations, settlements, balances/budgets</p>
+<h3>Track D: Human Surface</h3>
+<p>Plain-language summaries, accessible event feed, mobile-friendly APIs, explainable
+errors, status/notification model</p>
+<h3>Track E: Federation</h3>
+<p>Institution-to-institution trust, agreements, scoped cross-boundary actions, shared
+auditability</p>
+<h3>Track F: CCL</h3>
+<p>Rule templates, executable policy bindings, readable governance/economic contracts,
+versioned institutional law</p>
+<hr>
+<h2>Milestones</h2>
+<h3>Milestone 1: Minimum Viable Cooperative</h3>
+<p>One institution can govern membership, vote, authorize a treasury action, and audit
+the result.</p>
+<h3>Milestone 2: Operational Commons</h3>
+<p>One institution can manage recurring obligations, budget logic, and role-governed
+stewardship through ICN.</p>
+<h3>Milestone 3: Accessible Member Interface</h3>
+<p>A nontechnical user can participate from a phone and understand what they are doing.</p>
+<h3>Milestone 4: Federated Cooperation</h3>
+<p>Two or more real institutions can coordinate through governed agreements.</p>
+<h3>Milestone 5: Institutional Grammar</h3>
+<p>CCL expresses the rules of institutional life in legible executable form.</p>
+<hr>
+<h2>Explicit Deprioritizations</h2>
+<ul>
+<li>Sprawling protocol expansion without user workflows</li>
+<li>Symbolic decentralization features</li>
+<li>Speculative token/economy complexity</li>
+<li>Federation demos that outpace institutional truth</li>
+<li>Overly abstract contract machinery</li>
+<li>Polishing provenance forever while operability lags</li>
+<li>Frontend glitter over backend dishonesty</li>
+<li>Adding endpoints that do not correspond to real capability</li>
+</ul>
+<hr>
+<h2>Current Priority Order (as of 2026-03-25)</h2>
+<ol>
+<li>Single-institution operability</li>
+<li>Governance-to-effect linkage</li>
+<li>Treasury/resource workflow</li>
+<li>Legible API/event surface</li>
+<li>Mobile/accessibility-informed backend design</li>
+<li>Federation of already-real institutions</li>
+<li>CCL gradual expansion</li>
+</ol>
+<h2>Next Implementation Tranche</h2>
+<p><strong>Governance→Execution Bridge (FreezeMember)</strong></p>
+<p>When <code>POST /gov/proposals/{id}/close</code> finalizes a <code>FreezeMember</code> proposal as
+<code>Accepted</code>, the target member is frozen in the cooperative&#39;s ledger with governance
+provenance. This is the first proof that ICN governance compiles into execution.</p>
+<p>See <code>docs/strategy/operability-audit-2026-03-25.md</code> for the full system audit and
+ranked implementation queue.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

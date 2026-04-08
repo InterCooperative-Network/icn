@@ -1,0 +1,879 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0012: Federation State Origin Model | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0012 federation state origin model</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0012-federation-state-origin-model.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>id: &quot;0012&quot;
+title: &quot;Federation State Origin Model — Gateway vs Governance vs Compute&quot;
+status: &quot;accepted&quot;
+date: &quot;2026-03-31&quot;
+context: &quot;federation-clearing-position-api / post-ADR-0011 architecture pass&quot;
+deciders: [&quot;Matt Faherty&quot;]
+tags: [&quot;gateway&quot;, &quot;architecture&quot;, &quot;federation&quot;, &quot;clearing&quot;, &quot;state-origins&quot;, &quot;parallel-model&quot;]</h2>
+<h1>ADR 0012: Federation State Origin Model</h1>
+<h2>Status</h2>
+<p>Accepted (2026-03-31)</p>
+<h2>Context</h2>
+<p>ADR 0011 established the canonical truth invariant: no gateway-local state for supervisor-owned
+domains. It identified that federation clearing position reads must go through the supervisor&#39;s
+<code>FederationService</code>. It left open the question: <strong>how do the gateway API write paths, governance
+execution write paths, and compute receipt paths relate — and what is the correct long-term model?</strong></p>
+<p>This ADR answers that question by tracing every federation write path from code, performing a
+per-concept convergence analysis, and defining the minimal correct architecture for the current
+phase with a precise roadmap for unification.</p>
+<hr>
+<h2>Phase 1: Federation State Origin Map</h2>
+<h3>Gateway-Originated State</h3>
+<p><strong>Owner</strong>: <code>FederationManager</code> (gateway-local)
+<strong>Store</strong>: <code>data_dir/federation_store</code> (persistent sled, per ADR 0011 fix)
+<strong>Provenance</strong>: None — no <code>decision_receipt_id</code>, no <code>decision_hash</code>, no settlement attribution
+<strong>Guarantees</strong>: Durable across gateway restarts, isolated from supervisor state</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Object Created</th>
+<th>Store Key</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /federation/init</code></td>
+<td>Own <code>CooperativeInfo</code></td>
+<td><code>CooperativeRegistry</code></td>
+</tr>
+<tr>
+<td><code>POST /federation/coops</code></td>
+<td>Peer <code>CooperativeInfo</code></td>
+<td><code>CooperativeRegistry</code></td>
+</tr>
+<tr>
+<td><code>POST /federation/connect</code></td>
+<td>Peer <code>CooperativeInfo</code></td>
+<td><code>CooperativeRegistry</code></td>
+</tr>
+<tr>
+<td><code>POST /federation/coops/{id}/vouch</code></td>
+<td><code>Vouch</code></td>
+<td><code>CooperativeRegistry</code></td>
+</tr>
+<tr>
+<td><code>POST /federation/attestations</code></td>
+<td><code>FederatedTrustAttestation</code></td>
+<td><code>AttestationStore</code></td>
+</tr>
+<tr>
+<td><code>POST /federation/clearing</code></td>
+<td><code>BilateralClearingAgreement</code></td>
+<td><code>ClearingManager</code></td>
+</tr>
+<tr>
+<td><code>POST /federation/clearing/{id}/settle</code></td>
+<td>Settlement (gateway&#39;s ClearingManager)</td>
+<td><code>ClearingManager</code></td>
+</tr>
+<tr>
+<td><code>POST /federation/clearing/settle-scheduled</code></td>
+<td>Multiple settlements</td>
+<td><code>ClearingManager</code></td>
+</tr>
+<tr>
+<td><code>POST /federation/clearing/netting/{unit}/apply</code></td>
+<td>Position adjustments</td>
+<td><code>ClearingManager</code></td>
+</tr>
+</tbody></table>
+<p><strong>Visibility through gateway reads</strong>:</p>
+<ul>
+<li><code>GET /federation/coops*</code> → prefers <code>FederationService</code> (Step 1a); falls back to <code>FederationManager</code></li>
+<li><code>GET /federation/clearing</code> → prefers <code>FederationService</code> (Step 1b); falls back to <code>FederationManager</code></li>
+<li><code>GET /federation/clearing/{id}</code> → prefers <code>FederationService</code> (Step 1b); falls back to <code>FederationManager</code></li>
+<li><code>GET /federation/clearing/{id}/position</code> → <code>FederationService</code> only (ADR 0011) — shows supervisor state</li>
+</ul>
+<h3>Supervisor/Governance-Originated State</h3>
+<p><strong>Owner</strong>: <code>FederationServiceImpl</code> (supervisor-owned)
+<strong>Store</strong>: <code>store_path/{federation,clearing}</code> (persistent sled, supervisor-controlled)
+<strong>Provenance</strong>: Full — carries <code>decision_receipt_id</code>, <code>decision_hash</code>, <code>state_change_hash</code> on every operation
+<strong>Guarantees</strong>: Durable, audit-attributed, settlement-linked, governance-ratified</p>
+<table>
+<thead>
+<tr>
+<th>Origin</th>
+<th>Kernel Effect</th>
+<th>Object Created</th>
+<th>Store Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CCL governance → kernel executor</td>
+<td><code>FederationEffect::JoinFederation</code></td>
+<td><code>CooperativeInfo</code> with provenance</td>
+<td><code>store_path/federation</code></td>
+</tr>
+<tr>
+<td>CCL governance → kernel executor</td>
+<td><code>FederationEffect::LeaveFederation</code></td>
+<td>Departure record</td>
+<td><code>store_path/federation</code></td>
+</tr>
+<tr>
+<td>CCL governance → kernel executor</td>
+<td><code>FederationEffect::VouchForCoop</code></td>
+<td><code>Vouch</code> with provenance</td>
+<td><code>store_path/federation</code></td>
+</tr>
+<tr>
+<td>CCL governance → kernel executor</td>
+<td><code>FederationEffect::EstablishClearing</code></td>
+<td><code>BilateralClearingAgreement</code> with provenance</td>
+<td><code>store_path/clearing</code></td>
+</tr>
+<tr>
+<td>CCL governance → kernel executor</td>
+<td><code>FederationEffect::SettleClearing</code></td>
+<td>Settlement + ledger entry</td>
+<td><code>store_path/clearing</code></td>
+</tr>
+</tbody></table>
+<p><strong>Execution chain</strong>:</p>
+<pre><code>CCL contract execution
+  → KernelEffect::Federation(FederationEffect)
+  → federation_effect_to_operation()
+  → KernelFederationExecutor::execute_federation_operation()
+  → FederationService::join_federation / vouch_for_cooperative / establish_clearing / settle_clearing
+  → FederationServiceImpl (adapter)
+  → CooperativeRegistry / ClearingManager at store_path/{federation,clearing}
+</code></pre>
+<h3>Compute-Originated Clearing State</h3>
+<p><strong>Owner</strong>: <code>ReceiptClearingManager</code> (supervisor-owned, fed by compute actor)
+<strong>Store</strong>: <code>store_path/clearing</code> (same physical store as governance-originated clearing)
+<strong>Provenance</strong>: Attestation hash from compute receipt
+<strong>Guarantees</strong>: Durable, per-task attributed, flushed periodically</p>
+<pre><code>Compute task completion (cross-coop)
+  → ComputeActor emits clearing receipt
+  → receipt_clearing_handle queue
+  → periodic flush task (spawn_clearing_receipt_flush_task)
+  → ReceiptClearingManager::flush_to_clearing()
+  → ClearingManager::record_transfer() at store_path/clearing
+</code></pre>
+<p><strong>Note</strong>: Compute receipts and governance-established agreements share the <strong>same</strong> <code>ClearingManager</code> instance at <code>store_path/clearing</code>. A compute receipt for agreement <code>X</code> accumulates into the same position that governance&#39;s <code>get_clearing_position(&quot;X&quot;)</code> reads. This is the intended design.</p>
+<h3>Agreements API (Separate Plane)</h3>
+<p><code>/v1/agreements/...</code> via <code>AgreementManagerHandle</code> manages inter-cooperative agreements with full
+lifecycle (draft, propose, sign, suspend, resume, terminate). These are <strong>not</strong> bilateral clearing
+agreements — they are structured documents (Trade, Credit, ResourceSharing, FederationMembership,
+Custom). They do not overlap with <code>/federation/clearing</code>. Omitted from convergence analysis below.</p>
+<hr>
+<h2>Phase 2: Per-Concept Convergence Analysis</h2>
+<h3>Cooperative Registry (coops, vouches)</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Gateway Path</th>
+<th>Governance Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Type</td>
+<td><code>CooperativeInfo</code>, <code>Vouch</code></td>
+<td><code>CooperativeInfo</code>, <code>Vouch</code> (same types)</td>
+</tr>
+<tr>
+<td>Store</td>
+<td><code>data_dir/federation_store</code></td>
+<td><code>store_path/federation</code></td>
+</tr>
+<tr>
+<td>Provenance</td>
+<td>None</td>
+<td><code>decision_receipt_id</code>, <code>decision_hash</code></td>
+</tr>
+<tr>
+<td>Read API</td>
+<td><code>GET /federation/coops</code></td>
+<td>Not exposed via gateway</td>
+</tr>
+<tr>
+<td>Relationship</td>
+<td><strong>Transitional</strong></td>
+<td><strong>Canonical</strong></td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: Governance-registered cooperatives are invisible to <code>GET /federation/coops</code>. The read API
+only queries the gateway&#39;s <code>FederationManager</code>. This is not a correctness bug — it is a read-plane
+gap that will require <code>FederationService</code> read method expansion to close.</p>
+<p><strong>Verdict</strong>: <strong>Parallel</strong> for now. Gateway path is direct-management / exploratory / standalone
+tooling. Governance path is institutional / ratified. Neither replaces the other in the current
+phase.</p>
+<h3>Attestations</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Gateway Path</th>
+<th>Governance Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Type</td>
+<td><code>FederatedTrustAttestation</code></td>
+<td>No governance effect path</td>
+</tr>
+<tr>
+<td>Store</td>
+<td><code>data_dir/federation_store</code></td>
+<td>N/A</td>
+</tr>
+<tr>
+<td>Provenance</td>
+<td>None</td>
+<td>N/A</td>
+</tr>
+</tbody></table>
+<p><strong>Verdict</strong>: <strong>Standalone</strong> — gateway is the only write path. No convergence needed.</p>
+<h3>Bilateral Clearing Agreements</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Gateway Path</th>
+<th>Governance Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Type</td>
+<td><code>BilateralClearingAgreement</code></td>
+<td><code>BilateralClearingAgreement</code> (same type)</td>
+</tr>
+<tr>
+<td>Store</td>
+<td><code>data_dir/federation_store</code></td>
+<td><code>store_path/clearing</code></td>
+</tr>
+<tr>
+<td>Provenance</td>
+<td>None</td>
+<td><code>decision_receipt_id</code>, <code>decision_hash</code></td>
+</tr>
+<tr>
+<td>Position query</td>
+<td>404 in daemon mode (ADR 0011)</td>
+<td>✅ via <code>FederationService::get_clearing_position</code></td>
+</tr>
+<tr>
+<td>Read list</td>
+<td><code>GET /federation/clearing</code> (fallback only)</td>
+<td>✅ via <code>FederationService::list_agreements</code> (Step 1b)</td>
+</tr>
+<tr>
+<td>Read by ID</td>
+<td><code>GET /federation/clearing/{id}</code> (fallback only)</td>
+<td>✅ via <code>FederationService::get_agreement</code> (Step 1b)</td>
+</tr>
+<tr>
+<td>Relationship</td>
+<td><strong>Transitional</strong></td>
+<td><strong>Canonical</strong></td>
+</tr>
+</tbody></table>
+<p><strong>Gap (documented, acceptable)</strong>: A clearing agreement created via <code>POST /federation/clearing</code> in
+daemon mode will return 404 from <code>GET /federation/clearing/{id}/position</code> because position reads
+go through the supervisor&#39;s service (ADR 0011) which only knows about governance-established
+agreements. This is documented and expected: direct-API agreements are for standalone operation.</p>
+<p><strong>Verdict</strong>: <strong>Parallel</strong> for now. Same analysis as cooperative registry.</p>
+<h3>Clearing Positions</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Write sources</td>
+<td>Governance (<code>SettleClearing</code>) + Compute (receipt flush)</td>
+</tr>
+<tr>
+<td>Store</td>
+<td><code>store_path/clearing</code> — single ClearingManager instance</td>
+</tr>
+<tr>
+<td>Read path</td>
+<td><code>FederationService::get_clearing_position</code> (supervisor)</td>
+</tr>
+<tr>
+<td>Gateway fallback</td>
+<td><code>FederationManager::get_position</code> (standalone only)</td>
+</tr>
+</tbody></table>
+<p><strong>Verdict</strong>: <strong>Already correctly unified</strong> under the supervisor&#39;s store. Governance and compute
+both write to the same <code>ClearingManager</code>. ADR 0011 fixed the read path. No further action needed.</p>
+<h3>Settlement</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Gateway Path</th>
+<th>Governance Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Endpoint</td>
+<td><code>POST /clearing/{id}/settle</code></td>
+<td><code>FederationEffect::SettleClearing</code></td>
+</tr>
+<tr>
+<td>Target store</td>
+<td><code>FederationManager</code>&#39;s ClearingManager</td>
+<td><code>FederationServiceImpl</code>&#39;s ClearingManager</td>
+</tr>
+<tr>
+<td>Can settle</td>
+<td>Only gateway-API-created agreements</td>
+<td>Only governance-established agreements</td>
+</tr>
+</tbody></table>
+<p><strong>Gap</strong>: Each settlement path can only settle agreements it owns. Gateway settlement of a
+governance-established agreement will return &quot;not found&quot;; governance settlement of a gateway-API
+agreement is not possible (no governance path to the gateway&#39;s store).</p>
+<p><strong>Verdict</strong>: <strong>Parallel</strong> — acceptable given the transitional status of the two paths.</p>
+<h3>Netting</h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Gateway Path</th>
+<th>Governance Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Endpoint</td>
+<td><code>POST /clearing/netting/{unit}</code> and <code>/apply</code></td>
+<td>No governance netting path</td>
+</tr>
+<tr>
+<td>Scope</td>
+<td>Gateway&#39;s ClearingManager only</td>
+<td>N/A</td>
+</tr>
+</tbody></table>
+<p><strong>Verdict</strong>: <strong>Standalone</strong> — netting only operates on gateway-API-created positions. No convergence needed or possible in current phase.</p>
+<hr>
+<h2>Phase 3: Chosen Model</h2>
+<h3>Decision: <strong>Model C (Explicit Parallel) with Targeted Promotion Path Design</strong></h3>
+<p>The two paths serve different institutional roles:</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Gateway API Path</th>
+<th>Governance Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Use case</td>
+<td>Direct management, admin tooling, standalone ops, test setup</td>
+<td>Democratic ratification, institutional decisions</td>
+</tr>
+<tr>
+<td>Actor</td>
+<td>API caller (admin)</td>
+<td>Governance body (votes)</td>
+</tr>
+<tr>
+<td>Provenance</td>
+<td>None</td>
+<td>Full audit trail (decision_receipt_id, decision_hash)</td>
+</tr>
+<tr>
+<td>Guarantees</td>
+<td>Durable state, isolated</td>
+<td>Durable, attributed, verifiable</td>
+</tr>
+<tr>
+<td>Appropriate for</td>
+<td>Exploratory federation, direct bilateral agreements, standalone nodes</td>
+<td>Production institutional federation, cross-coop credit, compliance-visible settlement</td>
+</tr>
+</tbody></table>
+<p><strong>Why not Option B (Submission/Proxy)</strong>:</p>
+<ul>
+<li>Gateway writes like <code>POST /federation/clearing</code> would need to create a governance proposal, wait for a vote, and return the agreement ID from governance execution</li>
+<li>This breaks the direct management use case entirely (no sync response possible)</li>
+<li>Governance quorum is inappropriate overhead for local administrative operations</li>
+</ul>
+<p><strong>Why not Option A (Promotion)</strong>:</p>
+<ul>
+<li>Gateway-created objects can&#39;t be &quot;proposed to governance&quot; without a CCL contract that accepts <code>BilateralClearingAgreement</code> as a proposal payload — this infrastructure doesn&#39;t exist</li>
+<li>Even if it did, the promotion flow is async and requires governance participation from both parties</li>
+</ul>
+<p><strong>Why not Option D (Hybrid unification of clearing)</strong>:</p>
+<ul>
+<li>The <code>FederationService</code> trait currently has no read methods beyond <code>get_clearing_position</code></li>
+<li>Unifying read paths requires adding <code>list_agreements</code>, <code>list_coops</code>, <code>get_vouches</code> to the trait</li>
+<li>This is non-trivial and out of scope for the current phase</li>
+</ul>
+<h3>Model C Rules (Explicit Parallel)</h3>
+<ol>
+<li><p><strong>Gateway API path = direct management / standalone tooling</strong>. Objects created here are valid for
+standalone and direct-bilateral use. They are NOT institutional state.</p>
+</li>
+<li><p><strong>Governance path = canonical institutional state</strong>. Production clearing agreements, cross-coop
+credit, and federation membership records that are compliance-visible MUST originate from
+governance execution.</p>
+</li>
+<li><p><strong>No silent mixing</strong>. The API contract must be clear which path a caller is on. Currently:</p>
+<ul>
+<li><code>POST /federation/clearing</code> → direct-management (no provenance)</li>
+<li>CCL governance execution → institutional (full provenance)
+These are not interchangeable.</li>
+</ul>
+</li>
+<li><p><strong>Read APIs reflect their write path</strong>. <code>GET /federation/coops</code> returns gateway-local state
+in standalone mode, governance-registered coops in daemon mode (Step 1 implemented below).</p>
+</li>
+<li><p><strong>Position reads are already unified</strong> (ADR 0011). This is the original crossing point.</p>
+</li>
+</ol>
+<hr>
+<h2>Phase 4: Precise Design Artifact — What Full Unification Requires</h2>
+<h2>Phase 4a: Read Unification — Step 1 Implementation (2026-03-31)</h2>
+<h3>Implemented: Cooperative Registry Read Surface</h3>
+<p>Added the following to <code>FederationService</code> (icn-kernel-api) and implemented in
+<code>FederationServiceImpl</code> (icn-core):</p>
+<pre><code class="language-rust">fn list_cooperatives(&amp;self) -&gt; Result&lt;Vec&lt;CooperativeView&gt;&gt;;
+fn get_cooperative(&amp;self, coop_id: &amp;str) -&gt; Result&lt;Option&lt;CooperativeView&gt;&gt;;
+fn get_vouches_for(&amp;self, coop_id: &amp;str) -&gt; Result&lt;Vec&lt;String&gt;&gt;;
+</code></pre>
+<p>New view DTO in <code>icn-kernel-api</code>:</p>
+<pre><code class="language-rust">pub struct CooperativeView {
+    pub coop_id: String,
+    pub name: String,
+    pub public_did: String,    // DID as string — no icn-identity dep in kernel-api
+    pub gateway_endpoints: Vec&lt;String&gt;,
+    pub capabilities: Vec&lt;String&gt;,
+    pub last_seen: u64,
+    pub origin: String,        // &quot;governance&quot; | &quot;direct-management&quot; (added Step 2)
+}
+</code></pre>
+<p>Gateway handlers updated to prefer service in daemon mode:</p>
+<ul>
+<li><code>GET /federation/coops</code> — prefers <code>FederationService::list_cooperatives()</code></li>
+<li><code>GET /federation/coops/{coop_id}</code> — prefers <code>FederationService::get_cooperative()</code></li>
+<li><code>GET /federation/coops/{coop_id}/vouches</code> — prefers <code>FederationService::get_vouches_for()</code></li>
+</ul>
+<p>In standalone mode (no service injected), all three fall back to <code>FederationManager</code>.</p>
+<p><strong>Response shape note</strong>: In daemon mode, these endpoints return <code>CooperativeView</code> (pruned DTO)
+not <code>CooperativeInfo</code> (internal type). Fields omitted from the view: <code>FederationPolicy</code>,
+<code>CurrencyInfo</code>, <code>signature</code>. These are federation-internal and should not cross the boundary.</p>
+<p><strong>Tests added</strong> (4 new in <code>api/federation.rs</code>):</p>
+<ul>
+<li><code>test_list_coops_prefers_federation_service</code> — proves service path taken over mgr</li>
+<li><code>test_list_coops_falls_back_to_fed_mgr_when_no_service</code> — proves fallback path</li>
+<li><code>test_get_coop_prefers_federation_service</code> — proves get + 404 behavior</li>
+<li><code>test_get_vouches_prefers_federation_service</code> — proves vouch path</li>
+</ul>
+<hr>
+<h2>Phase 4b: Remaining Read Unification — What Full Unification Requires</h2>
+<p>The cooperative registry reads are now unified. The following remain gateway-only reads:</p>
+<pre><code>GET /federation/clearing          → FederationManager only (no service equivalent)
+GET /federation/clearing/{id}     → FederationManager only
+</code></pre>
+<h3>Prerequisite: ClearingAgreementView DTO</h3>
+<p><strong>Blocking issue</strong>: <code>BilateralClearingAgreement</code> is in <code>icn-federation</code> (not <code>icn-kernel-api</code>).
+The trait needs a <code>ClearingAgreementView</code> DTO similar to <code>ClearingPositionView</code>.</p>
+<p>Required new service methods:</p>
+<pre><code class="language-rust">fn list_agreements(&amp;self) -&gt; Result&lt;Vec&lt;ClearingAgreementView&gt;&gt;;
+fn get_agreement(&amp;self, agreement_id: &amp;str) -&gt; Result&lt;Option&lt;ClearingAgreementView&gt;&gt;;
+</code></pre>
+<h3>Prerequisite B: Origin Labeling</h3>
+<p>Before mixed-origin reads can be served from the gateway without confusion, objects need an
+origin tag:</p>
+<pre><code class="language-rust">pub enum FederationStateOrigin {
+    DirectManagement,           // gateway API, no provenance
+    GovernanceRatified {        // governance execution, full provenance
+        decision_receipt_id: String,
+        decision_hash: String,
+    },
+    ComputeReceipt {            // compute task attribution
+        attestation_hash: String,
+    },
+}
+</code></pre>
+<p>This allows the API to return both governance-ratified and direct-management coops/agreements
+in a single list with clear provenance markers.</p>
+<h3>Prerequisite C: Promotion Path (Optional, Long-Term)</h3>
+<p>If gateway-created objects should be promotable to governance-ratified state:</p>
+<ol>
+<li>A CCL contract type for &quot;adopt_direct_agreement&quot; would accept a <code>BilateralClearingAgreement</code>
+payload and, on approval, execute <code>FederationEffect::EstablishClearing</code> with the same terms</li>
+<li>The governance execution path would write to the supervisor&#39;s store with full provenance</li>
+<li>The direct-management record would be superseded by the governance-ratified record</li>
+</ol>
+<p>This is a long-term path, not a current requirement.</p>
+<h3>Sequencing Plan</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Prerequisite</th>
+<th>Risk</th>
+<th>Scope</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1a. <code>list/get_cooperative</code>, <code>get_vouches_for</code>, <code>CooperativeView</code> DTO</td>
+<td>None</td>
+<td>Low</td>
+<td><code>icn-kernel-api</code> + <code>icn-core</code> + <code>icn-gateway</code></td>
+<td>✅ Done (2026-03-31)</td>
+</tr>
+<tr>
+<td>1b. <code>list/get_agreement</code>, <code>ClearingAgreementView</code> DTO</td>
+<td>None</td>
+<td>Low</td>
+<td><code>icn-kernel-api</code> + <code>icn-core</code> + <code>icn-gateway</code></td>
+<td>✅ Done (2026-04-01)</td>
+</tr>
+<tr>
+<td>2. Add origin labeling to response DTOs</td>
+<td>Steps 1a+1b</td>
+<td>Medium</td>
+<td>Cross-crate</td>
+<td>✅ Done (2026-04-01)</td>
+</tr>
+<tr>
+<td>3a. Terms propagation fix + source reference fields</td>
+<td>Steps 1-2 + store-isolation tests</td>
+<td>Low</td>
+<td><code>icn-kernel-api</code> + <code>icn-core</code></td>
+<td>✅ Done (2026-04-01)</td>
+</tr>
+<tr>
+<td>3b. Adoption provenance persistence (Sled)</td>
+<td>Step 3a</td>
+<td>Low</td>
+<td><code>icn-core</code></td>
+<td>✅ Done (2026-04-01)</td>
+</tr>
+<tr>
+<td>3c. <code>source_agreement_id</code> in ClearingAgreementView</td>
+<td>Step 3b</td>
+<td>Low</td>
+<td><code>icn-kernel-api</code> + <code>icn-gateway</code></td>
+<td>✅ Done (2026-04-01)</td>
+</tr>
+<tr>
+<td>3d. Adoption proposal endpoint</td>
+<td>Steps 3a-3c + governance plumbing</td>
+<td>High</td>
+<td><code>icn-gateway</code> + governance</td>
+<td>⏳ Future (ADR 0013)</td>
+</tr>
+</tbody></table>
+<p>Step 2 is the origin labeling pass — adds <code>origin: &quot;governance&quot; | &quot;direct-management&quot;</code> to view DTOs and gateway fallback paths. See Phase 4d below.</p>
+<p>Step 3 (ADR 0013) is the adoption contract / lifecycle unification. Steps 3a-3c are
+independently implementable (terms fix + reference fields). Step 3d (adoption proposal
+endpoint) requires governance plumbing and is the final piece. See ADR 0013 for full design.</p>
+<hr>
+<h2>Phase 4c: Read Unification — Step 1b Implementation (2026-04-01)</h2>
+<h3>Implemented: Clearing Agreement Read Surface</h3>
+<p>Added the following to <code>FederationService</code> (icn-kernel-api) and implemented in
+<code>FederationServiceImpl</code> (icn-core):</p>
+<pre><code class="language-rust">fn list_agreements(&amp;self) -&gt; Result&lt;Vec&lt;ClearingAgreementView&gt;&gt;;
+fn get_agreement(&amp;self, agreement_id: &amp;str) -&gt; Result&lt;Option&lt;ClearingAgreementView&gt;&gt;;
+</code></pre>
+<p>New view DTO in <code>icn-kernel-api</code>:</p>
+<pre><code class="language-rust">pub struct ClearingAgreementView {
+    pub agreement_id: String,
+    pub coop_a: String,
+    pub coop_a_did: String,   // Did as string — no icn-identity dep in kernel-api
+    pub coop_b: String,
+    pub coop_b_did: String,
+    pub settlement_interval: String, // &quot;daily&quot; | &quot;weekly&quot; | &quot;monthly&quot; | &quot;manual&quot;
+    pub max_imbalance: i64,
+    pub created_at: u64,
+    pub exchange_rates: std::collections::HashMap&lt;String, f64&gt;,
+    pub origin: String,       // &quot;governance&quot; | &quot;direct-management&quot; (added Step 2)
+}
+</code></pre>
+<p><strong>Boundary notes</strong>:</p>
+<ul>
+<li><code>Did</code> mapped to <code>String</code> — <code>icn-kernel-api</code> has no <code>icn-identity</code> dependency</li>
+<li><code>SettlementInterval</code> mapped to string — avoids cross-crate enum duplication, safe for future variants</li>
+<li><code>signatures</code> field omitted — raw cryptographic bytes have no API utility and must not cross boundary</li>
+<li><code>exchange_rates: HashMap&lt;String, f64&gt;</code> crosses freely (std primitives)</li>
+<li><code>None</code> clearing manager: <code>list_agreements</code> returns empty vec, <code>get_agreement</code> returns <code>Ok(None)</code></li>
+</ul>
+<p>Gateway handlers updated to prefer service in daemon mode:</p>
+<ul>
+<li><code>GET /federation/clearing</code> — prefers <code>FederationService::list_agreements()</code></li>
+<li><code>GET /federation/clearing/{id}</code> — prefers <code>FederationService::get_agreement()</code></li>
+</ul>
+<p>In standalone mode (no service injected), both fall back to <code>FederationManager</code>.</p>
+<p><strong>Tests added</strong> (3 new in <code>api/federation.rs</code>):</p>
+<ul>
+<li><code>test_list_agreements_prefers_federation_service</code> — proves service path taken over mgr, correct shape</li>
+<li><code>test_get_agreement_prefers_federation_service</code> — proves get + 404 behavior</li>
+<li><code>test_list_agreements_falls_back_to_fed_mgr_when_no_service</code> — proves fallback path fires</li>
+</ul>
+<hr>
+<h2>Phase 4d: Origin Labeling — Step 2 Implementation (2026-04-01)</h2>
+<h3>Why origin labeling was needed after Step 1a/1b</h3>
+<p>After Steps 1a and 1b, the 5 federation GET endpoints all have two possible code paths:</p>
+<ul>
+<li><strong>Service path</strong> — reads from the supervisor&#39;s store (governance-originated state)</li>
+<li><strong>Fallback path</strong> — reads from <code>FederationManager</code> (direct-management state)</li>
+</ul>
+<p>Before this step:</p>
+<ol>
+<li>The <code>origin</code> was entirely implicit — clients had no in-band signal indicating which path was taken</li>
+<li>The fallback paths serialized raw <code>icn-federation</code> domain types (<code>CooperativeInfo</code>,
+<code>BilateralClearingAgreement</code>) with different JSON shapes than the service-path view DTOs —
+creating an undocumented shape inconsistency between daemon mode and standalone mode</li>
+</ol>
+<h3>Labeling model chosen: Option A (add <code>origin</code> field to view DTOs)</h3>
+<p>Considered:</p>
+<ul>
+<li><strong>Option B (envelope <code>{ origin, data }</code>)</strong>: body-breaking change, requires unwrap by clients</li>
+<li><strong>Option C (response header)</strong>: silently ignorable, not reflected in OpenAPI</li>
+<li><strong>Option A (field on DTOs)</strong>: consistent with existing DTO pattern, visible in body, type-safe</li>
+</ul>
+<p>Chose Option A. The <code>origin</code> field is a stable string at the <code>CooperativeView</code> and
+<code>ClearingAgreementView</code> boundaries. It is not a full provenance record — that requires
+<code>decision_receipt_id</code> / <code>decision_hash</code>, which belong in a future promotion-path design.</p>
+<h3>DTOs changed</h3>
+<p><code>CooperativeView</code> in <code>icn-kernel-api</code>:</p>
+<ul>
+<li>Added <code>pub origin: String</code> — <code>&quot;governance&quot;</code> or <code>&quot;direct-management&quot;</code></li>
+</ul>
+<p><code>ClearingAgreementView</code> in <code>icn-kernel-api</code>:</p>
+<ul>
+<li>Added <code>pub origin: String</code> — <code>&quot;governance&quot;</code> or <code>&quot;direct-management&quot;</code></li>
+</ul>
+<p><code>GET /federation/coops/{id}/vouches</code> response (raw JSON object):</p>
+<ul>
+<li>Added <code>&quot;origin&quot;</code> key directly — not a typed DTO</li>
+</ul>
+<h3>Handler changes</h3>
+<p><strong>Service path</strong> (daemon mode): <code>origin = &quot;governance&quot;</code> — set in <code>FederationServiceImpl</code> mappers
+in <code>icn-core</code></p>
+<p><strong>Fallback path</strong> (standalone mode): <code>origin = &quot;direct-management&quot;</code> — set in gateway handler
+adapters. <strong>Important</strong>: the fallback paths now also adapt the raw <code>icn-federation</code> types
+(<code>CooperativeInfo</code>, <code>BilateralClearingAgreement</code>) to the view DTOs. This:</p>
+<ul>
+<li>Unifies the response shape regardless of which path was taken</li>
+<li>Eliminates the hidden shape inconsistency between daemon and standalone mode</li>
+<li>Ensures <code>signatures</code>, <code>FederationPolicy</code>, <code>CurrencyInfo</code> fields never reach API consumers</li>
+</ul>
+<p><code>ClearingPositionView</code> was NOT labeled — this endpoint only has one meaningful path
+(<code>FederationService</code>) and the fallback already builds the same DTO from gateway state.
+The handler comments explain the distinction.</p>
+<h3>Tests added (5 new)</h3>
+<ul>
+<li><code>test_list_coops_origin_governance_when_service_present</code></li>
+<li><code>test_get_coop_origin_governance_when_service_present</code></li>
+<li><code>test_get_vouches_origin_governance_when_service_present</code></li>
+<li><code>test_list_agreements_origin_governance_when_service_present</code></li>
+<li><code>test_get_agreement_origin_governance_when_service_present</code></li>
+</ul>
+<p>Each asserts <code>body[&quot;origin&quot;] == &quot;governance&quot;</code> when the stub service is injected.
+Fallback path (direct-management) origin is covered implicitly by the existing fallback tests
+(<code>test_list_coops_falls_back_to_fed_mgr_when_no_service</code>, etc.) which now produce labeled
+<code>ClearingAgreementView</code> / <code>CooperativeView</code> responses.</p>
+<h3>What the next slice should be</h3>
+<p>Steps 3a/3b/3c (terms propagation, adoption provenance persistence, read surface exposure) are
+complete as of 2026-04-01. See Phase 4e below for details.</p>
+<p>Step 3d (CCL adoption proposal endpoint: <code>POST /v1/federation/clearing/{id}/propose-adoption</code>) is
+the remaining item for the Step 3 adoption contract sequence. It requires wiring the gateway
+endpoint that accepts a direct-management agreement ID and emits an <code>EstablishClearing</code> effect with
+the stored terms and <code>source_agreement_id</code> set. The governance execution path (Step 3b) is already
+wired to carry these fields through to <code>BilateralClearingAgreement</code>.</p>
+<p>Before Step 3d: consider whether origin labeling should be extended to include
+<code>decision_receipt_id</code> and <code>decision_hash</code> on <code>&quot;governance&quot;</code> records — currently these fields are
+available in <code>FederationProvenance</code> (stored in <code>FederationServiceImpl</code>) but not exposed in the
+view DTOs. Exposing them would allow clients to verify governance provenance directly from the API.</p>
+<hr>
+<h2>Phase 4e: Adoption Contract Foundation — Steps 3a/3b/3c (2026-04-01)</h2>
+<h3>What was implemented</h3>
+<p>Steps 3a, 3b, and 3c close the terms-carry-through gap and establish adoption provenance
+persistence across the governance execution path.</p>
+<p><strong>Step 3a — Terms propagation fix</strong></p>
+<p>Extended the full effect chain to carry agreement terms from proposal through to the stored
+<code>BilateralClearingAgreement</code>. Four types updated:</p>
+<ul>
+<li><code>FederationEffect::EstablishClearing</code> (in <code>icn-kernel-api::effects</code>): added
+<code>settlement_interval: Option&lt;String&gt;</code>, <code>max_imbalance: Option&lt;i64&gt;</code>,
+<code>source_agreement_id: Option&lt;String&gt;</code> — all with <code>#[serde(default)]</code> for backward compat</li>
+<li><code>FederationOperation</code> (in <code>icn-kernel-api::governance</code>): same three fields added with
+<code>#[serde(default, skip_serializing_if = &quot;Option::is_none&quot;)]</code></li>
+<li><code>federation_effect_to_operation()</code>: <code>EstablishClearing</code> arm updated to carry all three fields</li>
+<li><code>FederationClearingRequest</code> (in <code>icn-kernel-api::services</code>): same three fields added</li>
+</ul>
+<p><code>establish_clearing()</code> in <code>icn-core::services::federation_service</code> updated to apply the provided
+<code>settlement_interval</code> and <code>max_imbalance</code> instead of relying on <code>BilateralClearingAgreement::new()</code>
+defaults (which were hardcoded to <code>Weekly</code> / <code>10000</code>).</p>
+<p><strong>Step 3b — Adoption provenance persistence</strong></p>
+<p><code>BilateralClearingAgreement</code> (in <code>icn-federation::clearing</code>) extended with
+<code>source_agreement_id: Option&lt;String&gt;</code> using <code>#[serde(default, skip_serializing_if = &quot;Option::is_none&quot;)]</code>
+for Sled backward compat. The field is populated in <code>establish_clearing()</code> from
+<code>request.source_agreement_id</code> before <code>ClearingManager::create_agreement()</code> persists it.</p>
+<p><code>governance_executor.rs</code> updated to forward <code>operation.source_agreement_id</code> into the
+<code>FederationClearingRequest</code> it constructs, completing the governance → persistence chain.</p>
+<p><strong>Step 3c — Read surface exposure</strong></p>
+<p><code>ClearingAgreementView</code> (in <code>icn-kernel-api::services</code>) extended with
+<code>source_agreement_id: Option&lt;String&gt;</code>. Both <code>list_agreements()</code> and <code>get_agreement()</code> in
+<code>federation_service.rs</code> now populate this field from the stored <code>BilateralClearingAgreement</code>.</p>
+<p>Gateway direct-management handlers in <code>icn-gateway::api::federation</code> set <code>source_agreement_id: None</code>
+(direct-management agreements are not adopted from anywhere).</p>
+<h3>Deviation from ADR 0013 design</h3>
+<p>ADR 0013 specified <code>exchange_rates: HashMap&lt;String, f64&gt;</code> as a term to carry through the effect
+chain. This field was <strong>deferred</strong>: <code>FederationEffect</code> derives <code>PartialEq + Eq</code>, and <code>HashMap&lt;String, f64&gt;</code> cannot satisfy <code>Eq</code> because <code>f64</code> does not implement <code>Eq</code>. Only <code>settlement_interval</code>,
+<code>max_imbalance</code>, and <code>source_agreement_id</code> were added.</p>
+<p>Resolution path when needed: wrap exchange rates in a newtype that implements <code>Eq</code> by approximate
+comparison, or relax the <code>Eq</code> derive on <code>FederationEffect</code> variants that don&#39;t need it.</p>
+<h3>Tests added (5 new in <code>icn-core</code>)</h3>
+<ul>
+<li><code>test_establish_clearing_terms_propagate</code> — verifies <code>settlement_interval</code> and <code>max_imbalance</code>
+from <code>FederationClearingRequest</code> are applied to the stored <code>BilateralClearingAgreement</code></li>
+<li><code>test_establish_clearing_backward_compat_no_terms</code> — verifies a request without terms fields
+creates an agreement with default <code>Weekly</code> / <code>10000</code> (backward compat)</li>
+<li><code>test_source_agreement_id_persisted_via_clearing_manager</code> — verifies <code>source_agreement_id</code> round-
+trips through <code>ClearingManager::create_agreement()</code> and is returned by <code>get_agreement()</code></li>
+<li><code>test_establish_clearing_creates_fresh_positions</code> — verifies governance-path agreement starts
+with zero credit balances regardless of source provenance</li>
+<li><code>test_list_agreements_returns_source_agreement_id</code> — verifies <code>list_agreements()</code> exposes
+<code>source_agreement_id</code> in the returned <code>ClearingAgreementView</code></li>
+</ul>
+<hr>
+<h2>Phase 5: Tests and Documentation</h2>
+<h3>Invariant Tests</h3>
+<p>The following invariants are already tested or should be added:</p>
+<p><strong>Existing</strong> (from ADR 0011 work):</p>
+<ul>
+<li><code>test_get_position_prefers_federation_service_over_local_manager</code> — proves ADR 0011 read
+preference is enforced for position queries</li>
+<li><code>test_persistent_storage_survives_manager_reconstruction</code> — proves gateway-API state is durable</li>
+</ul>
+<p><strong>Required</strong> (now confirmed present in <code>icn-gateway/src/federation_mgr.rs</code>):</p>
+<ul>
+<li><strong><code>test_gateway_clearing_and_governance_clearing_do_not_share_positions</code></strong>: exists and passes.
+Proves gateway and supervisor Sled stores are isolated — creating an agreement via one path does
+not appear in the other&#39;s position reads.</li>
+<li><strong><code>test_gateway_coop_list_reflects_only_gateway_registered_coops</code></strong>: exists and passes. Proves
+<code>FederationManager::list_cooperatives</code> reflects only direct-management registrations, not
+governance-ratified ones.</li>
+</ul>
+<h3>Documentation Updates</h3>
+<p>This ADR serves as the design artifact. Gateway API documentation should note:</p>
+<ul>
+<li>&quot;Objects created via direct management APIs are for standalone and direct-bilateral use. Production
+institutional federation should originate from CCL governance execution.&quot;</li>
+<li><code>GET /federation/coops</code> and related list endpoints return only direct-management state, not
+governance-ratified state.</li>
+<li><code>GET /federation/clearing/{id}/position</code> returns supervisor-owned state (governance + compute)
+and will 404 for agreements created via direct management API in daemon mode.</li>
+</ul>
+<hr>
+<h2>Consequences</h2>
+<h3>What This ADR Locks In</h3>
+<ol>
+<li><strong>Model C is the current architecture</strong>: two parallel paths, intentionally separate.</li>
+<li><strong>Gateway read APIs reflect their write path</strong> — this is correct behavior, documented as such.</li>
+<li><strong>No state copying</strong> between paths — divergence is the intended design.</li>
+<li><strong>Read unification requires FederationService expansion</strong> — do not attempt partial unification
+before Steps 1-3 above are complete.</li>
+<li><strong>Position reads (ADR 0011) are the only crossing point</strong> — do not add more crossing points
+without following the full wiring chain from ADR 0011.</li>
+</ol>
+<h3>What This ADR Leaves Open</h3>
+<ol>
+<li>Step 3d: <code>POST /v1/federation/clearing/{id}/propose-adoption</code> endpoint — emits <code>EstablishClearing</code>
+effect with stored terms + <code>source_agreement_id</code> from an existing direct-management agreement.
+The governance execution and Sled persistence are already wired (Steps 3a/3b/3c); only the
+gateway intake endpoint remains.</li>
+<li>Provenance field exposure on governance-origin reads: <code>decision_receipt_id</code> / <code>decision_hash</code> are
+stored in <code>FederationProvenance</code> but not yet exposed in view DTOs. Clients cannot verify
+governance origin directly from the API without this. Low-complexity follow-up.</li>
+<li><code>exchange_rates: HashMap&lt;String, f64&gt;</code> carry-through: deferred because <code>FederationEffect</code> derives
+<code>Eq</code> and <code>f64</code> does not implement <code>Eq</code>. Exchange rate terms do not flow through the effect chain
+today. When needed: either wrap in a newtype that implements <code>Eq</code>, or relax the <code>Eq</code> derive on
+<code>FederationEffect</code>.</li>
+</ol>
+<p>Steps 1a, 1b (FederationService read expansion), Step 2 (origin labeling), and Steps 3a/3b/3c
+(terms propagation, adoption provenance persistence, read surface exposure) are complete as of
+2026-04-01. See Phase 4a, 4c, 4d, 4e below for details.</p>
+<hr>
+<h2>References</h2>
+<ul>
+<li>ADR 0011: Canonical Truth Ownership — Gateway vs Supervisor</li>
+<li><code>crates/icn-kernel-api/src/services.rs</code> — FederationService trait (current + needed methods)</li>
+<li><code>crates/icn-kernel-api/src/effects.rs</code> — FederationEffect enum (5 governance effect variants)</li>
+<li><code>crates/icn-core/src/supervisor/governance_executor.rs</code> — KernelFederationExecutor, effect→operation bridge</li>
+<li><code>crates/icn-core/src/services/federation_service.rs</code> — FederationServiceImpl adapter</li>
+<li><code>crates/icn-core/src/supervisor/init_federation.rs</code> — ReceiptClearingManager setup</li>
+<li><code>crates/icn-gateway/src/api/federation.rs</code> — All gateway write endpoints</li>
+<li><code>crates/icn-gateway/src/federation_mgr.rs</code> — FederationManager (gateway&#39;s state layer)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

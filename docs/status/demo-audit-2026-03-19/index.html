@@ -1,0 +1,477 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Demo Audit — 2026-03-19 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>status</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>demo audit 2026 03 19</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/status/demo-audit-2026-03-19.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Demo Audit — 2026-03-19</h1>
+<p><strong>Cluster target:</strong> K3s at 10.8.30.40:30080
+<strong>Auditor:</strong> Claude Code (s15-t1)
+<strong>Reseed:</strong> <code>reseed-federation-demo.sh</code> — seeded 4, skipped 9, failed 0
+<strong>Timestamp:</strong> 2026-03-19, sprint 15 phase B</p>
+<hr>
+<h2>Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Flow</th>
+<th>Script</th>
+<th>Classification</th>
+<th>Governance</th>
+<th>Core Feature</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Flow 1</td>
+<td><code>flow-1-governance.sh</code></td>
+<td><strong>PROVEN</strong></td>
+<td>✅</td>
+<td>GovernanceReceipt + Ed25519</td>
+</tr>
+<tr>
+<td>Flow 2</td>
+<td><code>flow-2-patronage.sh</code></td>
+<td><strong>FRAGILE</strong></td>
+<td>✅</td>
+<td>Ledger 404, receipt chain 400</td>
+</tr>
+<tr>
+<td>Flow 3</td>
+<td><code>flow-3-federation.sh</code></td>
+<td><strong>FRAGILE</strong></td>
+<td>✅</td>
+<td>Federation API schema mismatch</td>
+</tr>
+<tr>
+<td>Flow 4</td>
+<td><code>flow-4-reporting.sh</code></td>
+<td><strong>FRAGILE</strong></td>
+<td>✅</td>
+<td>Receipt chain 400, federation 400</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Flow 1 — Harbor Homes Governance</h2>
+<p><strong>Script:</strong> <code>demo/scripts/flow-1-governance.sh</code>
+<strong>Classification: PROVEN</strong></p>
+<h3>Command</h3>
+<pre><code class="language-bash">cd /home/ubuntu/projects/icn &amp;&amp; bash demo/scripts/flow-1-governance.sh
+</code></pre>
+<h3>Result</h3>
+<p>Exit code: 0. All 10 steps succeeded.</p>
+<h3>Evidence</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Action</th>
+<th>HTTP</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Create governance domain</td>
+<td>200</td>
+<td><code>harbor-governance</code> domain active</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Create roof repair proposal</td>
+<td>201</td>
+<td>Proposal ID assigned</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Open proposal for voting</td>
+<td>200</td>
+<td>State → Open</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Cast vote (For)</td>
+<td>200</td>
+<td>Vote recorded</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Request tally</td>
+<td>200</td>
+<td>Tally computed</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Close proposal</td>
+<td>200</td>
+<td>State → Accepted</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Get GovernanceReceipt</td>
+<td>200</td>
+<td>Ed25519 signature present</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Get full governance record</td>
+<td>200</td>
+<td>Complete audit trail</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Authorization boundary test</td>
+<td>401</td>
+<td>Write rejected without scope</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Query decisions index</td>
+<td>200</td>
+<td>Decision visible in index</td>
+</tr>
+</tbody></table>
+<p><strong>GovernanceReceipt evidence:</strong></p>
+<pre><code class="language-json">{
+  &quot;decision_hash&quot;: &quot;...&quot;,
+  &quot;signature&quot;: { &quot;algorithm&quot;: &quot;Ed25519&quot;, &quot;value&quot;: &quot;...&quot; },
+  &quot;timestamp&quot;: &quot;...&quot;,
+  &quot;proposal_id&quot;: &quot;...&quot;
+}
+</code></pre>
+<p>The GovernanceReceipt with Ed25519 signature is working live on K3s. PR #1327 appears merged and deployed.</p>
+<hr>
+<h2>Flow 2 — BrightWorks Patronage</h2>
+<p><strong>Script:</strong> <code>demo/scripts/flow-2-patronage.sh</code>
+<strong>Classification: FRAGILE</strong></p>
+<h3>Command</h3>
+<pre><code class="language-bash">cd /home/ubuntu/projects/icn &amp;&amp; bash demo/scripts/flow-2-patronage.sh
+</code></pre>
+<h3>Result</h3>
+<p>Script exits with non-zero. Governance portion proven; ledger and receipt chain broken.</p>
+<h3>Evidence</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Action</th>
+<th>HTTP</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1–7</td>
+<td>Governance (proposal → vote → close → receipt)</td>
+<td>2xx</td>
+<td>✅ PROVEN</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>POST /v1/ledger/brightworks-cooperative/payment</code></td>
+<td>404</td>
+<td>Route not found</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>GET /v1/ledger/brightworks-cooperative/balance/{did}</code></td>
+<td>404</td>
+<td>Route not found</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>GET /v1/ledger/brightworks-cooperative/history</code></td>
+<td>2xx</td>
+<td>✅ History works</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>GET /v1/receipts/allocations</code> (no decision_hash)</td>
+<td>400</td>
+<td><strong>Bug #1334</strong></td>
+</tr>
+</tbody></table>
+<p><strong>Bug #1334 error (step 11):</strong></p>
+<pre><code>HTTP 400 — Query deserialize error: missing field `decision_hash`
+</code></pre>
+<p><strong>Root cause:</strong> <code>ByDecisionQuery.decision_hash</code> is <code>String</code> (required). Actix-web rejects the request when the query param is absent. Field should be <code>Option&lt;String&gt;</code> — querying all allocations is a valid operation.</p>
+<p><strong>Ledger 404 root cause:</strong> Routes <code>/payment</code> and <code>/balance/{did}</code> appear renamed in the deployed binary. The <code>demo_api_preflight()</code> function reports <code>UNKNOWN</code> binary SHA (health endpoint git_sha not populated), so API surface detection cannot confirm the rename. Routes <code>/history</code> and <code>/position/{did}</code> appear correct. These 404s are a separate issue from #1334/#1335 and not in scope for Sprint 15 Phase B.</p>
+<hr>
+<h2>Flow 3 — River City ↔ BrightWorks Federation</h2>
+<p><strong>Script:</strong> <code>demo/scripts/flow-3-federation.sh</code>
+<strong>Classification: FRAGILE</strong></p>
+<h3>Command</h3>
+<pre><code class="language-bash">cd /home/ubuntu/projects/icn &amp;&amp; bash demo/scripts/flow-3-federation.sh
+</code></pre>
+<h3>Result</h3>
+<p>Script exits with non-zero. Governance PROVEN; all federation API calls broken due to schema mismatch between demo script and deployed gateway API.</p>
+<h3>Evidence</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Action</th>
+<th>HTTP</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>3</td>
+<td>River City governance (proposal → vote → close)</td>
+<td>2xx</td>
+<td>✅ PROVEN</td>
+</tr>
+<tr>
+<td>4</td>
+<td>BrightWorks governance (proposal → vote → close)</td>
+<td>2xx</td>
+<td>✅ PROVEN</td>
+</tr>
+<tr>
+<td>5a</td>
+<td><code>POST /v1/federation/coops</code> (register River City)</td>
+<td>400</td>
+<td><strong>Bug #1335</strong> — schema mismatch</td>
+</tr>
+<tr>
+<td>5b</td>
+<td><code>POST /v1/federation/coops</code> (register BrightWorks)</td>
+<td>400</td>
+<td><strong>Bug #1335</strong> — schema mismatch</td>
+</tr>
+<tr>
+<td>6a</td>
+<td><code>POST /v1/federation/coops/{id}/vouch</code> (River City)</td>
+<td>400</td>
+<td><strong>Bug #1335</strong> — schema mismatch</td>
+</tr>
+<tr>
+<td>6b</td>
+<td><code>POST /v1/federation/coops/{id}/vouch</code> (BrightWorks)</td>
+<td>400</td>
+<td><strong>Bug #1335</strong> — schema mismatch</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>POST /v1/federation/clearing</code></td>
+<td>400</td>
+<td><strong>Bug #1335</strong> — missing field <code>agreement_id</code></td>
+</tr>
+</tbody></table>
+<p><strong>Bug #1335 schema mismatches:</strong></p>
+<p>Step 5 — coop registration:</p>
+<pre><code class="language-json">// Demo sends (wrong):
+{&quot;coop_id&quot;:&quot;...&quot;,&quot;name&quot;:&quot;...&quot;,&quot;did&quot;:&quot;&lt;DID&gt;&quot;}
+
+// Gateway expects (RegisterCoopRequest):
+{&quot;coop_id&quot;:&quot;...&quot;,&quot;name&quot;:&quot;...&quot;,&quot;public_did&quot;:&quot;&lt;DID&gt;&quot;,&quot;gateway_endpoints&quot;:[],&quot;capabilities&quot;:[]}
+</code></pre>
+<p>Fix: rename <code>did</code> → <code>public_did</code>. <code>gateway_endpoints</code> and <code>capabilities</code> have <code>#[serde(default)]</code> and can be omitted.</p>
+<p>Step 6 — vouch:</p>
+<pre><code class="language-json">// Demo sends (wrong):
+{&quot;attested_by&quot;:&quot;&lt;DID&gt;&quot;,&quot;attestation&quot;:&quot;&lt;text&gt;&quot;}
+
+// Gateway expects (VouchRequest):
+{&quot;target_coop_id&quot;:&quot;&lt;coop_id&gt;&quot;,&quot;trust_score&quot;:0.85,&quot;expires_in_days&quot;:365}
+</code></pre>
+<p>Note: the handler uses the URL path <code>{coop_id}</code> for the actual target, but <code>target_coop_id</code> is still a required field in the body struct.</p>
+<p>Step 7 — clearing creation:</p>
+<pre><code class="language-json">// Demo sends (wrong):
+{&quot;name&quot;:&quot;...&quot;,&quot;parties&quot;:[...],&quot;facilitator&quot;:&quot;...&quot;,&quot;unit&quot;:&quot;...&quot;,&quot;settlement_period_days&quot;:90}
+
+// Gateway expects (CreateAgreementRequest):
+{&quot;agreement_id&quot;:&quot;&lt;client-id&gt;&quot;,&quot;partner_coop_id&quot;:&quot;&lt;coop_id&gt;&quot;,&quot;partner_did&quot;:&quot;&lt;DID&gt;&quot;,&quot;max_imbalance&quot;:1000,&quot;settlement&quot;:&quot;monthly&quot;}
+</code></pre>
+<p>The gateway API is bilateral (one partner, not a parties list). Fix: generate a client-side <code>agreement_id</code>, provide one <code>partner_coop_id</code>/<code>partner_did</code>, and use <code>settlement</code> enum string.</p>
+<hr>
+<h2>Flow 4 — Finger Lakes CDN Reporting</h2>
+<p><strong>Script:</strong> <code>demo/scripts/flow-4-reporting.sh</code>
+<strong>Classification: FRAGILE</strong></p>
+<h3>Command</h3>
+<pre><code class="language-bash">cd /home/ubuntu/projects/icn &amp;&amp; bash demo/scripts/flow-4-reporting.sh
+</code></pre>
+<h3>Result</h3>
+<p>Script completes with warnings. Governance reporting PROVEN; receipt chain and federation broken.</p>
+<h3>Evidence</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Action</th>
+<th>HTTP</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Harbor Homes governance records</td>
+<td>200</td>
+<td>✅ PROVEN</td>
+</tr>
+<tr>
+<td>2</td>
+<td>BrightWorks governance records</td>
+<td>200</td>
+<td>✅ PROVEN</td>
+</tr>
+<tr>
+<td>3</td>
+<td>River City governance records</td>
+<td>200</td>
+<td>✅ PROVEN</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Harbor Homes GovernanceReceipt</td>
+<td>200</td>
+<td>✅ PROVEN (Ed25519 signature)</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>GET /v1/receipts/chain</code> (no decision_hash)</td>
+<td>400</td>
+<td>Bug #1334</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>POST /v1/federation/coops</code></td>
+<td>400</td>
+<td>Bug #1335</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>GET /v1/federation/coops</code></td>
+<td>400</td>
+<td>Possibly uninitialized</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Authorization boundary (write rejected)</td>
+<td>401</td>
+<td>✅ PROVEN</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Bug Index</h2>
+<table>
+<thead>
+<tr>
+<th>Bug</th>
+<th>Issue</th>
+<th>Location</th>
+<th>Description</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1334</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1334" target="_blank" rel="noopener">#1334</a></td>
+<td><code>icn-gateway/src/api/receipts.rs:18</code></td>
+<td><code>ByDecisionQuery.decision_hash: String</code> (required) → 400 when param absent</td>
+<td>Change to <code>Option&lt;String&gt;</code>, return all allocations when None</td>
+</tr>
+<tr>
+<td>#1335</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1335" target="_blank" rel="noopener">#1335</a></td>
+<td><code>demo/scripts/flow-3-federation.sh</code></td>
+<td>Demo sends wrong field names and body schemas for federation registration, vouch, and clearing</td>
+<td>Update script to match deployed API contract</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>What Remains Before All 4 Flows Are PROVEN</h2>
+<ol>
+<li><strong>Fix Bug #1334</strong> (s15-t2) — <code>decision_hash</code> optional in allocations/chain endpoints</li>
+<li><strong>Fix Bug #1335</strong> (s15-t3) — flow-3 federation schema corrections</li>
+<li><strong>Investigate ledger 404s</strong> — <code>/payment</code> and <code>/balance/{did}</code> routes missing (separate issue, not blocking Phase B)</li>
+<li><strong>Re-run Flow 2 and Flow 3</strong> after fixes to confirm PROVEN status</li>
+</ol>
+<hr>
+<h2>Post-Fix Re-Audit (to be filled after s15-t2 and s15-t3 complete)</h2>
+<table>
+<thead>
+<tr>
+<th>Flow</th>
+<th>Pre-fix</th>
+<th>Post-fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Flow 1</td>
+<td>PROVEN</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Flow 2</td>
+<td>FRAGILE</td>
+<td>TBD</td>
+</tr>
+<tr>
+<td>Flow 3</td>
+<td>FRAGILE</td>
+<td>TBD</td>
+</tr>
+<tr>
+<td>Flow 4</td>
+<td>FRAGILE</td>
+<td>TBD</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

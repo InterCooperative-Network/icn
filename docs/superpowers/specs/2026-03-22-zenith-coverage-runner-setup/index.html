@@ -1,0 +1,315 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Zenith Temporary Coverage Runner Setup | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>superpowers</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>specs</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 03 22 zenith coverage runner setup</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/superpowers/specs/2026-03-22-zenith-coverage-runner-setup.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Zenith Temporary Coverage Runner Setup</h1>
+<p><strong>Date:</strong> 2026-03-22
+<strong>Status:</strong> Ready to execute — 30 min ops task
+<strong>Context:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/2026-03-22-coverage-ci-decision">coverage-ci-decision.md</a></p>
+<hr>
+<h2>Why Zenith</h2>
+<p>ci-runner (3.8GB RAM) is proven insufficient for full-workspace <code>cargo-llvm-cov</code>. Zenith (54GB RAM, Ryzen 7 7800X3D) has no capacity constraints and is immediately available. It hosts WSL2 Ubuntu 24.04, which can run a GitHub Actions self-hosted runner natively.</p>
+<p>This is a temporary assignment. After Hyperion&#39;s RAM RMA completes, a proper always-on runner VM will be provisioned there and Zenith will be deregistered. The workflow label stays stable through that transition.</p>
+<hr>
+<h2>Step 1 — Get the registration token</h2>
+<p>From a browser, go to:</p>
+<pre><code>https://github.com/InterCooperative-Network/icn/settings/actions/runners/new
+</code></pre>
+<p>Select <strong>Linux / x64</strong>. Copy the registration token (starts with <code>A</code>, expires after 1 hour).</p>
+<p>Also note the runner download URL from that page — it shows the current version (e.g. <code>v2.321.0</code>).</p>
+<hr>
+<h2>Step 2 — On Zenith, in WSL2 Ubuntu-24.04</h2>
+<pre><code class="language-bash"># Create an isolated runner directory (not inside the ICN repo)
+mkdir -p ~/actions-runner-coverage &amp;&amp; cd ~/actions-runner-coverage
+
+# Download the runner — use the URL from Step 1 (current version shown on GitHub)
+# Example (check GitHub for latest version):
+curl -o actions-runner-linux-x64.tar.gz -L \
+  https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz
+tar xzf ./actions-runner-linux-x64.tar.gz
+
+# Configure with coverage label — this is the stable interface
+./config.sh \
+  --url https://github.com/InterCooperative-Network/icn \
+  --token &lt;REGISTRATION_TOKEN_FROM_STEP_1&gt; \
+  --name &quot;zentith-coverage&quot; \
+  --labels &quot;self-hosted,linux,x64,coverage,zentith&quot;
+</code></pre>
+<p>When prompted for runner group: accept default (<code>Default</code>).
+When prompted for work folder: accept default (<code>_work</code>).</p>
+<hr>
+<h2>Step 3 — Install Rust coverage tooling on Zenith WSL2</h2>
+<pre><code class="language-bash"># Install or confirm pinned toolchain
+rustup toolchain install 1.88.0
+rustup component add llvm-tools-preview --toolchain 1.88.0
+
+# Install cargo-llvm-cov
+cargo +1.88.0 install cargo-llvm-cov --locked
+
+# Verify
+cargo +1.88.0 llvm-cov --version
+# Expected: cargo-llvm-cov &lt;version&gt;
+</code></pre>
+<p>If <code>rustup</code> is not yet on Zenith WSL2:</p>
+<pre><code class="language-bash">curl --proto &#39;=https&#39; --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source ~/.cargo/env
+</code></pre>
+<hr>
+<h2>Step 4 — Start the runner</h2>
+<pre><code class="language-bash">cd ~/actions-runner-coverage
+./run.sh
+</code></pre>
+<p>For a persistent background service (optional, survives WSL2 restart):</p>
+<pre><code class="language-bash">sudo ./svc.sh install
+sudo ./svc.sh start
+sudo ./svc.sh status
+</code></pre>
+<p>Verify it appears online:</p>
+<pre><code>https://github.com/InterCooperative-Network/icn/settings/actions/runners
+</code></pre>
+<p>Look for <code>zentith-coverage</code> with status <code>Idle</code>.</p>
+<hr>
+<h2>Step 5 — Validate before touching ci.yml</h2>
+<p>On Zenith WSL2, with the ICN repo cloned or accessible:</p>
+<pre><code class="language-bash">cd /path/to/icn/icn  # Rust workspace root (contains Cargo.toml)
+cargo +1.88.0 llvm-cov --workspace --lcov --output-path /tmp/lcov-validate.info 2&gt;&amp;1 | tail -20
+ls -lh /tmp/lcov-validate.info
+# Expected: file exists, &gt; 0 bytes, runtime &lt; 20 min
+</code></pre>
+<p>Do not update ci.yml until this completes cleanly.</p>
+<hr>
+<h2>Step 6 — Update ci.yml (minimal diff)</h2>
+<p>File: <code>.github/workflows/ci.yml</code>, the <code>coverage:</code> job.</p>
+<p><strong>Before:</strong></p>
+<pre><code class="language-yaml">  coverage:
+    name: Test Coverage
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != &#39;true&#39;
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+        with:
+          verbose: &#39;true&#39;
+          aggressive: &#39;true&#39;
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --locked
+
+      - name: Pre-tarpaulin cleanup
+        run: |
+          rm -rf ~/.cargo/registry/cache || true
+          rm -rf ~/.cargo/git/db || true
+          df -h /
+
+      - name: Generate coverage
+        run: cargo tarpaulin --workspace --timeout 300 --out Xml --output-dir ./coverage
+        working-directory: ./icn
+        continue-on-error: ${{ env.GATE_RATCHET_PHASE_COVERAGE != &#39;blocking&#39; }}
+
+      - name: Upload coverage to Codecov
+        if: hashFiles(&#39;./icn/coverage/cobertura.xml&#39;) != &#39;&#39;
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./icn/coverage/cobertura.xml
+          fail_ci_if_error: false
+</code></pre>
+<p><strong>After:</strong></p>
+<pre><code class="language-yaml">  coverage:
+    name: Test Coverage
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != &#39;true&#39;
+    timeout-minutes: 30
+    runs-on: [self-hosted, linux, x64, coverage]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Rust toolchain
+        # Uses the pinned toolchain from rust-toolchain.toml (1.88.0)
+        run: rustup show
+
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+
+      - name: Generate coverage
+        run: cargo llvm-cov --workspace --lcov --output-path ./coverage/lcov.info
+        working-directory: ./icn
+        continue-on-error: ${{ env.GATE_RATCHET_PHASE_COVERAGE != &#39;blocking&#39; }}
+
+      - name: Upload coverage to Codecov
+        if: hashFiles(&#39;./icn/coverage/lcov.info&#39;) != &#39;&#39;
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./icn/coverage/lcov.info
+          fail_ci_if_error: false
+</code></pre>
+<p><strong>What changed:</strong></p>
+<ul>
+<li><code>runs-on</code>: <code>ubuntu-latest</code> → <code>[self-hosted, linux, x64, coverage]</code></li>
+<li><code>timeout-minutes</code>: 45 → 30</li>
+<li>Removed: <code>Free disk space</code>, <code>Install build tools</code>, <code>dtolnay/rust-toolchain@stable</code>, <code>Install cargo-tarpaulin</code>, <code>Pre-tarpaulin cleanup</code></li>
+<li>Coverage tool: tarpaulin → llvm-cov</li>
+<li>Output format: Cobertura XML → LCOV (Codecov accepts both)</li>
+</ul>
+<p>Create a PR from a <code>chore/</code> branch:</p>
+<pre><code class="language-bash">git checkout -b chore/coverage-llvm-cov-zenith
+# edit the file
+git add .github/workflows/ci.yml
+git commit -m &quot;chore(ci): migrate coverage to llvm-cov on self-hosted coverage runner&quot;
+gh pr create --title &quot;chore(ci): migrate coverage to llvm-cov on self-hosted coverage runner&quot; \
+  --body &quot;Switches the coverage job from tarpaulin on GitHub-hosted runners to cargo-llvm-cov on the self-hosted coverage runner (Zenith WSL2 temporarily, Hyperion post-RMA).
+
+**Why:** ci-runner (3.8GB RAM) is insufficient for full-workspace instrumented builds. Zenith (54GB RAM) handles it without constraints.
+
+**Gate:** coverage remains \`observational\` — this PR does not block merges.
+
+**Validation:** Full workspace llvm-cov run completed on Zenith WSL2 before this PR was opened.
+
+**Runner label:** \`[self-hosted, linux, x64, coverage]\` — stable across Zenith → Hyperion migration.&quot;
+</code></pre>
+<hr>
+<h2>Rollback</h2>
+<p>If Zenith becomes unavailable before the PR merges:</p>
+<ul>
+<li>The workflow is unchanged (still on <code>ubuntu-latest</code> with tarpaulin)</li>
+<li>No action needed</li>
+</ul>
+<p>If Zenith goes offline after the PR merges and the <code>coverage</code> label has no active runner:</p>
+<ul>
+<li>Coverage jobs will queue and eventually time out</li>
+<li>Gate is <code>observational</code> — no merges are blocked</li>
+<li>Options: (a) restart Zenith WSL2 runner, (b) temporarily re-point label to a k3s-worker</li>
+</ul>
+<p>If k3s-worker becomes the temporary fallback:</p>
+<pre><code class="language-bash"># On k3s-worker-1 (10.8.30.41, 15GB RAM, 28GB disk):
+curl -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
+source ~/.cargo/env
+rustup component add llvm-tools-preview
+cargo install cargo-llvm-cov --locked
+# Register runner with same labels
+mkdir ~/actions-runner-coverage &amp;&amp; cd ~/actions-runner-coverage
+# download + ./config.sh with same --labels as Zenith
+</code></pre>
+<p>Disk concern: if the <code>_work</code> directory fills (28GB can be tight for large instrumented builds), add a step to <code>ci.yml</code> to clean <code>target/llvm-cov-target</code> after the run.</p>
+<hr>
+<h2>Long-Term Migration to Hyperion (post-RMA)</h2>
+<p>When Hyperion returns with working RAM:</p>
+<ol>
+<li>Provision a runner VM on Hyperion — recommended spec: 8+ vCPU, 16GB RAM, 100GB disk</li>
+<li>Install Rust 1.88.0 + cargo-llvm-cov + sccache on the VM</li>
+<li>Register the runner with labels: <code>self-hosted,linux,x64,coverage,hyperion</code></li>
+<li>Verify a full coverage run completes cleanly on Hyperion</li>
+<li>Deregister Zenith: <code>cd ~/actions-runner-coverage &amp;&amp; ./config.sh remove --token &lt;REMOVAL_TOKEN&gt;</code></li>
+<li>The <code>ci.yml</code> workflow label <code>[self-hosted, linux, x64, coverage]</code> requires <strong>no change</strong></li>
+</ol>
+<p>The label is the stable interface. The machine behind it changes transparently.</p>
+<hr>
+<hr>
+<h2>Completed Execution (2026-03-22)</h2>
+<p>All steps were executed. Results:</p>
+<p><strong>Validation run (on Zentith WSL2, before ci.yml change):</strong></p>
+<ul>
+<li>Duration: 11 minutes 9 seconds (22:50:44 → 22:01:29 local)</li>
+<li>Peak RAM: 7.2GB of 54GB — no swap used</li>
+<li>Output: <code>/tmp/lcov-validate.info</code>, 288,731 LCOV lines, valid source file references</li>
+<li>Exit code: 0</li>
+</ul>
+<p><strong>CI run (PR #1395, after ci.yml change):</strong></p>
+<ul>
+<li>Runner: <code>zentith-coverage</code> (self-hosted, Zenith WSL2)</li>
+<li>Duration: 11 minutes 21 seconds</li>
+<li><code>Generate coverage</code> step: success</li>
+<li><code>Upload coverage to Codecov</code> step: success — <strong>first successful Codecov upload in project history</strong></li>
+<li>PR: <a href="https://github.com/InterCooperative-Network/icn/pull/1395" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/pull/1395</a></li>
+</ul>
+<p><strong>Runner process:</strong></p>
+<ul>
+<li>Started with: <code>nohup ./run.sh &gt; /tmp/gh-runner.log 2&gt;&amp;1 &amp;</code></li>
+<li>systemd service approach was not used — hung in WSL2 during <code>svc.sh install</code></li>
+<li>Runner is a background process tied to the WSL2 session</li>
+</ul>
+<p><strong>⚠️ Persistence note:</strong>
+The runner does NOT survive WSL2 restarts or Windows reboots. After a restart:</p>
+<pre><code class="language-bash">cd ~/actions-runner-coverage &amp;&amp; nohup ./run.sh &gt; /tmp/gh-runner.log 2&gt;&amp;1 &amp;
+</code></pre>
+<p>To make it persistent, add to <code>~/.bashrc</code> or set up a cron <code>@reboot</code> entry — the systemd approach hung and was skipped.</p>
+<hr>
+<h2>Success Condition — Achieved ✓</h2>
+<ul>
+<li>Push to <code>main</code> triggers the coverage job on <code>zentith-coverage</code></li>
+<li>Job completes in 11 min 21 sec (well under 30 min limit)</li>
+<li><code>lcov.info</code> produced and uploaded to Codecov</li>
+<li>First coverage data in Codecov dashboard for this project</li>
+</ul>
+<p>Gate remains <code>observational</code> until a meaningful coverage baseline is established.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

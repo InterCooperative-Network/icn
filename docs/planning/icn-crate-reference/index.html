@@ -1,0 +1,745 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Crate Reference — Accurate Technical Inventory | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>planning</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>icn crate reference</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/planning/icn-crate-reference.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Crate Reference — Accurate Technical Inventory</h1>
+<h1>Generated from live repo exploration, 2026-03-12</h1>
+<p><strong>Source:</strong> <code>~/projects/icn</code> on icn-dev (10.8.30.45)
+<strong>Workspace root:</strong> <code>icn/</code> (38 members in Cargo.toml)
+<strong>Binaries:</strong> <code>icnd</code>, <code>icnctl</code>, <code>icn-console</code>
+<strong>Last explored commit:</strong> <code>72a8b7a3</code> (docs: FORWARD_PLAN_2026-03)</p>
+<hr>
+<h2>Layer 0: The Rule Book</h2>
+<h3><code>kernel_surface.toml</code> (repo root)</h3>
+<p>Tracks the Meaning Firewall health across all 29 kernel-touching crates.</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Count</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>clean</code></td>
+<td>9</td>
+<td>Pure infrastructure, no domain coupling</td>
+</tr>
+<tr>
+<td><code>infected</code></td>
+<td>11</td>
+<td>Contains domain logic being extracted to apps</td>
+</tr>
+<tr>
+<td><code>needs-review</code></td>
+<td>9</td>
+<td>Unclear, requires analysis</td>
+</tr>
+</tbody></table>
+<p>The Meaning Firewall is a ratchet: <code>icn-core</code> currently has 43 governance refs + 31 ledger refs + 32 CCL refs being extracted incrementally via the apps layer pattern.</p>
+<hr>
+<h2>Layer 1: Kernel API (Contracts Only)</h2>
+<h3><code>icn-kernel-api</code></h3>
+<p><strong>Role:</strong> The only crate that defines interfaces. No implementations live here.</p>
+<p>The kernel provides <strong>8 primitives</strong>:</p>
+<ol>
+<li><strong>Identity</strong> — DID operations, signing, verification</li>
+<li><strong>Authorization</strong> — Object-capabilities, policy oracles</li>
+<li><strong>State</strong> — Logs, blobs, KV storage</li>
+<li><strong>Compute</strong> — WASM execution, scheduling</li>
+<li><strong>Communication</strong> — Pub/sub, request/response, streams</li>
+<li><strong>Time</strong> — Logical clocks, scheduling, leases</li>
+<li><strong>Coordination</strong> — Consensus groups, CRDTs</li>
+<li><strong>Naming</strong> — Name resolution, service discovery</li>
+</ol>
+<p>Key exports: <code>ServiceRegistry</code>, <code>ProtocolParameterStore</code>, <code>GovernanceExecutor</code> (adapter for kernel/app boundary), <code>PolicyOracle</code>, <code>EscrowStore</code>, <code>BudgetStore</code></p>
+<hr>
+<h2>Layer 2: Core Infrastructure Crates</h2>
+<h3><code>icn-core</code></h3>
+<p><strong>Role:</strong> Actor runtime and supervisor</p>
+<p><strong>Status:</strong> <code>infected</code> (medium severity, actively being cleaned)</p>
+<p>Modules: <code>anti_entropy</code>, <code>apps</code>, <code>config</code>, <code>dead_letter</code>, <code>events</code>, <code>identity</code>, <code>node</code>, <code>policy</code>, <code>replication</code>, <code>resource_enforcer_actor</code>, <code>restart</code>, <code>runtime</code>, <code>services</code>, <code>storage_challenge</code>, <code>supervisor</code>, <code>trust_propagation</code>, <code>upgrade</code>, <code>upgrade_actor</code></p>
+<p>Key exports: <code>Runtime</code>, <code>Supervisor</code>, <code>EventBus</code>, <code>AppBuilder/AppHandle/AppRuntime</code>, <code>DeadLetterQueue</code></p>
+<p><strong>Remaining infections being extracted:</strong></p>
+<ul>
+<li>governance_handlers: 43 refs → <code>apps/governance</code> (icn-governance-actor)</li>
+<li>ledger refs: 31 → <code>apps/ledger</code> (icn-ledger-actor)</li>
+<li>CCL refs: 32 → future extraction</li>
+</ul>
+<h3><code>icn-store</code></h3>
+<p><strong>Role:</strong> Storage abstraction (Sled backend)</p>
+<h3><code>icn-encoding</code></h3>
+<p><strong>Role:</strong> Versioned serialization for store-level data</p>
+<h3><code>icn-obs</code></h3>
+<p><strong>Role:</strong> Observability — Prometheus metrics, OpenTelemetry tracing</p>
+<h3><code>icn-rpc</code></h3>
+<p><strong>Role:</strong> JSON-RPC over HTTP transport</p>
+<h3><code>icn-time</code></h3>
+<p><strong>Role:</strong> Logical clocks, scheduling, leases</p>
+<h3><code>icn-snapshot</code></h3>
+<p><strong>Role:</strong> State snapshot and restore</p>
+<h3><code>icn-testkit</code></h3>
+<p><strong>Role:</strong> Testing utilities shared across workspace</p>
+<h3><code>icn-http-kit</code></h3>
+<p><strong>Role:</strong> Shared HTTP scaffolding — auth middleware, error formatting, pagination, validation</p>
+<hr>
+<h2>Layer 3: Identity &amp; Cryptography</h2>
+<h3><code>icn-identity</code></h3>
+<p><strong>Role:</strong> DID management, key generation, cryptographic operations</p>
+<p><strong>Two DID types:</strong></p>
+<ul>
+<li>Traditional: <code>did:icn:&lt;base58pubkey&gt;</code> (Ed25519)</li>
+<li>SDIS Anchor: <code>did:icn:&lt;anchor-id&gt;</code> (privacy-preserving, backed by VUI)</li>
+</ul>
+<p><strong>Modules:</strong> <code>anchor</code>, <code>backend_factory</code>, <code>batch_verify</code>, <code>bundle</code>, <code>commons</code>, <code>commons_store</code>, <code>did_signer</code>, <code>keybundle</code>, <code>keystore</code>, <code>keystore_backend</code>, <code>multi_device</code>, <code>personhood</code>, <code>personhood_store</code>, <code>recovery</code>, <code>revocation</code>, <code>revocation_store</code>, <code>sync</code>, <code>vui</code></p>
+<p><strong>Optional features:</strong></p>
+<ul>
+<li><code>hsm</code> — PKCS#11 hardware security module</li>
+<li><code>tpm-experimental</code> — TPM 2.0 support</li>
+<li><code>post-quantum</code> — PQ key bundles</li>
+</ul>
+<p><strong>SDIS (Sovereign Digital Identity System):</strong> Full Sybil resistance via threshold PRF + steward network. VUI = Verifiable Unique Identifier — proves uniqueness without revealing who you are.</p>
+<h3><code>icn-crypto</code></h3>
+<p><strong>Role:</strong> Core cryptographic primitives (Ed25519, X25519, ChaCha20-Poly1305)</p>
+<h3><code>icn-crypto-pq</code></h3>
+<p><strong>Role:</strong> Post-quantum cryptography (lattice-based, Kyber/Dilithium wrappers)</p>
+<h3><code>icn-zkp</code></h3>
+<p><strong>Role:</strong> Zero-knowledge proofs for SDIS</p>
+<p>Three proof types:</p>
+<ul>
+<li><strong>Attribute proofs</strong> — Prove age/citizenship/membership without revealing data</li>
+<li><strong>Non-revocation proofs</strong> — Prove credential is not revoked</li>
+<li><strong>Compound proofs</strong> — Combine attribute + non-revocation</li>
+</ul>
+<p>Two accumulator backends:</p>
+<ul>
+<li>RSA accumulator (legacy, performance)</li>
+<li>Merkle accumulator (post-quantum safe)</li>
+</ul>
+<h3><code>icn-steward</code></h3>
+<p><strong>Role:</strong> Steward network for SDIS — the trust anchor layer</p>
+<p>Stewards provide:</p>
+<ul>
+<li><strong>VUI Computation</strong> — Threshold PRF (t-of-n distributed)</li>
+<li><strong>Enrollment Ceremonies</strong> — Proof-of-personhood verification</li>
+<li><strong>Token Issuance</strong> — Blind signatures for privacy-preserving enrollment</li>
+<li><strong>Key Recovery</strong> — Social recovery through steward attestations</li>
+<li><strong>VUI Registry</strong> — Distributed uniqueness checking</li>
+</ul>
+<p>Architecture: Multiple stewards each hold a PepperShare, threshold computation ensures no single steward knows the full VUI.</p>
+<hr>
+<h2>Layer 4: Network &amp; Communication</h2>
+<h3><code>icn-net</code></h3>
+<p><strong>Role:</strong> P2P transport layer</p>
+<p>Transport: QUIC/TLS (quinn + rustls)
+Discovery: mDNS local, STUN for NAT traversal, TURN for symmetric NAT fallback
+Bootstrap: <code>icn://DID@IP:PORT</code> rendezvous format</p>
+<h3><code>icn-gossip</code></h3>
+<p><strong>Role:</strong> Topic-based message distribution (pub/sub across nodes)</p>
+<p>Key topics used by other crates:</p>
+<ul>
+<li><code>compute:submit</code>, <code>compute:claim</code> (icn-compute)</li>
+<li><code>community:updates</code> (icn-community)</li>
+<li>Federation registry + attestation topics (icn-federation)</li>
+<li>Governance broadcast (icn-governance-actor)</li>
+</ul>
+<h3><code>icn-trust</code></h3>
+<p><strong>Role:</strong> Trust graph management with 3-dimensional scoring</p>
+<p><strong>Three independent graphs</strong> (prevent cross-domain clique capture):</p>
+<table>
+<thead>
+<tr>
+<th>Graph</th>
+<th>Purpose</th>
+<th>Scoring</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Social</strong></td>
+<td>Peer endorsements, working relationships</td>
+<td>60% direct + 40% transitive</td>
+</tr>
+<tr>
+<td><strong>Economic</strong></td>
+<td>Payment history, credit behavior</td>
+<td>80% direct + 20% transitive</td>
+</tr>
+<tr>
+<td><strong>Technical</strong></td>
+<td>Node uptime, task success rates</td>
+<td>(configurable)</td>
+</tr>
+</tbody></table>
+<p><strong>Four trust classes (configurable in icn.toml):</strong></p>
+<ul>
+<li><code>isolated</code> (&lt;0.1) — treat as untrusted, 10 msg/s max</li>
+<li><code>known</code> (0.1–0.4) — minimal trust, 50 msg/s</li>
+<li><code>partner</code> (0.4–0.7) — working relationship, 100 msg/s</li>
+<li><code>federated</code> (0.7+) — full federation trust, 200 msg/s</li>
+</ul>
+<p><strong>Cache invalidation:</strong> LRU with 5-minute TTL; edge A→B change invalidates B&#39;s score + all C where B→C exists (one-hop bounded).</p>
+<h3><code>icn-privacy</code></h3>
+<p><strong>Role:</strong> Metadata protection (Phase 20)</p>
+<p>Week 1-2 (implemented): ChaCha20-Poly1305 encrypted topic names + Bloom filter discovery
+Week 3-4 (planned): Onion routing (multi-hop, Tor-like)
+Week 5-6 (planned): Traffic obfuscation (random delays, size padding, cover traffic)</p>
+<h3><code>icn-gateway</code></h3>
+<p><strong>Role:</strong> REST + WebSocket API for cooperative applications</p>
+<p><strong>What it provides:</strong></p>
+<ul>
+<li>DID-based authentication + capability tokens</li>
+<li>Coop namespace isolation</li>
+<li>Ledger operations (balance, transfers, history)</li>
+<li>WebSocket event streaming</li>
+</ul>
+<p><strong>What it is NOT:</strong> An app runtime. External apps call this HTTP API.</p>
+<hr>
+<h2>Layer 5: Economic Engine</h2>
+<h3><code>icn-ledger</code></h3>
+<p><strong>Role:</strong> Double-entry mutual credit ledger with Merkle-DAG</p>
+<p><strong>Design:</strong> Append-only journal entries, each content-addressed with parent links.</p>
+<p><strong>Double-entry invariant:</strong> Σ debits == Σ credits per currency (enforced at kernel level)</p>
+<p><strong>Multi-currency:</strong> Hours, USD, kWh, and custom unit currencies all in one ledger</p>
+<p><strong>Credit limits:</strong> Per-participant, per-currency overdraft limits</p>
+<p><strong>Merkle-DAG:</strong> Tamper-evident, content-addressable, independently verifiable</p>
+<h3><code>icn-ccl</code></h3>
+<p><strong>Role:</strong> Cooperative Contract Language — DSL for cooperative agreements</p>
+<p><strong>Properties:</strong></p>
+<ul>
+<li><strong>Deterministic</strong> — same inputs always produce same outputs</li>
+<li><strong>Capability-based security</strong> — explicit permissions for ledger access</li>
+<li><strong>Fuel metering</strong> — bounded execution, prevents infinite loops</li>
+<li><strong>Not Turing-complete</strong> — safe subset intentionally</li>
+</ul>
+<p><strong>Example use:</strong> TimeBank contract — <code>record_service(recipient, hours)</code> triggers debit/credit pair with validation</p>
+<h3><code>icn-protocol</code></h3>
+<p><strong>Role:</strong> Protocol state machine (wire format, message types)</p>
+<hr>
+<h2>Layer 6: Governance</h2>
+<h3><code>icn-governance</code></h3>
+<p><strong>Role:</strong> Governance substrate for decentralized decision-making</p>
+<p><strong>Philosophy:</strong> Democratic by default, configurable by communities, extensible via contracts</p>
+<p><strong>Core types:</strong></p>
+<ul>
+<li><code>GovernanceDomain</code> — A decision space (org, coop, community)</li>
+<li><code>Proposal</code> — Title, description, payload (any action)</li>
+<li><code>Vote</code> — for / against / abstain</li>
+<li><code>GovernanceProfile</code> — Rules for evaluating votes (quorum, threshold, method)</li>
+<li><code>MembershipConfig</code> — Who is eligible to vote</li>
+</ul>
+<p><strong>Modules:</strong> <code>amendment</code>, <code>appeal</code>, <code>charter</code>, <code>charter_store</code>, <code>config</code> + more</p>
+<p><strong>Charter:</strong> The governance constitution — TOML format, defines rules for a specific coop/community type</p>
+<h3><code>icn-authz</code></h3>
+<p><strong>Role:</strong> Capability graph model (app-layer — interprets domain semantics)</p>
+<p>Types: <code>SubjectId</code>, <code>Action</code>, <code>ResourceId/Kind</code>, <code>Constraint</code>, <code>CapabilityEdge</code>, <code>CapabilityGraph</code>, <code>Decision</code></p>
+<p>The kernel sees only hashes from this crate, never the capability model itself (Meaning Firewall compliant)</p>
+<hr>
+<h2>Layer 7: Entity Model</h2>
+<p><strong>Architecture principle:</strong> Cooperatives (economic engine) and Communities (civic/political engine) are <strong>co-equal</strong> — neither is subordinate. Federation bridges both without owning either.</p>
+<p><strong>Membership model:</strong> A person can be a member of a cooperative, a community, or both simultaneously. Membership is non-exclusive. By extension, a person can join a federation directly (federations are composable entities). There is no forced path through either engine.</p>
+<pre><code>Person ──── member of ──→ Cooperative (economic: labor, capital, ledger, treasury)
+       └─── member of ──→ Community   (civic: shared governance, political voice, solidarity)
+       └─── member of ──→ Federation  (by extension: cross-coop/cross-community coordination)
+</code></pre>
+<h3><code>icn-entity</code></h3>
+<p><strong>Role:</strong> Unified recursive entity abstraction</p>
+<p><strong>The insight:</strong> Membership is recursive. A cooperative&#39;s members can themselves be cooperatives. A community&#39;s members can include both individuals and organizations.</p>
+<p><strong>EntityId format:</strong> <code>entity:icn:&lt;type&gt;:&lt;identifier&gt;</code></p>
+<ul>
+<li><code>entity:icn:individual:z5TrA8...</code> (wraps DID)</li>
+<li><code>entity:icn:cooperative:food-coop-2024</code></li>
+<li><code>entity:icn:federation:midwest-fed</code></li>
+</ul>
+<p><strong>AccountId:</strong> Backward-compatibility enum wrapping <code>Did</code> (legacy) or <code>EntityId</code> (new)</p>
+<h3><code>icn-coop</code></h3>
+<p><strong>Role:</strong> Cooperative actor, lifecycle, and membership management</p>
+<p><strong>Modules:</strong> <code>actor</code>, <code>handle</code>, <code>lifecycle</code>, <code>membership</code>, <code>store</code>, <code>types</code></p>
+<p><strong>Lifecycle:</strong> Formation → Active → Dissolution (with asset distribution plan)</p>
+<p><strong>Types:</strong> <code>Cooperative</code>, <code>CooperativeId</code>, <code>Member</code>, <code>MemberRole</code>, <code>MemberStatus</code>, <code>MembershipApplication</code>, <code>MembershipTier</code>, <code>MembershipChange</code>, <code>FormationRequest</code>, <code>DissolutionRequest</code></p>
+<p><strong>Treasury anchor:</strong> <code>derive_treasury_anchor()</code> + <code>derive_treasury_did()</code> — deterministic treasury identity from coop ID (no separate key required)</p>
+<p><strong>Treasury:</strong> <code>TreasuryManagerHandle</code> — used by coop actor for budget operations</p>
+<h3><code>icn-community</code></h3>
+<p><strong>Role:</strong> Communities — the civic engine (complements cooperatives as economic engine)</p>
+<p><strong>Purpose:</strong> Groups cooperatives and individuals for shared governance, resources, mutual support</p>
+<p><strong>Architecture:</strong></p>
+<pre><code>CommunityHandle → CommunityActor → CommunityStore
+                        |
+                 GossipActor (community:updates)
+</code></pre>
+<p><strong>Modules:</strong> <code>actor</code>, <code>error</code>, <code>handle</code>, <code>lifecycle</code>, <code>membership</code> + types</p>
+<p><strong>Community types:</strong> Geographic, Interest, Solidarity (others configurable)</p>
+<h3><code>icn-federation</code></h3>
+<p><strong>Role:</strong> Inter-cooperative coordination layer</p>
+<p><strong>Capabilities:</strong></p>
+<ul>
+<li><strong>Discover</strong> — gossip-based registry announcements</li>
+<li><strong>Bridge trust</strong> — federated attestations (foreign DIDs get trust scores)</li>
+<li><strong>Settle credits</strong> — cross-cooperative ledger transfers</li>
+<li><strong>Route gossip</strong> — cooperative-scoped topic visibility</li>
+<li><strong>Resolve DIDs</strong> — across federation boundaries</li>
+</ul>
+<p><strong>DID format with federation routing:</strong></p>
+<pre><code>did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK
+        ^^^^^^^^^
+        coop prefix routes to the right node
+</code></pre>
+<p><strong>Modules:</strong> <code>error</code>, <code>gossip</code>, <code>metrics</code>, <code>registry</code>, <code>types</code></p>
+<h3><code>icn-naming</code></h3>
+<p><strong>Role:</strong> Hierarchical naming service</p>
+<p><strong>Namespaces (root paths):</strong></p>
+<ul>
+<li><code>/cell/...</code> — individual/household</li>
+<li><code>/org/...</code> — organizations/coops</li>
+<li><code>/fed/...</code> — federations</li>
+<li><code>/commons/...</code> — shared resources</li>
+</ul>
+<p><strong>Features:</strong> Authority-signature enforcement on register/update/delete, alias-aware resolution with bounded recursion</p>
+<hr>
+<h2>Layer 8: Advanced Capabilities</h2>
+<h3><code>icn-compute</code></h3>
+<p><strong>Role:</strong> Trust-gated distributed task execution</p>
+<p><strong>Supported execution types:</strong> CCL contracts, WebAssembly modules</p>
+<p><strong>Topics:</strong> <code>compute:submit</code>, <code>compute:claim</code></p>
+<p><strong>Architecture:</strong></p>
+<pre><code>Submitter → Gossip (routing) → Executor
+              Trust Graph
+            (access control)
+</code></pre>
+<p><strong>icnd feature flag:</strong> <code>--features wasm</code> enables wasmtime for WASM execution</p>
+<h3><code>icn-security</code></h3>
+<p><strong>Role:</strong> Security utilities and attack detection</p>
+<hr>
+<h2>Layer 9: Apps (runtime-integrated, <code>icn/apps/</code>)</h2>
+<h3><code>icn-governance-actor</code> (apps/governance)</h3>
+<p><strong>Role:</strong> Governance actor extracted from icn-core</p>
+<p>Handles: proposal dispatch, committee voting, execution receipts, GovernanceProof signing</p>
+<p>Uses: actix-web for HTTP handlers, blake3 for proof hashing, Sled for action item persistence</p>
+<h3><code>icn-ledger-actor</code> (apps/ledger)</h3>
+<p><strong>Role:</strong> Escrow and budget store implementations</p>
+<p>Implements <code>EscrowStore</code> + <code>BudgetStore</code> traits from <code>icn-kernel-api</code></p>
+<h3><code>icn-membership-app</code> (apps/membership)</h3>
+<p><strong>Role:</strong> Unified entity and membership management</p>
+<p>Handles: coop lifecycle, member applications, charter management, treasury management</p>
+<hr>
+<h2>Binaries</h2>
+<h3><code>icnd</code> — The Substrate Daemon</h3>
+<p><strong>What it starts:</strong> Actor runtime with governance, ledger, trust, net, gossip, RPC, and optionally: Gateway API, WASM executor</p>
+<p><strong>Key args:</strong></p>
+<pre><code>--config &lt;path&gt;          Configuration file
+--data-dir &lt;path&gt;        Data directory (~/.icn default)
+--gateway-enable         Enable REST/WebSocket Gateway API
+--gateway-bind &lt;addr&gt;    Gateway bind address
+--gateway-jwt-secret     JWT signing key
+--insecure-gateway-no-jwt  Dev only, skip JWT
+--validate-config        CI/CD config validation
+--tracing               OpenTelemetry distributed tracing
+</code></pre>
+<p><strong>Features:</strong></p>
+<ul>
+<li><code>wasm</code> — wasmtime WASM execution</li>
+<li><code>hsm</code> — PKCS#11 hardware key storage</li>
+<li><code>tpm-experimental</code> — TPM 2.0</li>
+</ul>
+<h3><code>icnctl</code> — The CLI</h3>
+<p><strong>Command tree:</strong></p>
+<pre><code>icnctl
+├── status                    Daemon health
+├── id                        DID management (create, show, import, export)
+├── device                    Multi-device identity (add, list, remove)
+├── recovery                  Social recovery (setup, initiate, complete)
+├── trust                     Trust graph (add-edge, query, list)
+├── ledger                    Ledger ops (balance, transfer, history, dispute)
+├── dispute                   Dispute management
+├── contract                  CCL contract execution
+├── network                   mDNS discovery, QUIC sessions
+├── federation                Cross-network (join, leave, query, sync)
+├── governance                Proposals, votes, domains
+│   ├── domain create/list
+│   ├── proposal create/vote/list
+│   └── amendment/appeal
+├── charter                   Organizational governance docs
+├── amendment                 Constitutional governance changes
+├── appeal                    Due process for governance decisions
+├── auth token               Get Gateway JWT
+├── compute submit-ccl        Distributed CCL execution
+├── compute submit-wasm       Distributed WASM execution
+├── scheduling               Cooperative scheduling policies
+├── quota                    Resource quota management
+├── steward                  SDIS steward network operations
+├── commons                  Commons identity operations
+├── backup/restore/verify    Data backup
+├── snapshot                 State snapshots
+├── coop-init               Guided cooperative setup wizard
+├── preflight               Pre-deployment health checks
+├── audit receipt-chain      Get receipt chain for decision hash
+├── audit allocation-receipt Single allocation receipt by hash
+├── audit settlement-intent  Single settlement by hash
+├── api-schema               OpenAPI spec management
+├── openapi                  Export OpenAPI spec
+└── completions              Shell completion generation
+</code></pre>
+<p><strong>Notable flags:</strong></p>
+<ul>
+<li><code>-d &lt;dir&gt;</code> — data directory (default <code>~/.icn</code>)</li>
+<li><code>-e &lt;addr&gt;</code> — RPC endpoint (default <code>[::1]:5601</code>)</li>
+<li><code>--features post-quantum</code> — PQ identity support</li>
+</ul>
+<p><strong>i18n support:</strong> <code>rust-i18n</code> + <code>sys-locale</code> — CLI messages in local language</p>
+<p><strong>QR code support:</strong> <code>qrcode</code> crate — for identity export/import (max 2000 bytes for reliable scanning)</p>
+<h3><code>icn-console</code> — The TUI</h3>
+<p><strong>Framework:</strong> ratatui + crossterm (terminal UI)</p>
+<p><strong>Tabs:</strong></p>
+<ol>
+<li><strong>Dashboard</strong> — Node overview, health stats</li>
+<li><strong>Members</strong> — Cooperative member list, roles, status</li>
+<li><strong>Ledger</strong> — Balances, transaction history</li>
+<li><strong>Governance</strong> — Active proposals, voting history</li>
+<li><strong>Trust</strong> — Trust graph visualization</li>
+</ol>
+<p><strong>Auth:</strong> Gateway JWT token via <code>--token</code> arg or interactive prompt</p>
+<hr>
+<h2>Frontend Surfaces</h2>
+<h3><code>web/pilot-ui/</code> — Timebank PWA (vanilla JS, 288KB app.js)</h3>
+<p><strong>Full name:</strong> <code>icn-timebank-pilot-ui</code></p>
+<p><strong>Core screens:</strong></p>
+<ul>
+<li>Main app: <code>index.html</code> + <code>app.js</code> + <code>style.css</code></li>
+<li>SDIS enrollment: <code>sdis-enrollment.html/js/css</code> (identity ceremony)</li>
+<li>SDIS identity viewer: <code>sdis-identity.html/js/css</code></li>
+<li>SDIS proofs: <code>sdis-proofs.html/js/css</code> (ZKP credential presentation)</li>
+<li>SDIS recovery: <code>sdis-recovery.html/js/css</code> (social key recovery)</li>
+<li>Steward dashboard: <code>steward-dashboard.html/js/css</code></li>
+</ul>
+<p><strong>Other files:</strong> <code>crypto.js</code>, <code>receipts.js</code>, <code>offline-storage.js</code>, <code>sw.js</code> (service worker)</p>
+<p><strong>I18n:</strong> <code>i18n.js</code> + <code>locales/</code> directory</p>
+<p><strong>Testing:</strong> Playwright E2E tests in <code>tests/</code>, Jest unit tests</p>
+<h3><code>web/dashboard/</code> — Static operator dashboard</h3>
+<h3><code>sdk/typescript/</code> — <code>@icn/client</code> v0.1.0</h3>
+<p>TypeScript SDK for Gateway API. OpenAPI-generated types (<code>src/generated/api-types.ts</code>). Tests for WASM deploy/list, typed error mapping.</p>
+<pre><code class="language-bash">npm run generate-types  # Regenerates from openapi.generated.yaml
+npm run check-types     # Verifies generated files in sync
+</code></pre>
+<h3><code>sdk/react-native/</code> — React Native SDK</h3>
+<p>Mobile cooperative management. Components: <code>BudgetManager.tsx</code>, <code>CooperativeManager.tsx</code>, <code>NotificationCenter.tsx</code>, <code>RecurringPaymentSetup.tsx</code>, <code>VotingScreen.tsx</code></p>
+<hr>
+<h2>Demo System (<code>demo/</code>)</h2>
+<h3>Four Cooperative Personas (live K3s nodes)</h3>
+<table>
+<thead>
+<tr>
+<th>Coop</th>
+<th>Type</th>
+<th>Demo question</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>BrightWorks Cooperative</strong></td>
+<td>Worker</td>
+<td>Why did this member get this patronage allocation?</td>
+</tr>
+<tr>
+<td><strong>River City Tool Library</strong></td>
+<td>Community</td>
+<td>How does a shared-resource coop track contributions?</td>
+</tr>
+<tr>
+<td><strong>Harbor Homes Cooperative</strong></td>
+<td>Housing</td>
+<td>Did the vote that authorized this $12K spend actually happen?</td>
+</tr>
+<tr>
+<td><strong>Finger Lakes CDN</strong></td>
+<td>Intermediate/Federation</td>
+<td>Can a federation support member coops without owning them?</td>
+</tr>
+</tbody></table>
+<h3>Four Demo Flows</h3>
+<table>
+<thead>
+<tr>
+<th>Flow</th>
+<th>Script</th>
+<th>Duration</th>
+<th>Core question</th>
+<th>Known gaps</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Flow 1: Governance</strong></td>
+<td><code>flow-1-governance.sh</code></td>
+<td>~5 min</td>
+<td>Did the vote that authorized this action actually happen?</td>
+<td>treasury:write scope missing; proof endpoint 404 (PR #1327 ExecutionReceiptGate — MERGED)</td>
+</tr>
+<tr>
+<td><strong>Flow 2: Patronage</strong></td>
+<td><code>flow-2-patronage.sh</code></td>
+<td>~5 min</td>
+<td>Why did this member get this distribution?</td>
+<td>treasury:write scope missing</td>
+</tr>
+<tr>
+<td><strong>Flow 3: Federation</strong></td>
+<td><code>flow-3-federation.sh</code></td>
+<td>varies</td>
+<td>How do independent co-ops coordinate without a bureaucracy?</td>
+<td>treasury:write, federation:write scopes</td>
+</tr>
+<tr>
+<td><strong>Flow 4: Reporting</strong></td>
+<td><code>flow-4-reporting.sh</code></td>
+<td>varies</td>
+<td>Can this produce trustworthy reporting without admin overhead?</td>
+<td>treasury:read scope</td>
+</tr>
+</tbody></table>
+<h3>Presenter Mode</h3>
+<pre><code class="language-bash">./demo/scripts/present.sh   # Launches tmux two-pane layout
+# Each flow: ./flow-N.sh --present   or   --narrated
+# Pauses at _beat() calls for presenter to speak
+</code></pre>
+<h3>Rehearsal Probe System</h3>
+<pre><code class="language-bash">./demo/scripts/reseed-federation-demo.sh  # Seed canonical state
+./demo/scripts/rehearsal-probe.sh          # Five-unknown probe
+# Expected output: &quot;✔ CONFIRMED   5 / 5&quot;
+</code></pre>
+<hr>
+<h2>Ops Layer (<code>ops/</code>)</h2>
+<h3><code>ops/mcp/</code> — <code>@icn/ops-mcp</code> v0.1.0</h3>
+<p>MCP server for Claude Code sessions on icn-dev. Built with <code>@modelcontextprotocol/sdk</code> + <code>better-sqlite3</code> + <code>zod</code>.</p>
+<p><strong>8 tool sets</strong> in <code>ops/mcp/src/tools/</code>:</p>
+<ul>
+<li>sessions — track Claude Code sessions</li>
+<li>tasks — task management</li>
+<li>repos — repository state</li>
+<li>health — cluster health</li>
+<li>decisions — ADRs and decisions</li>
+<li>comms — communication log</li>
+<li>events — event tracking</li>
+<li>watchers — process watchers + zombie prevention</li>
+</ul>
+<p><strong>Process poller</strong> in <code>ops/mcp/src/polling/</code> — prevents zombie Claude Code processes</p>
+<p><strong>State</strong> in <code>ops/mcp/src/state/</code> — SQLite-backed persistent state</p>
+<hr>
+<h2>Simulations (<code>sims/</code>)</h2>
+<h3><code>sims/mutual-credit/</code> — Python agent-based economic simulation</h3>
+<p><strong>Framework:</strong> Mesa (agent-based modeling)</p>
+<p><strong>Purpose:</strong> Validate mutual credit parameters before production deployment</p>
+<p><strong>Tests:</strong></p>
+<ul>
+<li>Failure modes: hoarding, free-riding, credit limit gaming, velocity collapse</li>
+<li>Parameter tuning: credit limits, demurrage rates, trust dynamics</li>
+<li>Resilience: defaults, trust breakdown, external shocks</li>
+</ul>
+<p><strong>Files:</strong> <code>model.py</code>, <code>agents.py</code>, <code>trust.py</code>, <code>economy.py</code>, <code>run_simulation.py</code>, scenarios JSON, analysis outputs</p>
+<hr>
+<h2>Examples (<code>examples/</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>Example</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>01-quickstart/</code></td>
+<td>Basic ICN node setup</td>
+</tr>
+<tr>
+<td><code>contracts/</code></td>
+<td>CCL contract examples</td>
+</tr>
+<tr>
+<td><code>governance-api/</code></td>
+<td>REST governance API usage</td>
+</tr>
+<tr>
+<td><code>mobile-app/</code></td>
+<td>React Native app (full cooperative management)</td>
+</tr>
+<tr>
+<td><code>wasm-compute/</code></td>
+<td>Rust WASM module for distributed execution</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Configuration (<code>config/</code>)</h2>
+<p><strong><code>icn.toml.example</code></strong> — Full config reference (9247 bytes):</p>
+<ul>
+<li><code>data_dir</code>, <code>[network]</code>, <code>[observability]</code>, <code>[rate_limiting.*]</code>, <code>[topology]</code>, <code>[gateway]</code>, <code>[governance]</code>, <code>[ledger]</code></li>
+</ul>
+<p><strong><code>icn.toml.example</code> highlights:</strong></p>
+<pre><code class="language-toml">[gateway]
+enabled = false
+bind = &quot;0.0.0.0:8080&quot;
+# ICN_GATEWAY_JWT_SECRET env var required
+
+[topology]
+region = &quot;local-dev&quot;
+cluster_id = &quot;laptop-1&quot;
+role = &quot;edge&quot;  # or &quot;validator&quot;, &quot;bootstrap&quot;
+
+[topology.neighbor_limits]
+max_local_cluster = 10
+max_regional = 10
+max_backbone = 5
+</code></pre>
+<p><strong>Devnet configs:</strong> <code>icn-alpha.toml</code> (port 7777, RPC 5601), <code>icn-beta.toml</code> (port 7778, RPC 5602)</p>
+<hr>
+<h2>GitHub CI Workflows (<code>.github/workflows/</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>Workflow</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ci.yml</code></td>
+<td>Main build/test/lint</td>
+</tr>
+<tr>
+<td><code>api-types.yml</code></td>
+<td>Verify OpenAPI types in sync</td>
+</tr>
+<tr>
+<td><code>security-audit.yml</code></td>
+<td><code>cargo audit</code> + <code>cargo deny</code></td>
+</tr>
+<tr>
+<td><code>benchmark.yml</code></td>
+<td>Performance benchmarks</td>
+</tr>
+<tr>
+<td><code>fuzz.yml</code></td>
+<td>Fuzzing (icn-ccl has fuzz target)</td>
+</tr>
+<tr>
+<td><code>claude.yml</code></td>
+<td>Claude Code integration</td>
+</tr>
+<tr>
+<td><code>claude-code-review.yml</code></td>
+<td>Automated code review</td>
+</tr>
+<tr>
+<td><code>docker-build-deploy.yml</code></td>
+<td>Container build + deploy</td>
+</tr>
+<tr>
+<td><code>release.yml</code></td>
+<td>Release automation</td>
+</tr>
+<tr>
+<td><code>npm-publish.yml</code></td>
+<td>Publish @icn/client SDK</td>
+</tr>
+<tr>
+<td><code>issue-label-enforcer.yml</code></td>
+<td>Label enforcement</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Build Commands (<code>justfile</code>)</h2>
+<pre><code class="language-bash">just build          # cargo build
+just build-release  # cargo build --release
+just test           # nextest or cargo test
+just test-safe      # 2-job parallel (memory constrained)
+just test-ci        # unit parallel, integration serial
+just check          # fmt + clippy
+just fmt            # cargo fmt
+just clippy         # cargo clippy -D warnings
+just devnet-up/down # 3-node devnet
+just audit          # cargo audit + cargo deny
+</code></pre>
+<hr>
+<h2>What Doesn&#39;t Exist Yet (Charter Templates)</h2>
+<p>The <code>icn-governance</code> crate has a <code>charter</code> module and <code>charter_store</code>, but there is no <code>charters/</code> directory at the repo root with pre-built TOML charter templates for common coop types.</p>
+<p><strong>Missing:</strong></p>
+<ul>
+<li><code>charters/worker-coop.toml</code></li>
+<li><code>charters/event-planning.toml</code></li>
+<li><code>charters/consumer-coop.toml</code></li>
+<li><code>charters/community-land.toml</code></li>
+<li><code>charters/federation.toml</code></li>
+</ul>
+<p>These are Phase 2 Track A deliverables. They&#39;re the &quot;governance constitution templates&quot; that let someone do <code>icnctl coop-init --charter worker-coop</code> and get a real working governance setup.</p>
+<hr>
+<h2>Current Deployment State</h2>
+<p><strong>K3s cluster on icn-dev (10.8.30.45):</strong></p>
+<ul>
+<li>4 pods: icn-alpha, icn-beta, icn-gamma (+ delta)</li>
+<li>Gateway API accessible at <code>10.8.10.40:30080</code> (K3s NodePort)</li>
+<li>SDIS API: <code>http://10.8.10.40:30080/v1/sdis/health</code></li>
+</ul>
+<p><strong>Known gaps in K3s deployment:</strong></p>
+<ul>
+<li><code>treasury:read/write</code> scopes not in <code>ALLOWED_SCOPES</code> → treasury API unreachable</li>
+<li>Proof endpoint returns 404 (signing key not configured in pod)</li>
+<li>PR #1327 (ExecutionReceiptGate) merged → Flow 1B will work once cluster is redeployed</li>
+</ul>
+<p><strong>ops/mcp:</strong> Running on icn-dev, accessible via <code>.mcp.json</code> in repo root</p>
+<hr>
+<p><em>Generated 2026-03-12 from live repo exploration. Update when new crates land or deployment state changes.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

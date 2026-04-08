@@ -1,0 +1,420 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Governance Demo — Walkthrough | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>demo</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>WALKTHROUGH</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/demo/WALKTHROUGH.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Governance Demo — Walkthrough</h1>
+<p><strong>Date:</strong> 2026-03-25
+<strong>Verified:</strong> All 19 steps pass, exit code 0.
+<strong>Script:</strong> <code>demo/scripts/demo-governance.py</code>
+<strong>Runtime:</strong> ~8 seconds against a local <code>icnd</code> process</p>
+<hr>
+<h2>What the Demo Proves</h2>
+<p>Three people — Alice, Bob, and Carol — form a cooperative from scratch and make their first democratic decision. No admin account. No corporation in the middle. No one has special permanent authority.</p>
+<p>Alice is elected temporary coordinator to bootstrap the coop structure. She uses that role to create the cooperative, set up the governance domain, and add Bob and Carol as members. Once the structure exists, her coordinator role is just another member token. Any member can propose. Any member can vote. Any member can close a vote.</p>
+<p>The first democratic act is ratifying the cooperative&#39;s own charter — the members adopt their own rules, together, before any substantive decisions are made. Then Bob (not the coordinator) proposes $12,000 for community kitchen equipment. All three vote for it. Carol (not the coordinator, not the proposer) closes the vote.</p>
+<p>When the vote closes, the ICN node generates a cryptographic receipt: a <code>GovernanceProofV2</code> that bundles the canonical decision hash, the vote tally, and a node attestation signed with the node&#39;s Ed25519 key. The receipt can be re-verified by any party at any time. It is anchored to the vote record, not to any central authority.</p>
+<p>That&#39;s the claim: <strong>a cooperative can self-govern, and the governance record is cryptographically verifiable, without a trusted third party</strong>.</p>
+<hr>
+<h2>Prerequisites</h2>
+<ul>
+<li><strong>Rust 1.88.0</strong> (pinned — do not upgrade)</li>
+<li><strong>Python 3.8+</strong> with the <code>cryptography</code> package</li>
+<li><strong>Port 8080</strong> free</li>
+</ul>
+<pre><code class="language-bash">pip install cryptography
+ss -tlnp | grep :8080    # must return nothing
+</code></pre>
+<p>First-time build (from the <code>icn/</code> monorepo root):</p>
+<pre><code class="language-bash">cd icn &amp;&amp; cargo build -p icnd   # ~2 minutes first time, ~10s incremental
+</code></pre>
+<hr>
+<h2>Quick Start</h2>
+<p>Three commands:</p>
+<pre><code class="language-bash">bash demo/scripts/start-demo.sh /tmp/icn-demo
+python3 demo/scripts/demo-governance.py http://localhost:8080
+pkill -f icnd
+</code></pre>
+<p>For a live-presentation experience with colored output and phase pauses:</p>
+<pre><code class="language-bash">bash demo/scripts/present-governance.sh
+</code></pre>
+<hr>
+<h2>Step-by-Step Walkthrough</h2>
+<h3>Phase 1: Founding Assembly (Steps 1–6)</h3>
+<p>Alice, Bob, and Carol are bootstrapped as equal founding members. Alice holds a temporary coordinator token to create the infrastructure. That role doesn&#39;t persist.</p>
+<hr>
+<p><strong>Step 1 — Generate member identities</strong></p>
+<p>No API call. Each member generates a fresh Ed25519 keypair in memory. Their DID is derived directly from the public key bytes, base58-encoded with the <code>did:icn:z</code> prefix.</p>
+<pre><code>Alice: did:icn:z&lt;base58-pubkey&gt;
+Bob:   did:icn:z&lt;base58-pubkey&gt;
+Carol: did:icn:z&lt;base58-pubkey&gt;
+</code></pre>
+<p><em>What this proves:</em> Identity is self-sovereign. No registration with a central authority. No username/password. The key is the identity.</p>
+<hr>
+<p><strong>Step 2 — Alice authenticates as coordinator</strong></p>
+<pre><code>POST /v1/auth/challenge  { &quot;did&quot;: alice.did }
+POST /v1/auth/verify     { &quot;did&quot;: alice.did, &quot;signature&quot;: hex(sign(nonce)), &quot;coop_id&quot;: &quot;finger-lakes-food&quot;, &quot;scopes&quot;: [...] }
+</code></pre>
+<p>The gateway issues a challenge nonce. Alice signs it with her Ed25519 private key and returns the hex signature. On verification, the gateway derives Alice&#39;s expected public key from her DID, verifies the signature, and issues a scoped JWT.</p>
+<p><em>What this proves:</em> Authentication is DID-native challenge-response. The gateway never sees Alice&#39;s private key. Possession of the key proves identity.</p>
+<p>Alice&#39;s scopes: <code>coop:read</code>, <code>coop:write</code>, <code>coop:admin</code>, <code>governance:read</code>, <code>governance:write</code>, <code>treasury:read</code>, <code>treasury:write</code>.</p>
+<hr>
+<p><strong>Step 3 — Create the cooperative</strong></p>
+<pre><code>POST /v1/coops  { &quot;id&quot;: &quot;finger-lakes-food&quot;, &quot;name&quot;: &quot;Finger Lakes Food Co-op&quot; }
+Authorization: Bearer &lt;alice-token&gt;
+</code></pre>
+<p><em>What this proves:</em> A cooperative entity exists in the system. <code>finger-lakes-food</code> is the canonical cooperative ID. Alice&#39;s admin scope authorizes creation.</p>
+<hr>
+<p><strong>Step 4 — Create governance domain</strong></p>
+<pre><code>POST /v1/gov/domains  {
+  &quot;id&quot;: &quot;coop:finger-lakes-food&quot;,
+  &quot;name&quot;: &quot;Finger Lakes Food Co-op Governance&quot;,
+  &quot;profile&quot;: &quot;cooperative_default&quot;,
+  &quot;quorum_percent&quot;: 50,
+  &quot;approval_percent&quot;: 51,
+  &quot;voting_period_days&quot;: 7,
+  &quot;members&quot;: [alice.did]
+}
+</code></pre>
+<p><em>What this proves:</em> Governance rules are explicit and stored: 50% quorum, simple majority (51%), 7-day voting windows. Alice is the initial member; Bob and Carol will be added next.</p>
+<hr>
+<p><strong>Step 5 — Add Bob to the cooperative and governance domain</strong></p>
+<pre><code>POST /v1/coops/finger-lakes-food/members  { &quot;did&quot;: bob.did, &quot;role&quot;: &quot;participant&quot;, &quot;display_name&quot;: &quot;Bob&quot; }
+POST /v1/gov/domains/coop:finger-lakes-food/members  { &quot;did&quot;: bob.did, &quot;weight&quot;: 1.0 }
+</code></pre>
+<p><em>What this proves:</em> Bob is a full coop member with voting weight 1.0. Equal to Alice.</p>
+<hr>
+<p><strong>Step 6 — Add Carol to the cooperative and governance domain</strong></p>
+<pre><code>POST /v1/coops/finger-lakes-food/members  { &quot;did&quot;: carol.did, &quot;role&quot;: &quot;participant&quot;, &quot;display_name&quot;: &quot;Carol&quot; }
+POST /v1/gov/domains/coop:finger-lakes-food/members  { &quot;did&quot;: carol.did, &quot;weight&quot;: 1.0 }
+</code></pre>
+<p><em>What this proves:</em> Carol is a full coop member with voting weight 1.0. Equal to Alice and Bob.</p>
+<p>✓ Phase 1 complete: Finger Lakes Food Co-op — 3 members, governance domain active.</p>
+<hr>
+<h3>Phase 2: Charter Ratification (Steps 7–12)</h3>
+<p>The first democratic act. Members don&#39;t inherit rules from above — they vote to adopt their own.</p>
+<hr>
+<p><strong>Step 7 — Alice submits the founding charter for ratification</strong></p>
+<pre><code>POST /v1/gov/proposals  {
+  &quot;domain_id&quot;: &quot;coop:finger-lakes-food&quot;,
+  &quot;title&quot;: &quot;Ratify the Finger Lakes Food Co-op Founding Charter&quot;,
+  &quot;description&quot;: &quot;...&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;charter&quot;,
+    &quot;charter_id&quot;: &quot;finger-lakes-food-coop&quot;,
+    &quot;charter_yaml&quot;: &quot;...&quot;
+  }
+}
+</code></pre>
+<p>The charter payload includes the full CCL (Cooperative Contract Language) YAML: governance bodies (<code>general_assembly</code>, <code>stewardship_circle</code>), decision thresholds (<code>ordinary</code> = simple majority, <code>constitutional</code> = two-thirds), delegation rules, credit limits, and surplus allocation (20% reserve, 80% patronage).</p>
+<p><em>What this proves:</em> Cooperative constitutions are first-class data in ICN — stored, governed, and enforced, not just text files.</p>
+<hr>
+<p><strong>Step 8 — Open charter for ratification vote</strong></p>
+<pre><code>POST /v1/gov/proposals/{charter_id}/open  { &quot;voting_period_seconds&quot;: 3600 }
+</code></pre>
+<p><em>What this proves:</em> Proposals are not live until explicitly opened. The voting window starts from this call.</p>
+<hr>
+<p><strong>Step 9 — Alice votes to ratify the charter</strong></p>
+<pre><code>POST /v1/gov/proposals/{charter_id}/vote  { &quot;choice&quot;: &quot;for&quot; }
+Authorization: Bearer &lt;alice-token&gt;
+</code></pre>
+<p><em>Alice: FOR</em></p>
+<hr>
+<p><strong>Step 10 — Bob authenticates and votes to ratify</strong></p>
+<p>Bob runs the same DID challenge-response as Alice (Step 2), receiving scopes <code>governance:read</code>, <code>governance:write</code>.</p>
+<pre><code>POST /v1/gov/proposals/{charter_id}/vote  { &quot;choice&quot;: &quot;for&quot; }
+Authorization: Bearer &lt;bob-token&gt;
+</code></pre>
+<p><em>Bob: FOR</em></p>
+<hr>
+<p><strong>Step 11 — Carol authenticates and votes to ratify</strong></p>
+<pre><code>POST /v1/gov/proposals/{charter_id}/vote  { &quot;choice&quot;: &quot;for&quot; }
+Authorization: Bearer &lt;carol-token&gt;
+</code></pre>
+<p><em>Carol: FOR</em></p>
+<hr>
+<p><strong>Step 12 — Alice closes the charter ratification</strong></p>
+<pre><code>POST /v1/gov/proposals/{charter_id}/close  {}
+Authorization: Bearer &lt;alice-token&gt;
+</code></pre>
+<p><em>What this proves:</em> 3/3 unanimous ratification. The cooperative&#39;s rules are now in effect.</p>
+<p>✓ Phase 2 complete: Charter ratified 3/3.</p>
+<hr>
+<h3>Phase 3: Democratic Decision (Steps 13–17)</h3>
+<p>Bob proposes a budget item. He&#39;s not the coordinator. He doesn&#39;t need permission to propose.</p>
+<hr>
+<p><strong>Step 13 — Bob proposes community kitchen equipment</strong></p>
+<pre><code>POST /v1/gov/proposals  {
+  &quot;domain_id&quot;: &quot;coop:finger-lakes-food&quot;,
+  &quot;title&quot;: &quot;Approve $12,000 for community kitchen equipment&quot;,
+  &quot;description&quot;: &quot;Purchase commercial-grade equipment for our shared community kitchen:
+    convection oven ($4,000), industrial mixer ($3,000),
+    prep tables and storage ($2,500), safety and small tools ($2,500).
+    This investment serves all 47 member households.&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;budget&quot;,
+    &quot;amount&quot;: 12000,
+    &quot;currency&quot;: &quot;USD&quot;,
+    &quot;purpose&quot;: &quot;Community Kitchen Equipment&quot;
+  }
+}
+Authorization: Bearer &lt;bob-token&gt;
+</code></pre>
+<p><em>What this proves:</em> Any member can create a proposal. Bob does not need Alice&#39;s permission or coordinator status.</p>
+<hr>
+<p><strong>Step 14 — Bob opens the proposal for voting</strong></p>
+<pre><code>POST /v1/gov/proposals/{proposal_id}/open  { &quot;voting_period_seconds&quot;: 3600 }
+Authorization: Bearer &lt;bob-token&gt;
+</code></pre>
+<p><em>What this proves:</em> The proposer controls when their proposal goes live — also without coordinator involvement.</p>
+<hr>
+<p><strong>Step 15 — Alice votes FOR the kitchen equipment</strong></p>
+<pre><code>POST /v1/gov/proposals/{proposal_id}/vote  { &quot;choice&quot;: &quot;for&quot; }
+Authorization: Bearer &lt;alice-token&gt;
+</code></pre>
+<p><em>Alice: FOR</em></p>
+<hr>
+<p><strong>Step 16 — Bob votes FOR</strong></p>
+<pre><code>POST /v1/gov/proposals/{proposal_id}/vote  { &quot;choice&quot;: &quot;for&quot; }
+Authorization: Bearer &lt;bob-token&gt;
+</code></pre>
+<p><em>Bob: FOR</em></p>
+<hr>
+<p><strong>Step 17 — Carol votes FOR</strong></p>
+<pre><code>POST /v1/gov/proposals/{proposal_id}/vote  { &quot;choice&quot;: &quot;for&quot; }
+Authorization: Bearer &lt;carol-token&gt;
+</code></pre>
+<p><em>Carol: FOR</em></p>
+<p>✓ Phase 3 complete: 3 votes FOR, 0 against.</p>
+<hr>
+<h3>Phase 4: Verification (Steps 18–19)</h3>
+<p>Carol closes the vote — not Alice, not Bob. Authority rotates naturally.</p>
+<hr>
+<p><strong>Step 18 — Carol closes and tallies the vote</strong></p>
+<pre><code>POST /v1/gov/proposals/{proposal_id}/close  {}
+Authorization: Bearer &lt;carol-token&gt;
+</code></pre>
+<p>After closing, the script retrieves the current proposal state and vote tally:</p>
+<pre><code>GET /v1/gov/proposals/{proposal_id}
+GET /v1/gov/proposals/{proposal_id}/tally
+</code></pre>
+<p>Tally response:</p>
+<pre><code class="language-json">{
+  &quot;for_votes&quot;: 3,
+  &quot;against_votes&quot;: 0,
+  &quot;abstain_votes&quot;: 0,
+  &quot;total_votes&quot;: 3
+}
+</code></pre>
+<p><em>What this proves:</em> The vote is counted and recorded. 3/3 for, 0 against. Quorum reached (100% &gt; 50%). Approval threshold met (100% &gt; 51%). Outcome: <strong>ACCEPTED</strong>.</p>
+<hr>
+<p><strong>Step 19 — Generate cryptographic proof</strong></p>
+<pre><code>GET /v1/gov/proposals/{proposal_id}/proof
+Authorization: Bearer &lt;carol-token&gt;
+</code></pre>
+<p>The gateway verifies the stored proof before serving it: checks the receipt binding hash, confirms at least one attestation is present, verifies each attestation&#39;s <code>decision_hash</code> matches the receipt, and validates the Ed25519 signature against the signer&#39;s DID.</p>
+<p>Proof response structure:</p>
+<pre><code class="language-json">{
+  &quot;receipt&quot;: {
+    &quot;proposal_id&quot;: &quot;&lt;uuid&gt;&quot;,
+    &quot;domain_id&quot;: &quot;coop:finger-lakes-food&quot;,
+    &quot;outcome&quot;: &quot;accepted&quot;,
+    &quot;vote_tally&quot;: {
+      &quot;for_votes&quot;: 3,
+      &quot;against_votes&quot;: 0,
+      &quot;abstain_votes&quot;: 0
+    },
+    &quot;vote_hash&quot;: [241, 16, 39, 185, ...],
+    &quot;decision_hash&quot;: [...]
+  },
+  &quot;attestations&quot;: [
+    {
+      &quot;decision_hash&quot;: [...],
+      &quot;signer_did&quot;: &quot;did:icn:z&lt;node-pubkey&gt;&quot;,
+      &quot;timestamp&quot;: &lt;unix-seconds&gt;,
+      &quot;signature&quot;: [...]
+    }
+  ]
+}
+</code></pre>
+<p><em>What this proves:</em></p>
+<ul>
+<li><strong><code>vote_hash</code></strong> — A BLAKE3 Merkle root over all sorted (voter DID, choice, weight) tuples. Order-independent: the same votes in any order produce the same hash.</li>
+<li><strong><code>decision_hash</code></strong> — A canonical BLAKE3 hash of the receipt fields (proposal ID, domain, outcome, tally, vote_hash). Deterministic across nodes: two independent nodes processing the same vote record produce identical <code>decision_hash</code> values.</li>
+<li><strong><code>attestation.signature</code></strong> — An Ed25519 signature over the canonical attestation payload (domain tag + decision_hash + signer DID + timestamp), signed by the ICN node&#39;s keystore key.</li>
+</ul>
+<p>The receipt is self-verifiable. Anyone with the node&#39;s public key (derivable from its DID) can check the signature. No trust in the node is required — possession of the data is sufficient.</p>
+<hr>
+<h2>Verified Output</h2>
+<p>Actual terminal output from the verified run (2026-03-25):</p>
+<pre><code>============================================================
+  ICN Cooperative Governance Demo
+============================================================
+  Gateway: http://localhost:8080
+
+  ✓ Gateway healthy (version ...)
+
+  ...
+
+  Step 18. Carol closes and tallies the vote
+  ✓ Vote closed by Carol
+  ✓ Proposal state: ACCEPTED
+  ✓ Vote tally retrieved
+    {
+      &quot;for_votes&quot;: 3,
+      &quot;against_votes&quot;: 0,
+      &quot;abstain_votes&quot;: 0,
+      &quot;total_votes&quot;: 3
+    }
+
+  Step 19. Generate cryptographic proof
+  ✓ Governance proof retrieved
+    { &quot;receipt&quot;: { ... &quot;vote_hash&quot;: [241, 16, 39, 185, ...] ... }, &quot;attestations&quot;: [...] }
+
+============================================================
+  Demo Complete
+============================================================
+
+  Cooperative:  Finger Lakes Food Co-op
+  Domain:       coop:finger-lakes-food
+  Members:      Alice, Bob, Carol
+  Charter:      Ratified 3/3
+  Proposal:     &quot;Approve $12,000 for community kitchen equipment&quot;
+  Tally:        3 for / 0 against
+  Outcome:      ACCEPTED
+  Receipt:      f11027b9...
+</code></pre>
+<p>The receipt hash (<code>f11027b9...</code>) is the <code>vote_hash</code> from the proof receipt, hex-encoded. It will differ on each run because Alice, Bob, and Carol each get freshly generated keypairs. The hash is a function of their DIDs and their votes — any change to either invalidates it.</p>
+<hr>
+<h2>What Makes This Cooperative-First</h2>
+<p><strong>The coordinator is temporary.</strong> Alice holds coordinator scopes to bootstrap the structure. Once Bob and Carol are added, she has no special authority over proposals or votes. Steps 13–19 proceed entirely without her initiating them — Bob proposes, Bob opens the vote, Carol closes it.</p>
+<p><strong>Any member can propose.</strong> Step 13 is Bob creating a proposal using his own governance JWT. No coordinator approval gate. No special role check. The governance domain rules (quorum, threshold, voting period) are the only constraints.</p>
+<p><strong>Any member can close a vote.</strong> Step 18 is Carol closing the vote. The governance system doesn&#39;t require the proposer or coordinator to close — any authenticated member with <code>governance:write</code> scope can do it. Authority is not concentrated.</p>
+<p><strong>All members have equal weight.</strong> Bob and Carol are added with <code>&quot;weight&quot;: 1.0</code>, the same as Alice. The tally is <code>for_votes: 3</code> — three equal votes, not three weighted ones.</p>
+<p><strong>The proof is not signed by a central authority.</strong> The attestation is signed by the ICN node (the gateway daemon), which the cooperative itself runs. The signer&#39;s DID is in the proof, derivable to a public key, verifiable locally. A third party verifying the receipt doesn&#39;t need to trust the coop or the node — they verify the math.</p>
+<hr>
+<h2>Running It Yourself</h2>
+<pre><code class="language-bash"># 1. Build
+cd icn &amp;&amp; cargo build -p icnd
+
+# 2. Start gateway and run demo
+bash demo/scripts/start-demo.sh /tmp/icn-demo
+python3 demo/scripts/demo-governance.py http://localhost:8080
+
+# 3. Cleanup
+pkill -f icnd &amp;&amp; rm -rf /tmp/icn-demo
+</code></pre>
+<p>For interactive presenter mode (colored, paused between phases):</p>
+<pre><code class="language-bash">bash demo/scripts/present-governance.sh
+</code></pre>
+<p>For browser UI (after gateway is running):</p>
+<pre><code>http://localhost:8080/static/demo.html
+</code></pre>
+<hr>
+<h2>Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Gateway not reachable</code></td>
+<td>Gateway not started or wrong port</td>
+<td><code>pgrep -f icnd</code> → <code>cat /tmp/icn-demo/gateway.log | tail -20</code></td>
+</tr>
+<tr>
+<td><code>sled lock error</code></td>
+<td>Previous gateway didn&#39;t clean up</td>
+<td><code>pkill -9 -f icnd</code> then use a fresh data dir</td>
+</tr>
+<tr>
+<td><code>JWT secret not configured</code></td>
+<td>Running manually without env vars</td>
+<td>See <code>RUNBOOK.md</code> for full manual invocation</td>
+</tr>
+<tr>
+<td><code>ModuleNotFoundError: cryptography</code></td>
+<td>Python package missing</td>
+<td><code>pip install cryptography</code></td>
+</tr>
+<tr>
+<td><code>Proof endpoint 404</code></td>
+<td>Node keystore not unlocked at startup</td>
+<td>Check logs for <code>GovernanceProof signing key unavailable</code></td>
+</tr>
+<tr>
+<td>Build <code>SIGSEGV</code></td>
+<td>Incremental compilation cache corruption</td>
+<td><code>cargo clean &amp;&amp; cargo build -p icnd</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>What to Look at Next</h2>
+<p><strong>K3s five-flow federation demo</strong> — Four real cooperatives running on the homelab K3s cluster (BrightWorks Collective, River City Tool Library, Harbor Homes, Finger Lakes CDN). Covers governance, patronage settlement, inter-coop federation treaties, regulatory reporting, and distributed compute with trust-gated task admission. See the K3s section in <code>demo/RUNBOOK.md</code>.</p>
+<p><strong>Browser demo</strong> — <code>http://localhost:8080/static/demo.html</code> after starting the gateway. Four &quot;Run Phase N&quot; buttons. Suitable for screen-share demos. Shows coordinator role labeled as &quot;Temporary&quot; and equal voting weights explicitly.</p>
+<p><strong>Architecture</strong> — <code>docs/ARCHITECTURE.md</code> covers the constraint enforcement model (apps translate meaning, kernel enforces blindly), the actor-based runtime, and the trust graph → PolicyOracle → ConstraintSet flow that underpins everything the demo exercises.</p>
+<p><strong>Proof structure</strong> — <code>icn/crates/icn-governance/src/proof.rs</code> is the canonical source for <code>GovernanceProof</code>, <code>GovernanceDecisionReceipt</code>, <code>GovernanceDecisionAttestation</code>, and <code>GovernanceProofV2</code>. The hash construction and verification logic is documented inline.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

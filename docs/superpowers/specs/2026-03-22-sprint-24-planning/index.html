@@ -1,0 +1,305 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Sprint 24 Planning — Commons Compute Hardening | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>superpowers</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>specs</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 03 22 sprint 24 planning</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/superpowers/specs/2026-03-22-sprint-24-planning.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Sprint 24 Planning — Commons Compute Hardening</h1>
+<p><strong>Date:</strong> 2026-03-22
+<strong>Status:</strong> Draft — pending sprint kickoff
+<strong>Author:</strong> Matt Faherty
+<strong>Input:</strong> Sprint 23 close memo + codebase audit</p>
+<hr>
+<h2>Governing Constraint</h2>
+<blockquote>
+<p>Sprint 23 is administratively complete. It is not equivalent to full demo readiness.</p>
+</blockquote>
+<p>This distinction must not be flattened at Sprint 24 kickoff. The board is clean. The state is more legible. Several real things landed. None of that is the same as &quot;the demo works end-to-end.&quot;</p>
+<hr>
+<h2>1. Current State Entering Sprint 24</h2>
+<h3>What is true</h3>
+<ul>
+<li>Sprint 22 archived. Sprint 23 board shows 10/10 done.</li>
+<li><code>main</code> passes all required CI gates. Test Coverage is an acknowledged exception (runner ceiling, documented in <code>ops/state/ci-exceptions.md</code> — non-blocking, not a code regression).</li>
+<li>Kernel API surface is legible: <code>StorageClass</code>, <code>ContainerRuntime</code>, <code>CrdtType</code> all defined. CRDT implementations and <code>ContainerAttestation</code> explicitly deferred.</li>
+<li>Platform baseline doc, storage governance spec, roadmap, and demo inventory all committed.</li>
+</ul>
+<h3>What is not true</h3>
+<ul>
+<li>The project is not demo-ready across all three flows.</li>
+<li>&quot;Sprint 23 complete&quot; does not mean a presenter can run the demo clean.</li>
+</ul>
+<hr>
+<h2>2. Demo Debt: Two Distinct Classes</h2>
+<p>The demo debt is <strong>not one thing</strong>. Collapsing it into &quot;demo polish&quot; will cause it to get deprioritized until it blocks a presentation.</p>
+<h3>Class 1 — Missing Script Debt</h3>
+<table>
+<thead>
+<tr>
+<th>Flow</th>
+<th>Script</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>WASM Compute (Flow A)</td>
+<td>none</td>
+<td>No script exists</td>
+</tr>
+<tr>
+<td>Discovery (Flow B)</td>
+<td>none</td>
+<td>No script exists</td>
+</tr>
+</tbody></table>
+<p>These flows have no demo exercise at all. The gateway routes for compute and discovery exist; there is no scripted walkthrough. This is <strong>authoring work</strong> — writing the scripts, finding the right sequence of API calls, making them presenter-grade.</p>
+<h3>Class 2 — <del>Deployment/Seeding Debt</del> RESOLVED (2026-03-22)</h3>
+<table>
+<thead>
+<tr>
+<th>Flow</th>
+<th>Script</th>
+<th>Status</th>
+<th>Validated</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Patronage (Flow 2)</td>
+<td><code>flow-2-patronage.sh</code></td>
+<td><strong>Working</strong></td>
+<td>2026-03-22 live test</td>
+</tr>
+</tbody></table>
+<p><strong>Live validation result (2026-03-22):</strong> All three ledger routes return expected results with a valid auth token:</p>
+<ul>
+<li><code>GET /v1/ledger/brightworks-cooperative/history</code> → <strong>200</strong> (3 prior transactions present)</li>
+<li><code>GET /v1/ledger/brightworks-cooperative/position/{did}</code> → <strong>200</strong></li>
+<li><code>POST /v1/ledger/brightworks-cooperative/settle</code> → <strong>201</strong> (transaction hash returned)</li>
+</ul>
+<p>The &quot;fragile — ledger routes 404&quot; characterization in the Sprint 23 demo-path doc was incorrect. The s23-t10 subagent read historical warning comments in the script (scope gaps resolved as of 2026-03-18) as evidence of current failures without running the script. No 404s were ever observed in live testing.</p>
+<p>The hardcoded <code>BRIGHTWORKS_NODE_DID</code> in <code>flow-2-patronage.sh:50</code> matches the running pod&#39;s DID exactly. Seeded data is present. No repair needed.</p>
+<p><strong>Flow 2 is not pre-sprint prerequisite work.</strong> It is a proven flow.</p>
+<h3>Class 2 — Proven Flows</h3>
+<table>
+<thead>
+<tr>
+<th>Flow</th>
+<th>Script</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Governance (Flow 1)</td>
+<td><code>flow-1-governance.sh</code></td>
+<td>Proven</td>
+</tr>
+<tr>
+<td>Patronage (Flow 2)</td>
+<td><code>flow-2-patronage.sh</code></td>
+<td>Proven (validated 2026-03-22)</td>
+</tr>
+<tr>
+<td>Federation (Flow 3)</td>
+<td><code>flow-3-federation.sh</code></td>
+<td>Proven</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>3. Recommended Sprint Boundary</h2>
+<h3>Pre-Sprint-24 Prerequisite Work</h3>
+<p>One remaining prerequisite (Flow 2 was validated and removed):</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Class</th>
+<th>Description</th>
+<th>Estimated size</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><del><strong>p24-pre-1</strong></del></td>
+<td><del>Deployment</del></td>
+<td><del>Flow 2 repair</del></td>
+<td><strong>Resolved</strong> — live test 2026-03-22 confirms working</td>
+</tr>
+<tr>
+<td><strong>p24-pre-2</strong></td>
+<td>Ops</td>
+<td>Confirm <code>cargo-tarpaulin</code> infrastructure fix path — either dedicated runner or switch to <code>llvm-cov</code>. Do not let this drift another sprint.</td>
+<td>2–4 hrs investigation</td>
+</tr>
+</tbody></table>
+<p>p24-pre-2 is the only remaining ops item before Sprint 24 kickoff.</p>
+<h3>Sprint 24 Proper — Commons Compute Hardening</h3>
+<p>The spine is #925 → #947 → #964, in dependency order:</p>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Title</th>
+<th>Why it goes here</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>#925</strong></td>
+<td>Commons resource pool and contribution accounting</td>
+<td>First primitive — enables nodes to pool resources and track contribution</td>
+</tr>
+<tr>
+<td><strong>#947</strong></td>
+<td>Unaffiliated node participation protocol</td>
+<td>Depends on #925 accounting model; enables nodes outside existing coops</td>
+</tr>
+<tr>
+<td><strong>#964</strong></td>
+<td>Stale commons pool participant expiry</td>
+<td>Correctness requirement for #925/#947; without expiry, pools accumulate dead entries</td>
+</tr>
+</tbody></table>
+<p>These three form a closed loop: you can&#39;t do #947 without #925 accounting, and both produce incorrect long-term state without #964 expiry.</p>
+<h3>What Should Not Silently Bleed In</h3>
+<ul>
+<li><strong>Flow A / Flow B demo scripts</strong> — these are script-authoring work, not commons-compute engineering. They do not belong inside Sprint 24 unless explicitly scoped as a parallel track with a named owner.</li>
+<li><strong>CRDT implementations</strong> (#1095) — deferred to Sprint 24 with explicit rationale, but this is a P2 item. If Sprint 24 is already carrying #925/#947/#964, CRDT risks competing for the same Rust engineering attention. Defer to Sprint 25 unless a specific commons-compute use case requires it.</li>
+<li><strong>ContainerAttestation</strong> — same risk profile as CRDT. Sprint 25 candidate.</li>
+<li><strong>Coverage CI infrastructure</strong> — this is ops/infra, not engineering. Assign it outside the sprint if possible.</li>
+</ul>
+<hr>
+<h2>4. Proposed Task Breakdown</h2>
+<h3>Pre-requisite / Unblockers (before Sprint 24 kickoff)</h3>
+<p><del><strong>p24-pre-1: Stabilize Flow 2 (Patronage)</strong></del> — <strong>Closed 2026-03-22.</strong> Live validation confirmed all three ledger routes return 200/201 with proper auth. No repair needed.</p>
+<p><strong>p24-pre-2: Decide Coverage CI path</strong></p>
+<ul>
+<li>Why: Red CI is acknowledged but not resolved; can&#39;t drift another sprint</li>
+<li>Owner: DevOps / infra</li>
+<li>Dependency: None</li>
+<li>Success: Either (a) dedicated larger runner is provisioned and tarpaulin job completes, or (b) <code>llvm-cov</code> migration is committed to with a named target sprint, or (c) the job is marked as permanently advisory with a PR that removes it from <code>failure</code> classification</li>
+</ul>
+<h3>Sprint 24 Core</h3>
+<p><strong>s24-t1: Commons resource pool (#925)</strong></p>
+<ul>
+<li>Why: First commons-compute primitive; without it, #947 has no accounting model to build on</li>
+<li>Owner: Rust / icn-compute domain</li>
+<li>Dependency: None (independent of demo work)</li>
+<li>Success: <code>CommonsResourcePool</code> type exists, contribution accounting is implemented, tests pass, kernel/app boundary respected (no domain leakage into kernel)</li>
+</ul>
+<p><strong>s24-t2: Unaffiliated node participation (#947)</strong></p>
+<ul>
+<li>Why: Enables nodes outside cooperative membership to participate in commons pools</li>
+<li>Owner: Rust / icn-compute + icn-federation</li>
+<li>Dependency: s24-t1 (accounting model must exist)</li>
+<li>Success: An unaffiliated node can join a commons pool, contribute resources, and have contributions recorded via #925 accounting</li>
+</ul>
+<p><strong>s24-t3: Stale participant expiry (#964)</strong></p>
+<ul>
+<li>Why: Without expiry, pools accumulate entries for nodes that have gone offline; correctness degrades over time</li>
+<li>Owner: Rust / icn-compute</li>
+<li>Dependency: s24-t1, s24-t2</li>
+<li>Success: Expiry policy is configurable, stale entries are purged on schedule, no data loss for active participants</li>
+</ul>
+<h3>Optional Follow-on / Demo Polish</h3>
+<p><strong>s24-opt-1: Flow A demo script (WASM Compute)</strong></p>
+<ul>
+<li>Why: Missing script; no presenter-grade WASM demo exists</li>
+<li>Owner: Demo ops / script authoring</li>
+<li>Dependency: None (gateway routes exist)</li>
+<li>Success: <code>flow-1-wasm.sh</code> runs end-to-end and narrates a WASM task execution</li>
+</ul>
+<p><strong>s24-opt-2: Flow B demo script (Discovery)</strong></p>
+<ul>
+<li>Why: Discovery is currently automatic/implicit; no scripted walkthrough exists</li>
+<li>Owner: Demo ops</li>
+<li>Dependency: None</li>
+<li>Success: Discovery behavior is observable and narrated in a script</li>
+</ul>
+<p><strong>s24-opt-3: CRDT implementations (#1095)</strong></p>
+<ul>
+<li>Why: OrSet + LwwRegister are enum stubs; zero concrete implementations</li>
+<li>Owner: Rust / icn-kernel-api domain</li>
+<li>Dependency: None (kernel-level, independent of commons-compute)</li>
+<li>Priority: P2 — include only if bandwidth exists without displacing core tasks</li>
+</ul>
+<hr>
+<h2>5. Risk Notes</h2>
+<h3>Bandwidth collision risk</h3>
+<p>If <code>p24-pre-1</code> (flow-2 seeding fix) is not resolved before Sprint 24 opens, it will be treated as a sprint task and will compete with #925/#947/#964 for the same engineering attention. Flow debugging and API implementation are not the same skill domain, but they compete for the same person-hours and sprint focus. <strong>Pull it forward.</strong></p>
+<h3>False bucket risk</h3>
+<p>The most common planning error here is treating all demo debt as one work item labeled &quot;demo polish.&quot; It is not. The two classes require different skills, different time commitments, and different urgency levels. Deployment/seeding fixes should be handled by whoever owns the K3s cluster. Script authoring is a separate track. Commons-compute engineering is the third track. These should not share a bucket.</p>
+<h3>Hidden coupling: DID staleness</h3>
+<p><code>flow-2-patronage.sh</code> has a hardcoded <code>BRIGHTWORKS_NODE_DID</code>. The script comments this explicitly: &quot;If pods are rebuilt, this DID changes.&quot; This means every K3s cluster rebuild silently invalidates the demo. This is a fragility that will recur. The longer-term fix is for <code>reseed-federation-demo.sh</code> to export the seeded DIDs into a file that the flow scripts source dynamically, rather than having them hardcoded. This is a one-time cleanup task, not a sprint item, but it should be noted.</p>
+<h3>CRDT and ContainerAttestation scope creep risk</h3>
+<p>Both were deferred to Sprint 24 per the Sprint 23 deferral rationale. If Sprint 24 is already carrying #925/#947/#964, adding both deferred items creates a sprint that is too wide. Choose one or defer both to Sprint 25. Explicit scoping at kickoff prevents this from becoming an implicit assumption.</p>
+<hr>
+<h2>Recommended Next Action</h2>
+<p>Before Sprint 24 planning is considered structurally sound, three things need to be resolved:</p>
+<ol>
+<li><p><strong>Run <code>reseed-federation-demo.sh</code> on the current K3s cluster.</strong> Confirm whether flow-2 works afterward. If yes, the fix is done. If no, diagnose further (NodePort routing, DID mismatch, scope gap).</p>
+</li>
+<li><p><strong>Decide on Coverage CI.</strong> Not a hard decision, but it needs to be a decision — not another sprint of acknowledged drift.</p>
+</li>
+<li><p><strong>Confirm CRDT and ContainerAttestation are explicitly out of Sprint 24 scope,</strong> or name a specific owner and bounded task for each. No ambiguity about whether they&#39;re in or out.</p>
+</li>
+</ol>
+<p>Once these three are resolved, Sprint 24 kickoff can proceed with a clean spine around #925/#947/#964.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

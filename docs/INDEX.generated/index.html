@@ -1,0 +1,834 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Documentation Index | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>INDEX.generated</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/INDEX.generated.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Documentation Index</h1>
+<h2>Canonical index of all ICN documentation, organized by category.</h2>
+<h2>Quick Navigation</h2>
+<ul>
+<li><a href="#architecture">Architecture</a></li>
+<li><a href="#design">Design</a></li>
+<li><a href="#guide">Guide</a></li>
+<li><a href="#operations">Operations</a></li>
+<li><a href="#reference">Reference</a></li>
+<li><a href="#security">Security</a></li>
+<li><a href="#status">Status</a></li>
+<li><a href="#strategy">Strategy</a></li>
+</ul>
+<hr>
+<h2>Architecture</h2>
+<h3>🔒 <strong>Canonical</strong> <a href="/VISION.md">ICN Vision Statement</a></h3>
+<p>Core vision, values, and long-term aspiration for InterCooperative Network</p>
+<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-02-01</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/ARCHITECTURE.md">ICN Architecture Reference</a></h3>
+<p>Single authoritative architecture covering all 8 primitives, kernel-app separation, subsystems, and implementation status</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code>, <code>grant-reviewers</code> | <strong>Updated:</strong> 2026-03-21</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0010-app-topology.md">ADR-0010: App Topology</a></h3>
+<p>Architectural decision record on app topology</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/ARCHITECTURAL_GAPS_AND_FIXES.md">Architectural Gaps & Remediation Plan</a></h3>
+<p>Analysis of architectural weaknesses and remediation strategies</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/CANONICAL_ENCODING.md">Canonical Encoding</a></h3>
+<p>Specification for deterministic serialization of ICN data structures</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/CELLS_AND_SCOPES.md">Cells and Scopes Architecture</a></h3>
+<p>Design of ICN&#39;s cell-based organization model and scope hierarchy</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/CLIENT_MODEL.md">Client Model Architecture</a></h3>
+<p>Architecture of ICN client models and their relationship to kernel primitives</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/FEDERATION_ACTIONS.md">Federation Actions</a></h3>
+<p>Design of federated action execution across network boundaries</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/FEDERATION_INTEROP_CONTRACT.md">Federation Interoperability Contract</a></h3>
+<p>Specification of contracts and interfaces for federation interoperability</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/GOVERNANCE_STATE_MACHINE.md">Governance State Machine Architecture</a></h3>
+<p>State machine design for governance decision-making and enforcement</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-12</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md">Identity and Membership Architecture</a></h3>
+<p>Design of identity primitives, membership verification, and member lifecycle</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/KERNEL_APP_SEPARATION.md">Kernel/App Separation Architecture</a></h3>
+<p>Normative specification of kernel-app boundary, infection vectors, and capability propagation rules</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-17</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/SCOPE_BOUNDED_TRUST.md">Scope Bounded Trust</a></h3>
+<p>Trust model design limiting trust scope to organizational boundaries</p>
+<p><strong>For:</strong> <code>architects</code>, <code>security</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/spec/KERNEL_CONTRACTS.md">ICN Kernel Contracts Specification</a></h3>
+<p>Specification of kernel contract primitives</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h2>Design</h2>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/COMMONS_EVOLUTION.md">RFC: ICN Commons Evolution</a></h3>
+<p>Design for evolving ICN commons governance and stewardship models over phases 0-3</p>
+<p><strong>For:</strong> <code>architects</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/MINIMAL-VIABLE-COOP.md">Minimal Viable Coop Track</a></h3>
+<p>Program for shipping one end-to-end cooperative use case for production 6-month validation</p>
+<p><strong>For:</strong> <code>product</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/capability-based-features.md">Capability-Based Feature Gating</a></h3>
+<p>System for graceful version handling via capability advertisement and negotiation</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/compute-classes.md">Compute Classes: Legitimacy vs Utility</a></h3>
+<p>Design distinguishing between legitimacy compute and utility compute subsystems</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/compute-substrate-design.md">Compute Substrate Design</a></h3>
+<p>Design for ICN&#39;s execution environment and compute resource management</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2025-11-18</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/deterministic-core.md">ICN Deterministic Core Specification</a></h3>
+<p>Specification for deterministic computation substrate ensuring reproducible state machines</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/economics/ECONOMIC_ARCHITECTURE.md">ICN Economic Architecture</a></h3>
+<p>Design of value flows, contribution accounting, and economic incentives</p>
+<p><strong>For:</strong> <code>architects</code>, <code>product</code> | <strong>Updated:</strong> 2026-01-17</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/economics/ECONOMIC_VISION.md">Economic Vision</a></h3>
+<p>Long-term vision for ICN&#39;s economic model and cooperative ownership</p>
+<p><strong>For:</strong> <code>architects</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/economics/contribution-credits-design.md">Contribution Credits Design</a></h3>
+<p>Design for tracking and accounting for contributions to cooperative entities</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/economics/econ-modeling.md">Economic Modeling for Mutual Credit</a></h3>
+<p>Simulation and validation of mutual credit economic models</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/economics/economic-safety.md">Economic Safety Design</a></h3>
+<p>Safety mechanisms preventing economic attacks and misuse of economic primitives</p>
+<p><strong>For:</strong> <code>architects</code>, <code>security</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/economics/economics-truth-contract.md">Economics Truth Contract</a></h3>
+<p>Truth contract auditing all economics-related code against specification</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/economics/model-validation.md">Economic Model Validation</a></h3>
+<p>Maps economic operations against implementation state</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/entity-dissolution-example.md">Entity Dissolution: Before and After</a></h3>
+<p>Practical example of entity dissolution workflow</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/entity-dissolution.md">Entity Dissolution Design</a></h3>
+<p>Design for graceful shutdown and dissolution of cooperative entities</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/execution-bridge-spec.md">Execution Bridge Specification</a></h3>
+<p>Authoritative design for bridging between ICN and external execution environments</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/governance/PROJECT_GOVERNANCE.md">ICN Project Governance</a></h3>
+<p>Governance structure for ICN development and decision-making</p>
+<p><strong>For:</strong> <code>team</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/governance/governance-primitives.md">Governance Primitives</a></h3>
+<p>Fundamental governance building blocks and decision-making patterns</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/governance/governance.md">Governance Framework</a></h3>
+<p>Comprehensive governance framework for cooperative decision-making</p>
+<p><strong>For:</strong> <code>architects</code>, <code>product</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/governance/model-validation.md">Governance Model Validation</a></h3>
+<p>Maps governance operations against implementation state</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/governance/witness-trust-validation.md">Trust-Graph Integration for Witness Validation</a></h3>
+<p>Trust-graph integration for witness validation in ledger operations</p>
+<p><strong>For:</strong> <code>architects</code>, <code>security</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/institution-in-a-box.md">Institution-in-a-Box</a></h3>
+<p>Design pattern for embedding ICN primitives into legacy digital infrastructure with CRDTs and replication</p>
+<p><strong>For:</strong> <code>architects</code>, <code>product</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/ipv6-endpoint-sets-design.md">IPv6 Endpoint Sets Design</a></h3>
+<p>Design for managing multiple network endpoints with IPv6</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/multi-device-identity-design.md">Multi-Device Identity Design</a></h3>
+<p>Design for managing identity across multiple devices within a single agent</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/nat-traversal-design.md">NAT Traversal Design</a></h3>
+<p>Design for peer-to-peer connectivity across NAT boundaries</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/platform-layer-design.md">Platform Layer Design</a></h3>
+<p>Design for platform abstractions and portability across systems</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/post-quantum-crypto.md">Post-Quantum Cryptography in ICN</a></h3>
+<p>Experimental post-quantum cryptography integration and migration strategy</p>
+<p><strong>For:</strong> <code>architects</code>, <code>security</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/razeto-integration-design.md">Razeto Integration Design</a></h3>
+<p>Design for integrating external systems via Razeto protocol</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/regulatory-safe-verifiable-state.md">Regulatory-Safe Verifiable State</a></h3>
+<p>Design maintaining provable state satisfying regulatory audits without exposing ledger internals</p>
+<p><strong>For:</strong> <code>architects</code>, <code>compliance</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/repo-reality-map.md">Repository Reality Map</a></h3>
+<p>Mapping between git repository structure and architectural reality</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/scheduler-evolution-plan.md">Scheduler Evolution Plan</a></h3>
+<p>Plan for evolving ICN&#39;s scheduling substrate over multiple phases</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/scope-scheduling.md">Scope Scheduling Design</a></h3>
+<p>Design for scheduling and resource allocation within organizational scopes</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/design/sdis/social-recovery.md">Social Recovery Guide</a></h3>
+<p>M-of-N social recovery mechanism for identity recovery</p>
+<p><strong>For:</strong> <code>architects</code>, <code>security</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/social-recovery-design.md">Social Recovery Design</a></h3>
+<p>M-of-N social recovery mechanism for lost devices and identity recovery</p>
+<p><strong>For:</strong> <code>architects</code>, <code>security</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/development/gossip-signed-envelope-migration.md">Gossip SignedEnvelope Migration</a></h3>
+<p>Migration plan for gossip cryptographic authentication</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/development/identity-bundle-refactor-plan.md">IdentityBundle Refactor Plan</a></h3>
+<p>Hardware-backed signing implementation plan</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/development/module-splitting-analysis.md">Module Splitting Analysis</a></h3>
+<p>Analysis of large modules for potential splitting</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/mobile/icn-mobile-ux-spec-v1.md">ICN Mobile Member UX Spec v1</a></h3>
+<p>Mobile application UX specification</p>
+<p><strong>For:</strong> <code>developers</code>, <code>product</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/sdis/SDIS_SYSTEM.md">SDIS: Secure Distributed Identity System</a></h3>
+<p>SDIS design with implemented flows and planned endpoints</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h2>Guide</h2>
+<h3>🔒 <strong>Canonical</strong> <a href="/CONTRIBUTING.md">Contributing to ICN</a></h3>
+<p>Architectural guardrails, contribution workflow, code standards, and review process</p>
+<p><strong>For:</strong> <code>contributors</code> | <strong>Updated:</strong> 2026-03-01</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/GETTING_STARTED.md">Getting Started with ICN</a></h3>
+<p>Quick-start guide for new developers to set up ICN in minutes</p>
+<p><strong>For:</strong> <code>developers</code>, <code>contributors</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/deployment/DEPLOY_TEST_NETWORK.md">Deploy Test Network</a></h3>
+<p>Guide for setting up multi-node test networks for validation</p>
+<p><strong>For:</strong> <code>developers</code>, <code>testers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/deployment/DEPLOY_TO_K3S.md">Deploy to K3s</a></h3>
+<p>Steps for deploying ICN to Kubernetes using K3s</p>
+<p><strong>For:</strong> <code>operators</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/deployment/QUICK_START.md">Quick Deploy Guide</a></h3>
+<p>Fast path for getting ICN running locally</p>
+<p><strong>For:</strong> <code>developers</code>, <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/dev/language-guide.md">ICN UX Language Guide</a></h3>
+<p>Enforced communications style guide for regulatory-safe messaging</p>
+<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/development/federation-roadmap-implementation.md">Federation Roadmap Implementation Guide</a></h3>
+<p>Step-by-step federation feature implementation guide</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/development/trust-multi-graph-migration.md">Trust Multi-Graph Migration Guide</a></h3>
+<p>Migration guide for multi-graph architecture</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/features/witness-signature-best-practices.md">Witness Signature Best Practices</a></h3>
+<p>Developer guide for witness signature implementation</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/developer/DEV_ENVIRONMENT.md">ICN Development Environment</a></h3>
+<p>Setup guide for icn-dev development VM</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/guides/developer/DOCUMENTATION_STYLE.md">Documentation Style Guide</a></h3>
+<p>Consistent documentation formatting standards</p>
+<p><strong>For:</strong> <code>contributors</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/guides/developer/README.md">Developer Guides</a></h3>
+<p>Index of guides for developers building on or contributing to ICN</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/guides/developer/i18n-guide.md">Internationalization (i18n) Guide</a></h3>
+<p>i18n implementation across Rust, React Native, web</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/guides/operations/README.md">Operations Guides</a></h3>
+<p>Operational guides for running ICN deployments</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/backup-and-recovery.md">Backup and Recovery Guide</a></h3>
+<p>Operator procedures for node backup and recovery</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/backup-restore.md">Backup and Restore: Operator Recovery</a></h3>
+<p>Low-level Sled database and keystore recovery</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/daemon-mode-governance.md">Daemon Mode with Governance Receipts</a></h3>
+<p>Phase 0 pilot daemon mode operations</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/nat-traversal-pilot-test.md">NAT Traversal Pilot Test Guide</a></h3>
+<p>Manual testing guide for NAT traversal feature</p>
+<p><strong>For:</strong> <code>operators</code>, <code>testers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/nat-traversal.md">NAT Traversal Operations Guide</a></h3>
+<p>Configuring and operating nodes behind NAT</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/operations-guide.md">ICN Operations Guide</a></h3>
+<p>Comprehensive operational procedures and workflows</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/pilot-smoke.md">Pilot Smoke Runbook</a></h3>
+<p>Deterministic operator check for pilot deployment</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/replication-operations.md">Replication Operations Guide</a></h3>
+<p>Replication procedures for Phase 17 storage hardening</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/troubleshooting.md">ICN Troubleshooting Runbooks</a></h3>
+<p>Step-by-step procedures for diagnosing operational issues</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/guides/user/README.md">User Guides</a></h3>
+<p>End-user documentation and tutorials</p>
+<p><strong>For:</strong> <code>users</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/user/cooperative-setup-guide.md">Cooperative Setup Guide</a></h3>
+<p>Instructions for setting up a new cooperative on ICN</p>
+<p><strong>For:</strong> <code>users</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/user/summit-demo.md">Summit Decision Registry Demo</a></h3>
+<p>Demo script for decision registry and treasury spending</p>
+<p><strong>For:</strong> <code>team</code>, <code>demo-users</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/internal/pilots/pilot-coordinator-guide.md">Pilot Coordinator Guide</a></h3>
+<p>Practical guide for cooperative coordinators deploying ICN</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/internal/pilots/pilot-playbook.md">Pilot Deployment Playbook</a></h3>
+<p>Step-by-step guide for pilot cooperative deployment</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/migration-guides/keystore-versions.md">Keystore Version Migration</a></h3>
+<p>Guide for keystore format version migration</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/migration-guides/version-upgrades.md">ICN Version Upgrade Guide</a></h3>
+<p>Guide for upgrading between ICN versions</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/observability/tail-based-sampling.md">Tail-Based Sampling Configuration</a></h3>
+<p>Tail-based sampling setup for traces</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/onboarding/README.md">Developer Onboarding Curriculum</a></h3>
+<p>Structured learning path for new ICN developers</p>
+<p><strong>For:</strong> <code>developers</code>, <code>contributors</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/assessments.md">Onboarding Assessments</a></h3>
+<p>Module checkpoints and self-review questions</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/capstone.md">Capstone: Local Two-Node ICN + Ledger Flow</a></h3>
+<p>Final capstone project demonstrating end-to-end ICN</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/labs/lab-01-workspace/README.md">Lab 01: Workspace Setup</a></h3>
+<p>Learning lab for workspace organization</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/labs/lab-02-error-receipt/README.md">Lab 02: Error Receipts and Tracing</a></h3>
+<p>Learning lab for structured errors and tracing</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/labs/lab-03-mini-actor/README.md">Lab 03: Mini Actor Runtime</a></h3>
+<p>Learning lab for actor model implementation</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/labs/lab-04-firewall-oracle/README.md">Lab 04: Firewall Oracle (Keystone Lab)</a></h3>
+<p>Keystone lab proving the Meaning Firewall boundary</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/labs/lab-05-mini-ledger/README.md">Lab 05: Mini Ledger with Double-Entry</a></h3>
+<p>Learning lab for ledger implementation</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/labs/lab-06-signed-envelope/README.md">Lab 06: Signed Envelopes with Replay Protection</a></h3>
+<p>Learning lab for cryptographic signatures</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/labs/lab-07-gossip-sync/README.md">Lab 07: Gossip Sync with Vector Clocks</a></h3>
+<p>Learning lab for eventual consistency</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/labs/lab-08-governance-flow/README.md">Lab 08: Governance Flow</a></h3>
+<p>Learning lab for governance proposal to constraint update</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-1-foundations/01-environment.md">01: Environment Setup & Repository Navigation</a></h3>
+<p>Foundational module on environment and repo layout</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-1-foundations/02-rust-through-icn.md">02: Rust Through ICN's Lens</a></h3>
+<p>Foundational module on Rust patterns used in ICN</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-1-foundations/03-errors-and-tracing.md">03: Errors and Tracing</a></h3>
+<p>Foundational module on error handling and distributed visibility</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-2-architecture/04-actors-and-concurrency.md">Actors and Concurrency</a></h3>
+<p>Learning module on ICN&#39;s actor model and concurrent execution</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-2-architecture/05-the-meaning-firewall.md">The Meaning Firewall</a></h3>
+<p>Learning module on ICN&#39;s type-safe boundary enforcement</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-2-architecture/06-persistence-and-ledger.md">Persistence and Ledger</a></h3>
+<p>Learning module on state persistence and event logging</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-3-systems/07-identity-and-crypto.md">07: Identity and Cryptography</a></h3>
+<p>Systems module on identity and cryptographic operations</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-3-systems/08-network-and-gossip.md">08: Network and Gossip</a></h3>
+<p>Systems module on network communication and eventual consistency</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-3-systems/09-governance-and-contracts.md">09: Governance and Contracts</a></h3>
+<p>Systems module on governance and contracts</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-4-ownership/10-federation-and-ops.md">10: Federation and Operations</a></h3>
+<p>Ownership module on federation and production deployment</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-4-ownership/11-maintainer.md">11: Maintainer Skills</a></h3>
+<p>Ownership module on reshaping architecture safely</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/path/phase-4-ownership/capstone.md">Maintainer Capstone</a></h3>
+<p>Final capstone gate for Maintainer tier</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reading-map.md">Onboarding Reading Map</a></h3>
+<p>Links between modules and high-signal source files</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-00-setup.md">Module 0: Setup and Tooling</a></h3>
+<p>Reference module on development environment setup</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-01-rust-fundamentals.md">Module 1: Rust Fundamentals</a></h3>
+<p>Reference module on Rust concepts for ICN</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-02-architecture-overview.md">Module 02: Architecture Overview</a></h3>
+<p>Reference module providing high-level architecture overview</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-03-runtime-actors.md">Module 3: Runtime and Actor Model</a></h3>
+<p>Reference module on actor model and constraint engine</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-04-identity-trust.md">Module 4: Identity and Trust</a></h3>
+<p>Reference module on identity and trust primitives</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-05-network-gossip.md">Module 5: Network and Gossip</a></h3>
+<p>Reference module on network communication and state sync</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-06-ledger-contracts.md">Module 6: Ledger and Contracts</a></h3>
+<p>Reference module on ledger and CCL programming</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-08-web-ui.md">Module 8: Web UI Integration</a></h3>
+<p>Reference module on web UI integration</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-09-ops-deploy.md">Module 9: Operations and Deployment</a></h3>
+<p>Reference module on production deployment</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-10-contributor-workflow.md">Module 10: Contributor Workflow</a></h3>
+<p>Reference module on contribution processes</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-11-federation.md">Module 11: Federation</a></h3>
+<p>Reference module on federation and inter-cooperative agreements</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-12-observability.md">Module 12: Observability and Metrics</a></h3>
+<p>Reference module on monitoring</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-13-security-privacy.md">Module 13: Security and Privacy</a></h3>
+<p>Reference module on security and privacy in ICN</p>
+<p><strong>For:</strong> <code>developers</code>, <code>security</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/reference/module-14-governance-ccl-deep-dive.md">Module 14: Governance and CCL Deep Dive</a></h3>
+<p>Reference module on governance and contract language</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/review-plan.md">Curriculum Gap Analysis</a></h3>
+<p>Analysis of curriculum gaps and iteration plan</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/onboarding/syllabus.md">Onboarding Syllabus</a></h3>
+<p>Overall course structure for Foundations and Accelerated tracks</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/onboarding/tracks/accelerated.md">Accelerated Track (4 weeks)</a></h3>
+<p>Fast-track onboarding for Rust-intermediate developers</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/onboarding/tracks/contributor-ladder.md">ICN Contributor Ladder</a></h3>
+<p>Tier-based contributor skill progression (Observer → Contributor → Maintainer → Architect)</p>
+<p><strong>For:</strong> <code>contributors</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/onboarding/tracks/foundations.md">Foundations Track (8 weeks)</a></h3>
+<p>Comprehensive onboarding track for Rust beginners</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/update-process.md">Curriculum Update Process</a></h3>
+<p>Process for keeping onboarding aligned with codebase</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-00-setup.md">Workshop 0: Local Build and Repo Orientation</a></h3>
+<p>Workshop on local build and repository structure</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-01-rust-fundamentals.md">Workshop 1: Rust Fundamentals in Practice</a></h3>
+<p>Workshop applying Rust patterns to ICN code</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-02-architecture.md">Workshop 2: Architecture Mapping Exercise</a></h3>
+<p>Workshop for building architecture mental models</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-03-runtime.md">Workshop 3: Runtime and Actor Lifecycle</a></h3>
+<p>Workshop on actor model and lifecycle</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-04-identity-trust.md">Workshop 4: Identity and Trust Hands-On</a></h3>
+<p>Workshop on identity and trust operations</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-05-network-gossip.md">Workshop 5: Network and Gossip Deep Dive</a></h3>
+<p>Workshop on network and gossip systems</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-06-ledger-contracts.md">Workshop 6: Ledger and Contract Flow</a></h3>
+<p>Workshop on ledger and contract operations</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-08-web-ui.md">Workshop 8: Web UI Exploration</a></h3>
+<p>Workshop on web UI and gateway integration</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-09-ops.md">Workshop 9: Local Deployment and Observability</a></h3>
+<p>Workshop on deployment and monitoring</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-10-contributor.md">Workshop 10: Contributor Workflow</a></h3>
+<p>Workshop on contribution workflow</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-11-federation.md">Workshop 11: Federation Hands-On</a></h3>
+<p>Workshop on federation code paths</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-12-observability.md">Workshop 12: Observability and Metrics</a></h3>
+<p>Workshop on observability</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-13-security-privacy.md">Workshop 13: Security and Privacy</a></h3>
+<p>Workshop on security and privacy layers</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/workshops/workshop-14-governance-ccl.md">Workshop 14: Governance and CCL Deep Dive</a></h3>
+<p>Workshop on governance and contract language</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/ops/runbooks/README.md">Ops runbooks relocated (stub)</a></h3>
+<p>Runbooks moved to docs/guides/operations/runbooks/ (tranche 3); use that path for updates</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-26</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/pilots/pilot-proposal-template.md">Pilot Proposal Template</a></h3>
+<p>Template for approaching potential pilot communities</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/sdis/SDIS_USER_GUIDE.md">SDIS User Guide</a></h3>
+<p>End-user guide for credential presentation system</p>
+<p><strong>For:</strong> <code>users</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/testing/MOBILE_APP_TESTING_GUIDE.md">Mobile App Testing Guide</a></h3>
+<p>Testing guide for mobile application</p>
+<p><strong>For:</strong> <code>testers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h2>Operations</h2>
+<h3>📝 <strong>Living</strong> <a href="/docs/deployment/DEPLOYMENT_GUIDE.md">ICN Deployment Guide</a></h3>
+<p>Comprehensive guide for deploying ICN to production environments</p>
+<p><strong>For:</strong> <code>operators</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/development/code-quality-improvements.md">Code Quality Improvement Tracker</a></h3>
+<p>Tracks error handling and code quality audits</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/guides/operations/network-policies.md">Network Policy Design — K3s</a></h3>
+<p>K3s network policy design (deferred)</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/phase-0-monitoring.md">Phase 0 Operational Monitoring</a></h3>
+<p>Monitoring configuration for Phase 0 pilot</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/runbooks/01-emergency-restart.md">Emergency Node Restart</a></h3>
+<p>Runbook for emergency node restart procedures</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/runbooks/02-data-recovery.md">Data Recovery Procedure</a></h3>
+<p>Runbook for node data recovery from backup</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/runbooks/03-version-upgrade.md">Version Upgrade Procedure</a></h3>
+<p>Runbook for upgrading daemon to new version</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/runbooks/04-security-incident.md">Security Incident Response</a></h3>
+<p>Runbook for security incident response</p>
+<p><strong>For:</strong> <code>operators</code>, <code>security</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/runbooks/05-troubleshooting.md">Troubleshooting Guide</a></h3>
+<p>Common issues and solutions for node operations</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/runbooks/06-secrets-rotation.md">Secrets Rotation Procedure</a></h3>
+<p>Runbook for rotating cryptographic secrets</p>
+<p><strong>For:</strong> <code>operators</code>, <code>security</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/runbooks/07-pilot-vertical-slice-smoke.md">Pilot Vertical Slice Smoke</a></h3>
+<p>Runbook for pilot deployment verification</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/operations/README.md">Operations Directory README</a></h3>
+<p>Navigation for operations and deployment documentation</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/operations/deployment/deployment-guide.md">Operations Deployment Guide</a></h3>
+<p>Deep operational guide for production deployments</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/operations/deployment/distributed-tracing.md">Distributed Tracing Setup</a></h3>
+<p>Configuration for distributed tracing and observability</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/operations/deployment/incident-response.md">Incident Response Plan</a></h3>
+<p>Procedures for responding to production incidents</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h2>Reference</h2>
+<h3>📝 <strong>Living</strong> <a href="/AGENTS.md">Agent Registry</a></h3>
+<p>Catalog of authorized AI agents and their capabilities for ICN development</p>
+<p><strong>For:</strong> <code>agents</code>, <code>team</code> | <strong>Updated:</strong> 2026-03-01</p>
+<h3>📝 <strong>Living</strong> <a href="/CHANGELOG.md">Changelog</a></h3>
+<p>Release notes and version history</p>
+<p><strong>For:</strong> <code>contributors</code>, <code>public</code> | <strong>Updated:</strong> 2026-03-21</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/CLAUDE.md">Claude Agent Onboarding</a></h3>
+<p>Guidance for Claude Code sessions working with ICN codebase</p>
+<p><strong>For:</strong> <code>agents</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-21</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/CODE_OF_CONDUCT.md">Code of Conduct</a></h3>
+<p>Community guidelines and expected behavior for contributors</p>
+<p><strong>For:</strong> <code>contributors</code>, <code>community</code> | <strong>Updated:</strong> 2025-12-01</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/README.md">ICN - InterCooperative Network</a></h3>
+<p>Main project README with overview, quick start, and CI/CD status badge</p>
+<p><strong>For:</strong> <code>contributors</code>, <code>public</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/DOCUMENTATION_CONTROL_SYSTEM.md">ICN Documentation Control System</a></h3>
+<p>Normative development control plane: discovery vs delivery, artifact routing, and documentation governance</p>
+<p><strong>For:</strong> <code>contributors</code>, <code>agents</code> | <strong>Updated:</strong> 2026-03-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/DOCUMENT_REGISTRY.md">ICN Document Registry (human summary)</a></h3>
+<p>Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh</p>
+<p><strong>For:</strong> <code>contributors</code>, <code>agents</code> | <strong>Updated:</strong> 2026-03-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/GOLDEN_PROMPT.md">ICN Golden Development Prompt</a></h3>
+<p>Master context and instructions for AI-assisted development on ICN</p>
+<p><strong>For:</strong> <code>agents</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-18</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/INDEX.md">ICN Documentation Index</a></h3>
+<p>Master navigation and directory of all documentation with cross-references</p>
+<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/README.md">Docs Directory README</a></h3>
+<p>Overview of documentation structure and navigation guide</p>
+<p><strong>For:</strong> <code>contributors</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/api/OPENAPI.md">ICN Gateway API Documentation</a></h3>
+<p>HTTP API specification and usage guide for ICN Gateway</p>
+<p><strong>For:</strong> <code>developers</code>, <code>integrators</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/api/README.md">API Documentation Index</a></h3>
+<p>Navigation and overview for API-related documentation</p>
+<p><strong>For:</strong> <code>developers</code>, <code>integrators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/api/openapi.yaml">OpenAPI Specification</a></h3>
+<p>Machine-readable API specification in OpenAPI 3.0 format</p>
+<p><strong>For:</strong> <code>developers</code>, <code>tools</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/architecture/README.md">Architecture Directory README</a></h3>
+<p>Navigation guide for architecture documentation</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/ci/CI_CURRENT_STATUS.md">CI Current Status</a></h3>
+<p>Current state of all CI checks and gate enforcement levels</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/ci/GATE_RATCHET_PLAN.md">CI Gate Ratchet Plan</a></h3>
+<p>CI gates, ratchet phases, required checks, and failure index</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/demo/README.md">Demo System Documentation</a></h3>
+<p>Documentation for ICN demonstration system</p>
+<p><strong>For:</strong> <code>team</code>, <code>demo-users</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/design/README.md">Design Directory README</a></h3>
+<p>Navigation guide for design documentation</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/design/economics/README.md">Economics Directory README</a></h3>
+<p>Navigation for economics and value flow documentation</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/design/governance/README.md">Governance Directory README</a></h3>
+<p>Navigation guide for governance documentation</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/design/sdis/README.md">SDIS Design Documentation</a></h3>
+<p>Navigation guide for Sovereign Digital Identity System design</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/development/README.md">Development Documentation</a></h3>
+<p>Navigation guide for development activities</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/development/testing/README.md">Testing Documentation</a></h3>
+<p>Navigation guide for testing guides</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/examples/policies/README.md">Policy Examples</a></h3>
+<p>Example governance policies for cooperative organizations</p>
+<p><strong>For:</strong> <code>users</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/glossary.md">ICN Glossary</a></h3>
+<p>Reference document with ICN terminology and definitions</p>
+<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/guides/operations/runbooks/README.md">ICN Operations Runbooks</a></h3>
+<p>Navigation guide for production runbooks (domain hub; not control-plane canonical)</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-26</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/internal/README.md">Internal Documentation</a></h3>
+<p>Internal-only documentation for team coordination</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/internal/documentation-control-system/00_CONTEXT_PACK_README.md">Imported documentation control context pack (readme)</a></h3>
+<p>Index and provenance for bundled control-system specs and templates source pack</p>
+<p><strong>For:</strong> <code>contributors</code>, <code>agents</code> | <strong>Updated:</strong> 2026-03-26</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/internal/legal-considerations.md">ICN Legal Considerations</a></h3>
+<p>Legal questions and considerations for cooperative communities</p>
+<p><strong>For:</strong> <code>compliance</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/internal/pilots/pilot-limitations.md">Pilot Deployment Limitations</a></h3>
+<p>Known limitations and constraints in pilot phase</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/internal/pilots/pilot-readiness-gaps.md">Pilot Readiness Gaps</a></h3>
+<p>Critical gaps between implementation and pilot readiness</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/observability/storage-metrics.md">Storage Metrics Reference</a></h3>
+<p>Prometheus metrics for storage and database monitoring</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/onboarding/module-template.md">Module Template</a></h3>
+<p>Template for creating onboarding modules</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/onboarding/patterns.md">ICN Common Patterns Reference</a></h3>
+<p>Quick reference for recurring code patterns in ICN</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/performance/README.md">Performance Documentation</a></h3>
+<p>Performance requirements, benchmarks, and optimization guidance</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/performance/trust-score-benchmark-results.md">Trust Score Benchmark Results</a></h3>
+<p>Benchmark results for trust score performance</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/performance/trust-service-performance.md">Trust Service Performance Characteristics</a></h3>
+<p>Performance characteristics and optimization guidance</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/pilots/decision_registry_treasury_vote.md">Decision Registry + Treasury Vote Pilot</a></h3>
+<p>Economic receipt chain implementation in pilot</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/pilots/hosted-approach.md">Hosted Pilot Approach</a></h3>
+<p>Approach for hosted cooperative pilot deployments</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/planning/agent-knowledge-architecture.md">Agent Knowledge Architecture</a></h3>
+<p>Design for AI agent knowledge bases and context management</p>
+<p><strong>For:</strong> <code>agents</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/planning/icn-crate-reference.md">ICN Crate Reference</a></h3>
+<p>Authoritative inventory of workspace crates</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/planning/icn-demo-one-pager.md">ICN Governance Demo One-Pager</a></h3>
+<p>One-page demo explanation and value proposition</p>
+<p><strong>For:</strong> <code>stakeholders</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/planning/icn-ecosystem-map.md">ICN Ecosystem Map</a></h3>
+<p>System component interconnection map</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/api/API_REFERENCE.md">API Reference</a></h3>
+<p>Detailed API endpoint reference with examples and error codes</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/reference/api/README.md">API Reference Documentation</a></h3>
+<p>Navigation guide for API reference documents</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/api/api-versioning.md">API Versioning Strategy</a></h3>
+<p>Versioning scheme and compatibility policy for ICN APIs</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/reference/api/topic-subscriptions-api.md">Topic Subscriptions API</a></h3>
+<p>API for subscribing to and consuming topic streams</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/config/CONFIGURATION.md">ICN Configuration Management Guide</a></h3>
+<p>Complete configuration reference for ICN nodes</p>
+<p><strong>For:</strong> <code>operators</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/reference/config/README.md">Configuration Reference</a></h3>
+<p>Navigation guide for configuration documentation</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/reference/config/identity-backend-configuration.md">Identity Backend Configuration</a></h3>
+<p>Identity keystore backend configuration guide</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/reference/config/trust-threshold-configuration.md">Trust Threshold Configuration</a></h3>
+<p>Trust score threshold configuration guide</p>
+<p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/sdis/SDIS_API_GUIDE.md">SDIS API Guide</a></h3>
+<p>Complete API guide for Sovereign Digital Identity System</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/sdis/SDIS_STATUS.md">SDIS + Steward System Status</a></h3>
+<p>Snapshot of SDIS deployment status</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/strategy/grants/README.md">Grant Application Artifacts</a></h3>
+<p>Navigation for grant application templates and materials</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/strategy/grants/budget-skeleton.md">ICN Budget Skeleton</a></h3>
+<p>Grant budget template</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/templates/README.md">Documentation Templates</a></h3>
+<p>Navigation guide for documentation templates</p>
+<p><strong>For:</strong> <code>contributors</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/templates/dev-journal.md">Development Journal Template</a></h3>
+<p>Template for development session journals</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/vision/README.md">Vision & Strategy</a></h3>
+<p>Navigation guide for vision and strategy documents</p>
+<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h2>Security</h2>
+<h3>📝 <strong>Living</strong> <a href="/docs/security/GATEWAY_CSP.md">Gateway Content Security Policy</a></h3>
+<p>CSP configuration for ICN gateway ensuring safe web integration</p>
+<p><strong>For:</strong> <code>security</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/security/README.md">Security Documentation Index</a></h3>
+<p>Navigation and overview of security-related documentation</p>
+<p><strong>For:</strong> <code>security</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/security/SECRET_MANAGEMENT.md">Secret Management</a></h3>
+<p>Policy and design for managing cryptographic secrets and sensitive data</p>
+<p><strong>For:</strong> <code>security</code>, <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/security/TOFU_SECURITY_MODEL.md">TOFU (Trust-On-First-Use) Security Model</a></h3>
+<p>Trust establishment for first-time peer contact without certificates or CAs</p>
+<p><strong>For:</strong> <code>security</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/security/phase-10c-security-analysis.md">Phase 10C Security Analysis</a></h3>
+<p>Security analysis and hardening for multi-party contracts</p>
+<p><strong>For:</strong> <code>security</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/security/production-hardening.md">Production Hardening</a></h3>
+<p>Hardening measures protecting against DoS, resource exhaustion, and operational failures</p>
+<p><strong>For:</strong> <code>operators</code>, <code>security</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/security/security-roadmap.md">ICN Security Roadmap</a></h3>
+<p>Security architecture and phased hardening approach</p>
+<p><strong>For:</strong> <code>security</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/security/threat-model.md">ICN Threat Model</a></h3>
+<p>Comprehensive threat model covering attack vectors, adversary capabilities, and mitigations</p>
+<p><strong>For:</strong> <code>security</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h2>Status</h2>
+<h3>📝 <strong>Living</strong> <a href="/docs/STATE.md">ICN State (living doc)</a></h3>
+<p>Living snapshot of repo layout, decisions, constraints, and current engineering status</p>
+<p><strong>For:</strong> <code>developers</code>, <code>agents</code> | <strong>Updated:</strong> 2026-03-18</p>
+<h2>Strategy</h2>
+<h3>📋 <strong>Draft</strong> <a href="/docs/planning/documentation-namespace-resolution.md">Documentation namespace resolution plan</a></h3>
+<p>Plans vs planning, ops vs operations; no moves executed here</p>
+<p><strong>For:</strong> <code>contributors</code> | <strong>Updated:</strong> 2026-03-26</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/sdis/SDIS_BUILD_PLAN.md">SDIS Complete Build Plan</a></h3>
+<p>Detailed SDIS build plan from API to mobile</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/sdis/SDIS_STEWARD_ROADMAP.md">SDIS & Steward Completion Roadmap</a></h3>
+<p>Roadmap for SDIS and steward system completion</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/strategy/ADR-001-What-ICN-Is.md">ADR-001: What ICN Is</a></h3>
+<p>Architectural Decision Record defining ICN scope, non-goals, and boundary conditions</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-02-28</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Definition.md">What ICN Is</a></h3>
+<p>Canonical definition: problem statement, solution approach, scope and non-goals</p>
+<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-03-17</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Evolution-Arc.md">ICN Evolution Arc</a></h3>
+<p>Long-term vision across phases 0-3, from MVP to mature cooperative ecosystem</p>
+<p><strong>For:</strong> <code>architects</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-03-08</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Gap-Analysis-March-2026.md">ICN Gap Analysis March 2026</a></h3>
+<p>Comprehensive implementation assessment across 10 subsystems with evidence and gaps</p>
+<p><strong>For:</strong> <code>grant-reviewers</code>, <code>architects</code>, <code>product</code> | <strong>Updated:</strong> 2026-03-17</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Pitch.md">ICN Pitch</a></h3>
+<p>Elevator pitch, one-pagers, and public communication messaging framework</p>
+<p><strong>For:</strong> <code>stakeholders</code>, <code>public</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Roadmap-Live.md">ICN Live Roadmap</a></h3>
+<p>Current sprint and quarterly priorities, immediate milestones, and dependencies</p>
+<p><strong>For:</strong> <code>team</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-03-21</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Roadmap-Strategy.md">ICN Roadmap Strategy</a></h3>
+<p>Strategic roadmap phases 0-3 with dependencies, milestones, and long-term vision</p>
+<p><strong>For:</strong> <code>architects</code>, <code>stakeholders</code>, <code>grant-reviewers</code> | <strong>Updated:</strong> 2026-03-12</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Scenarios.md">ICN Scenarios</a></h3>
+<p>Use case narratives and operational scenarios demonstrating ICN in practice</p>
+<p><strong>For:</strong> <code>product</code>, <code>marketing</code> | <strong>Updated:</strong> 2026-03-09</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Sprint-March17.md">ICN Sprint March 17</a></h3>
+<p>Specific sprint plan and tactical objectives for week of March 17, 2026</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-17</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Technical-Whitepaper.md">ICN Technical Whitepaper</a></h3>
+<p>Formal technical specification for grants, regulatory review, and architectural validation</p>
+<p><strong>For:</strong> <code>grant-reviewers</code>, <code>architects</code>, <code>compliance</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/strategy/grants/compliance-architecture.md">ICN Compliance Architecture</a></h3>
+<p>Regulatory-safe design rationale for grants</p>
+<p><strong>For:</strong> <code>compliance</code>, <code>grant-reviewers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/strategy/grants/grant-narrative-core.md">ICN Grant Narrative Core</a></h3>
+<p>Reusable grant narrative sections</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/strategy/grants/grant-one-pager.md">ICN Grant One-Pager</a></h3>
+<p>One-page ICN summary for grant applications</p>
+<p><strong>For:</strong> <code>grant-reviewers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/strategy/grants/milestones.md">ICN Milestones</a></h3>
+<p>Project timeline through pilot deployment</p>
+<p><strong>For:</strong> <code>grant-reviewers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/strategy/grants/pilot-readiness.md">Pilot Readiness Assessment</a></h3>
+<p>Assessment of pilot readiness and gaps</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<hr>
+<h2>Summary</h2>
+<p><strong>Total documents:</strong> 246</p>
+<p><strong>By status:</strong></p>
+<ul>
+<li>Canonical: 38</li>
+<li>Draft: 48</li>
+<li>Living: 160</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

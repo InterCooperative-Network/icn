@@ -1,0 +1,432 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Coverage CI Decision — p24-pre-2 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>superpowers</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>specs</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 03 22 coverage ci decision</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/superpowers/specs/2026-03-22-coverage-ci-decision.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Coverage CI Decision — p24-pre-2</h1>
+<p><strong>Date:</strong> 2026-03-22
+<strong>Status:</strong> COMPLETE — PR #1395 merged; Codecov receiving data for the first time
+<strong>Author:</strong> Sprint 23 close session + live validation</p>
+<hr>
+<h2>Files Inspected</h2>
+<ul>
+<li><code>.github/workflows/ci.yml</code> (lines 414–466, the <code>coverage</code> job)</li>
+<li><code>ops/state/ci-exceptions.md</code> (exception classification from s23-t1)</li>
+<li>ci-runner (10.8.30.46) — SSH live testing</li>
+<li>k3s-worker-1 (10.8.30.41) — SSH census</li>
+<li>k3s-worker-2 (10.8.30.42) — SSH census</li>
+<li>k3s-control (10.8.30.40) — SSH census</li>
+</ul>
+<hr>
+<h2>Current Setup</h2>
+<p><strong>Job:</strong> <code>Test Coverage</code> in <code>ci.yml</code>
+<strong>Gate:</strong> <code>GATE_RATCHET_PHASE_COVERAGE: observational</code> — non-blocking
+<strong>Runner:</strong> <code>ubuntu-latest</code> (GitHub-hosted)
+<strong>Timeout:</strong> <code>timeout-minutes: 45</code>
+<strong>Toolchain:</strong> <code>dtolnay/rust-toolchain@stable</code> (NOT the pinned 1.88.0)
+<strong>Tool:</strong> <code>cargo-tarpaulin</code> — installed fresh each run (<code>cargo install cargo-tarpaulin --locked</code>)
+<strong>Command:</strong> <code>cargo tarpaulin --workspace --timeout 300 --out Xml --output-dir ./coverage</code></p>
+<p>Notable workarounds already in place:</p>
+<ul>
+<li>Aggressive disk space cleanup before tarpaulin runs</li>
+<li>No <code>rust-cache</code> on this job (intentional — tarpaulin needs fresh instrumented builds)</li>
+<li><code>continue-on-error</code> active (tarpaulin failures don&#39;t block merges)</li>
+<li>Codecov upload skipped if XML doesn&#39;t exist</li>
+</ul>
+<hr>
+<h2>Confirmed Failure Shape</h2>
+<p>From the s23-t1 diagnosis (CI run logs, 2026-03-22):</p>
+<blockquote>
+<p><code>The runner has received a shutdown signal.</code> at the ~28-minute mark.</p>
+</blockquote>
+<p>Tarpaulin compiles the entire 34-crate workspace with ptrace instrumentation (<code>cargo clean</code> + full recompile). The GitHub-hosted <code>ubuntu-latest</code> runner is a spot instance with 2 vCPU / 7GB RAM / ~14GB effective disk. The instrumented build exceeds runner lifetime before tarpaulin reaches test execution — no coverage XML is ever produced, Codecov upload is skipped, job fails.</p>
+<p>This is not OOM. It is spot preemption — the runner is killed mid-build because GitHub&#39;s spot market reclaimed it.</p>
+<hr>
+<h2>Live Validation Results (2026-03-22)</h2>
+<h3>What was tested</h3>
+<p>Attempted two runs of <code>cargo-llvm-cov</code> on ci-runner (10.8.30.46):</p>
+<p><strong>Run 1 — full workspace:</strong></p>
+<pre><code class="language-bash">cargo +1.88.0 llvm-cov --workspace --lcov --output-path /tmp/lcov.info
+</code></pre>
+<ul>
+<li>Result: Never completed after 45+ minutes</li>
+<li>Swap: rose to 5.6GB used (8GB total), high I/O wait</li>
+<li>No lcov.info produced</li>
+<li>Killed manually</li>
+</ul>
+<p><strong>Run 2 — lib only (unit tests only, no integration test binaries):</strong></p>
+<pre><code class="language-bash">cargo +1.88.0 llvm-cov --lib --workspace --lcov --output-path /tmp/lcov-lib.info
+</code></pre>
+<ul>
+<li>Result: Still compiling after 50+ minutes, swap reached 6.8GB</li>
+<li>Final log: <code>Compiling icnd</code>, <code>icn-console</code>, <code>icnctl</code> (bins compiled last despite <code>--lib</code>)</li>
+<li>No lcov-lib.info produced</li>
+<li>Killed manually</li>
+</ul>
+<p><strong>Conclusion:</strong> <code>cargo-llvm-cov</code> does NOT avoid compiling binaries even with <code>--lib</code>. The full dependency graph is compiled. On a 3.8GB RAM machine with 8GB swap, the 34-crate workspace instrumented build saturates swap before compilation completes. The prior estimate (&quot;8–15 min vs 28+ min&quot;) was wrong — it assumed sccache would make subsequent runs fast, but the first run cannot complete at all.</p>
+<p>The &quot;RAM constraint is avoided&quot; claim in the earlier analysis was incorrect for this hardware.</p>
+<hr>
+<h2>Infrastructure Census (2026-03-22)</h2>
+<p>Full inventory of accessible nodes from icn-dev:</p>
+<table>
+<thead>
+<tr>
+<th>Node</th>
+<th>IP</th>
+<th>CPU</th>
+<th>RAM</th>
+<th>RAM Free</th>
+<th>Disk Free</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>ci-runner</strong></td>
+<td>10.8.30.46</td>
+<td>i7-7700K 4c/4t @ 4.2GHz</td>
+<td>3.8GB</td>
+<td>~0.3GB</td>
+<td>39GB</td>
+<td>Hyperion VM 446; current GH runner; <strong>proven insufficient</strong></td>
+</tr>
+<tr>
+<td><strong>k3s-control</strong></td>
+<td>10.8.30.40</td>
+<td>4c</td>
+<td>7.8GB</td>
+<td>6.5GB</td>
+<td>unknown</td>
+<td>Control plane, tainted NoSchedule; not a CI candidate</td>
+</tr>
+<tr>
+<td><strong>k3s-worker-1</strong></td>
+<td>10.8.30.41</td>
+<td>i5-6500 4c/4t @ 3.2GHz</td>
+<td>15GB</td>
+<td><strong>14GB</strong></td>
+<td>28GB</td>
+<td>ICN pods; no Rust installed; disk may be tight</td>
+</tr>
+<tr>
+<td><strong>k3s-worker-2</strong></td>
+<td>10.8.30.42</td>
+<td>i5-6500 4c/4t @ 3.2GHz</td>
+<td>15GB</td>
+<td><strong>14GB</strong></td>
+<td>29GB</td>
+<td>ICN pods; no Rust installed; disk may be tight</td>
+</tr>
+<tr>
+<td><strong>Hyperion</strong></td>
+<td>10.8.10.15</td>
+<td>Ryzen 9 3900X 12c/24t</td>
+<td>15GB (bad)</td>
+<td>—</td>
+<td>—</td>
+<td>Proxmox; RAM RMA in progress; offline for CI</td>
+</tr>
+<tr>
+<td><strong>Zentith</strong></td>
+<td>10.8.10.100</td>
+<td>Ryzen 7 7800X3D 8c/16t</td>
+<td><strong>54GB</strong></td>
+<td>high</td>
+<td>—</td>
+<td>Matt&#39;s workstation; WSL2 Ubuntu 24.04; strongest available</td>
+</tr>
+</tbody></table>
+<p>Proxmox nodes node-1 through node-4 (10.8.10.11–14): SSH not authorized from icn-dev; capacity unknown.</p>
+<hr>
+<h2>Corrected Problem Statement</h2>
+<p>The problem is not &quot;tarpaulin vs llvm-cov.&quot; It is &quot;the current ci-runner has insufficient RAM (3.8GB) for any full-workspace Rust coverage instrumentation on a 34-crate codebase.&quot; Both tarpaulin and llvm-cov fail at compilation before reaching test execution. The tool choice is secondary to the hardware constraint.</p>
+<hr>
+<h2>Option Comparison (Revised)</h2>
+<h3>Path A — Increase ci-runner RAM on Hyperion</h3>
+<p><code>qm set 446 --memory 8192</code> (or higher) from Proxmox.</p>
+<table>
+<thead>
+<tr>
+<th>Factor</th>
+<th>Assessment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Effort</td>
+<td>One Proxmox command</td>
+</tr>
+<tr>
+<td>Risk</td>
+<td>ci-runner is VM 446 on Hyperion, which has bad RAM pending RMA. Adding memory pressure to a failing host is inadvisable.</td>
+</tr>
+<tr>
+<td>Viability</td>
+<td>Blocked until Hyperion RMA completes</td>
+</tr>
+</tbody></table>
+<p><strong>Verdict:</strong> Not viable now.</p>
+<h3>Path B — Use Zenith as temporary coverage runner</h3>
+<p>Register Zentith WSL2 (Ubuntu 24.04) as a self-hosted runner with a <code>coverage</code> label.</p>
+<table>
+<thead>
+<tr>
+<th>Factor</th>
+<th>Assessment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RAM</td>
+<td>54GB — no constraints</td>
+</tr>
+<tr>
+<td>CPU</td>
+<td>Ryzen 7 7800X3D 8c/16t — faster than any other available host</td>
+</tr>
+<tr>
+<td>Disk</td>
+<td>Sufficient</td>
+</tr>
+<tr>
+<td>Rust</td>
+<td>Likely already present; install 1.88.0 + cargo-llvm-cov</td>
+</tr>
+<tr>
+<td>Always-on</td>
+<td>No — requires Windows running. Acceptable during active development phase.</td>
+</tr>
+<tr>
+<td>Effort</td>
+<td>~30 min: register runner in WSL2, install tooling, update ci.yml label</td>
+</tr>
+<tr>
+<td>Impact</td>
+<td>Coverage starts working immediately</td>
+</tr>
+<tr>
+<td>Long-term</td>
+<td>Move to Hyperion (post-RMA) or dedicated VM; deregister Zentith</td>
+</tr>
+</tbody></table>
+<p><strong>Verdict:</strong> Best immediate path. Honest about the tradeoff (not always-on).</p>
+<h3>Path C — Use k3s-worker-1 as coverage runner</h3>
+<p>Register k3s-worker-1 as a runner alongside K3s.</p>
+<table>
+<thead>
+<tr>
+<th>Factor</th>
+<th>Assessment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RAM</td>
+<td>15GB available — sufficient</td>
+</tr>
+<tr>
+<td>CPU</td>
+<td>i5-6500 4c/4t — adequate</td>
+</tr>
+<tr>
+<td>Disk</td>
+<td>28GB free — tight; a full instrumented build target dir can reach 20GB+</td>
+</tr>
+<tr>
+<td>Conflict</td>
+<td>Could compete with K3s pod scheduling during coverage runs</td>
+</tr>
+<tr>
+<td>Effort</td>
+<td>~1 hr: install Rust, runner agent, update ci.yml</td>
+</tr>
+<tr>
+<td>Risk</td>
+<td>Disk pressure; K3s scheduling conflicts if pods land during coverage run</td>
+</tr>
+</tbody></table>
+<p><strong>Verdict:</strong> Viable fallback if Zenith is unavailable. Disk is the binding concern.</p>
+<h3>Path D — Explicit CI exception, defer to Hyperion post-RMA</h3>
+<p>Document that coverage is deferred infrastructure work, keep <code>observational</code> gate, do nothing now.</p>
+<table>
+<thead>
+<tr>
+<th>Factor</th>
+<th>Assessment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Effort</td>
+<td>Zero</td>
+</tr>
+<tr>
+<td>Sprint impact</td>
+<td>Sprint 24 opens cleanly; coverage stays non-functional</td>
+</tr>
+<tr>
+<td>Honesty</td>
+<td>Accurate — the gate is already <code>observational</code>, exception already documented</td>
+</tr>
+<tr>
+<td>Risk</td>
+<td>Coverage data never reaches Codecov; third sprint of zero coverage data</td>
+</tr>
+</tbody></table>
+<p><strong>Verdict:</strong> Acceptable if bandwidth is the constraint. Worse for the project than Path B.</p>
+<hr>
+<h2>Recommendation: Path B (Zentith temporary runner)</h2>
+<p><strong>Register Zentith WSL2 as a self-hosted runner for coverage only.</strong></p>
+<p>Steps:</p>
+<h3>Step 1 — On Zentith WSL2, register the runner</h3>
+<pre><code class="language-bash"># In WSL2 Ubuntu-24.04 on Zentith
+mkdir ~/actions-runner-coverage &amp;&amp; cd ~/actions-runner-coverage
+# Download current runner (check https://github.com/InterCooperative-Network/icn/settings/actions/runners/new)
+curl -o actions-runner-linux-x64.tar.gz -L &lt;runner-download-url&gt;
+tar xzf ./actions-runner-linux-x64.tar.gz
+./config.sh \
+  --url https://github.com/InterCooperative-Network/icn \
+  --token &lt;REGISTRATION_TOKEN&gt; \
+  --name &quot;zentith-coverage&quot; \
+  --labels &quot;self-hosted,linux,x64,coverage,zenith&quot;
+./run.sh  # or install as service: sudo ./svc.sh install &amp;&amp; sudo ./svc.sh start
+</code></pre>
+<p>Get the registration token from:
+<code>https://github.com/InterCooperative-Network/icn/settings/actions/runners/new</code></p>
+<h3>Step 2 — On Zentith WSL2, install Rust coverage tooling</h3>
+<pre><code class="language-bash">rustup toolchain install 1.88.0
+rustup component add llvm-tools-preview --toolchain 1.88.0
+cargo +1.88.0 install cargo-llvm-cov --locked
+# Verify:
+cargo +1.88.0 llvm-cov --version
+</code></pre>
+<h3>Step 3 — Validate on Zentith before changing ci.yml</h3>
+<pre><code class="language-bash">cd /path/to/icn/icn  # the Rust workspace root
+cargo +1.88.0 llvm-cov --workspace --lcov --output-path /tmp/lcov.info 2&gt;&amp;1 | tail -20
+# If lcov.info exists and run completes &lt; 20 min: proceed
+</code></pre>
+<h3>Step 4 — Update ci.yml coverage job</h3>
+<p>Change the <code>runs-on</code> label from <code>ubuntu-latest</code> to the new runner label:</p>
+<pre><code class="language-yaml">  coverage:
+    name: Test Coverage
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != &#39;true&#39;
+    timeout-minutes: 30
+    runs-on: [self-hosted, linux, x64, coverage]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Rust toolchain
+        # Uses the pinned toolchain from rust-toolchain.toml (1.88.0)
+        run: rustup show
+
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+
+      - name: Generate coverage
+        run: cargo llvm-cov --workspace --lcov --output-path ./coverage/lcov.info
+        working-directory: ./icn
+        continue-on-error: ${{ env.GATE_RATCHET_PHASE_COVERAGE != &#39;blocking&#39; }}
+
+      - name: Upload coverage to Codecov
+        if: hashFiles(&#39;./icn/coverage/lcov.info&#39;) != &#39;&#39;
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./icn/coverage/lcov.info
+          fail_ci_if_error: false
+</code></pre>
+<p>Note: <code>runs-on: [self-hosted, linux, x64, coverage]</code> uses the <code>coverage</code> label. Only Zentith (or a future dedicated runner) carries this label. The existing ci-runner keeps <code>homelab,k3s</code> labels and handles other jobs.</p>
+<h3>Step 5 — After Hyperion RMA</h3>
+<p>When Hyperion returns with good RAM:</p>
+<ol>
+<li>Provision a dedicated coverage runner VM (8+ GB RAM, 60GB+ disk, <code>ubuntu-latest</code>-style setup)</li>
+<li>Register with the <code>coverage</code> label</li>
+<li>Deregister Zentith from GitHub Actions</li>
+<li>The ci.yml <code>runs-on: [self-hosted, linux, x64, coverage]</code> requires no change</li>
+</ol>
+<hr>
+<h2>Definition of &quot;Resolved Enough to Stop Being Sprint Drag&quot;</h2>
+<p>The Coverage CI is resolved when:</p>
+<ol>
+<li>A push to main triggers the coverage job</li>
+<li>The job completes within 30 minutes</li>
+<li><code>lcov.info</code> is produced and uploaded to Codecov</li>
+</ol>
+<p>&quot;Acknowledged observational exception&quot; does not count as resolved — it means the job never produces data.</p>
+<p>The gate remains <code>observational</code> until a coverage baseline is established after the first successful run.</p>
+<hr>
+<h2>Sprint Impact</h2>
+<p><strong>Sprint 24 can open cleanly.</strong></p>
+<p>Coverage CI is:</p>
+<ul>
+<li>Not a blocking gate (observational)</li>
+<li>Not part of the #925/#947/#964 commons-compute spine</li>
+<li>Now has a concrete resolution path (Zenith runner, ~30 min setup)</li>
+</ul>
+<p>p24-pre-2 is complete as a decision artifact. Implementation is a ~30 min ops task on Zentith that does not block Sprint 24 from starting.</p>
+<hr>
+<h2>What This Does NOT Change</h2>
+<ul>
+<li>Sprint 24 spine: #925, #947, #964 — unaffected</li>
+<li>Branch protection: no changes</li>
+<li>Test jobs: unaffected — this is coverage-only</li>
+<li>The gate stays <code>observational</code> until there&#39;s a coverage baseline to enforce</li>
+<li>Flow 2 (patronage): validated working 2026-03-22, not reopened</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

@@ -1,0 +1,741 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Development Control System | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DOCUMENTATION CONTROL SYSTEM</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/DOCUMENTATION_CONTROL_SYSTEM.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: normative
+Canonical: yes
+Last Reviewed: 2026-03-26</h2>
+<h1>ICN Development Control System</h1>
+<p><strong>Note:</strong> The YAML header above is the documentation control-plane source of truth for classification of this file. Narrative status below is retained for historical context.</p>
+<p><strong>Canonical scope:</strong> Only paths in <code>[control].canonical_doc_paths</code> in <code>docs/registry.toml</code> are <em>control-plane canonical</em> (machine-checked headers + merged registry alignment). Domain hubs (for example operations runbook indexes) remain important but are not in that set unless explicitly listed there.</p>
+<p><strong>Status (narrative):</strong> Proposed canonical replacement / consolidation draft<br><strong>Date:</strong> 2026-03-25<br><strong>Purpose:</strong> Replace recursive document sprawl with a formal development control plane that tells ICN what kind of work it is doing, what artifact should exist next, where that artifact belongs, and how humans and agents should move safely from discovery to delivery.</p>
+<hr>
+<h2>1. Why this exists</h2>
+<p>ICN no longer fails because there are too few ideas. It fails when ideas, architecture, plans, issues, PRs, and agent sessions drift out of sync.</p>
+<p>The project needs a control system that answers, at any moment:</p>
+<ul>
+<li>What is ICN trying to become?</li>
+<li>What is true right now?</li>
+<li>What kind of work are we doing?</li>
+<li>What artifact should exist next?</li>
+<li>What is the smallest safe tranche?</li>
+<li>How should an agent be instructed for this stage?</li>
+<li>What must be updated afterward?</li>
+</ul>
+<p>This is not bureaucracy. It is the minimum structure required for emergent architecture to become durable institutional architecture.</p>
+<hr>
+<h2>2. First principles</h2>
+<h3>2.1 Kernel truth</h3>
+<p>ICN is infrastructure first: a P2P constraint engine with a hard kernel/app boundary.</p>
+<h3>2.2 Emergence over premature closure</h3>
+<p>The system should enable higher-order institutional and civilizational coordination as an emergent property. That does <strong>not</strong> mean hardcoding full social semantics into the kernel.</p>
+<h3>2.3 Truth before momentum</h3>
+<p>Do not let activity impersonate progress. Passing tests, long chats, and merged code do not matter if semantics, boundaries, or architectural truth are still false.</p>
+<h3>2.4 Explicit beats implicit</h3>
+<p>If a decision matters, it must exist outside chat:</p>
+<ul>
+<li>doc</li>
+<li>ADR</li>
+<li>RFC</li>
+<li>spec</li>
+<li>issue</li>
+<li>PR</li>
+<li>status note</li>
+<li>runbook</li>
+</ul>
+<h3>2.5 Retrieval over preload</h3>
+<p>Agents should not load the whole universe every time. They should start from a lightweight orientation, then retrieve targeted context on demand.</p>
+<h3>2.6 Smallest safe tranche</h3>
+<p>All work should be risk-bounded, not time-bounded.</p>
+<hr>
+<h2>3. The two-loop development model</h2>
+<p>ICN development runs on two interacting loops.</p>
+<h2>3.1 Discovery Loop</h2>
+<p>Use when the problem, boundary, or decision is still unclear.</p>
+<p><strong>Loop:</strong><br><strong>observe -&gt; question -&gt; investigate -&gt; model -&gt; propose</strong></p>
+<p><strong>Outputs:</strong></p>
+<ul>
+<li>problem statements</li>
+<li>investigation notes / spikes</li>
+<li>architecture clarifications</li>
+<li>RFCs / design proposals</li>
+</ul>
+<p><strong>Use discovery mode when:</strong></p>
+<ul>
+<li>the authoritative path is unclear</li>
+<li>semantics are ambiguous</li>
+<li>multiple plausible designs exist</li>
+<li>repo truth must be resolved before coding</li>
+<li>implementation would otherwise be guesswork</li>
+</ul>
+<h2>3.2 Delivery Loop</h2>
+<p>Use when enough is known to make a bounded, safe change.</p>
+<p><strong>Loop:</strong><br><strong>decide -&gt; tranche -&gt; implement -&gt; verify -&gt; record -&gt; merge</strong></p>
+<p><strong>Outputs:</strong></p>
+<ul>
+<li>tranche plans</li>
+<li>issues</li>
+<li>code changes</li>
+<li>tests</li>
+<li>PRs</li>
+<li>status notes</li>
+<li>doc updates</li>
+</ul>
+<p><strong>Use delivery mode when:</strong></p>
+<ul>
+<li>the next change is bounded</li>
+<li>repo truth is known</li>
+<li>invariants are clear</li>
+<li>blast radius is acceptable</li>
+<li>success criteria are explicit</li>
+</ul>
+<h2>3.3 Governing rule</h2>
+<p>Never force delivery when still in discovery.<br>Never stay in discovery once the next safe tranche is clear.</p>
+<p>At every stage, explicitly ask:</p>
+<p><strong>Are we discovering, or delivering?</strong></p>
+<hr>
+<h2>4. The master navigation loop</h2>
+<h3>Step 1: Re-orient</h3>
+<p>Establish current truth.</p>
+<p>Questions:</p>
+<ul>
+<li>What branch are we on?</li>
+<li>What is true in code right now?</li>
+<li>What docs are authoritative?</li>
+<li>What decisions already exist?</li>
+<li>What work is in flight?</li>
+<li>What was the last completed tranche?</li>
+<li>What tests or repo evidence matter here?</li>
+</ul>
+<h3>Step 2: Identify pressure</h3>
+<p>Find the most important mismatch between the north star and the current state.</p>
+<p>Questions:</p>
+<ul>
+<li>What is most false right now?</li>
+<li>What is most blocking right now?</li>
+<li>What is causing drift, ambiguity, or false closure?</li>
+<li>What prevents the next safe move?</li>
+</ul>
+<h3>Step 3: Name the next real question</h3>
+<p>Questions:</p>
+<ul>
+<li>What must we learn before acting?</li>
+<li>What decision is actually pending?</li>
+<li>What ambiguity is load-bearing?</li>
+</ul>
+<p>If the question is still fuzzy, remain in discovery.</p>
+<h3>Step 4: Choose mode</h3>
+<ul>
+<li>Missing understanding -&gt; discovery</li>
+<li>Missing implementation -&gt; delivery</li>
+</ul>
+<h3>Step 5: Produce the right artifact</h3>
+<p>Discovery artifacts:</p>
+<ul>
+<li>problem statement</li>
+<li>investigation note</li>
+<li>RFC</li>
+<li>architecture clarification</li>
+</ul>
+<p>Delivery artifacts:</p>
+<ul>
+<li>tranche plan</li>
+<li>issue</li>
+<li>PR</li>
+<li>spec update</li>
+<li>ADR update</li>
+<li>runbook / status update</li>
+</ul>
+<h3>Step 6: Execute one bounded tranche</h3>
+<p>A tranche should:</p>
+<ul>
+<li>target one class of problem</li>
+<li>have explicit non-goals</li>
+<li>have verification criteria</li>
+<li>stop cleanly</li>
+</ul>
+<h3>Step 7: Verify truthfully</h3>
+<p>Questions:</p>
+<ul>
+<li>What changed in reality?</li>
+<li>What remains unverified?</li>
+<li>Were invariants preserved?</li>
+<li>Did scope widen accidentally?</li>
+</ul>
+<h3>Step 8: Record what became true</h3>
+<p>Update the map:</p>
+<ul>
+<li>ADR</li>
+<li>spec</li>
+<li>issue</li>
+<li>PR</li>
+<li>roadmap / status</li>
+<li>session summary</li>
+</ul>
+<h3>Step 9: Re-rank and repeat</h3>
+<p>Ask again:</p>
+<ul>
+<li>What is the top remaining pressure?</li>
+<li>What is the next real question?</li>
+<li>What is the next safe tranche?</li>
+</ul>
+<hr>
+<h2>5. Stage gates</h2>
+<p>Before significant work, pass these gates.</p>
+<h3>Gate 1: Orientation Gate</h3>
+<p>Must know:</p>
+<ul>
+<li>current branch</li>
+<li>current truth in code</li>
+<li>authoritative docs</li>
+<li>last completed tranche</li>
+<li>top pressure point</li>
+</ul>
+<h3>Gate 2: Mode Gate</h3>
+<p>Are we discovering or delivering?</p>
+<p>If unclear, default to discovery.</p>
+<h3>Gate 3: Artifact Gate</h3>
+<p>What artifact should exist next?</p>
+<p>Choose one:</p>
+<ul>
+<li>problem statement</li>
+<li>investigation note</li>
+<li>RFC</li>
+<li>ADR</li>
+<li>spec</li>
+<li>implementation plan</li>
+<li>issue</li>
+<li>PR</li>
+<li>runbook</li>
+<li>status note</li>
+</ul>
+<h3>Gate 4: Boundary Gate</h3>
+<p>Must define:</p>
+<ul>
+<li>explicit goal</li>
+<li>explicit non-goals</li>
+<li>minimal investigation or patch surface</li>
+<li>understood blast radius</li>
+</ul>
+<h3>Gate 5: Verification Gate</h3>
+<p>Must define:</p>
+<ul>
+<li>what to run</li>
+<li>what evidence is sufficient</li>
+<li>what remains unverified</li>
+</ul>
+<h3>Gate 6: Recording Gate</h3>
+<p>Must define:</p>
+<ul>
+<li>what issue/PR/doc/status artifact gets updated afterward</li>
+</ul>
+<p>If these gates are unclear, do not start large work.</p>
+<hr>
+<h2>6. Prioritization stack</h2>
+<p>Use this order.</p>
+<h3>6.1 Invariants first</h3>
+<p>Anything threatening core project truth:</p>
+<ul>
+<li>Meaning Firewall</li>
+<li>authoritative execution path</li>
+<li>truthful outcomes</li>
+<li>provenance integrity</li>
+<li>kernel/app boundary</li>
+<li>current truth staying current</li>
+</ul>
+<h3>6.2 Blockers next</h3>
+<p>Anything preventing safe understanding or execution:</p>
+<ul>
+<li>ambiguous semantics</li>
+<li>unclear authoritative path</li>
+<li>missing context at a load-bearing boundary</li>
+</ul>
+<h3>6.3 Load-bearing boundaries</h3>
+<p>Prioritize interfaces many future tasks depend on:</p>
+<ul>
+<li>governance effect translation</li>
+<li>execution outcome semantics</li>
+<li>identity/trust scope</li>
+<li>treasury authorization boundaries</li>
+<li>gateway/app registration boundaries</li>
+<li>mobile/provenance rendering contracts</li>
+</ul>
+<h3>6.4 Truth before polish</h3>
+<p>Correctness and legibility before cleanup theater.</p>
+<h3>6.5 Foundational before expansive</h3>
+<p>Do the work that makes ten future things safer before building one flashy feature.</p>
+<h3>6.6 Smallest safe tranche</h3>
+<p>Even the right priority must still be sliced down.</p>
+<hr>
+<h2>7. Canonical artifact taxonomy</h2>
+<p>Different docs solve different problems. Stop using one doc type to do another doc type&#39;s job.</p>
+<h3>7.1 North-star artifacts</h3>
+<p><strong>Use for identity and long-range coherence.</strong></p>
+<ul>
+<li>thesis / vision doc</li>
+<li>architecture overview</li>
+<li>concept glossary</li>
+</ul>
+<h3>7.2 Discovery artifacts</h3>
+<p><strong>Use when truth or design is not settled.</strong></p>
+<ul>
+<li>problem statements</li>
+<li>investigation notes / spikes</li>
+<li>RFCs / design proposals</li>
+</ul>
+<h3>7.3 Decision artifacts</h3>
+<p><strong>Use when a choice becomes durable.</strong></p>
+<ul>
+<li>ADRs</li>
+</ul>
+<h3>7.4 Exact behavior artifacts</h3>
+<p><strong>Use when ambiguity must die.</strong></p>
+<ul>
+<li>specs</li>
+</ul>
+<h3>7.5 Execution artifacts</h3>
+<p><strong>Use to sequence bounded work.</strong></p>
+<ul>
+<li>roadmap</li>
+<li>implementation plan</li>
+<li>milestone plan</li>
+<li>tranche plan</li>
+</ul>
+<h3>7.6 Operational artifacts</h3>
+<p><strong>Use to run and recover real systems.</strong></p>
+<ul>
+<li>runbooks</li>
+<li>playbooks</li>
+<li>deployment procedures</li>
+<li>recovery procedures</li>
+</ul>
+<h3>7.7 Historical continuity artifacts</h3>
+<p><strong>Use to preserve continuity without pretending history is canon.</strong></p>
+<ul>
+<li>status notes</li>
+<li>changelog</li>
+<li>session summaries</li>
+<li>postmortems</li>
+</ul>
+<hr>
+<h2>8. Minimal durable stack for ICN</h2>
+<h3>Layer 1: North Star</h3>
+<ul>
+<li>thesis / vision doc</li>
+<li>current-state architecture overview</li>
+<li>concept glossary</li>
+</ul>
+<h3>Layer 2: Discovery + Decisions</h3>
+<ul>
+<li>problem statements</li>
+<li>investigation notes</li>
+<li>RFCs</li>
+<li>ADRs</li>
+</ul>
+<h3>Layer 3: Exact behavior</h3>
+<p>Priority specs:</p>
+<ul>
+<li>governance decision lifecycle</li>
+<li>governance effect translation + execution outcomes</li>
+<li>deferred/rejected institutional memory</li>
+<li>identity + trust scope model</li>
+<li>treasury semantics + authorization boundaries</li>
+<li>CCL expression-to-execution mapping</li>
+<li>mobile participation contracts</li>
+</ul>
+<h3>Layer 4: Execution</h3>
+<ul>
+<li>roadmap</li>
+<li>implementation plans</li>
+<li>milestone docs</li>
+<li>tranche plans</li>
+</ul>
+<h3>Layer 5: Operations + History</h3>
+<ul>
+<li>runbooks</li>
+<li>status notes</li>
+<li>changelog</li>
+<li>incident/postmortem docs</li>
+</ul>
+<hr>
+<h2>9. Physical doc placement rules</h2>
+<p>Your new draft was stronger on workflow. The repo already has a better instinct for <strong>where</strong> docs should live. Keep that.</p>
+<h3>9.1 Core docs that can live directly under <code>docs/</code></h3>
+<p>Only durable, project-wide navigation or canon:</p>
+<ul>
+<li><code>ARCHITECTURE.md</code></li>
+<li><code>GETTING_STARTED.md</code></li>
+<li><code>INDEX.md</code></li>
+<li><code>STATE.md</code></li>
+<li><code>TODO.md</code></li>
+<li><code>glossary.md</code></li>
+<li>this control system doc (or a renamed canonical equivalent)</li>
+</ul>
+<h3>9.2 Directory placement</h3>
+<p>Use these defaults:</p>
+<ul>
+<li><code>docs/architecture/</code> -&gt; architecture deep dives, boundary docs, invariants</li>
+<li><code>docs/design/</code> -&gt; design proposals and subsystem designs not yet frozen</li>
+<li><code>docs/spec/</code> -&gt; exact contracts and behavioral specs</li>
+<li><code>docs/planning/</code> or <code>docs/plans/</code> -&gt; implementation sequencing, milestone docs, tranche plans</li>
+<li><code>docs/strategy/</code> -&gt; north-star framing, roadmap strategy, operability framing</li>
+<li><code>docs/guides/</code> -&gt; user/developer/operator guides</li>
+<li><code>docs/deployment/</code> -&gt; deployment and environment docs</li>
+<li><code>docs/security/</code> -&gt; threat models, security design, hardening notes</li>
+<li><code>docs/status/</code> -&gt; current or dated status notes</li>
+<li><code>docs/development/sessions/</code> -&gt; session summaries and archaeology</li>
+<li><code>docs/archive/YYYY/</code> -&gt; superseded or historical docs</li>
+<li><code>docs/internal/</code> -&gt; temporary internal planning that is not yet canon</li>
+</ul>
+<h3>9.3 Placement rule</h3>
+<p>If a doc is:</p>
+<ul>
+<li><strong>durable truth</strong> -&gt; put it where future contributors will search first</li>
+<li><strong>time-bound work coordination</strong> -&gt; planning/status/development</li>
+<li><strong>historical but still useful</strong> -&gt; archive it, do not leave it impersonating canon</li>
+</ul>
+<hr>
+<h2>10. Truth classes</h2>
+<p>Every important doc should declare a truth class near the top.</p>
+<p>Suggested truth classes:</p>
+<ul>
+<li><code>normative</code> -&gt; how the system is supposed to work</li>
+<li><code>descriptive</code> -&gt; what the system currently is</li>
+<li><code>operational</code> -&gt; how to run or verify it</li>
+<li><code>historical</code> -&gt; preserved for context, not current truth</li>
+<li><code>draft</code> -&gt; proposal, not yet frozen</li>
+</ul>
+<p>This prevents old docs from silently masquerading as canon.</p>
+<hr>
+<h2>11. GitHub model</h2>
+<p>GitHub is the work coordination layer. It is not the full thinking layer.</p>
+<h3>11.1 Docs vs Issues vs PRs</h3>
+<ul>
+<li><strong>Docs</strong> preserve understanding</li>
+<li><strong>Issues</strong> track actionable work</li>
+<li><strong>PRs</strong> propose concrete change</li>
+</ul>
+<h3>11.2 What becomes a doc?</h3>
+<p>Use a doc for:</p>
+<ul>
+<li>architecture truth</li>
+<li>design rationale</li>
+<li>behavioral contracts</li>
+<li>implementation sequencing</li>
+<li>operating instructions</li>
+</ul>
+<h3>11.3 What becomes an issue?</h3>
+<p>Use an issue when something is a bounded work item:</p>
+<ul>
+<li>bug</li>
+<li>missing implementation</li>
+<li>docs gap</li>
+<li>research spike</li>
+<li>refactor</li>
+<li>debt item</li>
+<li>follow-up from ADR/spec/plan</li>
+</ul>
+<p>A good issue is:</p>
+<ul>
+<li>actionable</li>
+<li>bounded enough to discuss</li>
+<li>linked to source docs</li>
+</ul>
+<h3>11.4 What becomes a PR?</h3>
+<p>Use a PR when there is a real proposed change.</p>
+<p>A PR should:</p>
+<ul>
+<li>explain what changed</li>
+<li>explain why</li>
+<li>link the issue(s)</li>
+<li>summarize verification</li>
+<li>state what remains unverified</li>
+</ul>
+<h3>11.5 Healthy traceability chain</h3>
+<p><strong>problem / RFC / ADR / spec / plan -&gt; issue -&gt; PR -&gt; merge -&gt; updated docs/history</strong></p>
+<hr>
+<h2>12. Naming conventions</h2>
+<h3>12.1 Durable artifacts</h3>
+<ul>
+<li><code>ADR-###-short-title.md</code></li>
+<li><code>RFC-###-short-title.md</code></li>
+<li><code>SPEC-###-short-title.md</code> or stable topic-based spec names</li>
+<li><code>YYYY-MM-DD-short-description.md</code> for status notes, investigations, session summaries</li>
+</ul>
+<h3>12.2 Internal numbering</h3>
+<p>Use hierarchical numbers inside plans:</p>
+<ul>
+<li>1</li>
+<li>1.1</li>
+<li>1.1.1</li>
+</ul>
+<h3>12.3 Rule</h3>
+<p>File names should tell you:</p>
+<ul>
+<li>whether it is durable or dated</li>
+<li>whether it is decision, proposal, status, or spec</li>
+<li>what domain it belongs to</li>
+</ul>
+<hr>
+<h2>13. Agent instruction system</h2>
+<p>Your draft is clearly stronger than anything currently in the repo on this point. Keep it, but tighten it.</p>
+<p>Every agent prompt must include:</p>
+<ol>
+<li>current truth  </li>
+<li>work stage  </li>
+<li>exact objective  </li>
+<li>constraints and non-goals  </li>
+<li>verification expectations  </li>
+<li>stop condition</li>
+</ol>
+<h3>13.1 Prompt stages</h3>
+<h4>Orientation Prompt</h4>
+<p>Use at session start.</p>
+<p>Must include:</p>
+<ul>
+<li>current branch</li>
+<li>authoritative docs</li>
+<li>north star</li>
+<li>known architecture truth</li>
+<li>current tranche / issue / milestone</li>
+<li>what is already known and should not be rediscovered</li>
+<li>immediate objective</li>
+<li>constraints</li>
+<li>required output shape</li>
+</ul>
+<h4>Discovery Prompt</h4>
+<p>Use when truth is still unclear.</p>
+<p>Must include:</p>
+<ul>
+<li>exact question to resolve</li>
+<li>files/surfaces to inspect</li>
+<li>required evidence</li>
+<li>no implementation until truth is resolved</li>
+<li>required output headings</li>
+</ul>
+<h4>Tranche Prompt</h4>
+<p>Use when work is bounded.</p>
+<p>Must include:</p>
+<ul>
+<li>tranche goal</li>
+<li>explicit non-goals</li>
+<li>minimal patch surface</li>
+<li>verification requirements</li>
+<li>stop condition</li>
+</ul>
+<h4>Review / Continuation Prompt</h4>
+<p>Use after a tranche or transcript.</p>
+<p>Must include:</p>
+<ul>
+<li>what was completed</li>
+<li>what remains</li>
+<li>top next pressure point</li>
+<li>what should not be reopened</li>
+<li>next bounded tranche</li>
+</ul>
+<hr>
+<h2>14. Retrieval architecture rule</h2>
+<p>This is where the existing <code>agent-knowledge-architecture</code> draft has the better idea.</p>
+<h3>14.1 Repo vs launchpad split</h3>
+<ul>
+<li><strong>ICN repo</strong> is the baseline for code-adjacent truth</li>
+<li><strong>Launchpad / external memory systems</strong> are the baseline for personal, cross-project, and organizational context</li>
+</ul>
+<h3>14.2 Pull context on demand</h3>
+<p>Agents should start with:</p>
+<ul>
+<li>lightweight orientation</li>
+<li>authoritative entry docs</li>
+<li>retrieval instructions</li>
+</ul>
+<p>They should <strong>not</strong> preload giant blobs of context by default.</p>
+<h3>14.3 2-hop visibility rule</h3>
+<p>Any durable doc should be reachable within:
+<strong>entry point -&gt; index/map -&gt; target</strong></p>
+<p>If not, it is effectively invisible.</p>
+<h3>14.4 Structured indexes beat prose indexes</h3>
+<p>Maintain machine-friendly maps:</p>
+<ul>
+<li>doc registry</li>
+<li>truth class</li>
+<li>freshness</li>
+<li>canonical/superseded state</li>
+<li>tags/domains</li>
+<li>owning subsystem</li>
+<li>linked ADR/spec/issues</li>
+</ul>
+<hr>
+<h2>15. Session control panel</h2>
+<p>At the start of any serious session, fill these six fields.</p>
+<ol>
+<li><p><strong>North Star</strong><br>What is ICN trying to become?</p>
+</li>
+<li><p><strong>Current State</strong><br>What is true right now in code and docs?</p>
+</li>
+<li><p><strong>Critical Gap</strong><br>What is the most important mismatch between current state and north star?</p>
+</li>
+<li><p><strong>Next Question</strong><br>What must be learned or decided before the next safe move?</p>
+</li>
+<li><p><strong>Next Tranche</strong><br>What is the smallest safe improvement to truth?</p>
+</li>
+<li><p><strong>Updated Record</strong><br>What must be written afterward so the project remains legible?</p>
+</li>
+</ol>
+<p>If these six are current, the project is navigable.</p>
+<hr>
+<h2>16. Anti-patterns to ban</h2>
+<ul>
+<li>chat as the only memory system</li>
+<li>plans pretending to be specs</li>
+<li>ADRs used for unresolved debates</li>
+<li>specs written before the question is understood</li>
+<li>issues used as architecture memory</li>
+<li>PRs smuggling decisions with no doc trail</li>
+<li>overscoped tranches</li>
+<li>stale historical docs sitting in canonical locations</li>
+<li>success theater</li>
+</ul>
+<hr>
+<h2>17. Immediate implementation sequence</h2>
+<p>This is the best near-term adoption path.</p>
+<h3>Phase A: Canon formation</h3>
+<ol>
+<li>Adopt this control system as the canonical development OS</li>
+<li>Define truth classes and add them to top-level canon docs</li>
+<li>Freeze a small set of authoritative entry docs</li>
+</ol>
+<h3>Phase B: Map cleanup</h3>
+<ol start="4">
+<li>Build a document registry with:<ul>
+<li>path</li>
+<li>truth class</li>
+<li>freshness</li>
+<li>canonical/superseded flag</li>
+<li>domain tags</li>
+</ul>
+</li>
+<li>Move obvious historical docs to archive</li>
+<li>Mark superseded docs explicitly instead of leaving them ambiguous</li>
+</ol>
+<h3>Phase C: Decision cleanup</h3>
+<ol start="7">
+<li>Perform ADR sweep over de facto decisions already true in code</li>
+<li>Link open issues back to ADRs/specs/plans where relevant</li>
+</ol>
+<h3>Phase D: Exact behavior cleanup</h3>
+<ol start="9">
+<li>Create or normalize the first load-bearing specs</li>
+<li>Separate plans from specs where they are currently blended</li>
+</ol>
+<h3>Phase E: Workflow enforcement</h3>
+<ol start="11">
+<li>Add issue template aligned to discovery vs delivery</li>
+<li>Add PR template aligned to verification + linked docs</li>
+<li>Add session-start control panel template</li>
+<li>Add agent prompt templates to the repo</li>
+</ol>
+<hr>
+<h2>18. What to adopt from the existing drafts</h2>
+<h3>Adopt directly from the new draft</h3>
+<p>These parts are already strong and should survive nearly intact:</p>
+<ul>
+<li>discovery vs delivery model</li>
+<li>navigation loop</li>
+<li>stage gates</li>
+<li>artifact taxonomy</li>
+<li>tranche discipline</li>
+<li>agent prompt staging</li>
+<li>six-part control panel</li>
+<li>anti-pattern list</li>
+</ul>
+<h3>Adopt from existing repo docs</h3>
+<p>These parts are already better elsewhere and should be incorporated:</p>
+<ul>
+<li>doc placement rules from <code>DOCUMENTATION_MAINTENANCE.md</code></li>
+<li>retrieval/indexing/on-demand knowledge model from <code>agent-knowledge-architecture.md</code></li>
+<li>explicit kernel/app framing from <code>ARCHITECTURE.md</code> and ADR-001</li>
+<li>stage framing and north-star compression from <code>GOLDEN_PROMPT.md</code></li>
+</ul>
+<h3>Do not keep as-is</h3>
+<ul>
+<li>multiple overlapping “master systems” that compete with each other</li>
+<li>static prose indexes without structured metadata</li>
+<li>historical documents left in active locations without truth-class labeling</li>
+</ul>
+<hr>
+<h2>19. Final rule</h2>
+<p>ICN cannot keep using intuition, memory, and chat recursion as its primary control plane.</p>
+<p>That was good enough for emergence. It is not good enough for durable coordination.</p>
+<p>The project now needs:</p>
+<ul>
+<li>explicit maps</li>
+<li>explicit truth classes</li>
+<li>explicit decisions</li>
+<li>explicit contracts</li>
+<li>explicit tranches</li>
+<li>explicit retrieval</li>
+<li>explicit records</li>
+</ul>
+<p>That is how emergent architecture becomes institutional architecture.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

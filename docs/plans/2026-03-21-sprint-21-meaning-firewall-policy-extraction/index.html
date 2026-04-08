@@ -1,0 +1,711 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Sprint 21: Meaning Firewall Policy Extraction Implementation Plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>plans</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 03 21 sprint 21 meaning firewall policy extraction</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/plans/2026-03-21-sprint-21-meaning-firewall-policy-extraction.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Sprint 21: Meaning Firewall Policy Extraction Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Make hardcoded governance constants in <code>icn-compute</code> and <code>icn-security</code> configurable via node config, eliminating the two HIGH-severity Meaning Firewall violations identified in the Phase 2 audit.</p>
+<p><strong>Architecture:</strong> The kernel crates keep their enforcement logic but stop encoding policy values as compiled constants. Thresholds move to config structs that are loaded from <code>config.toml</code> at startup. This is Phase 2 (config-driven) on a path toward Phase 3 (per-coop PolicyOracle-driven dynamic values). No new traits needed in Sprint 21.</p>
+<p><strong>Tech Stack:</strong> Rust 1.88.0, serde/serde_json for config, toml crate already in workspace, <code>icn-core</code> config module pattern (see <code>crates/icn-core/src/config/gateway.rs</code> for how config sections are structured)</p>
+<p><strong>Sprint 20 Context:</strong> Four open PRs (#1380, #1381, #1382, #1383) need to merge before this sprint starts. Sprint board <code>ops/state/sprint/current.json</code> still shows Sprint 19 — update it as the first task.</p>
+<hr>
+<h2>Background: What We&#39;re Fixing</h2>
+<p>The <a href="/docs/architecture/meaning-firewall-audit">Meaning Firewall audit</a> found two HIGH-severity violations:</p>
+<p><strong>icn-compute</strong> (<code>crates/icn-compute/src/policy.rs</code>, <code>commons_pool.rs</code>):</p>
+<ul>
+<li><code>min_standing: 0.3</code> — hardcoded trust threshold for commons pool access</li>
+<li><code>min_trust_score: 0.1</code> — hardcoded sybil admission threshold</li>
+<li><code>estimate_task_cost()</code> — fuel-to-credits conversion with hardcoded <code>1000</code> divisor</li>
+</ul>
+<p><strong>icn-security</strong> (<code>crates/icn-security/src/misbehavior.rs</code>):</p>
+<ul>
+<li><code>Violation::severity()</code> returns hardcoded scores: Critical=10, Major=5, Minor=1</li>
+<li><code>StorageFailureReason::severity()</code>: InvalidMerkleProof=8, DataMismatch=5, NoResponse=1</li>
+<li><code>apply_penalty()</code>: <code>penalty = severity * 0.05</code> — hardcoded 5% per severity point</li>
+</ul>
+<p>These values encode governance decisions that different cooperatives should be able to set. A cooperative running high-stakes compute should be able to set <code>min_standing: 0.7</code>. A development cooperative should be able to set <code>min_standing: 0.1</code>. None of that is possible today without a code deploy.</p>
+<hr>
+<h2>Pre-Sprint: Close Sprint 20</h2>
+<h3>Task 0: Update sprint board and merge Sprint 20 PRs</h3>
+<p><strong>Files:</strong></p>
+<ul>
+<li><p>Modify: <code>ops/state/sprint/current.json</code></p>
+</li>
+<li><p>Modify: <code>ops/state/sprint/history/sprint-19.json</code> (create from current sprint 19 data)</p>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Step 1: Check PR merge status</strong></p>
+</li>
+</ul>
+<pre><code class="language-bash">gh pr list --repo InterCooperative-Network/icn --state open \
+  --json number,title,statusCheckRollup \
+  | python3 -c &quot;import json,sys; [print(p[&#39;number&#39;], p[&#39;title&#39;]) for p in json.load(sys.stdin)]&quot;
+</code></pre>
+<p>Expected: PRs #1380, #1381, #1382, #1383 visible</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Step 2: Merge Sprint 20 PRs (in order)</strong></li>
+</ul>
+<pre><code class="language-bash">gh pr merge 1382 --squash --delete-branch --repo InterCooperative-Network/icn
+gh pr merge 1383 --squash --delete-branch --repo InterCooperative-Network/icn
+gh pr merge 1380 --squash --delete-branch --repo InterCooperative-Network/icn
+gh pr merge 1381 --squash --delete-branch --repo InterCooperative-Network/icn
+</code></pre>
+<p>Use <code>--admin</code> if CI is queue-stalled (Benchmark &quot;Compare Against Base&quot; running &gt;1hr).</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Step 3: Archive Sprint 19, activate Sprint 20</strong></li>
+</ul>
+<p>On <code>main</code> after merges:</p>
+<pre><code class="language-bash">git checkout main &amp;&amp; git pull origin main
+cp ops/state/sprint/current.json /tmp/sprint-19-backup.json
+</code></pre>
+<p>Confirm <code>current.json</code> was updated to Sprint 20 by the <code>feat/1051</code> merge. If not, update manually (see Sprint 20 content below).</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Step 4: Create Sprint 21 board</strong></li>
+</ul>
+<p>Write <code>ops/state/sprint/current.json</code> (see Sprint 21 JSON at end of this doc).</p>
+<pre><code class="language-bash">git add ops/state/sprint/current.json
+git commit -m &quot;chore(ops): advance sprint board to Sprint 21&quot;
+git push
+</code></pre>
+<hr>
+<h2>Sprint 21 Scope</h2>
+<p><strong>Two tasks. Both are config-extraction changes — no new traits, no interface changes, no PolicyOracle wiring (that&#39;s Sprint 22).</strong></p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Crate</th>
+<th>What moves</th>
+<th>Config section</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>s21-t1</td>
+<td><code>icn-compute</code></td>
+<td><code>min_standing</code>, <code>min_trust_score</code>, fuel cost divisor</td>
+<td><code>[compute.policy]</code></td>
+</tr>
+<tr>
+<td>s21-t2</td>
+<td><code>icn-security</code></td>
+<td>Severity weights, penalty rate</td>
+<td><code>[security.reputation]</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Task 1: Compute Policy Config Extraction (s21-t1)</h2>
+<p><strong>Issue:</strong> #1370 (partial — compute violations)</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>crates/icn-compute/src/policy.rs</code> — make <code>CommonsPoolPolicy</code> defaults configurable</li>
+<li>Modify: <code>crates/icn-compute/src/commons_pool.rs</code> — make <code>SybilPolicy</code> defaults configurable</li>
+<li>Create: <code>crates/icn-core/src/config/compute.rs</code> — new <code>ComputePolicyConfig</code> struct</li>
+<li>Modify: <code>crates/icn-core/src/config/mod.rs</code> — add <code>compute: ComputePolicyConfig</code> field</li>
+<li>Modify: <code>crates/icn-core/src/supervisor/lifecycle.rs</code> — pass config to compute components</li>
+<li>Test: <code>crates/icn-compute/src/policy.rs</code> — new config-driven default tests</li>
+</ul>
+<h3>Step 1.1: Create branch</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Create branch</strong></li>
+</ul>
+<pre><code class="language-bash">git checkout main &amp;&amp; git pull origin main
+git checkout -b feat/1370-compute-policy-config
+</code></pre>
+<h3>Step 1.2: Write failing test for configurable threshold</h3>
+<p>The test asserts that <code>CommonsPoolPolicy</code> can be constructed with a non-default <code>min_standing</code>, and that <code>check_standing()</code> uses the configured value, not the hardcoded <code>0.3</code>.</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Write test in <code>crates/icn-compute/src/policy.rs</code></strong> (in existing <code>#[cfg(test)]</code> block):</li>
+</ul>
+<pre><code class="language-rust">#[test]
+fn test_commonspool_policy_uses_configured_min_standing() {
+    let policy = CommonsPoolPolicy {
+        min_standing: 0.7, // cooperative set this, not compiled constant
+        ..CommonsPoolPolicy::default()
+    };
+    assert!(policy.check_standing(0.6).is_err(), &quot;0.6 should fail 0.7 threshold&quot;);
+    assert!(policy.check_standing(0.8).is_ok(), &quot;0.8 should pass 0.7 threshold&quot;);
+}
+
+#[test]
+fn test_sybil_policy_uses_configured_min_trust() {
+    let policy = SybilPolicy { min_trust_score: 0.5 };
+    assert!(policy.min_trust_score == 0.5);
+    // Try to add participant below threshold
+    let mut pool = CommonsPool::with_policy(policy);
+    let participant = CommonsParticipant {
+        did: &quot;did:icn:test&quot;.to_string(),
+        trust_score: 0.3, // below 0.5 threshold
+        // ... other fields from existing test helpers
+    };
+    assert!(pool.try_add_participant(participant).is_err());
+}
+</code></pre>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Run test to verify it fails (or verify it passes if structs already accept these)</strong></li>
+</ul>
+<pre><code class="language-bash">cd /home/ubuntu/projects/icn/icn
+cargo test -p icn-compute -- test_commonspool_policy test_sybil_policy 2&gt;&amp;1 | tail -5
+</code></pre>
+<h3>Step 1.3: Create <code>ComputePolicyConfig</code></h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Create <code>crates/icn-core/src/config/compute.rs</code></strong>:</li>
+</ul>
+<pre><code class="language-rust">//! Compute subsystem policy configuration
+use serde::{Deserialize, Serialize};
+
+/// Policy thresholds for the compute subsystem.
+///
+/// These values are governance decisions — different cooperatives should be
+/// able to set them via config without recompiling. Default values match the
+/// original hardcoded constants.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComputePolicyConfig {
+    /// Minimum trust standing required to submit to the commons pool (0.0–1.0).
+    /// Original hardcoded value: 0.3
+    #[serde(default = &quot;default_min_standing&quot;)]
+    pub min_standing: f64,
+
+    /// Minimum trust score required for sybil admission to commons pool (0.0–1.0).
+    /// Original hardcoded value: 0.1
+    #[serde(default = &quot;default_min_trust_score&quot;)]
+    pub min_trust_score: f64,
+
+    /// Fuel units per credit for cost estimation.
+    /// Original hardcoded value: 1000 (1 credit per 1000 fuel units)
+    #[serde(default = &quot;default_fuel_cost_divisor&quot;)]
+    pub fuel_cost_divisor: u64,
+}
+
+fn default_min_standing() -&gt; f64 { 0.3 }
+fn default_min_trust_score() -&gt; f64 { 0.1 }
+fn default_fuel_cost_divisor() -&gt; u64 { 1000 }
+
+impl Default for ComputePolicyConfig {
+    fn default() -&gt; Self {
+        Self {
+            min_standing: default_min_standing(),
+            min_trust_score: default_min_trust_score(),
+            fuel_cost_divisor: default_fuel_cost_divisor(),
+        }
+    }
+}
+</code></pre>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Run <code>cargo check -p icn-core</code></strong></li>
+</ul>
+<pre><code class="language-bash">cargo check -p icn-core 2&gt;&amp;1 | tail -5
+</code></pre>
+<p>Expected: no errors yet (module not wired in)</p>
+<h3>Step 1.4: Wire into <code>NodeConfig</code></h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Read <code>crates/icn-core/src/config/mod.rs</code></strong> and add <code>compute</code> field:</li>
+</ul>
+<pre><code class="language-rust">pub mod compute;
+pub use compute::ComputePolicyConfig;
+
+// In NodeConfig struct, add:
+pub compute: ComputePolicyConfig,
+
+// In NodeConfig::default():
+compute: ComputePolicyConfig::default(),
+</code></pre>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Verify compile</strong></li>
+</ul>
+<pre><code class="language-bash">cargo check -p icn-core 2&gt;&amp;1 | tail -5
+</code></pre>
+<h3>Step 1.5: Use config values in <code>CommonsPoolPolicy</code> and <code>SybilPolicy</code></h3>
+<p>The structs already accept configured values — this step ensures lifecycle.rs passes the config to them instead of relying on hardcoded <code>Default</code> values.</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Modify <code>crates/icn-core/src/supervisor/lifecycle.rs</code></strong> — find where <code>CommonsPool</code> or <code>CommonsPoolPolicy</code> is constructed and pass config values. Search:</li>
+</ul>
+<pre><code class="language-bash">grep -n &quot;CommonsPool\|CommonsPoolPolicy\|SybilPolicy&quot; \
+  crates/icn-core/src/supervisor/lifecycle.rs
+</code></pre>
+<p>If construction is inside <code>icn-compute</code>, thread config through via a new <code>init</code> function that accepts <code>ComputePolicyConfig</code>.</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Modify <code>estimate_task_cost</code> in <code>crates/icn-compute/src/policy.rs</code></strong> — replace hardcoded <code>1000</code>:</li>
+</ul>
+<pre><code class="language-rust">// Before:
+fn estimate_task_cost(task: &amp;ComputeTask) -&gt; i64 {
+    (task.fuel_limit / 1000) as i64  // 1 credit per 1000 fuel
+}
+
+// After — add fuel_cost_divisor to CommonsPoolPolicy:
+pub fuel_cost_divisor: u64,  // new field, default 1000
+
+fn estimate_task_cost(&amp;self, task: &amp;ComputeTask) -&gt; i64 {
+    (task.fuel_limit / self.fuel_cost_divisor) as i64
+}
+</code></pre>
+<p>Note: <code>estimate_task_cost</code> is currently a static method (<code>fn estimate_task_cost(task: &amp;ComputeTask)</code>). Change to <code>&amp;self</code> to access <code>fuel_cost_divisor</code>.</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Run all compute tests</strong></li>
+</ul>
+<pre><code class="language-bash">cargo test -p icn-compute 2&gt;&amp;1 | tail -10
+</code></pre>
+<p>Expected: all passing</p>
+<h3>Step 1.6: Commit</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Verify fmt and clippy</strong></li>
+</ul>
+<pre><code class="language-bash">cargo fmt --all --check
+cargo clippy -p icn-compute -p icn-core --all-targets -- -D warnings 2&gt;&amp;1 | tail -5
+</code></pre>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cargo fmt --all
+git add crates/icn-compute/src/policy.rs \
+        crates/icn-compute/src/commons_pool.rs \
+        crates/icn-core/src/config/compute.rs \
+        crates/icn-core/src/config/mod.rs \
+        crates/icn-core/src/supervisor/lifecycle.rs
+git commit -m &quot;feat(compute): make admission thresholds config-driven (#1370)
+
+Move min_standing, min_trust_score, and fuel_cost_divisor from hardcoded
+constants to ComputePolicyConfig in node config. Default values match the
+original constants for backward compatibility.
+
+This is Sprint 21 Phase 2 of the Meaning Firewall audit — making governance
+choices configurable via config.toml rather than requiring code deploys.
+Phase 3 (per-coop PolicyOracle dynamic values) is future work.
+
+Part of #1370.&quot;
+</code></pre>
+<h3>Step 1.7: Open PR</h3>
+<pre><code class="language-bash">git push -u origin feat/1370-compute-policy-config
+gh pr create \
+  --title &quot;feat(compute): make admission thresholds config-driven (#1370)&quot; \
+  --body &quot;Part of #1370 Meaning Firewall Phase 2. Moves min_standing, min_trust_score, fuel_cost_divisor from hardcoded constants to ComputePolicyConfig. Defaults unchanged.&quot;
+</code></pre>
+<hr>
+<h2>Task 2: Reputation Policy Config Extraction (s21-t2)</h2>
+<p><strong>Issue:</strong> #1370 (partial — security violations)</p>
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>crates/icn-security/src/misbehavior.rs</code> — add <code>SeverityWeights</code> and <code>penalty_rate</code> to <code>MisbehaviorThresholds</code></li>
+<li>Create: <code>crates/icn-core/src/config/security.rs</code> — <code>ReputationPolicyConfig</code></li>
+<li>Modify: <code>crates/icn-core/src/config/mod.rs</code> — add <code>security: ReputationPolicyConfig</code></li>
+<li>Modify: <code>crates/icn-core/src/supervisor/lifecycle.rs</code> — pass config to <code>MisbehaviorDetector</code></li>
+<li>Test: <code>crates/icn-security/src/misbehavior.rs</code> — configurable severity tests</li>
+</ul>
+<h3>Step 2.1: Create branch</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Create branch</strong> (after t1 is merged, or in parallel with t1 on a separate branch)</li>
+</ul>
+<pre><code class="language-bash">git checkout main &amp;&amp; git pull origin main
+git checkout -b feat/1370-reputation-policy-config
+</code></pre>
+<h3>Step 2.2: Understand current severity structure</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Read the current code</strong></li>
+</ul>
+<pre><code class="language-bash">sed -n &#39;95,145p&#39; crates/icn-security/src/misbehavior.rs
+</code></pre>
+<p>Note: <code>Violation::severity()</code> returns <code>u32</code> and switches on violation type with hardcoded values. <code>apply_penalty</code> uses <code>severity * 0.05</code>.</p>
+<h3>Step 2.3: Write failing test for configurable severity</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Write test</strong> (in <code>crates/icn-security/src/misbehavior.rs</code> test block):</li>
+</ul>
+<pre><code class="language-rust">#[test]
+fn test_apply_penalty_uses_configurable_rate() {
+    let mut score = ReputationScore::new();
+    let initial = score.score;
+
+    // Default rate is 0.05 (5% per severity point)
+    // Critical violation has severity 10 → default penalty = 0.5
+    let violation = Violation::ConsistentlyOffline { missed_rounds: 5 };
+    score.apply_penalty(&amp;violation, 0.05);
+    let default_penalty = initial - score.score;
+
+    // Now use a different rate
+    let mut score2 = ReputationScore::new();
+    score2.apply_penalty(&amp;violation, 0.10); // 10% per point
+    let custom_penalty = initial - score2.score;
+
+    assert!(
+        custom_penalty &gt; default_penalty,
+        &quot;higher rate should produce larger penalty&quot;
+    );
+}
+
+#[test]
+fn test_severity_weights_are_configurable() {
+    // With default weights: Critical=10, Major=5, Minor=1
+    let w = SeverityWeights::default();
+    let v = Violation::SybilAttack;
+    assert_eq!(v.severity_with_weights(&amp;w), 10); // Critical
+
+    // With custom weights
+    let custom = SeverityWeights { critical: 20, major: 10, minor: 2 };
+    assert_eq!(v.severity_with_weights(&amp;custom), 20);
+}
+</code></pre>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Run to confirm failure (method doesn&#39;t exist yet)</strong></li>
+</ul>
+<pre><code class="language-bash">cargo test -p icn-security -- test_apply_penalty_uses test_severity_weights 2&gt;&amp;1 | tail -5
+</code></pre>
+<h3>Step 2.4: Add <code>SeverityWeights</code> struct and update <code>apply_penalty</code></h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Modify <code>crates/icn-security/src/misbehavior.rs</code></strong>:</li>
+</ul>
+<p>Add after the existing <code>Violation</code> impl block:</p>
+<pre><code class="language-rust">/// Configurable weights for violation severity scoring.
+///
+/// These are governance decisions — different cooperatives may weigh
+/// violations differently based on their risk tolerance.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeverityWeights {
+    /// Weight for critical violations (default: 10)
+    pub critical: u32,
+    /// Weight for major violations (default: 5)
+    pub major: u32,
+    /// Weight for minor violations (default: 1)
+    pub minor: u32,
+}
+
+impl Default for SeverityWeights {
+    fn default() -&gt; Self {
+        Self { critical: 10, major: 5, minor: 1 }
+    }
+}
+</code></pre>
+<p>Add <code>severity_with_weights</code> method to <code>Violation</code>:</p>
+<pre><code class="language-rust">impl Violation {
+    // Keep existing severity() for backward compat (uses default weights)
+    pub fn severity(&amp;self) -&gt; u32 {
+        self.severity_with_weights(&amp;SeverityWeights::default())
+    }
+
+    /// Compute severity using provided weights instead of hardcoded values.
+    pub fn severity_with_weights(&amp;self, weights: &amp;SeverityWeights) -&gt; u32 {
+        match self {
+            // Critical violations
+            Violation::SybilAttack | Violation::InvalidBlock { .. }
+            | Violation::DoubleSigning { .. } =&gt; weights.critical,
+            // Major violations
+            Violation::InvalidProposal { .. } | Violation::FailedStorageChallenge { .. }
+            | Violation::ConsistentlyOffline { .. } =&gt; weights.major,
+            // Minor violations
+            Violation::SlowResponse { .. } | Violation::PartialResponse { .. } =&gt; weights.minor,
+        }
+    }
+}
+</code></pre>
+<p><strong>Note:</strong> Check the actual variant names in the existing <code>severity()</code> match — map each arm to critical/major/minor, preserving the original mapping.</p>
+<p>Update <code>apply_penalty</code> to accept <code>decay_rate</code> as a parameter (already does!) and use <code>severity_with_weights</code>:</p>
+<pre><code class="language-rust">pub fn apply_penalty(&amp;mut self, violation: &amp;Violation, decay_rate: f64) {
+    self.apply_penalty_with_weights(violation, decay_rate, &amp;SeverityWeights::default())
+}
+
+pub fn apply_penalty_with_weights(
+    &amp;mut self,
+    violation: &amp;Violation,
+    decay_rate: f64,
+    weights: &amp;SeverityWeights,
+) {
+    let severity = violation.severity_with_weights(weights);
+    let penalty = severity as f64 * decay_rate; // was 0.05 hardcoded
+    self.score = (self.score - penalty).max(0.0);
+    self.severity_points += severity;
+    // ... existing logging
+}
+</code></pre>
+<h3>Step 2.5: Create <code>ReputationPolicyConfig</code></h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Create <code>crates/icn-core/src/config/security.rs</code></strong>:</li>
+</ul>
+<pre><code class="language-rust">//! Security subsystem reputation policy configuration
+use serde::{Deserialize, Serialize};
+
+/// Reputation policy parameters for the security subsystem.
+///
+/// These are governance decisions that cooperatives should control.
+/// Default values match the original hardcoded constants.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReputationPolicyConfig {
+    /// Penalty rate per severity point (e.g. 0.05 = 5% per point).
+    /// Original hardcoded value: 0.05
+    #[serde(default = &quot;default_penalty_rate&quot;)]
+    pub penalty_rate: f64,
+
+    /// Severity weight for critical violations.
+    /// Original hardcoded value: 10
+    #[serde(default = &quot;default_critical_weight&quot;)]
+    pub critical_weight: u32,
+
+    /// Severity weight for major violations.
+    /// Original hardcoded value: 5
+    #[serde(default = &quot;default_major_weight&quot;)]
+    pub major_weight: u32,
+
+    /// Severity weight for minor violations.
+    /// Original hardcoded value: 1
+    #[serde(default = &quot;default_minor_weight&quot;)]
+    pub minor_weight: u32,
+
+    /// Maximum violations per hour before auto-quarantine.
+    /// Original hardcoded value: 10
+    #[serde(default = &quot;default_max_violations_per_hour&quot;)]
+    pub max_violations_per_hour: usize,
+
+    /// Violation history retention in seconds.
+    /// Original hardcoded value: 604800 (7 days)
+    #[serde(default = &quot;default_violation_retention_secs&quot;)]
+    pub violation_retention_secs: u64,
+}
+
+fn default_penalty_rate() -&gt; f64 { 0.05 }
+fn default_critical_weight() -&gt; u32 { 10 }
+fn default_major_weight() -&gt; u32 { 5 }
+fn default_minor_weight() -&gt; u32 { 1 }
+fn default_max_violations_per_hour() -&gt; usize { 10 }
+fn default_violation_retention_secs() -&gt; u64 { 7 * 24 * 3600 }
+
+impl Default for ReputationPolicyConfig {
+    fn default() -&gt; Self {
+        Self {
+            penalty_rate: default_penalty_rate(),
+            critical_weight: default_critical_weight(),
+            major_weight: default_major_weight(),
+            minor_weight: default_minor_weight(),
+            max_violations_per_hour: default_max_violations_per_hour(),
+            violation_retention_secs: default_violation_retention_secs(),
+        }
+    }
+}
+
+impl ReputationPolicyConfig {
+    /// Convert to `SeverityWeights` for use with `Violation::severity_with_weights()`.
+    pub fn severity_weights(&amp;self) -&gt; icn_security::misbehavior::SeverityWeights {
+        icn_security::misbehavior::SeverityWeights {
+            critical: self.critical_weight,
+            major: self.major_weight,
+            minor: self.minor_weight,
+        }
+    }
+}
+</code></pre>
+<h3>Step 2.6: Wire into supervisor</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Find where <code>MisbehaviorDetector</code> is constructed</strong>:</li>
+</ul>
+<pre><code class="language-bash">grep -n &quot;MisbehaviorDetector::new\|MisbehaviorThresholds&quot; \
+  crates/icn-core/src/supervisor/lifecycle.rs
+</code></pre>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Pass config-derived thresholds</strong>:
+Replace <code>MisbehaviorThresholds::default()</code> with values from config:</li>
+</ul>
+<pre><code class="language-rust">let reputation_config = &amp;config.security;
+let thresholds = MisbehaviorThresholds {
+    quarantine_threshold: thresholds.quarantine_threshold, // keep existing field
+    ban_threshold: thresholds.ban_threshold,
+    max_violations_per_hour: reputation_config.max_violations_per_hour,
+    decay_rate: thresholds.decay_rate,
+    violation_retention_secs: reputation_config.violation_retention_secs,
+};
+// Pass penalty_rate and severity_weights to detector separately
+// or add them to MisbehaviorThresholds as new fields
+</code></pre>
+<h3>Step 2.7: Run all security tests</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Run tests</strong></li>
+</ul>
+<pre><code class="language-bash">cargo test -p icn-security 2&gt;&amp;1 | tail -10
+</code></pre>
+<p>Expected: all passing</p>
+<h3>Step 2.8: Commit and open PR</h3>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Verify fmt and clippy</strong></li>
+</ul>
+<pre><code class="language-bash">cargo fmt --all --check
+cargo clippy -p icn-security -p icn-core --all-targets -- -D warnings 2&gt;&amp;1 | tail -5
+</code></pre>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Commit</strong></li>
+</ul>
+<pre><code class="language-bash">cargo fmt --all
+git add crates/icn-security/src/misbehavior.rs \
+        crates/icn-core/src/config/security.rs \
+        crates/icn-core/src/config/mod.rs \
+        crates/icn-core/src/supervisor/lifecycle.rs
+git commit -m &quot;feat(security): make severity scoring and penalty rate config-driven (#1370)
+
+Add SeverityWeights struct and severity_with_weights() method to replace
+hardcoded 10/5/1 severity scores. Add penalty_rate to ReputationPolicyConfig
+to replace hardcoded 0.05 constant. All values wired to node config with
+defaults matching original hardcoded values.
+
+Sprint 21 Meaning Firewall Phase 2 — security violations.
+Part of #1370.&quot;
+</code></pre>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Open PR</strong></li>
+</ul>
+<pre><code class="language-bash">git push -u origin feat/1370-reputation-policy-config
+gh pr create \
+  --title &quot;feat(security): make severity scoring and penalty rate config-driven (#1370)&quot; \
+  --body &quot;Part of #1370 Meaning Firewall Phase 2. Adds SeverityWeights + configurable penalty_rate. Defaults unchanged.&quot;
+</code></pre>
+<hr>
+<h2>Task 3: Update Audit Doc (Post-Merge)</h2>
+<p>After both PRs merge, update the audit doc to reflect remediated violations.</p>
+<ul>
+<li><p><input disabled="" type="checkbox"> <strong>Update <code>docs/architecture/meaning-firewall-audit.md</code></strong></p>
+<ul>
+<li>Mark compute and security violations as &quot;REMEDIATED in Sprint 21&quot;</li>
+<li>Update summary table — remaining: icn-ledger (Sprint 22), icn-core/icn-obs (low priority)</li>
+</ul>
+</li>
+<li><p><input disabled="" type="checkbox"> <strong>Commit on main</strong></p>
+</li>
+</ul>
+<pre><code class="language-bash">git add docs/architecture/meaning-firewall-audit.md
+git commit -m &quot;docs(arch): update meaning firewall audit — sprint 21 remediations&quot;
+</code></pre>
+<hr>
+<h2>Sprint 21 Board JSON</h2>
+<p>Write this to <code>ops/state/sprint/current.json</code> when advancing from Sprint 20:</p>
+<pre><code class="language-json">{
+  &quot;sprint&quot;: 21,
+  &quot;name&quot;: &quot;Sprint 21 — Meaning Firewall Policy Extraction&quot;,
+  &quot;started&quot;: &quot;2026-03-21&quot;,
+  &quot;goals&quot;: [
+    &quot;Close Sprint 20: merge PRs #1380 #1381 #1382 #1383&quot;,
+    &quot;Make compute admission thresholds config-driven: min_standing, min_trust_score, fuel_cost_divisor&quot;,
+    &quot;Make reputation severity scoring config-driven: SeverityWeights, penalty_rate&quot;,
+    &quot;Update meaning firewall audit doc with Sprint 21 remediations&quot;
+  ],
+  &quot;tasks&quot;: [
+    {
+      &quot;id&quot;: &quot;s21-t0&quot;,
+      &quot;title&quot;: &quot;chore(ops): close Sprint 20 — merge PRs and update sprint board&quot;,
+      &quot;status&quot;: &quot;pending&quot;,
+      &quot;prs&quot;: [1380, 1381, 1382, 1383],
+      &quot;note&quot;: &quot;Merge in order: doc PRs first (1382, 1383), then code PRs (1380, 1381). Use --admin if Benchmark job is stalled.&quot;
+    },
+    {
+      &quot;id&quot;: &quot;s21-t1&quot;,
+      &quot;title&quot;: &quot;feat(compute): make admission thresholds config-driven (#1370 partial)&quot;,
+      &quot;status&quot;: &quot;pending&quot;,
+      &quot;pr&quot;: null,
+      &quot;issue&quot;: 1370,
+      &quot;note&quot;: &quot;ComputePolicyConfig in icn-core/config/compute.rs. min_standing, min_trust_score, fuel_cost_divisor. Wire into lifecycle.rs. Defaults match current hardcoded values.&quot;
+    },
+    {
+      &quot;id&quot;: &quot;s21-t2&quot;,
+      &quot;title&quot;: &quot;feat(security): make severity scoring config-driven (#1370 partial)&quot;,
+      &quot;status&quot;: &quot;pending&quot;,
+      &quot;pr&quot;: null,
+      &quot;issue&quot;: 1370,
+      &quot;note&quot;: &quot;SeverityWeights struct, severity_with_weights() method, penalty_rate in ReputationPolicyConfig. Wire into MisbehaviorDetector via lifecycle.rs. Defaults match current hardcoded values.&quot;
+    },
+    {
+      &quot;id&quot;: &quot;s21-t3&quot;,
+      &quot;title&quot;: &quot;docs(arch): update meaning firewall audit post-sprint&quot;,
+      &quot;status&quot;: &quot;pending&quot;,
+      &quot;pr&quot;: null,
+      &quot;issue&quot;: 1370,
+      &quot;note&quot;: &quot;Update docs/architecture/meaning-firewall-audit.md to mark compute and security violations as remediated. Update summary table.&quot;
+    }
+  ],
+  &quot;deferred_to_s22&quot;: {
+    &quot;note&quot;: &quot;icn-ledger CreditPolicy extraction, icn-obs attestation thresholds, full PolicyOracle wiring for per-coop dynamic values&quot;,
+    &quot;issues&quot;: [1370]
+  }
+}
+</code></pre>
+<hr>
+<h2>Verification Checklist</h2>
+<p>After all Sprint 21 PRs merge:</p>
+<pre><code class="language-bash">cd /home/ubuntu/projects/icn/icn
+
+# All tests pass
+cargo test --workspace --lib 2&gt;&amp;1 | tail -5
+cargo test -p icn-compute 2&gt;&amp;1 | tail -5
+cargo test -p icn-security 2&gt;&amp;1 | tail -5
+
+# Meaning firewall CI gate still passes
+cargo test -p icn-core --lib meaning_firewall 2&gt;&amp;1 | tail -5
+
+# No format or clippy regressions
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings 2&gt;&amp;1 | tail -5
+</code></pre>
+<p><strong>Manual verification</strong>: Set non-default values in a test <code>config.toml</code>:</p>
+<pre><code class="language-toml">[compute.policy]
+min_standing = 0.7
+min_trust_score = 0.4
+fuel_cost_divisor = 500
+
+[security.reputation]
+penalty_rate = 0.10
+critical_weight = 20
+</code></pre>
+<p>Start <code>icnd</code> with this config and verify logs reflect the new values.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

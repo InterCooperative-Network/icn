@@ -1,0 +1,319 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>CommonsManager Persistence — Execution Checklist | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>development</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>commons persistence checklist</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/development/commons-persistence-checklist.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: ready-for-execution
+Created: 2026-03-28
+Design doc: commons-persistence-design.md
+Branch: feat/commons-persistence</h2>
+<h1>CommonsManager Persistence — Execution Checklist</h1>
+<h2>Pre-flight (before touching code)</h2>
+<ul>
+<li><input disabled="" type="checkbox"> <code>git checkout main &amp;&amp; git pull</code> — confirm at <code>168653bc</code> (post PR #1450)</li>
+<li><input disabled="" type="checkbox"> <code>git checkout -b feat/commons-persistence</code></li>
+<li><input disabled="" type="checkbox"> <code>git branch --show-current</code> — must be <code>feat/commons-persistence</code></li>
+<li><input disabled="" type="checkbox"> Read <code>docs/development/commons-persistence-design.md</code> (the full design)</li>
+<li><input disabled="" type="checkbox"> Verify <code>self.data_dir</code> is set in production daemon startup:<pre><code class="language-bash">grep -n &#39;data_dir\|with_data_dir&#39; icn/crates/icn-gateway/src/server.rs | head -10
+grep -n &#39;data_dir\|with_data_dir&#39; icn/crates/icn-core/src/supervisor.rs | head -10
+</code></pre>
+</li>
+<li><input disabled="" type="checkbox"> Confirm <code>flush()</code> callers (before deciding to keep or move it):<pre><code class="language-bash">grep -rn &#39;\.flush()&#39; icn/crates/icn-gateway/src/ --include=&#39;*.rs&#39; | grep -v test
+</code></pre>
+</li>
+</ul>
+<hr>
+<h2>Step 1 — Add blanket impl in <code>commons_store.rs</code></h2>
+<p><strong>File:</strong> <code>icn/crates/icn-gateway/src/commons_store.rs</code></p>
+<p>After the <code>CommonsStoreBackend</code> trait definition (around line 72), add:</p>
+<pre><code class="language-rust">/// Allow `Arc&lt;dyn CommonsStoreBackend&gt;` to be used as a backend directly.
+/// This enables type-erased CommonsManager construction without changing handler signatures.
+impl CommonsStoreBackend for Arc&lt;dyn CommonsStoreBackend&gt; {
+    fn get(&amp;self, key: &amp;[u8]) -&gt; Result&lt;Option&lt;Vec&lt;u8&gt;&gt;&gt; {
+        self.as_ref().get(key)
+    }
+    fn put(&amp;self, key: &amp;[u8], value: &amp;[u8]) -&gt; Result&lt;()&gt; {
+        self.as_ref().put(key, value)
+    }
+    fn delete(&amp;self, key: &amp;[u8]) -&gt; Result&lt;()&gt; {
+        self.as_ref().delete(key)
+    }
+    fn scan(&amp;self, prefix: &amp;[u8]) -&gt; Result&lt;Vec&lt;(Vec&lt;u8&gt;, Vec&lt;u8&gt;)&gt;&gt; {
+        self.as_ref().scan(prefix)
+    }
+}
+</code></pre>
+<p>Verify: <code>cargo check -p icn-gateway</code> — should compile (no handler changes needed yet).</p>
+<hr>
+<h2>Step 2 — Update <code>CommonsManager</code> in <code>commons_mgr.rs</code></h2>
+<p><strong>File:</strong> <code>icn/crates/icn-gateway/src/commons_mgr.rs</code></p>
+<h3>2a — Change default type parameter (line 40)</h3>
+<pre><code class="language-rust">// BEFORE:
+pub struct CommonsManager&lt;S: CommonsStoreBackend = InMemoryCommonsStore&gt; {
+
+// AFTER:
+pub struct CommonsManager&lt;S: CommonsStoreBackend = Arc&lt;dyn CommonsStoreBackend&gt;&gt; {
+</code></pre>
+<p>Add import at top if not present:</p>
+<pre><code class="language-rust">use std::sync::Arc;
+// Arc&lt;dyn CommonsStoreBackend&gt; needs this — already imported in most files
+</code></pre>
+<h3>2b — Replace <code>impl CommonsManager&lt;InMemoryCommonsStore&gt;</code> block (line 48)</h3>
+<pre><code class="language-rust">// REPLACE the old InMemoryCommonsStore impl block with:
+impl CommonsManager&lt;Arc&lt;dyn CommonsStoreBackend&gt;&gt; {
+    /// In-memory backend (testing / no data_dir configured)
+    pub fn new() -&gt; Self {
+        let backend: Arc&lt;dyn CommonsStoreBackend&gt; = Arc::new(InMemoryCommonsStore::new());
+        Self::with_store(backend)
+    }
+
+    /// Persistent sled backend (production)
+    pub fn with_sled_path(path: impl AsRef&lt;std::path::Path&gt;) -&gt; Result&lt;Self&gt; {
+        let backend: Arc&lt;dyn CommonsStoreBackend&gt; =
+            Arc::new(SledCommonsStore::open(path).context(&quot;Failed to open commons sled store&quot;)?);
+        Ok(Self::with_store(backend))
+    }
+
+    /// Temporary sled backend (tests needing real persistence behavior)
+    pub fn with_sled_temporary() -&gt; Result&lt;Self&gt; {
+        let backend: Arc&lt;dyn CommonsStoreBackend&gt; = Arc::new(
+            SledCommonsStore::temporary().context(&quot;Failed to create temporary commons sled store&quot;)?,
+        );
+        Ok(Self::with_store(backend))
+    }
+}
+</code></pre>
+<h3>2c — Handle <code>flush()</code> from <code>impl CommonsManager&lt;SledCommonsStore&gt;</code></h3>
+<p>Check if <code>flush()</code> is called anywhere:</p>
+<pre><code class="language-bash">grep -rn &#39;commons_manager.*flush\|\.flush()&#39; icn/crates/icn-gateway/src/ | grep -v test
+</code></pre>
+<p>If unused externally, add to the <code>Arc&lt;dyn CommonsStoreBackend&gt;</code> impl as a no-op or
+move the <code>SledCommonsStore</code>-specific impl into a helper. If needed:</p>
+<pre><code class="language-rust">// Add to CommonsStoreBackend trait (optional extension):
+fn flush(&amp;self) -&gt; Result&lt;()&gt; { Ok(()) }  // default no-op
+</code></pre>
+<p>Then <code>SledCommonsStore</code> can override it.</p>
+<h3>2d — Remove or deprecate <code>impl CommonsManager&lt;SledCommonsStore&gt;</code> block</h3>
+<p>The old <code>with_sled_path</code> / <code>with_sled_temporary</code> / <code>flush()</code> methods in the
+<code>SledCommonsStore</code> specific impl block are superseded. Remove or add <code>#[deprecated]</code>.</p>
+<p>Verify compile: <code>cargo check -p icn-gateway</code> — fix any type errors.</p>
+<hr>
+<h2>Step 3 — Update <code>server.rs</code></h2>
+<p><strong>File:</strong> <code>icn/crates/icn-gateway/src/server.rs</code>
+<strong>Lines:</strong> 692-701 (current <code>CommonsManager::new()</code> block)</p>
+<p>Replace:</p>
+<pre><code class="language-rust">// TODO: wire CommonsManager to a daemon handle (CommonsHandle) for cross-restart
+// persistence. Currently all commons/personhood/charter/enrollment state is
+// in-memory only and will be lost on process restart.
+// See GovernanceManager::with_handle() for the pattern to follow.
+warn!(
+    &quot;CommonsManager running in-memory-only mode: \
+     commons/personhood/charter/enrollment state will NOT survive process restart. \
+     Wire a CommonsHandle for production use.&quot;
+);
+let commons_manager = Arc::new(CommonsManager::new());
+</code></pre>
+<p>With:</p>
+<pre><code class="language-rust">let commons_manager: Arc&lt;CommonsManager&gt; = if let Some(ref data_dir) = self.data_dir {
+    let commons_path = data_dir.join(&quot;commons.sled&quot;);
+    info!(&quot;CommonsManager: opening sled store at {:?}&quot;, commons_path);
+    Arc::new(
+        CommonsManager::with_sled_path(&amp;commons_path)
+            .context(&quot;Failed to open commons sled store&quot;)?,
+    )
+} else {
+    warn!(
+        &quot;CommonsManager: no data_dir configured, running in-memory only — \
+         commons/personhood/charter/enrollment state will NOT survive process restart&quot;
+    );
+    Arc::new(CommonsManager::new())
+};
+</code></pre>
+<p><strong>Check:</strong> <code>data_dir.join(&quot;commons.sled&quot;)</code> must NOT collide with any existing sled path.
+Confirm no other store uses <code>commons.sled</code>:</p>
+<pre><code class="language-bash">grep -rn &#39;&quot;commons&#39; icn/crates/icn-gateway/src/server.rs
+grep -rn &#39;join.*sled\|sled.*join&#39; icn/crates/icn-gateway/src/server.rs
+</code></pre>
+<hr>
+<h2>Step 4 — Full compile check</h2>
+<pre><code class="language-bash">cd /home/ubuntu/projects/icn/icn
+cargo check -p icn-gateway 2&gt;&amp;1 | head -50
+</code></pre>
+<p>Expect: clean compile. If there are type errors, they will be in:</p>
+<ul>
+<li><code>commons_mgr.rs</code> — type param instantiation sites</li>
+<li><code>commons_store.rs</code> — LRU cache size or <code>Arc&lt;dyn ...&gt;</code> constraint issues</li>
+<li><code>server.rs</code> — result handling on <code>CommonsManager::with_sled_path</code></li>
+</ul>
+<hr>
+<h2>Step 5 — Write persistence proof tests</h2>
+<p><strong>File:</strong> <code>icn/crates/icn-gateway/tests/commons_integration.rs</code></p>
+<p>Add these tests (see testing plan doc for full spec):</p>
+<ol>
+<li><code>test_commons_anchor_survives_sled_drop_and_reopen</code> — Layer 1 (direct sled)</li>
+<li><code>test_commons_charter_survives_sled_drop_and_reopen</code> — Layer 1 variant for charter</li>
+<li><code>test_commons_holder_survives_sled_drop_and_reopen</code> — Layer 1 variant for holder</li>
+</ol>
+<p>These use <code>CommonsManager::with_sled_temporary()</code> so they don&#39;t need tempfile dirs.
+But to prove drop-and-reopen, they need a real path:</p>
+<pre><code class="language-rust">let tmp = tempfile::tempdir().unwrap();
+let sled_path = tmp.path().join(&quot;commons.sled&quot;);
+
+// Phase 1: write
+{
+    let mgr = CommonsManager::with_sled_path(&amp;sled_path).unwrap();
+    mgr.create_anchor_from_enrollment(...).await.unwrap();
+    // drop mgr here
+}
+
+// Phase 2: reopen
+let mgr2 = CommonsManager::with_sled_path(&amp;sled_path).unwrap();
+let anchor = mgr2.get_anchor(&amp;anchor_id).await.unwrap();
+assert!(anchor.is_some());
+</code></pre>
+<hr>
+<h2>Step 6 — Run tests</h2>
+<pre><code class="language-bash"># Unit tests for commons_store inline
+cargo test -p icn-gateway --lib -- commons_store 2&gt;&amp;1
+
+# Full gateway integration tests
+cargo test -p icn-gateway 2&gt;&amp;1 | tail -20
+</code></pre>
+<p>Fix any failures before proceeding.</p>
+<hr>
+<h2>Step 7 — Scoped fmt + clippy</h2>
+<pre><code class="language-bash">cargo fmt --all --check 2&gt;&amp;1
+# if fails: cargo fmt --all
+
+cargo clippy -p icn-gateway --all-targets -- -D warnings 2&gt;&amp;1 | tail -20
+</code></pre>
+<hr>
+<h2>Step 8 — Commit and push</h2>
+<pre><code class="language-bash">git add icn/crates/icn-gateway/src/commons_store.rs \
+        icn/crates/icn-gateway/src/commons_mgr.rs \
+        icn/crates/icn-gateway/src/server.rs \
+        icn/crates/icn-gateway/tests/commons_integration.rs
+
+git commit -m &quot;feat(gateway): wire CommonsManager to sled-backed storage
+
+Replace in-memory CommonsManager default with Arc&lt;dyn CommonsStoreBackend&gt;
+type-erased backend. server.rs now opens commons.sled when data_dir is set,
+falling back to in-memory when not configured.
+
+Adds persistence proof tests (L1 drop-and-reopen) for anchor, charter,
+and holder state. RevocationRegistry remains in-memory (out of scope).
+&quot;
+
+# push via /push skill — runs fmt+clippy+tests before pushing
+</code></pre>
+<hr>
+<h2>Verification sequence summary</h2>
+<pre><code class="language-bash">cargo check -p icn-gateway           # fast type check
+cargo test -p icn-gateway --lib      # inline tests (commons_store)
+cargo test -p icn-gateway            # full integration tests
+cargo fmt --all --check
+cargo clippy -p icn-gateway --all-targets -- -D warnings
+</code></pre>
+<hr>
+<h2>Likely failure points</h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>type mismatch</code> on <code>CommonsManager::new()</code></td>
+<td>Old call site expects <code>InMemoryCommonsStore</code></td>
+<td>Update to new default</td>
+</tr>
+<tr>
+<td><code>CommonsStore&lt;Arc&lt;dyn ...&gt;&gt;: Unpin</code> required</td>
+<td>Async trait bounds</td>
+<td>Add <code>+ Unpin</code> or use <code>Box::pin</code></td>
+</tr>
+<tr>
+<td>sled open error at startup</td>
+<td>Sled lock held by test</td>
+<td>Use <code>temporary()</code> in tests, <code>commons.sled</code> in prod</td>
+</tr>
+<tr>
+<td><code>flush()</code> not found on <code>CommonsManager</code></td>
+<td>Moved method</td>
+<td>Add to trait or keep SledCommonsStore impl</td>
+</tr>
+<tr>
+<td><code>CommonsManager</code> in handler not <code>Sync+Send</code></td>
+<td><code>Arc&lt;dyn ...&gt;</code> not <code>Sync</code></td>
+<td>Add <code>+ Send + Sync</code> bound to <code>CommonsStoreBackend</code> (already there)</td>
+</tr>
+<tr>
+<td>Handler compile error</td>
+<td>Type default mismatch</td>
+<td>Ensure handlers use <code>CommonsManager</code> (no explicit param)</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 

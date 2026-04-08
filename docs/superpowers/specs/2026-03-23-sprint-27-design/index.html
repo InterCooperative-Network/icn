@@ -1,0 +1,403 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Sprint 27 Design: Demo-Ready + Compute Story | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.qsYwu5Qs.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <nav class="nav" id="main-nav"> <div class="nav-inner"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#nav-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"></circle> <defs> <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/about">About</a></li> <li><a href="/docs" class="active">Docs</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Developer Setup</a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main>  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>superpowers</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>specs</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>2026 03 23 sprint 27 design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/superpowers/specs/2026-03-23-sprint-27-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Sprint 27 Design: Demo-Ready + Compute Story</h1>
+<p><strong>Date:</strong> 2026-03-23
+<strong>Sprint:</strong> 27
+<strong>Author:</strong> Claude Code (brainstorming session)
+<strong>Status:</strong> Approved — proceeding to implementation plan</p>
+<hr>
+<h2>Sprint Objective</h2>
+<p>Make ICN presentable for the NY Cooperative Summit (October 2026) and the May call for
+presenters. By sprint end, a presenter can run all five demo flows end-to-end without
+manual intervention, the website accurately reflects what ICN can do, and a summit
+workshop proposal draft is ready to file.</p>
+<hr>
+<h2>Narrative Rationale</h2>
+<p>Sprints 24–26 built a complete commons compute credit system: trust-gated admission,
+two-phase credit reservation, cost enforcement, idempotent cancellation. None of this
+is visible to any external audience yet.</p>
+<p>Meanwhile:</p>
+<ul>
+<li><strong>Flow 2 (patronage)</strong> and <strong>Flow 4 (reporting)</strong> are broken on K3s. Flow 2 calls
+<code>/v1/receipts/allocations</code> without <code>decision_hash</code>; <code>/receipts/chain</code> is not called
+at all in Flow 2 and needs to be added. Flow 4 calls <code>/v1/receipts/chain</code> without
+<code>decision_hash</code>. Both need: extract <code>decision_hash</code> from the GovernanceReceipt
+response and thread it into downstream receipt calls. Bug #1334&#39;s <code>Option&lt;String&gt;</code>
+fix is already live in the gateway&#39;s <code>receipts.rs</code>.</li>
+<li>The <strong>website</strong> hasn&#39;t been updated since the federation demo merged (March 13). It
+doesn&#39;t reflect the commons compute work, the current demo flows, or the project&#39;s
+current capabilities.</li>
+<li>There is <strong>no summit proposal draft</strong>. The May call for presenters is ~6 weeks away.</li>
+</ul>
+<p>A sprint that fixes the script bugs, adds a Flow 5 compute narrative, and refreshes the
+website transforms three sprints of invisible backend work into a coherent demo story
+that cooperative organizers can follow.</p>
+<hr>
+<h2>Workstreams</h2>
+<h3>WS-1: Demo Script Fixes (Flows 2 &amp; 4)</h3>
+<p><strong>Root cause:</strong> Scripts do not extract <code>decision_hash</code> from GovernanceReceipt responses
+or thread it into downstream receipt calls. Specific gaps:</p>
+<ul>
+<li>Flow 2: calls <code>/receipts/allocations</code> without <code>decision_hash</code>; does NOT call
+<code>/receipts/chain</code> at all — it needs to be added as a new step.</li>
+<li>Flow 4: calls <code>/receipts/chain</code> (line 316) without <code>decision_hash</code>.</li>
+</ul>
+<p><strong>Pre-condition:</strong> Before writing fixes, run both scripts live on K3s to confirm current
+failure modes match this analysis (the March 19 audit is 4 days old).</p>
+<p>Flow 4 additionally has federation API schema mismatch bugs (same as Flow 3 pre-PR
+#1344). The federation fix from PR #1344 needs to be ported to Flow 4&#39;s script.</p>
+<p><strong>Scope note:</strong> No Rust gateway changes expected. These are shell-script integration fixes.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>WS1-T1: Fix <code>flow-2-patronage.sh</code> — extract <code>DECISION_HASH</code> from Step 7 response,
+pass to <code>/receipts/allocations?decision_hash=</code>, add new step calling
+<code>/receipts/chain?decision_hash=</code></li>
+<li>WS1-T2: Fix <code>flow-4-reporting.sh</code> — same <code>decision_hash</code> threading; port federation
+API schema corrections from PR #1344 (field renames: <code>did</code> → <code>public_did</code>,
+vouch body restructure, clearing body restructure)</li>
+<li>WS1-T3: <code>reseed-federation-demo.sh</code> + re-audit Flows 2 &amp; 4 on K3s; confirm PROVEN</li>
+</ul>
+<hr>
+<h3>WS-2: Flow 5 — Commons Compute Demo</h3>
+<p><strong>Scenario:</strong> Finger Lakes CDN (Delta node, already in the 4-coop cluster) submits a
+compute task to the commons pool. The flow shows trust-gated admission, credit
+reservation before execution, task completion, and a settlement receipt with provenance
+chain linking back to the compute submission.</p>
+<p><strong>Actual gateway routes (confirmed from source):</strong></p>
+<ul>
+<li>Submit: <code>POST /v1/compute/submit</code></li>
+<li>Status: <code>GET /v1/compute/status/{task_hash}</code></li>
+<li>Cancel: <code>POST /v1/compute/cancel/{task_hash}</code></li>
+<li>WASM upload: <code>POST /v1/compute/wasm/upload</code></li>
+</ul>
+<p><strong>API path:</strong></p>
+<ol>
+<li>Authenticate with Delta node (<code>compute:write compute:read ledger:read</code> scopes)</li>
+<li><code>POST /v1/compute/submit</code> — submit task with <code>scope: &quot;commons&quot;</code> (e.g., &quot;route optimization&quot;)</li>
+<li>Poll <code>GET /v1/compute/status/{task_hash}</code> until status transitions from <code>Pending</code></li>
+<li>Show pre-execution credit reservation via <code>GET /v1/ledger/{coop_id}/position/{did}</code>
+(scope: <code>ledger:read</code>)</li>
+<li>On completion: query receipt chain for full provenance</li>
+<li>Authorization boundary — confirm <code>compute:write</code> scope enforcement</li>
+</ol>
+<p><strong>Target environment:</strong></p>
+<ul>
+<li>Primary: K3s (consistent with Flows 1–4; <code>kubectl port-forward</code> to Delta pod)</li>
+<li>Fallback: devnet (if compute actor not wired in the K3s deployment image)</li>
+</ul>
+<p><strong>Pre-flight:</strong> Before writing the script, probe the Delta pod compute endpoint to
+confirm the actor is live. If not: use devnet fallback, document K3s wiring as
+Sprint 28 work.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>WS2-T1: Probe compute actor on K3s Delta pod — <code>POST /v1/compute/submit</code> with minimal
+body; expect 400/422 (actor live, invalid payload) not 404/connection refused</li>
+<li>WS2-T2: Write <code>demo/scripts/flow-5-compute.sh</code> with <code>--present</code> and <code>--narrated</code> modes</li>
+<li>WS2-T3: Write <code>demo/notes/flow-5-notes.md</code> with beat-by-beat presenter narrative</li>
+<li>WS2-T4: Extend <code>demo/scripts/reseed-federation-demo.sh</code> to seed Delta node with
+compute scopes and any required initial state</li>
+<li>WS2-T5: Test end-to-end on K3s (or devnet fallback); confirm script exits 0</li>
+</ul>
+<hr>
+<h3>WS-3: Website Update</h3>
+<p><strong>Current state:</strong> Pages exist for index, about, architecture, community, roadmap, blog,
+docs. Content predates the federation demo merge. Issue #1369 (render roadmap-current.yaml)
+is open but the YAML may not be populated.</p>
+<p><strong>Target state:</strong></p>
+<ul>
+<li><code>index.astro</code>: Update hero and capability bullets to include federation + compute</li>
+<li><code>architecture.astro</code>: Add commons compute layer; show full stack:
+Identity → Trust → Governance → Ledger → Compute → Federation</li>
+<li><code>roadmap.astro</code>: Update static milestones to reflect current phase — Phase 0 ✅,
+Phase 1 ✅ (federation demo), Phase 2 (current: demo-ready), Phase 3 (planned)
+— implement #1369 YAML rendering only if <code>roadmap-current.yaml</code> is populated</li>
+<li><code>docs/demo.astro</code> (new): Step-through of all 5 demo flows for a cooperative audience
+with plain-language explanations of what each step proves. Note: <code>docs/</code> uses a
+<code>[...slug].astro</code> dynamic route — Astro 5 resolves static files before dynamic
+routes, so <code>demo.astro</code> is valid, but confirm no slug collision with existing content
+during WS3-T4.</li>
+</ul>
+<p><strong>Out of scope:</strong> Design system changes, new blog posts, SDK docs, #1368 community infra.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>WS3-T1: Audit all pages for stale content; produce change list</li>
+<li>WS3-T2: Update <code>index.astro</code> + <code>architecture.astro</code></li>
+<li>WS3-T3: Update <code>roadmap.astro</code> (static update; #1369 YAML rendering if trivial)</li>
+<li>WS3-T4: Add <code>docs/demo.astro</code> — 5-flow walkthrough page; verify build resolves correctly</li>
+<li>WS3-T5: <code>npm run build</code> + <code>npm run lint</code> + <code>npm run format -- --check</code> — all three clean</li>
+</ul>
+<hr>
+<h3>WS-4: Summit Proposal Draft</h3>
+<p><strong>Target audience:</strong> NY Cooperative Summit May call for presenters. Audience is
+cooperative organizers, workers, housing co-op members — not developers.</p>
+<p><strong>Format:</strong> 60-minute workshop — 20-min live demo + 20-min cooperative context and
+discussion + 20-min design exercise (attendees define governance rules for a
+hypothetical cooperative using ICN&#39;s parameter system).</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>WS4-T1: Write <code>docs/summit/workshop-proposal-draft.md</code> — title, 200-word description,
+3–5 learning outcomes, format, technical requirements</li>
+<li>WS4-T2: Review for cooperative-organizer register (informal, values-aligned, not
+developer-facing); apply writing-voice rules (no em dashes, declarative rhythm)</li>
+</ul>
+<hr>
+<h2>Dependencies and Sequencing</h2>
+<pre><code>WS1-T1 ──┐
+WS1-T2 ──┴─→ WS1-T3 (re-audit only after fixes)
+
+WS2-T1 → WS2-T2 → WS2-T4 → WS2-T5
+                └─→ WS2-T3 (notes can be written alongside script)
+
+WS3-T1 → WS3-T2 ─┐
+         WS3-T3 ──┴─→ WS3-T5
+         WS3-T4 ──┘
+
+WS4 has no external dependencies — can start any time
+
+WS1 and WS2 can run concurrently (different scripts)
+WS3 and WS4 can run concurrently and in parallel with WS1/WS2
+</code></pre>
+<p><strong>Recommended execution order:</strong></p>
+<ol>
+<li>WS1-T1 + WS1-T2 (fix demo scripts — highest risk, validate early)</li>
+<li>WS2-T1 (probe compute on K3s — gates all of WS2)</li>
+<li>WS1-T3 (re-audit flows 2 &amp; 4 — confirm fixes before proceeding)</li>
+<li>WS2-T2 + WS2-T3 + WS3-T1 (parallel: write Flow 5 + audit website)</li>
+<li>WS2-T4 + WS2-T5 + WS3-T2–T5 + WS4-T1 (parallel finalization)</li>
+</ol>
+<hr>
+<h2>Risks and De-Scoping Rules</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Probability</th>
+<th>Impact</th>
+<th>Mitigation / De-scope Rule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Compute actor not wired in K3s deployment</td>
+<td>Medium</td>
+<td>High</td>
+<td>Fall back to devnet for Flow 5; note K3s wiring as Sprint 28</td>
+</tr>
+<tr>
+<td>Flow 2 fix exposes deeper gateway route issues</td>
+<td>Low</td>
+<td>Medium</td>
+<td>Cap WS1 at 2 PRs; if root cause is a gateway bug, scope Flow 2 to &quot;governance PROVEN, ledger narrated as illustrative&quot;</td>
+</tr>
+<tr>
+<td>Flow 4 federation schema fix introduces regressions</td>
+<td>Low</td>
+<td>Low</td>
+<td>Flow 4 is lower-priority; if complex, drop receipt chain to &quot;illustrative&quot; and ship governance + federation as PROVEN</td>
+</tr>
+<tr>
+<td>Website scope creep</td>
+<td>Medium</td>
+<td>Low</td>
+<td>Content updates only. No new components, no design-system changes</td>
+</tr>
+<tr>
+<td>Summit proposal perfectionism</td>
+<td>Low</td>
+<td>Low</td>
+<td>Ship 80%-good draft; it&#39;s a draft</td>
+</tr>
+<tr>
+<td>#1369 YAML not populated</td>
+<td>Medium</td>
+<td>Low</td>
+<td>Update static roadmap content instead; don&#39;t build YAML renderer for empty file</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>PR Groupings</h2>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Branch</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PR-A</td>
+<td><code>fix/s27-demo-script-fixes</code></td>
+<td>flow-2 fix, flow-4 fix, reseed update (WS1)</td>
+</tr>
+<tr>
+<td>PR-B</td>
+<td><code>feat/s27-flow-5-compute</code></td>
+<td>flow-5 script, flow-5 notes, reseed extension (WS2)</td>
+</tr>
+<tr>
+<td>PR-C</td>
+<td><code>docs/s27-website-refresh</code></td>
+<td>all website page updates (WS3)</td>
+</tr>
+<tr>
+<td>PR-D</td>
+<td><code>docs/s27-summit-proposal</code></td>
+<td>summit proposal + any supporting docs (WS4)</td>
+</tr>
+</tbody></table>
+<p>PR-A merges first; PR-B depends on PR-A being green (reseed shared dependency).
+PR-C and PR-D are independent and can merge in any order.</p>
+<hr>
+<h2>Files Expected to Change</h2>
+<p><strong>WS-1 (Demo Fixes):</strong></p>
+<ul>
+<li><code>demo/scripts/flow-2-patronage.sh</code></li>
+<li><code>demo/scripts/flow-4-reporting.sh</code></li>
+<li><code>demo/scripts/reseed-federation-demo.sh</code> (minor: ensure scopes for receipt queries)</li>
+</ul>
+<p><strong>WS-2 (Flow 5):</strong></p>
+<ul>
+<li><code>demo/scripts/flow-5-compute.sh</code> ← new</li>
+<li><code>demo/notes/flow-5-notes.md</code> ← new</li>
+<li><code>demo/scripts/reseed-federation-demo.sh</code> (extend for Delta compute scopes)</li>
+</ul>
+<p><strong>WS-3 (Website):</strong></p>
+<ul>
+<li><code>website/src/pages/index.astro</code></li>
+<li><code>website/src/pages/architecture.astro</code></li>
+<li><code>website/src/pages/roadmap.astro</code></li>
+<li><code>website/src/pages/docs/demo.astro</code> ← new</li>
+</ul>
+<p><strong>WS-4 (Summit):</strong></p>
+<ul>
+<li><code>docs/summit/workshop-proposal-draft.md</code> ← new</li>
+</ul>
+<p><strong>No Rust changes expected.</strong> If a gateway bug is discovered during WS1 investigation,
+it becomes a separate issue and Sprint 27 narrates around it.</p>
+<hr>
+<h2>GitHub Issues to Create</h2>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Title</th>
+<th>Links to</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>New</td>
+<td>fix(demo): flow-2 receipt chain — thread decision_hash through steps 8–11</td>
+<td>Bug #1334</td>
+</tr>
+<tr>
+<td>New</td>
+<td>fix(demo): flow-4 receipt chain + federation schema</td>
+<td>Bug #1334, PR #1344</td>
+</tr>
+<tr>
+<td>New</td>
+<td>feat(demo): Flow 5 — Commons Compute demo script</td>
+<td>Epic #1099</td>
+</tr>
+<tr>
+<td>New</td>
+<td>chore(website): Sprint 27 content refresh — all 5 flows</td>
+<td>Issue #1369</td>
+</tr>
+<tr>
+<td>New</td>
+<td>docs(summit): workshop proposal draft for May call for presenters</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Definition of Done</h2>
+<ul>
+<li><input disabled="" type="checkbox"> <code>bash demo/scripts/flow-2-patronage.sh</code> exits 0 on K3s (post reseed)</li>
+<li><input disabled="" type="checkbox"> <code>bash demo/scripts/flow-4-reporting.sh</code> exits 0 on K3s (post reseed)</li>
+<li><input disabled="" type="checkbox"> <code>demo/scripts/flow-5-compute.sh</code> exists with <code>--present</code> and <code>--narrated</code> modes</li>
+<li><input disabled="" type="checkbox"> Flow 5 script exits 0 on K3s or devnet</li>
+<li><input disabled="" type="checkbox"> <code>demo/notes/flow-5-notes.md</code> committed with beat-by-beat narrative</li>
+<li><input disabled="" type="checkbox"> <code>reseed-federation-demo.sh</code> supports all 5 flows</li>
+<li><input disabled="" type="checkbox"> <code>cd website &amp;&amp; npm run build</code> passes; <code>npm run lint</code> clean; <code>npm run format -- --check</code> clean</li>
+<li><input disabled="" type="checkbox"> <code>website/src/pages/index.astro</code>, <code>architecture.astro</code>, <code>roadmap.astro</code> updated</li>
+<li><input disabled="" type="checkbox"> <code>website/src/pages/docs/demo.astro</code> page exists covering all 5 flows</li>
+<li><input disabled="" type="checkbox"> <code>docs/summit/workshop-proposal-draft.md</code> committed</li>
+<li><input disabled="" type="checkbox"> Sprint board: all 5 new issues closed</li>
+<li><input disabled="" type="checkbox"> Audit doc updated: all 4 original flows marked PROVEN (or explicitly narrated if
+a de-scope rule was invoked)</li>
+</ul>
+<hr>
+<h2>Recommended First 3 Moves</h2>
+<ol>
+<li><p><strong>Run the broken flows live on K3s right now.</strong> <code>bash demo/scripts/reseed-federation-demo.sh &amp;&amp; bash demo/scripts/flow-2-patronage.sh</code>. Takes 10 minutes. Confirms the exact failure points against today&#39;s deployed binary before writing a single fix — the March 19 audit is 4 days old and CI has run since then.</p>
+</li>
+<li><p><strong>Fix <code>flow-2-patronage.sh</code> decision_hash threading.</strong> Open the script at Step 7 (GovernanceReceipt call), extract <code>decision_hash</code> from the JSON response into <code>DECISION_HASH</code>, pass it as a query parameter to Steps 8–11. This is ~20 lines of shell, no Rust required. Commit and re-run.</p>
+</li>
+<li><p><strong>Probe the compute endpoint on K3s before writing Flow 5.</strong> <code>kubectl -n icn-coop-delta exec -it $(kubectl -n icn-coop-delta get pods -o name | head -1) -- curl -s -X POST http://localhost:8080/v1/compute/submit -H &#39;Content-Type: application/json&#39; -d &#39;{}&#39;</code>. If it returns 400/401/422 (any HTTP response): the route exists and the actor is live — Flow 5 targets K3s. If 404 or connection refused: target devnet and file a K3s compute-wiring issue for Sprint 28.</p>
+</li>
+</ol>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none"> <rect width="128" height="128" rx="28" fill="url(#ft-bg)"></rect> <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"></line> <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"></circle> <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"></circle> <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"></circle> <defs> <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"></stop><stop offset="1" stop-color="#0a1628"></stop></linearGradient> <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"></stop><stop offset="1" stop-color="#fb923c"></stop></linearGradient> </defs> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Project</h4> <ul> <li><a href="/about">About</a></li> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> </ul> </div> <div class="footer-col"> <h4>Resources</h4> <ul> <li><a href="/docs/GETTING_STARTED">Getting Started</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav-links')?.classList.remove('open');
+      });
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script> </body> </html> 
