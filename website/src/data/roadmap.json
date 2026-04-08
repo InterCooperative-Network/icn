@@ -1,8 +1,9 @@
 {
   "currentSprint": {
-    "number": 23,
-    "name": "Baseline Lock + Narrative Surface",
-    "status": "active"
+    "number": 28,
+    "name": "Governance Dispatch Tranches",
+    "status": "active",
+    "detail": "Sprints 24–28 shipped (commons-compute spine, Flow 5 demo, gossip fan-out fix). Current workstream: post-Sprint-28 governance dispatch tranches wiring real executors for every accepted proposal payload. Tranches 9–16 merged (TrustThreshold, BondIssuance, ShareRedemption, LeaveFederation, SdisService executor, ReconfirmSteward, ReinstateSteward, SuspendSteward). Tranche 17 (UpdateJurisdictionTier) complete locally, pending push. Tranche 18 (TerminateClearing + RevokeVouch) up next."
   },
   "stages": [
     {
