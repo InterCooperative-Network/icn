@@ -27,7 +27,55 @@ function titleFromFilename(filename: string): string {
     .replace(/\bApi\b/g, 'API')
     .replace(/\bCcl\b/g, 'CCL')
     .replace(/\bIcn\b/g, 'ICN')
-    .replace(/\bDid\b/g, 'DID');
+    .replace(/\bDid\b/g, 'DID')
+    .replace(/\bAdr\b/g, 'ADR')
+    .replace(/\bSdis\b/g, 'SDIS');
+}
+
+/**
+ * Extract a display title for a doc using the fallback chain:
+ *   1. YAML frontmatter `title:` field
+ *   2. First Markdown `# H1` heading
+ *   3. titleFromFilename(filename)
+ *
+ * Fails safely — any parse error falls through to the filename transform.
+ */
+function titleForDoc(filePath: string, filename: string): string {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+
+    // (1) YAML frontmatter title
+    if (content.startsWith('---')) {
+      const end = content.indexOf('\n---', 3);
+      if (end > 0) {
+        const frontmatter = content.slice(3, end);
+        const match = frontmatter.match(/^\s*title\s*:\s*(.+?)\s*$/m);
+        if (match) {
+          const raw = match[1].trim();
+          // Strip surrounding quotes if present
+          const unquoted = raw.replace(/^["']([\s\S]*)["']$/, '$1').trim();
+          if (unquoted.length > 0) return unquoted;
+        }
+      }
+    }
+
+    // (2) First Markdown H1
+    // Skip frontmatter block if present, then look for first `# Heading` line.
+    let body = content;
+    if (content.startsWith('---')) {
+      const end = content.indexOf('\n---', 3);
+      if (end > 0) body = content.slice(end + 4);
+    }
+    const h1Match = body.match(/^#\s+(.+?)\s*$/m);
+    if (h1Match) {
+      return h1Match[1].trim();
+    }
+  } catch {
+    // fall through
+  }
+
+  // (3) Filename fallback
+  return titleFromFilename(filename);
 }
 
 function scanDocs(): DocSection[] {
@@ -37,13 +85,13 @@ function scanDocs(): DocSection[] {
   const topLevelFiles = fs.readdirSync(docsRoot)
     .filter(f => f.endsWith('.md') && !fs.statSync(path.join(docsRoot, f)).isDirectory())
     .sort();
-  
+
   if (topLevelFiles.length > 0) {
     sections.push({
       name: 'Core',
       docs: topLevelFiles.map(f => ({
         slug: f.replace('.md', ''),
-        title: titleFromFilename(f),
+        title: titleForDoc(path.join(docsRoot, f), f),
         path: `/docs/${f.replace('.md', '')}`
       }))
     });
@@ -66,14 +114,14 @@ function scanDocs(): DocSection[] {
         } else if (entry.endsWith('.md')) {
           files.push({
             slug: `${prefix}/${entry.replace('.md', '')}`,
-            title: titleFromFilename(entry),
+            title: titleForDoc(entryPath, entry),
             path: `/docs${prefix}/${entry.replace('.md', '')}`
           });
         }
       }
       return files;
     };
-    
+
     const docs = scanDir(dirPath, `/${dir}`);
     if (docs.length > 0) {
       sections.push({
