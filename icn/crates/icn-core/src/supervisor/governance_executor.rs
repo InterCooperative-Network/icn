@@ -2365,6 +2365,53 @@ impl KernelSdisExecutor {
                     })
                 }
             }
+            SdisEffect::SanctionSteward {
+                steward_did,
+                bond_slash_amount,
+                suspend_reason,
+                reason,
+                proposal_id,
+            } => {
+                let request = icn_kernel_api::SanctionStewardRequest {
+                    steward_did: steward_did.clone(),
+                    bond_slash_amount: *bond_slash_amount,
+                    suspend_reason: suspend_reason.clone(),
+                    reason: reason.clone(),
+                    proposal_id: proposal_id.clone(),
+                };
+                let result = service.sanction_steward(request)?;
+                if result.success {
+                    info!(
+                        steward_did = %steward_did,
+                        remaining_bond = %result.remaining_bond,
+                        suspended = %result.suspended,
+                        state_change_hash = %result.state_change_hash,
+                        "Steward sanctioned (bond slashed) via governance dispatch"
+                    );
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: true,
+                        message: format!(
+                            "Steward {} sanctioned: bond_remaining={}, suspended={} -> state_hash={}",
+                            steward_did, result.remaining_bond, result.suspended, result.state_change_hash
+                        ),
+                        state_change_hash: Some(result.state_change_hash),
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                } else {
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: false,
+                        message: result
+                            .error
+                            .unwrap_or_else(|| "Sanction failed".to_string()),
+                        state_change_hash: None,
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                }
+            }
         }
     }
 }

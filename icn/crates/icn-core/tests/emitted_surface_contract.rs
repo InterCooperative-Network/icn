@@ -67,6 +67,7 @@ fn approved_emitted_effects() -> BTreeSet<&'static str> {
         "Resource::RevokeAccess",
         // SDIS effects
         "Sdis::ApproveSteward",
+        "Sdis::SanctionSteward",
         "Sdis::RevokeSteward",
         "Sdis::ReconfirmSteward",
         "Sdis::ReinstateSteward",

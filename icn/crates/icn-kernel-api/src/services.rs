@@ -2216,6 +2216,15 @@ pub trait SdisService: Send + Sync {
         &self,
         request: SuspendStewardRequest,
     ) -> Result<SuspendStewardResult, anyhow::Error>;
+
+    /// Apply a bond-slash sanction to a steward via governance dispatch.
+    ///
+    /// Deducts `bond_slash_amount` from the steward's bond and, when
+    /// `suspend_reason` is non-empty, also suspends the steward.
+    fn sanction_steward(
+        &self,
+        request: SanctionStewardRequest,
+    ) -> Result<SanctionStewardResult, anyhow::Error>;
 }
 
 /// Request to suspend a steward via governance dispatch.
@@ -2257,6 +2266,34 @@ pub struct ReinstateStewardResult {
     /// False if the steward was not suspended (no-op path).
     pub was_suspended: bool,
     /// Stable hash of the state change (for audit); empty on no-op path.
+    pub state_change_hash: String,
+    pub error: Option<String>,
+}
+
+/// Request to sanction a steward with a bond slash via governance dispatch.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SanctionStewardRequest {
+    /// DID of the steward to sanction
+    pub steward_did: String,
+    /// Amount to deduct from the steward's bond
+    pub bond_slash_amount: u64,
+    /// If non-empty, also suspend with this reason after slashing
+    pub suspend_reason: String,
+    /// Human-readable sanction rationale
+    pub reason: String,
+    /// Proposal receipt ID for audit linkage
+    pub proposal_id: String,
+}
+
+/// Result of a sanction-steward operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SanctionStewardResult {
+    pub success: bool,
+    /// Remaining bond after slash; 0 on failure.
+    pub remaining_bond: u64,
+    /// Whether the steward was also suspended.
+    pub suspended: bool,
+    /// Stable hash of the state change (for audit); empty on failure.
     pub state_change_hash: String,
     pub error: Option<String>,
 }

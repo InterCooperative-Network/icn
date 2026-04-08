@@ -8,7 +8,8 @@ use anyhow::Result;
 use icn_kernel_api::{
     AppointStewardRequest, AppointStewardResult, ReconfirmStewardRequest, ReconfirmStewardResult,
     ReinstateStewardRequest, ReinstateStewardResult, RevokeStewardRequest, RevokeStewardResult,
-    SdisService, SuspendStewardRequest, SuspendStewardResult,
+    SanctionStewardRequest, SanctionStewardResult, SdisService, SuspendStewardRequest,
+    SuspendStewardResult,
 };
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
@@ -396,6 +397,93 @@ impl SdisService for SdisServiceImpl {
                 );
                 Ok(SuspendStewardResult {
                     success: false,
+                    state_change_hash: String::new(),
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
+
+    fn sanction_steward(&self, request: SanctionStewardRequest) -> Result<SanctionStewardResult> {
+        info!(
+            steward_did = %request.steward_did,
+            bond_slash_amount = %request.bond_slash_amount,
+            proposal_id = %request.proposal_id,
+            "Sanctioning steward via governance dispatch (bond slash)"
+        );
+        let steward_did = icn_identity::Did::from_str(&request.steward_did)
+            .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
+
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let record = match self.commons.get_steward_by_did(&steward_did).await {
+                    Ok(Some(r)) => r,
+                    Ok(None) => {
+                        return Err(anyhow::anyhow!(
+                            "Steward '{}' not found — cannot sanction",
+                            request.steward_did
+                        ))
+                    }
+                    Err(e) => return Err(e),
+                };
+                let steward_id = record.id().to_hex();
+
+                // Slash bond
+                let remaining = self
+                    .commons
+                    .slash_steward_bond(&steward_id, request.bond_slash_amount)
+                    .await?;
+
+                // Optionally suspend
+                let suspended = if !request.suspend_reason.is_empty() {
+                    self.commons
+                        .suspend_steward(&steward_id, request.suspend_reason.clone())
+                        .await?;
+                    true
+                } else {
+                    false
+                };
+
+                Ok((remaining, suspended))
+            })
+        });
+
+        match result {
+            Ok((remaining_bond, suspended)) => {
+                let mut hasher = Sha256::new();
+                hasher.update(b"sdis:sanction:");
+                hasher.update(request.steward_did.as_bytes());
+                hasher.update(b":");
+                hasher.update(request.proposal_id.as_bytes());
+                hasher.update(b":");
+                hasher.update(request.bond_slash_amount.to_le_bytes());
+                let state_change_hash = format!("{:x}", hasher.finalize());
+
+                info!(
+                    steward_did = %request.steward_did,
+                    remaining_bond = %remaining_bond,
+                    suspended = %suspended,
+                    state_change_hash = %state_change_hash,
+                    "Steward sanctioned (bond slashed) in commons"
+                );
+                Ok(SanctionStewardResult {
+                    success: true,
+                    remaining_bond,
+                    suspended,
+                    state_change_hash,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                warn!(
+                    steward_did = %request.steward_did,
+                    error = %e,
+                    "Failed to sanction steward in commons"
+                );
+                Ok(SanctionStewardResult {
+                    success: false,
+                    remaining_bond: 0,
+                    suspended: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
                 })

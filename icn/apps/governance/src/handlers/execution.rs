@@ -271,13 +271,113 @@ pub fn translate_payload_to_effects(
                 duration_seconds: *duration,
                 proposal_id: decision_receipt_id.to_string(),
             })]),
-            _ => Err(TranslationError::unsupported(
-                "sdis",
-                format!(
-                    "SDIS proposal type not yet translated: {:?}",
-                    std::mem::discriminant(proposal)
+            icn_governance::sdis::SdisProposal::SanctionSteward {
+                steward,
+                penalty,
+                reason,
+                ..
+            } => {
+                use icn_governance::sdis::StewardPenalty;
+                match penalty {
+                    StewardPenalty::Warning => Ok(vec![KernelEffect::NoOp {
+                        reason: format!(
+                            "governance_warning: steward {} received a formal warning",
+                            steward
+                        ),
+                    }]),
+                    StewardPenalty::Suspension { duration } => {
+                        Ok(vec![KernelEffect::Sdis(SdisEffect::SuspendSteward {
+                            steward_did: steward.to_string(),
+                            reason: reason.clone(),
+                            duration_seconds: *duration,
+                            proposal_id: decision_receipt_id.to_string(),
+                        })])
+                    }
+                    StewardPenalty::BondSlash { amount } => {
+                        Ok(vec![KernelEffect::Sdis(SdisEffect::SanctionSteward {
+                            steward_did: steward.to_string(),
+                            bond_slash_amount: (*amount).max(0) as u64,
+                            suspend_reason: String::new(),
+                            reason: reason.clone(),
+                            proposal_id: decision_receipt_id.to_string(),
+                        })])
+                    }
+                    StewardPenalty::TierDemotion { .. } => Ok(vec![KernelEffect::NoOp {
+                        reason: "sdis_sanction_tier_demotion: deferred — UpdateJurisdictionTier infrastructure pending icn-dev Tranche 17".to_string(),
+                    }]),
+                    StewardPenalty::Removal { .. } => {
+                        Ok(vec![KernelEffect::Sdis(SdisEffect::RevokeSteward {
+                            steward_did: steward.to_string(),
+                            reason: reason.clone(),
+                        })])
+                    }
+                    StewardPenalty::Probation { duration, .. } => {
+                        // Probation maps to a timed suspension for now
+                        Ok(vec![KernelEffect::Sdis(SdisEffect::SuspendSteward {
+                            steward_did: steward.to_string(),
+                            reason: format!("probation: {reason}"),
+                            duration_seconds: *duration,
+                            proposal_id: decision_receipt_id.to_string(),
+                        })])
+                    }
+                }
+            }
+            icn_governance::sdis::SdisProposal::ModifyThreshold {
+                threshold_type,
+                new_value,
+                ..
+            } => {
+                let parameter_name =
+                    format!("sdis.threshold.{:?}", threshold_type).to_lowercase();
+                Ok(vec![KernelEffect::Protocol(ProtocolEffect::SetParameter {
+                    parameter_name,
+                    old_value_hash: String::new(),
+                    new_value_json: new_value.to_string(),
+                    effective_at: 0,
+                })])
+            }
+            icn_governance::sdis::SdisProposal::UpdateJurisdictionTier {
+                steward, reason, ..
+            } => {
+                // JurisdictionTier update requires CommonsHandle.update_jurisdiction_tier()
+                // which is not yet implemented. Wired as NoOp pending icn-dev Tranche 17.
+                Ok(vec![KernelEffect::NoOp {
+                    reason: format!(
+                        "sdis_update_jurisdiction_tier: deferred for steward {} — infrastructure pending (reason: {})",
+                        steward, reason
+                    ),
+                }])
+            }
+            icn_governance::sdis::SdisProposal::ForceKeyRotation { steward, reason } => {
+                // Key rotation enforcement requires identity layer integration.
+                // Wired as NoOp — records the governance mandate for audit trail.
+                Ok(vec![KernelEffect::NoOp {
+                    reason: format!(
+                        "sdis_force_key_rotation: governance mandate recorded for steward {} (reason: {}); enforcement via identity layer pending",
+                        steward, reason
+                    ),
+                }])
+            }
+            icn_governance::sdis::SdisProposal::ApproveAuthority { .. } => {
+                Ok(vec![KernelEffect::NoOp {
+                    reason: "sdis_approve_authority: institutional authority infra not yet implemented — governance mandate recorded".to_string(),
+                }])
+            }
+            icn_governance::sdis::SdisProposal::RevokeAuthority {
+                authority_did,
+                reason,
+                ..
+            } => Ok(vec![KernelEffect::NoOp {
+                reason: format!(
+                    "sdis_revoke_authority: institutional authority infra not yet implemented — mandate recorded for {} (reason: {})",
+                    authority_did, reason
                 ),
-            )),
+            }]),
+            icn_governance::sdis::SdisProposal::RevocationAppeal { .. } => {
+                Ok(vec![KernelEffect::NoOp {
+                    reason: "sdis_revocation_appeal: appeal outcome requires separate governance proposal — this records the appeal submission".to_string(),
+                }])
+            }
         },
 
         // Federation proposals
