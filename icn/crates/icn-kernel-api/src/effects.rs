@@ -485,6 +485,21 @@ pub enum SdisEffect {
         /// Proposal receipt ID for audit linkage.
         proposal_id: String,
     },
+    /// Slash a steward's bond as a governance-ratified sanction.
+    ///
+    /// Deducts `bond_slash_amount` from the steward's on-chain bond.
+    /// Also suspends the steward when `suspend_reason` is non-empty.
+    SanctionSteward {
+        steward_did: String,
+        /// Amount to slash from bond (governance credits).
+        bond_slash_amount: u64,
+        /// If non-empty, also suspend with this reason after slashing.
+        suspend_reason: String,
+        /// Human-readable penalty rationale for audit trail.
+        reason: String,
+        /// Proposal receipt ID for audit linkage.
+        proposal_id: String,
+    },
 }
 
 // =============================================================================
