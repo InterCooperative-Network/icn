@@ -57,5 +57,8 @@ Fonts: Inter (body), Outfit (headings), JetBrains Mono (code).
 
 ## Deployment
 
-For manual deploy: `npm run deploy` (builds and pushes to `gh-pages` branch).
-CI deployment workflow will be unified with monorepo CI in a future phase.
+**Automatic.** `.github/workflows/website-deploy.yml` builds and publishes to the `gh-pages` branch on every push to `main` that touches `website/**`, `docs/**`, or the workflow itself. Uses `peaceiris/actions-gh-pages@v4` to force-push the `website/dist/` build output to `gh-pages`. Site is served at `https://intercooperative.network` by GitHub Pages.
+
+**Manual fallback:** `npm run deploy` from `website/` still works (builds and pushes via the `gh-pages` npm package). Use this only when the workflow is broken or you need to push a one-off deploy without a main commit.
+
+**Triggering without content changes:** `gh workflow run website-deploy.yml` — useful for re-deploying after a docs/stats change that didn't modify `website/`.
