@@ -977,6 +977,60 @@ pub struct FederationLeaveResult {
     pub error: Option<String>,
 }
 
+/// Request to terminate a bilateral clearing agreement.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationTerminateClearingRequest {
+    /// DID or ID of the cooperative initiating termination
+    pub initiating_coop_did: String,
+    /// DID or ID of the partner cooperative
+    pub partner_coop_did: String,
+    /// Human-readable reason for audit trail
+    pub reason: String,
+    /// Decision receipt ID that authorized this termination
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this termination
+    pub decision_hash: String,
+}
+
+/// Result of a clearing termination operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationTerminateClearingResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// The agreement ID that was terminated (empty on failure)
+    pub agreement_id: String,
+    /// State change hash (for verification)
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Request to revoke a previously-issued vouch.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationRevokeVouchRequest {
+    /// DID or ID of the cooperative revoking its vouch
+    pub revoker_did: String,
+    /// DID or ID of the cooperative whose vouch is being revoked
+    pub target_coop_did: String,
+    /// Human-readable reason for audit trail
+    pub reason: String,
+    /// Decision receipt ID that authorized this revocation
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this revocation
+    pub decision_hash: String,
+}
+
+/// Result of a vouch revocation operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationRevokeVouchResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash (for verification)
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
 /// Abstract federation management service.
 ///
 /// The kernel uses this to register cooperatives, record vouches, and
@@ -1038,6 +1092,25 @@ pub trait FederationService: Send + Sync {
         &self,
         request: FederationClearingSettleRequest,
     ) -> Result<FederationClearingSettleResult, anyhow::Error>;
+
+    /// Terminate an existing bilateral clearing agreement.
+    ///
+    /// Removes the agreement and all position tracking for the clearing relationship
+    /// between `initiating_coop_did` and `partner_coop_did`.
+    /// Returns state_change_hash for verification.
+    fn terminate_clearing(
+        &self,
+        request: FederationTerminateClearingRequest,
+    ) -> Result<FederationTerminateClearingResult, anyhow::Error>;
+
+    /// Revoke a previously-issued vouch for another cooperative.
+    ///
+    /// Removes the trust attestation from the registry.
+    /// Returns state_change_hash for verification.
+    fn revoke_vouch(
+        &self,
+        request: FederationRevokeVouchRequest,
+    ) -> Result<FederationRevokeVouchResult, anyhow::Error>;
 
     /// Query the current clearing position for a bilateral agreement.
     ///

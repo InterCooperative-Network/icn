@@ -353,6 +353,30 @@ pub enum FederationEffect {
         #[serde(default)]
         decision_hash: String,
     },
+    /// Terminate an existing bilateral clearing agreement.
+    ///
+    /// Removes the agreement and all position tracking.  Initiated by one
+    /// cooperative against its current clearing partner.
+    TerminateClearing {
+        /// The cooperative initiating termination (DID or cooperative ID).
+        initiating_coop_did: String,
+        /// The partner cooperative whose clearing agreement is being terminated.
+        partner_coop_did: String,
+        /// Human-readable reason for audit trail.
+        reason: String,
+    },
+    /// Revoke a previously-issued vouch for another cooperative.
+    ///
+    /// Removes the trust attestation from the registry, reducing the target's
+    /// federated trust score.
+    RevokeVouch {
+        /// The cooperative revoking its vouch (DID or cooperative ID).
+        revoker_did: String,
+        /// The cooperative whose vouch is being revoked.
+        target_coop_did: String,
+        /// Human-readable reason for audit trail.
+        reason: String,
+    },
 }
 
 // =============================================================================

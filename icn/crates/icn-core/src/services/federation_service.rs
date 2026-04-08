@@ -17,8 +17,10 @@ use icn_kernel_api::services::TreasuryOperationType;
 use icn_kernel_api::{
     FederationClearingRequest, FederationClearingResult, FederationClearingSettleRequest,
     FederationClearingSettleResult, FederationJoinRequest, FederationJoinResult,
-    FederationLeaveRequest, FederationLeaveResult, FederationService, FederationVouchRequest,
-    FederationVouchResult, LedgerService, TreasuryEntryRequest,
+    FederationLeaveRequest, FederationLeaveResult, FederationRevokeVouchRequest,
+    FederationRevokeVouchResult, FederationService, FederationTerminateClearingRequest,
+    FederationTerminateClearingResult, FederationVouchRequest, FederationVouchResult,
+    LedgerService, TreasuryEntryRequest,
 };
 use sha2::{Digest, Sha256};
 use tracing::info;
@@ -634,6 +636,128 @@ impl FederationService for FederationServiceImpl {
                     transfers_settled: 0,
                     state_change_hash: String::new(),
                     ledger_entry_hash: None,
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
+
+    fn terminate_clearing(
+        &self,
+        request: FederationTerminateClearingRequest,
+    ) -> Result<FederationTerminateClearingResult> {
+        let clearing = match &self.clearing {
+            Some(c) => c,
+            None => {
+                return Ok(FederationTerminateClearingResult {
+                    success: false,
+                    agreement_id: String::new(),
+                    state_change_hash: String::new(),
+                    error: Some(
+                        "Clearing manager not configured — wire FederationServiceImpl::with_clearing_manager in supervisor"
+                            .to_string(),
+                    ),
+                });
+            }
+        };
+
+        info!(
+            initiating_coop = %request.initiating_coop_did,
+            partner_coop = %request.partner_coop_did,
+            reason = %request.reason,
+            decision_receipt_id = %request.decision_receipt_id,
+            "Terminating bilateral clearing agreement via governance"
+        );
+
+        match clearing.terminate_agreement(&request.initiating_coop_did, &request.partner_coop_did)
+        {
+            Ok(agreement_id) => {
+                let mut hasher = Sha256::new();
+                hasher.update(b"federation:terminate_clearing:");
+                hasher.update(agreement_id.as_bytes());
+                hasher.update(b":");
+                hasher.update(request.decision_receipt_id.as_bytes());
+                let state_change_hash = format!("{:x}", hasher.finalize());
+
+                info!(
+                    agreement_id = %agreement_id,
+                    state_change_hash = %state_change_hash,
+                    "Clearing agreement terminated"
+                );
+
+                Ok(FederationTerminateClearingResult {
+                    success: true,
+                    agreement_id,
+                    state_change_hash,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                tracing::warn!(
+                    initiating_coop = %request.initiating_coop_did,
+                    partner_coop = %request.partner_coop_did,
+                    error = %e,
+                    "Clearing termination failed"
+                );
+                Ok(FederationTerminateClearingResult {
+                    success: false,
+                    agreement_id: String::new(),
+                    state_change_hash: String::new(),
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
+
+    fn revoke_vouch(
+        &self,
+        request: FederationRevokeVouchRequest,
+    ) -> Result<FederationRevokeVouchResult> {
+        info!(
+            revoker = %request.revoker_did,
+            target = %request.target_coop_did,
+            reason = %request.reason,
+            decision_receipt_id = %request.decision_receipt_id,
+            "Revoking vouch via governance"
+        );
+
+        match self
+            .registry
+            .remove_vouch(&request.revoker_did, &request.target_coop_did)
+        {
+            Ok(()) => {
+                let mut hasher = Sha256::new();
+                hasher.update(b"federation:revoke_vouch:");
+                hasher.update(request.revoker_did.as_bytes());
+                hasher.update(b":");
+                hasher.update(request.target_coop_did.as_bytes());
+                hasher.update(b":");
+                hasher.update(request.decision_receipt_id.as_bytes());
+                let state_change_hash = format!("{:x}", hasher.finalize());
+
+                info!(
+                    revoker = %request.revoker_did,
+                    target = %request.target_coop_did,
+                    state_change_hash = %state_change_hash,
+                    "Vouch revoked"
+                );
+
+                Ok(FederationRevokeVouchResult {
+                    success: true,
+                    state_change_hash,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                tracing::warn!(
+                    revoker = %request.revoker_did,
+                    target = %request.target_coop_did,
+                    error = %e,
+                    "Vouch revocation failed"
+                );
+                Ok(FederationRevokeVouchResult {
+                    success: false,
+                    state_change_hash: String::new(),
                     error: Some(e.to_string()),
                 })
             }

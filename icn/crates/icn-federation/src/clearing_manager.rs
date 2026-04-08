@@ -588,6 +588,45 @@ impl ClearingManager {
         reports
     }
 
+    /// Terminate a bilateral clearing agreement between two cooperatives.
+    ///
+    /// Looks up the agreement by the partner cooperative ID (either side), removes
+    /// it from the durable store, and drops the associated position tracking.
+    /// Returns the terminated agreement ID.
+    ///
+    /// Fails with `ClearingAgreementNotFound` if no agreement exists between the
+    /// own coop and the given partner.
+    pub fn terminate_agreement(&self, own_coop: &str, partner_coop: &str) -> Result<String> {
+        let agreement_id = self.find_agreement(own_coop, partner_coop)?;
+
+        // Remove agreement
+        {
+            let mut agreements = self.agreements.write().unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            });
+            agreements.remove(&agreement_id);
+        }
+
+        // Remove associated position tracking
+        {
+            let mut positions = self.positions.write().unwrap_or_else(|poisoned| {
+                warn!("Positions lock poisoned, recovering");
+                poisoned.into_inner()
+            });
+            positions.remove(&agreement_id);
+        }
+
+        info!(
+            agreement_id = %agreement_id,
+            own_coop = %own_coop,
+            partner_coop = %partner_coop,
+            "Bilateral clearing agreement terminated via governance"
+        );
+
+        Ok(agreement_id)
+    }
+
     /// Find agreement between two cooperatives
     fn find_agreement(&self, coop_a: &str, coop_b: &str) -> Result<String> {
         let agreements = self.agreements.read().unwrap_or_else(|poisoned| {
