@@ -57,6 +57,8 @@ fn approved_emitted_effects() -> BTreeSet<&'static str> {
         "Federation::LeaveFederation",
         "Federation::EstablishClearing",
         "Federation::VouchForCoop",
+        "Federation::TerminateClearing",
+        "Federation::RevokeVouch",
         // Dispute effects
         "Dispute::ResolveDispute",
         "Dispute::RollbackLedger",
