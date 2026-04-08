@@ -564,7 +564,27 @@ fn translate_federation_proposal(
                 attestation_hash: String::new(),
             },
         )]),
-        // Fallback for other federation proposals
+        FederationProposal::TerminateClearing {
+            partner_coop_id,
+            reason,
+        } => Ok(vec![KernelEffect::Federation(
+            FederationEffect::TerminateClearing {
+                initiating_coop_did: String::new(),
+                partner_coop_did: partner_coop_id.clone(),
+                reason: reason.clone(),
+            },
+        )]),
+        FederationProposal::RevokeVouch {
+            target_coop_id,
+            reason,
+        } => Ok(vec![KernelEffect::Federation(
+            FederationEffect::RevokeVouch {
+                revoker_did: String::new(),
+                target_coop_did: target_coop_id.clone(),
+                reason: reason.clone(),
+            },
+        )]),
+        // Fallback for other federation proposals (UpdateFederationPolicy etc.)
         _ => Err(TranslationError::unsupported(
             "federation_proposal",
             format!(
@@ -990,6 +1010,58 @@ mod tests {
                 assert_eq!(decision_hash, "hash-surplus-1");
             }
             other => panic!("expected DistributeSurplus effect, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_translate_terminate_clearing() {
+        let payload = icn_governance::ProposalPayload::Federation(
+            icn_governance::FederationProposal::TerminateClearing {
+                partner_coop_id: "coop-beta".to_string(),
+                reason: "persistent imbalance violations".to_string(),
+            },
+        );
+        let effects =
+            translate_payload_to_effects(&payload, "receipt-tc-1", "hash-tc-1", "coop-alpha")
+                .expect("TerminateClearing should translate");
+        assert_eq!(effects.len(), 1);
+        match &effects[0] {
+            KernelEffect::Federation(
+                icn_kernel_api::effects::FederationEffect::TerminateClearing {
+                    initiating_coop_did: _,
+                    partner_coop_did,
+                    reason,
+                },
+            ) => {
+                assert_eq!(partner_coop_did, "coop-beta");
+                assert_eq!(reason, "persistent imbalance violations");
+            }
+            other => panic!("expected TerminateClearing effect, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_translate_revoke_vouch() {
+        let payload = icn_governance::ProposalPayload::Federation(
+            icn_governance::FederationProposal::RevokeVouch {
+                target_coop_id: "coop-gamma".to_string(),
+                reason: "governance misconduct".to_string(),
+            },
+        );
+        let effects =
+            translate_payload_to_effects(&payload, "receipt-rv-1", "hash-rv-1", "coop-alpha")
+                .expect("RevokeVouch should translate");
+        assert_eq!(effects.len(), 1);
+        match &effects[0] {
+            KernelEffect::Federation(icn_kernel_api::effects::FederationEffect::RevokeVouch {
+                revoker_did: _,
+                target_coop_did,
+                reason,
+            }) => {
+                assert_eq!(target_coop_did, "coop-gamma");
+                assert_eq!(reason, "governance misconduct");
+            }
+            other => panic!("expected RevokeVouch effect, got {other:?}"),
         }
     }
 }

@@ -1368,6 +1368,74 @@ impl FederationExecutor for KernelFederationExecutor {
                         })
                     }
                 }
+                FederationOperationType::TerminateClearing => {
+                    let partner_coop_did = operation.target_id.clone().unwrap_or_default();
+                    let log_partner = partner_coop_did.clone();
+                    let request = icn_kernel_api::FederationTerminateClearingRequest {
+                        initiating_coop_did: operation.coop_did.clone(),
+                        partner_coop_did,
+                        reason: String::new(), // reason not carried through FederationOperation
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: operation.decision_hash.clone().unwrap_or_default(),
+                    };
+
+                    let result = service.terminate_clearing(request)?;
+
+                    if result.success {
+                        tracing::info!(
+                            agreement_id = %result.agreement_id,
+                            state_change_hash = %result.state_change_hash,
+                            "Bilateral clearing agreement terminated with durable state"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Clearing terminated: {} <-> {} (agreement={}) -> state_hash={}",
+                                operation.coop_did,
+                                log_partner,
+                                result.agreement_id,
+                                result.state_change_hash
+                            )],
+                        })
+                    } else {
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        })
+                    }
+                }
+                FederationOperationType::RevokeVouch => {
+                    let target_coop_did = operation.target_id.clone().unwrap_or_default();
+                    let log_target = target_coop_did.clone();
+                    let request = icn_kernel_api::FederationRevokeVouchRequest {
+                        revoker_did: operation.coop_did.clone(),
+                        target_coop_did,
+                        reason: String::new(), // reason not carried through FederationOperation
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: operation.decision_hash.clone().unwrap_or_default(),
+                    };
+
+                    let result = service.revoke_vouch(request)?;
+
+                    if result.success {
+                        tracing::info!(
+                            state_change_hash = %result.state_change_hash,
+                            "Vouch revoked with durable state"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Vouch revoked: {} -/-> {} -> state_hash={}",
+                                operation.coop_did, log_target, result.state_change_hash
+                            )],
+                        })
+                    } else {
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        })
+                    }
+                }
             }
         } else {
             // No service configured - return failure instead of lying

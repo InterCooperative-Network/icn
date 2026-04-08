@@ -133,6 +133,10 @@ pub enum FederationOperationType {
     /// Settle net positions for a bilateral clearing agreement and emit a
     /// ledger transfer entry for the net amount.
     SettleClearing,
+    /// Terminate an existing bilateral clearing agreement.
+    TerminateClearing,
+    /// Revoke a previously-issued vouch for another cooperative.
+    RevokeVouch,
 }
 
 /// Federation operation request from governance
@@ -638,6 +642,34 @@ pub fn federation_effect_to_operation(effect: &FederationEffect) -> FederationOp
             } else {
                 Some(decision_hash.clone())
             },
+            settlement_interval: None,
+            max_imbalance: None,
+            source_agreement_id: None,
+        },
+        FederationEffect::TerminateClearing {
+            initiating_coop_did,
+            partner_coop_did,
+            reason: _,
+        } => FederationOperation {
+            operation_type: FederationOperationType::TerminateClearing,
+            coop_did: initiating_coop_did.clone(),
+            target_id: Some(partner_coop_did.clone()),
+            agreement_hash: None,
+            decision_hash: None,
+            settlement_interval: None,
+            max_imbalance: None,
+            source_agreement_id: None,
+        },
+        FederationEffect::RevokeVouch {
+            revoker_did,
+            target_coop_did,
+            reason: _,
+        } => FederationOperation {
+            operation_type: FederationOperationType::RevokeVouch,
+            coop_did: revoker_did.clone(),
+            target_id: Some(target_coop_did.clone()),
+            agreement_hash: None,
+            decision_hash: None,
             settlement_interval: None,
             max_imbalance: None,
             source_agreement_id: None,
