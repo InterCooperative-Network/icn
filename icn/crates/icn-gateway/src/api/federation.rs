@@ -1046,7 +1046,9 @@ mod tests {
         use icn_kernel_api::{
             ClearingPositionView, FederationClearingRequest, FederationClearingResult,
             FederationClearingSettleRequest, FederationClearingSettleResult, FederationJoinRequest,
-            FederationJoinResult, FederationService, FederationVouchRequest, FederationVouchResult,
+            FederationJoinResult, FederationRevokeVouchRequest, FederationRevokeVouchResult,
+            FederationService, FederationTerminateClearingRequest,
+            FederationTerminateClearingResult, FederationVouchRequest, FederationVouchResult,
         };
 
         // Stub service that records calls and returns a known ClearingPositionView.
@@ -1084,6 +1086,18 @@ mod tests {
                 _req: FederationClearingSettleRequest,
             ) -> anyhow::Result<FederationClearingSettleResult> {
                 unimplemented!("test stub: settle_clearing should not be called")
+            }
+            fn terminate_clearing(
+                &self,
+                _req: FederationTerminateClearingRequest,
+            ) -> anyhow::Result<FederationTerminateClearingResult> {
+                unimplemented!("test stub: terminate_clearing should not be called")
+            }
+            fn revoke_vouch(
+                &self,
+                _req: FederationRevokeVouchRequest,
+            ) -> anyhow::Result<FederationRevokeVouchResult> {
+                unimplemented!("test stub: revoke_vouch should not be called")
             }
             fn get_clearing_position(
                 &self,
@@ -1234,8 +1248,9 @@ mod tests {
         use icn_kernel_api::{
             FederationClearingRequest, FederationClearingResult, FederationClearingSettleRequest,
             FederationClearingSettleResult, FederationJoinRequest, FederationJoinResult,
-            FederationLeaveRequest, FederationLeaveResult, FederationVouchRequest,
-            FederationVouchResult,
+            FederationLeaveRequest, FederationLeaveResult, FederationRevokeVouchRequest,
+            FederationRevokeVouchResult, FederationTerminateClearingRequest,
+            FederationTerminateClearingResult, FederationVouchRequest, FederationVouchResult,
         };
         struct Stub;
         impl FederationService for Stub {
@@ -1267,6 +1282,18 @@ mod tests {
                 &self,
                 _: FederationClearingSettleRequest,
             ) -> anyhow::Result<FederationClearingSettleResult> {
+                unimplemented!()
+            }
+            fn terminate_clearing(
+                &self,
+                _: FederationTerminateClearingRequest,
+            ) -> anyhow::Result<FederationTerminateClearingResult> {
+                unimplemented!()
+            }
+            fn revoke_vouch(
+                &self,
+                _: FederationRevokeVouchRequest,
+            ) -> anyhow::Result<FederationRevokeVouchResult> {
                 unimplemented!()
             }
             fn get_clearing_position(&self, _: &str) -> anyhow::Result<ClearingPositionView> {
