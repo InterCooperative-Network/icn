@@ -12,16 +12,29 @@ if (fs.existsSync(archPath)) {
 }
 ---
 
-<Layout title="Architecture" activeNav="architecture">
-  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
-    <div class="container">
-      <div class="section-header" style="text-align: left; max-width: none;">
+<Layout title="Architecture reference" activeNav="architecture" description="The technical architecture reference for ICN — kernel/app separation, the meaning firewall, and the subsystems that make the substrate work. Synced from docs/ARCHITECTURE.md.">
+  <section class="section arch-intro">
+    <div class="container narrow">
+      <div class="ref-banner">
+        <span class="ref-label">Technical reference layer</span>
+        <p class="ref-text">
+          This page is the deep technical architecture of ICN, synced directly from
+          <code>docs/ARCHITECTURE.md</code> in the main repository. It is written for developers,
+          architects, and technical evaluators.
+        </p>
+        <p class="ref-text">
+          If you are trying to understand ICN as an institution rather than as a codebase, start with
+          <a href="/what-is-icn">What is ICN</a> or <a href="/how-it-works">How it Works</a>.
+          Those pages describe the same system in plain language, without the crate map.
+        </p>
+      </div>
+
+      <div class="page-hero">
         <span class="badge badge-blue">System Design</span>
         <h1>Architecture</h1>
-        <p>
-          A deep dive into the Constraint Engine Model, kernel/app separation, 
-          and the subsystems that make ICN work. This document is synced from 
-          <code>docs/ARCHITECTURE.md</code> in the main repository.
+        <p class="lead">
+          Kernel/app separation, the meaning firewall, the actor runtime, and the subsystems that make ICN work —
+          at the level of detail serious readers want.
         </p>
       </div>
     </div>
@@ -55,19 +68,82 @@ if (fs.existsSync(archPath)) {
   <section class="section">
     <div class="container-narrow">
       <article class="prose" set:html={archHtml} />
-      
-      <div class="doc-footer" style="margin-top: var(--space-3xl); padding-top: var(--space-xl); border-top: 1px solid var(--border-subtle);">
-        <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ARCHITECTURE.md" target="_blank" class="btn btn-ghost">View source on GitHub →</a>
+
+      <div class="doc-footer">
+        <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener" class="btn btn-ghost">View source on GitHub →</a>
+        <a href="/how-it-works" class="btn btn-ghost">Public explanation →</a>
+        <a href="/for-developers" class="btn btn-ghost">For Developers</a>
       </div>
     </div>
   </section>
 </Layout>
 
 <style>
+  .arch-intro {
+    padding-top: calc(64px + var(--space-3xl));
+  }
+  .narrow { max-width: 760px; margin: 0 auto; }
+
+  .ref-banner {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-left: 3px solid var(--accent-blue);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg) var(--space-xl);
+    margin-bottom: var(--space-2xl);
+  }
+  .ref-label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent-blue);
+    margin-bottom: var(--space-sm);
+  }
+  .ref-text {
+    margin: 0 0 var(--space-sm);
+    color: var(--text-muted);
+    line-height: 1.65;
+    font-size: 0.9375rem;
+  }
+  .ref-text:last-child { margin-bottom: 0; }
+  .ref-text code {
+    font-size: 0.85em;
+    background: var(--bg-surface);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+
+  .page-hero {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    align-items: flex-start;
+  }
+  .page-hero .badge { align-self: flex-start; }
+  .page-hero h1 { margin: 0; }
+  .lead {
+    font-size: 1.0625rem;
+    color: var(--text-body);
+    line-height: 1.6;
+    margin: 0;
+    max-width: 40em;
+  }
+
   .arch-overview-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: var(--space-lg);
+  }
+
+  .doc-footer {
+    margin-top: var(--space-3xl);
+    padding-top: var(--space-xl);
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
   }
 
   @media (max-width: 1100px) {

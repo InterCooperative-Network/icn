@@ -1,0 +1,98 @@
+---
+// Icon.astro — the canonical ICN icon renderer.
+//
+// Usage:
+//   <Icon name="identity" />                                decorative, paired with text
+//   <Icon name="identity" label="Identity" />               standalone, labeled
+//   <Icon name="identity" size={24} />                      custom size
+//   <Icon name="identity" class="some-modifier" />          class passthrough
+//
+// Rules:
+//   - When `label` is provided, the SVG is treated as meaningful
+//     (role="img", aria-label set).
+//   - When `label` is absent, the SVG is treated as decorative
+//     (aria-hidden="true"), which is correct when the icon sits
+//     next to visible text that already names it.
+//   - `focusable="false"` is always set so the icon never traps tab focus.
+//   - Colors come from the parent element via currentColor — never baked in.
+//
+// See docs/design-language/brief-v0.md and
+// docs/design-language/accessibility.md for the rules this component enforces.
+
+import { ICONS, type IconName } from '../data/icons';
+
+export interface Props {
+  /** Canonical concept id. Must exist in ICONS. */
+  name: IconName;
+  /** Pixel size (width and height). Defaults to 20. */
+  size?: number;
+  /** Accessible label. If omitted, the icon is marked decorative. */
+  label?: string;
+  /** Extra class names for the <svg>. */
+  class?: string;
+  /** Stroke width override. Defaults to 1.5. */
+  strokeWidth?: number;
+}
+
+const {
+  name,
+  size = 20,
+  label,
+  class: className,
+  strokeWidth = 1.5,
+} = Astro.props;
+
+const icon = ICONS[name];
+if (!icon) {
+  throw new Error(
+    `Icon "${name}" not found. Add it to src/data/icons.ts and docs/design-language/concept-map.md.`
+  );
+}
+
+const isDecorative = !label;
+const accessibilityAttrs = isDecorative
+  ? { 'aria-hidden': 'true' }
+  : { role: 'img', 'aria-label': label };
+---
+
+<svg
+  class:list={['icon', `icon-${name}`, className]}
+  width={size}
+  height={size}
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width={strokeWidth}
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  focusable="false"
+  {...accessibilityAttrs}
+>
+  {icon.paths.map((d) => <path d={d} />)}
+  {
+    icon.extras?.map((shape) => {
+      if (shape.type === 'circle') {
+        return (
+          <circle
+            cx={shape.cx}
+            cy={shape.cy}
+            r={shape.r}
+            fill={shape.fill ?? 'none'}
+          />
+        );
+      }
+      if (shape.type === 'line') {
+        return <line x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} />;
+      }
+      return null;
+    })
+  }
+</svg>
+
+<style>
+  .icon {
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+</style>

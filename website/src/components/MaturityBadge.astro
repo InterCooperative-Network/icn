@@ -1,0 +1,74 @@
+---
+// MaturityBadge.astro — the inline "truth-state" pill used on headings
+// to mark which maturity band a subsystem or claim sits in.
+//
+// Canonical bands (see docs/design-language/concept-map.md):
+//   strong    — implemented, integrated, load-bearing
+//   advancing — actively being built, real progress, not yet reliable
+//   maturing  — real implementation, but surfaces/integrations still lag
+//   notyet    — scoped but not currently active
+//   behind    — capability exists underneath, interface still catching up
+//
+// Every band has a color (reinforcement only) and a text label (the source
+// of truth). Meaning never depends on color alone.
+//
+// Usage:
+//   <MaturityBadge band="strong" />                        uses default label
+//   <MaturityBadge band="behind" label="behind the system" /> custom label
+
+export type Band = 'strong' | 'advancing' | 'maturing' | 'notyet' | 'behind';
+
+export interface Props {
+  band: Band;
+  /** Override the default label. Defaults are the canonical forms. */
+  label?: string;
+}
+
+const DEFAULT_LABELS: Record<Band, string> = {
+  strong: 'strong today',
+  advancing: 'advancing now',
+  maturing: 'real but maturing',
+  notyet: 'not yet',
+  behind: 'behind the system',
+};
+
+const { band, label } = Astro.props;
+const displayLabel = label ?? DEFAULT_LABELS[band];
+---
+
+<span class:list={['maturity-badge', `band-${band}`]}>{displayLabel}</span>
+
+<style>
+  .maturity-badge {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.2em 0.65em;
+    border-radius: 999px;
+    border: 1px solid var(--border-default);
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .maturity-badge.band-strong {
+    color: var(--accent-green);
+    border-color: rgba(74, 222, 128, 0.35);
+  }
+  .maturity-badge.band-advancing {
+    color: var(--accent-teal);
+    border-color: rgba(45, 212, 191, 0.35);
+  }
+  .maturity-badge.band-maturing {
+    color: var(--accent-amber);
+    border-color: rgba(251, 146, 60, 0.35);
+  }
+  .maturity-badge.band-notyet,
+  .maturity-badge.band-behind {
+    color: var(--text-muted);
+    border-color: var(--border-default);
+  }
+</style>

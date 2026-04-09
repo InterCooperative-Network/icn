@@ -1,0 +1,465 @@
+---
+// ReadingLadder.astro — the public-narrative reading-order indicator.
+//
+// Renders the canonical 5-step ladder defined in src/data/readingOrder.ts
+// at the bottom of every public narrative page, marking the reader's
+// current position and showing previous/next destinations.
+//
+// Design rules:
+//   - shows the full ladder, not just the immediate neighbors,
+//     so the reader sees the whole sequence at a glance
+//   - uses the existing station-number mono pill grammar from ClosureLoop
+//   - "current" state carries a teal accent + dot marker AND a label
+//     ("you are here") so meaning never depends on color alone
+//   - works on mobile with a single-column stack
+//   - works in grayscale: current step is distinguishable by its dot
+//     marker, its border, and its label
+//   - the homepage, /about, /architecture, /community, /blog are NOT
+//     part of the ladder and should not render this component
+//   - step 5 is a fork (For Cooperatives | For Developers); rendered as
+//     a parallel pair under a shared "05" number
+//
+// Usage:
+//   <ReadingLadder current="what-is-icn" />
+//   <ReadingLadder current="for-cooperatives" />
+//
+// Optional slot for page-specific alt CTAs that are not part of the
+// ladder (e.g. "GitHub ↗" or "Back to How It Works"):
+//   <ReadingLadder current="how-it-works">
+//     <a slot="extras" href="...">...</a>
+//   </ReadingLadder>
+
+import {
+  LADDER_STEPS,
+  LADDER_FORK,
+  getNeighbors,
+  type LadderSlug,
+} from '../data/readingOrder';
+
+export interface Props {
+  current: LadderSlug;
+}
+
+const { current } = Astro.props;
+
+const neighbors = getNeighbors(current);
+
+// Helper: is this step the current one?
+const isCurrent = (slug: string) => slug === current;
+
+// Helper: type guard for the fork's "next"
+function isFork(
+  next: ReturnType<typeof getNeighbors>['next']
+): next is typeof LADDER_FORK {
+  return next !== null && 'options' in next;
+}
+---
+
+<nav class="reading-ladder" aria-label="Public reading order">
+  <div class="ladder-eyebrow">Reading order</div>
+
+  <ol class="ladder-rail" role="list">
+    {LADDER_STEPS.map((step) => (
+      <li class:list={['ladder-step', { 'is-current': isCurrent(step.slug) }]}>
+        {isCurrent(step.slug) ? (
+          <div class="ladder-step-inner">
+            <span class="ladder-marker" aria-hidden="true"></span>
+            <span class="ladder-num">{step.n}</span>
+            <span class="ladder-label">{step.label}</span>
+            <span class="ladder-here">you are here</span>
+          </div>
+        ) : (
+          <a href={step.href} class="ladder-step-inner ladder-link">
+            <span class="ladder-num">{step.n}</span>
+            <span class="ladder-label">{step.label}</span>
+          </a>
+        )}
+      </li>
+    ))}
+
+    <li class:list={[
+      'ladder-step',
+      'ladder-step-fork',
+      { 'is-current': LADDER_FORK.options.some((o) => isCurrent(o.slug)) },
+    ]}>
+      <div class="ladder-fork">
+        <span class="ladder-fork-num">{LADDER_FORK.n}</span>
+        <div class="ladder-fork-options">
+          {LADDER_FORK.options.map((opt) => (
+            isCurrent(opt.slug) ? (
+              <div class="ladder-fork-opt is-current">
+                <span class="ladder-marker" aria-hidden="true"></span>
+                <span class="ladder-label">{opt.label}</span>
+                <span class="ladder-here">you are here</span>
+              </div>
+            ) : (
+              <a href={opt.href} class="ladder-fork-opt ladder-link">
+                <span class="ladder-label">{opt.label}</span>
+              </a>
+            )
+          ))}
+        </div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="ladder-navigation">
+    {neighbors.prev && (
+      <a href={neighbors.prev.href} class="ladder-nav ladder-nav-prev">
+        <span class="ladder-nav-eyebrow">← Previous</span>
+        <span class="ladder-nav-label">{neighbors.prev.label}</span>
+      </a>
+    )}
+    {neighbors.next && (
+      <div class="ladder-nav-next-wrap">
+        {isFork(neighbors.next) ? (
+          <>
+            <span class="ladder-nav-eyebrow">Next — pick one →</span>
+            <div class="ladder-nav-fork">
+              {neighbors.next.options.map((opt) => (
+                <a href={opt.href} class="ladder-nav ladder-nav-next">
+                  <span class="ladder-nav-label">{opt.label}</span>
+                </a>
+              ))}
+            </div>
+          </>
+        ) : (
+          <a href={neighbors.next.href} class="ladder-nav ladder-nav-next">
+            <span class="ladder-nav-eyebrow">Next →</span>
+            <span class="ladder-nav-label">{neighbors.next.label}</span>
+          </a>
+        )}
+      </div>
+    )}
+  </div>
+
+  {Astro.slots.has('extras') && (
+    <div class="ladder-extras">
+      <slot name="extras" />
+    </div>
+  )}
+</nav>
+
+<style>
+  .reading-ladder {
+    --ladder-accent: var(--accent-teal);
+    --ladder-rail: var(--border-default);
+    margin: 0;
+    padding: var(--space-xl) 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  .ladder-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  /* The rail: shows ALL five steps so the reader sees the sequence
+     as a whole, not just the immediate neighbors. Mobile-first stack. */
+  .ladder-rail {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .ladder-step {
+    position: relative;
+  }
+
+  .ladder-step-inner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out);
+  }
+
+  .ladder-link:hover {
+    border-color: var(--ladder-accent);
+    background: var(--bg-card-hover);
+  }
+
+  .ladder-num {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    min-width: 1.75em;
+  }
+
+  .ladder-label {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Current step: teal-bordered, with a dot marker AND a "you are here"
+     label. Color is reinforcement; the marker dot and the label carry the
+     meaning. Grayscale-safe. */
+  .ladder-step.is-current .ladder-step-inner,
+  .ladder-step.is-current .ladder-fork-opt.is-current {
+    border-color: var(--ladder-accent);
+    background: var(--bg-card-hover);
+  }
+
+  .ladder-step.is-current .ladder-num {
+    color: var(--ladder-accent);
+  }
+
+  .ladder-marker {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ladder-accent);
+    flex-shrink: 0;
+  }
+
+  .ladder-here {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ladder-accent);
+    padding: 0.2em 0.6em;
+    border: 1px solid var(--ladder-accent);
+    border-radius: 999px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Fork step: parallel pair under a shared "05" number. */
+  .ladder-fork {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .ladder-step.is-current .ladder-fork {
+    border-color: var(--ladder-accent);
+    background: var(--bg-card-hover);
+  }
+
+  .ladder-fork-num {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    min-width: 1.75em;
+    align-self: center;
+  }
+
+  .ladder-step.is-current .ladder-fork-num {
+    color: var(--ladder-accent);
+  }
+
+  .ladder-fork-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ladder-fork-opt {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    color: inherit;
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out);
+  }
+
+  .ladder-fork-opt.ladder-link:hover {
+    border-color: var(--ladder-accent);
+    background: var(--bg-surface);
+  }
+
+  .ladder-fork-opt.is-current {
+    border-color: var(--ladder-accent);
+    background: var(--bg-surface);
+  }
+
+  /* Wider viewports: render the rail horizontally so the sequence is
+     scannable in a single line. Each step takes equal width. */
+  @media (min-width: 720px) {
+    .ladder-rail {
+      flex-direction: row;
+      align-items: stretch;
+      gap: var(--space-sm);
+    }
+    .ladder-step {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .ladder-step-inner {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-xs);
+      padding: var(--space-md);
+      height: 100%;
+    }
+    .ladder-num {
+      min-width: 0;
+    }
+    .ladder-label {
+      flex: none;
+    }
+    .ladder-here {
+      align-self: flex-start;
+    }
+    .ladder-step-fork .ladder-fork {
+      flex-direction: column;
+      align-items: stretch;
+      padding: var(--space-md);
+      height: 100%;
+    }
+    .ladder-fork-num {
+      min-width: 0;
+      align-self: flex-start;
+    }
+  }
+
+  /* Previous / next navigation block — explicit reading direction. */
+  .ladder-navigation {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .ladder-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out);
+  }
+
+  .ladder-nav:hover {
+    border-color: var(--ladder-accent);
+    background: var(--bg-card-hover);
+  }
+
+  .ladder-nav-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+  }
+
+  .ladder-nav-label {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text-heading);
+    line-height: 1.3;
+  }
+
+  .ladder-nav-next-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .ladder-nav-next-wrap > .ladder-nav-eyebrow {
+    padding: 0 var(--space-md);
+  }
+
+  .ladder-nav-fork {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  @media (min-width: 720px) {
+    .ladder-navigation {
+      flex-direction: row;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: var(--space-md);
+    }
+    .ladder-nav {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .ladder-nav-prev {
+      text-align: left;
+    }
+    .ladder-nav-next {
+      text-align: right;
+    }
+    .ladder-nav-next-wrap {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .ladder-nav-next-wrap > .ladder-nav-eyebrow {
+      padding: 0;
+      text-align: right;
+    }
+    .ladder-nav-fork {
+      flex-direction: row;
+      gap: var(--space-sm);
+    }
+    .ladder-nav-fork .ladder-nav {
+      flex: 1 1 0;
+    }
+  }
+
+  /* Optional extras row — for page-specific alt CTAs that are not
+     part of the ladder (e.g. "GitHub ↗"). Rendered only when a slot
+     named "extras" is provided. */
+  .ladder-extras {
+    display: flex;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+    justify-content: center;
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-subtle);
+  }
+</style>

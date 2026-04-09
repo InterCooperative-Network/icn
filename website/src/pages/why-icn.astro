@@ -1,0 +1,140 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ClosureLoop from '../components/ClosureLoop.astro';
+import ReadingLadder from '../components/ReadingLadder.astro';
+---
+
+<Layout title="Why ICN" activeNav="why-icn" description="Why cooperatives and democratic institutions need infrastructure that takes their form seriously — and why generic software does not solve the problem.">
+
+  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container narrow">
+      <div class="page-hero">
+        <span class="badge badge-amber">Why ICN</span>
+        <h1>Cooperatives and democratic institutions should not have to govern themselves through toolchains built for firms, platforms, and administrative convenience.</h1>
+        <p class="lead">
+          ICN exists because the software stack available to collective institutions
+          actively fights the way those institutions are supposed to work.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-alt">
+    <div class="container narrow prose">
+      <h2>The fracture</h2>
+      <p>
+        Run any cooperative, community organization, or federation long enough and the same pattern appears.
+      </p>
+      <p>
+        Governance happens in meetings and minutes. Policy lives in documents nobody reads the same way twice.
+        Membership lives in a spreadsheet or a CRM that was built for a sales team.
+        Accounting lives in a system that has no idea what a decision was.
+        Execution happens because a specific person remembers what they were supposed to do.
+      </p>
+      <p>
+        Each of these tools is fine in isolation. Together, they produce drift.
+      </p>
+      <p>
+        Decisions do not reliably become action. Rules do not reliably bind practice.
+        Accountability decays into <em>trust in individual people</em>
+        instead of <em>trust in the institution</em>.
+        And when something goes wrong, there is no path back from the outcome to the decision that was supposed to govern it.
+      </p>
+      <p>
+        This is not a failure of any one tool. It is the shape of the gap between institutional life
+        and the software stack it has been forced to use.
+      </p>
+
+      <h2>Most of the tools we depend on do not answer to us</h2>
+      <p>
+        The deeper problem is that most of the systems we depend on —
+        platforms, employers, infrastructure providers, administrative backends —
+        do not answer to the people who live inside them. They answer to ownership, to management,
+        to capital, or to centralized administration.
+      </p>
+      <p>
+        This is not a conspiracy. It is just the default shape of software built for firms and platforms.
+        Democratic institutions are forced to operate inside it, and they pay the translation cost every day,
+        in staff time, in lost history, in weakened accountability, in the quiet conversion of institutional trust into individual trust.
+      </p>
+
+      <h2>Why generic tools do not fix this</h2>
+      <p>
+        It is tempting to believe the answer is a better project management tool,
+        a better voting app, a better accounting package, or tighter integration between them.
+      </p>
+      <p>
+        It is not.
+      </p>
+      <p>
+        The problem is not that the tools are individually bad. The problem is that none of them
+        model the institution itself. None of them know what a member is.
+        None of them know what a rule is.
+        None of them know what it means for a decision to bind action.
+        Integrating them only spreads the gap more evenly.
+      </p>
+      <p>
+        A cooperative running on a stack of generic tools is not running on infrastructure built for cooperatives.
+        It is running on infrastructure built for firms and platforms.
+      </p>
+
+      <h2>Why this matters beyond convenience</h2>
+      <p>
+        The cost of the fracture is not just operational overhead. It is legitimacy.
+      </p>
+      <p>
+        Every serious institution runs on a chain that looks something like this:
+        a member has <em>standing</em>, standing confers <em>authority</em> to participate in decisions,
+        decisions produce <em>policy</em>, policy binds <em>action</em>, and the record of what happened
+        becomes the basis for the next round of standing and authority.
+        When that chain is broken — when the rules live in one place, the decision in another,
+        the action in a third, and the record in none of them —
+        the institution is running on trust in individuals, not trust in itself.
+      </p>
+      <p>
+        That works until it doesn't. It does not scale, it does not federate,
+        and it does not survive the departure of the people who held the loop together in their heads.
+        A democratic institution's authority comes from its ability to show that chain intact.
+        Losing the chain means losing the authority, even if nothing visibly breaks.
+      </p>
+
+      <h2>What ICN proposes</h2>
+      <p>
+        ICN proposes that the institutional substrate itself should be the software.
+      </p>
+      <p>
+        Identity, standing, authority, governance, policy, economic life, execution, provenance, and federation
+        should not be scattered across a stack of tools held together by staff discipline.
+        They should be stations in one coherent loop — where members can be recognized,
+        decisions carry into real operational effect, obligations are carried as institutional facts,
+        and the whole history remains legible to the people who live inside it.
+      </p>
+
+      <ClosureLoop variant="compact" title="The chain ICN is built to keep intact" showReturn={false} />
+
+      <p>
+        That is not a small claim, and ICN does not pretend the work is done.
+        But the direction is clear, and the gap it addresses is real.
+        <a href="/how-it-works">How It Works</a> walks each station in plain language;
+        <a href="/whats-real-now">What's Real Now</a> says which stations are strongest today
+        and which are still being built.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container narrow">
+      <ReadingLadder current="why-icn" />
+    </div>
+  </section>
+</Layout>
+
+<style>
+.narrow { max-width: 760px; }
+.page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
+.page-hero .badge { align-self: flex-start; }
+.page-hero h1 { margin: 0; font-size: clamp(1.625rem, 3.8vw, 2.25rem); line-height: 1.2; }
+.lead { font-size: 1.125rem; color: var(--text-body); line-height: 1.6; margin: 0; }
+.prose h2 { margin-top: var(--space-2xl); margin-bottom: var(--space-md); }
+.prose p { margin: 0 0 var(--space-md); line-height: 1.7; }
+</style>

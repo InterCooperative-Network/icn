@@ -1,0 +1,188 @@
+---
+import Layout from '../layouts/Layout.astro';
+import MaturityGrid from '../components/MaturityGrid.astro';
+import MaturityCard from '../components/MaturityCard.astro';
+import ProvenanceTrail from '../components/ProvenanceTrail.astro';
+import ScopeModel from '../components/ScopeModel.astro';
+import ReadingLadder from '../components/ReadingLadder.astro';
+---
+
+<Layout title="What's Real Now" activeNav="whats-real-now" description="An honest account of which parts of ICN are strongest today, which are advancing, which are still maturing, and which are not yet built.">
+
+  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container narrow">
+      <div class="page-hero">
+        <span class="badge badge-amber">Maturity Anchor</span>
+        <h1>What's Real Now</h1>
+        <p class="lead">
+          ICN is a real, active infrastructure project with uneven maturity.
+          This page is where we say what is proven, what is advancing, and what is not yet finished.
+          Every other page on this site should be readable against what is here without contradiction.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-alt">
+    <div class="container narrow prose">
+      <h2>How to read this page</h2>
+      <p>
+        ICN is large, and different parts of the system are at different levels of maturity.
+        The public-facing site has historically lagged the actual implementation,
+        and this page is part of closing that gap. We describe maturity in four bands,
+        and every capability claim elsewhere on this site is placed in one of them.
+      </p>
+
+      <MaturityGrid>
+        <MaturityCard band="strong">
+          <p>Implemented, integrated, and load-bearing. The project is willing to stand behind these capabilities in public.</p>
+        </MaturityCard>
+        <MaturityCard band="advancing">
+          <p>Actively under development with visible progress. Real work, real incompleteness. Not yet something to rely on.</p>
+        </MaturityCard>
+        <MaturityCard band="maturing">
+          <p>Serious implementation exists. Surfaces and integrations are still being finished. Implementation is often ahead of the public-facing story.</p>
+        </MaturityCard>
+        <MaturityCard band="notyet">
+          <p>Scoped and intended, but not where real work is concentrated right now. We would rather say that directly than imply a schedule.</p>
+        </MaturityCard>
+      </MaturityGrid>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container narrow prose">
+      <h2>Strong today</h2>
+      <p>
+        <strong>Provenance and institutional memory.</strong>
+        The deepest mature part of ICN is the chain that carries an outcome back through the rule that shaped it,
+        the decision that authorized it, and the members who held standing. Proposals, votes, receipts,
+        and the decision-to-outcome chain are the strongest through-line in the current system.
+      </p>
+      <p>
+        <strong>Auditable coordination.</strong>
+        The paths that carry a decision into a recorded outcome are where the most implementation effort and
+        the most hardening have gone. These are the capabilities we are most willing to stand behind today.
+      </p>
+      <p>
+        <strong>Cryptographic identity and membership primitives.</strong>
+        Self-held identity for members and institutions is in place, and is the foundation the rest of the system builds on.
+      </p>
+      <p>
+        <strong>The meaning-firewall discipline.</strong>
+        The structural separation between the kernel (which enforces constraints blindly) and the app layer
+        (which interprets domain meaning) is enforced in the crate graph itself. It is not aspirational;
+        it is how the system stays coherent as it grows.
+      </p>
+
+      <ProvenanceTrail title="What 'strongest today' means, concretely" />
+
+      <h2>Advancing now</h2>
+      <p>
+        <strong>Execution coverage.</strong>
+        A kernel-dispatch bridge between accepted governance payloads and the subsystems that carry them
+        into operational effect already exists. Widening the set of payload types that dispatch cleanly —
+        so that more of what a scope decides actually becomes operationally real — is the active frontier.
+        Real work, real incompleteness.
+      </p>
+      <p>
+        <strong>Policy binding practice.</strong>
+        The mechanisms that let shared rules bind what happens, rather than just describe what is supposed to happen,
+        are advancing alongside execution coverage. This is one of the most consequential active fronts in the project.
+      </p>
+
+      <h2>Real but maturing</h2>
+      <p>
+        <strong>Federation.</strong>
+        Inter-institutional coordination is a serious, active subsystem with real implementation behind it:
+        formal agreements, attestations, typed inter-institutional channels, and cross-scope clearing.
+        It is not yet at the level where its public-facing story is complete, and some integrations remain partial.
+        We would rather say that directly than paper over it.
+      </p>
+      <p>
+        <strong>Commons and compute.</strong>
+        Shared infrastructure participating in the same institutional loop as governance and accounting.
+        Implementation includes trust-aware task placement, cross-participant clearing, checkpointing, and dispute resolution.
+        This is the area where implementation is most meaningfully ahead of the public narrative,
+        and the surfaces that would let outsiders evaluate it are still being built.
+      </p>
+      <p>
+        <strong>Economic semantics.</strong>
+        Obligations, treasury with budgets and approvals, patronage settlement, mutual-credit positions,
+        progressive credit limits, and usage-rights accounting all have implementation behind them.
+        The governed-social-accounting framing is real; the cross-scope integration story is still being completed.
+      </p>
+      <p>
+        <strong>Member-facing experience.</strong>
+        Identity, participation, and institutional interaction are converging toward a coherent member surface,
+        but that surface is not yet where the underlying system is. This is the gap a cooperative adopting ICN today
+        will feel most directly.
+      </p>
+
+      <h2>Not yet, or not yet publicly surfaced</h2>
+      <p>
+        Some parts of the system are real but not yet worth highlighting to outsiders because their
+        public-facing story is thin. <strong>Privacy primitives</strong> and <strong>zero-knowledge proof components</strong>
+        exist as dedicated subsystems, and a <strong>steward network</strong> for trust distribution is implemented —
+        but none of them are ready to be described in public without risking overclaim. We would rather wait
+        than paint pictures we cannot yet stand behind.
+      </p>
+      <p>
+        Other parts of the system are scoped and intended but not where active work is concentrated right now.
+        When outsiders ask "does ICN do X," the honest answer is sometimes <em>not yet, and we are not pretending otherwise</em>.
+      </p>
+
+      <h2>Where the site and the system diverge</h2>
+      <p>
+        One honest caveat: the public-facing site has historically lagged the actual implementation, sometimes significantly.
+        Parts of ICN that are real and working are not yet well represented in the public narrative.
+        Parts that are still maturing have sometimes been described as if they were further along than they are.
+        This page — and the refactor it belongs to — is how we are closing that gap.
+      </p>
+      <p>
+        If you find a claim elsewhere on the site that does not match what you see in the code, that is a bug in the site and we want to know.
+      </p>
+
+      <h2>The scopes the bands above apply across</h2>
+      <p>
+        The maturity bands above describe <em>capabilities</em>. ICN runs those capabilities
+        across five distinct contexts of action — five scopes. The substrate is at <strong>different
+        levels of maturity inside each scope</strong>. Provenance and identity are strongest at the
+        cooperative scope today; federation and commons are real but maturing; the
+        member-facing surface trails the substrate underneath. The scopes diagram below is the
+        map the bands apply across — not a claim that ICN is uniformly strong everywhere on it.
+      </p>
+
+      <ScopeModel title="The contexts the maturity bands apply across" />
+
+      <h2>Where to look directly</h2>
+      <ul>
+        <li><a href="/architecture">Architecture reference</a> — the technical deep-dive synced from the repo</li>
+        <li><a href="/docs">Documentation</a> — current developer and operator docs</li>
+        <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">Source on GitHub</a> — the ground truth</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section-alt">
+    <div class="container narrow">
+      <ReadingLadder current="whats-real-now" />
+    </div>
+  </section>
+</Layout>
+
+<style>
+.narrow { max-width: 760px; }
+.page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
+.page-hero .badge { align-self: flex-start; }
+.page-hero h1 { margin: 0; }
+.lead { font-size: 1.125rem; color: var(--text-body); line-height: 1.6; margin: 0; }
+
+.prose h2 { margin-top: var(--space-2xl); margin-bottom: var(--space-md); }
+.prose p { margin: 0 0 var(--space-md); line-height: 1.7; }
+.prose ul { margin: var(--space-md) 0; padding-left: var(--space-lg); }
+.prose li { margin-bottom: var(--space-xs); line-height: 1.6; }
+
+/* Band grid styles moved to MaturityGrid/MaturityCard components. */
+/* Bottom CTA styles moved to ReadingLadder component. */
+</style>

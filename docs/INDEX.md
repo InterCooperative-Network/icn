@@ -36,10 +36,19 @@ Welcome to the ICN (Intercooperative Network) documentation! This index provides
 
 - **New to ICN?** → Start with [Getting Started Guide](GETTING_STARTED.md)
 - **Understanding the system?** → Read [Architecture Overview](ARCHITECTURE.md)
+- **Building the public site?** → Start with [Design Language Brief v0](design-language/brief-v0.md)
 - **Building features?** → Check [Developer Guides](#developer-guides)
 - **Deploying ICN?** → See [Operations Guides](#operations-guides)
 - **Looking for APIs?** → Browse [API Reference](#api-reference)
 - **Historical context?** → Explore [Archives](#archives)
+
+### Design language (canonical)
+
+The ICN public website is the first implementation surface of the universal civic design language. These docs are the source of truth for every public-facing design decision:
+
+- **[design-language/brief-v0.md](design-language/brief-v0.md)** — the canonical design language brief (principles, semantic layers, visual primitives, anti-patterns)
+- **[design-language/concept-map.md](design-language/concept-map.md)** — canonical → public plain-language label → localization notes for every ICN concept
+- **[design-language/accessibility.md](design-language/accessibility.md)** — WCAG rules, contrast requirements, the review checklist every PR must pass
 
 ---
 

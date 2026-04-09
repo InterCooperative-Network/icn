@@ -1,0 +1,260 @@
+---
+import Layout from '../layouts/Layout.astro';
+import MaturityBadge from '../components/MaturityBadge.astro';
+import ScopeModel from '../components/ScopeModel.astro';
+import ProvenanceTrail from '../components/ProvenanceTrail.astro';
+import MemberSurface from '../components/MemberSurface.astro';
+import ReadingLadder from '../components/ReadingLadder.astro';
+---
+
+<Layout title="How it Works" activeNav="how-it-works" description="A plain-language explanation of how ICN connects identity, membership, governance, rules, accounting, execution, provenance, federation, and the member experience into one coherent substrate.">
+
+  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container narrow">
+      <div class="page-hero">
+        <span class="badge badge-teal">How it Works</span>
+        <h1>ICN works by connecting the parts of institutional life that are usually split apart.</h1>
+        <p class="lead">
+          In most cooperatives, communities, and federations today,
+          the pieces of institutional life live in different systems that don't know about each other.
+          ICN is built on the premise that this fragmentation is not a fact of nature.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-alt">
+    <div class="container narrow prose">
+      <p>
+        The same institution can hold membership, governance, shared rules, economic coordination,
+        execution, provenance, and federation as <em>one coherent substrate</em> —
+        a single underlying layer on which institutional life runs —
+        rather than as seven disconnected systems that staff have to reconcile by hand.
+      </p>
+      <p>
+        This page walks through the pieces of that substrate one at a time,
+        and then shows how they close a single loop.
+      </p>
+
+      <h2><span class="station-number">01 · 02</span>Identity and membership <MaturityBadge band="strong" /></h2>
+      <p>
+        Every person, cooperative, community, and federation in ICN has a cryptographic identity they control directly.
+        A member is not an account on a platform. They are a participant with their own keys and their own history,
+        recognized by the institutions they belong to because those institutions can verify their standing directly.
+      </p>
+      <p>
+        This is what "self-sovereign identity" means in the ICN sense: not independence
+        <em>from</em> institutions, but the ability to be a provable participant <em>inside</em> them.
+      </p>
+
+      <h2><span class="station-number">Scope</span>Scopes and institutions <MaturityBadge band="strong" /></h2>
+      <p>
+        ICN models cooperatives, communities, and federations as <strong>scopes</strong>:
+        real institutional entities with their own rules, their own members, their own history, and their own boundaries.
+        A scope is not a tenant on someone else's platform. It is a distinct institution the substrate knows about directly.
+      </p>
+      <p>
+        Scopes are <em>contexts of action</em>, not levels of hierarchy.
+        When a member acts, they are always acting inside one or more scopes at once.
+        Every decision, every rule, every obligation, and every receipt belongs to its scopes.
+      </p>
+
+      <ScopeModel title="The five scopes a member acts inside" />
+
+      <h2><span class="station-number">03 · 04</span>Authority and governance <MaturityBadge band="strong" /></h2>
+      <p>
+        Governance in ICN is the process by which members of a scope make decisions that the institution will honor.
+        Proposals are created, deliberated on, decided, and recorded.
+        The decisions produce durable artifacts: not just vote tallies, but records that can be pointed to later.
+      </p>
+      <p>
+        ICN does not govern. Members govern. ICN is the layer that makes the record of their governance durable —
+        that holds the proposal, the deliberation, the decision, and the link between the decision and what happens afterward.
+      </p>
+
+      <h2><span class="station-number">05</span>Policy — rules that bind practice <MaturityBadge band="advancing" /></h2>
+      <p>
+        Decisions, once made, produce rules. Rules are what govern practice afterward:
+        who can do what, under what conditions, within what limits, with what approvals.
+      </p>
+      <p>
+        ICN's ambition is that a rule produced by a decision should actually bind the practice that follows —
+        not by removing human interpretation, but by making the rule legible at the point where it matters.
+        Policy mechanisms are the active frontier of the system right now.
+        Real work is happening here, and it is not yet complete.
+      </p>
+
+      <h2><span class="station-number">06</span>Accounting — governed social accounting <MaturityBadge band="advancing" /></h2>
+      <p>
+        Economics in ICN is not commerce. It is not primarily about exchange, pricing, or markets.
+        It is about how institutions carry <em>obligations between real parties</em> — who has contributed what,
+        who owes what to whom, how resources are allocated, how budgets are approved,
+        how surpluses are stewarded, and how reciprocity is recorded.
+      </p>
+      <p>
+        The vocabulary is concrete: obligations, treasury with budgets and approvals,
+        patronage settlement, mutual-credit positions, progressive credit limits, and usage-rights accounting.
+        The accounting is relational, denominated in obligations between named parties,
+        not in a tradable asset. That choice is deliberate — it keeps the economic layer
+        tied to institutional rules rather than drifting into speculation or payment-rail framing.
+      </p>
+
+      <h2><span class="station-number">07</span>Execution and operational effect <MaturityBadge band="advancing" /></h2>
+      <p>
+        A decision that never touches practice is not really a decision.
+        The hardest problem in institutional software — the one most systems quietly punt on —
+        is <strong>execution</strong>: the step where an accepted decision turns into a concrete operational effect.
+      </p>
+      <p>
+        ICN has a kernel-dispatch bridge between accepted governance payloads and the subsystems
+        that carry them into effect. Some payload types are wired through and load-bearing today;
+        others are being added. Widening the set of decisions that dispatch cleanly is the active frontier of the project.
+        <a href="/whats-real-now">What's Real Now</a> carries the precise current state.
+      </p>
+
+      <h2><span class="station-number">08</span>Receipts, provenance, and auditability <MaturityBadge band="strong" /></h2>
+      <p>
+        When something happens in ICN — a proposal accepted, a rule applied, an obligation settled,
+        an action taken under authorization — the substrate produces a durable record of it.
+        Those records are receipts in the strict sense: evidence that a specific thing happened
+        under specific rules with specific standing.
+      </p>
+      <p>
+        Provenance is the chain those receipts form. You can follow a particular outcome back to the decision
+        that authorized it, to the rule that shaped it, to the members who had standing in the decision.
+        This is where the substrate is strongest, and it is the anchor the rest of the system is built around.
+      </p>
+
+      <ProvenanceTrail title="How the chain is built" />
+
+      <h2><span class="station-number">Cross-scope</span>Federation <MaturityBadge band="maturing" /></h2>
+      <p>
+        No cooperative is an island. Federation in ICN is the layer that lets scopes
+        recognize each other, enter formal agreements, exchange attestations, and settle obligations
+        across their boundaries — without being collapsed into a single organization.
+      </p>
+      <p>
+        The principle is that federation strengthens its member institutions rather than dissolving them.
+        A cooperative in a federation is still a cooperative: its own governance, rules, members, and history.
+        The federation is an additional scope that its member institutions participate in,
+        with its own governance and its own agreements — not a merger that erases what it contains.
+      </p>
+      <p>
+        Federation is real. Serious implementation exists: treaty-grade agreements, attestations,
+        typed inter-institutional channels, and cross-scope clearing. At the same time, the public-facing surfaces
+        that would let an outside reader see federation clearly are still being completed,
+        and some integrations remain partial.
+      </p>
+
+      <h2><span class="station-number">Shared scope</span>Commons and compute <MaturityBadge band="maturing" /></h2>
+      <p>
+        Some things institutions need to do cannot be held by a single organization.
+        Shared resources — compute capacity, storage, coordinated work, infrastructure — need
+        to be held in common across members of a network, with rules that are accountable to all of them.
+        <strong>Commons and compute</strong> is the name ICN uses for this part of the substrate:
+        shared infrastructure participating in the same institutional loop as governance and accounting.
+      </p>
+      <p>
+        In concrete terms, the implementation includes trust-aware task placement,
+        cross-participant clearing, checkpointing, and dispute resolution — federation-aware where it needs to be.
+        This is one of the areas where ICN's implementation is meaningfully ahead of its public-facing explanation.
+        The work is serious; the surfaces that would let an outsider see and evaluate it are still being built.
+      </p>
+
+      <h2><span class="station-number">09</span>Member-facing experience <MaturityBadge band="behind" /></h2>
+      <p>
+        All of the pieces above are useless if a member cannot actually experience the institution through them.
+        The member-facing surface of ICN is where identity, membership, governance, rules, accounting,
+        receipts, and federation come together into something a person can see and use.
+      </p>
+      <p>
+        This is an area where the substrate is ahead of the surface.
+        The capabilities underneath are real and in many places strong.
+        The interface through which ordinary members interact with those capabilities is still being built out.
+      </p>
+
+      <MemberSurface />
+
+      <h2>Closing the loop</h2>
+      <p>
+        The point of describing the pieces one at a time is that they are not actually separate.
+        ICN is built on the claim that institutional life breaks down when its pieces are scattered,
+        and works when they are held together.
+      </p>
+      <ul>
+        <li><strong>Identity</strong> belongs to the member — cryptographic, self-held, verifiable.</li>
+        <li><strong>Standing</strong> inside a scope is not administrative metadata; it is a provable fact about who the member is in this institution.</li>
+        <li><strong>Authority</strong> flows from the scope's rules and the decisions its members have made under them — not from a platform owner.</li>
+        <li><strong>Governance</strong> is how members make decisions that the institution will honor.</li>
+        <li><strong>Policy</strong> is what those decisions produce: rules that shape what can happen next.</li>
+        <li><strong>Execution</strong> is where accepted decisions translate into operational effect — through obligations, allocations, settlements, commons actions, or federation clearing.</li>
+        <li><strong>Receipts and provenance</strong> carry the chain from authority to outcome, and feed back into the record the institution runs on.</li>
+        <li><strong>Federation</strong> lets scopes coordinate across their boundaries without dissolving into each other.</li>
+        <li><strong>The member-facing experience</strong> is where all of this becomes something a person can actually see, use, and live inside — one institution, not seven tools.</li>
+      </ul>
+      <p>
+        That is the loop ICN is trying to close. Parts of it are already closed today.
+        Other parts are still being filled in.
+      </p>
+
+      <h2>Why this enhances human institutions rather than replacing them</h2>
+      <p>
+        Everything above is easy to misread as a claim that software can run an institution.
+        It cannot, and ICN is not designed to pretend otherwise.
+      </p>
+      <p>
+        People still deliberate. People still govern. People still interpret rules,
+        negotiate edge cases, and make calls about what the institution should do
+        when reality does not match what was written down. People still do the work of caring about each other,
+        mediating disputes, and holding each other accountable.
+      </p>
+      <p>
+        What ICN changes is the <em>fragility of the glue</em>.
+        Most institutions today hold themselves together through individual memory, staff discretion,
+        informal trust, and scattered tools that only a few people fully understand.
+        That glue works until the people holding it burn out, leave, or disagree about what happened.
+      </p>
+      <p>
+        ICN is built to reduce how much institutional coherence depends on that kind of fragile glue.
+        Better memory. Better continuity. Better accountability. Better legibility.
+        Better collective capacity across organizations.
+        The system holds what the institution has written down so that the people inside it
+        can spend their attention on the work that actually requires human judgment.
+      </p>
+
+      <h3>What this page does not mean</h3>
+      <ul>
+        <li><strong>ICN does not replace people with software.</strong> Deliberation, interpretation, and care remain human.</li>
+        <li><strong>ICN does not eliminate politics.</strong> Disagreement, negotiation, and contested judgment are still human work.</li>
+        <li><strong>ICN does not make institutions automatically fair.</strong> A legible rule can still be a bad rule.</li>
+        <li><strong>ICN does not collapse all institutions into one model.</strong> Scopes are distinct; federations do not erase their members.</li>
+        <li><strong>ICN does not require blind faith in external authorities.</strong> Sovereignty in the ICN sense is operational — a member can verify their own standing.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container narrow">
+      <ReadingLadder current="how-it-works" />
+    </div>
+  </section>
+</Layout>
+
+<style>
+.narrow { max-width: 780px; }
+.page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
+.page-hero .badge { align-self: flex-start; }
+.page-hero h1 { margin: 0; font-size: clamp(1.625rem, 3.6vw, 2.25rem); line-height: 1.25; }
+.lead { font-size: 1.125rem; color: var(--text-body); line-height: 1.6; margin: 0; }
+
+.prose h2 {
+  margin-top: var(--space-2xl); margin-bottom: var(--space-md);
+  display: flex; align-items: baseline; gap: var(--space-md); flex-wrap: wrap;
+}
+.prose h3 { margin-top: var(--space-xl); margin-bottom: var(--space-md); }
+.prose p { margin: 0 0 var(--space-md); line-height: 1.7; }
+.prose ul { margin: var(--space-md) 0; padding-left: var(--space-lg); }
+.prose li { margin-bottom: var(--space-sm); line-height: 1.7; }
+
+/* .maturity-badge styles moved to MaturityBadge component (scoped). */
+</style>

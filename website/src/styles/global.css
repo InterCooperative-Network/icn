@@ -8,8 +8,8 @@
   --bg-surface: #0f1620;
   --bg-code: #0d1117;
   --text-primary: #e8edf5;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-secondary: #a3b0c2; /* raised from #94a3b8 for AA on card bgs */
+  --text-muted: #8b99ad; /* raised from #64748b for AA on card bgs */
   --text-heading: #f1f5f9;
   --accent-teal: #2dd4bf;
   --accent-teal-dim: #14b8a6;
@@ -87,6 +87,82 @@
   margin: 0;
   padding: 0;
 }
+
+/* ─── Accessibility foundations ─────────────────────────────
+   Skip link, focus-visible rings, and reduced-motion rules.
+   See docs/design-language/accessibility.md for the full ruleset. */
+
+.skip-link {
+  position: absolute;
+  top: -9999px;
+  left: 0;
+  z-index: 200;
+  background: var(--bg-primary);
+  color: var(--text-heading);
+  padding: var(--space-sm) var(--space-lg);
+  border: 2px solid var(--accent-teal);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: none;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: var(--space-sm);
+  left: var(--space-sm);
+  outline: none;
+}
+
+/* Global focus-visible ring — applied to every interactive element
+   that doesn't define its own focus style. Keyboard users need to
+   see where they are; mouse users are not affected. */
+*:focus {
+  outline: none;
+}
+*:focus-visible {
+  outline: 2px solid var(--accent-teal);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent-teal);
+  outline-offset: 3px;
+}
+
+/* Main content target — hidden tabindex anchor for skip link.
+   Visible :focus would be distracting, so we suppress its outline. */
+#main-content:focus,
+#main-content:focus-visible {
+  outline: none;
+}
+
+/* Reduced-motion override: honor user preference. The reveal
+   IntersectionObserver also detects this and skips animation,
+   but this catches any stray transitions and animations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal,
+  .reveal.revealed {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
 html {
   font-size: 16px;
   scroll-behavior: smooth;
@@ -212,6 +288,193 @@ pre code {
     grid-template-columns: 1fr;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   System grammar — institutional interface primitives.
+   These are the shared "institutional object" visual treatments
+   used across public pages to make the site feel like a system
+   rather than a set of documents.
+   ───────────────────────────────────────────────────────────── */
+
+/* Eyebrow — mono uppercase section marker. Use above h2 when a
+   section is a "stage" or "component" of the system rather than
+   a standalone topic. */
+.eyebrow {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+}
+.eyebrow-accent {
+  color: var(--accent-teal);
+}
+
+/* Station number — mono numeric marker for stations of the
+   institutional closure loop. Use inline with prose headings.
+   Fixed size (not em-relative) so it stays small regardless of
+   heading scale. On narrow viewports, wraps naturally above h2. */
+.station-number {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--accent-teal);
+  padding: 0.3em 0.65em;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+  margin-right: 0.8em;
+  line-height: 1;
+  position: relative;
+  top: -0.2em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* System divider — thin horizontal rule with a centered mono
+   label. Used between major movements of a long page. */
+.system-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin: var(--space-3xl) 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.system-divider::before,
+.system-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-default);
+}
+
+/* Institutional card — the shared "object" treatment for
+   capability/primitive cards. Uses a left accent bar, a mono
+   eyebrow label, a heading, and prose. Distinct from the
+   generic .card class which is a plain container. */
+.inst-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent-teal);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg) var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+.inst-card:hover {
+  border-color: var(--accent-teal);
+  background: var(--bg-card-hover);
+}
+.inst-card-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  line-height: 1.4;
+}
+.inst-card-eyebrow .inst-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  color: var(--accent-teal);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+.inst-card-eyebrow .inst-card-eyebrow-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 0.2em;
+  min-width: 0;
+}
+.inst-card-eyebrow .inst-card-num {
+  color: var(--accent-teal);
+  white-space: nowrap;
+}
+.inst-card h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.3;
+}
+.inst-card p {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* Accent variants for inst-card — tie card color to semantic
+   category (governance=amber, provenance=green, economics=blue,
+   federation=purple, commons=rose). The accent cascades to the left
+   border, hover border, station number, and icon chip. Meaning never
+   depends on color alone — every card also carries a text category
+   label and a concept icon with its own silhouette. Color is
+   reinforcement, not source of truth. */
+.inst-card.acc-teal { border-left-color: var(--accent-teal); }
+.inst-card.acc-teal:hover { border-color: var(--accent-teal); }
+.inst-card.acc-teal .inst-card-num,
+.inst-card.acc-teal .inst-card-icon { color: var(--accent-teal); }
+
+.inst-card.acc-amber { border-left-color: var(--accent-amber); }
+.inst-card.acc-amber:hover { border-color: var(--accent-amber); }
+.inst-card.acc-amber .inst-card-num,
+.inst-card.acc-amber .inst-card-icon { color: var(--accent-amber); }
+
+.inst-card.acc-green { border-left-color: var(--accent-green); }
+.inst-card.acc-green:hover { border-color: var(--accent-green); }
+.inst-card.acc-green .inst-card-num,
+.inst-card.acc-green .inst-card-icon { color: var(--accent-green); }
+
+.inst-card.acc-blue { border-left-color: var(--accent-blue); }
+.inst-card.acc-blue:hover { border-color: var(--accent-blue); }
+.inst-card.acc-blue .inst-card-num,
+.inst-card.acc-blue .inst-card-icon { color: var(--accent-blue); }
+
+.inst-card.acc-purple { border-left-color: var(--accent-purple); }
+.inst-card.acc-purple:hover { border-color: var(--accent-purple); }
+.inst-card.acc-purple .inst-card-num,
+.inst-card.acc-purple .inst-card-icon { color: var(--accent-purple); }
+
+.inst-card.acc-rose { border-left-color: var(--accent-rose); }
+.inst-card.acc-rose:hover { border-color: var(--accent-rose); }
+.inst-card.acc-rose .inst-card-num,
+.inst-card.acc-rose .inst-card-icon { color: var(--accent-rose); }
+
+/* Section frame — container that gives a section an institutional
+   "panel" feel with a subtle top hairline and eyebrow label. Used
+   sparingly for sections that are system components. */
+.section-frame {
+  position: relative;
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--border-subtle);
+}
+.section-frame > .eyebrow {
+  display: block;
+  margin-bottom: var(--space-md);
+}
+
 ﻿.nav {
   position: fixed;
   top: 0;

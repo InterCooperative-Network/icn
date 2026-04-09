@@ -1,0 +1,474 @@
+---
+// MemberSurface.astro — illustrative member-facing surface.
+//
+// The closure model is walkable. Scope is visible. Provenance has a shape.
+// What this primitive shows is the last missing piece: what it would feel
+// like to inhabit ICN as a member on an actual device surface.
+//
+// CRITICAL: this is NOT a product mockup and NOT a claim to a shipped
+// member app. The ICN member-facing surface is currently the part of
+// the system most visibly trailing the substrate underneath (see
+// /whats-real-now, "behind the system" band). This component exists
+// specifically to make that gap inspectable rather than abstract.
+//
+// Rules this component must preserve:
+//   - clearly labeled as illustrative ("MEMBER SURFACE · ILLUSTRATIVE")
+//   - no payment-app vocabulary (no balance, no wallet, no currency symbol)
+//   - economics rendered as governed social accounting: contributions,
+//     obligations, allocations, patronage, mutual-credit position
+//   - sample entity names are fictional and read as examples
+//   - uses existing icons from the canonical family
+//   - reuses existing visual grammar: eyebrow → intro → blocks → footer
+//   - grayscale-safe: every cue is carried by structure + label, not color
+//   - mobile-first, stacks cleanly
+//
+// See docs/design-language/brief-v0.md §7a (icon rules) and
+// docs/design-language/accessibility.md §3.11.
+
+import Icon from './Icon.astro';
+---
+
+<figure
+  class="member-surface"
+  aria-label="An illustrative member-facing surface showing what it could look like to inhabit ICN on a personal device. This is a design illustration, not a claim to a shipped app."
+>
+  <figcaption class="ms-title">An illustrative member surface</figcaption>
+
+  <p class="ms-intro">
+    What would it feel like to inhabit ICN as a member, on your own device?
+    Below is an illustration — not a product — of how the closure loop resolves
+    into something a person can see, read, and act on. The capabilities
+    underneath each panel are real; the interface on top is still being built.
+  </p>
+
+  <div class="ms-device" role="group" aria-labelledby="ms-device-label">
+    <div class="ms-device-bar">
+      <span class="ms-device-label" id="ms-device-label">Member surface · illustrative</span>
+      <span class="ms-device-dots" aria-hidden="true">
+        <span class="ms-dot"></span>
+        <span class="ms-dot"></span>
+        <span class="ms-dot"></span>
+      </span>
+    </div>
+
+    <div class="ms-device-body">
+      <!-- Acting as / inside — the scope context a member is currently acting within -->
+      <section class="ms-panel">
+        <header class="ms-panel-head">
+          <span class="ms-panel-icon" aria-hidden="true">
+            <Icon name="identity" size={18} />
+          </span>
+          <span class="ms-panel-eyebrow">Acting as</span>
+        </header>
+        <div class="ms-panel-body">
+          <p class="ms-primary"><strong>Self</strong> — your cryptographic identity</p>
+          <p class="ms-secondary">
+            Inside <strong>Brightworks Collective</strong>
+            <span class="ms-scope-type">(cooperative)</span>
+          </p>
+          <p class="ms-secondary">
+            Inside <strong>Northeast Worker Federation</strong>
+            <span class="ms-scope-type">(federation)</span>
+          </p>
+        </div>
+      </section>
+
+      <!-- Standing — provable participation inside those scopes -->
+      <section class="ms-panel">
+        <header class="ms-panel-head">
+          <span class="ms-panel-icon" aria-hidden="true">
+            <Icon name="authority" size={18} />
+          </span>
+          <span class="ms-panel-eyebrow">Standing</span>
+        </header>
+        <div class="ms-panel-body">
+          <p class="ms-primary"><strong>Recognized member</strong> · Brightworks Collective</p>
+          <p class="ms-meta">
+            <span class="ms-chip">Recognized since 2024-11</span>
+            <span class="ms-chip">Role: Member</span>
+          </p>
+        </div>
+      </section>
+
+      <!-- Governed social accounting — explicitly not a wallet, not a balance -->
+      <section class="ms-panel">
+        <header class="ms-panel-head">
+          <span class="ms-panel-icon" aria-hidden="true">
+            <Icon name="accounting" size={18} />
+          </span>
+          <span class="ms-panel-eyebrow">Position</span>
+        </header>
+        <div class="ms-panel-body">
+          <p class="ms-primary">Mutual-credit position inside Brightworks</p>
+          <dl class="ms-stat-list">
+            <div class="ms-stat">
+              <dt>Contributions recorded</dt>
+              <dd>142 hours</dd>
+            </div>
+            <div class="ms-stat">
+              <dt>Allocations drawn</dt>
+              <dd>38 hours</dd>
+            </div>
+            <div class="ms-stat">
+              <dt>Open obligations</dt>
+              <dd>2 outstanding</dd>
+            </div>
+            <div class="ms-stat">
+              <dt>Patronage (Q3)</dt>
+              <dd>pending approval</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <!-- Active governance — a pending decision inside your scope -->
+      <section class="ms-panel">
+        <header class="ms-panel-head">
+          <span class="ms-panel-icon" aria-hidden="true">
+            <Icon name="governance" size={18} />
+          </span>
+          <span class="ms-panel-eyebrow">Open decision</span>
+        </header>
+        <div class="ms-panel-body">
+          <p class="ms-primary">
+            <strong>Proposal:</strong> Extend the commons compute pool cap
+            for the next quarter
+          </p>
+          <p class="ms-meta">
+            <span class="ms-chip">Your vote: pending</span>
+            <span class="ms-chip">Closes in 3 days</span>
+            <span class="ms-chip">Scope: Federation</span>
+          </p>
+        </div>
+      </section>
+
+      <!-- Recent receipts — provenance as lived record -->
+      <section class="ms-panel">
+        <header class="ms-panel-head">
+          <span class="ms-panel-icon" aria-hidden="true">
+            <Icon name="provenance" size={18} />
+          </span>
+          <span class="ms-panel-eyebrow">Recent receipts</span>
+        </header>
+        <div class="ms-panel-body">
+          <ul class="ms-receipt-list" role="list">
+            <li>
+              <span class="ms-receipt-id">#482</span>
+              <span class="ms-receipt-text">Patronage settlement Q3 — scope: Cooperative</span>
+              <span class="ms-receipt-stamp">stamped 2024-10-31</span>
+            </li>
+            <li>
+              <span class="ms-receipt-id">#481</span>
+              <span class="ms-receipt-text">Shared room booking approved — scope: Community</span>
+              <span class="ms-receipt-stamp">stamped 2024-10-28</span>
+            </li>
+            <li>
+              <span class="ms-receipt-id">#479</span>
+              <span class="ms-receipt-text">Federation cross-clearing complete — scope: Federation</span>
+              <span class="ms-receipt-stamp">stamped 2024-10-24</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <p class="ms-foot">
+    <span class="ms-foot-eyebrow">Illustrative, not shipped</span>
+    ICN's member-facing surface is the part of the system most visibly
+    trailing the substrate underneath. The panels above are a design
+    illustration of how governance, economics, scope, and provenance could
+    resolve into a coherent member surface — what a person would read and
+    act on. The capabilities beneath each panel are real today; the
+    interface on top is still being built. This illustration is how we
+    keep the gap visible instead of abstract.
+  </p>
+</figure>
+
+<style>
+  .member-surface {
+    --ms-accent: var(--accent-teal);
+    --ms-rail: var(--border-default);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .ms-title {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  .ms-intro {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  /* The device: a bordered panel with a top bar labeled 'illustrative'.
+     Not a phone bezel — a civic "screen frame" that stays in the
+     institutional register rather than product-mockup territory. */
+  .ms-device {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-top: var(--space-sm);
+    box-shadow: var(--shadow-md);
+  }
+
+  .ms-device-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .ms-device-label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ms-accent);
+  }
+
+  .ms-device-dots {
+    display: inline-flex;
+    gap: 4px;
+  }
+  .ms-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border-default);
+  }
+
+  .ms-device-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Each panel is a "section" of the surface. No left accent color —
+     the icons + labels carry the meaning. Subtle hairlines between
+     panels make them read as stacked regions of the same screen. */
+  .ms-panel {
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .ms-panel:last-child {
+    border-bottom: none;
+  }
+
+  .ms-panel-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+  }
+
+  .ms-panel-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    flex-shrink: 0;
+    color: var(--ms-accent);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+  }
+
+  .ms-panel-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+  }
+
+  .ms-panel-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .ms-panel-body p {
+    margin: 0;
+  }
+
+  .ms-primary {
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+  }
+
+  .ms-primary strong {
+    color: var(--text-heading);
+    font-weight: 600;
+  }
+
+  .ms-secondary {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .ms-secondary strong {
+    color: var(--text-heading);
+    font-weight: 600;
+  }
+
+  .ms-scope-type {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+  }
+
+  .ms-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-top: var(--space-xs);
+  }
+
+  .ms-chip {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.25em 0.65em;
+    border-radius: 999px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  /* Governed social accounting stat list.
+     NEVER a "balance" row. Each stat labels its nature explicitly. */
+  .ms-stat-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+    margin: var(--space-xs) 0 0;
+    padding: 0;
+  }
+
+  @media (min-width: 520px) {
+    .ms-stat-list {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .ms-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .ms-stat dt {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+
+  .ms-stat dd {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-heading);
+    line-height: 1.3;
+  }
+
+  .ms-receipt-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .ms-receipt-list li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: var(--space-sm);
+    row-gap: 2px;
+    padding: var(--space-xs) 0;
+  }
+
+  .ms-receipt-id {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: start;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ms-accent);
+    padding-top: 0.15em;
+    min-width: 2.75em;
+  }
+
+  .ms-receipt-text {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+
+  .ms-receipt-stamp {
+    grid-column: 2;
+    grid-row: 2;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  /* Dashed "illustrative, not shipped" footer — same grammar as the
+     ClosureLoop return card and the ScopeModel footer caption, so
+     pages carrying multiple primitives share visual language. */
+  .ms-foot {
+    margin: var(--space-md) 0 0;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-surface);
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .ms-foot-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent-amber);
+  }
+</style>

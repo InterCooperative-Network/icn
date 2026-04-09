@@ -102,3 +102,9 @@ icn-wt/
 # Claude Code agent worktrees (per-session, never tracked — commit dcc7baeb
 # accidentally added 2192 files / 934K insertions from an orphan worktree)
 .claude/worktrees/
+
+# Local Preview MCP launch config — per-developer, not project state
+.claude/launch.json
+
+# Playwright MCP debug artifacts (screenshots, console logs, snapshots)
+.playwright-mcp/

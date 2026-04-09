@@ -1,0 +1,169 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ClosureLoop from '../components/ClosureLoop.astro';
+import ReadingLadder from '../components/ReadingLadder.astro';
+---
+
+<Layout title="For Developers" activeNav="for-developers" description="ICN as a technical system: kernel/app separation, trust-native architecture, mutual-credit accounting, and where the current implementation is strongest.">
+
+  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container narrow">
+      <div class="page-hero">
+        <span class="badge badge-teal">For Developers</span>
+        <h1>ICN is institutional infrastructure with a real codebase behind it.</h1>
+        <p class="lead">
+          If you are reading this, you probably already know that most "infrastructure for cooperatives" projects
+          turn out to be either a thin SaaS layer or a crypto protocol wearing institutional language.
+          ICN is neither. This page is where the public narrative meets the implementation.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-alt">
+    <div class="container narrow prose">
+      <h2>Why ICN may be interesting to technical readers</h2>
+      <ul>
+        <li><strong>Kernel/app separation with a strict meaning firewall.</strong> The kernel enforces generic constraints without understanding their domain semantics. Apps translate domain meaning into those constraints. The boundary is enforced in the crate graph.</li>
+        <li><strong>Trust-native, not trustless.</strong> ICN is built around trust as a first-class, measurable, auditable property — not around the assumption that trust can be eliminated.</li>
+        <li><strong>Mutual-credit accounting rather than token economics.</strong> The economic layer is relational: obligations between named parties, settled institutionally, not a market instrument.</li>
+        <li><strong>Actor-based runtime over Tokio</strong>, with explicit supervision, shutdown, and message-passing between subsystems.</li>
+        <li><strong>Cryptographic identity for members, cooperatives, communities, and federations</strong>, with an Age-encrypted keystore and explicit key rotation paths.</li>
+        <li><strong>An honest repository.</strong> The project is unusually direct about what is real, what is being built, and what is still unfinished.</li>
+      </ul>
+
+      <h2>What kind of system this is, technically</h2>
+      <p>
+        ICN is a daemon (<code>icnd</code>) implemented in Rust, running as a peer in a network of other ICN nodes.
+        It is not a blockchain. There is no global consensus layer, no token, no mining.
+        It is not a client-server application. There is no central service that nodes report to.
+      </p>
+      <p>
+        Nodes communicate over QUIC/TLS with cryptographic identity bound to the transport layer.
+        Between nodes, the main coordination primitives are topic-based gossip with causal ordering,
+        signed envelopes with replay protection, a mutual-credit ledger of obligations between parties,
+        and <strong>policy oracles</strong> — app-level components that translate domain decisions
+        (governance, trust, membership) into generic constraints the kernel can enforce without understanding the domain.
+      </p>
+      <p>
+        Inside a node, the runtime is an actor system: the supervisor spawns long-lived actors
+        for the network, gossip, ledger, and related subsystems, and wires them together
+        through message passing and typed callbacks.
+        State is persisted through sled-backed storage; cryptographic material lives in an Age-encrypted keystore.
+      </p>
+
+      <h2>Core architectural ideas worth knowing before reading the code</h2>
+      <ul>
+        <li><strong>The meaning firewall.</strong> Kernel crates enforce constraints; app crates supply meaning. The kernel is not allowed to understand what a "trust score" or a "cooperative" is. The boundary is enforced in the crate graph itself, not as a design aspiration.</li>
+        <li><strong>Policy oracles.</strong> An app that implements the <code>PolicyOracle</code> interface is the bridge between domain semantics and kernel enforcement. The trust oracle is the canonical example.</li>
+        <li><strong>The governance executor.</strong> A kernel-dispatch bridge between accepted governance payloads and the subsystems that carry them into operational effect. Widening the set of payload types it dispatches is the active frontier of the project.</li>
+        <li><strong>Scopes as first-class institutions.</strong> A member, a cooperative, a community, a federation, and a commons are each modeled as a distinct scope. Each has its own crate in the workspace.</li>
+        <li><strong>Actors and supervision.</strong> The runtime is built around long-lived actors managed by a supervisor, communicating through message passing.</li>
+        <li><strong>Trust-gated rate limiting and placement.</strong> Trust class affects message rate limits, credit relationships, and task placement. Trust is native, not trustless.</li>
+        <li><strong>Signed envelopes and replay guards.</strong> All messages between nodes are signed and replay-protected; verification happens in the network actor before messages reach the rest of the system.</li>
+        <li><strong>Federation as treaty.</strong> The federation crate carries formal agreements, attestations, typed inter-institutional channels, and cross-scope clearing — not just message relay.</li>
+        <li><strong>Commons and compute.</strong> Shared infrastructure with trust-aware placement, checkpointing, cross-participant clearing, and dispute resolution — participating in the same institutional loop as governance and accounting.</li>
+      </ul>
+
+      <ClosureLoop variant="full" title="The institutional loop you'll be reading code against" showReturn={false} />
+
+      <h2>Subsystems that exist but are not yet publicly described</h2>
+      <p>
+        Some parts of the codebase are real but we are not yet willing to carry them on the public narrative pages —
+        either because their public surfaces are thin, or because we are not ready to describe them in a way we can stand behind.
+        Technical readers looking at the workspace will see them, so we name them here honestly:
+      </p>
+      <ul>
+        <li><strong><code>icn-privacy</code></strong> — privacy primitives as a dedicated crate. Real code, no polished public framing yet.</li>
+        <li><strong><code>icn-zkp</code></strong> — zero-knowledge proof components. Real code, limited public narrative.</li>
+        <li><strong><code>icn-steward</code></strong> — a steward network for trust distribution and integrity. Real implementation, deliberately absent from public pages until we can describe it without overclaim.</li>
+      </ul>
+      <p>
+        If you are evaluating ICN as a system and any of these matter to your work, read the crates directly rather than waiting for the public story to catch up.
+      </p>
+
+      <h2>Where the current implementation is strongest</h2>
+      <p>
+        ICN's strongest technical through-line today is the part of the system that connects governance
+        to durable, auditable records. The primitives for cryptographic identity, signed messages,
+        provenance, and receipts are mature and load-bearing. The paths from decision to recorded outcome
+        are where the most implementation work has gone.
+      </p>
+      <p>
+        Core kernel subsystems — the actor runtime, network transport, gossip, identity primitives,
+        storage, and the meaning-firewall boundary between kernel and apps — are in place and integrated.
+        The trust policy oracle is a working example of the kernel/app pattern and is the reference
+        implementation to read first if you want to understand how the separation is meant to work.
+      </p>
+
+      <h2>Where active work is happening</h2>
+      <ul>
+        <li><strong>Execution coverage.</strong> Expanding the range of decisions that translate cleanly into concrete operational effect.</li>
+        <li><strong>Policy mechanisms.</strong> The breadth of governance patterns an app can express, and the fidelity with which policy oracles can translate them into kernel-enforceable constraints.</li>
+        <li><strong>Federation.</strong> The federation crate and the coordination protocols between scopes are real, but integrations across adjacent subsystems are still being completed.</li>
+        <li><strong>Commons and compute.</strong> The distributed compute layer with trust-gated task placement exists and is serious, but the surfaces that would let external readers evaluate it are underdeveloped.</li>
+        <li><strong>The gateway and member-facing APIs.</strong> The REST and WebSocket surfaces that would let ordinary members interact with a scope are the part of the system most visibly trailing the substrate underneath.</li>
+      </ul>
+
+      <h2>How to explore the codebase and docs</h2>
+      <p>
+        The main monorepo is at
+        <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">InterCooperative-Network/icn</a>.
+        It is a Cargo workspace with crates in <code>icn/crates/</code> and apps in <code>icn/apps/</code>,
+        binaries in <code>icn/bins/</code>.
+      </p>
+      <p>A reasonable reading order for someone new:</p>
+      <ol>
+        <li>Start with the <a href="/architecture">architecture reference</a> for the structural model.</li>
+        <li>Read the trust policy oracle as the canonical example of how an app translates domain semantics into generic constraints.</li>
+        <li>Read the supervisor and runtime (<code>icn-core</code>) to see how actors are spawned, wired, and shut down.</li>
+        <li>Read the network actor (<code>icn-net</code>) and the gossip actor (<code>icn-gossip</code>) to see how inter-node communication works.</li>
+        <li>Read the ledger (<code>icn-ledger</code>) to see how mutual-credit accounting is carried as a replicated journal.</li>
+        <li>Read the governance app to see how proposals, decisions, and the transition from governance to policy are handled today.</li>
+      </ol>
+
+      <h2>How to contribute without misunderstanding the project</h2>
+      <ul>
+        <li><strong>ICN is institutional infrastructure, not a protocol in search of a use case.</strong> Contributions that treat it as a generic substrate for arbitrary coordination tend to miss the point.</li>
+        <li><strong>The kernel/app separation is load-bearing.</strong> Contributions that erode the meaning firewall will be reverted.</li>
+        <li><strong>Trust is native, not trustless.</strong> Designs that assume trust can be eliminated will not fit.</li>
+        <li><strong>Honesty about maturity is a project value.</strong> Contributions that overclaim — PRs whose descriptions suggest a feature is complete when it is only partially wired — will not land.</li>
+        <li><strong>Scope discipline matters.</strong> Small, focused contributions against a clearly scoped issue are the path of least resistance.</li>
+      </ul>
+
+      <h2>What ICN is not, technically</h2>
+      <ul>
+        <li><strong>Not a blockchain.</strong> No global consensus, no token, no mining.</li>
+        <li><strong>Not a DAO framework.</strong> Governance is one part of a larger substrate, not voting over a treasury.</li>
+        <li><strong>Not a federated social platform.</strong> Federation is about institutional coordination, not content distribution.</li>
+        <li><strong>Not a general-purpose smart contract platform.</strong> CCL is domain-scoped, deterministic, fuel-metered, and not Turing-complete.</li>
+        <li><strong>Not finished.</strong> ICN is real and active, but not mature. See <a href="/whats-real-now">What's Real Now</a>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container narrow">
+      <ReadingLadder current="for-developers">
+        <Fragment slot="extras">
+          <a href="/architecture" class="btn btn-ghost">Architecture reference →</a>
+          <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="btn btn-ghost">GitHub ↗</a>
+          <a href="/docs" class="btn btn-ghost">Docs</a>
+        </Fragment>
+      </ReadingLadder>
+    </div>
+  </section>
+</Layout>
+
+<style>
+.narrow { max-width: 780px; }
+.page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
+.page-hero .badge { align-self: flex-start; }
+.page-hero h1 { margin: 0; font-size: clamp(1.625rem, 3.6vw, 2.25rem); line-height: 1.25; }
+.lead { font-size: 1.125rem; color: var(--text-body); line-height: 1.6; margin: 0; }
+.prose h2 { margin-top: var(--space-2xl); margin-bottom: var(--space-md); }
+.prose p { margin: 0 0 var(--space-md); line-height: 1.7; }
+.prose ul, .prose ol { margin: var(--space-md) 0; padding-left: var(--space-lg); }
+.prose li { margin-bottom: var(--space-sm); line-height: 1.7; }
+.prose code { font-size: 0.85em; background: var(--bg-surface); padding: 0.15em 0.4em; border-radius: 4px; }
+</style>

@@ -1,0 +1,252 @@
+---
+// ScopeModel.astro — The five scopes of institutional action in ICN.
+//
+// Scopes are contexts of action, not levels of hierarchy. When a member
+// acts inside ICN, they are always acting inside one or more scopes at
+// once: self, cooperative, community, federation, commons. Each scope
+// has its own rules, its own accounting, and its own receipts. An
+// action, a decision, a rule, or a proof belongs to one or more scopes
+// at once — that's the point.
+//
+// This component makes that visible. It is the second canonical
+// diagram primitive of the ICN civic design language, alongside
+// ClosureLoop. It uses the Icon component and the shared token system.
+// Meaning never depends on color alone — structure + icon silhouette +
+// text label carry the signal.
+//
+// Usage:
+//   <ScopeModel />                     default title
+//   <ScopeModel title="Where you act" /> custom title
+//
+// See docs/design-language/brief-v0.md and concept-map.md.
+
+import Icon from './Icon.astro';
+import type { IconName } from '../data/icons';
+
+export interface Props {
+  title?: string;
+}
+
+const { title = 'Five scopes of action' } = Astro.props;
+
+interface Scope {
+  id: string;
+  label: string;
+  gloss: string;
+  icon: IconName;
+}
+
+// Ordered from widest shared context to most personal.
+// This ordering is explicit and documented in the figcaption: it is
+// NOT a hierarchy. It is "walk down from the most shared to the most
+// personal — a single action often touches several at once."
+const scopes: Scope[] = [
+  {
+    id: 'commons',
+    label: 'Commons',
+    gloss: 'Shared resources governed by the institutions that use them.',
+    icon: 'commons',
+  },
+  {
+    id: 'federation',
+    label: 'Federation',
+    gloss: 'How distinct institutions coordinate without merging.',
+    icon: 'federation',
+  },
+  {
+    id: 'community',
+    label: 'Community',
+    gloss: 'A group of members with shared rules, purpose, and standing.',
+    icon: 'governance',
+  },
+  {
+    id: 'cooperative',
+    label: 'Cooperative',
+    gloss: 'A scoped institution owned and governed by its members.',
+    icon: 'authority',
+  },
+  {
+    id: 'self',
+    label: 'Self',
+    gloss: 'The individual member — the identity that holds standing in each scope above.',
+    icon: 'identity',
+  },
+];
+---
+
+<figure
+  class="scope-model"
+  aria-label="ICN's five scopes of institutional action, from the most shared context to the most personal"
+>
+  <figcaption class="scope-title">{title}</figcaption>
+
+  <p class="scope-intro">
+    Scope is <strong>context of action</strong>, not hierarchy.
+    Every ICN action belongs to one or more scopes at once.
+  </p>
+
+  <ol class="scope-rail" role="list">
+    {scopes.map((s) => (
+      <li class="scope-row" id={`scope-${s.id}`}>
+        <span class="scope-rail-node" aria-hidden="true"></span>
+        <div class="scope-card">
+          <span class="scope-icon" aria-hidden="true">
+            <Icon name={s.icon} size={22} />
+          </span>
+          <div class="scope-body">
+            <span class="scope-label">{s.label}</span>
+            <span class="scope-gloss">{s.gloss}</span>
+          </div>
+        </div>
+      </li>
+    ))}
+  </ol>
+
+  <p class="scope-foot">
+    Read top to bottom: widest shared context down to the most personal.
+    A single decision can touch several scopes at once — that is the point.
+    The receipt it produces is tagged with every scope it passed through.
+  </p>
+</figure>
+
+<style>
+  .scope-model {
+    --rail-color: var(--accent-teal);
+    --rail-dim: var(--border-default);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .scope-title {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  .scope-intro {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .scope-intro strong {
+    color: var(--text-heading);
+    font-weight: 600;
+  }
+
+  /* The rail: a single vertical line connecting all five scopes so the
+     visual communicates "you are always inside all of these at once."
+     The rail runs the full height of the list; each row has a node
+     where it touches the rail. */
+  .scope-rail {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-sm) 0 0;
+    position: relative;
+  }
+
+  .scope-rail::before {
+    content: '';
+    position: absolute;
+    left: 0.75rem;
+    top: 1.1rem;
+    bottom: 1.1rem;
+    width: 2px;
+    background: var(--rail-color);
+    border-radius: 1px;
+  }
+
+  .scope-row {
+    position: relative;
+    padding-left: 2rem;
+    padding-bottom: var(--space-md);
+  }
+
+  .scope-row:last-child {
+    padding-bottom: 0;
+  }
+
+  .scope-rail-node {
+    position: absolute;
+    left: calc(0.75rem - 5px);
+    top: 1.05rem;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--bg-primary);
+    border: 2px solid var(--rail-color);
+  }
+
+  .scope-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-md) var(--space-lg);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out);
+  }
+
+  .scope-card:hover {
+    border-color: var(--rail-color);
+    background: var(--bg-card-hover);
+  }
+
+  .scope-icon {
+    flex-shrink: 0;
+    color: var(--rail-color);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+  }
+
+  .scope-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .scope-label {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-heading);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+
+  .scope-gloss {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+
+  .scope-foot {
+    margin: var(--space-md) 0 0;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-surface);
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+  }
+</style>

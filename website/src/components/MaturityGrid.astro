@@ -1,0 +1,25 @@
+---
+// MaturityGrid.astro — the wrapper grid for a maturity band summary.
+// Used on the homepage "what's real now" strip and on the full
+// /whats-real-now page. Accepts MaturityCard children as a slot.
+//
+// Responsive: single column on narrow viewports, 2-up at ≥720px.
+---
+
+<div class="maturity-grid">
+  <slot />
+</div>
+
+<style>
+  .maturity-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+    margin: var(--space-xl) 0;
+  }
+  @media (min-width: 720px) {
+    .maturity-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+</style>
