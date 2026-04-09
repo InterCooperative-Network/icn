@@ -1,14 +1,16 @@
 # ICN Website
 
-The official website for the InterCooperative Network (ICN) - a federated compute, resource, and governance protocol designed for cooperatives, communities, and federations.
+The public-facing website for the InterCooperative Network (ICN) — institutional infrastructure for cooperatives, communities, and federations.
 
-## 🌟 Features
+## Design language (read this first)
 
-- **Modern Design**: Clean, responsive design with dark theme and vibrant accents
-- **Comprehensive Documentation**: Integrated documentation with clear navigation and search
-- **Performance Optimized**: Built with Astro for fast loading and excellent SEO
-- **Accessibility**: WCAG compliant with proper semantic markup and keyboard navigation
-- **Mobile First**: Responsive design that works beautifully on all devices
+The website is the first implementation surface of ICN's universal civic design language. Every public-facing edit should be checkable against the canonical design-language docs:
+
+- **[brief-v0](../docs/design-language/brief-v0.md)** — the canonical source of truth for the design language (principles, semantic layers, visual primitives, anti-patterns)
+- **[concept-map](../docs/design-language/concept-map.md)** — canonical term → public plain-language label → localization notes, for every ICN concept
+- **[accessibility](../docs/design-language/accessibility.md)** — WCAG rules, contrast requirements, keyboard and screen-reader expectations, and the review checklist every PR must pass
+
+If an edit introduces something these docs do not describe, either the docs evolve or the edit is out of scope for the design language. Do not let ad-hoc decisions silently drift the system.
 
 ## 🚀 Quick Start
 

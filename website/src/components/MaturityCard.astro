@@ -1,0 +1,79 @@
+---
+// MaturityCard.astro — a single card in the maturity band grid.
+// Shows a band label and a description of which capabilities currently
+// sit in that band. Meant to be used inside <MaturityGrid> on pages like
+// the homepage "what's real now" strip and the full /whats-real-now page.
+//
+// Description content is passed as a slot so each page can write its
+// own prose for each band.
+
+import type { Band } from './MaturityBadge.astro';
+
+export interface Props {
+  band: Band;
+  /** Visible label. Defaults to the canonical form. */
+  label?: string;
+}
+
+const DEFAULT_LABELS: Record<Band, string> = {
+  strong: 'Strong today',
+  advancing: 'Advancing now',
+  maturing: 'Real but maturing',
+  notyet: 'Not yet',
+  behind: 'Behind the system',
+};
+
+const { band, label } = Astro.props;
+const displayLabel = label ?? DEFAULT_LABELS[band];
+---
+
+<div class:list={['maturity-card', `mc-${band}`]}>
+  <div class="maturity-card-label">{displayLabel}</div>
+  <div class="maturity-card-body">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .maturity-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-left: 3px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+  .maturity-card-label {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 0.9375rem;
+    color: var(--text-heading);
+  }
+  .maturity-card-body {
+    font-size: 0.9375rem;
+    color: var(--text-muted);
+    line-height: 1.65;
+  }
+  .maturity-card-body :global(p) {
+    margin: 0;
+  }
+
+  /* Accent color cascades to the left border only. Card background,
+     label color, and body color stay constant across all bands so the
+     band is distinguished by its label first, color second. */
+  .maturity-card.mc-strong {
+    border-left-color: var(--accent-green);
+  }
+  .maturity-card.mc-advancing {
+    border-left-color: var(--accent-teal);
+  }
+  .maturity-card.mc-maturing {
+    border-left-color: var(--accent-amber);
+  }
+  .maturity-card.mc-notyet,
+  .maturity-card.mc-behind {
+    border-left-color: var(--text-muted);
+  }
+</style>

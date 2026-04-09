@@ -1,0 +1,116 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ClosureLoop from '../components/ClosureLoop.astro';
+import ScopeModel from '../components/ScopeModel.astro';
+import ReadingLadder from '../components/ReadingLadder.astro';
+---
+
+<Layout title="What is ICN" activeNav="what-is-icn" description="ICN is digital infrastructure for cooperatives, communities, and federations — a substrate where membership, governance, rules, and accountability are native rather than layered on.">
+
+  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container narrow">
+      <div class="page-hero">
+        <span class="badge badge-teal">What is ICN</span>
+        <h1>ICN is digital infrastructure for cooperatives, communities, and federations.</h1>
+        <p class="lead">
+          It gives institutions a coherent substrate where membership, governance, shared rules, economic coordination, and accountability are native —
+          so decisions, action, and proof do not have to live in separate worlds.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-alt">
+    <div class="container narrow prose">
+      <h2>A different kind of system</h2>
+      <p>
+        ICN is not an app. It is not a management SaaS. It is not a blockchain,
+        and it is not a DAO platform.
+      </p>
+      <p>
+        It is infrastructure — the layer underneath institutional life that most democratic organizations
+        have never had. The layer that says <em>who is a member</em>, <em>what the rules are</em>,
+        <em>what was decided</em>, <em>what happened</em>, <em>what is owed</em>,
+        and <em>what can be proven later</em>.
+      </p>
+      <p>
+        Today that layer is improvised. It lives in spreadsheets, chat threads, documents,
+        staff memory, and disconnected tools that were never designed to carry institutional weight.
+        ICN is an attempt to give it a real home.
+      </p>
+
+      <h2>What ICN models directly</h2>
+      <p>Most software models users and accounts. ICN models institutions.</p>
+      <ul>
+        <li><strong>Members</strong> — people with cryptographic identity and real, provable standing inside the institutions they belong to.</li>
+        <li><strong>Scopes</strong> — cooperatives, communities, federations, and commons, each modeled as a first-class institutional entity with its own rules, members, and history.</li>
+        <li><strong>Authority</strong> — not handed down from a platform owner, but derived from the scope's rules and the decisions its members have made under them.</li>
+        <li><strong>Governance and policy</strong> — proposals, deliberation, and the rules those decisions produce — rules that shape what can happen next.</li>
+        <li><strong>Economic life</strong> — obligations, treasury with budgets and approvals, mutual-credit positions, patronage settlement, usage-rights. Social accounting denominated in obligations between real parties, not payment rails.</li>
+        <li><strong>Execution</strong> — the step where an accepted decision turns into a concrete operational effect, so decisions do not die in meeting minutes.</li>
+        <li><strong>Receipts and provenance</strong> — durable records that trace every outcome back through the rule that shaped it, the decision that authorized it, and the members who held standing.</li>
+        <li><strong>Federation</strong> — formal agreements, attestations, and cross-institutional clearing between distinct scopes. Coordination without merger.</li>
+      </ul>
+      <p>
+        These are not features layered on top of a generic platform.
+        They are the primitives of the system.
+      </p>
+
+      <ScopeModel title="The five scopes of institutional action" />
+
+      <h2>Closing the institutional loop</h2>
+      <p>
+        The defining idea behind ICN is that institutional life should not be scattered
+        across unrelated tools. The loop that matters is specific, and the system is built
+        to carry every station of it. Read the nine stations in order:
+      </p>
+
+      <ClosureLoop variant="full" title="The nine-station closure" />
+
+      <p class="after-loop">
+        That is the loop. ICN exists to close it.
+        Parts of it are already closed today; other parts are still being filled in.
+        See <a href="/whats-real-now">What's Real Now</a> for the direct account
+        of which stations are strongest, which are the active frontier, and which are still behind.
+      </p>
+
+      <h2>What ICN is not</h2>
+      <ul>
+        <li><strong>Not a blockchain.</strong> ICN is not oriented around tokens, speculation, or trustless global consensus. It is oriented around institutions and their accountability to themselves and each other.</li>
+        <li><strong>Not a DAO framework.</strong> DAOs typically treat governance as voting over a treasury. ICN treats governance as one part of a much larger institutional substrate.</li>
+        <li><strong>Not a SaaS suite.</strong> ICN is not a bundle of management tools. It is the layer those tools should sit on top of.</li>
+        <li><strong>Not finished.</strong> ICN is a real, active project with uneven maturity. See <a href="/whats-real-now">What's Real Now</a> for a direct account.</li>
+      </ul>
+
+      <h2>Why this framing matters</h2>
+      <p>
+        If you treat institutions as user groups on generic software, you get what we already have:
+        governance that cannot bind practice, decisions that do not become action,
+        and accountability that depends on individuals remembering what happened.
+      </p>
+      <p>
+        If you treat institutions as first-class entities with their own identity, rules, and history,
+        something different becomes possible. That is the bet ICN is making.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container narrow">
+      <ReadingLadder current="what-is-icn" />
+    </div>
+  </section>
+</Layout>
+
+<style>
+.narrow { max-width: 760px; }
+.page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
+.page-hero .badge { align-self: flex-start; }
+.page-hero h1 { margin: 0; }
+.lead { font-size: 1.125rem; color: var(--text-body); line-height: 1.6; margin: 0; }
+.prose h2 { margin-top: var(--space-2xl); margin-bottom: var(--space-md); }
+.prose p { margin: 0 0 var(--space-md); line-height: 1.7; }
+.prose ul { margin: var(--space-md) 0; padding-left: var(--space-lg); }
+.prose li { margin-bottom: var(--space-sm); line-height: 1.7; }
+.after-loop { margin-top: var(--space-xl) !important; }
+</style>

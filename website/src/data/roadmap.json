@@ -1,46 +1,53 @@
 {
-  "currentSprint": {
-    "number": 28,
-    "name": "Governance Dispatch Tranches",
-    "status": "active",
-    "detail": "Sprints 24–28 shipped (commons-compute spine, Flow 5 demo, gossip fan-out fix). Current workstream: post-Sprint-28 governance dispatch tranches wiring real executors for every accepted proposal payload. Tranches 9–16 merged (TrustThreshold, BondIssuance, ShareRedemption, LeaveFederation, SdisService executor, ReconfirmSteward, ReinstateSteward, SuspendSteward). Tranche 17 (UpdateJurisdictionTier) complete locally, pending push. Tranche 18 (TerminateClearing + RevokeVouch) up next."
+  "currentEmphasis": {
+    "title": "What the project is concentrating on right now",
+    "detail": "The active frontier is expanding execution coverage — the breadth with which accepted decisions carry into concrete operational effect. Governance-backed provenance and receipts are the load-bearing parts of the system today; work is ongoing to connect more of the decisions the substrate records to the actions those decisions are supposed to authorize."
   },
   "stages": [
     {
       "id": "A",
-      "label": "Stage A — Now",
-      "badge": "badge-teal",
-      "markerColor": "var(--accent-teal)",
-      "title": "Institution-in-a-Box",
-      "description": "Charter templates, guided cooperative formation, membership onboarding, treasury ledger, and proposal-to-vote loop. The minimum viable institution. Live on K3s with five cooperatives running governance, patronage settlement, and financial reporting.",
-      "status": "active"
+      "label": "Current emphasis",
+      "badge": "badge-green",
+      "markerColor": "var(--accent-green)",
+      "title": "Institution-in-a-box",
+      "description": "The core loop of cooperative life — identity, membership, proposals, decisions, and durable receipts — is the most mature part of the system. Governance-backed provenance and auditable coordination are load-bearing today. This is the part of ICN we are most willing to stand behind in public.",
+      "band": "strong"
     },
     {
       "id": "B",
-      "label": "Stage B — In Development",
-      "badge": "badge-blue",
-      "markerColor": "var(--accent-blue)",
-      "title": "Federation Layer",
-      "description": "Inter-cooperative trust and federated coordination live on K3s. Multiple cooperatives operate simultaneously with shared trust graphs, cross-coop governance receipts, and ledger integration. Formal treaty-based clearing and mutual credit settlement across organizations follow.",
-      "status": "in-progress"
+      "label": "Direction of work",
+      "badge": "badge-teal",
+      "markerColor": "var(--accent-teal)",
+      "title": "Execution coverage and shared rules",
+      "description": "Expanding the range of accepted decisions that translate cleanly into real operational effect, and the mechanisms that let shared rules bind practice rather than just describe it. This is the active frontier of the project. Real progress, real incompleteness — the direction is clear and the pace is real.",
+      "band": "advancing"
     },
     {
       "id": "C",
-      "label": "Stage C — In Development",
-      "badge": "badge-purple",
-      "markerColor": "var(--accent-purple)",
-      "title": "Compute Commons",
-      "description": "Trust-gated compute task admission is live: trust score enforcement, compute:write scope authorization, and ledger position integration are proven on K3s. Task execution by registered executor nodes and settlement receipt generation follow in the next sprint.",
-      "status": "in-progress"
+      "label": "Direction of work",
+      "badge": "badge-amber",
+      "markerColor": "var(--accent-amber)",
+      "title": "Federation and commons",
+      "description": "Inter-institutional coordination and shared resources across the network. Both are real, active subsystems with serious implementation behind them, and both are still maturing. In some places the implementation is ahead of the public-facing story, and the surfaces that would let outsiders see and evaluate this work are still being built.",
+      "band": "maturing"
     },
     {
       "id": "D",
-      "label": "Stage D",
+      "label": "Direction of work",
       "badge": "badge-amber",
       "markerColor": "var(--accent-amber)",
-      "title": "Civilization Tools",
-      "description": "Participatory budgeting at city scale. Municipal governance platforms. Public infrastructure coordination. The long-term vision: democratic technology governance beyond the co-op.",
-      "status": "vision"
+      "title": "Member-facing experience",
+      "description": "The surface through which ordinary members would interact with identity, governance, rules, accounting, receipts, and federation as one coherent environment. The capabilities underneath are real and in places strong. The interface on top is still catching up, and closing that gap is active work — not a finished capability.",
+      "band": "maturing"
+    },
+    {
+      "id": "E",
+      "label": "Long-term direction",
+      "badge": "badge-purple",
+      "markerColor": "var(--accent-purple)",
+      "title": "Public and civic-scale coordination",
+      "description": "Participatory budgeting, municipal governance, and public infrastructure coordination. The architecture is designed with this horizon in mind, but it is not where active work is concentrated today. When outsiders ask whether ICN does this, the honest answer is not yet — and we would rather say so than imply a schedule.",
+      "band": "notyet"
     }
   ]
 }

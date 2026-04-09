@@ -1,0 +1,365 @@
+---
+// ClosureLoop.astro — The nine-station institutional closure.
+// Visual representation of ICN's core thesis: identity → standing → authority →
+// governance → policy → accounting → execution → receipts/provenance → member
+// experience, with the loop closing back to the next round of standing.
+//
+// Variants:
+//   full    — complete with station notes (default, primary pages)
+//   compact — station chips only, for homepage / inline use
+//
+// Responsive: horizontal two-column stagger on desktop (full variant),
+// stacked vertical flow with connectors on mobile. Compact variant is a
+// horizontal chip row that wraps.
+
+import Icon from './Icon.astro';
+import type { IconName } from '../data/icons';
+
+export interface Props {
+  variant?: 'full' | 'compact';
+  title?: string;
+  showReturn?: boolean;
+}
+
+const { variant = 'full', title, showReturn = true } = Astro.props;
+
+interface Station {
+  n: string;
+  label: string;
+  note: string;
+  icon?: IconName;
+}
+
+const stations: Station[] = [
+  {
+    n: '01',
+    label: 'Identity',
+    note: 'Cryptographic identity held by the member — not a platform account.',
+    icon: 'identity',
+  },
+  {
+    n: '02',
+    label: 'Standing',
+    note: 'Provable participation inside a scope. The institution can verify it directly.',
+    icon: 'standing',
+  },
+  {
+    n: '03',
+    label: 'Authority',
+    note: 'Derived from scope rules and the decisions members have made under them.',
+    icon: 'authority',
+  },
+  {
+    n: '04',
+    label: 'Governance',
+    note: 'Proposals, deliberation, and decisions the institution will honor.',
+    icon: 'governance',
+  },
+  {
+    n: '05',
+    label: 'Policy',
+    note: 'Shared rules produced by decisions, shaping what can happen next.',
+    icon: 'policy',
+  },
+  {
+    n: '06',
+    label: 'Accounting',
+    note: 'Obligations, treasury, patronage, mutual-credit positions — governed social accounting.',
+    icon: 'accounting',
+  },
+  {
+    n: '07',
+    label: 'Execution',
+    note: 'Where accepted decisions translate into real operational effect.',
+    icon: 'execution',
+  },
+  {
+    n: '08',
+    label: 'Receipts & Provenance',
+    note: 'The chain from authority to outcome — durable, auditable institutional memory.',
+    icon: 'provenance',
+  },
+  {
+    n: '09',
+    label: 'Member Experience',
+    note: 'Where all of the above becomes something a person can see, use, and live in.',
+    icon: 'member_experience',
+  },
+];
+---
+
+<figure class="closure-loop" data-variant={variant} aria-label="ICN's nine-station institutional closure loop">
+  {title && <figcaption class="loop-title">{title}</figcaption>}
+
+  <ol class="loop-list">
+    {stations.map((s, i) => (
+      <li class="loop-station">
+        <div class="loop-station-inner">
+          <span class="loop-number" aria-hidden="true">{s.n}</span>
+          {s.icon && (
+            <span class="loop-icon" aria-hidden="true">
+              <Icon name={s.icon} size={22} />
+            </span>
+          )}
+          <div class="loop-body">
+            <span class="loop-label">{s.label}</span>
+            {variant === 'full' && <span class="loop-note">{s.note}</span>}
+          </div>
+        </div>
+        {i < stations.length - 1 && (
+          <span class="loop-connector" aria-hidden="true">
+            <span class="loop-connector-line"></span>
+            <span class="loop-connector-arrow">↓</span>
+          </span>
+        )}
+      </li>
+    ))}
+  </ol>
+
+  {showReturn && (
+    <div class="loop-return" aria-hidden="true">
+      <span class="loop-return-mark">↻</span>
+      <span class="loop-return-text">
+        <span class="loop-return-eyebrow">The loop closes</span>
+        Every round of standing starts the next. Identity does not begin at 01 again —
+        it is reinforced by the provenance that station 08 produces and the member experience at 09.
+      </span>
+    </div>
+  )}
+</figure>
+
+<style>
+  .closure-loop {
+    --loop-accent: var(--accent-teal);
+    --loop-accent-dim: var(--accent-teal-dim);
+    --loop-rail: var(--border-default);
+    --loop-text: var(--text-heading);
+    --loop-muted: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    margin: 0;
+    padding: 0;
+  }
+
+  .loop-title {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--loop-muted);
+    text-align: left;
+  }
+
+  .loop-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .loop-station {
+    position: relative;
+    padding: 0;
+  }
+
+  .loop-station-inner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-left: 3px solid var(--loop-accent);
+    border-radius: var(--radius-md);
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
+  }
+
+  .loop-station-inner:hover {
+    border-color: var(--loop-accent);
+    background: var(--bg-card-hover);
+  }
+
+  .loop-number {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: var(--loop-accent);
+    flex-shrink: 0;
+    padding-top: 0.25em;
+    min-width: 1.75em;
+  }
+
+  .loop-icon {
+    flex-shrink: 0;
+    color: var(--loop-accent);
+    display: inline-flex;
+    align-items: flex-start;
+    padding-top: 0.1em;
+  }
+
+  .loop-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .loop-label {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--loop-text);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+
+  .loop-note {
+    font-size: 0.875rem;
+    color: var(--loop-muted);
+    line-height: 1.55;
+  }
+
+  /* Connector between stations — vertical on mobile/narrow */
+  .loop-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: var(--space-lg);
+    position: relative;
+    padding-left: calc(var(--space-lg) + 1.75em + var(--space-md));
+  }
+
+  .loop-connector-line {
+    position: absolute;
+    left: calc(var(--space-lg) + 0.875em + var(--space-md) / 2 - 0.5px);
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--loop-rail);
+  }
+
+  .loop-connector-arrow {
+    position: absolute;
+    left: calc(var(--space-lg) + 0.875em + var(--space-md) / 2);
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.75rem;
+    color: var(--loop-muted);
+    background: var(--bg-primary);
+    width: 1.25em;
+    text-align: center;
+    line-height: 1;
+  }
+
+  /* Return-arrow card — the loop closing */
+  .loop-return {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-surface);
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--loop-muted);
+  }
+
+  .loop-return-mark {
+    font-size: 1.25rem;
+    color: var(--loop-accent);
+    flex-shrink: 0;
+    line-height: 1.3;
+  }
+
+  .loop-return-text {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .loop-return-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--loop-accent);
+  }
+
+  /* Compact variant: chips that wrap */
+  .closure-loop[data-variant='compact'] .loop-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .closure-loop[data-variant='compact'] .loop-station-inner {
+    padding: var(--space-sm) var(--space-md);
+    border-left-width: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  .closure-loop[data-variant='compact'] .loop-note {
+    display: none;
+  }
+
+  .closure-loop[data-variant='compact'] .loop-connector {
+    display: none;
+  }
+
+  .closure-loop[data-variant='compact'] .loop-label {
+    font-size: 0.875rem;
+  }
+
+  .closure-loop[data-variant='compact'] .loop-number {
+    padding-top: 0.15em;
+    min-width: 1.5em;
+  }
+
+  .closure-loop[data-variant='compact'] .loop-return {
+    margin-top: var(--space-md);
+  }
+
+  /* Wide viewports (full variant): two-column stagger, converging on last row */
+  @media (min-width: 900px) {
+    .closure-loop[data-variant='full'] .loop-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: var(--space-lg);
+      row-gap: var(--space-md);
+    }
+
+    .closure-loop[data-variant='full'] .loop-connector {
+      display: none;
+    }
+
+    /* Last station spans both columns to feel like the loop converging */
+    .closure-loop[data-variant='full'] .loop-station:last-child {
+      grid-column: 1 / -1;
+    }
+
+    .closure-loop[data-variant='full'] .loop-station:last-child .loop-station-inner {
+      border-left-width: 3px;
+      border-left-color: var(--accent-amber);
+      background: linear-gradient(
+        to right,
+        var(--bg-card) 0%,
+        var(--accent-amber-glow) 100%
+      );
+    }
+
+    .closure-loop[data-variant='full'] .loop-station:last-child .loop-number {
+      color: var(--accent-amber);
+    }
+  }
+</style>
