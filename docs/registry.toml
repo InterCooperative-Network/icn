@@ -11,9 +11,9 @@
 schema_version = 1
 allowlisted_docs_subdirs = [
   "adr", "ai", "api", "architecture", "archive", "ci", "crate-manifests", "demo", "deployment",
-  "design", "dev", "development", "examples", "features", "guides", "internal", "maintenance",
-  "manual", "migration-guides", "mobile", "observability", "onboarding", "operations", "ops",
-  "performance", "phases", "pilots", "planning", "plans", "reference", "scripts", "sdis",
+  "design", "design-language", "dev", "development", "examples", "features", "guides", "internal",
+  "maintenance", "manual", "migration-guides", "mobile", "observability", "onboarding", "operations",
+  "ops", "performance", "phases", "pilots", "planning", "plans", "reference", "scripts", "sdis",
   "security", "spec", "sprints", "state", "status", "strategy", "summit", "superpowers",
   "templates", "testing", "vision",
 ]
@@ -150,6 +150,16 @@ freshness = "unknown"
 domain_tags = ["design"]
 recommended_action = "keep"
 last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/design-language/"
+truth_class = "normative"
+role = "design"
+canonical = "no"
+freshness = "current"
+domain_tags = ["design-language", "website"]
+recommended_action = "keep"
+last_reviewed = "2026-04-09"
 
 [[doc_path_defaults]]
 prefix = "docs/guides/"
