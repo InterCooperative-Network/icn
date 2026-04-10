@@ -11,6 +11,7 @@
   --text-secondary: #a3b0c2; /* raised from #94a3b8 for AA on card bgs */
   --text-muted: #8b99ad; /* raised from #64748b for AA on card bgs */
   --text-heading: #f1f5f9;
+  --text-body: var(--text-secondary);
   --accent-teal: #2dd4bf;
   --accent-teal-dim: #14b8a6;
   --accent-teal-glow: rgba(45, 212, 191, 0.15);
@@ -73,6 +74,7 @@
   --text-secondary: #475569;
   --text-heading: #020617;
   --text-muted: #64748b;
+  --text-body: var(--text-secondary);
 
   /* Accent colors — darkened for WCAG AA contrast on white */
   --accent-teal: #0d9488;
@@ -677,10 +679,10 @@ pre code {
 .btn-teal {
   background: var(--accent-teal-glow);
   color: var(--accent-teal);
-  border: 1px solid rgba(45, 212, 191, 0.25);
+  border: 1px solid var(--border-teal);
 }
 .btn-teal:hover {
-  background: rgba(45, 212, 191, 0.2);
+  background: var(--accent-teal-glow);
   color: var(--accent-teal);
   transform: translateY(-1px);
 }
@@ -707,27 +709,27 @@ pre code {
 .badge-teal {
   background: var(--accent-teal-glow);
   color: var(--accent-teal);
-  border: 1px solid rgba(45, 212, 191, 0.2);
+  border: 1px solid var(--border-teal);
 }
 .badge-amber {
   background: var(--accent-amber-glow);
   color: var(--accent-amber);
-  border: 1px solid rgba(251, 146, 60, 0.25);
+  border: 1px solid var(--border-accent);
 }
 .badge-green {
   background: var(--accent-green-glow);
   color: var(--accent-green);
-  border: 1px solid rgba(74, 222, 128, 0.2);
+  border: 1px solid var(--accent-green-glow);
 }
 .badge-blue {
-  background: rgba(56, 189, 248, 0.12);
+  background: var(--accent-teal-glow);
   color: var(--accent-blue);
-  border: 1px solid rgba(56, 189, 248, 0.2);
+  border: 1px solid var(--border-teal);
 }
 .badge-purple {
-  background: rgba(167, 139, 250, 0.12);
+  background: var(--accent-teal-glow);
   color: var(--accent-purple);
-  border: 1px solid rgba(167, 139, 250, 0.2);
+  border: 1px solid var(--border-subtle);
 }
 ﻿.card {
   background: var(--bg-card);

@@ -318,13 +318,15 @@ import MaturityCard from '../components/MaturityCard.astro';
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
 
 .hero-bg-grid {
+  --grid-line: var(--accent-teal-glow);
   position: absolute; inset: 0;
   background-image:
-    linear-gradient(rgba(45,212,191,.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(45,212,191,.025) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 60px 60px;
   mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
   -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
+  opacity: 0.2;
   pointer-events: none;
 }
 
