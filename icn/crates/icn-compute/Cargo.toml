@@ -46,9 +46,9 @@ num_cpus = "1.16"
 sled.workspace = true
 
 # WASM runtime (optional)
-# NOTE: wasmtime is pinned to 24.x due to rustc/cranelift compatibility constraints.
-# Bumped to 24.0.6 to fix RUSTSEC-2026-0020 (guest-controlled resource exhaustion in WASI).
-wasmtime = { version = "24.0.6", optional = true }
+# Bumped to 36.0.7 to fix RUSTSEC-2026-0095 (critical: sandbox-escaping memory access via Winch).
+# Previous pin at 24.x was due to old rustc constraints; 36.x requires rustc >= 1.86.0.
+wasmtime = { version = "36.0.7", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.49", features = ["rt-multi-thread", "macros"] }
