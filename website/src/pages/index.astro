@@ -1,6 +1,5 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import NetworkGraph from '../components/NetworkGraph.astro';
 import ClosureLoop from '../components/ClosureLoop.astro';
 import Icon from '../components/Icon.astro';
 import MaturityGrid from '../components/MaturityGrid.astro';
@@ -11,10 +10,6 @@ import MaturityCard from '../components/MaturityCard.astro';
 
   <!-- ═══ HERO ═══════════════════════════════════════════════════ -->
   <section class="hero hero-home">
-    <div class="hero-graph" aria-hidden="true">
-      <NetworkGraph />
-    </div>
-
     <div class="container narrow hero-container">
       <div class="hero-content animate-in">
         <div class="badge badge-teal mb-lg">
@@ -166,14 +161,12 @@ import MaturityCard from '../components/MaturityCard.astro';
         <span class="badge badge-teal">The Closure Loop</span>
         <h2>Nine stations, one institution.</h2>
         <p>
-          Every serious institution runs on a chain: a member has standing,
-          standing confers authority, authority produces decisions, decisions bind action,
-          and the record of what happened becomes the basis for the next round of standing.
-          ICN carries that chain as one substrate, station by station.
+          ICN carries the full institutional chain — standing, authority, decisions, action,
+          and the record of what happened — as one substrate, station by station.
         </p>
       </div>
 
-      <ClosureLoop variant="full" title="The institutional closure" />
+      <ClosureLoop variant="compact" title="The institutional closure" />
 
       <p class="closure-footnote">
         <a href="/what-is-icn">What is ICN</a> walks through each station in plain language.
@@ -273,30 +266,12 @@ import MaturityCard from '../components/MaturityCard.astro';
     </div>
   </section>
 
-  <!-- ═══ EXPLORE ═══════════════════════════════════════════════ -->
+  <!-- ═══ WHERE TO GO NEXT ══════════════════════════════════════ -->
   <section class="section-alt">
-    <div class="container">
-      <div class="cta-box">
-        <h2>Where to go next</h2>
-        <p>
-          ICN is one coherent institutional substrate, not a pile of features.
-          These pages are designed to be read in order.
-        </p>
-        <div class="next-step">
-          <span class="next-label">Start here →</span>
-          <a href="/what-is-icn" class="btn btn-primary btn-lg">What is ICN</a>
-        </div>
-        <div class="reading-order">
-          <span class="reading-order-label">Reading order</span>
-          <ol class="reading-order-list">
-            <li><a href="/what-is-icn">What is ICN</a></li>
-            <li><a href="/why-icn">Why ICN</a></li>
-            <li><a href="/how-it-works">How It Works</a></li>
-            <li><a href="/whats-real-now">What's Real Now</a></li>
-            <li><a href="/for-cooperatives">For Cooperatives</a> <span class="or">or</span> <a href="/for-developers">For Developers</a></li>
-          </ol>
-        </div>
-      </div>
+    <div class="container narrow text-center">
+      <h2>Where to go next</h2>
+      <p class="section-lede">These pages are designed to be read in order, starting here.</p>
+      <a href="/what-is-icn" class="btn btn-primary btn-lg">Start reading: What is ICN →</a>
     </div>
   </section>
 
@@ -330,38 +305,6 @@ import MaturityCard from '../components/MaturityCard.astro';
   line-height: 1.6;
 }
 
-/* NetworkGraph wrapper: anchored right, masked so it never touches the headline.
-   Labels are hidden on the homepage — the graph reads as abstract background texture. */
-.hero-graph {
-  position: absolute;
-  top: 0;
-  right: -8%;
-  bottom: 0;
-  width: 50%;
-  opacity: 0.18;
-  pointer-events: none;
-  z-index: 0;
-  mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    transparent 15%,
-    rgba(0,0,0,0.6) 50%,
-    black 90%
-  );
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    transparent 15%,
-    rgba(0,0,0,0.6) 50%,
-    black 90%
-  );
-}
-.hero-graph :global(svg text) {
-  display: none;
-}
-@media (max-width: 1100px) {
-  .hero-graph { display: none; }
-}
 
 .hero-qualifier {
   font-size: .8125rem; color: var(--text-muted);
@@ -439,60 +382,13 @@ import MaturityCard from '../components/MaturityCard.astro';
 }
 .link-arrow:hover { text-decoration: underline; }
 
-/* CTA box */
-.cta-box { text-align: center; max-width: 760px; margin: 0 auto; }
-.cta-box h2 { margin-bottom: var(--space-md); }
-.cta-box > p { margin: 0 auto var(--space-xl); font-size: 1.0625rem; color: var(--text-muted); }
-
-.next-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-xl);
-}
-.next-label {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--text-muted);
-}
 .btn-lg { font-size: 1rem; padding: 0.75rem 1.5rem; }
-
-.reading-order {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-top: var(--space-lg);
-  padding-top: var(--space-lg);
-  border-top: 1px solid var(--border-subtle);
-}
-.reading-order-label {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+.section-lede {
+  font-size: 1.0625rem;
   color: var(--text-muted);
+  margin: 0 auto var(--space-xl);
+  max-width: 36em;
 }
-.reading-order-list {
-  list-style: decimal;
-  padding-left: var(--space-lg);
-  margin: 0;
-  text-align: left;
-  font-size: 0.9375rem;
-  color: var(--text-body);
-  line-height: 1.9;
-}
-.reading-order-list a {
-  color: var(--text-body);
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--duration-fast) var(--ease-out);
-}
-.reading-order-list a:hover { border-bottom-color: var(--accent-teal); }
-.or { color: var(--text-muted); font-size: 0.875em; }
 
 @media (max-width: 768px) {
   .hero-home {
