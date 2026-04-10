@@ -28,9 +28,8 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <h2>How to read this page</h2>
       <p>
         ICN is large, and different parts of the system are at different levels of maturity.
-        The public-facing site has historically lagged the actual implementation,
-        and this page is part of closing that gap. We describe maturity in four bands,
-        and every capability claim elsewhere on this site is placed in one of them.
+        We describe maturity in four bands. Every capability claim on this site
+        is placed in one of them.
       </p>
 
       <MaturityGrid>
@@ -38,7 +37,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
           <p>Implemented, integrated, and load-bearing. The project is willing to stand behind these capabilities in public.</p>
         </MaturityCard>
         <MaturityCard band="advancing">
-          <p>Actively under development with visible progress. Real work, real incompleteness. Not yet something to rely on.</p>
+          <p>Actively under development with visible progress. Not yet something to rely on, but moving.</p>
         </MaturityCard>
         <MaturityCard band="maturing">
           <p>Serious implementation exists. Surfaces and integrations are still being finished. Implementation is often ahead of the public-facing story.</p>
@@ -69,10 +68,10 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         Self-held identity for members and institutions is in place, and is the foundation the rest of the system builds on.
       </p>
       <p>
-        <strong>The meaning-firewall discipline.</strong>
-        The structural separation between the kernel (which enforces constraints blindly) and the app layer
-        (which interprets domain meaning) is enforced in the crate graph itself. It is not aspirational;
-        it is how the system stays coherent as it grows.
+        <strong>Structural discipline.</strong>
+        The separation between the enforcement layer (which enforces constraints without understanding
+        their domain meaning) and the application layer (which interprets institutional concepts)
+        is enforced in the codebase architecture. This is how the system stays coherent as it grows.
       </p>
 
       <ProvenanceTrail title="What 'strongest today' means, concretely" />
@@ -80,10 +79,9 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <h2>Advancing now</h2>
       <p>
         <strong>Execution coverage.</strong>
-        A kernel-dispatch bridge between accepted governance payloads and the subsystems that carry them
-        into operational effect already exists. Widening the set of payload types that dispatch cleanly —
-        so that more of what a scope decides actually becomes operationally real — is the active frontier.
-        Real work, real incompleteness.
+        The mechanism that carries accepted decisions into operational effect already exists.
+        Expanding the range of decision types it handles — so that more of what an institution
+        decides actually becomes operationally real — is where active development is concentrated.
       </p>
       <p>
         <strong>Policy binding practice.</strong>
@@ -103,8 +101,8 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         <strong>Commons and compute.</strong>
         Shared infrastructure participating in the same institutional loop as governance and accounting.
         Implementation includes trust-aware task placement, cross-participant clearing, checkpointing, and dispute resolution.
-        This is the area where implementation is most meaningfully ahead of the public narrative,
-        and the surfaces that would let outsiders evaluate it are still being built.
+        This is one of the areas where the implementation is ahead of what the documentation
+        and public surfaces currently convey.
       </p>
       <p>
         <strong>Economic semantics.</strong>
@@ -132,15 +130,12 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         When outsiders ask "does ICN do X," the honest answer is sometimes <em>not yet, and we are not pretending otherwise</em>.
       </p>
 
-      <h2>Where the site and the system diverge</h2>
+      <h2>What this page commits to</h2>
       <p>
-        One honest caveat: the public-facing site has historically lagged the actual implementation, sometimes significantly.
-        Parts of ICN that are real and working are not yet well represented in the public narrative.
-        Parts that are still maturing have sometimes been described as if they were further along than they are.
-        This page — and the refactor it belongs to — is how we are closing that gap.
-      </p>
-      <p>
-        If you find a claim elsewhere on the site that does not match what you see in the code, that is a bug in the site and we want to know.
+        Every capability claim on this site is grounded in the maturity bands above.
+        If something is described as "strong today," it is implemented and in use.
+        If something is described as "advancing," it is under active development but not finished.
+        If you find a claim elsewhere on this site that contradicts what is here, please let us know.
       </p>
 
       <h2>The scopes the bands above apply across</h2>
