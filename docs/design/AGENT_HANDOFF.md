@@ -99,7 +99,7 @@ let engine = Engine::default();  // No determinism config!
 
 ```toml
 # Line 52 - already pinned for security
-wasmtime = { version = "24.0.5", optional = true }
+wasmtime = { version = "36.0.7", optional = true }
 ```
 
 ### Governance Path (THE LC BOUNDARY)
