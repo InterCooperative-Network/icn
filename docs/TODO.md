@@ -1,13 +1,18 @@
 # ICN TODO (ordered)
 
-Last reviewed: 2026-02-18
+Last reviewed: 2026-04-10
 
-1) Sprint: Pilot Vertical Slice Hardening (active)
-   - #1214 `refactor(api): governance + ledger shared service parity in icn-api`
-   - #1221 `refactor(gateway): enforce adapter/view-model boundary for decision+ledger reads`
-   - #1220 `refactor(governance): migrate pilot-required proposal types off legacy handlers`
-   - #1222 `docs(ops): pilot runbook + one-command smoke verification`
-   Acceptance: all four issues merged with required crate checks and invariant-safe behavior.
+1) Main CI — stable as of 2026-04-10
+   - Security Audit gate (RUSTSEC-2026-0095, wasmtime 24.0.6) resolved via PR #1522
+   - Test gate (`test_treasury_nonce_survives_reopen` sled lock) resolved via PR #1522
+   - PR #1520 (website cleanup) merged 2026-04-10
+   - PR #1521 closed as superseded by #1522
+
+2) Sprint: Pilot Vertical Slice Hardening (complete — all issues closed)
+   - #1214 ✅ closed
+   - #1221 ✅ closed
+   - #1220 ✅ closed
+   - #1222 ✅ closed
 
 2) Docs reality-sync (active, non-archive/session scope)
    - Fix broken links and stale absolute paths under `docs/`
