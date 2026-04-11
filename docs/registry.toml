@@ -733,6 +733,22 @@ last_updated = "2026-03-15"
 owner = "matt"
 audiences = ["developers", "contributors"]
 
+[docs."docs/genesis.md"]
+category = "architecture"
+status = "canonical"
+title = "Constitutional Genesis"
+description = "Immutable substrate invariants, bootstrap sequence, and governance boundaries"
+last_updated = "2026-04-10"
+last_reviewed = "2026-04-10"
+owner = "matt"
+audiences = ["developers", "agents", "stakeholders"]
+truth_class = "normative"
+role = "architecture"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["architecture", "governance", "invariants"]
+recommended_action = "keep"
+
 [docs."docs/GOLDEN_PROMPT.md"]
 category = "reference"
 status = "living"
