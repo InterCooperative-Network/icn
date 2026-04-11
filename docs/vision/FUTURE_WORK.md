@@ -444,7 +444,7 @@ This document should be updated:
 
 Related documents:
 - [GAP_ANALYSIS.md](../internal/status/GAP_ANALYSIS.md) - Current gap status
-- [ROADMAP.md](../development/sessions/undated/ROADMAP.md) - Strategic roadmap
+- [ROADMAP.md](../strategy/ICN-Roadmap-Live.md) - Strategic roadmap
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture
 
 ---

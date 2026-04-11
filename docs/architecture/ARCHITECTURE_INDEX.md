@@ -408,7 +408,7 @@ icn/
 ### Development
 - [CONTRIBUTING.md](../../CONTRIBUTING.md) - Contribution guidelines
 - [CHANGELOG.md](../../CHANGELOG.md) - Release notes
-- [ROADMAP.md](../development/sessions/undated/ROADMAP.md) - Feature timeline (historical session roadmap)
+- [ROADMAP.md](../strategy/ICN-Roadmap-Live.md) - Feature timeline (historical session roadmap)
 
 ---
 

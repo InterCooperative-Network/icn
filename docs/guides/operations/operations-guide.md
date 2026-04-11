@@ -1025,7 +1025,7 @@ icnctl gossip stats
 - **Incident Response**: [incident-response.md](../../operations/deployment/incident-response.md)
 - **Architecture**: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 - **Changelog**: [CHANGELOG.md](../../../CHANGELOG.md)
-- **Roadmap**: [ROADMAP.md](../../development/sessions/undated/ROADMAP.md)
+- **Roadmap**: [ROADMAP.md](../../strategy/ICN-Roadmap-Live.md)
 
 ---
 

@@ -1954,7 +1954,7 @@ These may be revisited in future RFCs based on community needs.
 
 ### ICN Documentation
 
-- [ROADMAP.md](../../development/sessions/undated/ROADMAP.md) - Strategic roadmap
+- [ROADMAP.md](../../strategy/ICN-Roadmap-Live.md) - Strategic roadmap
 - [glossary.md](../../glossary.md) - Authoritative terminology definitions
 - [economic-safety.md](economic-safety.md) - Credit limits and disputes
 - [econ-modeling.md](econ-modeling.md) - Economic simulation results

@@ -904,5 +904,5 @@ pub trait GovernanceOps: Send + Sync {
 - [social-recovery.md](../sdis/social-recovery.md) - Similar gossip-based coordination pattern
 
 **External Context:**
-- [ROADMAP.md](../../development/sessions/undated/ROADMAP.md) - Phase 13 objectives and next steps
+- [ROADMAP.md](../../strategy/ICN-Roadmap-Live.md) - Phase 13 objectives and next steps
 - [../economics/econ-modeling.md](../economics/econ-modeling.md) - Economic safety mechanisms (Phase 12)

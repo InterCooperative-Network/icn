@@ -74,7 +74,7 @@ This is the architectural invariant. The kernel provides mechanisms (identity, t
 
 ## What's Incomplete
 
-- **CCL Charter Engine:** Complete (Phase 1, PRs #1336 + #1337). YAML charter documents parse, validate, and bridge to `ConstraintSet` via `charter_to_constraints()`. `CharterPolicyOracle` in `apps/charter` deploys charters through governance ratification. The expression evaluator works (`parse_expr("0.67 * members")`). Contracts are JSON ASTs interpreted with fuel metering. No text parser. No WASM compiler in this repo.
+- **CCL Charter Engine:** Complete (Phase 1, PRs #1336 + #1337). YAML charter documents parse, validate, and bridge to `ConstraintSet` via `charter_to_constraints()`. `CharterPolicyOracle` in `icn/apps/charter` deploys charters through governance ratification. The expression evaluator works (`parse_expr("0.67 * members")`). Contracts are JSON ASTs interpreted with fuel metering. No text parser. No WASM compiler in this repo.
 - **Kernel infection:** Domain imports in `icn-core` have been reduced to ~23 (down from 100+). CI meaning-firewall regression tests enforce a ratchet. Active work continues to extract remaining domain references from kernel crates.
 - **Gateway:** 59K lines in one crate. Adapter/view-model boundary refactor is in progress.
 - **Federation end-to-end:** Clearing and netting exist but aren't wired through the full AgreementSchema lifecycle.
@@ -270,7 +270,7 @@ charter_to_constraints()           ← COMPLETE (icn-ccl)
   ├── EvalContext binds runtime data
   ├── Schema expressions evaluate to numbers
   └── Numbers map to ConstraintSet
-CharterPolicyOracle                ← COMPLETE (apps/charter)
+CharterPolicyOracle                ← COMPLETE (icn/apps/charter)
 Kernel enforcement                 ← EXISTS
 ```
 
@@ -278,7 +278,7 @@ Governance ratification flow: vote passes → `close_proposal` fires type-erased
 
 ### Delivered
 - `charter_to_constraints()` in `icn-ccl`
-- `CharterPolicyOracle` in `apps/charter`
+- `CharterPolicyOracle` in `icn/apps/charter`
 - 5 charter templates: worker coop, consumer coop, housing coop, community org, federation
 - `icnctl charter validate/deploy/inspect` subcommands
 - Demo Flow 1 uses a real charter document
@@ -541,7 +541,7 @@ ConstraintSet { custom: { "min_votes": Int(67) } }  ← Map to constraint
 ### CharterPolicyOracle
 
 ```rust
-// In apps/charter/src/oracle.rs (new crate)
+// In icn/apps/charter/src/oracle.rs (new crate)
 
 pub struct CharterPolicyOracle {
     // Stores active charters per entity, keyed by content hash

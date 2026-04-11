@@ -1037,7 +1037,7 @@ compute_handle.submit_with_placement(training_task, placement_req).await?;
 ## References
 
 - [Phase 15 Compute Layer](../../icn/crates/icn-compute/) - Current implementation
-- [ROADMAP.md](../development/sessions/undated/ROADMAP.md) - Overall project roadmap
+- [ROADMAP.md](../strategy/ICN-Roadmap-Live.md) - Overall project roadmap
 - [CLAUDE.md](../../CLAUDE.md) - Project guidance
 - [Scheduler Module](../../icn/crates/icn-compute/src/scheduler.rs) - Phase 16A foundation types
 - [Strategic Gap Analysis](../development/sessions/2026-01/2025-01-15-strategic-gap-analysis.md) - Missing pieces for pilot deployment
