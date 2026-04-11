@@ -6,15 +6,16 @@ Last Reviewed: 2026-04-10
 
 # ICN State (living doc)
 
-## Current status (2026-04-10 snapshot)
-- **PR #1520** (website cleanup: logo, homepage condensation, light theme, NetworkGraph/d3 removal) merged to main
-- **PR #1522** (`fix/coop-store-sled-lock`) merged — resolves two main CI blockers:
+## Current status (2026-04-11 snapshot)
+- **PR #1520** (website cleanup: logo, homepage condensation, light theme, NetworkGraph/d3 removal) merged 2026-04-10
+- **PR #1522** (`fix/coop-store-sled-lock`) merged 2026-04-11T00:21Z — resolves two main CI blockers:
   - Security Audit gate: wasmtime bumped 24.0.6 → 36.0.7 (RUSTSEC-2026-0095, critical sandbox escape)
   - Test gate: `icn_coop::store::tests::test_treasury_nonce_survives_reopen` sled lock contention fixed via explicit `drop(store)` before reopen
 - **PR #1521** (`fix/wasmtime-security-audit`) closed as superseded by #1522 (strict superset)
 - **Pilot Vertical Slice Hardening sprint complete**: #1214, #1221, #1220, #1222 all closed
-- **Issue #862** (naming primitive) closed as superseded — implemented as `icn-naming` crate (`SledNamingService` with authority signature enforcement, alias chain resolution, sled persistence)
-- Main CI post-merge: Clippy ✅, Format ✅, Test (in progress), Build Release (in progress), Security Audit skipping (not failing — skip pattern matches PR CI behavior; wasmtime 36.0.7 is in Cargo.lock)
+- **Issue #862** (naming primitive) closed as superseded — implemented as `icn-naming` crate
+- **Issue #1401** (hung docker-build-deploy CI) closed — root cause (Test job) already removed in PR #1403
+- Main CI post-merge: all real gates green. Security Audit was skipping due to missing `has_rust` dual-signal guard in CI workflow (fix: PR #1524)
 
 
 ## Architecture notes
