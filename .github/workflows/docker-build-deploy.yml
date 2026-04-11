@@ -50,6 +50,7 @@ jobs:
   build-and-deploy:
     name: Build and Deploy
     runs-on: [self-hosted, homelab, k3s]
+    timeout-minutes: 30
     # Skip build/deploy on scheduled runs (cleanup only)
     if: github.event_name != 'schedule'
 
@@ -187,6 +188,7 @@ jobs:
   cleanup:
     name: Cleanup Old Images
     runs-on: [self-hosted, homelab, k3s]
+    timeout-minutes: 15
     if: github.event_name == 'schedule'
     steps:
       - name: Remove old images on all nodes
