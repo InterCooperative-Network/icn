@@ -1,13 +1,13 @@
 # ICN Phase Progress
-**Last Updated:** 2026-03-18
-**Current Phase:** Phase 0 — Close the Demo
+**Last Updated:** 2026-04-11
+**Current Phase:** Phase 2 — Pilot Launch (blocked on cooperative partners)
 
 ---
 
 ### Phase 0: Close the Demo
-**Status:** 🚧 In Progress
+**Status:** ✅ Complete
 **Started:** 2026-03-18
-**Completed:** —
+**Completed:** 2026-03-18
 **Sprint(s):** S16
 
 **Objective:** All 4 demo flows run end-to-end with ExecutionReceiptGate, correct scopes, and proof signing.
@@ -95,7 +95,7 @@
 ---
 
 ### Phase 2: Pilot Launch
-**Status:** ⏳ Planned
+**Status:** ⏳ Blocked (awaiting cooperative partners)
 **Started:** —
 **Completed:** —
 **Sprint(s):** S19–S20
@@ -103,7 +103,7 @@
 **Objective:** 3–5 real cooperatives operating on ICN for governance and/or time-credit tracking.
 
 **Deliverables:**
-- [ ] Pilot runbook (#1222)
+- [x] Pilot runbook (#1222 ✅ closed)
 - [ ] One-command deployment script per cooperative
 - [ ] Charter customization workflow documented
 - [ ] Pilot onboarding guide (non-technical audience)
@@ -112,8 +112,8 @@
 - [ ] Pilot case study written (for grant/funder audiences)
 
 **Blockers:**
-- Requires Phase 1 complete (charter engine must work)
-- Requires cooperative partners identified and committed
+- ~~Requires Phase 1 complete~~ ✅ Charter Engine is live
+- Requires cooperative partners identified and committed (primary blocker)
 
 **Decisions Made:**
 - (none yet)
