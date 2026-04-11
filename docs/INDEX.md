@@ -376,13 +376,10 @@ Strategic direction and gap analysis (March 2026):
 
 Live status reports and deployment verification:
 
-- [icn-status-march-2026.md](status/icn-status-march-2026.md) - March 2026 status report
 - [icn-status-march-2026.md](status/icn-status-march-2026.md) - Current status report
 - [DEPLOYMENT_VERIFICATION.md](status/DEPLOYMENT_VERIFICATION.md) - Deployment verification
-- ~~FINAL_CI_RESOLUTION.md, FINAL_DEMO_SUCCESS.md, FINAL_SESSION_STATUS.md~~ — archived to `archive/2025/`
 - [MOBILE_APP_DEMO.md](status/MOBILE_APP_DEMO.md) - Mobile app demo
-- ~~TESTS_FIXED_STATUS.md~~ — archived to `archive/2025/`
-- [2025-12-25-sprint-status.md](status/2025-12-25-sprint-status.md) - Sprint status
+- Archived to `archive/2025/`: CURRENT_SYSTEM_STATUS, FINAL_CI_RESOLUTION, FINAL_DEMO_SUCCESS, FINAL_SESSION_STATUS, TESTS_FIXED_STATUS, 2025-12-25-sprint-status
 
 ### Architecture Decision Records (`adr/`)
 
