@@ -86,7 +86,7 @@ icnctl network stats
 
 ## Project Structure
 
-**28 crates** in `icn/crates/`, **4 app crates** in `apps/`, **3 binaries** in `icn/bins/`.
+**35 crates** in `icn/crates/`, **4 app crates** in `apps/`, **3 binaries** in `icn/bins/`.
 
 ### Kernel (domain-agnostic)
 
@@ -180,20 +180,14 @@ Trust-gated rate limiting enforces per-actor throughput bounds based on trust cl
 - **[Architecture Index](docs/architecture/)** — Visual diagrams, kernel/app separation details
 - **[Onboarding Modules](docs/onboarding/)** — Deep-dive learning modules
 - **[Production Hardening](docs/production-hardening.md)** — Security and deployment
-- **[Roadmap](docs/dev-journal/ROADMAP.md)** — Current and planned phases
+- **[Roadmap](docs/strategy/ICN-Roadmap-Live.md)** — Current sprint and tranche progress
 - **[Phase History](docs/PHASE_HISTORY.md)** — Completed development phases
 
 ## Status
 
-~362K lines of Rust across 28 crates and 4 app crates. Deployed on a K3s cluster since December 2025.
+~198K lines of Rust across 35 crates, 4 app crates, and 3 binaries. Deployed on a K3s cluster since December 2025.
 
-Active work is tracked in [6 epics](https://github.com/InterCooperative-Network/icn/issues/856):
-- **Kernel/App Separation** — Extracting domain logic from kernel (governance ratchet: 83 → 43)
-- **Architecture Invariants** — Formalizing the constraint engine boundary
-- **Trust Hardening** — Attestation signing, revocations, replay protection
-- **Service Discovery** — Gossip-based endpoint propagation
-- **Commons/Compute** — Resource pool and credit accounting
-- **Kernel Performance** — StateSnapshot COW, rate limiting
+Kernel/app separation (Phases 0-7) is complete. The Charter Engine is live — YAML charter documents produce kernel-enforced constraints. Active development follows [Governance Dispatch Tranches](docs/strategy/ICN-Roadmap-Live.md) (Tranches 9-18), wiring remaining governance decision types through the executor pipeline. Phase 2 (Pilot Launch) is blocked on cooperative partner identification.
 
 ## License
 

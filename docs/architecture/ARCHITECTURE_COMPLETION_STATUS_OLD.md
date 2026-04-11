@@ -319,7 +319,7 @@ The system demonstrates:
 ## References
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - System design
-- [ROADMAP.md](../development/sessions/undated/ROADMAP.md) - Development phases  
+- [ROADMAP.md](../strategy/ICN-Roadmap-Live.md) - Development phases  
 - [GETTING_STARTED.md](../GETTING_STARTED.md) - Developer guide
 - [production-hardening.md](../security/production-hardening.md) - Security measures
 - [governance-primitives.md](../design/governance/governance-primitives.md) - Democratic system

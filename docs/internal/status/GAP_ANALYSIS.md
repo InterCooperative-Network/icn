@@ -261,5 +261,5 @@ Progress on gap remediation will be tracked in:
 ## References
 
 - [CLAUDE.md](../../../CLAUDE.md) - Project architecture
-- [ROADMAP.md](../../development/sessions/undated/ROADMAP.md) - Strategic roadmap
+- [ROADMAP.md](../../strategy/ICN-Roadmap-Live.md) - Strategic roadmap
 - [INTERNAL_TESTING_PLAN.md](../../development/testing/INTERNAL_TESTING_PLAN.md) - Test scenarios

@@ -430,7 +430,7 @@ Health check cycle (every 60 seconds):
 ## Related Documentation
 
 - [ARCHITECTURE.md Section 7.4](../../ARCHITECTURE.md#74-data-durability--replication) - Technical design
-- [ROADMAP.md Phase 17](../../development/sessions/undated/ROADMAP.md#phase-17-storage-hardening--replication-4-weeks) - Implementation timeline
+- [ROADMAP.md Phase 17](../../strategy/ICN-Roadmap-Live.md#phase-17-storage-hardening--replication-4-weeks) - Implementation timeline
 - [CHANGELOG.md](../../../CHANGELOG.md) - Release notes
 
 ## Support

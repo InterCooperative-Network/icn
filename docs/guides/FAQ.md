@@ -430,7 +430,7 @@ icnctl --data-dir ~/.icn id init
 
 ### What's next for ICN?
 
-See [ROADMAP.md](../development/sessions/undated/ROADMAP.md) for detailed plans. Summary:
+See [ROADMAP.md](../strategy/ICN-Roadmap-Live.md) for detailed plans. Summary:
 
 **Immediate (2025 Q1):**
 - Track C1: Select pilot community
@@ -490,7 +490,7 @@ If yes to all four, ICN is likely a good fit!
 
 **Community:**
 - GitHub Issues: https://github.com/InterCooperative-Network/icn/issues
-- Roadmap: [ROADMAP.md](../development/sessions/undated/ROADMAP.md)
+- Roadmap: [ROADMAP.md](../strategy/ICN-Roadmap-Live.md)
 - Contributing: [CONTRIBUTING.md](../../CONTRIBUTING.md)
 
 ---

@@ -73,7 +73,7 @@ Last Reviewed: 2026-04-10
   - Pilot UI Receipts tab with sorted verification badge
   - icnctl receipts commands (chain/allocation/intent)
   - Demo scripts and E2E tests for cross-node determinism
-- Historical roadmap reference: `docs/development/sessions/undated/ROADMAP.md` (point-in-time planning document).
+- Historical roadmap reference: `docs/strategy/ICN-Roadmap-Live.md` (point-in-time planning document).
 - Current architecture and migration direction: `docs/PHASE_HISTORY.md` and `docs/architecture/KERNEL_APP_SEPARATION.md`.
 - CI status docs (docs/ci/CI_CURRENT_STATUS.md) are snapshot-based; re-verify before release decisions.
 - Local CI baseline 2026-02-11 passed with rustc 1.88.0 (icn/rust-toolchain.toml).
@@ -109,7 +109,7 @@ Last Reviewed: 2026-04-10
   - crates/icn-core/src/supervisor/governance_handlers.rs (4243 lines)
 
 ## References
-- docs/development/sessions/undated/ROADMAP.md
+- docs/strategy/ICN-Roadmap-Live.md
 - docs/architecture/KERNEL_APP_SEPARATION.md
 - docs/ci/CI_CURRENT_STATUS.md
 - docs/status/TESTS_FIXED_STATUS.md

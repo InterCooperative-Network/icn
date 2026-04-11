@@ -633,7 +633,7 @@ canonical = "yes"
 freshness = "current"
 domain_tags = ["navigation", "index"]
 recommended_action = "keep"
-last_reviewed = "2026-03-26"
+last_reviewed = "2026-04-11"
 
 [docs."docs/STATE.md"]
 category = "status"

@@ -156,7 +156,7 @@ This document describes how the ICN project is governed, how decisions are made,
    - Revise based on feedback
 
 3. **Publish**:
-   - Update [ROADMAP.md](../../development/sessions/undated/ROADMAP.md)
+   - Update [ROADMAP.md](../../strategy/ICN-Roadmap-Live.md)
    - Announce in CHANGELOG
    - Communicate to pilot communities
 
