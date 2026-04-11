@@ -1,3 +1,6 @@
+> **Archived / superseded document.**
+> Current source of truth: `docs/strategy/ICN-Roadmap-Live.md`
+
 # ICN Roadmap
 
 **Last Updated**: 2026-01-31

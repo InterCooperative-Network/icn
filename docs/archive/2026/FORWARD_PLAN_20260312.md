@@ -1,6 +1,9 @@
+> **Archived / superseded document.**
+> Current source of truth: `docs/strategy/ICN-Roadmap-Live.md`
+
 # ICN Forward Plan — March 2026
 
-**Document status:** Living planning document
+**Document status:** Archived planning snapshot (2026-03-12)
 **Last updated:** 2026-03-12
 **Author:** Matt Faherty
 **Canonical location:** `.claude_launchpad/icn-forward-plan.md` (launchpad) + `docs/planning/FORWARD_PLAN_2026-03.md` (ICN repo)
