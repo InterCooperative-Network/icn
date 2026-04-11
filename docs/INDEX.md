@@ -1,7 +1,7 @@
 ---
 Status: operational
 Canonical: yes
-Last Reviewed: 2026-03-26
+Last Reviewed: 2026-04-11
 ---
 
 ## Where things live (control plane)
@@ -350,7 +350,7 @@ Active project status and gap analyses:
 
 Current project planning and analysis:
 
-- [FORWARD_PLAN_2026-03.md](planning/FORWARD_PLAN_2026-03.md) - Phase 2-4 roadmap and timeline
+- ~~FORWARD_PLAN_2026-03.md~~ — archived to `archive/2026/FORWARD_PLAN_20260312.md`
 - [icn-crate-reference.md](planning/icn-crate-reference.md) - 38-crate inventory with roles and modules
 - [icn-ecosystem-map.md](planning/icn-ecosystem-map.md) - Entity hierarchy, surfaces, funnels, flywheel
 - [icn-vertical-slice-assessment.md](planning/icn-vertical-slice-assessment.md) - Gateway endpoint inventory and gap analysis
@@ -377,14 +377,11 @@ Strategic direction and gap analysis (March 2026):
 Live status reports and deployment verification:
 
 - [icn-status-march-2026.md](status/icn-status-march-2026.md) - March 2026 status report
-- [PROJECT_STATE_2026-02-09.md](status/PROJECT_STATE_2026-02-09.md) - Current project state ⭐
-- [CURRENT_SYSTEM_STATUS.md](status/CURRENT_SYSTEM_STATUS.md) - System status
+- [icn-status-march-2026.md](status/icn-status-march-2026.md) - Current status report
 - [DEPLOYMENT_VERIFICATION.md](status/DEPLOYMENT_VERIFICATION.md) - Deployment verification
-- [FINAL_CI_RESOLUTION.md](status/FINAL_CI_RESOLUTION.md) - CI resolution status
-- [FINAL_DEMO_SUCCESS.md](status/FINAL_DEMO_SUCCESS.md) - Demo success report
-- [FINAL_SESSION_STATUS.md](status/FINAL_SESSION_STATUS.md) - Session status
+- ~~FINAL_CI_RESOLUTION.md, FINAL_DEMO_SUCCESS.md, FINAL_SESSION_STATUS.md~~ — archived to `archive/2025/`
 - [MOBILE_APP_DEMO.md](status/MOBILE_APP_DEMO.md) - Mobile app demo
-- [TESTS_FIXED_STATUS.md](status/TESTS_FIXED_STATUS.md) - Test fix status
+- ~~TESTS_FIXED_STATUS.md~~ — archived to `archive/2025/`
 - [2025-12-25-sprint-status.md](status/2025-12-25-sprint-status.md) - Sprint status
 
 ### Architecture Decision Records (`adr/`)
