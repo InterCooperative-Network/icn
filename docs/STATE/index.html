@@ -42,18 +42,19 @@ View source on GitHub →
 Canonical: yes
 Last Reviewed: 2026-04-10</h2>
 <h1>ICN State (living doc)</h1>
-<h2>Current status (2026-04-10 snapshot)</h2>
+<h2>Current status (2026-04-11 snapshot)</h2>
 <ul>
-<li><strong>PR #1520</strong> (website cleanup: logo, homepage condensation, light theme, NetworkGraph/d3 removal) merged to main</li>
-<li><strong>PR #1522</strong> (<code>fix/coop-store-sled-lock</code>) merged — resolves two main CI blockers:<ul>
+<li><strong>PR #1520</strong> (website cleanup: logo, homepage condensation, light theme, NetworkGraph/d3 removal) merged 2026-04-10</li>
+<li><strong>PR #1522</strong> (<code>fix/coop-store-sled-lock</code>) merged 2026-04-11T00:21Z — resolves two main CI blockers:<ul>
 <li>Security Audit gate: wasmtime bumped 24.0.6 → 36.0.7 (RUSTSEC-2026-0095, critical sandbox escape)</li>
 <li>Test gate: <code>icn_coop::store::tests::test_treasury_nonce_survives_reopen</code> sled lock contention fixed via explicit <code>drop(store)</code> before reopen</li>
 </ul>
 </li>
 <li><strong>PR #1521</strong> (<code>fix/wasmtime-security-audit</code>) closed as superseded by #1522 (strict superset)</li>
 <li><strong>Pilot Vertical Slice Hardening sprint complete</strong>: #1214, #1221, #1220, #1222 all closed</li>
-<li><strong>Issue #862</strong> (naming primitive) closed as superseded — implemented as <code>icn-naming</code> crate (<code>SledNamingService</code> with authority signature enforcement, alias chain resolution, sled persistence)</li>
-<li>Main CI post-merge: Clippy ✅, Format ✅, Test (in progress), Build Release (in progress), Security Audit skipping (not failing — skip pattern matches PR CI behavior; wasmtime 36.0.7 is in Cargo.lock)</li>
+<li><strong>Issue #862</strong> (naming primitive) closed as superseded — implemented as <code>icn-naming</code> crate</li>
+<li><strong>Issue #1401</strong> (hung docker-build-deploy CI) closed — root cause (Test job) already removed in PR #1403</li>
+<li>Main CI post-merge: all real gates green. Security Audit was skipping due to missing <code>has_rust</code> dual-signal guard in CI workflow (fix: PR #1524)</li>
 </ul>
 <h2>Architecture notes</h2>
 <ul>
