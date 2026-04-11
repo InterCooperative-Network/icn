@@ -1,0 +1,683 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Constitutional Genesis | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yTnaBP6O.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>genesis</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/genesis.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: normative
+Canonical: yes
+Last Reviewed: 2026-04-10</h2>
+<h1>Constitutional Genesis</h1>
+<p>This document defines the immutable substrate of the Intercooperative Network: what cannot be changed by governance, what can, and how the system bootstraps from nothing into a governed cooperative.</p>
+<h2>Foundation: The Constraint Engine</h2>
+<p>ICN is a constraint engine. Applications translate meaning into constraints; the kernel enforces constraints without understanding meaning. This separation is the architectural foundation of everything that follows.</p>
+<p>The kernel sees <code>ConstraintSet</code> values: rate limits, topic caps, message size bounds, and opaque custom fields. It never sees trust scores, membership tiers, or governance roles. That boundary — the <strong>meaning firewall</strong> — is itself an immutable invariant.</p>
+<h2>Hard Invariants</h2>
+<p>Hard invariants are substrate mechanics. Governance cannot remove them. They define what ICN <em>is</em> rather than how it is configured.</p>
+<h3>Frozen-Core Invariants</h3>
+<p>The kernel recognizes 10 frozen-core invariants, organized into three domains. These are defined in <code>icn-kernel-api/src/invariants.rs</code> as <code>InvariantId</code>. The kernel verifies attestation presence, format, and hash linkage for these invariants — it never evaluates the predicates themselves. Predicate evaluation lives in the governance app layer (<code>InvariantGate</code>).</p>
+<h4>Sovereignty Core (Consent and Exit)</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Invariant</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>Right of Exit</strong></td>
+<td>No rule can prevent an identity from leaving an entity</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>No Retroactive Obligations</strong></td>
+<td>Rules only apply to actions after their activation block</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Explicit Cryptographic Entry</strong></td>
+<td>Adding an identity to an entity requires their cryptographic signature</td>
+</tr>
+</tbody></table>
+<h4>Anti-Capture Core (Power and Governance)</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Invariant</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>4</td>
+<td><strong>No Silent Power Changes</strong></td>
+<td>Authorization changes must include a computable capability delta</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Bounded Authority</strong></td>
+<td>No wildcard capabilities across all resources</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Mandatory Execution Delay</strong></td>
+<td>Economic and capability changes require a timelock delay</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Capability Conservation</strong></td>
+<td>Cannot delegate capabilities you do not possess</td>
+</tr>
+</tbody></table>
+<h4>Economic Core</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Invariant</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>8</td>
+<td><strong>Mutual Credit Conservation</strong></td>
+<td>Credit loops must net to zero</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>Sovereign Signature Requirement</strong></td>
+<td>Funds move only via owner signature or pre-consented dispute hook</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>Universal Receipt Generation</strong></td>
+<td>Every state transition emits an immutable receipt</td>
+</tr>
+</tbody></table>
+<h3>Enforcement Mechanisms (Hard Invariants)</h3>
+<p>Beyond the frozen-core governance invariants, the substrate enforces these structural mechanics. Governance can change the <em>values</em> fed into these mechanisms but cannot remove the mechanisms themselves.</p>
+<table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Enforced In</th>
+<th>What It Does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Zero-sum ledger</strong></td>
+<td><code>icn-ledger/src/ledger.rs</code> (<code>validate_entry</code>)</td>
+<td>Every credit creates a matching debit. Double-entry balance check per currency.</td>
+</tr>
+<tr>
+<td><strong>Deterministic compute</strong></td>
+<td><code>icn-kernel-api/src/compute.rs</code> (<code>DeterminismClass::Canonical</code>)</td>
+<td>Canonical execution mode guarantees same inputs produce same outputs.</td>
+</tr>
+<tr>
+<td><strong>Kernel/app separation</strong></td>
+<td><code>icn-core/src/meaning_firewall.rs</code> + CI denylist</td>
+<td>Kernel crates never import domain types. Validated by CI import regression tests.</td>
+</tr>
+<tr>
+<td><strong>Members control keys</strong></td>
+<td><code>icn-identity/src/bundle.rs</code>, <code>keystore.rs</code></td>
+<td>Private keys live in age-encrypted keystore. No custodial escrow. Export requires passphrase.</td>
+</tr>
+<tr>
+<td><strong>Transport authentication</strong></td>
+<td><code>icn-net/src/envelope.rs</code> (<code>SignedEnvelope::verify</code>)</td>
+<td>Ed25519 signature verification on all network messages. Hybrid ML-DSA verification available via <code>verify_with_pq_key()</code> when PQ public key is present.</td>
+</tr>
+<tr>
+<td><strong>Replay guard</strong></td>
+<td><code>icn-net/src/replay_guard.rs</code> + network handlers</td>
+<td>Monotonic sequence numbers and timestamp age checks prevent message replay. Wired into the network actor via signed message handlers.</td>
+</tr>
+<tr>
+<td><strong>Rate limiter</strong></td>
+<td><code>icn-net/src/rate_limit.rs</code> (token bucket)</td>
+<td>Per-peer token bucket rate limiting. Mechanism exists; values come from PolicyOracle.</td>
+</tr>
+<tr>
+<td><strong>Capability gate</strong></td>
+<td><code>icn-kernel-api/src/bootstrap.rs</code> (<code>Capability</code>, <code>CapabilitySet</code>)</td>
+<td>Capabilities are bearer tokens with delegation rules checked via <code>CapabilitySet::can_delegate()</code>.</td>
+</tr>
+<tr>
+<td><strong>Credit gate</strong></td>
+<td><code>icn-ledger/src/credit_policy.rs</code></td>
+<td>Dynamic credit limits checked against account balance, trust score, and cleared volume.</td>
+</tr>
+</tbody></table>
+<h3>The Critical Distinction</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Governance CAN</th>
+<th>Governance CANNOT</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rate limiting</td>
+<td>Change the rate (20/s to 100/s)</td>
+<td>Remove rate limiting entirely</td>
+</tr>
+<tr>
+<td>Credit gating</td>
+<td>Change the ceiling (1000 to 5000)</td>
+<td>Remove credit gating entirely</td>
+</tr>
+<tr>
+<td>Capability system</td>
+<td>Change who gets what grants</td>
+<td>Remove capability checking entirely</td>
+</tr>
+<tr>
+<td>Zero-sum ledger</td>
+<td>(not applicable)</td>
+<td>Violate double-entry balance</td>
+</tr>
+<tr>
+<td>Deterministic compute</td>
+<td>(not applicable)</td>
+<td>Make canonical execution non-deterministic</td>
+</tr>
+<tr>
+<td>Kernel/app separation</td>
+<td>(not applicable)</td>
+<td>Allow domain imports in kernel crates</td>
+</tr>
+</tbody></table>
+<p>If governance could remove enforcement mechanisms, there would be no stable substrate.</p>
+<h2>Meta-Invariants</h2>
+<p>Meta-invariants are constraint <em>values</em> that governance can change through the PolicyOracle pattern. Apps translate domain semantics into <code>ConstraintSet</code> fields; the kernel enforces those fields blindly.</p>
+<table>
+<thead>
+<tr>
+<th>Meta-Invariant</th>
+<th>Source Oracle</th>
+<th>What It Controls</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Rate limit values</strong></td>
+<td><code>TrustPolicyOracle</code> (<code>apps/trust/src/oracle.rs</code>)</td>
+<td>Requests per second per trust class (10/20/100/200)</td>
+</tr>
+<tr>
+<td><strong>Credit ceiling values</strong></td>
+<td><code>LedgerPolicyOracle</code> (<code>apps/ledger/src/oracle.rs</code>)</td>
+<td>Maximum credit extended per account</td>
+</tr>
+<tr>
+<td><strong>Capability grants</strong></td>
+<td><code>CapabilityGate</code> (<code>icn-kernel-api/src/bootstrap.rs</code>)</td>
+<td>Which actors hold which capabilities</td>
+</tr>
+<tr>
+<td><strong>Trust class thresholds</strong></td>
+<td><code>TrustPolicyOracle</code></td>
+<td>Score boundaries for Isolated/Known/Partner/Federated (0.0/0.1/0.4/0.7)</td>
+</tr>
+<tr>
+<td><strong>Voting methods</strong></td>
+<td><code>GovernancePolicyOracle</code> (<code>apps/governance/src/oracle.rs</code>)</td>
+<td>Simple majority vs supermajority, quorum requirements</td>
+</tr>
+<tr>
+<td><strong>Treasury policy</strong></td>
+<td>Governance + Treasury actor</td>
+<td>Surplus distribution rules, demurrage schedules</td>
+</tr>
+</tbody></table>
+<h3>The Meaning Firewall Boundary</h3>
+<p>Each PolicyOracle converts domain-specific knowledge into generic constraints:</p>
+<pre><code>TrustPolicyOracle:
+  trust_score(0.85) → ConstraintSet { rate_limit: 200/s, custom: { credit_multiplier: 0.85 } }
+
+GovernancePolicyOracle:
+  protocol_params → ConstraintSet { rate_limit: N, custom: { resource_quota: M } }
+
+LedgerPolicyOracle:
+  account_state → ConstraintSet { custom: { credit_ceiling: K } }
+</code></pre>
+<p>The kernel receives <code>ConstraintSet</code>. It enforces rate limits, topic caps, and opaque custom fields. It never knows these values came from trust scores or governance parameters.</p>
+<h2>Bootstrap Sequence</h2>
+<p>A new ICN node starts from nothing and transitions through three phases before reaching normal operation.</p>
+<h3>Phase 1: Genesis</h3>
+<p>The daemon loads configuration, unlocks the keystore, and enters the Genesis bootstrap phase.</p>
+<p><strong>What happens:</strong></p>
+<ol>
+<li>Configuration loaded from <code>icn.toml</code></li>
+<li>Identity bundle loaded or generated from age-encrypted keystore</li>
+<li><code>AllowAllOracle</code> is active — all operations are permitted</li>
+<li>Genesis capabilities can be issued (time-limited, phase-guarded)</li>
+<li>Trust service initializes with empty trust graph</li>
+<li>Ledger initializes with empty state</li>
+<li>Governance service initializes with default protocol parameters</li>
+</ol>
+<p><strong>What this means:</strong> During Genesis, the node has no trust relationships, no credit history, and no governance structure. The <code>AllowAllOracle</code> permits bootstrap operations that would otherwise be denied.</p>
+<h3>Phase 2: CoreApps</h3>
+<p>First-party applications load and register their PolicyOracles.</p>
+<p><strong>What happens:</strong></p>
+<ol>
+<li>Trust oracle registers with the PolicyOracle registry</li>
+<li>Governance oracle registers</li>
+<li>Ledger oracle registers</li>
+<li>Genesis capabilities remain valid but will expire</li>
+<li>Missing oracles still default to allow (bootstrap flexibility)</li>
+</ol>
+<p><strong>What this means:</strong> The system is transitioning from permissive to enforced. Apps are loading their domain-specific authorization logic.</p>
+<h3>Phase 3: Running</h3>
+<p>Normal operation begins. The system transitions to deny-by-default for unknown domains.</p>
+<p><strong>What happens:</strong></p>
+<ol>
+<li>Genesis capabilities expire</li>
+<li><code>AllowAllOracle</code> is replaced by registered domain oracles</li>
+<li>Unknown domains receive <code>PolicyDecision::Deny</code> (not allow)</li>
+<li>All frozen-core invariants are actively enforced</li>
+<li>Gossip synchronization begins</li>
+<li>Network actors accept peer connections</li>
+</ol>
+<p><strong>What this means:</strong> The cooperative is live. Every operation is authorized by a PolicyOracle or denied. The substrate enforces constraints without understanding their semantic origin.</p>
+<h3>Genesis Identity</h3>
+<p>The first identity is created during node initialization:</p>
+<ol>
+<li><code>icnctl id init</code> generates an Ed25519 keypair</li>
+<li>DID is derived: <code>did:icn:&lt;base58-pubkey&gt;</code></li>
+<li>Private key is stored in age-encrypted keystore at <code>~/.icn/keystore.age</code></li>
+<li>X25519 key is derived for TLS binding</li>
+<li>The identity can be exported at any time via <code>icnctl id export</code></li>
+</ol>
+<h3>Genesis Trust</h3>
+<p>Initial trust is seeded explicitly. There is no implicit trust:</p>
+<ol>
+<li>First node starts with an empty trust graph</li>
+<li>Trust edges are added via explicit peer connections</li>
+<li>Trust scores are computed transitively from direct edges</li>
+<li>The genesis trust configuration is auditable and replaceable</li>
+</ol>
+<h3>Genesis Treasury</h3>
+<p>The initial credit pool is created through the ledger:</p>
+<ol>
+<li>Ledger starts with no accounts and no balances</li>
+<li>Genesis credit issuance follows double-entry rules (credit creates matching debit)</li>
+<li>The zero-sum invariant holds from the first transaction</li>
+<li>Treasury policy is a meta-invariant — governance can change distribution rules</li>
+</ol>
+<h2>Exit and Fork Rights</h2>
+<p>ICN guarantees data sovereignty. Members can always leave and take their data.</p>
+<h3>What Members Can Export</h3>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Mechanism</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Identity (keypair + DID)</td>
+<td>Age-encrypted bundle</td>
+<td><code>icnctl id export</code></td>
+</tr>
+<tr>
+<td>Full node state</td>
+<td>Archive backup</td>
+<td><code>icnctl backup</code></td>
+</tr>
+<tr>
+<td>Ledger entries authored</td>
+<td>Cryptographically signed DAG entries</td>
+<td>Ledger export (entries are self-authenticating)</td>
+</tr>
+<tr>
+<td>Trust edges issued</td>
+<td>Signed trust attestations</td>
+<td>Trust graph export</td>
+</tr>
+</tbody></table>
+<h3>What Cannot Be Taken</h3>
+<ul>
+<li>Trust edges <em>received from others</em> (those belong to the issuer)</li>
+<li>Governance votes cast by other members</li>
+<li>Credit balances owed by others (the obligation is bilateral)</li>
+</ul>
+<h3>Fork Rights</h3>
+<p>Because identity is self-sovereign (DID derived from public key, private key in member&#39;s keystore), a member can:</p>
+<ol>
+<li>Export their identity</li>
+<li>Export their authored ledger entries</li>
+<li>Start a new node with the same identity</li>
+<li>Establish new trust relationships independently</li>
+</ol>
+<p>There is no administrator who can revoke a DID or freeze an account. The Sovereign Signature Requirement (invariant #9) guarantees that funds move only via owner signature or pre-consented dispute hooks.</p>
+<h2>Invariant Enforcement Table</h2>
+<table>
+<thead>
+<tr>
+<th>Invariant</th>
+<th>Hard/Meta</th>
+<th>Domain</th>
+<th>Where Enforced</th>
+<th>How Tested</th>
+<th>How Observed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Right of Exit</td>
+<td>Hard</td>
+<td>Sovereignty</td>
+<td><code>icn-kernel-api/src/invariants.rs</code> (attestation format); governance app (predicate)</td>
+<td>Governance invariant attestation</td>
+<td>Invariant report in governance decisions</td>
+</tr>
+<tr>
+<td>No Retroactive Obligations</td>
+<td>Hard</td>
+<td>Sovereignty</td>
+<td><code>icn-kernel-api/src/invariants.rs</code> (attestation format); governance app (predicate)</td>
+<td>Block height checks</td>
+<td>Invariant report</td>
+</tr>
+<tr>
+<td>Explicit Cryptographic Entry</td>
+<td>Hard</td>
+<td>Sovereignty</td>
+<td><code>icn-kernel-api/src/invariants.rs</code> (attestation format); governance app (predicate)</td>
+<td>Signature verification</td>
+<td>Invariant report</td>
+</tr>
+<tr>
+<td>No Silent Power Changes</td>
+<td>Hard</td>
+<td>Anti-Capture</td>
+<td><code>icn-kernel-api/src/invariants.rs</code></td>
+<td>Capability delta checks</td>
+<td>Invariant report</td>
+</tr>
+<tr>
+<td>Bounded Authority</td>
+<td>Hard</td>
+<td>Anti-Capture</td>
+<td><code>icn-kernel-api/src/invariants.rs</code></td>
+<td>Wildcard rejection</td>
+<td>Invariant report</td>
+</tr>
+<tr>
+<td>Mandatory Execution Delay</td>
+<td>Hard</td>
+<td>Anti-Capture</td>
+<td><code>icn-kernel-api/src/invariants.rs</code></td>
+<td>Timelock verification</td>
+<td>Invariant report</td>
+</tr>
+<tr>
+<td>Capability Conservation</td>
+<td>Hard</td>
+<td>Anti-Capture</td>
+<td><code>icn-kernel-api/src/bootstrap.rs</code></td>
+<td><code>test_capability_set_delegation</code></td>
+<td>Delegation metrics</td>
+</tr>
+<tr>
+<td>Mutual Credit Conservation</td>
+<td>Hard</td>
+<td>Economic</td>
+<td><code>icn-ledger/src/ledger.rs</code></td>
+<td>Balance validation tests</td>
+<td><code>icn_ledger_transactions_total</code>, <code>icn_ledger_entries_quarantined_total</code></td>
+</tr>
+<tr>
+<td>Sovereign Signature Requirement</td>
+<td>Hard</td>
+<td>Economic</td>
+<td><code>icn-ledger/src/ledger.rs</code></td>
+<td>Entry signature checks</td>
+<td>Signature failure counters</td>
+</tr>
+<tr>
+<td>Universal Receipt Generation</td>
+<td>Hard</td>
+<td>Economic</td>
+<td><code>icn-kernel-api/src/proofs.rs</code></td>
+<td>Receipt generation tests</td>
+<td>Receipt store metrics</td>
+</tr>
+<tr>
+<td>Zero-sum ledger</td>
+<td>Hard</td>
+<td>Mechanism</td>
+<td><code>icn-ledger/src/ledger.rs</code></td>
+<td><code>ledger_persistence.rs</code></td>
+<td>Arithmetic overflow counters</td>
+</tr>
+<tr>
+<td>Deterministic compute</td>
+<td>Hard</td>
+<td>Mechanism</td>
+<td><code>icn-kernel-api/src/compute.rs</code></td>
+<td><code>compute_integration.rs</code></td>
+<td>Canonical execution metrics</td>
+</tr>
+<tr>
+<td>Kernel/app separation</td>
+<td>Hard</td>
+<td>Mechanism</td>
+<td><code>icn-core/src/meaning_firewall.rs</code></td>
+<td><code>meaning_firewall.rs</code> (CI)</td>
+<td>Import count regression</td>
+</tr>
+<tr>
+<td>Members control keys</td>
+<td>Hard</td>
+<td>Mechanism</td>
+<td><code>icn-identity/src/bundle.rs</code></td>
+<td><code>backup_restore_test.rs</code></td>
+<td>Export requires passphrase</td>
+</tr>
+<tr>
+<td>Transport authentication</td>
+<td>Hard</td>
+<td>Mechanism</td>
+<td><code>icn-net/src/envelope.rs</code></td>
+<td>Handler integration tests</td>
+<td>Signature failure logs</td>
+</tr>
+<tr>
+<td>Replay guard</td>
+<td>Hard</td>
+<td>Mechanism</td>
+<td><code>icn-net/src/replay_guard.rs</code> + handlers</td>
+<td>Rate limiting integration tests</td>
+<td>Replay rejection counters</td>
+</tr>
+<tr>
+<td>Rate limiter (mechanism)</td>
+<td>Hard</td>
+<td>Mechanism</td>
+<td><code>icn-net/src/rate_limit.rs</code></td>
+<td><code>trust_gated_rate_limiting_integration.rs</code></td>
+<td>Token bucket metrics</td>
+</tr>
+<tr>
+<td>Capability gate (mechanism)</td>
+<td>Hard</td>
+<td>Mechanism</td>
+<td><code>icn-kernel-api/src/bootstrap.rs</code></td>
+<td>Capability delegation tests</td>
+<td>Capability metrics</td>
+</tr>
+<tr>
+<td>Credit gate (mechanism)</td>
+<td>Hard</td>
+<td>Mechanism</td>
+<td><code>icn-ledger/src/credit_policy.rs</code></td>
+<td>Credit limit tests</td>
+<td>Credit violation counters</td>
+</tr>
+<tr>
+<td>Rate limit values</td>
+<td>Meta</td>
+<td>Value</td>
+<td><code>apps/trust/src/oracle.rs</code></td>
+<td>Oracle evaluation tests</td>
+<td><code>rate_limit_current</code></td>
+</tr>
+<tr>
+<td>Credit ceiling values</td>
+<td>Meta</td>
+<td>Value</td>
+<td><code>apps/ledger/src/oracle.rs</code></td>
+<td>Credit policy tests</td>
+<td><code>credit_ceiling_current</code></td>
+</tr>
+<tr>
+<td>Trust class thresholds</td>
+<td>Meta</td>
+<td>Value</td>
+<td><code>apps/trust/src/oracle.rs</code></td>
+<td>Trust class tests</td>
+<td>Trust class distribution</td>
+</tr>
+<tr>
+<td>Capability grants</td>
+<td>Meta</td>
+<td>Value</td>
+<td>Bootstrap <code>CapabilitySet</code></td>
+<td>Installation tests</td>
+<td>Capability registry</td>
+</tr>
+<tr>
+<td>Voting methods</td>
+<td>Meta</td>
+<td>Value</td>
+<td><code>apps/governance/src/oracle.rs</code></td>
+<td>Governance parameter tests</td>
+<td>Protocol parameter store</td>
+</tr>
+<tr>
+<td>Treasury policy</td>
+<td>Meta</td>
+<td>Value</td>
+<td>Governance + Treasury</td>
+<td>Treasury distribution tests</td>
+<td>Treasury metrics</td>
+</tr>
+</tbody></table>
+<h2>Governance Decision Flow</h2>
+<p>When governance changes a meta-invariant:</p>
+<ol>
+<li><strong>Proposal created</strong> — governance app receives a proposal to change parameter values</li>
+<li><strong>Invariant check</strong> — an <code>InvariantReport</code> is generated, attesting that all 10 frozen-core invariants are preserved by the proposed change</li>
+<li><strong>Voting</strong> — members vote according to the current voting method (itself a meta-invariant)</li>
+<li><strong>Execution</strong> — the governance decision flows through the effect dispatcher to the <code>ProtocolParameterStore</code></li>
+<li><strong>Observable change</strong> — PolicyOracles re-evaluate with new parameter values; constraint values change dynamically</li>
+</ol>
+<p>The kernel participates in steps 2 (verifying attestation format and hash linkage) and 5 (enforcing the new constraint values). It never evaluates the predicates themselves.</p>
+<h2>Summary</h2>
+<p>ICN&#39;s constitutional foundation rests on a clear separation:</p>
+<ul>
+<li><strong>Hard invariants</strong> define what the substrate <em>is</em>. They cannot be removed by governance. They are enforced by code, validated by tests, and observed by metrics.</li>
+<li><strong>Meta-invariants</strong> define how the substrate is <em>configured</em>. They are set by PolicyOracles, changed by governance decisions, and enforced blindly by the kernel.</li>
+<li><strong>The meaning firewall</strong> separates the two. Domain semantics stay in apps. The kernel sees only constraints.</li>
+</ul>
+<p>A cooperative built on ICN inherits these guarantees: members can always exit, credit always balances, power changes are always visible, and the substrate cannot be captured by changing its configuration.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
