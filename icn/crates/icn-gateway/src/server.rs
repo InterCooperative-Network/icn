@@ -634,20 +634,31 @@ impl GatewayServer {
             None
         };
 
-        // Create governance manager with Sled-backed action items
+        // Create governance manager with Sled-backed action items, structures, and activities.
         // (uses GovernanceActor if handle available for proposals/votes/domains)
+        let sled_db_arc = Arc::new(db.clone());
+        let structure_store: Arc<dyn icn_governance::StructureStoreBackend> = Arc::new(
+            icn_governance_actor::SledStructureStore::new(sled_db_arc.clone()),
+        );
+        let activity_store: Arc<dyn icn_governance::ActivityStoreBackend> = Arc::new(
+            icn_governance_actor::SledActivityStore::new(sled_db_arc.clone()),
+        );
         let governance_manager: Arc<GovernanceManager> =
             if let Some(handle) = self.governance_handle {
                 info!("Governance manager connected to daemon with persistent action items");
                 Arc::new(
-                    GovernanceManager::with_sled_action_items(handle, Arc::new(db.clone()))
-                        .with_receipt_store(receipt_store.clone()),
+                    GovernanceManager::with_sled_action_items(handle, sled_db_arc)
+                        .with_receipt_store(receipt_store.clone())
+                        .with_structure_store(structure_store)
+                        .with_activity_store(activity_store),
                 )
             } else {
                 info!("Governance manager running standalone with persistent action items");
                 Arc::new(
-                    GovernanceManager::new_with_sled(Arc::new(db.clone()))
-                        .with_receipt_store(receipt_store.clone()),
+                    GovernanceManager::new_with_sled(sled_db_arc)
+                        .with_receipt_store(receipt_store.clone())
+                        .with_structure_store(structure_store)
+                        .with_activity_store(activity_store),
                 )
             };
         let ledger_service: Option<Arc<icn_api::LedgerService>> =

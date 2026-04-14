@@ -542,3 +542,87 @@ pub struct StatusUpdateRequest {
 pub struct RemoveDomainMemberRequest {
     pub did: String,
 }
+
+// ============================================================================
+// Institutional Structure (committees, working groups, teams)
+// ============================================================================
+
+/// Request to create an internal structure
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreateStructureRequest {
+    /// Kind: "committee", "working_group", "team", "office"
+    pub kind: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// Structure response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct StructureResponse {
+    pub id: String,
+    pub entity_id: String,
+    pub kind: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub status: String,
+    pub created_at: u64,
+}
+
+/// Request to assign a role in a structure
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AssignRoleRequest {
+    /// DID of the person receiving the role
+    pub did: String,
+    /// Role name: "coordinator", "member", "facilitator", "note_taker", etc.
+    pub role: String,
+}
+
+/// Role assignment response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct RoleAssignmentResponse {
+    pub id: String,
+    pub structure_id: String,
+    pub person_did: String,
+    pub role: String,
+    pub start_date: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_date: Option<u64>,
+}
+
+// ============================================================================
+// Activity (events, programs, projects, initiatives)
+// ============================================================================
+
+/// Request to create an activity
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreateActivityRequest {
+    /// Kind: "event", "program", "project", "initiative"
+    pub kind: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_date: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_date: Option<u64>,
+}
+
+/// Activity response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ActivityResponse {
+    pub id: String,
+    pub entity_id: String,
+    pub kind: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_date: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_date: Option<u64>,
+    pub linked_structures: Vec<String>,
+    pub created_at: u64,
+}

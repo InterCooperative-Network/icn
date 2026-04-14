@@ -7,10 +7,11 @@
 use actix_web::{web, HttpRequest, HttpResponse};
 use icn_federation::SettlementInterval;
 use icn_governance::{
-    ActionItemFilter, ActionItemId, ActionItemPriority, ActionItemStatus, DataSharingLevel,
-    Delegation, DelegationId, DelegationScope, DisputeResolutionMethod, FederationProposal,
-    FederationTerms, GovernanceDomainId, GovernanceParams, MembershipAction, MembershipConfig,
-    ProposalId, ProposalPayload, ProposalScope, VoteChoice,
+    ActionItemFilter, ActionItemId, ActionItemPriority, ActionItemStatus, ActivityId, ActivityKind,
+    ActivityStatus, DataSharingLevel, Delegation, DelegationId, DelegationScope,
+    DisputeResolutionMethod, FederationProposal, FederationTerms, GovernanceDomainId,
+    GovernanceParams, MembershipAction, MembershipConfig, ProposalId, ProposalPayload,
+    ProposalScope, StructureId, StructureKind, StructureStatus, VoteChoice,
 };
 use icn_http_kit::{
     auth::{require_scope, BasicClaims},
@@ -2565,6 +2566,250 @@ pub async fn create_remove_steward_proposal<E: GovernanceEventEmitter + Clone + 
         .ok_or_else(|| err_internal("Proposal creation succeeded but proposal not found"))?;
 
     Ok(HttpResponse::Created().json(proposal))
+}
+
+// ============================================================================
+// Structure and Activity helpers
+// ============================================================================
+
+fn parse_structure_kind(s: &str) -> Result<StructureKind, ApiError> {
+    match s {
+        "committee" => Ok(StructureKind::Committee),
+        "working_group" => Ok(StructureKind::WorkingGroup),
+        "team" => Ok(StructureKind::Team),
+        "office" => Ok(StructureKind::Office),
+        _ => Err(err_bad(format!(
+            "Unknown structure kind: '{s}'. Must be one of: committee, working_group, team, office"
+        ))),
+    }
+}
+
+fn parse_activity_kind(s: &str) -> Result<ActivityKind, ApiError> {
+    match s {
+        "event" => Ok(ActivityKind::Event),
+        "program" => Ok(ActivityKind::Program),
+        "project" => Ok(ActivityKind::Project),
+        "initiative" => Ok(ActivityKind::Initiative),
+        _ => Err(err_bad(format!(
+            "Unknown activity kind: '{s}'. Must be one of: event, program, project, initiative"
+        ))),
+    }
+}
+
+fn structure_to_response(s: &icn_governance::Structure) -> StructureResponse {
+    StructureResponse {
+        id: s.id.0.clone(),
+        entity_id: s.parent_entity_id.clone(),
+        kind: match s.kind {
+            StructureKind::Committee => "committee",
+            StructureKind::WorkingGroup => "working_group",
+            StructureKind::Team => "team",
+            StructureKind::Office => "office",
+        }
+        .to_string(),
+        name: s.name.clone(),
+        description: s.mandate.clone(),
+        status: match s.status {
+            StructureStatus::Active => "active",
+            StructureStatus::Suspended => "suspended",
+            StructureStatus::Dissolved => "dissolved",
+        }
+        .to_string(),
+        created_at: s.created_at,
+    }
+}
+
+fn role_to_response(r: &icn_governance::RoleAssignment) -> RoleAssignmentResponse {
+    RoleAssignmentResponse {
+        id: r.id.to_string(),
+        structure_id: r.structure_id.0.clone(),
+        person_did: r.person_did.to_string(),
+        role: r.role.clone(),
+        start_date: r.start_date,
+        end_date: r.end_date,
+    }
+}
+
+fn activity_to_response(a: &icn_governance::Activity) -> ActivityResponse {
+    ActivityResponse {
+        id: a.id.0.clone(),
+        entity_id: a.parent_entity_id.clone(),
+        kind: match a.kind {
+            ActivityKind::Event => "event",
+            ActivityKind::Program => "program",
+            ActivityKind::Project => "project",
+            ActivityKind::Initiative => "initiative",
+        }
+        .to_string(),
+        name: a.name.clone(),
+        description: a.description.clone(),
+        status: match a.status {
+            ActivityStatus::Planned => "planned",
+            ActivityStatus::Active => "active",
+            ActivityStatus::Completed => "completed",
+            ActivityStatus::Cancelled => "cancelled",
+        }
+        .to_string(),
+        start_date: a.start_date,
+        end_date: a.end_date,
+        linked_structures: a.linked_structures.iter().map(|s| s.0.clone()).collect(),
+        created_at: a.created_at,
+    }
+}
+
+// ── Structure endpoints ──────────────────────────────────────────────────────
+
+/// POST /gov/entities/{entity_id}/structures — Create a structure.
+pub async fn create_structure<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    entity_id: web::Path<String>,
+    req: web::Json<CreateStructureRequest>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let entity = entity_id.into_inner();
+    let kind = parse_structure_kind(&req.kind)?;
+
+    let s = ctx
+        .manager
+        .create_structure(entity, kind, req.name.clone(), req.description.clone())
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Created().json(structure_to_response(&s)))
+}
+
+/// GET /gov/entities/{entity_id}/structures — List structures for an entity.
+pub async fn list_structures<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    entity_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let entity = entity_id.into_inner();
+
+    let structures = ctx
+        .manager
+        .list_structures(&entity)
+        .map_err(anyhow_to_api)?;
+
+    let responses: Vec<StructureResponse> = structures.iter().map(structure_to_response).collect();
+    Ok(HttpResponse::Ok().json(responses))
+}
+
+/// GET /gov/structures/{structure_id} — Get a specific structure.
+pub async fn get_structure<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    structure_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let id = StructureId(structure_id.into_inner());
+
+    let s = ctx
+        .manager
+        .get_structure(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Structure not found"))?;
+
+    Ok(HttpResponse::Ok().json(structure_to_response(&s)))
+}
+
+/// POST /gov/structures/{structure_id}/roles — Assign a role.
+pub async fn assign_role<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    structure_id: web::Path<String>,
+    req: web::Json<AssignRoleRequest>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let sid = StructureId(structure_id.into_inner());
+    let person_did = parse_did(&req.did, "Invalid DID in request")?;
+
+    let assignment = ctx
+        .manager
+        .assign_role(sid, person_did, req.role.clone())
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Created().json(role_to_response(&assignment)))
+}
+
+/// GET /gov/structures/{structure_id}/roles — List roles for a structure.
+pub async fn list_roles<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    structure_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let id = StructureId(structure_id.into_inner());
+
+    let roles = ctx.manager.list_roles(&id).map_err(anyhow_to_api)?;
+
+    let responses: Vec<RoleAssignmentResponse> = roles.iter().map(role_to_response).collect();
+    Ok(HttpResponse::Ok().json(responses))
+}
+
+// ── Activity endpoints ───────────────────────────────────────────────────────
+
+/// POST /gov/entities/{entity_id}/activities — Create an activity.
+pub async fn create_activity<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    entity_id: web::Path<String>,
+    req: web::Json<CreateActivityRequest>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let entity = entity_id.into_inner();
+    let kind = parse_activity_kind(&req.kind)?;
+
+    let a = ctx
+        .manager
+        .create_activity(
+            entity,
+            kind,
+            req.name.clone(),
+            req.description.clone(),
+            req.start_date,
+            req.end_date,
+        )
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Created().json(activity_to_response(&a)))
+}
+
+/// GET /gov/entities/{entity_id}/activities — List activities for an entity.
+pub async fn list_activities<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    entity_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let entity = entity_id.into_inner();
+
+    let activities = ctx
+        .manager
+        .list_activities(&entity)
+        .map_err(anyhow_to_api)?;
+
+    let responses: Vec<ActivityResponse> = activities.iter().map(activity_to_response).collect();
+    Ok(HttpResponse::Ok().json(responses))
+}
+
+/// GET /gov/activities/{activity_id} — Get a specific activity.
+pub async fn get_activity<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    activity_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let id = ActivityId(activity_id.into_inner());
+
+    let a = ctx
+        .manager
+        .get_activity(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Activity not found"))?;
+
+    Ok(HttpResponse::Ok().json(activity_to_response(&a)))
 }
 
 // ============================================================================

@@ -11,13 +11,15 @@ use anyhow::Result;
 use icn_federation::BilateralClearingAgreement;
 use icn_governance::{
     scopes_overlap, ActionItem, ActionItemFilter, ActionItemId, ActionItemPriority,
-    ActionItemStatus, ActionItemStoreBackend, Comment, CommentId, Delegation, DelegationId,
-    DelegationScope, Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt,
-    GovernanceDomain, GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams,
-    GovernanceProfileId, InMemoryActionItemStore, InMemoryDiscussionStore, MembershipConfig,
-    MembershipSource, PaginatedResult, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
-    ProposalPayload, ProposalScope, ProposalState, Timestamp, Vote, VoteChoice, VoteTally,
-    DEFAULT_MAX_DELEGATION_DEPTH,
+    ActionItemStatus, ActionItemStoreBackend, Activity, ActivityId, ActivityKind,
+    ActivityStoreBackend, Comment, CommentId, Delegation, DelegationId, DelegationScope,
+    Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt, GovernanceDomain,
+    GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
+    InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore,
+    InMemoryStructureStore, MembershipConfig, MembershipSource, PaginatedResult, ProofOutcome,
+    Proposal, ProposalDomainLookup, ProposalId, ProposalPayload, ProposalScope, ProposalState,
+    RoleAssignment, Structure, StructureId, StructureKind, StructureStoreBackend, Timestamp, Vote,
+    VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -529,6 +531,10 @@ pub struct GovernanceManager {
     discussions: RwLock<InMemoryDiscussionStore>,
     /// Action item storage backend (in-memory or Sled-backed)
     action_items: Box<dyn ActionItemStoreBackend>,
+    /// Structure store backend (committees, working groups, etc.)
+    structure_store: Arc<dyn StructureStoreBackend>,
+    /// Activity store backend (events, programs, projects)
+    activity_store: Arc<dyn ActivityStoreBackend>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
     /// Optional receipt store for persisting GovernanceDecisionReceipts
@@ -549,6 +555,8 @@ impl GovernanceManager {
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
             action_items: Box::new(InMemoryActionItemStore::new()),
+            structure_store: Arc::new(InMemoryStructureStore::new()),
+            activity_store: Arc::new(InMemoryActivityStore::new()),
             governance_handle: None,
             receipt_store: None,
         }
@@ -580,6 +588,8 @@ impl GovernanceManager {
             // Action items are always stored in gateway (not synced via gossip)
             // Use set_action_item_store() to configure persistent storage
             action_items: Box::new(InMemoryActionItemStore::new()),
+            structure_store: Arc::new(InMemoryStructureStore::new()),
+            activity_store: Arc::new(InMemoryActivityStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -602,6 +612,22 @@ impl GovernanceManager {
         self
     }
 
+    /// Replace the structure store backend.
+    ///
+    /// Use this to configure Sled-backed persistent storage for structures.
+    pub fn with_structure_store(mut self, store: Arc<dyn StructureStoreBackend>) -> Self {
+        self.structure_store = store;
+        self
+    }
+
+    /// Replace the activity store backend.
+    ///
+    /// Use this to configure Sled-backed persistent storage for activities.
+    pub fn with_activity_store(mut self, store: Arc<dyn ActivityStoreBackend>) -> Self {
+        self.activity_store = store;
+        self
+    }
+
     /// Create a governance manager with Sled-backed action item storage
     ///
     /// This is the recommended mode for production with persistent action items.
@@ -614,6 +640,8 @@ impl GovernanceManager {
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
             action_items: Box::new(SledActionItemStore::new(db)),
+            structure_store: Arc::new(InMemoryStructureStore::new()),
+            activity_store: Arc::new(InMemoryActivityStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -631,6 +659,8 @@ impl GovernanceManager {
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
             action_items: Box::new(SledActionItemStore::new(db)),
+            structure_store: Arc::new(InMemoryStructureStore::new()),
+            activity_store: Arc::new(InMemoryActivityStore::new()),
             governance_handle: None,
             receipt_store: None,
         }
@@ -2121,6 +2151,104 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
 
         Ok(item)
+    }
+
+    // ========================================================================
+    // Structure management (committees, working groups, teams)
+    // ========================================================================
+
+    /// Create a new internal structure owned by an entity.
+    pub fn create_structure(
+        &self,
+        parent_entity_id: String,
+        kind: StructureKind,
+        name: String,
+        mandate: Option<String>,
+    ) -> Result<Structure> {
+        let now = icn_time::current_timestamp_secs();
+        let id = StructureId::generate();
+        let mut s = Structure::new(id, parent_entity_id, kind, name, now);
+        s.mandate = mandate;
+        self.structure_store
+            .save_structure(&s)
+            .map_err(|e| anyhow::anyhow!("Failed to save structure: {e}"))?;
+        Ok(s)
+    }
+
+    /// Get a structure by ID.
+    pub fn get_structure(&self, id: &StructureId) -> Result<Option<Structure>> {
+        self.structure_store
+            .get_structure(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get structure: {e}"))
+    }
+
+    /// List all structures owned by an entity.
+    pub fn list_structures(&self, entity_id: &str) -> Result<Vec<Structure>> {
+        self.structure_store
+            .list_structures_by_entity(entity_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list structures: {e}"))
+    }
+
+    /// Assign a role in a structure.
+    pub fn assign_role(
+        &self,
+        structure_id: StructureId,
+        person_did: icn_identity::Did,
+        role: String,
+    ) -> Result<RoleAssignment> {
+        let now = icn_time::current_timestamp_secs();
+        let assignment = RoleAssignment::new(structure_id, person_did, role, now);
+        self.structure_store
+            .save_role(&assignment)
+            .map_err(|e| anyhow::anyhow!("Failed to save role assignment: {e}"))?;
+        Ok(assignment)
+    }
+
+    /// List role assignments for a structure.
+    pub fn list_roles(&self, structure_id: &StructureId) -> Result<Vec<RoleAssignment>> {
+        self.structure_store
+            .list_roles_by_structure(structure_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list roles: {e}"))
+    }
+
+    // ========================================================================
+    // Activity management (events, programs, projects, initiatives)
+    // ========================================================================
+
+    /// Create a new activity owned by an entity.
+    pub fn create_activity(
+        &self,
+        parent_entity_id: String,
+        kind: ActivityKind,
+        name: String,
+        description: Option<String>,
+        start_date: Option<u64>,
+        end_date: Option<u64>,
+    ) -> Result<Activity> {
+        let now = icn_time::current_timestamp_secs();
+        let id = ActivityId::generate();
+        let mut a = Activity::new(id, parent_entity_id, kind, name, now);
+        a.description = description;
+        a.start_date = start_date;
+        a.end_date = end_date;
+        self.activity_store
+            .save(&a)
+            .map_err(|e| anyhow::anyhow!("Failed to save activity: {e}"))?;
+        Ok(a)
+    }
+
+    /// Get an activity by ID.
+    pub fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>> {
+        self.activity_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get activity: {e}"))
+    }
+
+    /// List all activities owned by an entity.
+    pub fn list_activities(&self, entity_id: &str) -> Result<Vec<Activity>> {
+        self.activity_store
+            .list_by_entity(entity_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list activities: {e}"))
     }
 
     // ========================================================================

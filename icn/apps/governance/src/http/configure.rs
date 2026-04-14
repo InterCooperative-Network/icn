@@ -326,6 +326,31 @@ where
             web::resource("/domains/{domain_id}/action-items/{item_id}/notes")
                 .route(web::post().to(handlers::add_action_item_note::<E>)),
         )
+        // ── Structure endpoints ──────────────────────────────────────────
+        .service(
+            web::resource("/entities/{entity_id}/structures")
+                .route(web::post().to(handlers::create_structure::<E>))
+                .route(web::get().to(handlers::list_structures::<E>)),
+        )
+        .service(
+            web::resource("/structures/{structure_id}")
+                .route(web::get().to(handlers::get_structure::<E>)),
+        )
+        .service(
+            web::resource("/structures/{structure_id}/roles")
+                .route(web::post().to(handlers::assign_role::<E>))
+                .route(web::get().to(handlers::list_roles::<E>)),
+        )
+        // ── Activity endpoints ───────────────────────────────────────────
+        .service(
+            web::resource("/entities/{entity_id}/activities")
+                .route(web::post().to(handlers::create_activity::<E>))
+                .route(web::get().to(handlers::list_activities::<E>)),
+        )
+        .service(
+            web::resource("/activities/{activity_id}")
+                .route(web::get().to(handlers::get_activity::<E>)),
+        )
         // ── Federation proposal endpoints ────────────────────────────────
         .service(
             web::resource("/proposals/federation/join")
