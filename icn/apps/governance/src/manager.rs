@@ -503,9 +503,41 @@ impl GovernanceManager {
         payload: ProposalPayload,
         scope: ProposalScope,
     ) -> Result<ProposalId> {
+        self.create_proposal_with_actions(
+            proposal_id,
+            domain_id,
+            proposer,
+            title,
+            description,
+            payload,
+            scope,
+            Vec::new(),
+        )
+        .await
+    }
+
+    /// Create a proposal with action item specs that will be materialized on acceptance.
+    pub async fn create_proposal_with_actions(
+        &self,
+        proposal_id: ProposalId,
+        domain_id: GovernanceDomainId,
+        proposer: Did,
+        title: String,
+        description: String,
+        payload: ProposalPayload,
+        scope: ProposalScope,
+        action_items_on_accept: Vec<icn_governance::ActionItemSpec>,
+    ) -> Result<ProposalId> {
         if let Some(ref handle) = self.governance_handle {
             let generated_id = handle
-                .create_proposal(domain_id, title, description, payload, scope)
+                .create_proposal_with_actions(
+                    domain_id,
+                    title,
+                    description,
+                    payload,
+                    scope,
+                    action_items_on_accept,
+                )
                 .await?;
             return Ok(generated_id);
         }
@@ -521,8 +553,9 @@ impl GovernanceManager {
         }
         drop(domains);
 
-        let mut proposal =
-            Proposal::new(domain_id, proposer, title, description, payload).with_scope(scope);
+        let mut proposal = Proposal::new(domain_id, proposer, title, description, payload)
+            .with_scope(scope)
+            .with_action_items(action_items_on_accept);
         proposal.id = proposal_id.clone();
 
         let mut proposals = self.proposals.write().map_err(|e| {

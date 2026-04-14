@@ -173,7 +173,7 @@ pub use proposal_cleanup::{CleanupStats, ProposalArchive, ProposalCleanupTask, P
 
 // Action item types
 pub use action_item::{
-    ActionItem, ActionItemFilter, ActionItemId, ActionItemNote, ActionItemPriority,
+    ActionItem, ActionItemFilter, ActionItemId, ActionItemNote, ActionItemPriority, ActionItemSpec,
     ActionItemStatus, ActionItemStore, ActionItemStoreBackend, InMemoryActionItemStore,
 };
 

@@ -755,9 +755,40 @@ pub async fn create_proposal<E: GovernanceEventEmitter + Clone + 'static>(
     let domain_id = GovernanceDomainId(req.domain_id.clone());
     let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
 
+    // Convert action item specs from API model to domain model, applying the
+    // same validation as the action-item endpoints.
+    let action_specs: Vec<icn_governance::ActionItemSpec> = req
+        .action_items_on_accept
+        .iter()
+        .map(|s| -> Result<icn_governance::ActionItemSpec, ApiError> {
+            val::validate_action_item_title(&s.title)?;
+            val::validate_action_item_description(&s.description)?;
+            val::validate_tags(&s.tags)?;
+
+            let priority = match s.priority.as_deref() {
+                Some(p) => parse_priority(p)?,
+                None => icn_governance::ActionItemPriority::Medium,
+            };
+
+            let assignee = match s.assignee.as_deref() {
+                Some(d) => Some(parse_did(d, "action_items_on_accept[].assignee")?),
+                None => None,
+            };
+
+            Ok(icn_governance::ActionItemSpec {
+                title: s.title.clone(),
+                description: s.description.clone(),
+                assignee,
+                due_offset_seconds: s.due_offset_seconds,
+                priority,
+                tags: s.tags.clone(),
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
     let proposal_id = ctx
         .manager
-        .create_proposal(
+        .create_proposal_with_actions(
             suggested_id,
             domain_id,
             proposer_did.clone(),
@@ -765,6 +796,7 @@ pub async fn create_proposal<E: GovernanceEventEmitter + Clone + 'static>(
             req.description.clone(),
             payload,
             scope,
+            action_specs,
         )
         .await
         .map_err(anyhow_to_api)?;

@@ -1321,6 +1321,18 @@ pub struct Proposal {
     /// Scope (local or federation). Defaults to Local for backward compat.
     #[serde(default)]
     pub scope: ProposalScope,
+
+    /// Action items to create when this proposal is accepted.
+    ///
+    /// Each spec is materialized into a concrete `ActionItem` linked to this
+    /// proposal's ID via `linked_proposal`. This is the decision-to-action bridge:
+    /// accepted proposals produce institutional obligations, not just status changes.
+    ///
+    /// Empty by default (backward compatible). Only obligation-producing proposals
+    /// use this field; other proposal types (Budget, Charter, Membership) have their
+    /// own execution hooks.
+    #[serde(default)]
+    pub action_items_on_accept: Vec<crate::action_item::ActionItemSpec>,
 }
 
 impl Proposal {
@@ -1345,7 +1357,15 @@ impl Proposal {
             created_at: now,
             updated_at: now,
             scope: ProposalScope::Local,
+            action_items_on_accept: Vec::new(),
         }
+    }
+
+    /// Attach action item specs to be created on acceptance.
+    #[must_use]
+    pub fn with_action_items(mut self, specs: Vec<crate::action_item::ActionItemSpec>) -> Self {
+        self.action_items_on_accept = specs;
+        self
     }
 
     /// Set the proposal scope.

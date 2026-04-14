@@ -74,6 +74,29 @@ pub struct CreateProposalRequest {
     pub payload: ProposalPayloadRequest,
     #[serde(default)]
     pub scope: Option<ProposalScopeRequest>,
+    /// Action items to create when this proposal is accepted.
+    /// Each spec becomes a linked ActionItem with provenance to this proposal.
+    #[serde(default)]
+    pub action_items_on_accept: Vec<ActionItemSpecRequest>,
+}
+
+/// Template for creating action items from accepted proposals (API model).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ActionItemSpecRequest {
+    pub title: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Assignee DID (optional)
+    #[serde(default)]
+    pub assignee: Option<String>,
+    /// Seconds after acceptance before this item is due
+    #[serde(default)]
+    pub due_offset_seconds: Option<u64>,
+    /// Priority: low, medium (default), high, critical
+    #[serde(default)]
+    pub priority: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 /// Proposal payload types

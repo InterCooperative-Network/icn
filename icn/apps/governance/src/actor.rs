@@ -131,6 +131,8 @@ pub enum GovernanceCommand {
         payload: ProposalPayload,
         /// Scope — local or federation-wide
         scope: ProposalScope,
+        /// Action items to create on acceptance (decision-to-action bridge)
+        action_items_on_accept: Vec<icn_governance::ActionItemSpec>,
     },
     /// Start deliberation period for a proposal
     ///
@@ -520,6 +522,22 @@ impl GovernanceHandle {
         self.executor.as_ref()
     }
 
+    /// Set the action item store for the decision-to-action bridge.
+    ///
+    /// When configured, proposals with `action_items_on_accept` specs will
+    /// auto-create linked action items on acceptance. Call during initialization
+    /// before cloning the handle.
+    pub fn with_action_item_store(
+        self,
+        store: Arc<dyn icn_governance::ActionItemStoreBackend>,
+    ) -> Self {
+        // Set on inner actor for use during proposal close
+        if let Ok(mut actor) = self.inner.try_write() {
+            actor.action_item_store = Some(store);
+        }
+        self
+    }
+
     /// List all protocol parameters
     pub fn list_protocol_parameters(&self) -> Result<Vec<ProtocolParameter>> {
         match &self.protocol_params {
@@ -789,6 +807,20 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
         payload: icn_governance::ProposalPayload,
         scope: ProposalScope,
     ) -> Result<ProposalId> {
+        self.create_proposal_with_actions(domain_id, title, description, payload, scope, Vec::new())
+            .await
+    }
+
+    /// Create a proposal with action item specs that will materialize on acceptance.
+    async fn create_proposal_with_actions(
+        &self,
+        domain_id: GovernanceDomainId,
+        title: String,
+        description: String,
+        payload: icn_governance::ProposalPayload,
+        scope: ProposalScope,
+        action_items_on_accept: Vec<icn_governance::ActionItemSpec>,
+    ) -> Result<ProposalId> {
         // Pre-validate ProtocolChange proposals to catch invalid parameters early
         // This prevents wasted governance cycles on proposals that would fail at execution
         if let ProposalPayload::ProtocolChange { ref proposal } = payload {
@@ -943,6 +975,7 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
             description,
             payload,
             scope,
+            action_items_on_accept,
         })
         .await?;
 
@@ -1108,6 +1141,10 @@ pub struct GovernanceActor {
     signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
     /// Optional kernel governance executor for delegated proposal execution
     executor: Option<Arc<dyn icn_kernel_api::governance::GovernanceExecutor>>,
+    /// Optional action item store for materializing action items from accepted proposals.
+    /// When present, proposals with `action_items_on_accept` specs will auto-create
+    /// linked action items on acceptance (decision-to-action bridge).
+    action_item_store: Option<Arc<dyn icn_governance::ActionItemStoreBackend>>,
 }
 
 impl GovernanceActor {
@@ -1183,6 +1220,7 @@ impl GovernanceActor {
             protocol_params: None,
             signing_key,
             executor: None,
+            action_item_store: None,
         };
 
         // Slot for the scheduler task JoinHandle; filled in after spawn.
@@ -1415,6 +1453,7 @@ impl GovernanceActor {
                 description,
                 payload,
                 scope,
+                action_items_on_accept,
             } => {
                 info!("Creating proposal: {} (scope: {:?})", title, scope);
 
@@ -1425,7 +1464,8 @@ impl GovernanceActor {
                     description,
                     payload,
                 )
-                .with_scope(scope);
+                .with_scope(scope)
+                .with_action_items(action_items_on_accept);
 
                 // Use the provided proposal ID instead of the generated one
                 proposal.id = proposal_id.clone();
@@ -1984,6 +2024,15 @@ impl GovernanceActor {
                     event_bus.emit(event).await;
                 }
 
+                // Decision-to-Action bridge: materialize action items from accepted proposals.
+                if matches!(outcome_result, DecisionOutcome::Accepted)
+                    && !proposal.action_items_on_accept.is_empty()
+                {
+                    if let Some(ref store) = self.action_item_store {
+                        Self::materialize_action_items(store, &proposal, &proposal_id, now);
+                    }
+                }
+
                 info!(
                     "✓ Proposal closed: {} ({:?})",
                     proposal_id.0, outcome_result
@@ -2120,6 +2169,16 @@ impl GovernanceActor {
                         },
                     };
                     event_bus.emit(event).await;
+                }
+
+                // Decision-to-Action bridge for force-accepted proposals
+                if matches!(forced_outcome, ForcedOutcome::Accept)
+                    && !proposal.action_items_on_accept.is_empty()
+                {
+                    if let Some(ref store) = self.action_item_store {
+                        let now = now_seconds();
+                        Self::materialize_action_items(store, &proposal, &proposal_id, now);
+                    }
                 }
 
                 icn_obs::metrics::governance::proposals_force_closed_inc();
@@ -2358,6 +2417,67 @@ impl GovernanceActor {
     /// Load a domain by ID
     fn load_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
         self.store.get_domain(id)
+    }
+
+    /// Materialize action items from an accepted proposal's specs.
+    ///
+    /// Idempotent: checks for existing linked items before creating new ones.
+    fn materialize_action_items(
+        store: &Arc<dyn icn_governance::ActionItemStoreBackend>,
+        proposal: &Proposal,
+        proposal_id: &ProposalId,
+        now: u64,
+    ) {
+        // Dedup check: skip if action items already exist for this proposal
+        let filter = icn_governance::ActionItemFilter {
+            linked_proposal: Some(proposal_id.clone()),
+            ..Default::default()
+        };
+        match store.list(&proposal.domain_id, &filter) {
+            Ok(existing) if !existing.is_empty() => {
+                info!(
+                    "📋 Skipping action item creation for proposal {} — {} linked item(s) already exist",
+                    proposal_id.0,
+                    existing.len()
+                );
+                return;
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to check existing action items for proposal {}: {e}",
+                    proposal_id.0
+                );
+                // Continue anyway — better to risk duplicates than lose items
+            }
+            _ => {}
+        }
+
+        let specs = &proposal.action_items_on_accept;
+        let mut created = 0usize;
+        for spec in specs {
+            let item = spec.materialize(
+                proposal.domain_id.clone(),
+                proposal_id.clone(),
+                proposal.proposer.clone(),
+                now,
+            );
+            match store.save(&item) {
+                Ok(()) => created += 1,
+                Err(e) => {
+                    warn!(
+                        "Failed to create action item '{}' from proposal {}: {e}",
+                        spec.title, proposal_id.0
+                    );
+                }
+            }
+        }
+        if created > 0 {
+            info!(
+                "📋 Created {created}/{} action items from accepted proposal {}",
+                specs.len(),
+                proposal_id.0
+            );
+        }
     }
 
     /// Load a proposal by ID

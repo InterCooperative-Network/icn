@@ -86,6 +86,64 @@ pub enum ActionItemPriority {
     Critical,
 }
 
+/// A template for creating action items when a proposal is accepted.
+///
+/// Attached to proposals via `Proposal::action_items_on_accept`. When the proposal
+/// is accepted, each spec produces an `ActionItem` linked to the originating proposal
+/// via `linked_proposal`. This is the first bridge pattern for obligation-producing
+/// proposals — other proposal types (Budget→ledger, Charter→oracle) keep their own
+/// execution hooks.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionItemSpec {
+    /// Short title describing the action
+    pub title: String,
+
+    /// Detailed description (optional)
+    #[serde(default)]
+    pub description: Option<String>,
+
+    /// Member responsible for this item (optional DID)
+    #[serde(default)]
+    pub assignee: Option<Did>,
+
+    /// Seconds after proposal acceptance before this item is due (optional).
+    /// Converted to absolute timestamp at creation time.
+    #[serde(default)]
+    pub due_offset_seconds: Option<u64>,
+
+    /// Priority level
+    #[serde(default)]
+    pub priority: ActionItemPriority,
+
+    /// Tags for categorization
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+impl ActionItemSpec {
+    /// Materialize this spec into a concrete ActionItem linked to the given proposal.
+    ///
+    /// The `now` timestamp is used for created_at and to compute due_date from the offset.
+    pub fn materialize(
+        &self,
+        domain_id: GovernanceDomainId,
+        proposal_id: ProposalId,
+        created_by: Did,
+        now: u64,
+    ) -> ActionItem {
+        let mut item = ActionItem::new(domain_id, self.title.clone(), created_by, now);
+        item.description = self.description.clone();
+        item.assignee = self.assignee.clone();
+        item.due_date = self
+            .due_offset_seconds
+            .map(|offset| now.saturating_add(offset));
+        item.priority = self.priority;
+        item.tags = self.tags.clone();
+        item.linked_proposal = Some(proposal_id);
+        item
+    }
+}
+
 /// An action item tracked within a governance domain
 ///
 /// Note: Option fields use `#[serde(default)]` for binary serialization compatibility
@@ -939,5 +997,160 @@ mod tests {
             store.count(&domain2, &ActionItemFilter::default()).unwrap(),
             1
         );
+    }
+
+    #[test]
+    fn test_action_item_spec_materialize() {
+        let spec = ActionItemSpec {
+            title: "Draft committee report".to_string(),
+            description: Some("Prepare Q1 report for the board".to_string()),
+            assignee: Some(test_did()),
+            due_offset_seconds: Some(7 * 24 * 3600), // 1 week
+            priority: ActionItemPriority::High,
+            tags: vec!["committee".to_string(), "report".to_string()],
+        };
+
+        let domain = test_domain();
+        let proposal_id = crate::ProposalId("prop-123".to_string());
+        let proposer = test_did();
+        let now = 1_000_000u64;
+
+        let item = spec.materialize(domain.clone(), proposal_id.clone(), proposer.clone(), now);
+
+        assert_eq!(item.domain_id, domain);
+        assert_eq!(item.title, "Draft committee report");
+        assert_eq!(
+            item.description,
+            Some("Prepare Q1 report for the board".to_string())
+        );
+        assert_eq!(item.assignee, Some(test_did()));
+        assert_eq!(item.due_date, Some(now + 7 * 24 * 3600));
+        assert_eq!(item.priority, ActionItemPriority::High);
+        assert_eq!(item.tags, vec!["committee", "report"]);
+        assert_eq!(item.linked_proposal, Some(proposal_id));
+        assert_eq!(item.status, ActionItemStatus::Pending);
+        assert_eq!(item.created_at, now);
+    }
+
+    #[test]
+    fn test_action_item_spec_materialize_minimal() {
+        let spec = ActionItemSpec {
+            title: "Follow up".to_string(),
+            description: None,
+            assignee: None,
+            due_offset_seconds: None,
+            priority: ActionItemPriority::Medium,
+            tags: Vec::new(),
+        };
+
+        let item = spec.materialize(
+            test_domain(),
+            crate::ProposalId("prop-456".to_string()),
+            test_did(),
+            500,
+        );
+
+        assert_eq!(item.title, "Follow up");
+        assert!(item.description.is_none());
+        assert!(item.assignee.is_none());
+        assert!(item.due_date.is_none());
+        assert_eq!(item.priority, ActionItemPriority::Medium);
+        assert!(item.tags.is_empty());
+        assert!(item.linked_proposal.is_some());
+    }
+
+    #[test]
+    fn test_action_item_spec_materialize_saturating_due_date() {
+        let spec = ActionItemSpec {
+            title: "Overflow test".to_string(),
+            description: None,
+            assignee: None,
+            due_offset_seconds: Some(u64::MAX),
+            priority: ActionItemPriority::Medium,
+            tags: Vec::new(),
+        };
+
+        let item = spec.materialize(
+            test_domain(),
+            crate::ProposalId("prop-overflow".to_string()),
+            test_did(),
+            1_000_000,
+        );
+
+        // Should saturate to u64::MAX, not panic or wrap
+        assert_eq!(item.due_date, Some(u64::MAX));
+    }
+
+    #[test]
+    fn test_materialize_creates_linked_items_in_store() {
+        let store = ActionItemStore::in_memory();
+        let domain = test_domain();
+        let proposal_id = crate::ProposalId("prop-accepted".to_string());
+
+        let specs = vec![
+            ActionItemSpec {
+                title: "Task A".to_string(),
+                description: None,
+                assignee: None,
+                due_offset_seconds: Some(3600),
+                priority: ActionItemPriority::High,
+                tags: vec!["urgent".to_string()],
+            },
+            ActionItemSpec {
+                title: "Task B".to_string(),
+                description: Some("Second task".to_string()),
+                assignee: Some(test_did()),
+                due_offset_seconds: None,
+                priority: ActionItemPriority::Low,
+                tags: Vec::new(),
+            },
+        ];
+
+        let now = 1_000_000u64;
+        for spec in &specs {
+            let item = spec.materialize(domain.clone(), proposal_id.clone(), test_did(), now);
+            store.save(&item).unwrap();
+        }
+
+        // All items linked to the proposal
+        let linked = store
+            .list(
+                &domain,
+                &ActionItemFilter {
+                    linked_proposal: Some(proposal_id.clone()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(linked.len(), 2);
+        assert!(linked
+            .iter()
+            .all(|i| i.linked_proposal.as_ref() == Some(&proposal_id)));
+
+        // Idempotency check: if items already exist, a second pass would find them
+        let existing = store
+            .list(
+                &domain,
+                &ActionItemFilter {
+                    linked_proposal: Some(proposal_id),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(existing.len(), 2, "dedup check should find existing items");
+    }
+
+    #[test]
+    fn test_action_item_spec_serde_defaults() {
+        // Minimal JSON — all optional fields omitted
+        let json = r#"{"title":"Minimal task"}"#;
+        let spec: ActionItemSpec = serde_json::from_str(json).unwrap();
+
+        assert_eq!(spec.title, "Minimal task");
+        assert!(spec.description.is_none());
+        assert!(spec.assignee.is_none());
+        assert!(spec.due_offset_seconds.is_none());
+        assert_eq!(spec.priority, ActionItemPriority::Medium);
+        assert!(spec.tags.is_empty());
     }
 }

@@ -337,6 +337,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
                 member: dave.did(),
             },
             scope: ProposalScope::Local,
+            action_items_on_accept: Vec::new(),
         })
         .await?;
 
@@ -428,6 +429,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
                 purpose: "Purchase drill press for tool library".to_string(),
             },
             scope: ProposalScope::Local,
+            action_items_on_accept: Vec::new(),
         })
         .await?;
 

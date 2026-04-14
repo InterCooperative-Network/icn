@@ -116,6 +116,7 @@ async fn lifecycle_proposal(
                 body: "Approve test motion".to_string(),
             },
             scope: ProposalScope::Local,
+            action_items_on_accept: Vec::new(),
         })
         .await?;
 
@@ -320,6 +321,7 @@ async fn test_lost_standing_member_delegation_blocked() -> Result<()> {
                 body: "Test motion".to_string(),
             },
             scope: ProposalScope::Local,
+            action_items_on_accept: Vec::new(),
         })
         .await?;
     actor
@@ -410,6 +412,7 @@ async fn test_suspended_delegator_weight_excluded_at_close_time() -> Result<()> 
                 body: "Motion text.".to_string(),
             },
             scope: ProposalScope::Local,
+            action_items_on_accept: Vec::new(),
         })
         .await?;
 
@@ -486,6 +489,7 @@ async fn test_suspended_delegator_weight_excluded_at_close_time() -> Result<()> 
                 body: "Motion text.".to_string(),
             },
             scope: ProposalScope::Local,
+            action_items_on_accept: Vec::new(),
         })
         .await?;
 

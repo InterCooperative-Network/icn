@@ -26,8 +26,8 @@ pub enum GovernanceMessage {
 
     /// A new proposal has been created
     ProposalCreated {
-        /// The proposal
-        proposal: Proposal,
+        /// The proposal (boxed to reduce enum size — Proposal is the largest variant)
+        proposal: Box<Proposal>,
     },
 
     /// A proposal has been opened for voting
@@ -231,7 +231,9 @@ impl GovernanceMessage {
 
     /// Create a ProposalCreated message
     pub fn proposal_created(proposal: Proposal) -> Self {
-        Self::ProposalCreated { proposal }
+        Self::ProposalCreated {
+            proposal: Box::new(proposal),
+        }
     }
 
     /// Create a ProposalOpened message
