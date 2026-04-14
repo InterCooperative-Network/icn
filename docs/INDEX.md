@@ -371,6 +371,8 @@ Strategic direction and gap analysis (March 2026):
 - [ICN-Pitch.md](strategy/ICN-Pitch.md) - Cooperative organizer pitch
 - [ICN-Scenarios.md](strategy/ICN-Scenarios.md) - Six working scenarios with API calls
 - [ICN-Evolution-Arc.md](strategy/ICN-Evolution-Arc.md) - Two-year project history
+- [NYCN-Institutional-Strategy.md](strategy/NYCN-Institutional-Strategy.md) - NYCN as first real ICN institution (2026-04-13)
+- [NYCN-Institutional-Design.md](strategy/NYCN-Institutional-Design.md) - NYCN entity tree, governance model, and ICN primitive mapping (2026-04-13)
 
 ### Current Status Reports (`status/`)
 
