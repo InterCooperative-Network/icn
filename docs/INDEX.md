@@ -385,6 +385,7 @@ Strategic direction and gap analysis (March 2026):
 - [NYCN-Institutional-Strategy.md](strategy/NYCN-Institutional-Strategy.md) - NYCN as first real ICN institution (2026-04-13)
 - [NYCN-Institutional-Design.md](strategy/NYCN-Institutional-Design.md) - NYCN entity tree, governance model, and ICN primitive mapping (2026-04-13)
 - [NYCN-Implementation-Plan.md](strategy/NYCN-Implementation-Plan.md) - 5-phase platform feature plan: decision→action bridge, consent mode, meetings, digests, documents (2026-04-13)
+- [NYCN-Sprint-Plan.md](strategy/NYCN-Sprint-Plan.md) - 3-lane sprint plan: platform closure, institutional model, migration prep (2026-04-13)
 
 ### Current Status Reports (`status/`)
 
