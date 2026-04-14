@@ -62,6 +62,7 @@ fn create_test_proposal(proposal_id: &str) -> Proposal {
         created_at: now - 3600,
         updated_at: now,
         scope: icn_governance::ProposalScope::Local,
+        action_items_on_accept: Vec::new(),
     }
 }
 

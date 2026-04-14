@@ -2025,37 +2025,11 @@ impl GovernanceActor {
                 }
 
                 // Decision-to-Action bridge: materialize action items from accepted proposals.
-                // Idempotent: uses proposal_id in dedup check to prevent duplicates on replay.
                 if matches!(outcome_result, DecisionOutcome::Accepted)
                     && !proposal.action_items_on_accept.is_empty()
                 {
                     if let Some(ref store) = self.action_item_store {
-                        let specs = &proposal.action_items_on_accept;
-                        let mut created = 0usize;
-                        for spec in specs {
-                            let item = spec.materialize(
-                                proposal.domain_id.clone(),
-                                proposal_id.clone(),
-                                proposal.proposer.clone(),
-                                now,
-                            );
-                            match store.save(&item) {
-                                Ok(()) => created += 1,
-                                Err(e) => {
-                                    warn!(
-                                        "Failed to create action item '{}' from proposal {}: {e}",
-                                        spec.title, proposal_id.0
-                                    );
-                                }
-                            }
-                        }
-                        if created > 0 {
-                            info!(
-                                "📋 Created {created}/{} action items from accepted proposal {}",
-                                specs.len(),
-                                proposal_id.0
-                            );
-                        }
+                        Self::materialize_action_items(store, &proposal, &proposal_id, now);
                     }
                 }
 
@@ -2203,20 +2177,7 @@ impl GovernanceActor {
                 {
                     if let Some(ref store) = self.action_item_store {
                         let now = now_seconds();
-                        for spec in &proposal.action_items_on_accept {
-                            let item = spec.materialize(
-                                proposal.domain_id.clone(),
-                                proposal_id.clone(),
-                                proposal.proposer.clone(),
-                                now,
-                            );
-                            if let Err(e) = store.save(&item) {
-                                warn!(
-                                    "Failed to create action item '{}' from force-accepted proposal {}: {e}",
-                                    spec.title, proposal_id.0
-                                );
-                            }
-                        }
+                        Self::materialize_action_items(store, &proposal, &proposal_id, now);
                     }
                 }
 
@@ -2456,6 +2417,67 @@ impl GovernanceActor {
     /// Load a domain by ID
     fn load_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
         self.store.get_domain(id)
+    }
+
+    /// Materialize action items from an accepted proposal's specs.
+    ///
+    /// Idempotent: checks for existing linked items before creating new ones.
+    fn materialize_action_items(
+        store: &Arc<dyn icn_governance::ActionItemStoreBackend>,
+        proposal: &Proposal,
+        proposal_id: &ProposalId,
+        now: u64,
+    ) {
+        // Dedup check: skip if action items already exist for this proposal
+        let filter = icn_governance::ActionItemFilter {
+            linked_proposal: Some(proposal_id.clone()),
+            ..Default::default()
+        };
+        match store.list(&proposal.domain_id, &filter) {
+            Ok(existing) if !existing.is_empty() => {
+                info!(
+                    "📋 Skipping action item creation for proposal {} — {} linked item(s) already exist",
+                    proposal_id.0,
+                    existing.len()
+                );
+                return;
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to check existing action items for proposal {}: {e}",
+                    proposal_id.0
+                );
+                // Continue anyway — better to risk duplicates than lose items
+            }
+            _ => {}
+        }
+
+        let specs = &proposal.action_items_on_accept;
+        let mut created = 0usize;
+        for spec in specs {
+            let item = spec.materialize(
+                proposal.domain_id.clone(),
+                proposal_id.clone(),
+                proposal.proposer.clone(),
+                now,
+            );
+            match store.save(&item) {
+                Ok(()) => created += 1,
+                Err(e) => {
+                    warn!(
+                        "Failed to create action item '{}' from proposal {}: {e}",
+                        spec.title, proposal_id.0
+                    );
+                }
+            }
+        }
+        if created > 0 {
+            info!(
+                "📋 Created {created}/{} action items from accepted proposal {}",
+                specs.len(),
+                proposal_id.0
+            );
+        }
     }
 
     /// Load a proposal by ID

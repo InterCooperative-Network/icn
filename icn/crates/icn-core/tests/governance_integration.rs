@@ -139,7 +139,7 @@ impl TestNode {
                         }
                         GovernanceMessage::ProposalCreated { proposal } => {
                             let proposal_id = proposal.id.clone();
-                            proposals_clone.write().await.insert(proposal_id, proposal);
+                            proposals_clone.write().await.insert(proposal_id, *proposal);
                         }
                         GovernanceMessage::ProposalOpened {
                             id,

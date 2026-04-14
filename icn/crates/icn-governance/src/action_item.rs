@@ -90,7 +90,7 @@ pub enum ActionItemPriority {
 ///
 /// Attached to proposals via `Proposal::action_items_on_accept`. When the proposal
 /// is accepted, each spec produces an `ActionItem` linked to the originating proposal
-/// with its provenance hash. This is the first bridge pattern for obligation-producing
+/// via `linked_proposal`. This is the first bridge pattern for obligation-producing
 /// proposals — other proposal types (Budget→ledger, Charter→oracle) keep their own
 /// execution hooks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,7 +134,9 @@ impl ActionItemSpec {
         let mut item = ActionItem::new(domain_id, self.title.clone(), created_by, now);
         item.description = self.description.clone();
         item.assignee = self.assignee.clone();
-        item.due_date = self.due_offset_seconds.map(|offset| now + offset);
+        item.due_date = self
+            .due_offset_seconds
+            .map(|offset| now.saturating_add(offset));
         item.priority = self.priority;
         item.tags = self.tags.clone();
         item.linked_proposal = Some(proposal_id);

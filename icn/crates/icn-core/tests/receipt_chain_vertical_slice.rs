@@ -129,6 +129,7 @@ async fn test_allocation_receipt_chain_end_to_end() -> Result<()> {
                 purpose: "q1-compute".to_string(),
             },
             scope: ProposalScope::Local,
+            action_items_on_accept: Vec::new(),
         })
         .await?;
 

@@ -112,6 +112,7 @@ async fn run_proposal(
                 body: "Nothing to allocate".to_string(),
             },
             scope: ProposalScope::Local,
+            action_items_on_accept: Vec::new(),
         })
         .await?;
 

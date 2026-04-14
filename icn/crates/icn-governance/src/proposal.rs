@@ -1325,7 +1325,7 @@ pub struct Proposal {
     /// Action items to create when this proposal is accepted.
     ///
     /// Each spec is materialized into a concrete `ActionItem` linked to this
-    /// proposal's ID and provenance hash. This is the decision-to-action bridge:
+    /// proposal's ID via `linked_proposal`. This is the decision-to-action bridge:
     /// accepted proposals produce institutional obligations, not just status changes.
     ///
     /// Empty by default (backward compatible). Only obligation-producing proposals
