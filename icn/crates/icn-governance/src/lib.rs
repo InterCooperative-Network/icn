@@ -174,7 +174,8 @@ pub use proposal_cleanup::{CleanupStats, ProposalArchive, ProposalCleanupTask, P
 // Action item types
 pub use action_item::{
     ActionItem, ActionItemFilter, ActionItemId, ActionItemNote, ActionItemPriority,
-    ActionItemStatus, ActionItemStore, ActionItemStoreBackend, InMemoryActionItemStore,
+    ActionItemSpec, ActionItemStatus, ActionItemStore, ActionItemStoreBackend,
+    InMemoryActionItemStore,
 };
 
 /// Unix timestamp in seconds

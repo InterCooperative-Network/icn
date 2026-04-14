@@ -66,6 +66,23 @@ pub trait GovernanceOps: Send + Sync {
         scope: ProposalScope,
     ) -> Result<ProposalId>;
 
+    /// Create a proposal with action item specs that materialize on acceptance.
+    ///
+    /// Default impl delegates to `create_proposal` (ignoring action items).
+    /// Implementations that support the decision-to-action bridge should override.
+    async fn create_proposal_with_actions(
+        &self,
+        domain_id: GovernanceDomainId,
+        title: String,
+        description: String,
+        payload: ProposalPayload,
+        scope: ProposalScope,
+        _action_items_on_accept: Vec<crate::action_item::ActionItemSpec>,
+    ) -> Result<ProposalId> {
+        self.create_proposal(domain_id, title, description, payload, scope)
+            .await
+    }
+
     /// Start deliberation period for a proposal
     ///
     /// Transitions the proposal from Draft to Deliberation state.

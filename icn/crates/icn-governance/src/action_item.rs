@@ -86,6 +86,62 @@ pub enum ActionItemPriority {
     Critical,
 }
 
+/// A template for creating action items when a proposal is accepted.
+///
+/// Attached to proposals via `Proposal::action_items_on_accept`. When the proposal
+/// is accepted, each spec produces an `ActionItem` linked to the originating proposal
+/// with its provenance hash. This is the first bridge pattern for obligation-producing
+/// proposals — other proposal types (Budget→ledger, Charter→oracle) keep their own
+/// execution hooks.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionItemSpec {
+    /// Short title describing the action
+    pub title: String,
+
+    /// Detailed description (optional)
+    #[serde(default)]
+    pub description: Option<String>,
+
+    /// Member responsible for this item (optional DID)
+    #[serde(default)]
+    pub assignee: Option<Did>,
+
+    /// Seconds after proposal acceptance before this item is due (optional).
+    /// Converted to absolute timestamp at creation time.
+    #[serde(default)]
+    pub due_offset_seconds: Option<u64>,
+
+    /// Priority level
+    #[serde(default)]
+    pub priority: ActionItemPriority,
+
+    /// Tags for categorization
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+impl ActionItemSpec {
+    /// Materialize this spec into a concrete ActionItem linked to the given proposal.
+    ///
+    /// The `now` timestamp is used for created_at and to compute due_date from the offset.
+    pub fn materialize(
+        &self,
+        domain_id: GovernanceDomainId,
+        proposal_id: ProposalId,
+        created_by: Did,
+        now: u64,
+    ) -> ActionItem {
+        let mut item = ActionItem::new(domain_id, self.title.clone(), created_by, now);
+        item.description = self.description.clone();
+        item.assignee = self.assignee.clone();
+        item.due_date = self.due_offset_seconds.map(|offset| now + offset);
+        item.priority = self.priority;
+        item.tags = self.tags.clone();
+        item.linked_proposal = Some(proposal_id);
+        item
+    }
+}
+
 /// An action item tracked within a governance domain
 ///
 /// Note: Option fields use `#[serde(default)]` for binary serialization compatibility

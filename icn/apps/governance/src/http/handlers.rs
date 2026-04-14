@@ -755,9 +755,28 @@ pub async fn create_proposal<E: GovernanceEventEmitter + Clone + 'static>(
     let domain_id = GovernanceDomainId(req.domain_id.clone());
     let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
 
+    // Convert action item specs from API model to domain model
+    let action_specs: Vec<icn_governance::ActionItemSpec> = req
+        .action_items_on_accept
+        .iter()
+        .map(|s| icn_governance::ActionItemSpec {
+            title: s.title.clone(),
+            description: s.description.clone(),
+            assignee: s.assignee.as_ref().and_then(|d| icn_identity::Did::from_str(d).ok()),
+            due_offset_seconds: s.due_offset_seconds,
+            priority: match s.priority.as_deref() {
+                Some("low") => icn_governance::ActionItemPriority::Low,
+                Some("high") => icn_governance::ActionItemPriority::High,
+                Some("critical") => icn_governance::ActionItemPriority::Critical,
+                _ => icn_governance::ActionItemPriority::Medium,
+            },
+            tags: s.tags.clone(),
+        })
+        .collect();
+
     let proposal_id = ctx
         .manager
-        .create_proposal(
+        .create_proposal_with_actions(
             suggested_id,
             domain_id,
             proposer_did.clone(),
@@ -765,6 +784,7 @@ pub async fn create_proposal<E: GovernanceEventEmitter + Clone + 'static>(
             req.description.clone(),
             payload,
             scope,
+            action_specs,
         )
         .await
         .map_err(anyhow_to_api)?;
