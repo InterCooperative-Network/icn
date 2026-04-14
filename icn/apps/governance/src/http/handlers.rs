@@ -2171,6 +2171,30 @@ pub async fn add_action_item_note<E: GovernanceEventEmitter + Clone + 'static>(
 }
 
 // ============================================================================
+// Notification digest handler
+// ============================================================================
+
+/// GET /gov/digest — Return a DID-scoped notification digest.
+///
+/// The `sub` claim in the token is used as the DID. Returns:
+/// - `pending_votes`: Open proposals the caller has not yet voted on.
+/// - `overdue_items`: Action items assigned to the caller that are past due.
+/// - `upcoming_meeting_count`: Always 0 (stub until meeting feature merges).
+pub async fn get_digest<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let did = parse_did(&claims.sub, "Invalid DID in token")?;
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let digest = ctx.manager.generate_digest(&did, now_secs).await;
+    Ok(HttpResponse::Ok().json(digest))
+}
+
+// ============================================================================
 // Federation proposal handlers
 // ============================================================================
 

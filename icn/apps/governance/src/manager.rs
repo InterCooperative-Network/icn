@@ -28,6 +28,53 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 use tracing::debug;
 
+// ============================================================================
+// Notification digest types
+// ============================================================================
+
+/// A pending vote in the digest: an Open proposal the caller has not yet voted on.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PendingVoteDigest {
+    /// The proposal ID
+    pub proposal_id: String,
+    /// Governance domain the proposal lives in
+    pub domain_id: String,
+    /// Human-readable title
+    pub title: String,
+    /// Unix timestamp when voting closes (`None` if not set)
+    pub closes_at: Option<u64>,
+}
+
+/// An overdue action item in the digest: assigned to the caller, past due, not completed.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct OverdueItemDigest {
+    /// The action item ID
+    pub item_id: String,
+    /// Governance domain the item belongs to
+    pub domain_id: String,
+    /// Human-readable title
+    pub title: String,
+    /// Unix timestamp of the due date
+    pub due_date: u64,
+}
+
+/// DID-scoped notification digest returned by `GET /gov/digest`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DigestSummary {
+    /// The DID this digest was generated for
+    pub did: String,
+    /// Count of pending votes
+    pub pending_vote_count: usize,
+    /// Open proposals the caller has not yet voted on
+    pub pending_votes: Vec<PendingVoteDigest>,
+    /// Count of overdue action items
+    pub overdue_item_count: usize,
+    /// Action items assigned to caller that are past their due date
+    pub overdue_items: Vec<OverdueItemDigest>,
+    /// Upcoming meetings in the next 48 h (stub = 0 until meeting feature merges)
+    pub upcoming_meeting_count: usize,
+}
+
 /// Full provenance chain for a governance proposal (INV-5).
 ///
 /// Links governance decision → allocation receipts for independent verification.
@@ -74,6 +121,28 @@ impl SledActionItemStore {
     fn domain_prefix(domain_id: &GovernanceDomainId) -> String {
         format!("action_item:{}:", domain_id.0)
     }
+
+    /// Generate the assignee secondary index key.
+    ///
+    /// Format: `action_item_by_assignee:{assignee_did}:{domain_id}:{item_id}`
+    /// Value: `b"1"` (tombstone — presence signals membership, no data stored)
+    fn assignee_idx_key(
+        assignee: &icn_identity::Did,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+    ) -> String {
+        format!(
+            "action_item_by_assignee:{}:{}:{}",
+            assignee.as_str(),
+            domain_id.0,
+            id.0
+        )
+    }
+
+    /// Prefix for scanning all assignee-index entries for a given DID.
+    fn assignee_idx_prefix(assignee: &icn_identity::Did) -> String {
+        format!("action_item_by_assignee:{}:", assignee.as_str())
+    }
 }
 
 impl ActionItemStoreBackend for SledActionItemStore {
@@ -84,6 +153,16 @@ impl ActionItemStoreBackend for SledActionItemStore {
         self.db
             .insert(key.as_bytes(), value)
             .map_err(|e| GovernanceError::Internal(format!("Sled insert failed: {e}")))?;
+
+        // Maintain assignee secondary index
+        if let Some(ref assignee) = item.assignee {
+            let idx_key = Self::assignee_idx_key(assignee, &item.domain_id, &item.id);
+            self.db
+                .insert(idx_key.as_bytes(), b"1" as &[u8])
+                .map_err(|e| {
+                    GovernanceError::Internal(format!("Sled assignee-idx insert failed: {e}"))
+                })?;
+        }
         Ok(())
     }
 
@@ -136,10 +215,72 @@ impl ActionItemStoreBackend for SledActionItemStore {
         id: &ActionItemId,
     ) -> std::result::Result<bool, GovernanceError> {
         let key = Self::item_key(domain_id, id);
+
+        // Load item first so we can clean up the assignee index
+        if let Ok(Some(existing)) = self.get(domain_id, id) {
+            if let Some(ref assignee) = existing.assignee {
+                let idx_key = Self::assignee_idx_key(assignee, domain_id, id);
+                self.db.remove(idx_key.as_bytes()).map_err(|e| {
+                    GovernanceError::Internal(format!("Sled assignee-idx delete failed: {e}"))
+                })?;
+            }
+        }
+
         self.db
             .remove(key.as_bytes())
             .map(|opt| opt.is_some())
             .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}")))
+    }
+
+    /// Scan the assignee secondary index and return all items assigned to `assignee`.
+    ///
+    /// Index key format: `action_item_by_assignee:{did}:{domain_id}:{item_id}`
+    /// Each entry is a tombstone; the actual item is read from the primary key.
+    fn list_by_assignee(
+        &self,
+        assignee: &icn_identity::Did,
+    ) -> std::result::Result<Vec<ActionItem>, GovernanceError> {
+        let prefix = Self::assignee_idx_prefix(assignee);
+        let mut items = Vec::new();
+
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (raw_key, _) = result.map_err(|e| {
+                GovernanceError::Internal(format!("Sled scan (assignee idx) failed: {e}"))
+            })?;
+
+            // Key format after prefix: "{domain_id}:{item_id}"
+            let key_str = std::str::from_utf8(&raw_key).map_err(|e| {
+                GovernanceError::Internal(format!("Invalid UTF-8 in assignee idx key: {e}"))
+            })?;
+            let suffix = key_str.strip_prefix(&prefix).unwrap_or(key_str);
+            let mut parts = suffix.splitn(2, ':');
+            let domain_id_str = parts.next().unwrap_or("");
+            let item_id_str = parts.next().unwrap_or("");
+
+            let domain_id = GovernanceDomainId(domain_id_str.to_string());
+            let item_id: ActionItemId = item_id_str.parse().map_err(|e| {
+                GovernanceError::Internal(format!("Invalid item_id in assignee idx: {e}"))
+            })?;
+
+            match self.get(&domain_id, &item_id) {
+                Ok(Some(item)) => items.push(item),
+                Ok(None) => {
+                    // Stale index entry — primary was deleted without cleaning index.
+                    // Skip silently; a background sweep would clean this.
+                    tracing::debug!(
+                        assignee = %assignee.as_str(),
+                        domain = %domain_id_str,
+                        item = %item_id_str,
+                        "stale assignee index entry; primary key not found"
+                    );
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(items)
     }
 
     fn count(
@@ -2543,6 +2684,96 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
 
         Ok(item)
+    }
+
+    // ========================================================================
+    // Notification digest
+    // ========================================================================
+
+    /// Generate a DID-scoped notification digest.
+    ///
+    /// Returns a summary of pending votes (Open proposals not yet voted on by
+    /// `did`), overdue action items (assigned to `did`, past due, not done),
+    /// and a stub of 0 for upcoming meetings (until the meeting feature merges).
+    pub async fn generate_digest(&self, did: &Did, now_secs: u64) -> DigestSummary {
+        let pending_votes = self.digest_pending_votes(did).await;
+        let overdue_items = self.digest_overdue_items(did, now_secs);
+
+        DigestSummary {
+            did: did.to_string(),
+            pending_vote_count: pending_votes.len(),
+            pending_votes,
+            overdue_item_count: overdue_items.len(),
+            overdue_items,
+            upcoming_meeting_count: 0,
+        }
+    }
+
+    /// Collect Open proposals the DID has not yet voted on.
+    async fn digest_pending_votes(&self, did: &Did) -> Vec<PendingVoteDigest> {
+        let proposals = match self.list_proposals().await {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(error = %e, "digest: failed to list proposals");
+                return vec![];
+            }
+        };
+
+        let mut result = Vec::new();
+        for proposal in proposals {
+            if !matches!(proposal.state, ProposalState::Open { .. }) {
+                continue;
+            }
+            let voter_dids = match self.get_voter_dids(&proposal.id).await {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::warn!(
+                        proposal_id = %proposal.id.0,
+                        error = %e,
+                        "digest: failed to get voter dids"
+                    );
+                    continue;
+                }
+            };
+            if voter_dids.contains(did) {
+                continue; // already voted
+            }
+            let closes_at = match &proposal.state {
+                ProposalState::Open { closes_at, .. } => Some(*closes_at),
+                _ => None,
+            };
+            result.push(PendingVoteDigest {
+                proposal_id: proposal.id.0.clone(),
+                domain_id: proposal.domain_id.0.clone(),
+                title: proposal.title.clone(),
+                closes_at,
+            });
+        }
+        result
+    }
+
+    /// Collect action items assigned to the DID that are overdue.
+    fn digest_overdue_items(&self, did: &Did, now_secs: u64) -> Vec<OverdueItemDigest> {
+        let items = match self.action_items.list_by_assignee(did) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(error = %e, "digest: failed to list items by assignee");
+                return vec![];
+            }
+        };
+
+        items
+            .into_iter()
+            .filter(|item| item.is_overdue(now_secs))
+            .filter_map(|item| {
+                item.due_date.map(|due| OverdueItemDigest {
+                    item_id: item.id.to_string(),
+                    domain_id: item.domain_id.0.clone(),
+                    title: item.title.clone(),
+                    due_date: due,
+                })
+            })
+            .collect()
     }
 
     // ========================================================================
