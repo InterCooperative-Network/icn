@@ -636,9 +636,8 @@ impl GatewayServer {
 
         // Create governance manager with Sled-backed action items, structures, and activities.
         // (uses GovernanceActor if handle available for proposals/votes/domains)
-        // Construct sled-backed stores for gateway-local institutional state.
-        // Types are inferred from the Sled*Store constructors — no explicit
-        // icn_governance:: trait annotations here (meaning-firewall ratchet).
+        // Infer types from Sled*Store constructors — no explicit trait-object
+        // annotations here (meaning-firewall ratchet, see icn-core).
         let sled_db_arc = Arc::new(db.clone());
         let structure_store = Arc::new(icn_governance_actor::SledStructureStore::new(
             sled_db_arc.clone(),
