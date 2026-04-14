@@ -326,8 +326,9 @@ impl icn_governance::StructureStoreBackend for SledStructureStore {
             .get(primary.as_bytes())
             .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?;
         let s: icn_governance::Structure = match existing {
-            Some(v) => icn_encoding::decode_versioned(&v)
-                .map_err(|e| GovernanceError::Internal(format!("Failed to decode structure: {e}")))?,
+            Some(v) => icn_encoding::decode_versioned(&v).map_err(|e| {
+                GovernanceError::Internal(format!("Failed to decode structure: {e}"))
+            })?,
             None => return Ok(false),
         };
 
@@ -425,8 +426,8 @@ impl icn_governance::StructureStoreBackend for SledStructureStore {
                     .get(primary.as_bytes())
                     .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
                 {
-                    let r: icn_governance::RoleAssignment =
-                        icn_encoding::decode_versioned(&value).map_err(|e| {
+                    let r: icn_governance::RoleAssignment = icn_encoding::decode_versioned(&value)
+                        .map_err(|e| {
                             GovernanceError::Internal(format!("Failed to decode role: {e}"))
                         })?;
                     out.push(r);
