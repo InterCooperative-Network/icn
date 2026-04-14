@@ -39,7 +39,9 @@ pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, Govern
 pub use events::{GovernanceEventEmitter, NoopEventEmitter};
 pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
 pub use handlers::translate_payload_to_effects;
-pub use manager::{GovernanceManager, SledActionItemStore, SledActivityStore, SledStructureStore};
+pub use manager::{
+    GovernanceManager, SledActionItemStore, SledActivityStore, SledMeetingStore, SledStructureStore,
+};
 pub use receipt_backend::GovernanceReceiptBackend;
 pub use state_store::{GovernanceStateStore, SledGovernanceStateStore};
 

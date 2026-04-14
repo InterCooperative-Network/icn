@@ -16,10 +16,11 @@ use icn_governance::{
     Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt, GovernanceDomain,
     GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
     InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore,
-    InMemoryStructureStore, MembershipConfig, MembershipSource, PaginatedResult, ProofOutcome,
-    Proposal, ProposalDomainLookup, ProposalId, ProposalPayload, ProposalScope, ProposalState,
-    RoleAssignment, Structure, StructureId, StructureKind, StructureStoreBackend, Timestamp, Vote,
-    VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
+    InMemoryMeetingStore, InMemoryStructureStore, Meeting, MeetingId, MeetingStoreBackend,
+    MembershipConfig, MembershipSource, PaginatedResult, ProofOutcome, Proposal,
+    ProposalDomainLookup, ProposalId, ProposalPayload, ProposalScope, ProposalState, RoleAssignment,
+    Structure, StructureId, StructureKind, StructureStoreBackend, Timestamp, Vote, VoteChoice,
+    VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -590,6 +591,109 @@ impl icn_governance::ActivityStoreBackend for SledActivityStore {
     }
 }
 
+// ============================================================================
+// Sled-Backed Meeting Store
+// ============================================================================
+
+/// Sled-backed storage for meetings.
+///
+/// Key scheme:
+/// - Meeting:  `meeting:{domain_id}:{meeting_id}`
+///
+/// All-meeting scan prefix: `meeting:` (for get-by-id when domain is unknown).
+pub struct SledMeetingStore {
+    db: Arc<sled::Db>,
+}
+
+impl SledMeetingStore {
+    /// Create a new Sled-backed meeting store.
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    fn meeting_key(domain_id: &str, id: &MeetingId) -> String {
+        format!("meeting:{}:{}", domain_id, id.0)
+    }
+
+    fn domain_prefix(domain_id: &str) -> String {
+        format!("meeting:{}:", domain_id)
+    }
+
+    fn all_prefix() -> &'static str {
+        "meeting:"
+    }
+}
+
+impl MeetingStoreBackend for SledMeetingStore {
+    fn save(&self, m: &Meeting) -> std::result::Result<(), GovernanceError> {
+        let key = Self::meeting_key(&m.domain_id, &m.id);
+        let value = icn_encoding::encode_versioned(m)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode meeting: {e}")))?;
+        self.db
+            .insert(key.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert failed: {e}")))?;
+        Ok(())
+    }
+
+    fn get(&self, id: &MeetingId) -> std::result::Result<Option<Meeting>, GovernanceError> {
+        let suffix = format!(":{}", id.0);
+        for result in self.db.scan_prefix(Self::all_prefix().as_bytes()) {
+            let (key, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let key_str = std::str::from_utf8(&key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            if key_str.ends_with(&suffix) {
+                let m: Meeting = icn_encoding::decode_versioned(&value).map_err(|e| {
+                    GovernanceError::Internal(format!("Failed to decode meeting: {e}"))
+                })?;
+                return Ok(Some(m));
+            }
+        }
+        Ok(None)
+    }
+
+    fn list_by_domain(
+        &self,
+        domain_id: &str,
+    ) -> std::result::Result<Vec<Meeting>, GovernanceError> {
+        let prefix = Self::domain_prefix(domain_id);
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let m: Meeting = icn_encoding::decode_versioned(&value).map_err(|e| {
+                GovernanceError::Internal(format!("Failed to decode meeting: {e}"))
+            })?;
+            out.push(m);
+        }
+        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(out)
+    }
+
+    fn delete(&self, id: &MeetingId) -> std::result::Result<bool, GovernanceError> {
+        let suffix = format!(":{}", id.0);
+        let mut found_key: Option<sled::IVec> = None;
+        for result in self.db.scan_prefix(Self::all_prefix().as_bytes()) {
+            let (key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let key_str = std::str::from_utf8(&key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            if key_str.ends_with(&suffix) {
+                found_key = Some(key);
+                break;
+            }
+        }
+        match found_key {
+            Some(k) => self
+                .db
+                .remove(k)
+                .map(|opt| opt.is_some())
+                .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}"))),
+            None => Ok(false),
+        }
+    }
+}
+
 /// Handle type for actor-backed governance
 ///
 /// This uses the `GovernanceOps` trait to avoid direct dependency on `icn-core`.
@@ -625,6 +729,8 @@ pub struct GovernanceManager {
     structure_store: Arc<dyn StructureStoreBackend>,
     /// Activity store backend (events, programs, projects)
     activity_store: Arc<dyn ActivityStoreBackend>,
+    /// Meeting store backend (deliberation trace objects)
+    meeting_store: Arc<dyn MeetingStoreBackend>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
     /// Optional receipt store for persisting GovernanceDecisionReceipts
@@ -647,6 +753,7 @@ impl GovernanceManager {
             action_items: Box::new(InMemoryActionItemStore::new()),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
+            meeting_store: Arc::new(InMemoryMeetingStore::new()),
             governance_handle: None,
             receipt_store: None,
         }
@@ -680,6 +787,7 @@ impl GovernanceManager {
             action_items: Box::new(InMemoryActionItemStore::new()),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
+            meeting_store: Arc::new(InMemoryMeetingStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -718,6 +826,14 @@ impl GovernanceManager {
         self
     }
 
+    /// Replace the meeting store backend.
+    ///
+    /// Use this to configure Sled-backed persistent storage for meetings.
+    pub fn with_meeting_store(mut self, store: Arc<dyn MeetingStoreBackend>) -> Self {
+        self.meeting_store = store;
+        self
+    }
+
     /// Create a governance manager with Sled-backed action item storage
     ///
     /// This is the recommended mode for production with persistent action items.
@@ -732,6 +848,7 @@ impl GovernanceManager {
             action_items: Box::new(SledActionItemStore::new(db)),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
+            meeting_store: Arc::new(InMemoryMeetingStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -751,6 +868,7 @@ impl GovernanceManager {
             action_items: Box::new(SledActionItemStore::new(db)),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
+            meeting_store: Arc::new(InMemoryMeetingStore::new()),
             governance_handle: None,
             receipt_store: None,
         }
@@ -2353,6 +2471,58 @@ impl GovernanceManager {
         self.activity_store
             .list_by_entity(entity_id)
             .map_err(|e| anyhow::anyhow!("Failed to list activities: {e}"))
+    }
+
+    // ========================================================================
+    // Meeting management (deliberation trace objects)
+    // ========================================================================
+
+    /// Create a new meeting in a governance domain.
+    pub fn create_meeting(
+        &self,
+        domain_id: String,
+        title: String,
+        description: Option<String>,
+        scheduled_at: Option<u64>,
+        created_by: String,
+    ) -> Result<Meeting> {
+        let now = icn_time::current_timestamp_secs();
+        let id = MeetingId::generate();
+        let mut m = Meeting::new(id, domain_id, title, created_by, now);
+        m.description = description;
+        m.scheduled_at = scheduled_at;
+        self.meeting_store
+            .save(&m)
+            .map_err(|e| anyhow::anyhow!("Failed to save meeting: {e}"))?;
+        Ok(m)
+    }
+
+    /// Get a meeting by ID.
+    pub fn get_meeting(&self, id: &MeetingId) -> Result<Option<Meeting>> {
+        self.meeting_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get meeting: {e}"))
+    }
+
+    /// List all meetings in a governance domain, newest first.
+    pub fn list_meetings(&self, domain_id: &str) -> Result<Vec<Meeting>> {
+        self.meeting_store
+            .list_by_domain(domain_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list meetings: {e}"))
+    }
+
+    /// Update a meeting record (full save — caller mutates then calls this).
+    pub fn update_meeting(&self, m: &Meeting) -> Result<()> {
+        self.meeting_store
+            .save(m)
+            .map_err(|e| anyhow::anyhow!("Failed to update meeting: {e}"))
+    }
+
+    /// Delete a meeting (hard delete).
+    pub fn delete_meeting(&self, id: &MeetingId) -> Result<bool> {
+        self.meeting_store
+            .delete(id)
+            .map_err(|e| anyhow::anyhow!("Failed to delete meeting: {e}"))
     }
 
     // ========================================================================

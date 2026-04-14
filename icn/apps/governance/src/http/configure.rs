@@ -351,6 +351,40 @@ where
             web::resource("/activities/{activity_id}")
                 .route(web::get().to(handlers::get_activity::<E>)),
         )
+        // ── Meeting endpoints ────────────────────────────────────────────
+        .service(
+            web::resource("/domains/{domain_id}/meetings")
+                .route(web::post().to(handlers::create_meeting::<E>))
+                .route(web::get().to(handlers::list_meetings::<E>)),
+        )
+        .service(
+            web::resource("/meetings/{meeting_id}")
+                .route(web::get().to(handlers::get_meeting::<E>)),
+        )
+        .service(
+            web::resource("/meetings/{meeting_id}/start")
+                .route(web::post().to(handlers::start_meeting::<E>)),
+        )
+        .service(
+            web::resource("/meetings/{meeting_id}/end")
+                .route(web::post().to(handlers::end_meeting::<E>)),
+        )
+        .service(
+            web::resource("/meetings/{meeting_id}/attendees")
+                .route(web::post().to(handlers::add_attendee::<E>)),
+        )
+        .service(
+            web::resource("/meetings/{meeting_id}/attendance")
+                .route(web::put().to(handlers::mark_attendance::<E>)),
+        )
+        .service(
+            web::resource("/meetings/{meeting_id}/agenda")
+                .route(web::post().to(handlers::add_agenda_item::<E>)),
+        )
+        .service(
+            web::resource("/meetings/{meeting_id}/agenda/{item_id}")
+                .route(web::put().to(handlers::update_agenda_item::<E>)),
+        )
         // ── Federation proposal endpoints ────────────────────────────────
         .service(
             web::resource("/proposals/federation/join")

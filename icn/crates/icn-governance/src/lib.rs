@@ -84,6 +84,7 @@ pub mod action_item;
 
 // Institutional structure + event model (Tranche 2)
 pub mod activity;
+pub mod meeting;
 pub mod parent;
 pub mod structure;
 
@@ -183,6 +184,10 @@ pub use action_item::{
 };
 pub use activity::{
     Activity, ActivityId, ActivityKind, ActivityStatus, ActivityStoreBackend, InMemoryActivityStore,
+};
+pub use meeting::{
+    AgendaItem, AgendaItemId, AttendanceStatus, InMemoryMeetingStore, Meeting, MeetingAttendee,
+    MeetingId, MeetingRole, MeetingStatus, MeetingStoreBackend,
 };
 pub use parent::InstitutionalParent;
 pub use structure::{

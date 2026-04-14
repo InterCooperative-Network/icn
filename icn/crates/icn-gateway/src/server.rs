@@ -645,6 +645,9 @@ impl GatewayServer {
         let activity_store = Arc::new(icn_governance_actor::SledActivityStore::new(
             sled_db_arc.clone(),
         ));
+        let meeting_store = Arc::new(icn_governance_actor::SledMeetingStore::new(
+            sled_db_arc.clone(),
+        ));
         let governance_manager: Arc<GovernanceManager> =
             if let Some(handle) = self.governance_handle {
                 info!("Governance manager connected to daemon with persistent action items");
@@ -652,7 +655,8 @@ impl GatewayServer {
                     GovernanceManager::with_sled_action_items(handle, sled_db_arc)
                         .with_receipt_store(receipt_store.clone())
                         .with_structure_store(structure_store)
-                        .with_activity_store(activity_store),
+                        .with_activity_store(activity_store)
+                        .with_meeting_store(meeting_store),
                 )
             } else {
                 info!("Governance manager running standalone with persistent action items");
@@ -660,7 +664,8 @@ impl GatewayServer {
                     GovernanceManager::new_with_sled(sled_db_arc)
                         .with_receipt_store(receipt_store.clone())
                         .with_structure_store(structure_store)
-                        .with_activity_store(activity_store),
+                        .with_activity_store(activity_store)
+                        .with_meeting_store(meeting_store),
                 )
             };
         let ledger_service: Option<Arc<icn_api::LedgerService>> =
