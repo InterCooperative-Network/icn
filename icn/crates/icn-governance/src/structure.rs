@@ -314,14 +314,24 @@ impl StructureStoreBackend for InMemoryStructureStore {
             .structures
             .read()
             .map_err(|e| GovernanceError::Internal(format!("structures lock poisoned: {e}")))?;
-        Ok(guard
+        let mut out: Vec<Structure> = guard
             .values()
             .filter(|s| s.parent_entity_id == entity_id)
             .cloned()
-            .collect())
+            .collect();
+        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(out)
     }
 
     fn delete_structure(&self, id: &StructureId) -> std::result::Result<bool, GovernanceError> {
+        // Cascade: remove all role assignments for this structure first
+        {
+            let mut roles_guard = self
+                .roles
+                .write()
+                .map_err(|e| GovernanceError::Internal(format!("roles lock poisoned: {e}")))?;
+            roles_guard.retain(|_, r| r.structure_id != *id);
+        }
         let mut guard = self
             .structures
             .write()
@@ -357,11 +367,13 @@ impl StructureStoreBackend for InMemoryStructureStore {
             .roles
             .read()
             .map_err(|e| GovernanceError::Internal(format!("roles lock poisoned: {e}")))?;
-        Ok(guard
+        let mut out: Vec<RoleAssignment> = guard
             .values()
             .filter(|r| r.structure_id == *sid)
             .cloned()
-            .collect())
+            .collect();
+        out.sort_by(|a, b| a.start_date.cmp(&b.start_date));
+        Ok(out)
     }
 
     fn delete_role(&self, id: &RoleAssignmentId) -> std::result::Result<bool, GovernanceError> {

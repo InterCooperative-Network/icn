@@ -1255,10 +1255,15 @@ mod tests {
 
     #[test]
     fn test_action_item_backward_compat_no_parent() {
-        // Parent=None round-trips cleanly; simulates old JSON without parent field.
+        // Simulate old JSON that predates the `parent` field: the key is missing entirely.
+        // serde should deserialize it via `#[serde(default)]` without error.
         let item = ActionItem::new(test_domain(), "x".to_string(), test_did(), 1000);
         assert!(item.parent.is_none());
-        let json = serde_json::to_string(&item).unwrap();
+        let mut json_value: serde_json::Value = serde_json::to_value(&item).unwrap();
+        // Remove the `parent` key to replicate a payload from before the field existed
+        json_value.as_object_mut().unwrap().remove("parent");
+        assert!(!json_value.as_object().unwrap().contains_key("parent"));
+        let json = serde_json::to_string(&json_value).unwrap();
         let round: ActionItem = serde_json::from_str(&json).unwrap();
         assert!(round.parent.is_none());
     }

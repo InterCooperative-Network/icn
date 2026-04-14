@@ -201,11 +201,13 @@ impl ActivityStoreBackend for InMemoryActivityStore {
             .activities
             .read()
             .map_err(|e| GovernanceError::Internal(format!("activities lock poisoned: {e}")))?;
-        Ok(guard
+        let mut out: Vec<Activity> = guard
             .values()
             .filter(|a| a.parent_entity_id == entity_id)
             .cloned()
-            .collect())
+            .collect();
+        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(out)
     }
 
     fn delete(&self, id: &ActivityId) -> std::result::Result<bool, GovernanceError> {
