@@ -131,8 +131,9 @@ charter:
           voting_period_hours: 24
 
   # ─── Committee Delegation ─────────────────────────────
-  # Each committee is a Community entity with its own governance domain.
-  # Committees operate by consent within their delegated scope.
+  # Committees are INTERNAL STRUCTURES of the organizing cooperative,
+  # NOT sovereign entities. They have delegated authority scopes but
+  # no independent governance domain, treasury, or federation membership.
   # Decisions outside scope escalate to the organizing cooperative.
   committees:
     defaults:
@@ -144,8 +145,8 @@ charter:
     bodies:
       - id: "nycn-steering"
         name: "Steering Committee"
-        entity_type: community
-        parent_id: "nycn-organizers"
+        structure_type: committee
+        parent_entity: "nycn-organizers"
         purpose: >
           Overall strategic direction, inter-committee coordination,
           and escalated decision authority for the organizing cooperative.
@@ -159,8 +160,8 @@ charter:
 
       - id: "nycn-content"
         name: "Content Committee"
-        entity_type: community
-        parent_id: "nycn-organizers"
+        structure_type: committee
+        parent_entity: "nycn-organizers"
         purpose: >
           Summit programming, speaker curation, session design,
           and year-round educational content.
@@ -175,8 +176,8 @@ charter:
 
       - id: "nycn-logistics"
         name: "Logistics Committee"
-        entity_type: community
-        parent_id: "nycn-organizers"
+        structure_type: committee
+        parent_entity: "nycn-organizers"
         purpose: >
           Venue management, vendor coordination, day-of operations,
           and physical infrastructure.
@@ -191,8 +192,8 @@ charter:
 
       - id: "nycn-finance"
         name: "Finance Committee"
-        entity_type: community
-        parent_id: "nycn-organizers"
+        structure_type: committee
+        parent_entity: "nycn-organizers"
         purpose: >
           Budget management, sponsorship processing, financial reporting,
           and fiscal accountability.
@@ -205,23 +206,24 @@ charter:
           - "Budget amendments or new expense categories"
           - "End-of-year financial close decisions"
 
-  # ─── Summit Entity ────────────────────────────────────
-  # Time-bounded community for each annual summit.
-  # Created fresh each year, inheriting institutional records.
+  # ─── Summit Activity ──────────────────────────────────
+  # The summit is an EVENT/ACTIVITY, not a sovereign entity.
+  # It is produced by the organizing cooperative and contributed to
+  # by committees. Created fresh each year.
   summit:
-    entity_template:
+    activity_template:
       id_pattern: "nycn-summit-{year}"
-      entity_type: community
-      parent_id: "nycn-organizers"
+      activity_type: event
+      parent_entity: "nycn-organizers"
+      linked_structures:
+        - "nycn-steering"
+        - "nycn-content"
+        - "nycn-logistics"
+        - "nycn-finance"
       lifecycle:
-        forming: "October (year-1)"
+        planned: "October (year-1)"
         active: "January–summit date"
         completed: "30 days post-summit"
-      governance:
-        decision_mode: consent
-        max_objections: 1
-        quorum: 0.5
-        voting_period_hours: 72
 
   # ─── Trust Thresholds ─────────────────────────────────
   trust:
