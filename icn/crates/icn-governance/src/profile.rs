@@ -108,7 +108,8 @@ impl GovernanceProfile {
     ) -> Result<DecisionOutcome> {
         // Check quorum: did enough people vote?
         let total_votes = tally.total_votes();
-        let quorum_required = (eligible_voter_count * thresholds.quorum_percentage as usize) / 100;
+        let quorum_required =
+            (eligible_voter_count * thresholds.quorum_percentage as usize).div_ceil(100);
 
         if total_votes < quorum_required {
             return Ok(DecisionOutcome::NoQuorum);
@@ -142,7 +143,8 @@ impl GovernanceProfile {
     ) -> Result<DecisionOutcome> {
         // Quorum check is identical regardless of decision mode
         let total_votes = tally.total_votes();
-        let quorum_required = (eligible_voter_count * thresholds.quorum_percentage as usize) / 100;
+        let quorum_required =
+            (eligible_voter_count * thresholds.quorum_percentage as usize).div_ceil(100);
 
         if total_votes < quorum_required {
             return Ok(DecisionOutcome::NoQuorum);

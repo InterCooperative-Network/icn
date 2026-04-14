@@ -161,10 +161,14 @@ impl GovernanceConfig {
             | ProposalPayload::BondIssuance { .. }
             | ProposalPayload::Federation(_)
             | ProposalPayload::ResourceAccess { .. }
-            | ProposalPayload::Charter { .. } => ProposalThresholds::new(
-                self.params.quorum_percentage,
-                self.params.approval_threshold_percentage,
-            ),
+            | ProposalPayload::Charter { .. } => {
+                let mut t = ProposalThresholds::new(
+                    self.params.quorum_percentage,
+                    self.params.approval_threshold_percentage,
+                );
+                t.max_objections = self.params.max_objections;
+                t
+            }
         }
     }
 }
@@ -463,9 +467,16 @@ pub struct GovernanceParams {
     /// How this domain evaluates proposal outcomes.
     ///
     /// - `Majority` (default): traditional vote counting.
-    /// - `Consent`: proposals pass unless objections exceed `max_objections` in `ProposalThresholds`.
+    /// - `Consent`: proposals pass unless objections exceed `max_objections`.
     #[serde(default)]
     pub decision_mode: DecisionMode,
+
+    /// Maximum objections allowed in consent mode (domain-level default).
+    ///
+    /// Propagated into `ProposalThresholds` for normal proposals.
+    /// `None` → strict consensus (0 objections allowed).
+    #[serde(default)]
+    pub max_objections: Option<u8>,
 }
 
 /// Default max execution delay: 1 year (31536000 seconds)
@@ -486,6 +497,7 @@ impl Default for GovernanceParams {
             max_deliberation_seconds: 30 * 24 * 60 * 60, // 30 days
             max_execution_delay_seconds: default_max_execution_delay(),
             decision_mode: DecisionMode::default(),
+            max_objections: None,
         }
     }
 }
