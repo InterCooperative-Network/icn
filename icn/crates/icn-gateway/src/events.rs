@@ -270,6 +270,27 @@ pub enum GatewayEvent {
         transferred_at: u64,
     },
 
+    // === Institutional Events ===
+    /// A meeting was scheduled in a governance domain
+    MeetingCreated {
+        domain_id: String,
+        meeting_id: String,
+        title: String,
+        scheduled_at: u64,
+        created_by: String,
+    },
+
+    /// A meeting transitioned to in-progress
+    MeetingStarted { domain_id: String, meeting_id: String },
+
+    /// A meeting was completed or cancelled
+    MeetingEnded {
+        domain_id: String,
+        meeting_id: String,
+        /// "completed" or "cancelled"
+        outcome: String,
+    },
+
     // === Control Events ===
     /// Server is shutting down gracefully
     ///
