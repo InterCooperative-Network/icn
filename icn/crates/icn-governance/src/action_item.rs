@@ -197,7 +197,8 @@ pub struct ActionItem {
 
     /// Typed link to the meeting that generated this action item.
     ///
-    /// Set automatically when action items are created during meeting close.
+    /// Optional reference to the meeting in which this action item originated.
+    /// Set by callers when creating action items from a meeting context.
     /// Coexists with `meeting_context` (the free-text field remains for backward
     /// compatibility and manual entry).
     #[serde(default)]

@@ -209,9 +209,7 @@ impl AgendaItem {
 
     /// Whether this item has been resolved (outcome is set to "resolved").
     pub fn is_resolved(&self) -> bool {
-        self.outcome
-            .as_deref()
-            .is_some_and(|o| o == "resolved")
+        self.outcome.as_deref().is_some_and(|o| o == "resolved")
     }
 }
 
@@ -361,10 +359,8 @@ pub trait MeetingStoreBackend: Send + Sync {
     fn get(&self, id: &MeetingId) -> std::result::Result<Option<Meeting>, GovernanceError>;
 
     /// List all meetings in a governance domain, newest first.
-    fn list_by_domain(
-        &self,
-        domain_id: &str,
-    ) -> std::result::Result<Vec<Meeting>, GovernanceError>;
+    fn list_by_domain(&self, domain_id: &str)
+        -> std::result::Result<Vec<Meeting>, GovernanceError>;
 
     /// Delete a meeting (hard delete — prefer `Cancelled` status for soft-cancel).
     fn delete(&self, id: &MeetingId) -> std::result::Result<bool, GovernanceError>;

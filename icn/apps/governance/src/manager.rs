@@ -15,12 +15,12 @@ use icn_governance::{
     ActivityStoreBackend, Comment, CommentId, Delegation, DelegationId, DelegationScope,
     Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt, GovernanceDomain,
     GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
-    InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore,
-    InMemoryMeetingStore, InMemoryStructureStore, Meeting, MeetingId, MeetingStoreBackend,
-    MembershipConfig, MembershipSource, PaginatedResult, ProofOutcome, Proposal,
-    ProposalDomainLookup, ProposalId, ProposalPayload, ProposalScope, ProposalState, RoleAssignment,
-    Structure, StructureId, StructureKind, StructureStoreBackend, Timestamp, Vote, VoteChoice,
-    VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
+    InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore, InMemoryMeetingStore,
+    InMemoryStructureStore, Meeting, MeetingId, MeetingStoreBackend, MembershipConfig,
+    MembershipSource, PaginatedResult, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
+    ProposalPayload, ProposalScope, ProposalState, RoleAssignment, Structure, StructureId,
+    StructureKind, StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally,
+    DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -661,9 +661,8 @@ impl MeetingStoreBackend for SledMeetingStore {
         for result in self.db.scan_prefix(prefix.as_bytes()) {
             let (_, value) =
                 result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
-            let m: Meeting = icn_encoding::decode_versioned(&value).map_err(|e| {
-                GovernanceError::Internal(format!("Failed to decode meeting: {e}"))
-            })?;
+            let m: Meeting = icn_encoding::decode_versioned(&value)
+                .map_err(|e| GovernanceError::Internal(format!("Failed to decode meeting: {e}")))?;
             out.push(m);
         }
         out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
