@@ -108,8 +108,9 @@ pub async fn init_governance_actor(
     let action_item_path = store_path.join("governance_action_items");
     let action_item_db = sled::open(&action_item_path)
         .map_err(|e| anyhow::anyhow!("Failed to open action item store: {e}"))?;
-    let action_store: Arc<dyn icn_governance::ActionItemStoreBackend> =
-        Arc::new(crate::manager::SledActionItemStore::new(Arc::new(action_item_db)));
+    let action_store: Arc<dyn icn_governance::ActionItemStoreBackend> = Arc::new(
+        crate::manager::SledActionItemStore::new(Arc::new(action_item_db)),
+    );
     let governance_handle = governance_handle.with_action_item_store(action_store);
 
     info!("Governance actor spawned at {}", gov_store_path.display());
