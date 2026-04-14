@@ -281,7 +281,10 @@ pub enum GatewayEvent {
     },
 
     /// A meeting transitioned to in-progress
-    MeetingStarted { domain_id: String, meeting_id: String },
+    MeetingStarted {
+        domain_id: String,
+        meeting_id: String,
+    },
 
     /// A meeting was completed or cancelled
     MeetingEnded {

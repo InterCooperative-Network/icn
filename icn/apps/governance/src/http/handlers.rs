@@ -2917,7 +2917,12 @@ pub async fn create_meeting<E: GovernanceEventEmitter + Clone + 'static>(
     let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
     let domain = GovernanceDomainId(domain_id.into_inner());
 
-    check_domain_membership(&ctx.manager, &domain, &parse_did(&claims.sub, "Invalid DID in token")?).await?;
+    check_domain_membership(
+        &ctx.manager,
+        &domain,
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
 
     let m = ctx
         .manager
@@ -2930,6 +2935,7 @@ pub async fn create_meeting<E: GovernanceEventEmitter + Clone + 'static>(
         )
         .map_err(anyhow_to_api)?;
 
+    // TODO: emit MeetingCreated event when GovernanceEventEmitter gains meeting methods
     Ok(HttpResponse::Created().json(meeting_to_response(&m)))
 }
 
@@ -2993,6 +2999,7 @@ pub async fn start_meeting<E: GovernanceEventEmitter + Clone + 'static>(
     m.started_at = Some(current_time_secs());
     ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
 
+    // TODO: emit MeetingStarted event when GovernanceEventEmitter gains meeting methods
     Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
 }
 
@@ -3024,6 +3031,7 @@ pub async fn end_meeting<E: GovernanceEventEmitter + Clone + 'static>(
     m.ended_at = Some(current_time_secs());
     ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
 
+    // TODO: emit MeetingEnded event when GovernanceEventEmitter gains meeting methods
     Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
 }
 
@@ -3034,7 +3042,7 @@ pub async fn add_attendee<E: GovernanceEventEmitter + Clone + 'static>(
     meeting_id: web::Path<String>,
     req: web::Json<AddAttendeeRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
     let id = MeetingId(meeting_id.into_inner());
     let role = parse_meeting_role(&req.meeting_role)?;
 
@@ -3043,6 +3051,23 @@ pub async fn add_attendee<E: GovernanceEventEmitter + Clone + 'static>(
         .get_meeting(&id)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    if matches!(
+        m.status,
+        MeetingStatus::Completed | MeetingStatus::Cancelled
+    ) {
+        return Ok(HttpResponse::UnprocessableEntity()
+            .json(serde_json::json!({"error": "Cannot modify a completed or cancelled meeting"})));
+    }
+
+    if let Some(ref checker) = ctx.member_checker {
+        let caller_did = parse_did(&claims.sub, "Invalid DID in token")?;
+        if !checker(caller_did, m.domain_id.clone()).await {
+            return Ok(
+                HttpResponse::Forbidden().json(serde_json::json!({"error": "Not a domain member"}))
+            );
+        }
+    }
 
     // Upsert: update existing entry or append
     if let Some(existing) = m.attendees.iter_mut().find(|a| a.did == req.did) {
@@ -3076,6 +3101,14 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Meeting not found"))?;
 
+    if matches!(
+        m.status,
+        MeetingStatus::Completed | MeetingStatus::Cancelled
+    ) {
+        return Ok(HttpResponse::UnprocessableEntity()
+            .json(serde_json::json!({"error": "Cannot modify a completed or cancelled meeting"})));
+    }
+
     let attendee = m
         .attendees
         .iter_mut()
@@ -3102,6 +3135,14 @@ pub async fn add_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
         .get_meeting(&id)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    if matches!(
+        m.status,
+        MeetingStatus::Completed | MeetingStatus::Cancelled
+    ) {
+        return Ok(HttpResponse::UnprocessableEntity()
+            .json(serde_json::json!({"error": "Cannot modify a completed or cancelled meeting"})));
+    }
 
     let mut item = icn_governance::AgendaItem::new(req.title.clone());
     item.description = req.description.clone();
@@ -3133,6 +3174,14 @@ pub async fn update_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
         .get_meeting(&meeting_id)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    if matches!(
+        m.status,
+        MeetingStatus::Completed | MeetingStatus::Cancelled
+    ) {
+        return Ok(HttpResponse::UnprocessableEntity()
+            .json(serde_json::json!({"error": "Cannot modify a completed or cancelled meeting"})));
+    }
 
     let item = m
         .get_agenda_item_mut(&item_id)
