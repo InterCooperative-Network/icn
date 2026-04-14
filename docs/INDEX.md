@@ -149,6 +149,12 @@ REST API, WebSocket, and SDK documentation:
 - [topic-subscriptions-api.md](reference/api/topic-subscriptions-api.md) - Subscription API
 - Also see: [api/OPENAPI.md](api/OPENAPI.md) and [api/README.md](api/README.md)
 
+### Institutional Reference (`reference/`)
+
+- [ccl-charter-templates.md](reference/ccl-charter-templates.md) - Starter charters for federations, cooperatives, communities, and multi-stakeholder co-ops
+- [governance-playbook.md](reference/governance-playbook.md) - Common governance decision patterns with API examples
+- [entity-topology-patterns.md](reference/entity-topology-patterns.md) - Organizational structure patterns (flat co-op through nested federation)
+
 ### Configuration Reference (`reference/config/`)
 
 Configuration files and environment settings:
@@ -168,6 +174,11 @@ Configuration files and environment settings:
 ## 📚 User & Developer Guides
 
 Practical guides for using and building with ICN.
+
+### Institutional Guides (`guides/`)
+
+- [institution-setup.md](guides/institution-setup.md) - How to create an institution on ICN (federation, cooperative, or community)
+- [onboarding-runbook.md](guides/onboarding-runbook.md) - How to bring real humans into an ICN institution
 
 ### User Guides (`guides/user/`)
 
