@@ -360,7 +360,17 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         })
         .await?;
 
-    info!("  Alice voted FOR Dave's membership");
+    // Bob also votes for (quorum requires ceil(3*50/100) = 2 votes)
+    gov_handle
+        .submit(GovernanceCommand::CastVote {
+            proposal_id: membership_proposal_id.clone(),
+            choice: VoteChoice::For,
+            voter: bob.did(),
+            comment: None,
+        })
+        .await?;
+
+    info!("  Alice and Bob voted FOR Dave's membership");
 
     // Close the proposal
     gov_handle
@@ -444,7 +454,17 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         })
         .await?;
 
-    info!("  Alice voted FOR budget proposal");
+    // Bob also votes for (quorum requires ceil(3*50/100) = 2 votes)
+    gov_handle
+        .submit(GovernanceCommand::CastVote {
+            proposal_id: budget_proposal_id.clone(),
+            choice: VoteChoice::For,
+            voter: bob.did(),
+            comment: None,
+        })
+        .await?;
+
+    info!("  Alice and Bob voted FOR budget proposal");
 
     gov_handle
         .submit(GovernanceCommand::CloseProposal {
