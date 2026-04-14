@@ -5,6 +5,26 @@ use crate::profile::GovernanceProfileId;
 use crate::proposal::{ProposalPayload, TreasuryProposalOperation};
 use serde::{Deserialize, Serialize};
 
+/// How a governance domain evaluates proposal outcomes.
+///
+/// - `Majority`: Traditional majority vote. Proposals pass when `for_votes > approval_threshold`.
+/// - `Consent`: Proposals pass unless objections exceed `max_objections`. An "against" vote
+///   in consent mode counts as an objection. Quorum still applies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DecisionMode {
+    /// Traditional majority-rule voting (default).
+    Majority,
+    /// Consent-based decision-making: proposals pass unless objections exceed threshold.
+    Consent,
+}
+
+impl Default for DecisionMode {
+    fn default() -> Self {
+        Self::Majority
+    }
+}
+
 /// Complete governance configuration for a domain
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GovernanceConfig {
@@ -356,15 +376,43 @@ pub struct ProposalThresholds {
     pub quorum_percentage: u8,
     /// Percentage of votes needed to pass (0-100)
     pub approval_percentage: u8,
+    /// Maximum number of objections (against-votes) allowed in consent mode.
+    ///
+    /// - `None` inherits the default behavior: `0` (any objection blocks).
+    /// - `Some(0)`: strict consensus — any objection blocks the proposal.
+    /// - `Some(1)`: one objection is tolerated, two or more block.
+    ///
+    /// Only meaningful when `DecisionMode::Consent` is active; ignored in majority mode.
+    #[serde(default)]
+    pub max_objections: Option<u8>,
 }
 
 impl ProposalThresholds {
-    /// Create new thresholds
+    /// Create new thresholds (majority mode defaults)
     pub fn new(quorum_percentage: u8, approval_percentage: u8) -> Self {
         Self {
             quorum_percentage,
             approval_percentage,
+            max_objections: None,
         }
+    }
+
+    /// Create new thresholds with a consent-mode objection limit
+    pub fn with_max_objections(
+        quorum_percentage: u8,
+        approval_percentage: u8,
+        max_objections: u8,
+    ) -> Self {
+        Self {
+            quorum_percentage,
+            approval_percentage,
+            max_objections: Some(max_objections),
+        }
+    }
+
+    /// Effective max objections: returns `max_objections` if set, otherwise `0` (strict consensus).
+    pub fn effective_max_objections(&self) -> u8 {
+        self.max_objections.unwrap_or(0)
     }
 }
 
@@ -411,6 +459,13 @@ pub struct GovernanceParams {
     /// - 63072000 (2 years): Constitutional amendments
     #[serde(default = "default_max_execution_delay")]
     pub max_execution_delay_seconds: u64,
+
+    /// How this domain evaluates proposal outcomes.
+    ///
+    /// - `Majority` (default): traditional vote counting.
+    /// - `Consent`: proposals pass unless objections exceed `max_objections` in `ProposalThresholds`.
+    #[serde(default)]
+    pub decision_mode: DecisionMode,
 }
 
 /// Default max execution delay: 1 year (31536000 seconds)
@@ -430,6 +485,7 @@ impl Default for GovernanceParams {
             min_deliberation_seconds: 24 * 60 * 60, // 1 day
             max_deliberation_seconds: 30 * 24 * 60 * 60, // 30 days
             max_execution_delay_seconds: default_max_execution_delay(),
+            decision_mode: DecisionMode::default(),
         }
     }
 }
@@ -933,5 +989,74 @@ mod tests {
         let thresholds = ProposalThresholds::new(67, 75);
         assert_eq!(thresholds.quorum_percentage, 67);
         assert_eq!(thresholds.approval_percentage, 75);
+        assert_eq!(thresholds.max_objections, None);
+    }
+
+    // ========== DecisionMode Tests ==========
+
+    #[test]
+    fn test_decision_mode_default_is_majority() {
+        let mode = DecisionMode::default();
+        assert_eq!(mode, DecisionMode::Majority);
+    }
+
+    #[test]
+    fn test_decision_mode_serde_roundtrip() {
+        // Majority
+        let json = serde_json::to_string(&DecisionMode::Majority).unwrap();
+        assert_eq!(json, r#""majority""#);
+        let deserialized: DecisionMode = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, DecisionMode::Majority);
+
+        // Consent
+        let json = serde_json::to_string(&DecisionMode::Consent).unwrap();
+        assert_eq!(json, r#""consent""#);
+        let deserialized: DecisionMode = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, DecisionMode::Consent);
+    }
+
+    #[test]
+    fn test_governance_params_default_is_majority() {
+        let params = GovernanceParams::default();
+        assert_eq!(params.decision_mode, DecisionMode::Majority);
+    }
+
+    #[test]
+    fn test_governance_params_serde_backward_compat() {
+        // JSON without decision_mode should deserialize with default (Majority)
+        let json = r#"{
+            "quorum_percentage": 50,
+            "approval_threshold_percentage": 50,
+            "voting_period_seconds": 604800,
+            "deliberation_period_seconds": 604800,
+            "require_deliberation": true,
+            "min_deliberation_seconds": 86400,
+            "max_deliberation_seconds": 2592000,
+            "max_execution_delay_seconds": 31536000
+        }"#;
+        let params: GovernanceParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.decision_mode, DecisionMode::Majority);
+    }
+
+    #[test]
+    fn test_proposal_thresholds_with_max_objections() {
+        let thresholds = ProposalThresholds::with_max_objections(50, 50, 1);
+        assert_eq!(thresholds.max_objections, Some(1));
+        assert_eq!(thresholds.effective_max_objections(), 1);
+    }
+
+    #[test]
+    fn test_proposal_thresholds_effective_max_objections_default() {
+        let thresholds = ProposalThresholds::new(50, 50);
+        // None defaults to 0 (strict consensus)
+        assert_eq!(thresholds.effective_max_objections(), 0);
+    }
+
+    #[test]
+    fn test_proposal_thresholds_serde_backward_compat() {
+        // JSON without max_objections should deserialize with None
+        let json = r#"{"quorum_percentage": 50, "approval_percentage": 60}"#;
+        let thresholds: ProposalThresholds = serde_json::from_str(json).unwrap();
+        assert_eq!(thresholds.max_objections, None);
     }
 }
