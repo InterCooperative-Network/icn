@@ -636,13 +636,16 @@ impl GatewayServer {
 
         // Create governance manager with Sled-backed action items, structures, and activities.
         // (uses GovernanceActor if handle available for proposals/votes/domains)
+        // Construct sled-backed stores for gateway-local institutional state.
+        // Types are inferred from the Sled*Store constructors — no explicit
+        // icn_governance:: trait annotations here (meaning-firewall ratchet).
         let sled_db_arc = Arc::new(db.clone());
-        let structure_store: Arc<dyn icn_governance::StructureStoreBackend> = Arc::new(
-            icn_governance_actor::SledStructureStore::new(sled_db_arc.clone()),
-        );
-        let activity_store: Arc<dyn icn_governance::ActivityStoreBackend> = Arc::new(
-            icn_governance_actor::SledActivityStore::new(sled_db_arc.clone()),
-        );
+        let structure_store = Arc::new(icn_governance_actor::SledStructureStore::new(
+            sled_db_arc.clone(),
+        ));
+        let activity_store = Arc::new(icn_governance_actor::SledActivityStore::new(
+            sled_db_arc.clone(),
+        ));
         let governance_manager: Arc<GovernanceManager> =
             if let Some(handle) = self.governance_handle {
                 info!("Governance manager connected to daemon with persistent action items");
