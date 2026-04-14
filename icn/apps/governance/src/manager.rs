@@ -190,6 +190,314 @@ impl ActionItemStoreBackend for SledActionItemStore {
     }
 }
 
+// ========== Sled store for Structures (Tranche 2) ==========
+
+/// Sled-backed storage for internal structures and role assignments.
+///
+/// Keys:
+///   - `structure:{entity_id}:{structure_id}` → Structure
+///   - `role:{structure_id}:{role_id}`        → RoleAssignment
+pub struct SledStructureStore {
+    db: Arc<sled::Db>,
+}
+
+impl SledStructureStore {
+    /// Create a new Sled-backed structure store
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    fn structure_key(entity_id: &str, id: &icn_governance::StructureId) -> String {
+        format!("structure:{}:{}", entity_id, id.0)
+    }
+
+    fn entity_structure_prefix(entity_id: &str) -> String {
+        format!("structure:{}:", entity_id)
+    }
+
+    fn role_key(
+        sid: &icn_governance::StructureId,
+        rid: &icn_governance::RoleAssignmentId,
+    ) -> String {
+        format!("role:{}:{}", sid.0, rid.0)
+    }
+
+    fn structure_role_prefix(sid: &icn_governance::StructureId) -> String {
+        format!("role:{}:", sid.0)
+    }
+
+    /// Scan all structures across all entities (used for reverse lookup by id).
+    fn all_structure_prefix() -> &'static str {
+        "structure:"
+    }
+}
+
+impl icn_governance::StructureStoreBackend for SledStructureStore {
+    fn save_structure(
+        &self,
+        s: &icn_governance::Structure,
+    ) -> std::result::Result<(), GovernanceError> {
+        let key = Self::structure_key(&s.parent_entity_id, &s.id);
+        let value = icn_encoding::encode_versioned(s)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode structure: {e}")))?;
+        self.db
+            .insert(key.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert failed: {e}")))?;
+        Ok(())
+    }
+
+    fn get_structure(
+        &self,
+        id: &icn_governance::StructureId,
+    ) -> std::result::Result<Option<icn_governance::Structure>, GovernanceError> {
+        // Scan all structures since keys include entity_id but lookup is by structure_id only
+        let suffix = format!(":{}", id.0);
+        for result in self.db.scan_prefix(Self::all_structure_prefix().as_bytes()) {
+            let (key, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let key_str = std::str::from_utf8(&key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            if key_str.ends_with(&suffix) {
+                let s: icn_governance::Structure =
+                    icn_encoding::decode_versioned(&value).map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode structure: {e}"))
+                    })?;
+                return Ok(Some(s));
+            }
+        }
+        Ok(None)
+    }
+
+    fn list_structures_by_entity(
+        &self,
+        entity_id: &str,
+    ) -> std::result::Result<Vec<icn_governance::Structure>, GovernanceError> {
+        let prefix = Self::entity_structure_prefix(entity_id);
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let s: icn_governance::Structure =
+                icn_encoding::decode_versioned(&value).map_err(|e| {
+                    GovernanceError::Internal(format!("Failed to decode structure: {e}"))
+                })?;
+            out.push(s);
+        }
+        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(out)
+    }
+
+    fn delete_structure(
+        &self,
+        id: &icn_governance::StructureId,
+    ) -> std::result::Result<bool, GovernanceError> {
+        // Locate by full scan (structure_id is globally unique but prefix needs entity_id)
+        let suffix = format!(":{}", id.0);
+        let mut found_key: Option<sled::IVec> = None;
+        for result in self.db.scan_prefix(Self::all_structure_prefix().as_bytes()) {
+            let (key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let key_str = std::str::from_utf8(&key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            if key_str.ends_with(&suffix) {
+                found_key = Some(key);
+                break;
+            }
+        }
+        match found_key {
+            Some(k) => self
+                .db
+                .remove(k)
+                .map(|opt| opt.is_some())
+                .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}"))),
+            None => Ok(false),
+        }
+    }
+
+    fn save_role(
+        &self,
+        r: &icn_governance::RoleAssignment,
+    ) -> std::result::Result<(), GovernanceError> {
+        let key = Self::role_key(&r.structure_id, &r.id);
+        let value = icn_encoding::encode_versioned(r)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode role: {e}")))?;
+        self.db
+            .insert(key.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert failed: {e}")))?;
+        Ok(())
+    }
+
+    fn get_role(
+        &self,
+        id: &icn_governance::RoleAssignmentId,
+    ) -> std::result::Result<Option<icn_governance::RoleAssignment>, GovernanceError> {
+        let suffix = format!(":{}", id.0);
+        for result in self.db.scan_prefix(b"role:") {
+            let (key, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let key_str = std::str::from_utf8(&key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            if key_str.ends_with(&suffix) {
+                let r: icn_governance::RoleAssignment = icn_encoding::decode_versioned(&value)
+                    .map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode role: {e}"))
+                    })?;
+                return Ok(Some(r));
+            }
+        }
+        Ok(None)
+    }
+
+    fn list_roles_by_structure(
+        &self,
+        sid: &icn_governance::StructureId,
+    ) -> std::result::Result<Vec<icn_governance::RoleAssignment>, GovernanceError> {
+        let prefix = Self::structure_role_prefix(sid);
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let r: icn_governance::RoleAssignment = icn_encoding::decode_versioned(&value)
+                .map_err(|e| GovernanceError::Internal(format!("Failed to decode role: {e}")))?;
+            out.push(r);
+        }
+        out.sort_by(|a, b| a.start_date.cmp(&b.start_date));
+        Ok(out)
+    }
+
+    fn delete_role(
+        &self,
+        id: &icn_governance::RoleAssignmentId,
+    ) -> std::result::Result<bool, GovernanceError> {
+        let suffix = format!(":{}", id.0);
+        let mut found_key: Option<sled::IVec> = None;
+        for result in self.db.scan_prefix(b"role:") {
+            let (key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let key_str = std::str::from_utf8(&key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            if key_str.ends_with(&suffix) {
+                found_key = Some(key);
+                break;
+            }
+        }
+        match found_key {
+            Some(k) => self
+                .db
+                .remove(k)
+                .map(|opt| opt.is_some())
+                .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}"))),
+            None => Ok(false),
+        }
+    }
+}
+
+// ========== Sled store for Activities (Tranche 2) ==========
+
+/// Sled-backed storage for activities.
+///
+/// Keys: `activity:{entity_id}:{activity_id}` → Activity
+pub struct SledActivityStore {
+    db: Arc<sled::Db>,
+}
+
+impl SledActivityStore {
+    /// Create a new Sled-backed activity store
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    fn activity_key(entity_id: &str, id: &icn_governance::ActivityId) -> String {
+        format!("activity:{}:{}", entity_id, id.0)
+    }
+
+    fn entity_activity_prefix(entity_id: &str) -> String {
+        format!("activity:{}:", entity_id)
+    }
+
+    fn all_activity_prefix() -> &'static str {
+        "activity:"
+    }
+}
+
+impl icn_governance::ActivityStoreBackend for SledActivityStore {
+    fn save(&self, a: &icn_governance::Activity) -> std::result::Result<(), GovernanceError> {
+        let key = Self::activity_key(&a.parent_entity_id, &a.id);
+        let value = icn_encoding::encode_versioned(a)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode activity: {e}")))?;
+        self.db
+            .insert(key.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert failed: {e}")))?;
+        Ok(())
+    }
+
+    fn get(
+        &self,
+        id: &icn_governance::ActivityId,
+    ) -> std::result::Result<Option<icn_governance::Activity>, GovernanceError> {
+        let suffix = format!(":{}", id.0);
+        for result in self.db.scan_prefix(Self::all_activity_prefix().as_bytes()) {
+            let (key, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let key_str = std::str::from_utf8(&key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            if key_str.ends_with(&suffix) {
+                let a: icn_governance::Activity =
+                    icn_encoding::decode_versioned(&value).map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode activity: {e}"))
+                    })?;
+                return Ok(Some(a));
+            }
+        }
+        Ok(None)
+    }
+
+    fn list_by_entity(
+        &self,
+        entity_id: &str,
+    ) -> std::result::Result<Vec<icn_governance::Activity>, GovernanceError> {
+        let prefix = Self::entity_activity_prefix(entity_id);
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let a: icn_governance::Activity =
+                icn_encoding::decode_versioned(&value).map_err(|e| {
+                    GovernanceError::Internal(format!("Failed to decode activity: {e}"))
+                })?;
+            out.push(a);
+        }
+        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(out)
+    }
+
+    fn delete(
+        &self,
+        id: &icn_governance::ActivityId,
+    ) -> std::result::Result<bool, GovernanceError> {
+        let suffix = format!(":{}", id.0);
+        let mut found_key: Option<sled::IVec> = None;
+        for result in self.db.scan_prefix(Self::all_activity_prefix().as_bytes()) {
+            let (key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let key_str = std::str::from_utf8(&key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            if key_str.ends_with(&suffix) {
+                found_key = Some(key);
+                break;
+            }
+        }
+        match found_key {
+            Some(k) => self
+                .db
+                .remove(k)
+                .map(|opt| opt.is_some())
+                .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}"))),
+            None => Ok(false),
+        }
+    }
+}
+
 /// Handle type for actor-backed governance
 ///
 /// This uses the `GovernanceOps` trait to avoid direct dependency on `icn-core`.
