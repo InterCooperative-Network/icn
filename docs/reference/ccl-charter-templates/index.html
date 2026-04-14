@@ -1,0 +1,617 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>CCL Charter Templates | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yTnaBP6O.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ccl charter templates</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/ccl-charter-templates.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>CCL Charter Templates</h1>
+<p>Starter charters for common institutional types on ICN. Each template defines governance parameters, committee delegation, trust thresholds, and budget authority. Customize to fit your institution.</p>
+<p>These are written in CCL (Cooperative Contract Language) YAML format. When ratified via a <code>Charter</code> governance proposal, they&#39;re deployed to the <code>CharterPolicyOracle</code> and enforced by the kernel.</p>
+<hr>
+<h2>Template 1: Federation of Cooperatives</h2>
+<p>Use when: A network of independent cooperatives coordinating through a shared governance layer. Each member co-op retains sovereignty. The federation governs shared concerns.</p>
+<p><strong>Reference implementation: NYCN</strong></p>
+<pre><code class="language-yaml"># federation-charter.yaml
+charter:
+  name: &quot;Regional Cooperative Federation&quot;
+  version: 1
+  entity_type: federation
+  
+  # ─── Federation Governance ───────────────────────────
+  governance:
+    # Who can vote on federation-level decisions
+    eligible_voters: federated_members
+    
+    decisions:
+      # Admitting new member organizations
+      membership_admission:
+        threshold: simple_majority
+        quorum: 0.5
+        deliberation_period_hours: 72
+        voting_period_hours: 168  # 7 days
+      
+      # Changing the charter itself
+      charter_amendment:
+        threshold: supermajority_two_thirds
+        quorum: 0.5
+        deliberation_period_hours: 168  # 7 days
+        voting_period_hours: 336  # 14 days
+      
+      # Removing a member organization
+      member_removal:
+        threshold: supermajority_two_thirds
+        quorum: 0.6
+        deliberation_period_hours: 168
+        voting_period_hours: 336
+      
+      # Federation-wide initiatives and resolutions
+      initiative:
+        threshold: simple_majority
+        quorum: 0.4
+        deliberation_period_hours: 72
+        voting_period_hours: 168
+
+  # ─── Operational Body ────────────────────────────────
+  # The entity that executes federation mandates
+  operations:
+    entity_type: cooperative
+    governance:
+      eligible_voters: steering_members
+      
+      decisions:
+        budget_approval:
+          threshold: supermajority_two_thirds
+          quorum: 0.5
+          deliberation_period_hours: 72
+          voting_period_hours: 168
+        
+        venue_selection:
+          threshold: simple_majority
+          quorum: 0.5
+          voting_period_hours: 120  # 5 days
+        
+        program_approval:
+          threshold: simple_majority
+          quorum: 0.5
+          voting_period_hours: 120
+        
+        spending_above_threshold:
+          threshold: simple_majority
+          quorum: 0.5
+          voting_period_hours: 72  # 3 days
+        
+        new_committee:
+          threshold: simple_majority
+          quorum: 0.5
+          deliberation_period_hours: 48
+          voting_period_hours: 120
+        
+        emergency_freeze:
+          threshold: supermajority_two_thirds
+          quorum: 0.3  # Lower quorum for emergencies
+          voting_period_hours: 24  # Fast action
+
+  # ─── Committee Delegation ────────────────────────────
+  committees:
+    defaults:
+      threshold: simple_majority
+      quorum: 0.5
+      voting_period_hours: 72
+    
+    delegation_rules:
+      # What committees can decide without escalating
+      - committee: content
+        autonomous_scope:
+          - &quot;Approve individual sessions&quot;
+          - &quot;Assign speakers to sessions&quot;
+          - &quot;Set session schedule within approved structure&quot;
+        escalation_required:
+          - &quot;Overall program structure (tracks, keynote, session count)&quot;
+          - &quot;Speaker fees above $200&quot;
+      
+      - committee: finance
+        autonomous_scope:
+          - &quot;Accept sponsorships up to $500&quot;
+          - &quot;Process routine expenses within allocation&quot;
+          - &quot;Generate financial reports&quot;
+        escalation_required:
+          - &quot;Sponsorships above $500&quot;
+          - &quot;Budget amendments&quot;
+          - &quot;New expense categories&quot;
+      
+      - committee: logistics
+        autonomous_scope:
+          - &quot;Vendor selection within budget&quot;
+          - &quot;Day-of operational decisions&quot;
+        escalation_required:
+          - &quot;Venue selection&quot;
+          - &quot;Contracts above $1,000&quot;
+      
+      - committee: marketing
+        autonomous_scope:
+          - &quot;Campaign execution within budget&quot;
+          - &quot;Social media and email content&quot;
+          - &quot;Design and branding decisions&quot;
+        escalation_required:
+          - &quot;Spending above allocation&quot;
+          - &quot;Partnership agreements&quot;
+
+  # ─── Trust Thresholds ────────────────────────────────
+  trust:
+    thresholds:
+      propose_discussion: 0.0       # Anyone can start a discussion
+      vote_committee: 0.1           # Minimal participation required
+      propose_budget_change: 0.5    # Established contributor
+      committee_coordinator: 0.5    # Proven track record
+      steering_membership: 0.7     # Core leadership
+      charter_amendment: 0.7       # High trust for constitutional changes
+
+  # ─── Budget Authority ────────────────────────────────
+  budget:
+    spending_threshold: 500  # USD — above this requires steering approval
+    currency: USD
+    
+    # Committees receive allocations; spending within allocation is autonomous
+    committee_allocations:
+      approval_required: steering
+      approval_threshold: supermajority_two_thirds
+    
+    # Individual expenses within allocation
+    expense_approval:
+      within_allocation: autonomous  # Committee coordinator approves
+      above_allocation: steering     # Requires budget amendment proposal
+
+  # ─── Membership Tiers ───────────────────────────────
+  membership:
+    tiers:
+      - name: full_member
+        entity_types: [cooperative]
+        role: federated_member
+        rights: [vote, propose, treasury_access, invite]
+        obligations:
+          - &quot;Maintain active participation&quot;
+          - &quot;Adhere to charter&quot;
+          - &quot;Send delegate to annual meeting&quot;
+      
+      - name: affiliate
+        entity_types: [cooperative, community]
+        role: associate_member
+        rights: [vote_limited, propose_limited]
+        obligations:
+          - &quot;Aligned mission&quot;
+      
+      - name: emerging
+        entity_types: [community]
+        role: provisional_member
+        rights: [propose_community]
+        obligations:
+          - &quot;Working toward cooperative formation&quot;
+      
+      - name: individual
+        entity_types: [individual]
+        role: member
+        rights: [vote_in_committees, propose]
+      
+      - name: observer
+        entity_types: [individual, cooperative]
+        role: observer_member
+        rights: [read_only]
+</code></pre>
+<hr>
+<h2>Template 2: Worker Cooperative</h2>
+<p>Use when: A single worker-owned cooperative where members share ownership and governance equally. All workers are member-owners with equal voting rights.</p>
+<pre><code class="language-yaml"># worker-coop-charter.yaml
+charter:
+  name: &quot;Worker Cooperative&quot;
+  version: 1
+  entity_type: cooperative
+  
+  governance:
+    eligible_voters: all_members
+    
+    decisions:
+      # Day-to-day operational decisions
+      operational:
+        threshold: simple_majority
+        quorum: 0.5
+        voting_period_hours: 48
+      
+      # Financial decisions above threshold
+      financial:
+        threshold: simple_majority
+        quorum: 0.6
+        voting_period_hours: 72
+      
+      # New member admission
+      membership:
+        threshold: supermajority_two_thirds
+        quorum: 0.6
+        deliberation_period_hours: 168  # 7 days
+        voting_period_hours: 168
+      
+      # Charter changes
+      constitutional:
+        threshold: supermajority_two_thirds
+        quorum: 0.75
+        deliberation_period_hours: 336  # 14 days
+        voting_period_hours: 336
+      
+      # Emergency actions
+      emergency:
+        threshold: supermajority_two_thirds
+        quorum: 0.3
+        voting_period_hours: 24
+
+  # Worker co-ops are typically flat — no committees by default
+  # Add committees section if needed as the co-op grows
+  
+  trust:
+    thresholds:
+      propose_operational: 0.0     # Any worker-member
+      propose_financial: 0.2       # Some track record
+      propose_membership: 0.3      # Established member
+      propose_constitutional: 0.5  # Senior member
+      officer_eligibility: 0.5     # Board/officer candidates
+
+  budget:
+    spending_threshold: 200  # Above this needs a vote
+    currency: USD
+    
+    expense_approval:
+      below_threshold: any_member     # Anyone can approve small expenses
+      above_threshold: membership_vote # Requires collective decision
+
+  membership:
+    probationary_period_days: 90  # New workers serve probation
+    buy_in_required: true         # Member equity contribution
+    
+    roles:
+      - name: worker_owner
+        role: worker
+        rights: [vote, propose, treasury_access]
+      
+      - name: probationary
+        role: provisional_member
+        rights: [propose]
+        # Cannot vote until probation ends
+      
+      - name: board_member
+        role: board_member
+        rights: [vote, propose, treasury_access, configure]
+        # Elected by worker-owners
+      
+      - name: officer
+        role: officer
+        rights: [vote, propose, treasury_access, sign, configure]
+        # Elected for specific titles (president, treasurer, secretary)
+
+  # ─── Surplus Distribution ────────────────────────────
+  surplus:
+    # How profits are distributed
+    allocation:
+      reserves: 0.20          # 20% to reserves
+      member_dividends: 0.60  # 60% to workers based on patronage
+      community_fund: 0.10    # 10% to community
+      education: 0.10         # 10% to education/training
+    
+    patronage_basis: hours_worked  # Dividends proportional to labor
+</code></pre>
+<hr>
+<h2>Template 3: Community Organization</h2>
+<p>Use when: A community group, mutual aid network, or civic organization focused on collective action and shared governance. May or may not handle money.</p>
+<pre><code class="language-yaml"># community-charter.yaml
+charter:
+  name: &quot;Community Organization&quot;
+  version: 1
+  entity_type: community
+  
+  governance:
+    eligible_voters: all_active_members
+    
+    decisions:
+      # General community decisions
+      general:
+        threshold: simple_majority
+        quorum: 0.3  # Lower quorum — community orgs have variable attendance
+        voting_period_hours: 120  # 5 days
+      
+      # Spending community funds (if any)
+      financial:
+        threshold: simple_majority
+        quorum: 0.4
+        voting_period_hours: 72
+      
+      # New member admission
+      membership:
+        threshold: simple_majority
+        quorum: 0.3
+        voting_period_hours: 72
+        # Many community orgs have open membership — set threshold low
+      
+      # Leadership elections
+      elections:
+        threshold: simple_majority
+        quorum: 0.5
+        voting_period_hours: 168
+      
+      # Charter changes
+      constitutional:
+        threshold: supermajority_two_thirds
+        quorum: 0.4
+        deliberation_period_hours: 168
+        voting_period_hours: 336
+
+  # ─── Working Groups ─────────────────────────────────
+  working_groups:
+    # Community orgs often use working groups instead of formal committees
+    formation: proposal  # New groups require a governance proposal
+    
+    defaults:
+      threshold: simple_majority
+      quorum: 0.5
+      voting_period_hours: 48
+    
+    # Working groups are autonomous within their scope
+    # but cannot commit the community to financial obligations
+    delegation:
+      autonomous:
+        - &quot;Planning within scope&quot;
+        - &quot;Recruiting volunteers&quot;
+        - &quot;Scheduling activities&quot;
+      requires_community_approval:
+        - &quot;Any financial commitment&quot;
+        - &quot;Public statements on behalf of community&quot;
+        - &quot;Partnerships or agreements&quot;
+
+  trust:
+    thresholds:
+      join_community: 0.0         # Open membership
+      propose_activity: 0.0       # Anyone can propose
+      vote: 0.05                  # Minimal participation
+      lead_working_group: 0.3     # Some track record
+      propose_financial: 0.3      # Trusted with money decisions
+      leadership_eligible: 0.4    # Can serve as coordinator
+
+  membership:
+    # Open membership is common for community orgs
+    admission: open  # or &quot;proposal&quot; for gated membership
+    
+    roles:
+      - name: community_member
+        role: member
+        rights: [vote, propose]
+      
+      - name: coordinator
+        role: officer
+        title: &quot;Coordinator&quot;
+        rights: [vote, propose, invite, configure]
+      
+      - name: working_group_lead
+        role: custom
+        name: &quot;Working Group Lead&quot;
+        rights: [vote, propose, invite]
+</code></pre>
+<hr>
+<h2>Template 4: Multi-Stakeholder Cooperative</h2>
+<p>Use when: A cooperative with multiple member classes (workers, consumers, community members, investors) who have different governance weights and rights.</p>
+<pre><code class="language-yaml"># multistakeholder-charter.yaml
+charter:
+  name: &quot;Multi-Stakeholder Cooperative&quot;
+  version: 1
+  entity_type: cooperative
+  
+  governance:
+    # Multi-stakeholder co-ops often use weighted voting by class
+    voting_model: stakeholder_weighted
+    
+    stakeholder_classes:
+      - name: workers
+        weight: 0.40          # 40% of voting power
+        eligible_role: worker
+      
+      - name: consumers
+        weight: 0.30          # 30% of voting power
+        eligible_role: consumer
+      
+      - name: community
+        weight: 0.20          # 20% of voting power
+        eligible_role: member
+      
+      - name: investors
+        weight: 0.10          # 10% of voting power
+        eligible_role: associate_member
+    
+    decisions:
+      operational:
+        threshold: simple_majority  # Within each class
+        quorum: 0.5
+        voting_period_hours: 72
+      
+      financial:
+        threshold: simple_majority
+        quorum: 0.6
+        voting_period_hours: 120
+      
+      membership:
+        threshold: supermajority_two_thirds
+        quorum: 0.5
+        voting_period_hours: 168
+      
+      constitutional:
+        threshold: supermajority_two_thirds
+        quorum: 0.6
+        # Constitutional changes require majority in EACH class
+        per_class_approval: true
+        deliberation_period_hours: 336
+        voting_period_hours: 336
+
+  trust:
+    thresholds:
+      propose: 0.1
+      vote: 0.05
+      board_eligible: 0.5
+      officer_eligible: 0.6
+
+  membership:
+    classes:
+      - name: worker_member
+        role: worker
+        buy_in: true
+        probation_days: 90
+        rights: [vote, propose, treasury_access]
+      
+      - name: consumer_member
+        role: consumer
+        buy_in: true  # Usually smaller share
+        rights: [vote, propose]
+      
+      - name: community_member
+        role: member
+        buy_in: false
+        rights: [vote, propose]
+      
+      - name: investor_member
+        role: associate_member
+        buy_in: true  # Preferred shares
+        rights: [vote_limited, propose_limited]
+        # Investor class has limited governance to prevent capital capture
+
+  surplus:
+    allocation:
+      reserves: 0.20
+      worker_dividends: 0.35  # Based on patronage (hours)
+      consumer_dividends: 0.15  # Based on patronage (purchases)
+      community_fund: 0.15
+      investor_return: 0.10  # Capped return on investment
+      education: 0.05
+
+  # ─── Anti-Capture Provisions ─────────────────────────
+  safeguards:
+    # Prevent any single class from dominating
+    max_class_weight: 0.50  # No class can exceed 50% voting power
+    investor_return_cap: 0.08  # 8% maximum annual return
+    worker_class_floor: 0.30  # Workers always have at least 30%
+</code></pre>
+<hr>
+<h2>Using a Template</h2>
+<ol>
+<li><strong>Choose the template</strong> closest to your institutional type</li>
+<li><strong>Customize</strong> governance thresholds, trust levels, committee structure, and budget rules</li>
+<li><strong>Save</strong> as a YAML file</li>
+<li><strong>Submit</strong> as a <code>Charter</code> proposal via the gateway API</li>
+<li><strong>Vote</strong> to ratify with your founding members</li>
+<li><strong>Deploy</strong> — on ratification, the charter engine begins enforcing the rules</li>
+</ol>
+<h3>Customization Checklist</h3>
+<p>Before ratifying, review:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Quorum thresholds — too high means decisions stall; too low means minority rule</li>
+<li><input disabled="" type="checkbox"> Voting periods — long enough for participation, short enough for action</li>
+<li><input disabled="" type="checkbox"> Deliberation periods — skip for routine decisions, require for constitutional changes</li>
+<li><input disabled="" type="checkbox"> Spending thresholds — what dollar amount triggers escalation</li>
+<li><input disabled="" type="checkbox"> Trust thresholds — balance accessibility with accountability</li>
+<li><input disabled="" type="checkbox"> Committee delegation — what can committees do without full-body approval</li>
+<li><input disabled="" type="checkbox"> Membership admission — open, proposal-based, or invitation-only</li>
+<li><input disabled="" type="checkbox"> Surplus distribution — only if the institution handles revenue</li>
+</ul>
+<hr>
+<h2>See Also</h2>
+<ul>
+<li><a href="/docs/guides/institution-setup">Institution Setup Guide</a> — Full bootstrap walkthrough</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/governance-playbook">Governance Playbook</a> — Common decision patterns</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/entity-topology-patterns">Entity Topology Patterns</a> — Organizational structures</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

@@ -1,0 +1,327 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Implementation Plan: ICN Platform Features for Institutional Use | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yTnaBP6O.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>strategy</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>NYCN Implementation Plan</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN-Implementation-Plan.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Implementation Plan: ICN Platform Features for Institutional Use</h1>
+<h2>Context</h2>
+<p>NYCN is the first real institution to live inside ICN. From their 2026 meeting notes (pulled live from Google Docs), we see they make decisions by informal consensus, delegate to 4 committees, and track everything in Google Docs. ICN has strong governance, ledger, and identity primitives but lacks the operational features institutions actually use daily.</p>
+<p>Every feature below is a platform feature — not NYCN-specific. Every institution on ICN will need them.</p>
+<h2>Core Diagnosis</h2>
+<p>ICN already has governance, identity, receipts, notifications, content-addressed storage, and an event bus. The plan is mostly about finishing bridges, not inventing subsystems. But the load-bearing gap is this: <strong>governance risks becoming ceremonial unless accepted decisions reliably dispatch downstream institutional effects.</strong> The Decision-to-Action bridge is the spine of the whole plan, not a follow-on convenience.</p>
+<hr>
+<h2>Phase 1: Decision-to-Action Bridge (THE SPINE)</h2>
+<p><strong>Scope</strong>: Medium | <strong>Agent</strong>: Opus (execution semantics are the correctness hotspot)</p>
+<p>When a proposal is accepted, it must produce real downstream institutional effects — not just a status change. Accepted proposals create <strong>institutional obligations</strong> with provenance linkage and verifiable fulfillment state, not merely reminder tasks.</p>
+<h3>Design</h3>
+<p>Add <code>action_items_on_accept: Vec&lt;ActionItemSpec&gt;</code> to <code>Proposal</code>. On acceptance, the actor creates <code>ActionItem</code> records linked to the proposal via <code>linked_proposal</code>. Each action item carries the proposal&#39;s provenance hash, making the obligation chain verifiable: proposal → acceptance tally → action item → fulfillment update → completion receipt.</p>
+<p>This is stronger than &quot;create task objects.&quot; It is: accepted proposal → deterministic creation of institutional obligations with provenance linkage.</p>
+<p><strong>Important constraint</strong>: <code>action_items_on_accept</code> is the <strong>first bridge pattern</strong> for obligation-producing proposals, not the universal execution model. Some accepted proposals should alter config, allocate resources, change permissions, or trigger other typed execution paths (budget allocations → ledger entries, charter ratification → oracle deployment, membership → entity updates). The action item bridge handles the common case; other proposal types already have their own execution hooks. Do not let this pattern harden into the only dispatch mechanism.</p>
+<h3>Files to modify</h3>
+<ul>
+<li><code>icn/crates/icn-governance/src/proposal.rs</code> — add <code>ActionItemSpec { title, description, assignee, due_offset_seconds, priority, tags }</code> and <code>action_items_on_accept: Vec&lt;ActionItemSpec&gt;</code> with <code>#[serde(default)]</code></li>
+<li><code>icn/apps/governance/src/actor.rs</code> (~line 1970 after ProposalAccepted event) — iterate specs, create ActionItems via store, link to proposal with provenance hash</li>
+<li><code>icn/apps/governance/src/http/models.rs</code> — accept action_items_on_accept in CreateProposalRequest</li>
+<li><code>icn/apps/governance/src/http/handlers.rs</code> — pass through specs</li>
+</ul>
+<h3>Scenario tests</h3>
+<ul>
+<li>Consent proposal closes with no objections → dispatches linked action items with correct provenance</li>
+<li>Budget proposal accepted → committee allocation action items created with due dates relative to acceptance time</li>
+<li>Action item completion updates are verifiable against the originating proposal</li>
+</ul>
+<hr>
+<h2>Phase 2: Consent-Based Proposal Mode</h2>
+<p><strong>Scope</strong>: Medium | <strong>Agent</strong>: Opus (governance state machine correctness)</p>
+<p><strong>Parallel with Phase 1.</strong> NYCN decides by consensus, not formal votes. ICN needs a configurable &quot;consent&quot; mode: proposal passes unless objections exceed a configurable threshold within the deliberation period.</p>
+<h3>Design Principle</h3>
+<p>Consent is a <strong>configurable governance evaluation mode</strong>, not a universal primitive embedded too deeply. Different institutions will want different objection thresholds, escalation paths, and quorum assumptions. The implementation layers consent as a policy over the same proposal infrastructure — the deliberation period becomes the objection window, &quot;against&quot; votes become objections.</p>
+<h3>Files to modify</h3>
+<ul>
+<li><code>icn/crates/icn-governance/src/config.rs</code> — add <code>DecisionMode { Majority, Consent }</code> enum (with <code>#[serde(default)]</code> → <code>Majority</code>), add to <code>GovernanceParams</code>. Add <code>max_objections: Option&lt;u8&gt;</code> to <code>ProposalThresholds</code> (default: 0 = any objection blocks). Add <code>escalation_on_objection: Option&lt;EscalationPolicy&gt;</code> for institutions that want objections to trigger escalation rather than rejection.</li>
+<li><code>icn/crates/icn-governance/src/profile.rs</code> — add consent evaluation path: if quorum met AND <code>against_votes &lt;= max_objections</code> → Accepted. If objections exceed threshold → Rejected (or escalated per policy). If quorum not met → NoQuorum. <strong>Quorum semantics note</strong>: consensus-mode institutions often operate with softer participation assumptions than majority-vote institutions. Consent quorum should support a &quot;participation witnessed&quot; model (e.g., quorum = those who viewed the proposal, not those who voted), not just reuse majority-mode quorum logic with different labels. This may require a <code>QuorumMode { VoterCount, ParticipantCount }</code> distinction.</li>
+<li><code>icn/apps/governance/src/actor.rs</code> (~line 1764) — check <code>domain.config.params.decision_mode</code>, route to consent evaluation</li>
+<li><code>icn/apps/governance/src/http/models.rs</code> — expose decision_mode and max_objections in domain creation API</li>
+</ul>
+<h3>Scenario tests</h3>
+<ul>
+<li>Zero objections at deadline → Accepted</li>
+<li>One objection with max_objections=0 → Rejected</li>
+<li>One objection with max_objections=1 → Accepted</li>
+<li>Quorum not met → NoQuorum regardless of mode</li>
+<li>Decision mode change via ConfigChange proposal</li>
+</ul>
+<hr>
+<h2>Phase 3: Meeting Management</h2>
+<p><strong>Scope</strong>: Large | <strong>Agent</strong>: Sonnet with Opus review | <strong>Depends on</strong>: Phase 1 (action items must link to meetings)</p>
+<h3>Design Principle</h3>
+<p>Meetings are <strong>institutional trace objects</strong>, not a calendar clone. A meeting exists because it produces deliberation context, witness context, and linked outputs. Bias toward agenda/proposal/action/minutes linkage, not generic scheduling features.</p>
+<p>The part that matters: meetings become first-class institutional objects connecting agenda → proposals → attendance (witness) → action items → records. Not CRUD for calendar entries.</p>
+<h3>New file</h3>
+<ul>
+<li><code>icn/crates/icn-governance/src/meeting.rs</code> (~300 lines)<ul>
+<li><code>Meeting { id, domain_id, title, scheduled_at, attendees: Vec&lt;MeetingAttendee&gt;, agenda: Vec&lt;AgendaItem&gt;, status, notes_doc: Option&lt;DocumentId&gt;, created_by, linked_action_items, linked_proposals }</code></li>
+<li><code>MeetingAttendee { did, presence: AttendanceStatus, role: Option&lt;MeetingRole&gt; }</code> — richer than <code>(Did, bool)</code> to avoid boxing in witness context too early</li>
+<li><code>AttendanceStatus { Invited, Present, Absent, Remote }</code> — extensible for quorum/witness purposes</li>
+<li><code>MeetingRole { Facilitator, NoteTaker, Participant, Observer }</code> — optional, defaults to Participant</li>
+<li><code>MeetingStatus { Scheduled, InProgress, Completed, Cancelled }</code></li>
+<li><code>AgendaItem { id, title, presenter, linked_proposal, discussion_outcome, generated_action_items }</code></li>
+<li>Each agenda item can produce proposals (submitted during meeting) and action items (generated at meeting close)</li>
+<li><code>MeetingStoreBackend</code> trait — same pattern as <code>ActionItemStoreBackend</code></li>
+</ul>
+</li>
+</ul>
+<h3>Files to modify</h3>
+<ul>
+<li><code>icn/crates/icn-governance/src/lib.rs</code> — register module</li>
+<li><code>icn/crates/icn-governance/src/action_item.rs</code> — add <code>meeting_id: Option&lt;MeetingId&gt;</code> (keep existing <code>meeting_context</code> for backward compat)</li>
+<li><code>icn/apps/governance/src/manager.rs</code> — add <code>SledMeetingStore</code>, add to <code>GovernanceManager</code></li>
+<li><code>icn/apps/governance/src/http/</code> — handlers, models, routes under <code>/gov/domains/{domain_id}/meetings/</code></li>
+<li><code>icn/crates/icn-gateway/src/events.rs</code> — add <code>MeetingCreated</code>, <code>MeetingStarted</code>, <code>MeetingEnded</code></li>
+</ul>
+<h3>Scenario tests</h3>
+<ul>
+<li>Meeting created → agenda items link to pending proposals</li>
+<li>Meeting ended → unresolved agenda items generate action items with meeting provenance</li>
+<li>Attendance records provide witness context for proposals discussed in meeting</li>
+</ul>
+<hr>
+<h2>Phase 4: Notification Aggregation</h2>
+<p><strong>Scope</strong>: Medium | <strong>Agent</strong>: Sonnet | <strong>Depends on</strong>: Phases 1 + 3</p>
+<p>&quot;You have 3 pending votes and 2 overdue action items&quot; — digest summaries, not event-noise spam.</p>
+<h3>Design Principle</h3>
+<p>Aggregation must be <strong>index-driven, not whole-store-scan</strong>. This is the kind of feature that starts simple and becomes a performance trap. The digest service queries derived indexes/views, not raw stores.</p>
+<h3>New file</h3>
+<ul>
+<li><code>icn/crates/icn-gateway/src/notification_digest.rs</code> (~250 lines)<ul>
+<li><code>NotificationDigestService</code> — spawns tokio task on configurable interval</li>
+<li><code>generate_digest(did)</code> queries: pending votes (Open proposals where user hasn&#39;t voted — use proposal index by state + vote set), overdue action items (user is assignee past due_date — use action item index by assignee+status), upcoming meetings (next 48h — use meeting index by scheduled_at)</li>
+<li>Returns <code>DigestSummary { pending_votes, overdue_items, upcoming_meetings }</code></li>
+</ul>
+</li>
+</ul>
+<h3>Indexes required</h3>
+<ul>
+<li>Action items: index by <code>assignee</code> + <code>status</code> (add to SledActionItemStore)</li>
+<li>Proposals: index by <code>state</code> + <code>domain_id</code> (may already exist)</li>
+<li>Meetings: index by <code>domain_id</code> + <code>scheduled_at</code> range</li>
+</ul>
+<h3>Files to modify</h3>
+<ul>
+<li><code>icn/crates/icn-gateway/src/notification_queue.rs</code> — add <code>GovernanceDigest</code> notification type</li>
+<li><code>icn/crates/icn-gateway/src/server.rs</code> — spawn digest service</li>
+<li><code>icn/apps/governance/src/manager.rs</code> — add index-backed query methods for digest generation</li>
+</ul>
+<h3>Scenario tests</h3>
+<ul>
+<li>Digest counts are correct across voting/action/meeting state changes</li>
+<li>Digest respects user notification preferences (opt-in/out)</li>
+<li>Digest generation completes in bounded time regardless of store size</li>
+</ul>
+<hr>
+<h2>Phase 5: Document Storage (Institutional Memory)</h2>
+<p><strong>Scope</strong>: Large | <strong>Agent</strong>: Opus for type design + gossip integration, Sonnet for HTTP/sled | <strong>Depends on</strong>: Phase 3 (meeting-document linking)</p>
+<h3>Design Principle</h3>
+<p><strong>Typed institutional memory, not generic blob storage.</strong> Documents are scoped, typed, content-addressed artifacts with provenance, version lineage, authorship, and linkage to meetings, proposals, entities, and committees. Protect against &quot;documents as blob dumping ground.&quot;</p>
+<p>Build on existing gossip + sled. No new kernel subsystem.</p>
+<h3>New file</h3>
+<ul>
+<li><code>icn/crates/icn-governance/src/document.rs</code> (~400 lines)<ul>
+<li><code>InstitutionalDocument { id (blake3 hash of body), domain_id, doc_type, title, authors: Vec&lt;Did&gt;, body: String, attachments: Vec&lt;AttachmentRef&gt;, version, parent_doc: Option&lt;DocumentId&gt;, linked_meeting: Option&lt;MeetingId&gt;, linked_proposal: Option&lt;ProposalId&gt;, tags, created_at }</code></li>
+<li><code>DocumentType { MeetingAgenda, MeetingMinutes, CommitteeReport, Policy, Evaluation, General }</code></li>
+<li>Every document is linked to at least one <strong>institutional scope or object</strong> — this can be a specific meeting/proposal instance OR an entity scope (committee, cooperative, federation). Charters, policies, member handbooks, and onboarding docs link to entity scope without requiring a specific meeting or proposal origin.</li>
+<li>Version lineage via <code>parent_doc</code> — each version is a new content-addressed document pointing to its predecessor</li>
+</ul>
+</li>
+</ul>
+<h3>Gossip integration</h3>
+<ul>
+<li>Topic: <code>governance:{domain_id}:documents</code></li>
+<li>Published as gossip entries (content-addressed, auto-replicated via existing protocol)</li>
+<li>Sled indexes: <code>doc:{domain_id}:{doc_id}</code>, <code>doc_idx:{domain_id}:{type}:{timestamp}</code>, <code>doc_link:{meeting_id}:{doc_id}</code></li>
+</ul>
+<h3>Files to modify</h3>
+<ul>
+<li><code>icn/crates/icn-governance/src/lib.rs</code>, <code>meeting.rs</code> (link notes to DocumentId)</li>
+<li><code>icn/apps/governance/src/manager.rs</code> — <code>SledDocumentStore</code></li>
+<li><code>icn/apps/governance/src/http/</code> — CRUD, version history, search</li>
+<li><code>icn/crates/icn-gateway/src/events.rs</code> — <code>DocumentCreated</code>, <code>DocumentUpdated</code></li>
+</ul>
+<h3>Scenario tests</h3>
+<ul>
+<li>Document versions remain hash-addressable and gossip-replicable</li>
+<li>Meeting minutes linked to meeting → linked to proposals discussed → linked to action items generated</li>
+<li>Full provenance chain queryable: document → meeting → proposal → action items</li>
+</ul>
+<hr>
+<h2>Merge Ordering</h2>
+<pre><code>Phase 1 (Decision→Action SPINE) ──┐
+                                   ├──&gt; Phase 4 (Notification Digests)
+Phase 2 (Consent Mode) ───────────┘         │
+                                             v
+Phase 3 (Meeting Management) ──────&gt; Phase 5 (Document Storage)
+</code></pre>
+<p><strong>Narrative</strong>: Governance semantics and execution bridge first (Phases 1 + 2). Then operator usability layers (Phases 3–5). Meetings are a coordination surface. Execution closure is the institutional core.</p>
+<p>Phases 1 and 2 develop in parallel on separate branches. Phase 3 can start development while 1+2 are in review. Phase 4 depends on 1+3. Phase 5 depends on 3.</p>
+<h2>Agent Assignment</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Agent</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1. Decision→Action</td>
+<td><strong>Opus</strong></td>
+<td>Execution semantics, provenance chain correctness</td>
+</tr>
+<tr>
+<td>2. Consent Mode</td>
+<td><strong>Opus</strong></td>
+<td>Governance state machine, policy configurability</td>
+</tr>
+<tr>
+<td>3. Meeting Management</td>
+<td><strong>Sonnet</strong> + Opus review</td>
+<td>Follows action item pattern, but meaning-firewall review needed</td>
+</tr>
+<tr>
+<td>4. Notification Digests</td>
+<td><strong>Sonnet</strong></td>
+<td>Additive, index design review by Opus</td>
+</tr>
+<tr>
+<td>5. Document Storage</td>
+<td><strong>Opus</strong> design + <strong>Sonnet</strong> HTTP/sled</td>
+<td>Gossip integration, institutional typing</td>
+</tr>
+</tbody></table>
+<p><strong>Integration review requirement</strong>: One pass by whoever has strongest understanding of ICN&#39;s meaning-firewall and governance/execution boundary. The risk is not syntax — it&#39;s accidentally building institution-specific semantics into the wrong layer.</p>
+<h2>Implementation Guardrails</h2>
+<ol>
+<li><p><strong>Phase 1 should eventually grow into a formal execution-dispatch abstraction.</strong> <code>action_items_on_accept</code> is the first bridge, but long-term the architecture wants typed <code>ExecutionEffect</code> handlers rather than accumulating one-off post-accept hooks.</p>
+</li>
+<li><p><strong>Consent quorum witness model needs explicit evidence semantics.</strong> If quorum can be based on participation rather than voting, be explicit about how participation is attested and by whom. Don&#39;t smuggle social-process ambiguity into correctness-sensitive state transitions.</p>
+</li>
+<li><p><strong>Meeting roles are coordination roles, not governance authority grants.</strong> Facilitator and NoteTaker do not imply permission or decision authority unless explicitly linked by charter policy. Keep the boundary clean.</p>
+</li>
+<li><p><strong>Document hash identity</strong>: <code>id = blake3(body)</code> is intentionally body-only. Attachments are referenced by their own hashes in <code>AttachmentRef</code>. Metadata (title, authors, tags) is mutable and does not affect the content hash. A new version = new body = new hash with <code>parent_doc</code> pointing to predecessor. Make this explicit in the type docs.</p>
+</li>
+<li><p><strong>Notification digests should eventually support partitioning by domain/role/scope.</strong> A single DID-level summary gets noisy when members act across multiple committees. Phase 4 can start with flat DID-level; Phase 4.5 adds domain partitioning.</p>
+</li>
+<li><p><strong>Meaning-firewall review on every phase.</strong> One integration pass by whoever understands the kernel/app boundary best. The risk is not syntax — it&#39;s institutional semantics leaking into the wrong layer.</p>
+</li>
+</ol>
+<h2>Verification</h2>
+<h3>Compile/lint (each phase)</h3>
+<ul>
+<li><code>cargo check -p icn-governance</code></li>
+<li><code>cargo test -p icn-governance</code></li>
+<li><code>cargo clippy --all-targets -- -D warnings</code></li>
+</ul>
+<h3>End-to-end institutional scenarios (critical)</h3>
+<ol>
+<li><strong>Full proposal lifecycle</strong>: Create consent proposal with action items → deliberation period → no objections → auto-accept → action items created with provenance → fulfillment tracked</li>
+<li><strong>Meeting-driven governance</strong>: Schedule meeting → add agenda with linked proposals → hold meeting → record attendance → close → generate action items and minutes document</li>
+<li><strong>Provenance chain</strong>: Query from document → meeting → proposal → acceptance tally → generated action items → completion status. Full chain must be traversable.</li>
+<li><strong>Digest correctness</strong>: Pending votes + overdue items + upcoming meetings counts accurate across state transitions</li>
+<li><strong>Cross-node replication</strong>: Documents published via gossip replicate to peer nodes, remain hash-verifiable</li>
+<li><strong>Failure and idempotence</strong>: Duplicate close events do not create duplicate action items. Repeated gossip publication does not create duplicate documents. Partial action-item creation failure rolls back cleanly. Acceptance hooks are replay-safe. Cross-node consistency holds under retry.</li>
+</ol>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

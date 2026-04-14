@@ -1,0 +1,454 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Institution Setup Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yTnaBP6O.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>institution setup</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/institution-setup.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Institution Setup Guide</h1>
+<p>How to create a real institution on ICN — from first entity to operational governance.</p>
+<p>This guide covers the full lifecycle: deciding what kind of institution you&#39;re building, creating entities, issuing identities, ratifying a charter, and bringing the institution to life. It uses the NYCN federation as the reference implementation, but the patterns generalize to any cooperative, community, or federation.</p>
+<hr>
+<h2>Step 0: Decide Your Institutional Shape</h2>
+<p>Before creating anything, answer three questions:</p>
+<p><strong>1. What kind of institution is this?</strong></p>
+<table>
+<thead>
+<tr>
+<th>If you are...</th>
+<th>Top-level entity type</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A single cooperative</td>
+<td><code>Cooperative</code></td>
+<td>A worker co-op, food co-op, housing co-op</td>
+</tr>
+<tr>
+<td>A community or civic organization</td>
+<td><code>Community</code></td>
+<td>A neighborhood council, mutual aid network</td>
+</tr>
+<tr>
+<td>A network of cooperatives</td>
+<td><code>Federation</code></td>
+<td>A regional co-op network, sector alliance</td>
+</tr>
+<tr>
+<td>A federation of federations</td>
+<td><code>Federation</code> (nested)</td>
+<td>A national cooperative association</td>
+</tr>
+</tbody></table>
+<p><strong>2. Does it have internal structure?</strong></p>
+<table>
+<thead>
+<tr>
+<th>If you need...</th>
+<th>Create child entities as...</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Committees or working groups</td>
+<td><code>Community</code> entities with <code>parent_id</code> pointing to the parent</td>
+</tr>
+<tr>
+<td>Departments with their own budgets</td>
+<td><code>Cooperative</code> entities with <code>parent_id</code> (they get their own treasury)</td>
+</tr>
+<tr>
+<td>Member organizations</td>
+<td>Independent entities joined via <code>FederationProfile.member_entities</code></td>
+</tr>
+<tr>
+<td>No internal structure</td>
+<td>Nothing — a single entity is fine</td>
+</tr>
+</tbody></table>
+<p><strong>3. What needs to be governed?</strong></p>
+<p>Every entity with a <code>governance_domain_id</code> gets its own proposal/voting space. Only create governance domains where actual decisions happen. A committee that just coordinates doesn&#39;t need one. A committee that approves sessions or spending does.</p>
+<hr>
+<h2>Step 1: Create the Root Entity</h2>
+<h3>Prerequisites</h3>
+<ul>
+<li>A running ICN node (<code>icnd</code>)</li>
+<li><code>icnctl</code> CLI installed</li>
+<li>At least one identity created (<code>icnctl id init</code>)</li>
+</ul>
+<h3>For a Single Cooperative</h3>
+<pre><code class="language-bash"># Create the cooperative
+curl -X POST http://localhost:8080/coops \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;id&quot;: &quot;my-coop&quot;,
+    &quot;name&quot;: &quot;My Worker Cooperative&quot;,
+    &quot;entity_type&quot;: &quot;Cooperative&quot;,
+    &quot;governance_domain_id&quot;: &quot;my-coop-gov&quot;,
+    &quot;treasury_account&quot;: &quot;my-coop-treasury&quot;
+  }&#39;
+</code></pre>
+<h3>For a Federation</h3>
+<pre><code class="language-bash"># Create the federation
+curl -X POST http://localhost:8080/coops \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;id&quot;: &quot;my-federation&quot;,
+    &quot;name&quot;: &quot;Regional Cooperative Federation&quot;,
+    &quot;entity_type&quot;: &quot;Federation&quot;,
+    &quot;governance_domain_id&quot;: &quot;my-fed-gov&quot;,
+    &quot;treasury_account&quot;: &quot;my-fed-treasury&quot;
+  }&#39;
+</code></pre>
+<h3>For a Community</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/coops \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;id&quot;: &quot;my-community&quot;,
+    &quot;name&quot;: &quot;Neighborhood Mutual Aid&quot;,
+    &quot;entity_type&quot;: &quot;Community&quot;,
+    &quot;governance_domain_id&quot;: &quot;my-community-gov&quot;
+  }&#39;
+</code></pre>
+<p>Note: Communities have governance but no treasury by default. If the community manages money, use <code>Cooperative</code> instead.</p>
+<hr>
+<h2>Step 2: Create Internal Structure</h2>
+<p>Skip this step if your institution is flat (no committees, departments, or working groups).</p>
+<h3>Committees as Child Communities</h3>
+<p>Each committee gets its own governance domain (its own proposal/voting space):</p>
+<pre><code class="language-bash"># Create a committee
+curl -X POST http://localhost:8080/coops \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;id&quot;: &quot;my-coop-finance&quot;,
+    &quot;name&quot;: &quot;Finance Committee&quot;,
+    &quot;entity_type&quot;: &quot;Community&quot;,
+    &quot;parent_id&quot;: &quot;my-coop&quot;,
+    &quot;governance_domain_id&quot;: &quot;my-coop-finance-gov&quot;
+  }&#39;
+</code></pre>
+<p>Repeat for each committee. The <code>parent_id</code> creates the hierarchical relationship.</p>
+<h3>Operational Body Under a Federation</h3>
+<p>If the federation has a distinct operational arm (like NYCN&#39;s organizing co-op):</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/coops \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;id&quot;: &quot;my-fed-ops&quot;,
+    &quot;name&quot;: &quot;Federation Operations&quot;,
+    &quot;entity_type&quot;: &quot;Cooperative&quot;,
+    &quot;parent_id&quot;: &quot;my-federation&quot;,
+    &quot;governance_domain_id&quot;: &quot;my-fed-ops-gov&quot;,
+    &quot;treasury_account&quot;: &quot;my-fed-ops-treasury&quot;
+  }&#39;
+</code></pre>
+<p>Use <code>Cooperative</code> (not <code>Community</code>) because it holds a treasury and executes operations.</p>
+<hr>
+<h2>Step 3: Issue Identities</h2>
+<p>Every person who participates needs a DID.</p>
+<h3>For the Founding Team</h3>
+<p>Each founder runs locally:</p>
+<pre><code class="language-bash">icnctl id init
+# Output: Created identity did:icn:z6MkrT...
+# Keystore saved to ~/.icn/keystore.age
+</code></pre>
+<h3>Authentication</h3>
+<p>To get a JWT for API access:</p>
+<pre><code class="language-bash"># 1. Request challenge
+CHALLENGE=$(curl -s -X POST http://localhost:8080/v1/auth/challenge \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;did&quot;: &quot;did:icn:z6MkrT...&quot;}&#39; | jq -r &#39;.nonce&#39;)
+
+# 2. Sign challenge with your key
+SIGNATURE=$(icnctl auth sign &quot;$CHALLENGE&quot;)
+
+# 3. Verify and get token
+TOKEN=$(curl -s -X POST http://localhost:8080/v1/auth/verify \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;did&quot;: &quot;did:icn:z6MkrT...&quot;,
+    &quot;signature&quot;: &quot;&#39;$SIGNATURE&#39;&quot;,
+    &quot;coop_id&quot;: &quot;my-coop&quot;,
+    &quot;scopes&quot;: [&quot;propose&quot;, &quot;vote&quot;, &quot;treasury_access&quot;]
+  }&#39; | jq -r &#39;.token&#39;)
+</code></pre>
+<p>The <code>coop_id</code> and <code>scopes</code> determine which hat you&#39;re wearing. Same DID, different institutional context.</p>
+<hr>
+<h2>Step 4: Add Founding Members</h2>
+<pre><code class="language-bash"># Add a founder to the root entity
+curl -X POST http://localhost:8080/coops/my-coop/members \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;did&quot;: &quot;did:icn:z6MkrT...&quot;,
+    &quot;role&quot;: &quot;founder&quot;
+  }&#39;
+</code></pre>
+<h3>Role Selection</h3>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Use When</th>
+<th>Default Capabilities</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>founder</code></td>
+<td>Establishing the institution</td>
+<td>All capabilities</td>
+</tr>
+<tr>
+<td><code>member</code></td>
+<td>Regular participant</td>
+<td>Vote, Propose</td>
+</tr>
+<tr>
+<td><code>board_member</code></td>
+<td>Elected/appointed leadership</td>
+<td>Vote, Propose, TreasuryAccess, Invite</td>
+</tr>
+<tr>
+<td><code>officer</code> (with title)</td>
+<td>Named role (treasurer, secretary)</td>
+<td>Vote, Propose, TreasuryAccess, Invite, Configure</td>
+</tr>
+<tr>
+<td><code>federated_member</code></td>
+<td>Organization joining a federation</td>
+<td>Vote, Propose</td>
+</tr>
+<tr>
+<td><code>associate_member</code></td>
+<td>Organization with limited participation</td>
+<td>Limited Vote</td>
+</tr>
+<tr>
+<td><code>observer_member</code></td>
+<td>Read-only access</td>
+<td>None (observe only)</td>
+</tr>
+<tr>
+<td><code>custom</code> (with name)</td>
+<td>Anything else</td>
+<td>Define per-institution</td>
+</tr>
+</tbody></table>
+<h3>Add Founders to Committees</h3>
+<p>Same person, different entity, different role:</p>
+<pre><code class="language-bash"># Matt as finance committee coordinator
+curl -X POST http://localhost:8080/coops/my-coop-finance/members \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;did&quot;: &quot;did:icn:z6MkrT...&quot;,
+    &quot;role&quot;: &quot;officer&quot;,
+    &quot;title&quot;: &quot;Coordinator&quot;
+  }&#39;
+</code></pre>
+<hr>
+<h2>Step 5: Ratify a Charter</h2>
+<p>The charter is the constitutional document. It defines governance rules, thresholds, authority boundaries, and trust requirements. See <a href="/docs/reference/ccl-charter-templates">CCL Charter Templates</a> for starter templates.</p>
+<h3>Submit the Charter</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/governance/my-coop-gov/proposals \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;title&quot;: &quot;Ratify founding charter&quot;,
+    &quot;description&quot;: &quot;Constitutional document establishing governance rules&quot;,
+    &quot;payload&quot;: {
+      &quot;type&quot;: &quot;Charter&quot;,
+      &quot;charter_id&quot;: &quot;my-coop-charter-v1&quot;,
+      &quot;yaml&quot;: &quot;... (CCL charter content) ...&quot;
+    }
+  }&#39;
+</code></pre>
+<h3>Vote on the Charter</h3>
+<p>All founders vote:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/governance/my-coop-gov/proposals/PROPOSAL_ID/vote \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;vote&quot;: &quot;yes&quot;}&#39;
+</code></pre>
+<p>When the charter passes, the <code>charter_accepted_hook</code> deploys it to the <code>CharterPolicyOracle</code>. From that point, governance rules are enforced by the system.</p>
+<hr>
+<h2>Step 6: Set Up Communication</h2>
+<p>Create gossip topics for institutional communication:</p>
+<h3>General Channel</h3>
+<pre><code>Topic: &quot;my-coop:general&quot;
+ACL: Participants([all member DIDs])
+</code></pre>
+<h3>Committee Channels</h3>
+<pre><code>Topic: &quot;my-coop:finance:coordination&quot;
+ACL: Participants([finance committee member DIDs])
+</code></pre>
+<h3>Public Channel</h3>
+<pre><code>Topic: &quot;my-coop:public&quot;
+ACL: Public
+</code></pre>
+<hr>
+<h2>Step 7: Set Up Budget (If Applicable)</h2>
+<h3>Submit Budget Proposal</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/governance/my-coop-gov/proposals \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;title&quot;: &quot;2026 Operating Budget&quot;,
+    &quot;payload&quot;: {
+      &quot;type&quot;: &quot;Allocation&quot;,
+      &quot;pool_amount&quot;: 5000,
+      &quot;unit&quot;: &quot;USD&quot;,
+      &quot;options&quot;: [
+        {&quot;name&quot;: &quot;operations&quot;, &quot;amount&quot;: 2000, &quot;description&quot;: &quot;General operations&quot;},
+        {&quot;name&quot;: &quot;programs&quot;, &quot;amount&quot;: 2000, &quot;description&quot;: &quot;Program activities&quot;},
+        {&quot;name&quot;: &quot;reserve&quot;, &quot;amount&quot;: 1000, &quot;description&quot;: &quot;Contingency&quot;}
+      ],
+      &quot;purpose&quot;: &quot;Annual operating budget&quot;
+    }
+  }&#39;
+</code></pre>
+<p>When approved, allocations become ledger entries — treasury credits per category.</p>
+<hr>
+<h2>Step 8: Invite Additional Members</h2>
+<p>Founders use the <code>Invite</code> capability to bring in more people:</p>
+<pre><code class="language-bash"># Create an invite
+curl -X POST http://localhost:8080/v1/invites \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{
+    &quot;coop_id&quot;: &quot;my-coop&quot;,
+    &quot;role&quot;: &quot;member&quot;,
+    &quot;max_uses&quot;: 10,
+    &quot;expires_in_hours&quot;: 168
+  }&#39;
+# Returns an invite code that new members use to join
+</code></pre>
+<p>New members:</p>
+<ol>
+<li>Create their identity (<code>icnctl id init</code>)</li>
+<li>Join via invite code</li>
+<li>Get assigned to committees as needed</li>
+</ol>
+<hr>
+<h2>Step 9: Begin Operating</h2>
+<p>The institution is now live. Members can:</p>
+<ul>
+<li><strong>Submit proposals</strong> in their governance domain</li>
+<li><strong>Vote</strong> on open proposals</li>
+<li><strong>Track budget</strong> through the ledger</li>
+<li><strong>Communicate</strong> via gossip topics</li>
+<li><strong>Invite</strong> new members (if they have the capability)</li>
+</ul>
+<p>Every decision, vote, and financial event is recorded with full provenance. The institution has durable memory from day one.</p>
+<hr>
+<h2>What&#39;s Next</h2>
+<ul>
+<li><a href="/docs/reference/ccl-charter-templates">CCL Charter Templates</a> — Starter charters for common institutional types</li>
+<li><a href="/docs/reference/governance-playbook">Governance Playbook</a> — Common decision patterns as reusable templates</li>
+<li><a href="/docs/reference/entity-topology-patterns">Entity Topology Patterns</a> — Organizational structures for different institution types</li>
+<li><a href="/docs/guides/onboarding-runbook">Onboarding Runbook</a> — How to bring real humans into an ICN institution</li>
+</ul>
+<hr>
+<h2>Reference: NYCN as Worked Example</h2>
+<p>The NYCN federation is the reference implementation of this guide. See:</p>
+<ul>
+<li><a href="/docs/strategy/NYCN-Institutional-Strategy">NYCN Institutional Strategy</a> — Why NYCN lives on ICN</li>
+<li><a href="/docs/strategy/NYCN-Institutional-Design">NYCN Institutional Design</a> — Full entity tree, governance model, and ICN primitive mapping</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

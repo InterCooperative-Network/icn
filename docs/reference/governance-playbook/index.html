@@ -1,0 +1,331 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance Playbook | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yTnaBP6O.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>governance playbook</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/governance-playbook.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Governance Playbook</h1>
+<p>Common decision patterns for institutions on ICN. Each pattern maps to an ICN <code>ProposalPayload</code> variant and includes the typical governance flow, threshold guidance, and API example.</p>
+<p>Use these as templates when your institution encounters these decision types.</p>
+<hr>
+<h2>Budget Decisions</h2>
+<h3>Annual Budget Approval</h3>
+<p><strong>When</strong>: Start of fiscal year or planning cycle.
+<strong>Payload</strong>: <code>Allocation</code>
+<strong>Typical threshold</strong>: Two-thirds supermajority of steering/board.
+<strong>Who votes</strong>: Steering committee, board, or full membership (depends on charter).</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;2026 Annual Operating Budget&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;Allocation&quot;,
+    &quot;pool_amount&quot;: 10000,
+    &quot;unit&quot;: &quot;USD&quot;,
+    &quot;options&quot;: [
+      { &quot;name&quot;: &quot;programs&quot;, &quot;amount&quot;: 4000, &quot;description&quot;: &quot;Core program delivery&quot; },
+      { &quot;name&quot;: &quot;operations&quot;, &quot;amount&quot;: 3000, &quot;description&quot;: &quot;Rent, utilities, admin&quot; },
+      { &quot;name&quot;: &quot;outreach&quot;, &quot;amount&quot;: 1500, &quot;description&quot;: &quot;Marketing and recruitment&quot; },
+      { &quot;name&quot;: &quot;reserve&quot;, &quot;amount&quot;: 1500, &quot;description&quot;: &quot;Emergency contingency&quot; }
+    ],
+    &quot;purpose&quot;: &quot;Allocate operating funds for calendar year 2026&quot;
+  }
+}
+</code></pre>
+<p><strong>Flow</strong>: Finance committee drafts → deliberation period → board/steering votes → on acceptance, allocations become ledger entries.</p>
+<h3>Single Expenditure Approval</h3>
+<p><strong>When</strong>: A specific expense exceeds committee delegation authority.
+<strong>Payload</strong>: <code>Budget</code>
+<strong>Typical threshold</strong>: Simple majority of governing body.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Approve venue deposit — Albany Convention Center&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;Budget&quot;,
+    &quot;amount&quot;: 1500,
+    &quot;currency&quot;: &quot;USD&quot;,
+    &quot;recipient&quot;: &quot;did:icn:z6Mk...&quot;,
+    &quot;purpose&quot;: &quot;Venue deposit for 2026 summit. Non-refundable. 200-person capacity, fully accessible.&quot;
+  }
+}
+</code></pre>
+<p><strong>Flow</strong>: Committee researches options → recommends one → proposal to governing body → vote → on acceptance, ledger settlement authorized.</p>
+<h3>Budget Amendment</h3>
+<p><strong>When</strong>: Committee needs more than originally allocated.
+<strong>Payload</strong>: <code>Budget</code> (additional allocation to specific account)
+<strong>Typical threshold</strong>: Same as budget approval.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Marketing budget amendment — additional $300 for print materials&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;Budget&quot;,
+    &quot;amount&quot;: 300,
+    &quot;currency&quot;: &quot;USD&quot;,
+    &quot;recipient&quot;: &quot;did:icn:z6Mk...&quot;,
+    &quot;purpose&quot;: &quot;Print run for summit brochures. Original $500 allocation exhausted on digital ads.&quot;
+  }
+}
+</code></pre>
+<hr>
+<h2>Membership Decisions</h2>
+<h3>Admit New Member</h3>
+<p><strong>When</strong>: A person or organization wants to join.
+<strong>Payload</strong>: <code>Membership</code>
+<strong>Typical threshold</strong>: Simple majority (for individuals), two-thirds (for organizations joining a federation).</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Admit GreenStar Food Co-op to federation&quot;,
+  &quot;description&quot;: &quot;GreenStar (Ithaca, NY) is a consumer food cooperative with 12,000 members. They&#39;ve participated in the last 3 summits and align with federation values.&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;Membership&quot;,
+    &quot;action&quot;: &quot;Add&quot;,
+    &quot;member&quot;: &quot;did:icn:z6Mk...&quot;
+  }
+}
+</code></pre>
+<p><strong>Flow</strong>: Applicant submits request → membership committee reviews → proposal created → members vote → on acceptance, entity added to membership roster.</p>
+<h3>Remove Member</h3>
+<p><strong>When</strong>: Member violates charter or becomes inactive.
+<strong>Payload</strong>: <code>Membership</code>
+<strong>Typical threshold</strong>: Two-thirds supermajority with extended deliberation.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Remove inactive member organization&quot;,
+  &quot;description&quot;: &quot;Organization has not participated in governance or sent delegates for 2 consecutive years. Per charter section 4.3, this triggers removal review.&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;Membership&quot;,
+    &quot;action&quot;: &quot;Remove&quot;,
+    &quot;member&quot;: &quot;did:icn:z6Mk...&quot;
+  }
+}
+</code></pre>
+<hr>
+<h2>Governance Configuration</h2>
+<h3>Change Governance Parameters</h3>
+<p><strong>When</strong>: Adjusting thresholds, voting periods, quorum requirements.
+<strong>Payload</strong>: <code>ConfigChange</code>
+<strong>Typical threshold</strong>: Two-thirds supermajority with deliberation period.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Lower committee quorum from 50% to 40%&quot;,
+  &quot;description&quot;: &quot;Committee attendance has averaged 45%. Current 50% quorum means decisions frequently fail. 40% still ensures representative participation.&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;ConfigChange&quot;,
+    &quot;new_config&quot;: &quot;{\&quot;committee_quorum\&quot;: 0.4}&quot;
+  }
+}
+</code></pre>
+<h3>Form New Committee</h3>
+<p><strong>When</strong>: Creating a new working group or committee.
+<strong>Payload</strong>: <code>Text</code> (followed by entity creation on acceptance)
+<strong>Typical threshold</strong>: Simple majority of governing body.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Create Volunteer Coordination Committee&quot;,
+  &quot;description&quot;: &quot;Scope: Recruit, train, and manage event-day volunteers. Authority: Autonomous volunteer recruitment and scheduling. Budget: $200 from operations allocation. Initial members: [names]. Coordinator: [name].&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;Text&quot;,
+    &quot;body&quot;: &quot;Establish a Volunteer Coordination Committee under the organizing cooperative. Scope, authority, budget, and initial membership as described.&quot;
+  }
+}
+</code></pre>
+<p><strong>Post-acceptance action</strong>: Create <code>Community</code> entity with <code>parent_id</code> pointing to the parent co-op, assign members.</p>
+<hr>
+<h2>Selection Decisions</h2>
+<h3>Venue / Vendor Selection</h3>
+<p><strong>When</strong>: Choosing between options for a significant commitment.
+<strong>Payload</strong>: <code>Text</code> (structured comparison in body)
+<strong>Typical threshold</strong>: Simple majority.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Select 2026 summit venue&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;Text&quot;,
+    &quot;body&quot;: &quot;## Options\n\n### Option A: Albany Convention Center\n- Cost: $1,500 deposit, $3,000 total\n- Capacity: 200\n- Accessibility: Full ADA compliance\n- Transit: Amtrak station 0.5 mi\n\n### Option B: Buffalo Conference Hall\n- Cost: $1,200 deposit, $2,500 total\n- Capacity: 150\n- Accessibility: Limited (2nd floor, elevator available)\n- Transit: Metro Rail 1 mi\n\n### Recommendation: Option A (Albany)\nHigher cost justified by capacity, accessibility, and transit access.&quot;
+  }
+}
+</code></pre>
+<h3>Speaker / Program Approval</h3>
+<p><strong>When</strong>: Approving the overall program structure (not individual sessions, which committees handle autonomously).
+<strong>Payload</strong>: <code>Text</code>
+<strong>Typical threshold</strong>: Simple majority.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Approve 2026 summit program structure&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;Text&quot;,
+    &quot;body&quot;: &quot;## Proposed Structure\n- 1 keynote (Saturday AM)\n- 4 tracks: Worker Co-ops, Food Systems, Housing, Cross-Sector\n- 16 breakout sessions (4 per track)\n- 2 emergent/unconference slots\n- Panel: State of NY Cooperatives\n\nContent committee has autonomous authority to fill sessions within this structure.&quot;
+  }
+}
+</code></pre>
+<hr>
+<h2>Emergency Decisions</h2>
+<h3>Freeze Member</h3>
+<p><strong>When</strong>: Account compromise, malicious behavior, or safety concern.
+<strong>Payload</strong>: <code>FreezeMember</code>
+<strong>Typical threshold</strong>: Two-thirds supermajority with fast voting period (24 hours).</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Emergency freeze — suspected compromised account&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;FreezeMember&quot;,
+    &quot;member&quot;: &quot;did:icn:z6Mk...&quot;,
+    &quot;reason&quot;: &quot;Unauthorized transactions detected from this DID. Freezing pending investigation.&quot;,
+    &quot;duration_seconds&quot;: 604800
+  }
+}
+</code></pre>
+<p><strong>Duration</strong>: <code>604800</code> = 7 days. Set <code>null</code> for indefinite (until explicitly unfrozen).</p>
+<h3>Veto a Proposal</h3>
+<p><strong>When</strong>: A passed or in-progress proposal needs to be overridden.
+<strong>Payload</strong>: <code>VetoProposal</code>
+<strong>Typical threshold</strong>: Supermajority.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Veto proposal #42 — venue contract&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;VetoProposal&quot;,
+    &quot;target_proposal_id&quot;: &quot;prop-42&quot;,
+    &quot;reason&quot;: &quot;New information: venue has unresolved ADA violations. Cannot proceed until resolved.&quot;
+  }
+}
+</code></pre>
+<h3>Force Close a Proposal</h3>
+<p><strong>When</strong>: Proposal must be halted immediately.
+<strong>Payload</strong>: <code>ForceCloseProposal</code>
+<strong>Typical threshold</strong>: Highest threshold in charter.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Force close budget proposal — superseded&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;ForceCloseProposal&quot;,
+    &quot;target_proposal_id&quot;: &quot;prop-38&quot;,
+    &quot;reason&quot;: &quot;Grant award changed total available funds. New budget proposal (prop-45) supersedes.&quot;,
+    &quot;forced_outcome&quot;: &quot;Rejected&quot;
+  }
+}
+</code></pre>
+<hr>
+<h2>Resolutions and Records</h2>
+<h3>Text Resolution</h3>
+<p><strong>When</strong>: Recording a decision, statement, or policy that doesn&#39;t require a specific system action.
+<strong>Payload</strong>: <code>Text</code>
+<strong>Typical threshold</strong>: Simple majority.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Resolution: Affirm commitment to cooperative principles&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;Text&quot;,
+    &quot;body&quot;: &quot;The federation affirms its commitment to the seven cooperative principles as defined by the ICA. All member organizations are expected to operate in accordance with these principles.&quot;
+  }
+}
+</code></pre>
+<h3>Decision Record</h3>
+<p><strong>When</strong>: Recording a decision made in a meeting for institutional memory.
+<strong>Payload</strong>: <code>Text</code>
+<strong>Typical threshold</strong>: Simple majority or consensus.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Decision record: 2026 summit date confirmed October 18&quot;,
+  &quot;payload&quot;: {
+    &quot;type&quot;: &quot;Text&quot;,
+    &quot;body&quot;: &quot;Steering committee confirmed October 18, 2026 as the summit date. Factors: venue availability, academic calendar, weather, conflict check with other cooperative events.&quot;
+  }
+}
+</code></pre>
+<hr>
+<h2>Proposal Best Practices</h2>
+<ol>
+<li><strong>Title should be a complete sentence</strong>: &quot;Approve 2026 budget&quot; not &quot;Budget&quot;</li>
+<li><strong>Description explains why, not just what</strong>: Include context, alternatives considered, and rationale</li>
+<li><strong>Use deliberation periods for significant decisions</strong>: Let people read, ask questions, and discuss before voting opens</li>
+<li><strong>Link related proposals</strong>: Reference prior decisions that inform this one</li>
+<li><strong>Keep scope focused</strong>: One decision per proposal. Don&#39;t bundle unrelated items.</li>
+<li><strong>Record the outcome context</strong>: Even for <code>Text</code> proposals, explain what changes as a result</li>
+</ol>
+<hr>
+<h2>See Also</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ccl-charter-templates">CCL Charter Templates</a> — Governance parameters for different institution types</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/entity-topology-patterns">Entity Topology Patterns</a> — How to structure your organization</li>
+<li><a href="/docs/guides/institution-setup">Institution Setup Guide</a> — Full bootstrap walkthrough</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

@@ -1,0 +1,825 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>NYCN on ICN — Institutional Design Document | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yTnaBP6O.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>strategy</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>NYCN Institutional Design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN-Institutional-Design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>NYCN on ICN — Institutional Design Document</h1>
+<h2>Introduction</h2>
+<p>This document formalizes the design for the New York Cooperative Network (NYCN) as a <strong>native institution inside the InterCooperative Network (ICN)</strong>.</p>
+<p>NYCN is not an application that uses ICN. NYCN is an institutional structure that lives within ICN. Every entity, relationship, decision, financial event, and communication channel maps to an ICN primitive. There is no separate database, no parallel app, no bespoke backend.</p>
+<p>The goal is to transform NYCN from an informal coordination network into a <strong>durable, governed federation</strong> with real operational capacity, institutional memory, and long-term continuity — and to prove that ICN can host real institutions in the process.</p>
+<hr>
+<h2>Core Thesis</h2>
+<blockquote>
+<p>NYCN is a regional federation of cooperatives, communities, and aligned organizations that coordinate, govern shared initiatives, and organize the annual summit through ICN-native identity, governance, and economic primitives.</p>
+</blockquote>
+<p>Every feature NYCN needs is a feature every future ICN institution needs. Nothing built for NYCN is bespoke. Everything built is platform.</p>
+<hr>
+<h2>Entity Structure</h2>
+<h3>ICN Primitive Mapping</h3>
+<p>ICN&#39;s entity model (<code>icn-entity</code>) supports four types: <code>Individual</code>, <code>Cooperative(CooperativeProfile)</code>, <code>Community(CommunityProfile)</code>, <code>Federation(FederationProfile)</code>. All entities support hierarchical nesting via <code>parent_id</code>. Each cooperative and federation has a <code>governance_domain_id</code> (links to proposal/voting system) and a <code>treasury_account</code> (links to ledger).</p>
+<h3>NYCN Entity Tree</h3>
+<pre><code>nycn                          Federation(FederationProfile)
+├── governance_domain_id:     &quot;nycn-federation-gov&quot;
+├── treasury_account:         &quot;nycn-federation-treasury&quot;
+├── member_entities:          [greenstar, cooperation-buffalo, ica-group, ...]
+│
+├── nycn-organizers           Cooperative(CooperativeProfile)
+│   ├── parent_id:            &quot;nycn&quot;
+│   ├── governance_domain_id: &quot;nycn-organizers-gov&quot;
+│   ├── treasury_account:     &quot;nycn-ops-treasury&quot;
+│   │
+│   ├── nycn-steering         Community(CommunityProfile)
+│   │   ├── parent_id:        &quot;nycn-organizers&quot;
+│   │   └── governance_domain_id: &quot;nycn-steering-gov&quot;
+│   │
+│   ├── nycn-content          Community(CommunityProfile)
+│   │   ├── parent_id:        &quot;nycn-organizers&quot;
+│   │   └── governance_domain_id: &quot;nycn-content-gov&quot;
+│   │
+│   ├── nycn-logistics        Community(CommunityProfile)
+│   │   ├── parent_id:        &quot;nycn-organizers&quot;
+│   │   └── governance_domain_id: &quot;nycn-logistics-gov&quot;
+│   │
+│   ├── nycn-marketing        Community(CommunityProfile)
+│   │   ├── parent_id:        &quot;nycn-organizers&quot;
+│   │   └── governance_domain_id: &quot;nycn-marketing-gov&quot;
+│   │
+│   ├── nycn-finance          Community(CommunityProfile)
+│   │   ├── parent_id:        &quot;nycn-organizers&quot;
+│   │   └── governance_domain_id: &quot;nycn-finance-gov&quot;
+│   │
+│   └── nycn-summit-2026      Community(CommunityProfile)
+│       ├── parent_id:        &quot;nycn-organizers&quot;
+│       └── governance_domain_id: &quot;nycn-summit-2026-gov&quot;
+│
+├── greenstar                 Cooperative(CooperativeProfile)
+│   └── (GreenStar&#39;s own entity, independent)
+│
+├── cooperation-buffalo       Cooperative(CooperativeProfile)
+│   └── (Cooperation Buffalo&#39;s own entity)
+│
+└── ... (217+ member organizations)
+</code></pre>
+<p><strong>Key design decisions:</strong></p>
+<ol>
+<li><p><strong>NYCN Federation</strong> is the top-level entity. It governs network-wide decisions: membership admission, federation charter amendments, shared initiatives.</p>
+</li>
+<li><p><strong>NYCN Organizers</strong> is a <code>Cooperative</code> (not a Community) because it holds treasury and executes operations. It&#39;s the operational body — the people who actually run things.</p>
+</li>
+<li><p><strong>Committees are <code>Community</code> entities</strong> nested under the organizer co-op. Each gets its own <code>governance_domain_id</code>, meaning each committee can run its own proposals and votes scoped to committee members. A <code>Community</code> requires a governance domain but not a treasury — committee spending goes through the parent co-op&#39;s treasury with scoped authority.</p>
+</li>
+<li><p><strong>Summit 2026 is a <code>Community</code> entity</strong> with time-bounded lifecycle. Status progresses: <code>Forming</code> → <code>Active</code> → completed (dissolved or archived). Next year, <code>nycn-summit-2027</code> is created fresh, inheriting institutional records from 2026.</p>
+</li>
+<li><p><strong>Member organizations are independent entities</strong> that join the federation via the <code>member_entities</code> list on <code>FederationProfile</code>. They keep their own governance and treasury. The federation relationship is additive, not subordinating.</p>
+</li>
+</ol>
+<hr>
+<h2>Identity</h2>
+<h3>ICN Primitive</h3>
+<p>DIDs: <code>did:icn:&lt;base58-ed25519-public-key&gt;</code>. Created locally via <code>icnctl id init</code>. Authentication is challenge-response: gateway issues 32-byte nonce → client signs with private key → gateway verifies → issues JWT with <code>sub</code> (DID), <code>coop_id</code>, and <code>scopes</code>.</p>
+<h3>NYCN Application</h3>
+<p>Every organizer gets a DID. Every participating organization gets one. The practical value is <strong>scope switching</strong>.</p>
+<p>When Matt authenticates with <code>coop_id: &quot;nycn-marketing&quot;</code> and scopes <code>[&quot;propose&quot;, &quot;vote&quot;]</code>, he&#39;s acting as the marketing committee. When he authenticates with <code>coop_id: &quot;nycn-organizers&quot;</code> and scopes <code>[&quot;propose&quot;, &quot;vote&quot;, &quot;treasury_access&quot;]</code>, he&#39;s acting as a co-op steward. Same person, same DID, different institutional hat.</p>
+<p>This solves the authority ambiguity problem: when someone approves a $2,000 sponsorship commitment, the system records that they did it as the finance committee coordinator with <code>TreasuryAccess</code> capability on <code>nycn-finance</code>, not as a random volunteer.</p>
+<p><strong>First circle:</strong> Core organizers (~15 people) and participating organizations. Attendees get identities optionally and later.</p>
+<hr>
+<h2>Membership Model</h2>
+<h3>ICN Primitives</h3>
+<p><code>MembershipRole</code> enum provides:</p>
+<p><strong>Individual roles</strong>: <code>Founder</code>, <code>Member</code>, <code>Worker</code>, <code>Consumer</code>, <code>Producer</code>, <code>BoardMember</code>, <code>Officer { title }</code>.</p>
+<p><strong>Entity roles</strong> (when the member is itself an organization): <code>FederatedMember</code>, <code>AssociateMember</code>, <code>ObserverMember</code>, <code>ProvisionalMember</code>.</p>
+<p><strong>Custom</strong>: <code>Custom { name }</code> for anything else.</p>
+<p>Each role carries default <code>MembershipCapability</code> grants: <code>Vote</code>, <code>Propose</code>, <code>TreasuryAccess</code>, <code>Invite</code>, <code>ManageSubEntities</code>, <code>Sign</code>, <code>Configure</code>.</p>
+<h3>NYCN Membership Tiers</h3>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>ICN Entity Type</th>
+<th>Federation Role</th>
+<th>Capabilities</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Full Member Co-op</strong></td>
+<td><code>Cooperative</code></td>
+<td><code>FederatedMember</code></td>
+<td>Vote, Propose, TreasuryAccess (if applicable), Invite</td>
+</tr>
+<tr>
+<td><strong>Affiliate Organization</strong></td>
+<td><code>Cooperative</code> or <code>Community</code></td>
+<td><code>AssociateMember</code></td>
+<td>Vote (limited), Propose (limited)</td>
+</tr>
+<tr>
+<td><strong>Emerging Co-op / Community</strong></td>
+<td><code>Community</code></td>
+<td><code>ProvisionalMember</code></td>
+<td>Propose (community-scoped only)</td>
+</tr>
+<tr>
+<td><strong>Individual Participant</strong></td>
+<td><code>Individual</code></td>
+<td><code>Member</code></td>
+<td>Vote (in committees they belong to), Propose</td>
+</tr>
+<tr>
+<td><strong>Observer</strong></td>
+<td><code>Individual</code> or <code>Cooperative</code></td>
+<td><code>ObserverMember</code></td>
+<td>Read-only, can attend but not vote</td>
+</tr>
+</tbody></table>
+<h3>Roles Within the Organizer Co-op</h3>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>ICN <code>MembershipRole</code></th>
+<th>Capabilities</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Co-op Founder</strong></td>
+<td><code>Founder</code></td>
+<td>All capabilities (Vote, Propose, TreasuryAccess, Invite, ManageSubEntities, Sign, Configure)</td>
+</tr>
+<tr>
+<td><strong>Steering Member</strong></td>
+<td><code>BoardMember</code></td>
+<td>Vote, Propose, TreasuryAccess, Invite</td>
+</tr>
+<tr>
+<td><strong>Committee Coordinator</strong></td>
+<td><code>Officer { title: &quot;Coordinator&quot; }</code></td>
+<td>Vote, Propose, Invite, Configure (within committee scope)</td>
+</tr>
+<tr>
+<td><strong>Organizer</strong></td>
+<td><code>Member</code></td>
+<td>Vote, Propose</td>
+</tr>
+<tr>
+<td><strong>Volunteer</strong></td>
+<td><code>Custom { name: &quot;Volunteer&quot; }</code></td>
+<td>Propose (limited scope)</td>
+</tr>
+</tbody></table>
+<h3>Membership Flow</h3>
+<ol>
+<li>Organization exists as an ICN entity (or individual creates a DID)</li>
+<li>Organization assigns a delegate (membership with <code>FederatedMember</code> role)</li>
+<li>Delegate submits membership request to <code>nycn-federation-gov</code></li>
+<li>Membership committee reviews (or auto-qualifies based on charter rules)</li>
+<li><code>Membership { action: Add, member: did }</code> proposal created in federation governance domain</li>
+<li>Federation members vote per charter thresholds</li>
+<li>On acceptance: entity added to <code>FederationProfile.member_entities</code>, membership record created in sled</li>
+</ol>
+<hr>
+<h2>Governance</h2>
+<h3>ICN Primitives</h3>
+<p><code>ProposalPayload</code> variants available today:</p>
+<ul>
+<li><code>Text { body }</code> — Discussion, resolutions, records</li>
+<li><code>Budget { amount, currency, recipient, purpose }</code> — Single-recipient allocation</li>
+<li><code>Allocation { pool_amount, unit, options, purpose }</code> — Participatory budgeting across competing options</li>
+<li><code>Membership { action, member }</code> — Add or remove members</li>
+<li><code>ConfigChange { new_config }</code> — Governance parameter changes</li>
+<li><code>FreezeMember { member, reason, duration }</code> — Emergency member suspension</li>
+<li><code>VetoProposal { target_proposal_id, reason }</code> — Override governance process</li>
+<li><code>ForceCloseProposal { target_proposal_id, reason, forced_outcome }</code> — Emergency halt</li>
+</ul>
+<p>Proposal lifecycle: <code>Draft → [Deliberation] → Open → Accepted / Rejected / NoQuorum</code></p>
+<p>Each entity&#39;s <code>governance_domain_id</code> scopes proposals — steering proposals live in <code>nycn-steering-gov</code>, content proposals live in <code>nycn-content-gov</code>, etc.</p>
+<h3>NYCN Governance Model</h3>
+<p><strong>Federation-level decisions</strong> (domain: <code>nycn-federation-gov</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Payload Type</th>
+<th>Threshold</th>
+<th>Who Votes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Admit new member co-op</td>
+<td><code>Membership { action: Add }</code></td>
+<td>Simple majority, quorum 50%</td>
+<td>All <code>FederatedMember</code> delegates</td>
+</tr>
+<tr>
+<td>Amend federation charter</td>
+<td><code>ConfigChange</code></td>
+<td>Two-thirds supermajority</td>
+<td>All <code>FederatedMember</code> delegates</td>
+</tr>
+<tr>
+<td>Federation-wide initiative</td>
+<td><code>Text</code></td>
+<td>Simple majority</td>
+<td>All <code>FederatedMember</code> delegates</td>
+</tr>
+<tr>
+<td>Remove member</td>
+<td><code>Membership { action: Remove }</code></td>
+<td>Two-thirds supermajority</td>
+<td>All <code>FederatedMember</code> delegates</td>
+</tr>
+</tbody></table>
+<p><strong>Steering committee decisions</strong> (domain: <code>nycn-steering-gov</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Payload Type</th>
+<th>Threshold</th>
+<th>Who Votes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Approve annual budget</td>
+<td><code>Allocation</code></td>
+<td>Two-thirds, quorum 50%</td>
+<td>Steering committee members</td>
+</tr>
+<tr>
+<td>Select venue</td>
+<td><code>Text</code> (with options in body)</td>
+<td>Simple majority</td>
+<td>Steering committee members</td>
+</tr>
+<tr>
+<td>Approve program structure</td>
+<td><code>Text</code></td>
+<td>Simple majority</td>
+<td>Steering committee members</td>
+</tr>
+<tr>
+<td>Accept sponsorship &gt; $500</td>
+<td><code>Budget</code></td>
+<td>Simple majority</td>
+<td>Steering committee members</td>
+</tr>
+<tr>
+<td>Form new committee</td>
+<td><code>Text</code> + follow-up entity creation</td>
+<td>Simple majority</td>
+<td>Steering committee members</td>
+</tr>
+<tr>
+<td>Emergency member freeze</td>
+<td><code>FreezeMember</code></td>
+<td>Supermajority</td>
+<td>Steering committee members</td>
+</tr>
+</tbody></table>
+<p><strong>Committee-level decisions</strong> (domain: <code>nycn-{committee}-gov</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Payload Type</th>
+<th>Authority</th>
+<th>Who Decides</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Approve individual session</td>
+<td><code>Text</code></td>
+<td>Autonomous (no steering approval)</td>
+<td>Content committee members</td>
+</tr>
+<tr>
+<td>Accept sponsorship ≤ $500</td>
+<td><code>Budget</code></td>
+<td>Autonomous</td>
+<td>Finance committee members</td>
+</tr>
+<tr>
+<td>Marketing plan approval</td>
+<td><code>Text</code></td>
+<td>Autonomous</td>
+<td>Marketing committee members</td>
+</tr>
+<tr>
+<td>Expense within allocation</td>
+<td><code>Budget</code></td>
+<td>Autonomous, within budget limit</td>
+<td>Committee coordinator</td>
+</tr>
+</tbody></table>
+<p>The charter defines the <strong>governance-management boundary</strong>: which decisions require a governance vote and which the committee handles autonomously. This boundary is the key organizational design choice.</p>
+<h3>Concrete Decision Flow: Venue Selection</h3>
+<ol>
+<li>Logistics committee researches venues, narrows to three options</li>
+<li>Logistics coordinator creates proposal in <code>nycn-steering-gov</code>:<pre><code>ProposalPayload::Text {
+  body: &quot;Venue selection: Albany Convention Center ($1,500 deposit, 200 cap, accessible)
+         vs. Buffalo Conference Hall ($1,200, 150 cap, limited transit)
+         vs. Syracuse Community Center ($800, 120 cap, full accessibility)
+         Recommendation: Albany. Cost higher but capacity and accessibility justify it.&quot;
+}
+</code></pre>
+</li>
+<li>Proposal enters deliberation period (charter-defined, e.g., 72 hours)</li>
+<li>After deliberation, proposal opens for voting</li>
+<li>Steering members cast votes (threshold: simple majority, quorum: half of steering)</li>
+<li>On acceptance: decision recorded with full provenance — proposer DID, every vote with DID, timestamps, tally</li>
+<li>2027 logistics committee queries <code>GET /governance/nycn-steering-gov/proposals?state=accepted</code> and sees exactly why Albany was chosen</li>
+</ol>
+<hr>
+<h2>Ledger and Budget</h2>
+<h3>ICN Primitives</h3>
+<p><code>icn-ledger</code> provides double-entry mutual credit. Every financial event is an immutable <code>Entry</code> with debit, credit, timestamp, and metadata. Treasury operations include allocations (capacity grants), settlements (bilateral transfers), and dispute handling. Dynamic credit limits based on trust scores.</p>
+<h3>NYCN Budget Architecture</h3>
+<p><strong>Treasury accounts</strong> (mapped to entity tree):</p>
+<pre><code>nycn-federation-treasury     Federation-level funds (dues, shared resources)
+nycn-ops-treasury            Organizer co-op operating funds
+  ├── allocated to:
+  │   nycn-steering          (no separate treasury — uses ops-treasury with scoped authority)
+  │   nycn-content           $1,000 allocation
+  │   nycn-logistics         $3,000 allocation
+  │   nycn-marketing         $500 allocation
+  │   nycn-finance           $200 allocation (admin costs)
+  │   nycn-summit-2026       event-specific allocation
+</code></pre>
+<h3>Budget Lifecycle</h3>
+<p><strong>1. Budget approval</strong> — Finance committee drafts budget, submits as <code>Allocation</code> proposal to <code>nycn-steering-gov</code>:</p>
+<pre><code>ProposalPayload::Allocation {
+    pool_amount: 5200,
+    unit: &quot;USD&quot;,
+    options: [
+        { name: &quot;content&quot;, amount: 1000, description: &quot;Speaker fees, materials&quot; },
+        { name: &quot;logistics&quot;, amount: 3000, description: &quot;Venue, AV, catering&quot; },
+        { name: &quot;marketing&quot;, amount: 500, description: &quot;Ads, printing, outreach&quot; },
+        { name: &quot;finance&quot;, amount: 200, description: &quot;Banking, admin&quot; },
+        { name: &quot;reserve&quot;, amount: 500, description: &quot;Contingency&quot; },
+    ],
+    purpose: &quot;Summit 2026 operating budget&quot;,
+}
+</code></pre>
+<p>When approved (two-thirds of steering), allocations become ledger entries — credits to each committee&#39;s scoped account.</p>
+<p><strong>2. Income tracking</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Ledger Entry</th>
+<th>Provenance</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Registration (SimpleTix)</td>
+<td>Credit to <code>nycn-ops-treasury</code>, metadata: <code>{ source: &quot;simpletix&quot;, batch: &quot;2026-Q3&quot; }</code></td>
+<td>External receipt — no governance proposal needed</td>
+</tr>
+<tr>
+<td>Sponsorship (GreenStar, $1,000)</td>
+<td>Credit to <code>nycn-ops-treasury</code>, metadata: <code>{ sponsor: &quot;greenstar&quot;, proposal_id: &quot;prop-42&quot; }</code></td>
+<td>Links to governance approval record</td>
+</tr>
+<tr>
+<td>Grant (CDF Ed Fund)</td>
+<td>Credit to <code>nycn-ops-treasury</code>, metadata: <code>{ grant: &quot;cdf-ed-fund-2026&quot; }</code></td>
+<td>External receipt with grant reference</td>
+</tr>
+</tbody></table>
+<p><strong>3. Spending</strong>:</p>
+<p>When logistics books a $1,500 venue deposit:</p>
+<pre><code>Settlement {
+    from: &quot;nycn-logistics&quot; (scoped allocation),
+    to: &quot;external:albany-convention-center&quot;,
+    amount: 1500,
+    currency: &quot;USD&quot;,
+    reference: &quot;venue-deposit-2026&quot;,
+    metadata: { proposal_id: &quot;prop-37&quot; }  // links to venue approval
+}
+</code></pre>
+<p>The ledger knows logistics had $3,000 allocated and now has $1,500 remaining. Every organizer with <code>ledger:read</code> scope can see this.</p>
+<p><strong>4. Reconciliation</strong>: At end of cycle, the ledger provides complete financial picture — all income, all expenses, all committee allocations, all surplus or deficit. Not a manually assembled spreadsheet. The actual institutional record.</p>
+<hr>
+<h2>Trust</h2>
+<h3>ICN Primitive</h3>
+<p><code>icn-trust</code> computes trust scores from a graph of attestations. Trust scores gate rate limits, capability grants, and access control. The <code>TrustPolicyOracle</code> converts trust scores into <code>ConstraintSet</code> values the kernel enforces.</p>
+<h3>NYCN Trust Model</h3>
+<p>Trust is not arbitrary hierarchy. It makes explicit what already happens informally.</p>
+<table>
+<thead>
+<tr>
+<th>Trust Level</th>
+<th>Who</th>
+<th>What They Can Do</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>New volunteer</strong> (trust &lt; 0.2)</td>
+<td>First-time participant</td>
+<td>Join committees, propose session topics, participate in discussions</td>
+</tr>
+<tr>
+<td><strong>Active organizer</strong> (trust 0.2–0.5)</td>
+<td>Returning volunteer with track record</td>
+<td>Vote on committee decisions, propose committee-level actions</td>
+</tr>
+<tr>
+<td><strong>Committee coordinator</strong> (trust 0.5–0.7)</td>
+<td>Experienced organizer, elected/appointed</td>
+<td>Approve spending within committee allocation, invite members</td>
+</tr>
+<tr>
+<td><strong>Steering member</strong> (trust 0.7+)</td>
+<td>Core leadership</td>
+<td>Propose budget amendments, vote on federation decisions, sign on behalf of entity</td>
+</tr>
+</tbody></table>
+<p>Trust builds through participation: attending meetings, completing commitments, participating in governance votes, receiving attestations from other members. The charter defines which trust thresholds gate which capabilities — anyone can propose a session topic, but only organizers above 0.5 trust can propose budget amendments.</p>
+<hr>
+<h2>Communication</h2>
+<h3>ICN Primitive</h3>
+<p><code>icn-gossip</code> provides topic-based pub/sub with access control. Topics have <code>AccessControl</code>: <code>Public</code>, <code>MinTrustScore(f64)</code>, or <code>Participants(Vec&lt;Did&gt;)</code>. Messages propagate via hybrid push/pull protocol.</p>
+<h3>NYCN Topic Structure</h3>
+<pre><code>Topic                                   ACL                              Purpose
+────────────────────────────────────────────────────────────────────────────────────
+nycn:federation:announcements           MinTrustScore(0.1)               Network-wide announcements
+nycn:organizers:general                 Participants([organizer DIDs])   Organizer coordination
+nycn:steering:discussion                Participants([steering DIDs])    Steering deliberation
+nycn:content:coordination               Participants([content DIDs])     Content committee
+nycn:logistics:coordination             Participants([logistics DIDs])   Logistics committee
+nycn:marketing:coordination             Participants([marketing DIDs])   Marketing committee
+nycn:finance:coordination               Participants([finance DIDs])     Finance committee
+nycn:summit-2026:updates                MinTrustScore(0.1)               Summit planning updates
+nycn:federation:public                  Public                           Public community space
+</code></pre>
+<p>Communication is scoped to institutional structure. Marketing coordination stays in marketing scope. Steering deliberation stays in steering scope. Cross-committee announcements go to the organizer channel. Public announcements go to the community-facing topic.</p>
+<hr>
+<h2>Institutional Memory</h2>
+<h3>The Problem</h3>
+<p>13 years of NYCN organizing knowledge is scattered across Google Drive with inconsistent ownership, naming, and structure. Every year, new organizers reconstruct context from scratch. Knowledge is lost when people leave.</p>
+<h3>The ICN Solution</h3>
+<p>Every meeting record, decision, budget, evaluation, and committee report is stored as a content-addressed, provenance-tracked artifact in ICN&#39;s storage layer. It doesn&#39;t disappear when someone&#39;s Google account changes. It doesn&#39;t get filed in the wrong folder.</p>
+<p><strong>What becomes institutional record:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>How It&#39;s Stored</th>
+<th>Provenance</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Meeting agenda</td>
+<td>Document artifact scoped to committee entity</td>
+<td>Author DID, committee scope, timestamp</td>
+</tr>
+<tr>
+<td>Meeting notes</td>
+<td>Document artifact scoped to committee entity</td>
+<td>Author DID, attendee list, decisions captured</td>
+</tr>
+<tr>
+<td>Governance decision</td>
+<td>Proposal record in governance domain</td>
+<td>Proposer, all votes, tally, timestamps</td>
+</tr>
+<tr>
+<td>Budget approval</td>
+<td>Allocation proposal + ledger entries</td>
+<td>Full chain from proposal to expenditure</td>
+</tr>
+<tr>
+<td>Committee report</td>
+<td>Document artifact scoped to committee entity</td>
+<td>Author DID, reporting period</td>
+</tr>
+<tr>
+<td>Summit evaluation</td>
+<td>Document artifact scoped to summit entity</td>
+<td>Year, metrics, lessons learned</td>
+</tr>
+<tr>
+<td>Sponsorship record</td>
+<td>Ledger entry + governance approval</td>
+<td>Sponsor entity, approval vote, payment receipt</td>
+</tr>
+</tbody></table>
+<p>The 2028 planning committee can trace the complete institutional history: how 2026 was organized, what was decided, what evaluations said, what the budget looked like, who was on each committee and what they did.</p>
+<hr>
+<h2>Federation</h2>
+<h3>ICN Primitive</h3>
+<p><code>FederationProfile</code> tracks <code>member_entities: Vec&lt;EntityId&gt;</code> with optional <code>parent_id</code> for nested federations. <code>icn-federation</code> provides clearing management — multi-party netting, bilateral settlement, receipt generation.</p>
+<h3>NYCN Federation Model</h3>
+<p>The 217+ organizations in the NYCN directory become real federation members or affiliates. Each participating co-op has its own ICN entity. The federation surface lets them:</p>
+<ul>
+<li><strong>Discover each other</strong> through the federation member registry</li>
+<li><strong>Coordinate on shared concerns</strong> through federation governance proposals</li>
+<li><strong>Participate in network governance</strong> through delegate voting</li>
+<li><strong>Contribute shared resources</strong> through commons artifacts</li>
+<li><strong>Track inter-organizational relationships</strong> through federation clearing</li>
+</ul>
+<p>When GreenStar sponsors the summit for $1,000, that&#39;s an inter-entity transaction in the federation ledger, with governance provenance, visible to all federation members who have <code>ledger:read</code> scope.</p>
+<p>When a Buffalo co-op sends a speaker, that&#39;s a cross-entity contribution tracked in the trust system — an attestation that builds the institutional relationship between organizations.</p>
+<p>The summit becomes the annual convening of a living network — not a one-off event a small team scrambles to produce.</p>
+<hr>
+<h2>Summit Lifecycle</h2>
+<h3>Before (January–September)</h3>
+<p><strong>January</strong>: Steering committee meets. Agenda posted as artifact in ICN storage. Committee reports submitted. Steering votes to approve budget (<code>Allocation</code> proposal, two-thirds threshold). Allocations become ledger entries. Meeting notes become permanent institutional record.</p>
+<p><strong>February</strong>: Marketing committee operates within $500 allocation autonomously. Marketing plan stored as artifact scoped to marketing entity. $150 Facebook ads logged as settlement against authorized budget.</p>
+<p><strong>March</strong>: Content committee proposes program structure (four tracks, keynote, 20 sessions) as <code>Text</code> proposal to <code>nycn-steering-gov</code>. Approved. Individual sessions approved within content committee&#39;s delegated authority via <code>nycn-content-gov</code>.</p>
+<p><strong>April</strong>: Logistics proposes Albany as venue → steering vote → passes. Venue deposit ($1,500) recorded as settlement from logistics allocation, referencing venue approval proposal.</p>
+<p><strong>May–September</strong>: Sponsor commitments flow through governance (above $500) or autonomous committee authority (below $500). All financial events recorded in ledger. Operational execution happens in external tools (email, task apps, etc.) but every institutional decision flows through ICN.</p>
+<h3>During (October)</h3>
+<p>Summit happens. Registration data links attendees to event. Financial transactions (ticket revenue, on-site sponsorship, expenses) flow through ledger.</p>
+<h3>After (November)</h3>
+<p>Post-event. Evaluation data captured and stored as artifact. Financial reconciliation generated from ledger. Knowledge capture: what worked, what didn&#39;t, what committees learned. All permanent institutional memory. The 2027 planning committee inherits a complete, auditable, structured record.</p>
+<hr>
+<h2>What Stays Outside ICN</h2>
+<table>
+<thead>
+<tr>
+<th>Outside ICN</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Task-level operations (&quot;email sponsor back,&quot; &quot;print badges&quot;)</td>
+<td>Management, not governance. Use whatever task tool organizers prefer.</td>
+</tr>
+<tr>
+<td>Email campaigns</td>
+<td>Mailchimp or equivalent. ICN is not an email platform.</td>
+</tr>
+<tr>
+<td>Ticket sales UX</td>
+<td>SimpleTix or equivalent. Registration needs a consumer-facing interface.</td>
+</tr>
+<tr>
+<td>Website</td>
+<td>Public marketing surface.</td>
+</tr>
+<tr>
+<td>Social media</td>
+<td>External platforms.</td>
+</tr>
+<tr>
+<td>Day-of logistics</td>
+<td>Room assignments, AV, volunteer shifts, food. Operational execution.</td>
+</tr>
+</tbody></table>
+<p><strong>The line</strong>: ICN holds the institutional reality (who, what authority, what was decided, what money moved, what the rules are). External tools handle operational execution (the actual doing of tasks, the public-facing surfaces, the marketing).</p>
+<hr>
+<h2>Design Principles</h2>
+<ol>
+<li><strong>Federation, not centralization.</strong> Member co-ops retain sovereignty. The federation coordinates; it does not govern member internals.</li>
+<li><strong>Governed shared layer.</strong> What&#39;s shared (budget, program, standards) is governed through proposals and voting. What&#39;s internal is each member&#39;s business.</li>
+<li><strong>Durable institutional memory.</strong> Every decision, every budget, every evaluation persists with provenance. New organizers inherit complete context.</li>
+<li><strong>Transparency and accountability.</strong> Every organizer can see budget position, decision history, and committee status at any time.</li>
+<li><strong>Actionable coordination, not symbolic membership.</strong> Membership implies structured participation — voting rights, committee access, governance voice. Not just a directory listing.</li>
+<li><strong>Scope-bound authority.</strong> Roles and capabilities are per-entity, not global. You act as a committee coordinator within your committee, not across the whole organization.</li>
+</ol>
+<hr>
+<h2>ICN Platform Gaps</h2>
+<p>These are features NYCN needs that ICN does not yet provide. They are listed as platform gaps, not NYCN customizations — every institution would need them.</p>
+<h3>Exists But Needs Wiring</h3>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>Current State</th>
+<th>What&#39;s Needed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Budget-as-constraints</strong></td>
+<td>Charter engine evaluates proposals; ledger tracks balances</td>
+<td>Wire allocation approval → spending authority enforcement. When marketing tries to settle $600 but only has $500 allocated, the system should reject or flag.</td>
+</tr>
+<tr>
+<td><strong>Multi-domain navigation in UI</strong></td>
+<td>Pilot UI shows one governance domain at a time</td>
+<td>Organizer needs to see &quot;my committees → each committee&#39;s proposals&quot; in one view. Dashboard scoped to identity and roles.</td>
+</tr>
+<tr>
+<td><strong>Proposal creation forms</strong></td>
+<td>API endpoints exist; UI has basic governance tab</td>
+<td>Need full proposal creation UX — select type, fill fields, submit, track status</td>
+</tr>
+</tbody></table>
+<h3>Does Not Exist Yet</h3>
+<table>
+<thead>
+<tr>
+<th>Gap</th>
+<th>What&#39;s Needed</th>
+<th>Why Every Institution Needs It</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Content-addressed document storage</strong></td>
+<td>Artifacts (agendas, reports, evaluations, templates) stored with authorship, scope, and provenance</td>
+<td>Every institution produces documents. Without this, institutional memory is incomplete.</td>
+</tr>
+<tr>
+<td><strong>Onboarding UX</strong></td>
+<td>Invite link → create identity → join entity → get role, all in-browser without crypto key management expertise</td>
+<td>Volunteer organizers will not adopt DID-based identity if the onboarding is <code>icnctl id init</code> in a terminal.</td>
+</tr>
+<tr>
+<td><strong>Notification system</strong></td>
+<td>Push notifications, email digest, &quot;you have 3 pending votes&quot; summaries</td>
+<td>No one polls a dashboard. Governance participation requires notification when votes open.</td>
+</tr>
+<tr>
+<td><strong>Calendar/event primitive</strong></td>
+<td>Lightweight event/milestone type attached to entities with time-bounded lifecycle</td>
+<td>Summits, meetings, deadlines are universal institutional artifacts.</td>
+</tr>
+<tr>
+<td><strong>Rich member profiles</strong></td>
+<td>Structured profile fields (skills, organization affiliation, contact info, bio) on entities</td>
+<td>Every institution needs a member directory that&#39;s more than a list of DIDs.</td>
+</tr>
+<tr>
+<td><strong>Seasonal lifecycle</strong></td>
+<td>Entity status patterns for dormant ↔ active ↔ intense ↔ dormant cycles</td>
+<td>The summit happens once a year. The institution persists. Entities need to handle seasonal intensity without creating/destroying structure.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Charter Outline (Draft)</h2>
+<p>The NYCN federation charter, written in CCL, would define:</p>
+<h3>Governance Parameters</h3>
+<pre><code class="language-yaml">federation:
+  name: &quot;New York Cooperative Network&quot;
+  governance:
+    membership_admission:
+      threshold: simple_majority
+      quorum: 0.5
+      eligible_voters: federated_members
+    charter_amendment:
+      threshold: supermajority_two_thirds
+      quorum: 0.5
+      eligible_voters: federated_members
+    
+organizer_coop:
+  governance:
+    budget_approval:
+      threshold: supermajority_two_thirds
+      quorum: 0.5
+      eligible_voters: steering_members
+    venue_selection:
+      threshold: simple_majority
+      quorum: 0.5
+      eligible_voters: steering_members
+    sponsorship_above_500:
+      threshold: simple_majority
+      quorum: 0.5
+      eligible_voters: steering_members
+
+committees:
+  delegation:
+    - content: autonomous for individual session approval
+    - finance: autonomous for sponsorship ≤ $500
+    - marketing: autonomous within budget allocation
+    - logistics: autonomous within budget allocation
+  escalation:
+    - program_structure: requires steering approval
+    - budget_amendment: requires steering approval
+    - new_committee: requires steering approval
+
+trust:
+  thresholds:
+    propose_session: 0.0        # anyone
+    vote_committee: 0.1         # minimal participation
+    propose_budget_change: 0.5  # established organizer
+    committee_coordinator: 0.5  # elected/appointed
+    steering_membership: 0.7    # core leadership
+</code></pre>
+<hr>
+<h2>Bootstrap Sequence</h2>
+<p>The minimum viable institutional instantiation:</p>
+<ol>
+<li><strong>Create federation entity</strong> (<code>nycn</code>, type <code>Federation</code>)</li>
+<li><strong>Create organizer co-op</strong> (<code>nycn-organizers</code>, type <code>Cooperative</code>, parent: <code>nycn</code>)</li>
+<li><strong>Create steering committee</strong> (<code>nycn-steering</code>, type <code>Community</code>, parent: <code>nycn-organizers</code>)</li>
+<li><strong>Issue identities</strong> to 3–5 founding organizers via <code>icnctl id init</code></li>
+<li><strong>Add founders</strong> to <code>nycn-organizers</code> with <code>Founder</code> role</li>
+<li><strong>Add founders</strong> to <code>nycn-steering</code> with <code>BoardMember</code> role</li>
+<li><strong>Submit and ratify bootstrap charter</strong> via <code>Charter</code> proposal in <code>nycn-organizers-gov</code></li>
+<li><strong>Create remaining committees</strong> (content, logistics, marketing, finance)</li>
+<li><strong>Invite additional organizers</strong> — founders use <code>Invite</code> capability to bring in the broader team</li>
+<li><strong>Submit and ratify budget</strong> via <code>Allocation</code> proposal in <code>nycn-steering-gov</code></li>
+<li><strong>Begin admitting member organizations</strong> to the federation</li>
+</ol>
+<p>Steps 1–7 can happen in a single session. Steps 8–11 happen over the following weeks as the institution becomes operational.</p>
+<hr>
+<h2>Conclusion</h2>
+<p>NYCN becomes a real institution when:</p>
+<ul>
+<li>Membership implies structured participation, not just a directory listing</li>
+<li>Decisions are governed through proposals with recorded provenance</li>
+<li>Budget is a real ledger with double-entry accounting, not a spreadsheet</li>
+<li>Coordination is persistent, scoped, and survives leadership transitions</li>
+<li>The summit is one function of an ongoing institutional structure</li>
+<li>Member organizations are federation entities with real relationships, not rows in a database</li>
+</ul>
+<p>This design establishes NYCN as the first real institutional implementation of ICN. Everything required to make NYCN function is everything required to make ICN function for any institution.</p>
+<p>The first serious proof that ICN works will not be a feature checklist. It will be a real federation using it to govern itself.</p>
+<hr>
+<p><em>Established 2026-04-13.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

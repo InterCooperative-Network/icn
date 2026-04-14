@@ -1,0 +1,262 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Entity Topology Patterns | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yTnaBP6O.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>entity topology patterns</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/entity-topology-patterns.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Entity Topology Patterns</h1>
+<p>Common organizational structures for institutions on ICN. Each pattern shows the entity tree, governance domains, and treasury layout. Choose the pattern closest to your institution and customize.</p>
+<hr>
+<h2>Pattern 1: Flat Cooperative</h2>
+<p>A single cooperative with no internal committees. All members participate equally in governance. Common for small worker co-ops (&lt; 20 members).</p>
+<pre><code>my-coop                       Cooperative(CooperativeProfile)
+├── governance_domain_id:     &quot;my-coop-gov&quot;
+├── treasury_account:         &quot;my-coop-treasury&quot;
+└── members:
+    ├── Alice (Founder)       → Vote, Propose, TreasuryAccess, Sign
+    ├── Bob (Worker)          → Vote, Propose
+    └── Carol (Worker)        → Vote, Propose
+</code></pre>
+<p><strong>Governance</strong>: One domain. All decisions go to the full membership.
+<strong>Treasury</strong>: One account. Spending thresholds defined in charter.
+<strong>Communication</strong>: One gossip topic (<code>my-coop:general</code>).</p>
+<p><strong>When to use</strong>: Worker co-ops with fewer than ~20 people where everyone participates in every decision.</p>
+<hr>
+<h2>Pattern 2: Cooperative with Committees</h2>
+<p>A cooperative with working groups that have delegated authority. The board/steering body governs, committees execute within their scope.</p>
+<pre><code>my-coop                       Cooperative(CooperativeProfile)
+├── governance_domain_id:     &quot;my-coop-gov&quot;
+├── treasury_account:         &quot;my-coop-treasury&quot;
+│
+├── my-coop-board             Community(CommunityProfile)
+│   ├── parent_id:            &quot;my-coop&quot;
+│   └── governance_domain_id: &quot;my-coop-board-gov&quot;
+│
+├── my-coop-finance           Community(CommunityProfile)
+│   ├── parent_id:            &quot;my-coop&quot;
+│   └── governance_domain_id: &quot;my-coop-finance-gov&quot;
+│
+└── my-coop-programs          Community(CommunityProfile)
+    ├── parent_id:            &quot;my-coop&quot;
+    └── governance_domain_id: &quot;my-coop-programs-gov&quot;
+</code></pre>
+<p><strong>Governance</strong>: Board domain for organizational decisions. Committee domains for delegated scope.
+<strong>Treasury</strong>: One account. Committees spend within board-approved allocations.
+<strong>Communication</strong>: Per-committee gossip topics + org-wide channel.</p>
+<p><strong>When to use</strong>: Mid-size cooperatives (20–100 members) with distinct functional areas.</p>
+<hr>
+<h2>Pattern 3: Federation of Cooperatives</h2>
+<p>A network of independent cooperatives coordinating through a shared governance layer. Each member retains sovereignty. The federation governs shared concerns.</p>
+<p><strong>This is the NYCN pattern.</strong> With real data:</p>
+<ul>
+<li>236 organizations in the network</li>
+<li>29 sponsors with 2026 pledges</li>
+<li>Committees: Content, Logistics, Marketing, Finance, Core Organizing</li>
+<li>Events: 2024 (Syracuse), 2025 (Albany), 2026 (Albany, planning)</li>
+</ul>
+<pre><code>nycn                          Federation(FederationProfile)
+├── governance_domain_id:     &quot;nycn-federation-gov&quot;
+├── treasury_account:         &quot;nycn-federation-treasury&quot;
+├── member_entities:          [greenstar, ica-group, ncba, cdi, cfne, ...]
+│
+├── nycn-organizers           Cooperative(CooperativeProfile)
+│   ├── parent_id:            &quot;nycn&quot;
+│   ├── governance_domain_id: &quot;nycn-organizers-gov&quot;
+│   ├── treasury_account:     &quot;nycn-ops-treasury&quot;
+│   │
+│   ├── nycn-steering         Community — steering committee
+│   ├── nycn-content          Community — content committee (12 sessions for 2026)
+│   ├── nycn-logistics        Community — logistics committee
+│   ├── nycn-marketing        Community — marketing committee
+│   ├── nycn-finance          Community — finance committee ($29K+ in sponsor pledges)
+│   │
+│   └── nycn-summit-2026      Community — time-bounded event entity
+│       └── status:           Forming → Active → Complete
+│
+├── greenstar                 Cooperative — GreenStar Food Co-op (silver sponsor, $500)
+├── ica-group                 Cooperative — ICA Group (platinum sponsor, $2,000)
+├── national-coop-bank        Cooperative — National Cooperative Bank (platinum, $2,000)
+├── cdi                       Cooperative — Cooperative Development Institute (gold, $1,000)
+├── cfne                      Cooperative — Cooperative Fund of the Northeast (gold, $1,000)
+└── ... (236 total organizations)
+</code></pre>
+<p><strong>Governance</strong>: Federation domain for network-wide decisions (membership, charter). Steering domain for operational decisions (budget, venue). Committee domains for delegated scope.
+<strong>Treasury</strong>: Federation treasury (dues, shared resources) + ops treasury (event budget). Committees have scoped allocations.
+<strong>Communication</strong>: Layered gossip topics — federation announcements, organizer coordination, per-committee channels, public community.</p>
+<p><strong>When to use</strong>: Regional networks, sector alliances, any coordination of independent cooperatives.</p>
+<hr>
+<h2>Pattern 4: Community Organization</h2>
+<p>An open-membership community with working groups and elected leadership. No treasury (or minimal), governance-focused.</p>
+<pre><code>my-community                  Community(CommunityProfile)
+├── governance_domain_id:     &quot;my-community-gov&quot;
+│
+├── my-community-mutual-aid   Community(CommunityProfile)
+│   ├── parent_id:            &quot;my-community&quot;
+│   └── governance_domain_id: &quot;my-community-aid-gov&quot;
+│
+└── my-community-events       Community(CommunityProfile)
+    ├── parent_id:            &quot;my-community&quot;
+    └── governance_domain_id: &quot;my-community-events-gov&quot;
+</code></pre>
+<p><strong>Governance</strong>: Low-threshold, open participation. Working groups form and dissolve by proposal.
+<strong>Treasury</strong>: None by default. If money enters the picture, upgrade the root entity to <code>Cooperative</code>.
+<strong>Communication</strong>: Open public channel + scoped working group channels.</p>
+<p><strong>When to use</strong>: Mutual aid networks, neighborhood councils, civic groups, movement organizations.</p>
+<hr>
+<h2>Pattern 5: Nested Federation (Federation of Federations)</h2>
+<p>A national or sectoral body coordinating regional federations, each of which coordinates local cooperatives.</p>
+<pre><code>national-coop-assoc           Federation(FederationProfile)
+├── governance_domain_id:     &quot;national-gov&quot;
+├── member_entities:          [nycn, midwest-fed, pacific-fed, ...]
+│
+├── nycn                      Federation(FederationProfile)
+│   ├── parent_id:            &quot;national-coop-assoc&quot;
+│   ├── member_entities:      [greenstar, breadhive, ...]
+│   └── ...
+│
+├── midwest-fed               Federation(FederationProfile)
+│   ├── parent_id:            &quot;national-coop-assoc&quot;
+│   ├── member_entities:      [...]
+│   └── ...
+│
+└── pacific-fed               Federation(FederationProfile)
+    ├── parent_id:            &quot;national-coop-assoc&quot;
+    ├── member_entities:      [...]
+    └── ...
+</code></pre>
+<p><strong>Governance</strong>: Three levels — national (cross-regional), regional (cross-local), local (per-coop). Each level has its own governance domain and charter.
+<strong>Treasury</strong>: Clearing relationships between federations. National treasury for shared programs.
+<strong>Communication</strong>: Hierarchical gossip topology — national announcements propagate down, local discussion stays local.</p>
+<p><strong>When to use</strong>: National cooperative associations, global federation structures, multi-tier networks.</p>
+<hr>
+<h2>Choosing Your Pattern</h2>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>If yes...</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Do you have fewer than 20 members and make all decisions together?</td>
+<td>Pattern 1: Flat Cooperative</td>
+</tr>
+<tr>
+<td>Do you have working groups or committees with delegated authority?</td>
+<td>Pattern 2: Cooperative with Committees</td>
+</tr>
+<tr>
+<td>Are you a network of independent organizations?</td>
+<td>Pattern 3: Federation</td>
+</tr>
+<tr>
+<td>Are you a community group focused on coordination, not economics?</td>
+<td>Pattern 4: Community Organization</td>
+</tr>
+<tr>
+<td>Do you coordinate other federations?</td>
+<td>Pattern 5: Nested Federation</td>
+</tr>
+</tbody></table>
+<p>Most institutions start as Pattern 1 or 4 and evolve toward Pattern 2 or 3 as they grow.</p>
+<hr>
+<h2>See Also</h2>
+<ul>
+<li><a href="/docs/guides/institution-setup">Institution Setup Guide</a> — Step-by-step bootstrap</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ccl-charter-templates">CCL Charter Templates</a> — Governance parameters per pattern</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/governance-playbook">Governance Playbook</a> — Common decision patterns</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
