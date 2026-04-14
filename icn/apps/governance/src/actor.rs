@@ -1761,10 +1761,15 @@ impl GovernanceActor {
                     .get_thresholds_from_params(&proposal.payload, None)
                     .unwrap_or_else(|| domain.config.thresholds_for_proposal(&proposal.payload));
 
-                // Evaluate outcome with proposal-type-specific thresholds
-                let outcome_result =
-                    self.profile
-                        .evaluate_with_thresholds(&tally, thresholds, eligible_count)?;
+                // Evaluate outcome with proposal-type-specific thresholds,
+                // respecting the domain's decision mode (majority or consent).
+                let decision_mode = domain.config.params.decision_mode;
+                let outcome_result = self.profile.evaluate_with_mode(
+                    &tally,
+                    thresholds,
+                    eligible_count,
+                    decision_mode,
+                )?;
 
                 // Record participation metrics (Issue #477)
                 let proposal_type = proposal.payload.type_name();

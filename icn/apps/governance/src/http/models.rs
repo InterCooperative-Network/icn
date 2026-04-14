@@ -21,6 +21,18 @@ pub struct CreateDomainRequest {
     pub approval_percent: u8,
     pub voting_period_days: u64,
     pub members: Vec<String>,
+
+    /// Decision mode: `"majority"` (default) or `"consent"`.
+    ///
+    /// In consent mode, proposals pass unless objections exceed `max_objections`.
+    #[serde(default)]
+    pub decision_mode: Option<String>,
+
+    /// Maximum number of objections (against-votes) allowed in consent mode.
+    /// Default `0` means any objection blocks the proposal (strict consensus).
+    /// Only meaningful when `decision_mode` is `"consent"`.
+    #[serde(default)]
+    pub max_objections: Option<u8>,
 }
 
 /// Add a member to a governance domain

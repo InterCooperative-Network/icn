@@ -396,11 +396,18 @@ pub async fn create_domain<E: GovernanceEventEmitter + Clone + 'static>(
     let members = members?;
 
     let membership = MembershipConfig::static_list(members);
-    let params = GovernanceParams::new(
+    let mut params = GovernanceParams::new(
         req.quorum_percent,
         req.approval_percent,
         voting_period_seconds,
     );
+    if let Some(ref mode) = req.decision_mode {
+        params.decision_mode = match mode.as_str() {
+            "consent" => icn_governance::DecisionMode::Consent,
+            _ => icn_governance::DecisionMode::Majority,
+        };
+    }
+    params.max_objections = req.max_objections;
     let domain_id = GovernanceDomainId(req.id.clone());
 
     ctx.manager

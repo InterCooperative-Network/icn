@@ -179,8 +179,10 @@ fn accepted_count(captured: &Arc<Mutex<Vec<SystemEvent>>>) -> usize {
 ///   for_votes=2, approval_required=(2*50)/100=1, 2>1 → Accepted
 #[tokio::test]
 async fn test_delegation_raises_participation_above_quorum() -> Result<()> {
+    // 66% quorum with 3 members → ceil(198/100) = 2 votes required.
+    // Alice votes + Bob delegated = 2 effective votes → quorum met.
     let (actor, captured, _sub, alice_did, bob_did, _carol_did, domain_id) =
-        make_three_member_actor(67, 50).await?;
+        make_three_member_actor(66, 50).await?;
 
     // Bob delegates to Alice (blanket scope)
     let delegation = Delegation::new(bob_did.clone(), alice_did.clone(), DelegationScope::Blanket);
@@ -196,7 +198,7 @@ async fn test_delegation_raises_participation_above_quorum() -> Result<()> {
     assert_eq!(
         accepted_count(&captured),
         1,
-        "Delegation should raise Bob's vote to Alice's For, reaching 2/3 = 66.7% ≥ 60% quorum"
+        "Delegation should raise Bob's vote to Alice's For, reaching 2/3 ≥ 66% quorum"
     );
 
     Ok(())
@@ -205,12 +207,12 @@ async fn test_delegation_raises_participation_above_quorum() -> Result<()> {
 /// --- Test 2: Without delegation, same setup fails quorum ---
 ///
 /// Same as Test 1 but Bob has NO delegation. Only Alice votes.
-/// quorum_required = (3 * 67) / 100 = 2; total_votes=1 < 2 → NoQuorum
+/// quorum_required = ceil(3 * 66 / 100) = 2; total_votes=1 < 2 → NoQuorum
 /// ProposalAccepted NOT emitted.
 #[tokio::test]
 async fn test_no_delegation_fails_quorum() -> Result<()> {
     let (actor, captured, _sub, alice_did, _bob_did, _carol_did, domain_id) =
-        make_three_member_actor(67, 50).await?;
+        make_three_member_actor(66, 50).await?;
 
     // No delegations created — Alice votes alone
     lifecycle_proposal(&actor, &domain_id, &[(alice_did.clone(), VoteChoice::For)]).await?;
@@ -231,7 +233,7 @@ async fn test_no_delegation_fails_quorum() -> Result<()> {
 ///
 /// Setup: 3 members, quorum=67%, approval=50%
 ///   All 3 vote: Alice For, Bob For (direct), Carol Against
-///   quorum_required = (3*67)/100 = 2; total_votes=3 ≥ 2 → quorum met
+///   quorum_required = ceil(3*67/100) = 3; total_votes=3 ≥ 3 → quorum met
 ///   for_votes=2, approval_required=(3*50)/100=1; 2>1 → Accepted
 ///
 /// If delegation INCORRECTLY replaced Bob's direct For with Carol's Against:

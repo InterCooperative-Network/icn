@@ -104,8 +104,8 @@ pub use charter::{
 };
 pub use charter_store::{CharterStore, CharterStoreBackend, InMemoryCharterStore};
 pub use config::{
-    default_max_execution_delay, EmergencyThresholds, GovernanceConfig, GovernanceParams,
-    ProposalThresholds,
+    default_max_execution_delay, DecisionMode, EmergencyThresholds, GovernanceConfig,
+    GovernanceParams, ProposalThresholds,
 };
 pub use delegation::{
     scopes_overlap, Delegation, DelegationError, DelegationId, DelegationManager, DelegationScope,
