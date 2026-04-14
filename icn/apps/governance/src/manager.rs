@@ -11,13 +11,15 @@ use anyhow::Result;
 use icn_federation::BilateralClearingAgreement;
 use icn_governance::{
     scopes_overlap, ActionItem, ActionItemFilter, ActionItemId, ActionItemPriority,
-    ActionItemStatus, ActionItemStoreBackend, Comment, CommentId, Delegation, DelegationId,
-    DelegationScope, Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt,
-    GovernanceDomain, GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams,
-    GovernanceProfileId, InMemoryActionItemStore, InMemoryDiscussionStore, MembershipConfig,
-    MembershipSource, PaginatedResult, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
-    ProposalPayload, ProposalScope, ProposalState, Timestamp, Vote, VoteChoice, VoteTally,
-    DEFAULT_MAX_DELEGATION_DEPTH,
+    ActionItemStatus, ActionItemStoreBackend, Activity, ActivityId, ActivityKind,
+    ActivityStoreBackend, Comment, CommentId, Delegation, DelegationId, DelegationScope,
+    Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt, GovernanceDomain,
+    GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
+    InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore,
+    InMemoryStructureStore, MembershipConfig, MembershipSource, PaginatedResult, ProofOutcome,
+    Proposal, ProposalDomainLookup, ProposalId, ProposalPayload, ProposalScope, ProposalState,
+    RoleAssignment, Structure, StructureId, StructureKind, StructureStoreBackend, Timestamp, Vote,
+    VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -190,6 +192,404 @@ impl ActionItemStoreBackend for SledActionItemStore {
     }
 }
 
+// ========== Sled store for Structures (Tranche 2) ==========
+
+/// Sled-backed storage for internal structures and role assignments.
+///
+/// # Key scheme (dual-key — no suffix scanning)
+///
+/// Structure:
+///   - Primary:      `structure:{structure_id}`                     → Structure
+///   - Entity index: `structure_by_entity:{entity_id}:{structure_id}` → b"1"
+///
+/// Role:
+///   - Primary:           `role:{role_id}`                             → RoleAssignment
+///   - Structure index:   `role_by_structure:{structure_id}:{role_id}` → b"1"
+pub struct SledStructureStore {
+    db: Arc<sled::Db>,
+}
+
+impl SledStructureStore {
+    /// Create a new Sled-backed structure store
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    // --- Structure keys ---
+
+    fn structure_primary_key(id: &icn_governance::StructureId) -> String {
+        format!("structure:{}", id.0)
+    }
+
+    fn structure_idx_key(entity_id: &str, id: &icn_governance::StructureId) -> String {
+        format!("structure_by_entity:{}:{}", entity_id, id.0)
+    }
+
+    fn entity_structure_index_prefix(entity_id: &str) -> String {
+        format!("structure_by_entity:{}:", entity_id)
+    }
+
+    // --- Role keys ---
+
+    fn role_primary_key(rid: &icn_governance::RoleAssignmentId) -> String {
+        format!("role:{}", rid.0)
+    }
+
+    fn role_idx_key(
+        sid: &icn_governance::StructureId,
+        rid: &icn_governance::RoleAssignmentId,
+    ) -> String {
+        format!("role_by_structure:{}:{}", sid.0, rid.0)
+    }
+
+    fn structure_role_index_prefix(sid: &icn_governance::StructureId) -> String {
+        format!("role_by_structure:{}:", sid.0)
+    }
+}
+
+impl icn_governance::StructureStoreBackend for SledStructureStore {
+    fn save_structure(
+        &self,
+        s: &icn_governance::Structure,
+    ) -> std::result::Result<(), GovernanceError> {
+        let primary = Self::structure_primary_key(&s.id);
+        let idx = Self::structure_idx_key(&s.parent_entity_id, &s.id);
+        let value = icn_encoding::encode_versioned(s)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode structure: {e}")))?;
+        self.db
+            .insert(primary.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert failed: {e}")))?;
+        self.db
+            .insert(idx.as_bytes(), b"1".as_ref())
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert index failed: {e}")))?;
+        Ok(())
+    }
+
+    fn get_structure(
+        &self,
+        id: &icn_governance::StructureId,
+    ) -> std::result::Result<Option<icn_governance::Structure>, GovernanceError> {
+        let key = Self::structure_primary_key(id);
+        match self.db.get(key.as_bytes()) {
+            Ok(Some(value)) => {
+                let s: icn_governance::Structure =
+                    icn_encoding::decode_versioned(&value).map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode structure: {e}"))
+                    })?;
+                Ok(Some(s))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(GovernanceError::Internal(format!("Sled get failed: {e}"))),
+        }
+    }
+
+    fn list_structures_by_entity(
+        &self,
+        entity_id: &str,
+    ) -> std::result::Result<Vec<icn_governance::Structure>, GovernanceError> {
+        let prefix = Self::entity_structure_index_prefix(entity_id);
+        let prefix_len = prefix.len();
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (idx_key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let idx_str = std::str::from_utf8(&idx_key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            // Extract structure_id from the tail of the index key
+            let sid_str = &idx_str[prefix_len..];
+            let sid = icn_governance::StructureId(sid_str.to_string());
+            let primary = Self::structure_primary_key(&sid);
+            if let Some(value) = self
+                .db
+                .get(primary.as_bytes())
+                .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+            {
+                let s: icn_governance::Structure =
+                    icn_encoding::decode_versioned(&value).map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode structure: {e}"))
+                    })?;
+                out.push(s);
+            }
+        }
+        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(out)
+    }
+
+    fn delete_structure(
+        &self,
+        id: &icn_governance::StructureId,
+    ) -> std::result::Result<bool, GovernanceError> {
+        // First fetch to know the entity_id (needed for the index key)
+        let primary = Self::structure_primary_key(id);
+        let existing = self
+            .db
+            .get(primary.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?;
+        let s: icn_governance::Structure = match existing {
+            Some(v) => icn_encoding::decode_versioned(&v).map_err(|e| {
+                GovernanceError::Internal(format!("Failed to decode structure: {e}"))
+            })?,
+            None => return Ok(false),
+        };
+
+        // Cascade: delete all roles for this structure
+        let role_idx_prefix = Self::structure_role_index_prefix(id);
+        let role_idx_prefix_len = role_idx_prefix.len();
+        let role_idx_keys: Vec<sled::IVec> = self
+            .db
+            .scan_prefix(role_idx_prefix.as_bytes())
+            .filter_map(|r| r.ok().map(|(k, _)| k))
+            .collect();
+        for idx_key in role_idx_keys {
+            let idx_str = std::str::from_utf8(&idx_key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            let rid_str = &idx_str[role_idx_prefix_len..];
+            // Parse as UUID for RoleAssignmentId
+            if let Ok(uuid) = uuid::Uuid::parse_str(rid_str) {
+                let rid = icn_governance::RoleAssignmentId::from_uuid(uuid);
+                let role_primary = Self::role_primary_key(&rid);
+                self.db
+                    .remove(role_primary.as_bytes())
+                    .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}")))?;
+            }
+            self.db
+                .remove(&idx_key)
+                .map_err(|e| GovernanceError::Internal(format!("Sled delete index failed: {e}")))?;
+        }
+
+        // Delete entity index key
+        let idx = Self::structure_idx_key(&s.parent_entity_id, id);
+        self.db
+            .remove(idx.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete index failed: {e}")))?;
+
+        // Delete primary
+        self.db
+            .remove(primary.as_bytes())
+            .map(|opt| opt.is_some())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}")))
+    }
+
+    fn save_role(
+        &self,
+        r: &icn_governance::RoleAssignment,
+    ) -> std::result::Result<(), GovernanceError> {
+        let primary = Self::role_primary_key(&r.id);
+        let idx = Self::role_idx_key(&r.structure_id, &r.id);
+        let value = icn_encoding::encode_versioned(r)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode role: {e}")))?;
+        self.db
+            .insert(primary.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert failed: {e}")))?;
+        self.db
+            .insert(idx.as_bytes(), b"1".as_ref())
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert index failed: {e}")))?;
+        Ok(())
+    }
+
+    fn get_role(
+        &self,
+        id: &icn_governance::RoleAssignmentId,
+    ) -> std::result::Result<Option<icn_governance::RoleAssignment>, GovernanceError> {
+        let key = Self::role_primary_key(id);
+        match self.db.get(key.as_bytes()) {
+            Ok(Some(value)) => {
+                let r: icn_governance::RoleAssignment = icn_encoding::decode_versioned(&value)
+                    .map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode role: {e}"))
+                    })?;
+                Ok(Some(r))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(GovernanceError::Internal(format!("Sled get failed: {e}"))),
+        }
+    }
+
+    fn list_roles_by_structure(
+        &self,
+        sid: &icn_governance::StructureId,
+    ) -> std::result::Result<Vec<icn_governance::RoleAssignment>, GovernanceError> {
+        let prefix = Self::structure_role_index_prefix(sid);
+        let prefix_len = prefix.len();
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (idx_key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let idx_str = std::str::from_utf8(&idx_key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            let rid_str = &idx_str[prefix_len..];
+            if let Ok(uuid) = uuid::Uuid::parse_str(rid_str) {
+                let rid = icn_governance::RoleAssignmentId::from_uuid(uuid);
+                let primary = Self::role_primary_key(&rid);
+                if let Some(value) = self
+                    .db
+                    .get(primary.as_bytes())
+                    .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+                {
+                    let r: icn_governance::RoleAssignment = icn_encoding::decode_versioned(&value)
+                        .map_err(|e| {
+                            GovernanceError::Internal(format!("Failed to decode role: {e}"))
+                        })?;
+                    out.push(r);
+                }
+            }
+        }
+        out.sort_by(|a, b| a.start_date.cmp(&b.start_date));
+        Ok(out)
+    }
+
+    fn delete_role(
+        &self,
+        id: &icn_governance::RoleAssignmentId,
+    ) -> std::result::Result<bool, GovernanceError> {
+        // Fetch role to know its structure_id (needed for index key)
+        let primary = Self::role_primary_key(id);
+        let existing = self
+            .db
+            .get(primary.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?;
+        let r: icn_governance::RoleAssignment = match existing {
+            Some(v) => icn_encoding::decode_versioned(&v)
+                .map_err(|e| GovernanceError::Internal(format!("Failed to decode role: {e}")))?,
+            None => return Ok(false),
+        };
+        // Delete index key
+        let idx = Self::role_idx_key(&r.structure_id, id);
+        self.db
+            .remove(idx.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete index failed: {e}")))?;
+        // Delete primary
+        self.db
+            .remove(primary.as_bytes())
+            .map(|opt| opt.is_some())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}")))
+    }
+}
+
+// ========== Sled store for Activities (Tranche 2) ==========
+
+/// Sled-backed storage for activities.
+///
+/// # Key scheme (dual-key — no suffix scanning)
+///
+///   - Primary:      `activity:{activity_id}`                        → Activity
+///   - Entity index: `activity_by_entity:{entity_id}:{activity_id}` → b"1"
+pub struct SledActivityStore {
+    db: Arc<sled::Db>,
+}
+
+impl SledActivityStore {
+    /// Create a new Sled-backed activity store
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    fn activity_primary_key(id: &icn_governance::ActivityId) -> String {
+        format!("activity:{}", id.0)
+    }
+
+    fn activity_idx_key(entity_id: &str, id: &icn_governance::ActivityId) -> String {
+        format!("activity_by_entity:{}:{}", entity_id, id.0)
+    }
+
+    fn entity_activity_index_prefix(entity_id: &str) -> String {
+        format!("activity_by_entity:{}:", entity_id)
+    }
+}
+
+impl icn_governance::ActivityStoreBackend for SledActivityStore {
+    fn save(&self, a: &icn_governance::Activity) -> std::result::Result<(), GovernanceError> {
+        let primary = Self::activity_primary_key(&a.id);
+        let idx = Self::activity_idx_key(&a.parent_entity_id, &a.id);
+        let value = icn_encoding::encode_versioned(a)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode activity: {e}")))?;
+        self.db
+            .insert(primary.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert failed: {e}")))?;
+        self.db
+            .insert(idx.as_bytes(), b"1".as_ref())
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert index failed: {e}")))?;
+        Ok(())
+    }
+
+    fn get(
+        &self,
+        id: &icn_governance::ActivityId,
+    ) -> std::result::Result<Option<icn_governance::Activity>, GovernanceError> {
+        let key = Self::activity_primary_key(id);
+        match self.db.get(key.as_bytes()) {
+            Ok(Some(value)) => {
+                let a: icn_governance::Activity =
+                    icn_encoding::decode_versioned(&value).map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode activity: {e}"))
+                    })?;
+                Ok(Some(a))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(GovernanceError::Internal(format!("Sled get failed: {e}"))),
+        }
+    }
+
+    fn list_by_entity(
+        &self,
+        entity_id: &str,
+    ) -> std::result::Result<Vec<icn_governance::Activity>, GovernanceError> {
+        let prefix = Self::entity_activity_index_prefix(entity_id);
+        let prefix_len = prefix.len();
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (idx_key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let idx_str = std::str::from_utf8(&idx_key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            let aid_str = &idx_str[prefix_len..];
+            let aid = icn_governance::ActivityId(aid_str.to_string());
+            let primary = Self::activity_primary_key(&aid);
+            if let Some(value) = self
+                .db
+                .get(primary.as_bytes())
+                .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+            {
+                let a: icn_governance::Activity =
+                    icn_encoding::decode_versioned(&value).map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode activity: {e}"))
+                    })?;
+                out.push(a);
+            }
+        }
+        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(out)
+    }
+
+    fn delete(
+        &self,
+        id: &icn_governance::ActivityId,
+    ) -> std::result::Result<bool, GovernanceError> {
+        // Fetch to know entity_id for the index key
+        let primary = Self::activity_primary_key(id);
+        let existing = self
+            .db
+            .get(primary.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?;
+        let a: icn_governance::Activity = match existing {
+            Some(v) => icn_encoding::decode_versioned(&v).map_err(|e| {
+                GovernanceError::Internal(format!("Failed to decode activity: {e}"))
+            })?,
+            None => return Ok(false),
+        };
+        // Delete index key
+        let idx = Self::activity_idx_key(&a.parent_entity_id, id);
+        self.db
+            .remove(idx.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete index failed: {e}")))?;
+        // Delete primary
+        self.db
+            .remove(primary.as_bytes())
+            .map(|opt| opt.is_some())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}")))
+    }
+}
+
 /// Handle type for actor-backed governance
 ///
 /// This uses the `GovernanceOps` trait to avoid direct dependency on `icn-core`.
@@ -221,6 +621,10 @@ pub struct GovernanceManager {
     discussions: RwLock<InMemoryDiscussionStore>,
     /// Action item storage backend (in-memory or Sled-backed)
     action_items: Box<dyn ActionItemStoreBackend>,
+    /// Structure store backend (committees, working groups, etc.)
+    structure_store: Arc<dyn StructureStoreBackend>,
+    /// Activity store backend (events, programs, projects)
+    activity_store: Arc<dyn ActivityStoreBackend>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
     /// Optional receipt store for persisting GovernanceDecisionReceipts
@@ -241,6 +645,8 @@ impl GovernanceManager {
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
             action_items: Box::new(InMemoryActionItemStore::new()),
+            structure_store: Arc::new(InMemoryStructureStore::new()),
+            activity_store: Arc::new(InMemoryActivityStore::new()),
             governance_handle: None,
             receipt_store: None,
         }
@@ -272,6 +678,8 @@ impl GovernanceManager {
             // Action items are always stored in gateway (not synced via gossip)
             // Use set_action_item_store() to configure persistent storage
             action_items: Box::new(InMemoryActionItemStore::new()),
+            structure_store: Arc::new(InMemoryStructureStore::new()),
+            activity_store: Arc::new(InMemoryActivityStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -294,6 +702,22 @@ impl GovernanceManager {
         self
     }
 
+    /// Replace the structure store backend.
+    ///
+    /// Use this to configure Sled-backed persistent storage for structures.
+    pub fn with_structure_store(mut self, store: Arc<dyn StructureStoreBackend>) -> Self {
+        self.structure_store = store;
+        self
+    }
+
+    /// Replace the activity store backend.
+    ///
+    /// Use this to configure Sled-backed persistent storage for activities.
+    pub fn with_activity_store(mut self, store: Arc<dyn ActivityStoreBackend>) -> Self {
+        self.activity_store = store;
+        self
+    }
+
     /// Create a governance manager with Sled-backed action item storage
     ///
     /// This is the recommended mode for production with persistent action items.
@@ -306,6 +730,8 @@ impl GovernanceManager {
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
             action_items: Box::new(SledActionItemStore::new(db)),
+            structure_store: Arc::new(InMemoryStructureStore::new()),
+            activity_store: Arc::new(InMemoryActivityStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -323,6 +749,8 @@ impl GovernanceManager {
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
             action_items: Box::new(SledActionItemStore::new(db)),
+            structure_store: Arc::new(InMemoryStructureStore::new()),
+            activity_store: Arc::new(InMemoryActivityStore::new()),
             governance_handle: None,
             receipt_store: None,
         }
@@ -1813,6 +2241,118 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
 
         Ok(item)
+    }
+
+    // ========================================================================
+    // Structure management (committees, working groups, teams)
+    // ========================================================================
+
+    /// Create a new internal structure owned by an entity.
+    pub fn create_structure(
+        &self,
+        parent_entity_id: String,
+        kind: StructureKind,
+        name: String,
+        mandate: Option<String>,
+    ) -> Result<Structure> {
+        let now = icn_time::current_timestamp_secs();
+        let id = StructureId::generate();
+        let mut s = Structure::new(id, parent_entity_id, kind, name, now);
+        s.mandate = mandate;
+        self.structure_store
+            .save_structure(&s)
+            .map_err(|e| anyhow::anyhow!("Failed to save structure: {e}"))?;
+        Ok(s)
+    }
+
+    /// Get a structure by ID.
+    pub fn get_structure(&self, id: &StructureId) -> Result<Option<Structure>> {
+        self.structure_store
+            .get_structure(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get structure: {e}"))
+    }
+
+    /// List all structures owned by an entity.
+    pub fn list_structures(&self, entity_id: &str) -> Result<Vec<Structure>> {
+        self.structure_store
+            .list_structures_by_entity(entity_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list structures: {e}"))
+    }
+
+    /// Assign a role in a structure.
+    pub fn assign_role(
+        &self,
+        structure_id: StructureId,
+        person_did: icn_identity::Did,
+        role: String,
+    ) -> Result<RoleAssignment> {
+        // Validate the structure exists before persisting the role
+        let exists = self
+            .structure_store
+            .get_structure(&structure_id)
+            .map_err(|e| anyhow::anyhow!("Failed to look up structure: {e}"))?;
+        if exists.is_none() {
+            return Err(anyhow::anyhow!("Structure {} not found", structure_id));
+        }
+        let now = icn_time::current_timestamp_secs();
+        let assignment = RoleAssignment::new(structure_id, person_did, role, now);
+        self.structure_store
+            .save_role(&assignment)
+            .map_err(|e| anyhow::anyhow!("Failed to save role assignment: {e}"))?;
+        Ok(assignment)
+    }
+
+    /// List role assignments for a structure.
+    pub fn list_roles(&self, structure_id: &StructureId) -> Result<Vec<RoleAssignment>> {
+        self.structure_store
+            .list_roles_by_structure(structure_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list roles: {e}"))
+    }
+
+    // ========================================================================
+    // Activity management (events, programs, projects, initiatives)
+    // ========================================================================
+
+    /// Create a new activity owned by an entity.
+    pub fn create_activity(
+        &self,
+        parent_entity_id: String,
+        kind: ActivityKind,
+        name: String,
+        description: Option<String>,
+        start_date: Option<u64>,
+        end_date: Option<u64>,
+    ) -> Result<Activity> {
+        // Validate date range when both are provided
+        if let (Some(start), Some(end)) = (start_date, end_date) {
+            if end < start {
+                return Err(anyhow::anyhow!("Activity end_date must be >= start_date"));
+            }
+        }
+        let now = icn_time::current_timestamp_secs();
+        let id = ActivityId::generate();
+        let mut a = Activity::new(id, parent_entity_id, kind, name, now);
+        a.description = description;
+        a.start_date = start_date;
+        a.end_date = end_date;
+        self.activity_store
+            .save(&a)
+            .map_err(|e| anyhow::anyhow!("Failed to save activity: {e}"))?;
+        Ok(a)
+    }
+
+    /// Get an activity by ID.
+    pub fn get_activity(&self, id: &ActivityId) -> Result<Option<Activity>> {
+        self.activity_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get activity: {e}"))
+    }
+
+    /// List all activities owned by an entity.
+    pub fn list_activities(&self, entity_id: &str) -> Result<Vec<Activity>> {
+        self.activity_store
+            .list_by_entity(entity_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list activities: {e}"))
     }
 
     // ========================================================================

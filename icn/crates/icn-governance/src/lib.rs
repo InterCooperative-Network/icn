@@ -82,6 +82,11 @@ pub mod vote;
 // Action items for meeting/task tracking
 pub mod action_item;
 
+// Institutional structure + event model (Tranche 2)
+pub mod activity;
+pub mod parent;
+pub mod structure;
+
 // Orphan cleanup (Phase 21)
 pub mod orphan_cleanup;
 
@@ -175,6 +180,14 @@ pub use proposal_cleanup::{CleanupStats, ProposalArchive, ProposalCleanupTask, P
 pub use action_item::{
     ActionItem, ActionItemFilter, ActionItemId, ActionItemNote, ActionItemPriority, ActionItemSpec,
     ActionItemStatus, ActionItemStore, ActionItemStoreBackend, InMemoryActionItemStore,
+};
+pub use activity::{
+    Activity, ActivityId, ActivityKind, ActivityStatus, ActivityStoreBackend, InMemoryActivityStore,
+};
+pub use parent::InstitutionalParent;
+pub use structure::{
+    InMemoryStructureStore, RoleAssignment, RoleAssignmentId, Structure, StructureId,
+    StructureKind, StructureStatus, StructureStoreBackend,
 };
 
 /// Unix timestamp in seconds
