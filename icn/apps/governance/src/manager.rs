@@ -15,11 +15,12 @@ use icn_governance::{
     ActivityStoreBackend, Comment, CommentId, Delegation, DelegationId, DelegationScope,
     Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt, GovernanceDomain,
     GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
-    InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore,
-    InMemoryStructureStore, MembershipConfig, MembershipSource, PaginatedResult, ProofOutcome,
-    Proposal, ProposalDomainLookup, ProposalId, ProposalPayload, ProposalScope, ProposalState,
-    RoleAssignment, Structure, StructureId, StructureKind, StructureStoreBackend, Timestamp, Vote,
-    VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
+    InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore, InMemoryMeetingStore,
+    InMemoryStructureStore, Meeting, MeetingId, MeetingStoreBackend, MembershipConfig,
+    MembershipSource, PaginatedResult, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
+    ProposalPayload, ProposalScope, ProposalState, RoleAssignment, Structure, StructureId,
+    StructureKind, StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally,
+    DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -590,6 +591,293 @@ impl icn_governance::ActivityStoreBackend for SledActivityStore {
     }
 }
 
+// ============================================================================
+// Sled-Backed Meeting Store
+// ============================================================================
+
+/// Sled-backed storage for meetings.
+///
+/// Key scheme (dual-key):
+/// - Primary:       `meeting:{meeting_id}`                     → postcard-encoded Meeting
+/// - Domain index:  `meeting_by_domain:{domain_id}:{meeting_id}` → empty (membership marker)
+///
+/// This matches the `<thing>_by_<scope>:...` secondary-index convention used by
+/// `SledStructureStore` and `SledActivityStore`. Lookups by meeting ID are O(1)
+/// via the primary key; lookups by domain scan the index prefix. The scheme is
+/// unambiguous under domain IDs containing `:` because the meeting ID lives in
+/// its own primary key namespace, not embedded as a suffix of the domain key.
+pub struct SledMeetingStore {
+    db: Arc<sled::Db>,
+}
+
+impl SledMeetingStore {
+    /// Create a new Sled-backed meeting store.
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    fn meeting_key(id: &MeetingId) -> String {
+        format!("meeting:{}", id.0)
+    }
+
+    fn index_key(domain_id: &str, id: &MeetingId) -> String {
+        format!("meeting_by_domain:{}:{}", domain_id, id.0)
+    }
+
+    fn domain_index_prefix(domain_id: &str) -> String {
+        format!("meeting_by_domain:{}:", domain_id)
+    }
+}
+
+impl MeetingStoreBackend for SledMeetingStore {
+    fn save(&self, m: &Meeting) -> std::result::Result<(), GovernanceError> {
+        let primary_key = Self::meeting_key(&m.id);
+        let index_key = Self::index_key(&m.domain_id, &m.id);
+        let value = icn_encoding::encode_versioned(m)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode meeting: {e}")))?;
+
+        // Best-effort atomic: write primary, then index. If either fails, the
+        // caller sees an error and can retry. sled::Batch would be stronger but
+        // is not used elsewhere in this store for this pattern.
+        self.db
+            .insert(primary_key.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert (primary) failed: {e}")))?;
+        self.db
+            .insert(index_key.as_bytes(), &[] as &[u8])
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert (index) failed: {e}")))?;
+        Ok(())
+    }
+
+    fn get(&self, id: &MeetingId) -> std::result::Result<Option<Meeting>, GovernanceError> {
+        let key = Self::meeting_key(id);
+        match self
+            .db
+            .get(key.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+        {
+            Some(value) => {
+                let m: Meeting = icn_encoding::decode_versioned(&value).map_err(|e| {
+                    GovernanceError::Internal(format!("Failed to decode meeting: {e}"))
+                })?;
+                Ok(Some(m))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn list_by_domain(
+        &self,
+        domain_id: &str,
+    ) -> std::result::Result<Vec<Meeting>, GovernanceError> {
+        let prefix = Self::domain_index_prefix(domain_id);
+        // The exact prefix the key's "domain portion" must match — i.e., the
+        // prefix minus its trailing ':'. This is necessary because sled's
+        // `scan_prefix` matches any byte-prefix, so `meeting_by_domain:coop:`
+        // also matches `meeting_by_domain:coop:nycn:{id}` (a different domain).
+        // We must reject index rows whose domain is not exactly `domain_id`.
+        let expected_domain_prefix = format!("meeting_by_domain:{}", domain_id);
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let key_str = std::str::from_utf8(&key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            // Split at the last ':' to recover (domain-portion, meeting-id).
+            let Some((domain_portion, meeting_id_str)) = key_str.rsplit_once(':') else {
+                continue;
+            };
+            // Reject keys whose domain portion doesn't exactly match. This
+            // filters out keys from domains whose name happens to start with
+            // `{domain_id}` (e.g., scanning `coop:` must not pick up `coop:nycn`).
+            if domain_portion != expected_domain_prefix {
+                continue;
+            }
+            let primary_key = format!("meeting:{}", meeting_id_str);
+            let Some(value) = self
+                .db
+                .get(primary_key.as_bytes())
+                .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+            else {
+                // Index entry without primary — treat as dangling and skip.
+                continue;
+            };
+            let m: Meeting = icn_encoding::decode_versioned(&value)
+                .map_err(|e| GovernanceError::Internal(format!("Failed to decode meeting: {e}")))?;
+            out.push(m);
+        }
+        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(out)
+    }
+
+    fn delete(&self, id: &MeetingId) -> std::result::Result<bool, GovernanceError> {
+        // Load the meeting to discover its domain_id so we can clean up the index.
+        let primary_key = Self::meeting_key(id);
+        let Some(value) = self
+            .db
+            .get(primary_key.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+        else {
+            return Ok(false);
+        };
+        let m: Meeting = icn_encoding::decode_versioned(&value)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to decode meeting: {e}")))?;
+        let index_key = Self::index_key(&m.domain_id, id);
+
+        self.db
+            .remove(primary_key.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete (primary) failed: {e}")))?;
+        self.db
+            .remove(index_key.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete (index) failed: {e}")))?;
+        Ok(true)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod sled_meeting_store_tests {
+    use super::*;
+    use icn_governance::{Meeting, MeetingId};
+
+    fn open_temp_db() -> (Arc<sled::Db>, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = sled::Config::new()
+            .path(dir.path())
+            .temporary(true)
+            .open()
+            .expect("sled open");
+        (Arc::new(db), dir)
+    }
+
+    fn mk_meeting(domain: &str, title: &str) -> Meeting {
+        Meeting::new(
+            MeetingId::generate(),
+            domain.to_string(),
+            title.to_string(),
+            "did:icn:creator".to_string(),
+            1_700_000_000,
+        )
+    }
+
+    #[test]
+    fn save_and_get_roundtrip() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let m = mk_meeting("dom-a", "Kickoff");
+        store.save(&m).unwrap();
+
+        let got = store.get(&m.id).unwrap().expect("meeting present");
+        assert_eq!(got.id, m.id);
+        assert_eq!(got.domain_id, "dom-a");
+        assert_eq!(got.title, "Kickoff");
+    }
+
+    #[test]
+    fn get_is_o1_and_does_not_scan() {
+        // Regression guard: the previous implementation full-scanned `meeting:`
+        // and could return the wrong meeting if two domains carried the same
+        // MeetingId. Primary keys are now meeting-id-only, so collisions are
+        // impossible within a single store.
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let m1 = mk_meeting("dom-a", "alpha");
+        let m2 = mk_meeting("dom-b", "beta");
+        store.save(&m1).unwrap();
+        store.save(&m2).unwrap();
+
+        let got1 = store.get(&m1.id).unwrap().unwrap();
+        let got2 = store.get(&m2.id).unwrap().unwrap();
+        assert_eq!(got1.title, "alpha");
+        assert_eq!(got2.title, "beta");
+    }
+
+    #[test]
+    fn list_by_domain_isolates_domains() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let m_a1 = mk_meeting("dom-a", "a1");
+        let m_a2 = mk_meeting("dom-a", "a2");
+        let m_b1 = mk_meeting("dom-b", "b1");
+        store.save(&m_a1).unwrap();
+        store.save(&m_a2).unwrap();
+        store.save(&m_b1).unwrap();
+
+        let a = store.list_by_domain("dom-a").unwrap();
+        let b = store.list_by_domain("dom-b").unwrap();
+        assert_eq!(a.len(), 2);
+        assert_eq!(b.len(), 1);
+        assert!(a.iter().all(|m| m.domain_id == "dom-a"));
+        assert!(b.iter().all(|m| m.domain_id == "dom-b"));
+    }
+
+    #[test]
+    fn domain_ids_with_colons_do_not_leak_across_domains() {
+        // Critical regression test: the previous `meeting:{domain}:{id}` scheme
+        // could confuse `meeting:foo:bar:baz` (domain `foo` / id `bar:baz` vs.
+        // domain `foo:bar` / id `baz`). The dual-key scheme is immune because
+        // domain IDs live only in the index prefix and meeting IDs live only in
+        // the primary key.
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let m_colon = mk_meeting("coop:nycn", "colon-domain");
+        let m_plain = mk_meeting("coop", "plain-domain");
+        store.save(&m_colon).unwrap();
+        store.save(&m_plain).unwrap();
+
+        let colon_listing = store.list_by_domain("coop:nycn").unwrap();
+        let plain_listing = store.list_by_domain("coop").unwrap();
+        assert_eq!(colon_listing.len(), 1);
+        assert_eq!(plain_listing.len(), 1);
+        assert_eq!(colon_listing[0].title, "colon-domain");
+        assert_eq!(plain_listing[0].title, "plain-domain");
+    }
+
+    #[test]
+    fn delete_removes_primary_and_index() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db.clone());
+        let m = mk_meeting("dom-a", "to-delete");
+        store.save(&m).unwrap();
+
+        let removed = store.delete(&m.id).unwrap();
+        assert!(removed);
+
+        assert!(store.get(&m.id).unwrap().is_none());
+        assert!(store.list_by_domain("dom-a").unwrap().is_empty());
+
+        // Verify both keys physically removed (no dangling index).
+        let primary = format!("meeting:{}", m.id.0);
+        let index = format!("meeting_by_domain:dom-a:{}", m.id.0);
+        assert!(db.get(primary.as_bytes()).unwrap().is_none());
+        assert!(db.get(index.as_bytes()).unwrap().is_none());
+    }
+
+    #[test]
+    fn delete_missing_returns_false() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let missing = MeetingId::from_raw("nope");
+        let removed = store.delete(&missing).unwrap();
+        assert!(!removed);
+    }
+
+    #[test]
+    fn list_by_domain_sorted_newest_first() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let mut m_old = mk_meeting("dom-a", "old");
+        m_old.created_at = 1_700_000_000;
+        let mut m_new = mk_meeting("dom-a", "new");
+        m_new.created_at = 1_700_000_999;
+        store.save(&m_old).unwrap();
+        store.save(&m_new).unwrap();
+
+        let listing = store.list_by_domain("dom-a").unwrap();
+        assert_eq!(listing[0].title, "new");
+        assert_eq!(listing[1].title, "old");
+    }
+}
+
 /// Handle type for actor-backed governance
 ///
 /// This uses the `GovernanceOps` trait to avoid direct dependency on `icn-core`.
@@ -625,6 +913,8 @@ pub struct GovernanceManager {
     structure_store: Arc<dyn StructureStoreBackend>,
     /// Activity store backend (events, programs, projects)
     activity_store: Arc<dyn ActivityStoreBackend>,
+    /// Meeting store backend (deliberation trace objects)
+    meeting_store: Arc<dyn MeetingStoreBackend>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
     /// Optional receipt store for persisting GovernanceDecisionReceipts
@@ -647,6 +937,7 @@ impl GovernanceManager {
             action_items: Box::new(InMemoryActionItemStore::new()),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
+            meeting_store: Arc::new(InMemoryMeetingStore::new()),
             governance_handle: None,
             receipt_store: None,
         }
@@ -680,6 +971,7 @@ impl GovernanceManager {
             action_items: Box::new(InMemoryActionItemStore::new()),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
+            meeting_store: Arc::new(InMemoryMeetingStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -718,6 +1010,14 @@ impl GovernanceManager {
         self
     }
 
+    /// Replace the meeting store backend.
+    ///
+    /// Use this to configure Sled-backed persistent storage for meetings.
+    pub fn with_meeting_store(mut self, store: Arc<dyn MeetingStoreBackend>) -> Self {
+        self.meeting_store = store;
+        self
+    }
+
     /// Create a governance manager with Sled-backed action item storage
     ///
     /// This is the recommended mode for production with persistent action items.
@@ -732,6 +1032,7 @@ impl GovernanceManager {
             action_items: Box::new(SledActionItemStore::new(db)),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
+            meeting_store: Arc::new(InMemoryMeetingStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -751,6 +1052,7 @@ impl GovernanceManager {
             action_items: Box::new(SledActionItemStore::new(db)),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
+            meeting_store: Arc::new(InMemoryMeetingStore::new()),
             governance_handle: None,
             receipt_store: None,
         }
@@ -2353,6 +2655,58 @@ impl GovernanceManager {
         self.activity_store
             .list_by_entity(entity_id)
             .map_err(|e| anyhow::anyhow!("Failed to list activities: {e}"))
+    }
+
+    // ========================================================================
+    // Meeting management (deliberation trace objects)
+    // ========================================================================
+
+    /// Create a new meeting in a governance domain.
+    pub fn create_meeting(
+        &self,
+        domain_id: String,
+        title: String,
+        description: Option<String>,
+        scheduled_at: Option<u64>,
+        created_by: String,
+    ) -> Result<Meeting> {
+        let now = icn_time::current_timestamp_secs();
+        let id = MeetingId::generate();
+        let mut m = Meeting::new(id, domain_id, title, created_by, now);
+        m.description = description;
+        m.scheduled_at = scheduled_at;
+        self.meeting_store
+            .save(&m)
+            .map_err(|e| anyhow::anyhow!("Failed to save meeting: {e}"))?;
+        Ok(m)
+    }
+
+    /// Get a meeting by ID.
+    pub fn get_meeting(&self, id: &MeetingId) -> Result<Option<Meeting>> {
+        self.meeting_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get meeting: {e}"))
+    }
+
+    /// List all meetings in a governance domain, newest first.
+    pub fn list_meetings(&self, domain_id: &str) -> Result<Vec<Meeting>> {
+        self.meeting_store
+            .list_by_domain(domain_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list meetings: {e}"))
+    }
+
+    /// Update a meeting record (full save — caller mutates then calls this).
+    pub fn update_meeting(&self, m: &Meeting) -> Result<()> {
+        self.meeting_store
+            .save(m)
+            .map_err(|e| anyhow::anyhow!("Failed to update meeting: {e}"))
+    }
+
+    /// Delete a meeting (hard delete).
+    pub fn delete_meeting(&self, id: &MeetingId) -> Result<bool> {
+        self.meeting_store
+            .delete(id)
+            .map_err(|e| anyhow::anyhow!("Failed to delete meeting: {e}"))
     }
 
     // ========================================================================

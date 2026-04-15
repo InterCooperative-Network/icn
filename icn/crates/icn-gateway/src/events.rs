@@ -271,6 +271,12 @@ pub enum GatewayEvent {
     },
 
     // === Control Events ===
+    // Note: meeting-lifecycle events (GovernanceMeetingCreated/Started/Ended)
+    // will ship in the notification-digest PR alongside GovernanceActionItemCreated,
+    // under the canonical `Governance<Thing><Verb>` naming convention locked in
+    // docs/strategy/NYCN-Repo-Architecture-Spec.md §6. The variants were not
+    // emittable from this PR because `GovernanceEventEmitter` does not yet
+    // expose meeting methods, so shipping them here would be dead code.
     /// Server is shutting down gracefully
     ///
     /// Clients should:

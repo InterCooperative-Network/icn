@@ -626,3 +626,114 @@ pub struct ActivityResponse {
     pub linked_structures: Vec<String>,
     pub created_at: u64,
 }
+
+// ============================================================================
+// Meeting (deliberation trace objects)
+// ============================================================================
+
+/// Request to create a meeting
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreateMeetingRequest {
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Scheduled start time as Unix timestamp
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scheduled_at: Option<u64>,
+}
+
+/// Request to add an attendee to a meeting
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AddAttendeeRequest {
+    pub did: String,
+    /// Coordination role: "facilitator", "note_taker", "participant", "observer"
+    #[serde(default = "default_meeting_role")]
+    pub meeting_role: String,
+}
+
+fn default_meeting_role() -> String {
+    "participant".to_string()
+}
+
+/// Request to mark attendance for a participant
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MarkAttendanceRequest {
+    pub did: String,
+    /// Status: "present", "absent", "remote"
+    pub status: String,
+}
+
+/// Request to add an agenda item
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AddAgendaItemRequest {
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presenter: Option<String>,
+    /// Proposal ID to discuss during this agenda item
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub linked_proposal: Option<String>,
+}
+
+/// Request to update an agenda item outcome
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct UpdateAgendaItemRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discussion_notes: Option<String>,
+    /// Outcome: "resolved", "tabled", "referred", "no_action"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<String>,
+}
+
+/// Attendee in a meeting response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MeetingAttendeeResponse {
+    pub did: String,
+    pub status: String,
+    pub meeting_role: String,
+}
+
+/// Agenda item in a meeting response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AgendaItemResponse {
+    pub id: String,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presenter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub linked_proposal: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discussion_notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<String>,
+    pub generated_action_items: Vec<String>,
+}
+
+/// Meeting response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MeetingResponse {
+    pub id: String,
+    pub domain_id: String,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scheduled_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ended_at: Option<u64>,
+    pub attendees: Vec<MeetingAttendeeResponse>,
+    pub agenda: Vec<AgendaItemResponse>,
+    pub linked_structures: Vec<String>,
+    pub linked_activities: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes_doc_id: Option<String>,
+    pub created_by: String,
+    pub created_at: u64,
+    pub present_count: usize,
+}

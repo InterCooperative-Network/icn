@@ -190,9 +190,19 @@ pub struct ActionItem {
     #[serde(default)]
     pub linked_proposal: Option<ProposalId>,
 
-    /// Meeting context (e.g., "2026-01-17 board meeting")
+    /// Meeting context (e.g., "2026-01-17 board meeting"). Free-text; kept for
+    /// backward compatibility. Prefer `meeting_id` for structured linkage.
     #[serde(default)]
     pub meeting_context: Option<String>,
+
+    /// Typed link to the meeting that generated this action item.
+    ///
+    /// Optional reference to the meeting in which this action item originated.
+    /// Set by callers when creating action items from a meeting context.
+    /// Coexists with `meeting_context` (the free-text field remains for backward
+    /// compatibility and manual entry).
+    #[serde(default)]
+    pub meeting_id: Option<crate::meeting::MeetingId>,
 
     /// Tags for categorization
     #[serde(default)]
@@ -230,6 +240,7 @@ impl ActionItem {
             updated_at: now,
             linked_proposal: None,
             meeting_context: None,
+            meeting_id: None,
             tags: Vec::new(),
             notes: Vec::new(),
             parent: None,

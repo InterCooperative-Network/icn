@@ -8,10 +8,11 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use icn_federation::SettlementInterval;
 use icn_governance::{
     ActionItemFilter, ActionItemId, ActionItemPriority, ActionItemStatus, ActivityId, ActivityKind,
-    ActivityStatus, DataSharingLevel, Delegation, DelegationId, DelegationScope,
+    ActivityStatus, AttendanceStatus, DataSharingLevel, Delegation, DelegationId, DelegationScope,
     DisputeResolutionMethod, FederationProposal, FederationTerms, GovernanceDomainId,
-    GovernanceParams, MembershipAction, MembershipConfig, ProposalId, ProposalPayload,
-    ProposalScope, StructureId, StructureKind, StructureStatus, VoteChoice,
+    GovernanceParams, MeetingId, MeetingRole, MeetingStatus, MembershipAction, MembershipConfig,
+    ProposalId, ProposalPayload, ProposalScope, StructureId, StructureKind, StructureStatus,
+    VoteChoice,
 };
 use icn_http_kit::{
     auth::{require_scope, BasicClaims},
@@ -2810,6 +2811,448 @@ pub async fn get_activity<E: GovernanceEventEmitter + Clone + 'static>(
         .ok_or_else(|| err_not_found("Activity not found"))?;
 
     Ok(HttpResponse::Ok().json(activity_to_response(&a)))
+}
+
+// ── Meeting helpers ──────────────────────────────────────────────────────────
+
+fn attendance_status_str(s: &AttendanceStatus) -> &'static str {
+    match s {
+        AttendanceStatus::Invited => "invited",
+        AttendanceStatus::Present => "present",
+        AttendanceStatus::Absent => "absent",
+        AttendanceStatus::Remote => "remote",
+    }
+}
+
+fn meeting_role_str(r: &MeetingRole) -> &'static str {
+    match r {
+        MeetingRole::Facilitator => "facilitator",
+        MeetingRole::NoteTaker => "note_taker",
+        MeetingRole::Participant => "participant",
+        MeetingRole::Observer => "observer",
+    }
+}
+
+fn parse_attendance_status(s: &str) -> Result<AttendanceStatus, ApiError> {
+    match s {
+        "invited" => Ok(AttendanceStatus::Invited),
+        "present" => Ok(AttendanceStatus::Present),
+        "absent" => Ok(AttendanceStatus::Absent),
+        "remote" => Ok(AttendanceStatus::Remote),
+        _ => Err(err_bad(format!("Unknown attendance status: {s}"))),
+    }
+}
+
+fn parse_meeting_role(s: &str) -> Result<MeetingRole, ApiError> {
+    match s {
+        "facilitator" => Ok(MeetingRole::Facilitator),
+        "note_taker" | "notetaker" => Ok(MeetingRole::NoteTaker),
+        "participant" => Ok(MeetingRole::Participant),
+        "observer" => Ok(MeetingRole::Observer),
+        _ => Err(err_bad(format!("Unknown meeting role: {s}"))),
+    }
+}
+
+fn meeting_to_response(m: &icn_governance::Meeting) -> MeetingResponse {
+    MeetingResponse {
+        id: m.id.0.clone(),
+        domain_id: m.domain_id.clone(),
+        title: m.title.clone(),
+        description: m.description.clone(),
+        status: match m.status {
+            MeetingStatus::Scheduled => "scheduled",
+            MeetingStatus::InProgress => "in_progress",
+            MeetingStatus::Completed => "completed",
+            MeetingStatus::Cancelled => "cancelled",
+        }
+        .to_string(),
+        scheduled_at: m.scheduled_at,
+        started_at: m.started_at,
+        ended_at: m.ended_at,
+        attendees: m
+            .attendees
+            .iter()
+            .map(|a| MeetingAttendeeResponse {
+                did: a.did.clone(),
+                status: attendance_status_str(&a.status).to_string(),
+                meeting_role: meeting_role_str(&a.meeting_role).to_string(),
+            })
+            .collect(),
+        agenda: m
+            .agenda
+            .iter()
+            .map(|item| AgendaItemResponse {
+                id: item.id.to_string(),
+                title: item.title.clone(),
+                description: item.description.clone(),
+                presenter: item.presenter.clone(),
+                linked_proposal: item.linked_proposal.as_ref().map(|p| p.0.clone()),
+                discussion_notes: item.discussion_notes.clone(),
+                outcome: item.outcome.clone(),
+                generated_action_items: item
+                    .generated_action_items
+                    .iter()
+                    .map(|id| id.to_string())
+                    .collect(),
+            })
+            .collect(),
+        linked_structures: m.linked_structures.iter().map(|s| s.0.clone()).collect(),
+        linked_activities: m.linked_activities.iter().map(|a| a.0.clone()).collect(),
+        notes_doc_id: m.notes_doc_id.clone(),
+        created_by: m.created_by.clone(),
+        created_at: m.created_at,
+        present_count: m.present_count(),
+    }
+}
+
+// ── Meeting endpoints ────────────────────────────────────────────────────────
+
+/// POST /gov/domains/{domain_id}/meetings — Create a meeting.
+pub async fn create_meeting<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    domain_id: web::Path<String>,
+    req: web::Json<CreateMeetingRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let domain = GovernanceDomainId(domain_id.into_inner());
+
+    check_domain_membership(
+        &ctx.manager,
+        &domain,
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
+
+    let m = ctx
+        .manager
+        .create_meeting(
+            domain.0,
+            req.title.clone(),
+            req.description.clone(),
+            req.scheduled_at,
+            claims.sub.clone(),
+        )
+        .map_err(anyhow_to_api)?;
+
+    // MeetingCreated event emission is deferred to the notification-digest PR,
+    // where GovernanceEventEmitter will gain meeting methods and the variant
+    // will ship under the canonical Governance<Thing><Verb> naming convention.
+    Ok(HttpResponse::Created().json(meeting_to_response(&m)))
+}
+
+/// GET /gov/domains/{domain_id}/meetings — List meetings in a domain.
+pub async fn list_meetings<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    domain_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let domain = domain_id.into_inner();
+
+    let meetings = ctx.manager.list_meetings(&domain).map_err(anyhow_to_api)?;
+    let responses: Vec<MeetingResponse> = meetings.iter().map(meeting_to_response).collect();
+    Ok(HttpResponse::Ok().json(responses))
+}
+
+/// GET /gov/meetings/{meeting_id} — Get a specific meeting.
+pub async fn get_meeting<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    meeting_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let id = MeetingId(meeting_id.into_inner());
+
+    let m = ctx
+        .manager
+        .get_meeting(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
+}
+
+/// POST /gov/meetings/{meeting_id}/start — Transition meeting to InProgress.
+///
+/// Authorization (Phase 3 scope):
+/// - Caller must hold the `governance:write` scope.
+/// - Caller must be a member of the meeting's governance domain.
+/// - Caller must be the `created_by` DID of the meeting.
+///
+/// Longer-term (Tranche 6, operational role delegation): authorization will
+/// derive from `RoleAssignment.authority_scope` capability strings plus a
+/// PolicyOracle rule — e.g., holders of `meeting-admin` on the linked structure.
+pub async fn start_meeting<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    meeting_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let id = MeetingId(meeting_id.into_inner());
+
+    let mut m = ctx
+        .manager
+        .get_meeting(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    check_domain_membership(
+        &ctx.manager,
+        &GovernanceDomainId(m.domain_id.clone()),
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
+
+    if m.created_by != claims.sub {
+        return Err(ApiError::Forbidden(
+            "Only the meeting creator can start it".into(),
+        ));
+    }
+    if !matches!(m.status, MeetingStatus::Scheduled) {
+        return Err(err_bad("Meeting is not in Scheduled status"));
+    }
+
+    m.status = MeetingStatus::InProgress;
+    m.started_at = Some(current_time_secs());
+    ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
+
+    // Event emission deferred to the notification-digest PR (see create_meeting).
+    Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
+}
+
+/// POST /gov/meetings/{meeting_id}/end — Transition meeting to Completed.
+///
+/// Authorization: same as `start_meeting` (see docs there). Creator-only plus
+/// domain membership is the Phase 3 policy; richer role-based authorization
+/// lands with Tranche 6.
+///
+/// Note: this handler does not yet materialize action items from unresolved
+/// agenda items. `AgendaItem.generated_action_items` is supported in the
+/// schema but the closure trigger is a Tranche 1 follow-up — for now, action
+/// items are created separately via the action-item API with `meeting_id` set.
+pub async fn end_meeting<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    meeting_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let id = MeetingId(meeting_id.into_inner());
+
+    let mut m = ctx
+        .manager
+        .get_meeting(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    check_domain_membership(
+        &ctx.manager,
+        &GovernanceDomainId(m.domain_id.clone()),
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
+
+    if m.created_by != claims.sub {
+        return Err(ApiError::Forbidden(
+            "Only the meeting creator can end it".into(),
+        ));
+    }
+    if !matches!(m.status, MeetingStatus::InProgress) {
+        return Err(err_bad("Meeting is not InProgress"));
+    }
+
+    m.status = MeetingStatus::Completed;
+    m.ended_at = Some(current_time_secs());
+    ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
+
+    // Event emission deferred to the notification-digest PR (see create_meeting).
+    Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
+}
+
+/// POST /gov/meetings/{meeting_id}/attendees — Add or update an attendee.
+pub async fn add_attendee<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    meeting_id: web::Path<String>,
+    req: web::Json<AddAttendeeRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let id = MeetingId(meeting_id.into_inner());
+    let role = parse_meeting_role(&req.meeting_role)?;
+
+    let mut m = ctx
+        .manager
+        .get_meeting(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    if matches!(
+        m.status,
+        MeetingStatus::Completed | MeetingStatus::Cancelled
+    ) {
+        return Ok(HttpResponse::UnprocessableEntity()
+            .json(serde_json::json!({"error": "Cannot modify a completed or cancelled meeting"})));
+    }
+
+    if let Some(ref checker) = ctx.member_checker {
+        let caller_did = parse_did(&claims.sub, "Invalid DID in token")?;
+        if !checker(caller_did, m.domain_id.clone()).await {
+            return Ok(
+                HttpResponse::Forbidden().json(serde_json::json!({"error": "Not a domain member"}))
+            );
+        }
+    }
+
+    // Upsert: update existing entry or append
+    if let Some(existing) = m.attendees.iter_mut().find(|a| a.did == req.did) {
+        existing.meeting_role = role;
+    } else {
+        m.attendees.push(icn_governance::MeetingAttendee {
+            did: req.did.clone(),
+            status: icn_governance::AttendanceStatus::Invited,
+            meeting_role: role,
+        });
+    }
+
+    ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
+    Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
+}
+
+/// PUT /gov/meetings/{meeting_id}/attendance — Mark attendance for a participant.
+pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    meeting_id: web::Path<String>,
+    req: web::Json<MarkAttendanceRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let id = MeetingId(meeting_id.into_inner());
+    let status = parse_attendance_status(&req.status)?;
+
+    let mut m = ctx
+        .manager
+        .get_meeting(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    // Domain-membership check: only members of the meeting's governance domain
+    // may mutate its state. `governance:write` alone is insufficient.
+    check_domain_membership(
+        &ctx.manager,
+        &GovernanceDomainId(m.domain_id.clone()),
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
+
+    if matches!(
+        m.status,
+        MeetingStatus::Completed | MeetingStatus::Cancelled
+    ) {
+        return Ok(HttpResponse::UnprocessableEntity()
+            .json(serde_json::json!({"error": "Cannot modify a completed or cancelled meeting"})));
+    }
+
+    let attendee = m
+        .attendees
+        .iter_mut()
+        .find(|a| a.did == req.did)
+        .ok_or_else(|| err_not_found("Attendee not found in this meeting"))?;
+
+    attendee.status = status;
+    ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
+    Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
+}
+
+/// POST /gov/meetings/{meeting_id}/agenda — Add an agenda item.
+pub async fn add_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    meeting_id: web::Path<String>,
+    req: web::Json<AddAgendaItemRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let id = MeetingId(meeting_id.into_inner());
+
+    let mut m = ctx
+        .manager
+        .get_meeting(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    check_domain_membership(
+        &ctx.manager,
+        &GovernanceDomainId(m.domain_id.clone()),
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
+
+    if matches!(
+        m.status,
+        MeetingStatus::Completed | MeetingStatus::Cancelled
+    ) {
+        return Ok(HttpResponse::UnprocessableEntity()
+            .json(serde_json::json!({"error": "Cannot modify a completed or cancelled meeting"})));
+    }
+
+    let mut item = icn_governance::AgendaItem::new(req.title.clone());
+    item.description = req.description.clone();
+    item.presenter = req.presenter.clone();
+    item.linked_proposal = req.linked_proposal.as_ref().map(|p| ProposalId(p.clone()));
+    m.agenda.push(item);
+
+    ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
+    Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
+}
+
+/// PUT /gov/meetings/{meeting_id}/agenda/{item_id} — Update an agenda item outcome.
+pub async fn update_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    path: web::Path<(String, String)>,
+    req: web::Json<UpdateAgendaItemRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let (meeting_id_str, item_id_str) = path.into_inner();
+    let meeting_id = MeetingId(meeting_id_str);
+    let item_uuid = item_id_str
+        .parse::<uuid::Uuid>()
+        .map_err(|e| err_bad(format!("Invalid agenda item ID: {e}")))?;
+    let item_id = icn_governance::AgendaItemId(item_uuid);
+
+    let mut m = ctx
+        .manager
+        .get_meeting(&meeting_id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    check_domain_membership(
+        &ctx.manager,
+        &GovernanceDomainId(m.domain_id.clone()),
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
+
+    if matches!(
+        m.status,
+        MeetingStatus::Completed | MeetingStatus::Cancelled
+    ) {
+        return Ok(HttpResponse::UnprocessableEntity()
+            .json(serde_json::json!({"error": "Cannot modify a completed or cancelled meeting"})));
+    }
+
+    let item = m
+        .get_agenda_item_mut(&item_id)
+        .ok_or_else(|| err_not_found("Agenda item not found"))?;
+
+    if let Some(ref notes) = req.discussion_notes {
+        item.discussion_notes = Some(notes.clone());
+    }
+    if let Some(ref outcome) = req.outcome {
+        item.outcome = Some(outcome.clone());
+    }
+
+    ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
+    Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
 }
 
 // ============================================================================
