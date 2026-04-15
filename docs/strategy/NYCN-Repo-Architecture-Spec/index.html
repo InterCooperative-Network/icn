@@ -1,0 +1,1195 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>NYCN × ICN Repo-Shaped Architecture Spec | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yTnaBP6O.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>strategy</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>NYCN Repo Architecture Spec</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN-Repo-Architecture-Spec.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>NYCN × ICN Repo-Shaped Architecture Spec</h1>
+<p><strong>Status</strong>: Spec (docs-only, grounded against <code>main</code> at <code>37ec91e0</code> — 2026-04-14)
+<strong>Supersedes</strong>: portions of <code>NYCN-Institutional-Design.md</code> (see §0.3)
+<strong>Companion docs</strong>:</p>
+<ul>
+<li><code>NYCN-Implementation-Matrix.md</code> — per-object gap table (exists / partial / missing)</li>
+<li><code>NYCN-Execution-Tranches.md</code> — merge-order + dependency plan</li>
+</ul>
+<hr>
+<h2>0. Preamble</h2>
+<h3>0.1 Purpose</h3>
+<p>Turn the NYCN/NYCS institutional design into a <strong>repo-shaped technical map</strong>: which crates, which modules, which stores, which events, which HTTP routes. Ground every claim in code that exists on <code>main</code> today, on open PRs, or in committed design docs — and clearly distinguish the three.</p>
+<p>This is <strong>not</strong> a re-derivation of the institutional model. The institutional model was locked on 2026-04-14 (layered ontology: sovereign entities vs. internal structures vs. time-bounded activities). This document is the mechanical follow-through.</p>
+<h3>0.2 Ground truth as of writing</h3>
+<p>Verified directly against the repo on 2026-04-14:</p>
+<table>
+<thead>
+<tr>
+<th>Fact</th>
+<th>Source</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Main HEAD</td>
+<td><code>git log origin/main</code></td>
+<td><code>37ec91e0 feat(governance): institutional structure + event model (Tranche 2, part 1) (#1540)</code></td>
+</tr>
+<tr>
+<td>PR #1532 decision→action bridge</td>
+<td><code>gh pr view 1532</code></td>
+<td><strong>MERGED</strong></td>
+</tr>
+<tr>
+<td>PR #1533 consent mode</td>
+<td><code>gh pr view 1533</code></td>
+<td><strong>MERGED</strong></td>
+</tr>
+<tr>
+<td>PR #1540 structure + activity + parent</td>
+<td><code>gh pr view 1540</code></td>
+<td><strong>MERGED</strong></td>
+</tr>
+<tr>
+<td>PR #1542 security audit fix</td>
+<td><code>gh pr view 1542</code></td>
+<td><strong>MERGED</strong></td>
+</tr>
+<tr>
+<td>PR #1543 meeting management</td>
+<td><code>gh pr view 1543</code></td>
+<td><strong>OPEN, mergeable, CI green except benchmark regression (non-blocking with <code>perf-regression-ok</code>)</strong></td>
+</tr>
+<tr>
+<td><code>feat/notification-digests</code></td>
+<td><code>git branch</code></td>
+<td>Local + remote, <strong>no PR opened</strong></td>
+</tr>
+<tr>
+<td><code>docs/strategy/NYCN-*</code> docs</td>
+<td>filesystem</td>
+<td><code>Charter-Draft.yaml</code>, <code>Implementation-Plan.md</code>, <code>Institutional-Design.md</code>, <code>Institutional-Strategy.md</code>, <code>Sprint-Plan.md</code> (NOT the <code>Bootstrap-Runbook.md</code> / <code>Schema-Mapping.md</code> the prior session claimed — those do not exist)</td>
+</tr>
+</tbody></table>
+<h3>0.3 Correction to prior design docs</h3>
+<p><code>NYCN-Institutional-Design.md</code> (committed 2026-04-13) maps committees (finance, content, logistics, marketing, steering) and <code>nycn-summit-2026</code> to <code>Community(CommunityProfile)</code> entities. <strong>This is superseded.</strong> The locked layered ontology (2026-04-14, merged as #1540) states:</p>
+<ul>
+<li><strong>Entities</strong> (sovereign, join federations, hold independent treasury): NYCN federation, <code>nycn-organizers</code> co-op, member co-ops.</li>
+<li><strong>Structures</strong> (non-sovereign, owned by a parent entity, delegated authority): committees, working groups, backbone group, host pods. <code>icn-governance::structure::Structure { kind: Committee | WorkingGroup | Team | Office }</code>.</li>
+<li><strong>Activities</strong> (time-bounded, owned by a parent entity): the summit cycle, regional meetup series, policy-advocacy day, sponsor campaigns. <code>icn-governance::activity::Activity { kind: Event | Program | Project | Initiative }</code>.</li>
+</ul>
+<p>Operational objects (action items, meetings, documents) attach to any of the three layers via <code>icn-governance::parent::InstitutionalParent</code>.</p>
+<p>Concretely, the NYCN topology becomes:</p>
+<pre><code>nycn                          Entity: Federation
+├── nycn-organizers           Entity: Cooperative (parent_id: &quot;nycn&quot;)
+│   ├── nycn-backbone         Structure { kind: Committee, parent_entity_id: &quot;nycn-organizers&quot; }
+│   ├── nycn-finance          Structure { kind: Committee, parent_entity_id: &quot;nycn-organizers&quot; }
+│   ├── nycn-content          Structure { kind: Committee, parent_entity_id: &quot;nycn-organizers&quot; }
+│   ├── nycn-logistics        Structure { kind: Committee, parent_entity_id: &quot;nycn-organizers&quot; }
+│   ├── nycn-marketing        Structure { kind: Committee, parent_entity_id: &quot;nycn-organizers&quot; }
+│   └── nycn-accessibility-wg Structure { kind: WorkingGroup, parent_entity_id: &quot;nycn-organizers&quot; }
+└── summit-2026               Activity { kind: Event, parent_entity_id: &quot;nycn-organizers&quot; }
+    (references committees via Activity.structures: Vec&lt;StructureId&gt;)
+</code></pre>
+<p>The older design doc&#39;s entity tree should be edited in a follow-up docs PR to match this.</p>
+<h3>0.4 Decisive test</h3>
+<blockquote>
+<p>Can a new organizer enter the system mid-cycle, switch into the right scope, see the summit&#39;s current phase, understand what was decided, know what is blocked, receive their obligations, trace why they exist, and continue the work without needing private oral history?</p>
+</blockquote>
+<p>Every architectural choice below is evaluated against that question.</p>
+<hr>
+<h2>1. Current-state audit</h2>
+<h3>1.1 What is already implemented on <code>main</code></h3>
+<p>Grounded in direct inspection of <code>icn/crates/icn-governance/src/</code> and <code>icn/apps/governance/src/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Code location</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Governance domain + proposals + voting</td>
+<td><code>icn-governance::{domain,proposal,vote,tally,profile}</code></td>
+<td>Mature</td>
+</tr>
+<tr>
+<td>Consent decision mode (majority / consent, <code>max_objections</code>)</td>
+<td><code>icn-governance::config</code>, <code>profile.rs</code></td>
+<td>#1533 merged</td>
+</tr>
+<tr>
+<td>Action items (CRUD, status, priority, notes, filter, sled store)</td>
+<td><code>icn-governance::action_item</code> (1281 LOC)</td>
+<td>Full store trait + <code>SledActionItemStore</code> + assignee index</td>
+</tr>
+<tr>
+<td>Decision→action bridge: accepted proposals auto-materialize <code>ActionItemSpec</code>s with provenance</td>
+<td><code>icn-governance::proposal::ActionItemSpec</code>, <code>apps/governance/src/actor.rs</code></td>
+<td>#1532 merged</td>
+</tr>
+<tr>
+<td>Institutional Structure (Committee / WorkingGroup / Team / Office) + sled store</td>
+<td><code>icn-governance::structure</code> (548 LOC), <code>apps/governance/src/manager.rs::SledStructureStore</code></td>
+<td>#1540 merged</td>
+</tr>
+<tr>
+<td>Role Assignment (<code>structure_id</code>, <code>person_did</code>, <code>role: String</code>, <code>authority_scope: Vec&lt;String&gt;</code>, start/end)</td>
+<td><code>icn-governance::structure::RoleAssignment</code></td>
+<td>#1540 merged. Authority is capability-string based, not a typed enum.</td>
+</tr>
+<tr>
+<td>Activity (Event / Program / Project / Initiative) + sled store</td>
+<td><code>icn-governance::activity</code> (335 LOC), <code>apps/governance/src/manager.rs::SledActivityStore</code></td>
+<td>#1540 merged</td>
+</tr>
+<tr>
+<td>Polymorphic <code>InstitutionalParent</code> attachment for action items</td>
+<td><code>icn-governance::parent</code>, <code>action_item::ActionItem.parent</code></td>
+<td>#1540 merged</td>
+</tr>
+<tr>
+<td>Federation charter / charter store</td>
+<td><code>icn-governance::{charter, charter_store}</code></td>
+<td>Mature</td>
+</tr>
+<tr>
+<td>Steward / steward store (SDIS)</td>
+<td><code>icn-governance::{steward, steward_store}</code></td>
+<td>Mature</td>
+</tr>
+<tr>
+<td>Delegation</td>
+<td><code>icn-governance::delegation</code> (1717 LOC)</td>
+<td>Mature</td>
+</tr>
+<tr>
+<td>Discussion / appeal / amendment</td>
+<td><code>icn-governance::{discussion, appeal, amendment}</code></td>
+<td>Mature</td>
+</tr>
+<tr>
+<td>Gateway events (structure/activity/proposal lifecycle)</td>
+<td><code>icn-gateway::events::GatewayEvent</code></td>
+<td></td>
+</tr>
+<tr>
+<td>HTTP surface for governance</td>
+<td><code>apps/governance/src/http/{configure,handlers,models}.rs</code></td>
+<td>Proposals, action items, structures, activities wired</td>
+</tr>
+</tbody></table>
+<h3>1.2 What is on open / unlanded branches</h3>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Branch</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Meeting</strong> primitive (564 LOC model + store + 9 HTTP endpoints + gateway events)</td>
+<td><code>feat/meeting-management</code> / <strong>PR #1543</strong></td>
+<td>OPEN, mergeable, CI green except non-blocking benchmark regression. Review comments from codex + copilot-reviewer; no blocking human review yet.</td>
+</tr>
+<tr>
+<td><strong>Notification digest</strong> endpoint (<code>DigestSummary</code>, <code>PendingVoteDigest</code>, <code>OverdueItemDigest</code>, <code>list_by_assignee</code> default + sled assignee secondary index, <code>GET /digest</code> handler)</td>
+<td><code>feat/notification-digests</code></td>
+<td>Local + remote branch, 1 commit ahead of main, <strong>NO PR yet opened</strong>. Upcoming-meetings stubbed at 0 because #1543 wasn&#39;t merged. Assignee secondary index not backfilled.</td>
+</tr>
+</tbody></table>
+<h3>1.3 What exists only as strategy / design docs</h3>
+<ul>
+<li><code>docs/strategy/NYCN-Institutional-Strategy.md</code></li>
+<li><code>docs/strategy/NYCN-Institutional-Design.md</code> (partially superseded — see §0.3)</li>
+<li><code>docs/strategy/NYCN-Implementation-Plan.md</code> (5-phase plan; phases 1/2 shipped, phase 3 in PR, phase 4 on unpushed-PR branch, phase 5 unstarted)</li>
+<li><code>docs/strategy/NYCN-Sprint-Plan.md</code> (3-lane sprint, largely executed)</li>
+<li><code>docs/strategy/NYCN-Charter-Draft.yaml</code> (CCL draft for NYCN federation charter)</li>
+</ul>
+<h3>1.4 What is missing entirely</h3>
+<p>No code or open branch addresses:</p>
+<ol>
+<li><strong>Program/cycle container</strong> as a first-class domain concept beyond <code>Activity</code>. Activity is enough for the summit as an <em>event</em>; it does <strong>not yet carry milestones, stage gates, closure state, or cycle-handoff hooks</strong>.</li>
+<li><strong>Program milestones</strong> with machine-readable required-check predicates (<code>venue_locked</code>, <code>budget_locked</code>, <code>public_launch_ready</code>, <code>closure_complete</code>).</li>
+<li><strong>Sponsor pipeline</strong>: no <code>Sponsor</code> type, no status lifecycle, no pipeline view.</li>
+<li><strong>Budget items / financial obligations</strong> at the program level (treasury exists at the entity level, but no per-program earmarking).</li>
+<li><strong>Sessions / speakers</strong>: no <code>Session</code> primitive, no publication state, no language-needs tracking.</li>
+<li><strong>Registrations</strong> with structured accessibility/childcare/language/dietary fields.</li>
+<li><strong>Accessibility state model</strong>: no typed accessibility scoring for venues/programs.</li>
+<li><strong>Institutional document / memory store</strong>: no typed <code>InstitutionalDocument</code> with version lineage, authorship, content addressing, or meeting/proposal linkage. (Phase 5 of the implementation plan; unstarted.)</li>
+<li><strong>External-source provenance edges</strong>: no <code>SourceRef</code> type to link Google Docs, Sheets, mailing lists, ny-coop-net rows, legacy repos with <code>linked | mirrored | imported | derived</code> provenance classification.</li>
+<li><strong>Delegation of role-bound capabilities</strong> with explicit grantor/grantee/scope/authority/time-window records distinct from the <code>delegation.rs</code> crate (which is about governance delegation, not operational scope delegation).</li>
+<li><strong>Digest partitioning</strong> by scope/role; current digest is DID-level only.</li>
+<li><strong>Cycle-comparison / year-over-year view</strong> derived from activity records.</li>
+<li><strong>Organizer onboarding pipeline</strong> (interest → orientation → role → first task).</li>
+</ol>
+<h3>1.5 Meaning-firewall status</h3>
+<p><code>icn-governance</code> is an <strong>app-layer</strong> crate by convention (it implements <code>PolicyOracle</code>, it imports <code>icn-identity::Did</code>). It is legitimately allowed to hold domain types. What the firewall forbids is <strong>kernel</strong> crates importing domain types. Nothing in this architecture proposes kernel imports of NYCN-specific anything. Every NYCN concept lives inside <code>icn-governance</code> (domain primitive) or <code>apps/governance</code> (persistence + HTTP).</p>
+<p>The only firewall risk to watch: <strong>do not hardcode NYCN-specific string constants into kernel crates.</strong> Use NYCN as a test fixture, not a dependency.</p>
+<hr>
+<h2>2. Bounded domain mapping</h2>
+<p>Eleven bounded domains were identified in the institutional review. Map each to the concrete ICN ownership:</p>
+<table>
+<thead>
+<tr>
+<th>Domain</th>
+<th>Owning crate(s)</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Identity &amp; participation</td>
+<td><code>icn-identity</code>, <code>icn-entity</code>, <code>icn-governance::membership</code>, <code>icn-governance::structure::RoleAssignment</code></td>
+<td>✅ sufficient for NYCN bootstrap</td>
+<td>Membership + role-assignment cover organizers, committee members, partner-org membership</td>
+</tr>
+<tr>
+<td>Institutional structure</td>
+<td><code>icn-governance::structure</code> + <code>apps/governance/src/manager.rs::SledStructureStore</code></td>
+<td>✅ covers committees / working groups / backbone / host-pods</td>
+<td>Do <strong>not</strong> promote committees to entities</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td><code>icn-governance::{proposal, vote, tally, profile, config, discussion, appeal, amendment}</code> + <code>apps/governance/src/actor.rs</code></td>
+<td>✅ mature, incl. consent mode + decision→action bridge</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Program / cycle</strong></td>
+<td><strong>Proposed: <code>icn-governance::program</code> (NEW)</strong> on top of <code>icn-governance::activity</code></td>
+<td>⚠️ Activity exists, Program container + milestones missing</td>
+<td>See §5</td>
+</tr>
+<tr>
+<td>Meeting</td>
+<td><code>icn-governance::meeting</code> + <code>apps/governance/src/manager.rs::SledMeetingStore</code></td>
+<td>🚧 on PR #1543</td>
+<td>Merge, validate with an NYCN scenario test, then build on it</td>
+</tr>
+<tr>
+<td>Work execution</td>
+<td><code>icn-governance::action_item</code> + decision-bridge</td>
+<td>✅ with <code>InstitutionalParent</code> attachment</td>
+<td><code>meeting_id: Option&lt;MeetingId&gt;</code> field added on #1543</td>
+</tr>
+<tr>
+<td>Communications / digests</td>
+<td><code>apps/governance::manager::{DigestSummary, PendingVoteDigest, OverdueItemDigest}</code> on <code>feat/notification-digests</code></td>
+<td>🚧 unpushed PR, upcoming-meetings stub</td>
+<td>Must be redone to consume #1543&#39;s meeting store once merged, and eventually partitioned by scope</td>
+</tr>
+<tr>
+<td>Funding / resource</td>
+<td>Treasury: <code>icn-ledger</code> (mature). <strong>Sponsor / budget items: MISSING</strong></td>
+<td>❌ missing</td>
+<td>Propose <code>icn-governance::sponsor</code> + <code>icn-governance::budget_item</code> (or place in a dedicated <code>apps/programs</code> app if the scope grows)</td>
+</tr>
+<tr>
+<td>Content / session</td>
+<td><strong>MISSING</strong></td>
+<td>❌ missing</td>
+<td>Propose <code>icn-governance::session</code></td>
+</tr>
+<tr>
+<td>Registration / attendee</td>
+<td><strong>MISSING</strong></td>
+<td>❌ missing</td>
+<td>Propose <code>icn-governance::registration</code> with structured accessibility fields</td>
+</tr>
+<tr>
+<td>Archive / provenance</td>
+<td><code>icn-governance::proof</code> (governance receipts), <code>icn-store</code> (sled). <strong>InstitutionalDocument: MISSING</strong></td>
+<td>⚠️ provenance exists for decisions; institutional docs missing</td>
+<td>Phase 5 of implementation plan</td>
+</tr>
+</tbody></table>
+<p><strong>Design principle carried from the institutional review</strong>: each domain gets its own module inside <code>icn-governance</code>, with a paired <code>Sled&lt;X&gt;Store</code> in <code>apps/governance/src/manager.rs</code> and an HTTP surface in <code>apps/governance/src/http/</code>. This matches the pattern already established by <code>structure</code>, <code>activity</code>, <code>action_item</code>, and (in PR) <code>meeting</code>. Do not invent new crate boundaries until a domain has justified it (e.g. sponsor + budget + session may eventually move to an <code>apps/programs</code> app once they reach ~3k LOC and their own oracle semantics emerge).</p>
+<hr>
+<h2>3. Canonical object mapping</h2>
+<p>Every object from the institutional review, mapped to repo reality.</p>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>Canonical home</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Entity</code></td>
+<td><code>icn-entity</code> (existing)</td>
+<td>✅</td>
+<td><code>Federation</code>, <code>Cooperative</code>, <code>Community</code>, <code>Individual</code> — used for NYCN, nycn-organizers, member co-ops only</td>
+</tr>
+<tr>
+<td><code>Person / Actor</code></td>
+<td><code>icn-identity::Did</code></td>
+<td>✅</td>
+<td></td>
+</tr>
+<tr>
+<td><code>Participation</code></td>
+<td><code>icn-governance::membership</code> + <code>RoleAssignment</code></td>
+<td>✅ for member/role cases</td>
+<td>Sponsor / speaker / attendee participation is MISSING (see §3 below)</td>
+</tr>
+<tr>
+<td><code>Structure</code></td>
+<td><code>icn-governance::structure::Structure</code></td>
+<td>✅</td>
+<td><code>kind: Committee/WorkingGroup/Team/Office</code></td>
+</tr>
+<tr>
+<td><code>RoleAssignment</code></td>
+<td><code>icn-governance::structure::RoleAssignment</code></td>
+<td>✅</td>
+<td>Scope-aware; authority represented by <code>authority_scope: Vec&lt;String&gt;</code> capability strings + freeform <code>role</code> — <strong>not</strong> a typed authority-level enum</td>
+</tr>
+<tr>
+<td><strong>Program</strong></td>
+<td>proposed <code>icn-governance::program::Program</code></td>
+<td>❌ missing</td>
+<td>Wraps <code>Activity</code> with milestones, phase state, closure hooks</td>
+</tr>
+<tr>
+<td><code>Activity</code></td>
+<td><code>icn-governance::activity::Activity</code></td>
+<td>✅</td>
+<td>Use as building block for Program</td>
+</tr>
+<tr>
+<td><code>Meeting</code></td>
+<td><code>icn-governance::meeting::Meeting</code></td>
+<td>🚧 PR #1543</td>
+<td></td>
+</tr>
+<tr>
+<td><code>AgendaItem</code></td>
+<td><code>icn-governance::meeting::AgendaItem</code></td>
+<td>🚧 PR #1543</td>
+<td></td>
+</tr>
+<tr>
+<td><code>Proposal / Decision</code></td>
+<td><code>icn-governance::proposal::Proposal</code></td>
+<td>✅</td>
+<td><code>action_items_on_accept</code> already wired</td>
+</tr>
+<tr>
+<td><code>ActionItem</code></td>
+<td><code>icn-governance::action_item::ActionItem</code></td>
+<td>✅</td>
+<td>Carries <code>parent</code>, <code>linked_proposal</code>, <code>meeting_id</code> (on PR #1543)</td>
+</tr>
+<tr>
+<td><strong>Campaign / Initiative</strong></td>
+<td><code>Activity { kind: Initiative }</code> or <code>Activity { kind: Campaign }</code></td>
+<td>⚠️ partial</td>
+<td><code>ActivityKind</code> enum has <code>Initiative</code> but no <code>Campaign</code> variant. Add if needed.</td>
+</tr>
+<tr>
+<td><strong>Sponsor record</strong></td>
+<td>proposed <code>icn-governance::sponsor::Sponsor</code></td>
+<td>❌ missing</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Budget item</strong></td>
+<td>proposed <code>icn-governance::budget_item::BudgetItem</code></td>
+<td>❌ missing</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Session / speaker</strong></td>
+<td>proposed <code>icn-governance::session::Session</code></td>
+<td>❌ missing</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Registration</strong></td>
+<td>proposed <code>icn-governance::registration::Registration</code></td>
+<td>❌ missing</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>SourceRef / document link</strong></td>
+<td>proposed <code>icn-governance::source_ref::SourceRef</code> (or lift to <code>icn-provenance</code> if cross-domain)</td>
+<td>❌ missing</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Digest packet</strong></td>
+<td><code>apps/governance::manager::DigestSummary</code></td>
+<td>🚧 on <code>feat/notification-digests</code></td>
+<td>Needs rework to consume meeting store once #1543 lands</td>
+</tr>
+<tr>
+<td><strong>InstitutionalDocument</strong></td>
+<td>proposed <code>icn-governance::document::InstitutionalDocument</code></td>
+<td>❌ missing</td>
+<td>Phase 5 of implementation plan</td>
+</tr>
+<tr>
+<td><strong>Milestone</strong></td>
+<td>proposed <code>icn-governance::program::Milestone</code></td>
+<td>❌ missing</td>
+<td>Tied to Program</td>
+</tr>
+<tr>
+<td><strong>Delegation (operational)</strong></td>
+<td><code>icn-governance::delegation</code> (governance-flavored)</td>
+<td>⚠️ partial</td>
+<td>Existing <code>delegation.rs</code> is for governance voting delegation. Operational role-delegation is a different shape; may be a new module <code>role_delegation.rs</code> or fields on <code>RoleAssignment</code></td>
+</tr>
+</tbody></table>
+<h3>3.1 Participation gap</h3>
+<p>The institutional model needs participation records that are <em>not</em> governance membership:</p>
+<ul>
+<li>Attendee → Program</li>
+<li>Speaker → Session</li>
+<li>Sponsor-contact (person) → Sponsor record</li>
+<li>Volunteer → Program or Structure</li>
+</ul>
+<p>Two options:</p>
+<ol>
+<li><strong>Extend <code>RoleAssignment</code></strong> with more <code>role_type</code> values (but this overloads governance semantics onto non-governance relationships).</li>
+<li><strong>Add a separate <code>Participation</code> type</strong> in <code>icn-governance::participation</code> that is <em>relational</em> (subject → object → type) without granting authority.</li>
+</ol>
+<p><strong>Recommendation</strong>: option 2. Governance-bearing participation stays in <code>RoleAssignment</code>. Non-authority participation (sponsor, speaker, attendee, volunteer) lives in a new lightweight <code>Participation</code> module. This preserves the meaning firewall inside the app layer — authority-granting relationships remain auditable and distinct from data-only relationships.</p>
+<hr>
+<h2>4. Authority and scope model</h2>
+<h3>4.1 What currently supports scoped authority</h3>
+<p><code>RoleAssignment</code> (in <code>icn-governance::structure</code>) carries:</p>
+<ul>
+<li><code>structure_id</code> — the structure the assignment belongs to</li>
+<li><code>person_did</code> — who holds the assignment</li>
+<li><code>role: String</code> — a freeform role label (e.g. <code>&quot;coordinator&quot;</code>, <code>&quot;facilitator&quot;</code>, <code>&quot;note_taker&quot;</code>, <code>&quot;member&quot;</code>)</li>
+<li><code>authority_scope: Vec&lt;String&gt;</code> — delegated capability strings within that role (narrower than or equal to the structure&#39;s scope)</li>
+<li><code>start_date</code> / <code>end_date</code> — time-bounded</li>
+<li><code>assigned_by_decision: Option&lt;ProposalId&gt;</code> — provenance link if proposal-backed</li>
+</ul>
+<p>Combined with <code>MembershipCapability</code> on entity membership, a user can already hold a structure-specific governance role with delegated capability scopes — e.g., &quot;Matt is assigned as finance-committee lead on <code>nycn-finance</code> with <code>authority_scope: [&quot;propose&quot;, &quot;approve-budget-&lt;=5000&quot;]</code>&quot;. <strong>This is the primitive scoped-authority plumbing.</strong></p>
+<p>What is missing:</p>
+<ul>
+<li><strong>Active-scope selection</strong> at the HTTP/session layer. The gateway currently takes JWTs with <code>coop_id</code> and <code>scopes</code>. It does not yet have a first-class &quot;act-as-structure-X-with-role-Y&quot; request-context mechanism resolved against the <code>RoleAssignment</code> store.</li>
+<li><strong>Operational role delegation</strong> for temporary handoff (&quot;Matt delegates venue-selection to Priya for 2 weeks&quot;), beyond the delegated capabilities already on an assignment.</li>
+</ul>
+<h3>4.2 Proposed additions</h3>
+<ol>
+<li><strong><code>SessionScope</code> in gateway request context</strong> — resolved from DID + active structure/role claim against the <code>RoleAssignment</code> store. Belongs in <code>icn-gateway::auth</code> / wherever JWT claims are validated.</li>
+<li><strong><code>RoleDelegation</code></strong> — new <code>icn-governance::role_delegation</code> module. Fields: <code>grantor</code>, <code>grantee</code>, <code>scope_ref</code>, <code>capabilities: Vec&lt;String&gt;</code> (same capability-string vocabulary as <code>authority_scope</code>), <code>starts_at</code>, <code>ends_at</code>, <code>reason</code>, <code>revoked_at</code>. Distinct from <code>icn-governance::delegation</code> (which is vote-delegation).</li>
+</ol>
+<h3>4.3 Backbone authority</h3>
+<p>The backbone group is one of the most politically load-bearing concepts in NYCN and one of the least supported today. Model it as:</p>
+<pre><code class="language-rust">Structure {
+    id: StructureId::from_raw(&quot;nycn-backbone&quot;),
+    parent_entity_id: &quot;nycn-organizers&quot;,
+    kind: StructureKind::Committee,
+    // metadata: { &quot;authority_class&quot;: &quot;backbone&quot;, &quot;requires_ratification_for&quot;: [&quot;...categories...&quot;] }
+}
+</code></pre>
+<p>Role holders on the backbone structure carry capability strings like <code>&quot;backbone-authority&quot;</code> in their <code>authority_scope</code>. Authority-rule enforcement is then a <strong>PolicyOracle decision</strong> keyed off those capability strings — not hard-coded match arms, not a new enum. Specifically: when a proposal is opened in a backbone-scoped domain with a type that requires full-network ratification, the oracle refuses to finalize unilaterally and flags it as requiring a downstream ratification proposal in the parent entity&#39;s governance domain. This keeps the meaning firewall intact (CCL/oracle config expresses which proposal types require ratification; the code does not hard-code NYCN categories) and makes the rule set data-driven.</p>
+<hr>
+<h2>5. Program / cycle model</h2>
+<p><strong>Decision</strong>: <code>Activity</code> is not enough. <code>Activity { kind: Event }</code> captures the summit-as-thing; it does not capture the summit-as-cycle-with-stage-gates. Promote to a <code>Program</code> primitive that wraps <code>Activity</code>.</p>
+<h3>5.1 Proposed module: <code>icn-governance::program</code></h3>
+<pre><code class="language-rust">pub struct ProgramId(pub String);
+
+pub enum ProgramKind {
+    AnnualSummit,       // summit-2026
+    Campaign,           // sponsor outreach push
+    Initiative,         // organizer recruitment drive
+    Series,             // regional meetup series
+    PolicyDay,          // advocacy day
+}
+
+pub enum ProgramStatus {
+    Draft,
+    ActivePlanning,
+    PublicLaunch,
+    InExecution,
+    Closed,
+    Archived,
+}
+
+pub struct Program {
+    pub id: ProgramId,
+    pub parent_entity_id: String,
+    pub activity_id: Option&lt;ActivityId&gt;,  // optional link for legacy Activity-only consumers
+    pub kind: ProgramKind,
+    pub name: String,
+    pub year: Option&lt;u32&gt;,
+    pub status: ProgramStatus,
+    pub start_at: Option&lt;Timestamp&gt;,
+    pub end_at: Option&lt;Timestamp&gt;,
+    pub parent_program_id: Option&lt;ProgramId&gt;,
+    pub milestones: Vec&lt;Milestone&gt;,
+    pub metadata: serde_json::Value,
+    pub created_at: Timestamp,
+    pub closed_at: Option&lt;Timestamp&gt;,
+}
+
+pub struct Milestone {
+    pub id: MilestoneId,
+    pub program_id: ProgramId,
+    pub milestone_type: MilestoneType,
+    pub required_checks: Vec&lt;CheckRef&gt;,
+    pub status: MilestoneStatus,
+    pub completed_at: Option&lt;Timestamp&gt;,
+    pub completed_by: Option&lt;Did&gt;,
+}
+
+pub enum MilestoneType {
+    StrategyLocked,
+    VenueLocked,
+    BudgetLocked,
+    PublicLaunchReady,
+    EventReady,
+    ClosureComplete,
+    Custom(String),
+}
+</code></pre>
+<h3>5.2 Why not just fatten <code>Activity</code>?</h3>
+<ol>
+<li><strong>Lifecycle divergence</strong>: Activities have 4 statuses (<code>Planned/Active/Completed/Cancelled</code>). Programs have 6+ including <code>PublicLaunch</code> and <code>InExecution</code> which are operationally distinct from &quot;active&quot;. Overloading <code>ActivityStatus</code> degrades signal.</li>
+<li><strong>Stage-gate semantics</strong>: Milestones with machine-readable required-check predicates are a Program concept, not a generic Activity concept. A regional meetup series (also an Activity) doesn&#39;t want milestones; it wants recurrence.</li>
+<li><strong>Cycle-comparison</strong>: <code>parent_program_id</code> lets <code>summit-2026</code> point to <code>summit-2025</code> for year-over-year views. This is awkward as a generic Activity self-reference.</li>
+<li><strong>Sprint-plan coherence</strong>: Several future objects (sponsor, budget_item, session, registration) naturally hang off a Program, not a generic Activity.</li>
+</ol>
+<p><strong>Activity remains the right level for</strong>: meetings&#39; parent context, one-off workshops, ad-hoc projects that don&#39;t need staging.
+<strong>Program is the right level for</strong>: recurring cycles with closure/handoff and stage-gated readiness.</p>
+<h3>5.3 Storage + HTTP</h3>
+<ul>
+<li><code>apps/governance/src/manager.rs::SledProgramStore</code> — follows the <code>SledActivityStore</code> pattern.</li>
+<li><code>apps/governance/src/http/</code>:<ul>
+<li><code>POST /programs</code></li>
+<li><code>GET /programs</code></li>
+<li><code>GET /programs/{id}</code></li>
+<li><code>POST /programs/{id}/milestones</code></li>
+<li><code>PATCH /programs/{id}/milestones/{mid}</code> (complete / fail / reset)</li>
+<li><code>POST /programs/{id}/close</code></li>
+<li><code>GET /programs/{id}/dashboard</code> — derived view; see §9</li>
+</ul>
+</li>
+</ul>
+<h3>5.4 Events</h3>
+<p>Add to <code>icn-gateway::events::GatewayEvent</code>:</p>
+<ul>
+<li><code>ProgramOpened</code></li>
+<li><code>ProgramClosed</code></li>
+<li><code>MilestoneCompleted</code></li>
+<li><code>MilestoneBlocked</code></li>
+</ul>
+<hr>
+<h2>6. Event-driven flow mapping</h2>
+<p>ICN already has <code>GatewayEvent</code> emission on <strong>proposal lifecycle</strong> (domain create, proposal create/open/close, vote cast). It does <strong>not</strong> yet emit events for action-items, structures, or activities. The NYCN integration requires both adding variants <strong>and</strong> wiring the emission sites — not just consumer materializers.</p>
+<p>Current governance-related variants on <code>main</code> (verified in <code>icn/crates/icn-gateway/src/events.rs</code>):</p>
+<ul>
+<li><code>GovernanceDomainCreated</code></li>
+<li><code>GovernanceProposalCreated</code></li>
+<li><code>GovernanceProposalOpened</code></li>
+<li><code>GovernanceProposalClosed { outcome: String, ... }</code></li>
+<li><code>GovernanceVoteCast</code></li>
+</ul>
+<h3>6.1 Governance → task chain (partial — consumer side wired, event side missing)</h3>
+<p>State-change side <strong>already works on <code>main</code></strong> (the decision→action bridge materializes action items in <code>apps/governance/src/actor.rs</code> after a proposal is accepted). The <strong>event emission</strong> for downstream consumers is incomplete:</p>
+<pre><code>proposal.accepted (state change)
+  → action_item records created (✅ on main, via ActionItemSpec materialization)
+  → GatewayEvent::GovernanceProposalClosed { outcome: &quot;accepted&quot;, ... }  (✅ on main)
+  → GatewayEvent::GovernanceActionItemCreated (per item)                  (❌ not emitted; must be added)
+</code></pre>
+<p>Gap 1: no per-action-item event is emitted. Consumers that need to react on materialization (digests, external integrations) cannot today — they must poll stores.
+Gap 2: no <code>digest.generated</code> event. Add when digest service gets a real task loop.</p>
+<p><strong>Recommended placement</strong>: add <code>GovernanceActionItemCreated { item_id, domain_id, linked_proposal, assignee }</code> as part of the Tranche 0b (notification-digests) PR, so the digest architecture can converge on event-driven materialization from the start.</p>
+<h3>6.2 Meeting closure chain (after #1543 merges)</h3>
+<pre><code>meeting.held  (status = Held)
+  → notes linked (document ref; see Phase 5)
+  → decisions recorded (proposal references on agenda items)
+  → action_items created (from AgendaItem.generated_action_items on close)
+  → post_meeting_digest.generated (new)
+</code></pre>
+<p>Requires a <code>POST /meetings/{id}/close</code> handler that:</p>
+<ol>
+<li>Validates meeting is <code>InProgress</code>.</li>
+<li>For each <code>AgendaItem</code> with unresolved state, optionally generates an <code>ActionItem</code> with <code>parent = InstitutionalParent::Activity(...)</code> or <code>Structure(...)</code> and <code>meeting_id</code> set.</li>
+<li>Emits <code>GatewayEvent::MeetingEnded</code>.</li>
+<li>Optionally triggers a digest packet generation addressed to attendees.</li>
+</ol>
+<h3>6.3 Registration → operations chain</h3>
+<pre><code>registration.confirmed
+  → attendee_count += 1 on program
+  → accessibility_requirements tallied
+  → logistics digest update
+</code></pre>
+<p>Not implementable until <code>Registration</code> primitive exists.</p>
+<h3>6.4 Sponsor pipeline chain</h3>
+<pre><code>sponsor.status_changed(confirmed)
+  → budget_item.created (income, amount, program)
+  → recognition_obligation.created (action item, parent = program, assignee = marketing-committee lead)
+  → finance_digest entry
+</code></pre>
+<p>Not implementable until <code>Sponsor</code> + <code>BudgetItem</code> exist.</p>
+<h3>6.5 Meaning-firewall note on events</h3>
+<p>Gateway events are <strong>domain-shaped</strong> but must remain kernel-neutral. Adding <code>SponsorConfirmed</code> to <code>GatewayEvent</code> is fine. What is <strong>not</strong> fine: embedding NYCN-specific payload fields (&quot;nycn_sponsor_tier&quot;: &quot;platinum&quot;) in the event. Sponsor tiers belong in the <code>Sponsor</code> record, not in the event envelope.</p>
+<hr>
+<h2>7. Stage gates as machine-readable milestones</h2>
+<p>Already described in §5. Key implementation points:</p>
+<ul>
+<li><code>CheckRef</code> should be an enum pointing to concrete predicates (<code>VenueSelected</code>, <code>HotelAccessReviewEntered</code>, <code>TransitAccessReviewEntered</code>, <code>AccessibilityScoreEntered</code>, <code>PublicCopyPresent</code>, …).</li>
+<li>Evaluating a milestone = running all its <code>required_checks</code> against the program state + linked records.</li>
+<li><strong>Milestones do not auto-complete.</strong> A user with appropriate scope (role on the owning structure or program lead) completes them explicitly, with the evaluator confirming all required checks pass.</li>
+<li>Gating transitions (Draft → ActivePlanning → PublicLaunch → InExecution → Closed) on required milestone completion enforces stage-gate discipline without hardcoding NYCN&#39;s specific process.</li>
+</ul>
+<hr>
+<h2>8. Query / organizer UX model</h2>
+<h3>8.1 Derived views required</h3>
+<table>
+<thead>
+<tr>
+<th>View</th>
+<th>Inputs</th>
+<th>Backing endpoint</th>
+<th>Current status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>MyActionQueueView</code></td>
+<td><code>ActionItem</code> by assignee, status, due</td>
+<td><code>GET /digest</code> (partial)</td>
+<td>🚧 on <code>feat/notification-digests</code>; needs completion</td>
+</tr>
+<tr>
+<td><code>MyScopeView</code></td>
+<td><code>RoleAssignment</code> by actor</td>
+<td><strong>MISSING</strong> (no <code>GET /me/scopes</code> handler)</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>ProgramDashboardView</code></td>
+<td><code>Program</code> + linked <code>Milestone</code>s + <code>ActionItem</code> counts + <code>Sponsor</code> counts + <code>Registration</code> counts</td>
+<td><strong>MISSING</strong></td>
+<td>❌ (depends on Program + others)</td>
+</tr>
+<tr>
+<td><code>CommitteeOperationalView</code></td>
+<td><code>Structure</code> + recent meetings + open action items</td>
+<td>partially buildable from existing stores</td>
+<td>⚠️ needs composition handler</td>
+</tr>
+<tr>
+<td><code>SponsorPipelineView</code></td>
+<td><code>Sponsor</code> by status</td>
+<td>depends on Sponsor</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>AccessibilityStatusView</code></td>
+<td><code>Registration.accessibility_notes</code> + program venue accessibility fields</td>
+<td>depends on Registration + venue model</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>PostMeetingSummaryView</code></td>
+<td><code>Meeting</code> + linked decisions + generated action items</td>
+<td>depends on #1543</td>
+<td>🚧</td>
+</tr>
+<tr>
+<td><code>CycleComparisonView</code></td>
+<td><code>Program</code> + <code>parent_program_id</code> → previous cycle&#39;s objects</td>
+<td>depends on Program</td>
+<td>❌</td>
+</tr>
+<tr>
+<td><code>OrganizerOnboardingView</code></td>
+<td>Onboarding pipeline state</td>
+<td><strong>MISSING</strong> (requires onboarding subsystem)</td>
+<td>❌</td>
+</tr>
+</tbody></table>
+<h3>8.2 Implementation pattern</h3>
+<p>Each view = a struct in <code>apps/governance/src/http/views.rs</code> (new file) + a <code>GET</code> handler that composes multiple store reads. <strong>Do not</strong> build a separate &quot;view store&quot; with its own persistence; views are computed-from-canonical. If performance becomes a concern, add cached materializers behind feature flags.</p>
+<h3>8.3 Where the mobile SDK ties in</h3>
+<p><code>docs/mobile/icn-mobile-ux-spec-v1.md</code> already anchors mobile surfaces to gateway API. The NYCN-facing mobile views (My Work, My Scope, Upcoming Meetings, Program Dashboard) should consume these same endpoints. Do not branch mobile-specific endpoints.</p>
+<hr>
+<h2>9. Communications and digest architecture</h2>
+<h3>9.1 Current state</h3>
+<p><code>feat/notification-digests</code> gives us:</p>
+<ul>
+<li><code>DigestSummary { pending_votes: Vec&lt;PendingVoteDigest&gt;, overdue_items: Vec&lt;OverdueItemDigest&gt;, upcoming_meetings: Vec&lt;_&gt; (stub) }</code></li>
+<li><code>GovernanceManager::generate_digest(did) -&gt; DigestSummary</code></li>
+<li><code>GET /digest?did=...</code> handler</li>
+<li><code>list_by_assignee</code> on <code>ActionItemStoreBackend</code></li>
+<li>Assignee secondary index in <code>SledActionItemStore</code></li>
+</ul>
+<h3>9.2 Required rework before shipping</h3>
+<p>Blocking issues identified in the review:</p>
+<ol>
+<li><strong>Upcoming meetings stub</strong> — wire against <code>SledMeetingStore</code> once #1543 merges. The digest branch was created before meetings landed, so this field currently returns <code>Vec::new()</code>.</li>
+<li><strong>Assignee index not backfilled</strong> — new items get indexed, existing items do not. Add a one-shot migration in <code>SledActionItemStore::ensure_assignee_index()</code> called on store init that walks all items once if an index version marker is absent.</li>
+<li><strong>No scope partitioning</strong> — current digest is DID-level. Phase 4.5: partition by structure/program scope so a user can get &quot;my finance committee digest&quot; distinct from &quot;my summit-2026 digest&quot;.</li>
+<li><strong>No delivery</strong> — digest is pull-only. That&#39;s fine for v1, but add a <code>DigestDelivery</code> record (not yet implemented, not blocking) for later email/webhook integration.</li>
+</ol>
+<h3>9.3 Digest types to expand to</h3>
+<p>v1 (current PR scope): personal work digest
+v1.1 (follow-up): committee digest, program digest, pre-meeting packet, post-meeting summary
+v2 (later): decision announcement, sponsor follow-up, organizer onboarding sequence</p>
+<h3>9.4 Storage rule</h3>
+<p>Digests are <strong>ephemeral derivations</strong> unless explicitly persisted. <code>DigestSummary</code> is a response shape, not a stored record. If we later need &quot;show me last week&#39;s digest as delivered&quot;, introduce a <code>DigestPacket</code> record with <code>generated_at</code>, <code>scope_ref</code>, <code>content_hash</code>, <code>delivery_state</code>. Do not prematurely store digests.</p>
+<hr>
+<h2>10. Accessibility and representation as structured data</h2>
+<h3>10.1 Proposal: <code>icn-governance::accessibility</code></h3>
+<p>A lightweight module that defines:</p>
+<pre><code class="language-rust">pub struct VenueAccessibility {
+    pub transit_score: Option&lt;AccessibilityScore&gt;,
+    pub hotel_walkability_score: Option&lt;AccessibilityScore&gt;,
+    pub childcare_fit: ChildcareFit,
+    pub interpretation_supported: Vec&lt;LanguageCode&gt;,
+    pub sobriety_friendly: bool,
+    pub navigation_clarity_score: Option&lt;AccessibilityScore&gt;,
+    pub restroom_inclusion_notes: Option&lt;String&gt;,
+    pub family_support_notes: Option&lt;String&gt;,
+    pub environmental_quality_notes: Option&lt;String&gt;,
+}
+
+pub enum AccessibilityScore { Poor, Fair, Good, Excellent, Unknown }
+pub enum ChildcareFit { None, OnSite, NearSite, NotEvaluated }
+</code></pre>
+<p>This struct is embedded on <code>Program</code> (for program-level fit) and referenced from venue records (TBD — venues may just live in <code>Program.metadata</code> initially).</p>
+<h3>10.2 Registration-side accessibility fields</h3>
+<p>When <code>Registration</code> is implemented, it carries:</p>
+<ul>
+<li><code>dietary_needs: Vec&lt;String&gt;</code></li>
+<li><code>childcare_needs: Option&lt;ChildcareNeed&gt;</code></li>
+<li><code>language_needs: Vec&lt;LanguageCode&gt;</code></li>
+<li><code>accessibility_notes: Option&lt;String&gt;</code> (free text for requests the structured fields don&#39;t cover)</li>
+</ul>
+<p>The <code>AccessibilityStatusView</code> joins registration fields with venue fit to surface gaps.</p>
+<h3>10.3 Representation tracking</h3>
+<p>Add optional fields on <code>Session</code>:</p>
+<ul>
+<li><code>sector: Option&lt;String&gt;</code> (worker-coop, ag, housing, solidarity-econ, platform, …)</li>
+<li><code>geography: Option&lt;String&gt;</code></li>
+<li><code>language: LanguageCode</code></li>
+<li><code>cooperative_type: Option&lt;String&gt;</code></li>
+</ul>
+<p>Plus a derived representation dashboard that aggregates these. Early implementation can be a <code>GET /programs/{id}/representation</code> handler that buckets confirmed sessions.</p>
+<hr>
+<h2>11. External tool integration and migration boundaries</h2>
+<h3>11.1 <code>SourceRef</code> primitive</h3>
+<p>Proposed module <code>icn-governance::source_ref</code>:</p>
+<pre><code class="language-rust">pub enum SourceSystem {
+    GoogleDoc,
+    GoogleSheet,
+    DriveFile,
+    LegacyRepo,
+    MailingList,
+    NyCoopNetRow,
+    ManualEntry,
+    Other(String),
+}
+
+pub enum ProvenanceType {
+    Linked,     // reference only
+    Mirrored,   // synced copy in ICN
+    Imported,   // structured extraction
+    Derived,    // generated from other canonical records
+}
+
+pub struct SourceRef {
+    pub id: SourceRefId,
+    pub source_system: SourceSystem,
+    pub external_identifier: String,
+    pub title: Option&lt;String&gt;,
+    pub uri: Option&lt;String&gt;,
+    pub captured_at: Timestamp,
+    pub checksum: Option&lt;String&gt;,
+    pub provenance_type: ProvenanceType,
+}
+</code></pre>
+<p>Every canonical object that was imported from an external system should carry <code>source_refs: Vec&lt;SourceRef&gt;</code> (or equivalent).</p>
+<h3>11.2 ny-coop-net migration</h3>
+<p><code>~/projects/ny-coop-net</code> (if present) is the legacy Postgres-backed operational app. The migration pattern:</p>
+<ol>
+<li>For each table in ny-coop-net, map rows to canonical ICN objects (entities, participations, programs, sponsors, etc.).</li>
+<li>Each materialized ICN record carries a <code>SourceRef { system: NyCoopNetRow, external_identifier: &quot;&lt;table&gt;:&lt;row_pk&gt;&quot; }</code>.</li>
+<li>Build a one-shot importer binary (<code>bins/icn-nycn-import</code> or a script in <code>scripts/</code>) that reads ny-coop-net and writes ICN records idempotently (re-running should not double-import).</li>
+<li>Do NOT write directly to ICN sled stores. Use the HTTP API so that the importer exercises the same validation path.</li>
+</ol>
+<h3>11.3 Google Docs / Sheets</h3>
+<ul>
+<li>Link-only in v1 via <code>SourceRef { system: GoogleDoc, uri: &quot;...&quot; }</code>.</li>
+<li>Mirroring and structured import are Phase 5 (document primitive) territory.</li>
+</ul>
+<h3>11.4 Mailing lists</h3>
+<ul>
+<li>Link only. A user explicitly attaches a mailing-list archive link to a program or structure. Do not attempt mailing-list import in this integration.</li>
+</ul>
+<hr>
+<h2>12. Provenance and audit requirements</h2>
+<h3>12.1 Built-in provenance</h3>
+<p>ICN&#39;s governance proof (<code>icn-governance::proof</code>), action item <code>linked_proposal</code>, and <code>ActionItem.parent</code> (<code>InstitutionalParent</code>) already give us:</p>
+<ul>
+<li>Proposal → action item lineage (via <code>linked_proposal</code> + provenance hash in the decision-to-action bridge)</li>
+<li>Action item → institutional scope (via <code>parent</code>)</li>
+<li>Action item → meeting (via <code>meeting_id</code>, on PR #1543)</li>
+</ul>
+<h3>12.2 Gaps</h3>
+<ul>
+<li><strong>Sponsor state changes</strong> — will need an audit log of (who, when, old state, new state) when <code>Sponsor</code> is implemented. Pattern: store state-change events alongside the record, either inline (<code>Vec&lt;StatusChange&gt;</code>) or as a separate <code>SponsorStatusLog</code>.</li>
+<li><strong>Milestone completion</strong> — record <code>completed_by: Did</code> + <code>completed_at</code>. This is already in the proposed Milestone struct.</li>
+<li><strong>Registration confirmation</strong> — needs payment-state history if any.</li>
+<li><strong>Document version lineage</strong> — Phase 5; <code>InstitutionalDocument.parent_doc</code> gives us content-addressed version chains.</li>
+</ul>
+<h3>12.3 Rule</h3>
+<p>Every state transition on a canonical object should be attributable. If the Rust type doesn&#39;t record the actor of a transition, add a <code>changed_by: Did</code> field or a side-log, but do not silently mutate without actor attribution.</p>
+<hr>
+<h2>13. API surface expectations</h2>
+<p>All governance routes are mounted under the <code>/gov</code> scope in the gateway (see <code>icn/crates/icn-gateway/src/server.rs:2008</code>). Routes that act on a specific governance domain or parent entity are nested under the scope segment — they are <strong>not</strong> flat top-level paths.</p>
+<h3>13.1 Existing on <code>main</code> (verified in <code>apps/governance/src/http/configure.rs</code>)</h3>
+<ul>
+<li>Domains: <code>POST/GET /gov/domains</code>, <code>GET /gov/domains/{domain_id}</code>, <code>POST/DELETE /gov/domains/{domain_id}/members</code></li>
+<li>Proposals: <code>POST/GET /gov/proposals</code>, <code>GET /gov/proposals/{id}</code>, <code>POST /gov/proposals/{id}/open</code>, <code>POST .../close</code>, <code>POST .../vote</code>, <code>GET .../tally</code>, <code>GET .../proof</code>, <code>GET .../chain</code>, <code>GET .../discussion</code>, plus <code>discussion/comments[/{id}[/reactions]]</code></li>
+<li>Delegations: <code>POST/GET /gov/delegations</code>, <code>DELETE /gov/delegations/{id}</code> (revoke — no GET-by-id handler exists on <code>main</code>)</li>
+<li>Action items: <code>POST/GET /gov/domains/{domain_id}/action-items</code>, <code>GET /gov/domains/{domain_id}/action-items/{item_id}</code>, <code>PUT .../status</code>, <code>POST .../notes</code></li>
+<li>Structures: <code>POST/GET /gov/entities/{entity_id}/structures</code>, <code>GET /gov/structures/{structure_id}</code>, <code>POST /gov/structures/{structure_id}/roles</code></li>
+<li>Activities: <code>POST/GET /gov/entities/{entity_id}/activities</code>, <code>GET /gov/activities/{activity_id}</code></li>
+<li>Federation / SDIS proposal shortcuts: <code>/gov/proposals/federation/...</code>, <code>/gov/proposals/sdis/...</code></li>
+</ul>
+<h3>13.2 On PR #1543 (meetings)</h3>
+<ul>
+<li><code>POST/GET /gov/meetings</code>, <code>GET /gov/meetings/{id}</code>, <code>PATCH /gov/meetings/{id}</code></li>
+<li><code>POST /gov/meetings/{id}/agenda-items</code>, <code>PATCH .../{aid}</code></li>
+<li><code>POST /gov/meetings/{id}/start</code>, <code>POST .../end</code></li>
+<li>Attendance endpoint (verify exact path against PR)</li>
+</ul>
+<h3>13.3 Proposed additions (by tranche)</h3>
+<ul>
+<li><strong>Tranche 0b (digest)</strong>: <code>GET /gov/digest</code> (DID-level)</li>
+<li><strong>Tranche 1 (Program + views)</strong>:<ul>
+<li>Programs: <code>POST/GET /gov/entities/{entity_id}/programs</code>, <code>GET /gov/programs/{program_id}</code>, <code>POST /gov/programs/{id}/milestones</code>, <code>PATCH /gov/programs/{id}/milestones/{mid}</code>, <code>POST /gov/programs/{id}/close</code>, <code>GET /gov/programs/{id}/dashboard</code></li>
+<li>Scope + work: <code>GET /gov/me/scopes</code>, <code>GET /gov/me/work</code></li>
+<li>Scope-partitioned digest: <code>GET /gov/digest?scope=structure:nycn-finance</code></li>
+</ul>
+</li>
+<li><strong>Tranche 2 (funding)</strong>:<ul>
+<li>Sponsors: <code>POST/GET /gov/sponsors</code>, <code>PATCH /gov/sponsors/{id}</code>, <code>GET /gov/programs/{id}/sponsors</code></li>
+<li>Budget: <code>POST/GET /gov/budget-items</code>, <code>PATCH /gov/budget-items/{id}</code>, <code>GET /gov/programs/{id}/budget</code></li>
+</ul>
+</li>
+<li><strong>Tranche 3 (content/attendees)</strong>:<ul>
+<li>Sessions: <code>POST/GET /gov/sessions</code>, <code>PATCH /gov/sessions/{id}</code>, <code>GET /gov/programs/{id}/sessions</code></li>
+<li>Registrations: <code>POST/GET /gov/registrations</code>, <code>GET /gov/programs/{id}/registrations</code></li>
+<li>Derived views: <code>GET /gov/programs/{id}/accessibility-status</code>, <code>GET /gov/programs/{id}/representation</code></li>
+</ul>
+</li>
+<li><strong>Tranche 5 (documents)</strong>: <code>POST/GET /gov/documents</code>, version history, search</li>
+<li><strong>Provenance</strong> (Tranche 4 or 5): <code>GET /gov/history/{ref}</code>, <code>GET /gov/provenance/{ref}</code></li>
+</ul>
+<p>New parent/entity/program-scoped routes should follow the established <code>/gov/{parent-type}/{parent-id}/{child}</code> pattern rather than flat top-level paths.</p>
+<h3>13.1 TypeScript SDK drift</h3>
+<p>Every new HTTP model added to <code>apps/governance/src/http/models.rs</code> requires regenerating <code>sdk/typescript/src/generated/api-types.ts</code> via <code>cd sdk/typescript &amp;&amp; npm ci &amp;&amp; npm run generate-types</code>. Commit as <code>chore(sdk): regenerate TypeScript API types</code> per CLAUDE.md&#39;s drift-fix recipe.</p>
+<hr>
+<h2>14. Storage model guidance</h2>
+<h3>14.1 Pattern (already established)</h3>
+<p>For each new domain object:</p>
+<ol>
+<li>Define the struct + store trait in <code>icn-governance::&lt;module&gt;</code>.</li>
+<li>Implement <code>InMemory&lt;X&gt;Store</code> in-module for tests.</li>
+<li>Implement <code>Sled&lt;X&gt;Store</code> in <code>apps/governance/src/manager.rs</code> following the existing naming pattern: primary keys as <code>&lt;thing&gt;:{scope}:{id}</code> (or <code>&lt;thing&gt;:{id}</code> when globally scoped), secondary indexes as <code>&lt;thing&gt;_by_&lt;scope&gt;:{scope_id}:{id}</code>.</li>
+<li>Wire into <code>GovernanceManager</code>.</li>
+<li>Use content-addressing for document-like objects (blake3 of canonical body).</li>
+</ol>
+<h3>14.2 Indexes — existing on <code>main</code> (verified in <code>apps/governance/src/manager.rs</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th>Primary key</th>
+<th>Secondary / scoped keys</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SledActionItemStore</code></td>
+<td><code>action_item:{domain_id}:{item_id}</code></td>
+<td>— (no secondary index yet)</td>
+</tr>
+<tr>
+<td><code>SledStructureStore</code></td>
+<td><code>structure:{structure_id}</code></td>
+<td><code>structure_by_entity:{entity_id}:{structure_id}</code>, <code>role:{role_id}</code>, <code>role_by_structure:{structure_id}:{role_id}</code></td>
+</tr>
+<tr>
+<td><code>SledActivityStore</code></td>
+<td><code>activity:{activity_id}</code></td>
+<td><code>activity_by_entity:{entity_id}:{activity_id}</code></td>
+</tr>
+</tbody></table>
+<h3>14.3 Indexes — proposed additions (new sled keys must follow the established <code>&lt;thing&gt;_by_&lt;scope&gt;:...</code> convention)</h3>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th>Primary key</th>
+<th>Secondary keys</th>
+<th>Tranche</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SledActionItemStore</code></td>
+<td>(existing)</td>
+<td><code>action_item_by_assignee:{did}:{domain_id}:{item_id}</code></td>
+<td>0b (digest)</td>
+</tr>
+<tr>
+<td><code>SledActionItemStore</code></td>
+<td>(existing)</td>
+<td><code>action_item_by_parent:{parent_tag}:{parent_id}:{domain_id}:{item_id}</code></td>
+<td>1 (views)</td>
+</tr>
+<tr>
+<td><code>SledActionItemStore</code></td>
+<td>(existing)</td>
+<td><code>action_item_by_status:{status}:{domain_id}:{item_id}</code></td>
+<td>1 (dashboard counts)</td>
+</tr>
+<tr>
+<td><code>SledMeetingStore</code></td>
+<td>verify on #1543</td>
+<td>verify on #1543 — should include <code>meeting_by_scope:{scope_tag}:{scope_id}:{scheduled_at}:{meeting_id}</code> to support upcoming-meetings digest</td>
+<td>0a</td>
+</tr>
+<tr>
+<td><code>SledProgramStore</code> (new)</td>
+<td><code>program:{program_id}</code></td>
+<td><code>program_by_entity:{entity_id}:{program_id}</code>, <code>program_by_status:{status}:{program_id}</code>, <code>program_by_kind:{kind}:{program_id}</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>SledSponsorStore</code> (new)</td>
+<td><code>sponsor:{sponsor_id}</code></td>
+<td><code>sponsor_by_program:{program_id}:{sponsor_id}</code>, <code>sponsor_by_status:{status}:{sponsor_id}</code></td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>SledBudgetItemStore</code> (new)</td>
+<td><code>budget_item:{item_id}</code></td>
+<td><code>budget_item_by_program:{program_id}:{item_id}</code></td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>SledSessionStore</code> (new)</td>
+<td><code>session:{session_id}</code></td>
+<td><code>session_by_program:{program_id}:{session_id}</code>, <code>session_by_status:{status}:{session_id}</code></td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>SledRegistrationStore</code> (new)</td>
+<td><code>registration:{registration_id}</code></td>
+<td><code>registration_by_program:{program_id}:{registration_id}</code>, <code>registration_by_actor:{did}:{registration_id}</code></td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>SledDocumentStore</code> (new)</td>
+<td><code>document:{doc_hash}</code></td>
+<td><code>document_by_domain_type:{domain_id}:{doc_type}:{timestamp}:{doc_hash}</code>, <code>document_by_scope:{scope_tag}:{scope_id}:{doc_hash}</code></td>
+<td>5</td>
+</tr>
+</tbody></table>
+<h3>14.3 Migration-safe index construction</h3>
+<p>Any new index added to an existing store must be backfilled on first start. Pattern: add a <code>pub(crate) const INDEX_VERSION_KEY: &amp;str = &quot;_meta:idx_version:&lt;name&gt;&quot;;</code>. On store init, check the marker; if absent or below current version, walk all rows once and populate.</p>
+<hr>
+<h2>15. Testing strategy</h2>
+<h3>15.1 Unit / crate-level (required minimum)</h3>
+<p>Each new module gets standard unit coverage (<code>cargo test -p icn-governance</code>, <code>-p icn-gateway</code>, specific <code>apps/governance</code> tests).</p>
+<h3>15.2 Scenario tests (the load-bearing ones)</h3>
+<p>These belong in <code>icn/crates/icn-governance/tests/</code> or <code>icn/apps/governance/tests/</code> and should exercise full loops, not type construction:</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Objects exercised</th>
+<th>What it proves</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>S1: Backbone → full-team transition</strong></td>
+<td>Entity, Structure(backbone), RoleAssignment, Proposal, Decision, Program, Milestone</td>
+<td>Backbone group opens a program draft, venue options logged, recommendation proposal created, full organizer body ratifies via a second proposal in parent domain, milestone flips to VenueLocked</td>
+</tr>
+<tr>
+<td><strong>S2: Committee consent decision → action</strong></td>
+<td>Structure(content committee), Proposal(mode=Consent), ActionItemSpec, ActionItem, DigestSummary</td>
+<td>Content committee proposes theme change with <code>action_items_on_accept</code>; consent threshold met; action items materialize with committee as <code>parent</code>; digest reaches content-committee members</td>
+</tr>
+<tr>
+<td><strong>S3: Meeting closure continuity</strong></td>
+<td>Meeting, AgendaItem, Proposal, ActionItem, DigestSummary</td>
+<td>Meeting held with 3 agenda items; 2 become action items on close, 1 becomes a decision; post-meeting digest summarizes; new organizer queries <code>/meetings/{id}/summary</code> and reconstructs the meeting</td>
+</tr>
+<tr>
+<td><strong>S4: Registration accessibility feedback</strong></td>
+<td>Program, Registration, AccessibilityStatusView</td>
+<td>Attendee registers with childcare + Spanish needs; program&#39;s accessibility-status view reflects counts; logistics committee gets a digest item</td>
+</tr>
+<tr>
+<td><strong>S5: Sponsor pipeline</strong></td>
+<td>Sponsor, BudgetItem, ActionItem, Program</td>
+<td>Sponsor added as prospect; follow-up action item auto-created; sponsor confirmed; budget item income record created; recognition action item auto-created for marketing lead</td>
+</tr>
+<tr>
+<td><strong>S6: Cycle closure + handoff</strong></td>
+<td>Program(summit-2026), Program(summit-2027, <code>parent_program_id=summit-2026</code>)</td>
+<td>Summit 2026 closes; lessons-learned document attached; summit-2027 program seeded with prior-cycle comparison view accessible</td>
+</tr>
+<tr>
+<td><strong>S7: Provenance chain</strong></td>
+<td>Document, Meeting, Proposal, ActionItem, SourceRef</td>
+<td>Walk from an ActionItem back through meeting → proposal → accepted decision → source doc reference; ends at an external SourceRef</td>
+</tr>
+<tr>
+<td><strong>S8: Replay / idempotence</strong></td>
+<td>Proposal, ActionItemSpec materialization</td>
+<td>Duplicate close events do not create duplicate action items (already tested in #1532; keep regression-guard)</td>
+</tr>
+</tbody></table>
+<h3>15.3 Test harness</h3>
+<p>Use existing <code>icn-testkit::TestNode</code> pattern. Scenarios S1–S6 are single-node. S7 should include at least one cross-node gossip replication path if <code>InstitutionalDocument</code> is gossiped in Phase 5.</p>
+<hr>
+<h2>16. Implementation sequencing</h2>
+<p>See the companion doc <code>NYCN-Execution-Tranches.md</code> for the full merge-order plan. Summary only here:</p>
+<ol>
+<li><strong>Phase 0 — land already-open work</strong> (#1543, then push+PR <code>feat/notification-digests</code> with stub fixes).</li>
+<li><strong>Phase 1 — Program + Milestones + scope-aware digest partitioning</strong> (core cycle container).</li>
+<li><strong>Phase 2 — Sponsor + BudgetItem</strong> (funding closure loop).</li>
+<li><strong>Phase 3 — Session + Registration + Accessibility</strong> (content + attendee + logistics loops).</li>
+<li><strong>Phase 4 — SourceRef + ny-coop-net importer</strong> (migration).</li>
+<li><strong>Phase 5 — InstitutionalDocument + document-linked provenance</strong> (phase 5 of the original implementation plan).</li>
+<li><strong>Phase 6 — RoleDelegation + OrganizerOnboarding subsystem</strong> (continuity).</li>
+</ol>
+<p>Each phase is one or two PRs. Phases 2–3 can parallelize once Phase 1 lands.</p>
+<hr>
+<h2>17. Architecture risks and firewalls</h2>
+<h3>17.1 Ontology drift</h3>
+<p>The layered ontology (entities vs. structures vs. activities vs. programs) is the single most fragile decision. Every time a new object is added, evaluate: does it sit cleanly in one layer? If it seems to need pieces of multiple layers, the model is being stretched — stop and re-examine.</p>
+<h3>17.2 Endpoint sprawl before ontology freeze</h3>
+<p>Phase 0 alone adds ~12 meeting-management endpoints and ~1 digest endpoint. Phase 1 adds program+milestone endpoints. <strong>Do not</strong> start adding sponsor/budget/session/registration endpoints until Phase 1 is reviewed and merged; the derived-view patterns need to stabilize first.</p>
+<h3>17.3 Authority ambiguity</h3>
+<p>The backbone-group question is political-process ambiguity bleeding into code. Keep the code honest: authority is <code>RoleAssignment.authority_scope</code> capability strings + <code>RoleDelegation</code> + policy-oracle rules keyed off those capability strings, not hard-coded backbone-group logic.</p>
+<h3>17.4 Organizer-hostile UX</h3>
+<p>Every new endpoint that returns raw domain objects instead of composed views is technical debt against the &quot;can a new organizer continue the work&quot; test. Pair every canonical endpoint with at least one composed view handler.</p>
+<h3>17.5 Spreadsheet-shaped architecture</h3>
+<p>Do not model <code>Sponsor</code>, <code>BudgetItem</code>, or <code>Registration</code> fields by copying the current Google Sheets columns. Model them by lifecycle and by the queries they need to serve. <code>SourceRef</code> preserves the link back to the spreadsheet; the ICN shape is structured and normalized.</p>
+<h3>17.6 Ceremonial governance</h3>
+<p>Every new proposal type should either use the decision→action bridge (via <code>action_items_on_accept</code>) or connect to a typed execution hook (config change, milestone completion, role assignment). Proposals without downstream effects should be rare and flagged.</p>
+<h3>17.7 Meaning firewall</h3>
+<p>Keep the firewall: no NYCN-specific strings, no NYCN-specific variants, no <code>&quot;nycn&quot;</code> matches in kernel crates. NYCN appears in code only as test fixtures (<code>StructureId::from_raw(&quot;nycn-finance&quot;)</code>, <code>ActivityId::from_raw(&quot;summit-2026&quot;)</code>) and in seed data (CCL charter YAML), not as branches in match arms.</p>
+<hr>
+<h2>18. Final technical thesis</h2>
+<p>The correct technical target is: <strong>implement NYCN as a scoped institutional domain on ICN, with summit-year programs, organizer structures, meetings, decisions, action materialization, digests, provenance, and migration-safe links to existing planning systems.</strong></p>
+<p>As of <code>37ec91e0</code>, the ICN governance layer already gives us ~70% of the institutional primitives NYCN needs. The remaining 30% is:</p>
+<ul>
+<li><strong>merge the two already-built things</strong> (meeting #1543, digest branch),</li>
+<li><strong>add Program + Milestones</strong> (real cycle container),</li>
+<li><strong>add Sponsor + BudgetItem + Session + Registration + Accessibility</strong> (operational domains),</li>
+<li><strong>add SourceRef + importer</strong> (migration),</li>
+<li><strong>add InstitutionalDocument + RoleDelegation + OnboardingPipeline</strong> (memory + continuity).</li>
+</ul>
+<p>None of this requires new kernel concepts. All of it fits inside <code>icn-governance</code> + <code>apps/governance</code> with gateway-event emission.</p>
+<p>If Phase 0–3 lands cleanly, NYCN can instantiate itself on a running ICN node and the decisive test starts to return &quot;yes.&quot;</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
