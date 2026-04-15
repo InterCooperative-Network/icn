@@ -65,9 +65,9 @@ nycn                                   Entity: Federation(FederationProfile)
 │   │   └── nycn-accessibility-wg      Structure { kind: WorkingGroup }
 │   │
 │   └── [ACTIVITIES — owned by nycn-organizers]
-│       ├── summit-2026                Activity { kind: Event }   — wrapped by Program (Tranche 1)
-│       ├── summit-2027                Activity { kind: Event }   — future; parent_program_id = summit-2026
-│       └── regional-meetup-q3-2026    Activity { kind: Series }
+│       ├── summit-2026                Activity { kind: Event }       — to be wrapped by Program (Tranche 1)
+│       ├── summit-2027                Activity { kind: Event }       — future; once Program lands, Program.parent_program_id = summit-2026
+│       └── regional-meetups-2026      Activity { kind: Initiative }  — ongoing regional meetup series (Initiative is the closest existing ActivityKind)
 │
 ├── greenstar                          Entity: Cooperative(CooperativeProfile)
 ├── cooperation-buffalo                Entity: Cooperative(CooperativeProfile)
@@ -82,7 +82,10 @@ nycn                                   Entity: Federation(FederationProfile)
 
 3. **Committees are `Structure` records**, not entities. Each committee (`nycn-finance`, `nycn-content`, `nycn-logistics`, `nycn-marketing`, `nycn-backbone`, the accessibility working group) lives in `icn-governance::structure::Structure` with `kind: Committee` (or `WorkingGroup`) and `parent_entity_id: "nycn-organizers"`. A governance domain can optionally be provisioned for a structure where scoped proposals/votes are needed, but the structure itself is not a sovereign entity and does not appear in `FederationProfile.member_entities`. This is important: committees have delegated authority (via `RoleAssignment.authority_scope` capability strings), not sovereignty.
 
-4. **Summit 2026 is an `Activity { kind: Event }`**, owned by `nycn-organizers`, to be wrapped by a first-class `Program` primitive in Tranche 1 for milestones, stage gates (`StrategyLocked → VenueLocked → BudgetLocked → PublicLaunchReady → EventReady → ClosureComplete`), and cycle-to-cycle handoff via `parent_program_id` (so `summit-2027` references `summit-2026` for year-over-year comparison). Activities do not appear in `FederationProfile.member_entities` either.
+4. **Summit 2026 is an `Activity { kind: Event }`**, owned by `nycn-organizers`. Today, `Activity` has four kinds (`Event | Program | Project | Initiative`) and no cycle-level container fields. Tranche 1 introduces a first-class `Program` primitive that wraps the summit Activity and adds:
+   - milestones with machine-readable required-check predicates (`StrategyLocked → VenueLocked → BudgetLocked → PublicLaunchReady → EventReady → ClosureComplete`),
+   - cycle-to-cycle handoff via `Program.parent_program_id` (so `summit-2027`'s Program points back to `summit-2026`'s Program for year-over-year comparison).
+   Note: `parent_program_id` is a proposed field on the proposed `Program` type, not on `Activity`. Activities do not appear in `FederationProfile.member_entities`.
 
 5. **Member organizations are independent entities** that join the federation via the `member_entities` list on `FederationProfile`. They keep their own governance and treasury. The federation relationship is additive, not subordinating.
 
