@@ -1,0 +1,443 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-04-15 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yTnaBP6O.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>handoff 2026 04 15</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/handoff-2026-04-15.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-04-15</h1>
+<h2>Session goal</h2>
+<p>Advance NYCN / NY Cooperative Summit integration from &quot;architecture written on a branch&quot; to &quot;architecture canonical on main + next implementation tranche unblocked.&quot; Specifically: ground the docs against code, resolve drift, substantively review the in-flight meeting PR, and leave the next session a clean runway toward Program/Milestone (Tranche 1).</p>
+<h2>Decisive test (unchanged)</h2>
+<blockquote>
+<p>Can a new organizer enter the system mid-cycle, switch into the right scope, see the summit&#39;s current phase, understand what was decided, know what is blocked, receive their obligations, trace why they exist, and continue the work without private oral history?</p>
+</blockquote>
+<p>Every next decision should be judged against whether it moves the repo toward &quot;yes.&quot;</p>
+<hr>
+<h2>Final state of repo (verified at handoff time)</h2>
+<h3><code>main</code> HEAD</h3>
+<p><code>f4be9107 docs(strategy): NYCN repo-shaped architecture spec + implementation matrix + execution tranches (#1544)</code></p>
+<h3>Open PRs</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Branch</th>
+<th>State</th>
+<th>Status</th>
+<th>Blocker</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>#1545</strong></td>
+<td><code>docs/nycn-design-correction</code></td>
+<td>OPEN, MERGEABLE, <code>mergeStateStatus: CLEAN</code></td>
+<td>24 pass / 5 skip — all required green</td>
+<td>Human approve + merge</td>
+</tr>
+<tr>
+<td><strong>#1543</strong></td>
+<td><code>feat/meeting-management</code></td>
+<td>OPEN, MERGEABLE, <code>BEHIND</code> (needs rebase for cleaner merge)</td>
+<td>CI re-running on <code>3bb0eb32</code>: 10 pass / 10 pending / 1 skip</td>
+<td>CI + human approve + merge</td>
+</tr>
+</tbody></table>
+<h3>Branches</h3>
+<ul>
+<li><code>feat/meeting-management</code> — local + remote, head <code>3bb0eb32</code>, fixes pushed</li>
+<li><code>feat/notification-digests</code> — <strong>branch-only</strong>, head <code>484c285c</code>, no PR, ~5 commits behind current main; must be rebased before opening</li>
+<li><code>docs/nycn-design-correction</code> — remote at <code>3a6b0e66</code></li>
+<li><code>docs/handoff-2026-04-15</code> — this doc</li>
+</ul>
+<h3>Not on main yet (ordered by merge path)</h3>
+<ol>
+<li>Design-doc correction (#1545) — ~100 LOC docs</li>
+<li>Meeting primitive (#1543) — ~1300 LOC code + tests</li>
+<li>Notification digest rework — branch work not yet a PR</li>
+<li>Program + Milestone (Tranche 1) — spec-only</li>
+</ol>
+<hr>
+<h2>What was accomplished this session</h2>
+<h3>1. Three NYCN architecture docs merged to main (PR #1544, <code>f4be9107</code>)</h3>
+<ul>
+<li><code>docs/strategy/NYCN-Repo-Architecture-Spec.md</code> — repo-shaped map: bounded domains, canonical objects, authority model, Program design, event flows, storage, API surface, tests.</li>
+<li><code>docs/strategy/NYCN-Implementation-Matrix.md</code> — execution ledger with mechanical <code>Source</code> column (<code>main</code> / <code>open_pr</code> / <code>branch_only</code> / <code>spec_only</code>), implementation touch points per object, bootstrap seed rows, ny-coop-net import crosswalk, phase-gated open questions.</li>
+<li><code>docs/strategy/NYCN-Execution-Tranches.md</code> — 7-tranche merge-order plan with rollback strategy, agent assignments, scenario tests per tranche.</li>
+</ul>
+<p>Two rounds of drift correction were required to ground these against actual code:</p>
+<ul>
+<li><strong>Round 1 (<code>efee1678</code>)</strong>: Gateway events demoted to <code>spec_only</code>, <code>RoleAssignment</code> authority model rewritten to capability-string, sled keys realigned to <code>&lt;thing&gt;_by_&lt;scope&gt;</code> convention, HTTP routes rewritten with real <code>/gov/domains/...</code> paths, added <code>GovernanceActionItemCreated</code> to Tranche 0b scope.</li>
+<li><strong>Round 2 (<code>2d15e8a3</code>)</strong>: <code>DELETE</code> vs <code>GET</code> for delegations, <code>PUT</code> vs <code>PATCH</code> for action-item status, missing <code>POST</code> on action-items collection, bootstrap seed routes changed to entity-scoped paths.</li>
+</ul>
+<h3>2. Design doc correction in flight (PR #1545)</h3>
+<p><code>NYCN-Institutional-Design.md</code> originally modeled committees (<code>nycn-finance</code>, <code>nycn-content</code>, <code>nycn-logistics</code>, <code>nycn-marketing</code>, <code>nycn-steering</code>) and <code>nycn-summit-2026</code> as <code>Community(CommunityProfile)</code> entities. This is superseded by the layered ontology (#1540 / #1544).</p>
+<p>Rewrote:</p>
+<ul>
+<li>Added revision-notice banner at the top pointing to the three canonical companion docs.</li>
+<li>Rewrote <strong>ICN Primitive Mapping</strong> to describe all three layers (Entity / Structure / Activity).</li>
+<li>Replaced entity tree with the layered topology: sovereign entities distinct from owned Structures (committees) and Activities (summit-2026 wrapped by proposed Program).</li>
+<li>Rewrote <strong>Key design decisions</strong> with capability-string authority model.</li>
+<li>Updated <code>docs/INDEX.md</code> from &quot;partially superseded&quot; → &quot;corrected in-place&quot;.</li>
+</ul>
+<p>One additional Codex-flagged drift fixed in <code>3a6b0e66</code>: <code>summit-2027 Activity { kind: Event } — parent_program_id</code> incorrectly placed field on Activity (real: lives on proposed Program). <code>regional-meetup-q3-2026 Activity { kind: Series }</code> used a non-existent ActivityKind variant — corrected to <code>Initiative</code>.</p>
+<h3>3. Substantive review of #1543 (meeting PR) + proactive fixes pushed</h3>
+<p>Reviewed PR #1543 against the merged NYCN architecture spec and ICN invariants. Identified:</p>
+<p><strong>Blocking correctness issues</strong>:</p>
+<ul>
+<li><strong>B1+B2</strong>: <code>SledMeetingStore</code> used <code>meeting:{domain_id}:{meeting_id}</code> single-key with full-scan <code>get</code>/<code>delete</code>. O(N) per lookup, nondeterministic on MeetingId collisions across domains, ambiguous under colon-containing domain IDs.</li>
+<li><strong>B3</strong>: <code>mark_attendance</code>, <code>add_agenda_item</code>, <code>update_agenda_item</code> had no domain-membership check — any caller with <code>governance:write</code> could mutate any meeting.</li>
+</ul>
+<p><strong>Strong-preference issues</strong>:</p>
+<ul>
+<li><strong>S1</strong>: <code>MeetingCreated/Started/Ended</code> broke the canonical <code>Governance&lt;Thing&gt;&lt;Verb&gt;</code> naming locked in #1544.</li>
+<li><strong>S3</strong>: Those same event variants were unemittable — <code>GovernanceEventEmitter</code> trait has no meeting methods; handlers carried <code>TODO: emit when trait gains methods</code>.</li>
+</ul>
+<p><strong>Fix pushed in <code>3bb0eb32</code></strong> (commit on <code>feat/meeting-management</code>):</p>
+<ul>
+<li>SledMeetingStore rewritten to dual-key scheme (primary <code>meeting:{meeting_id}</code> + index <code>meeting_by_domain:{domain_id}:{meeting_id}</code>), matching the existing <code>&lt;thing&gt;_by_&lt;scope&gt;</code> convention used by <code>SledStructureStore</code> and <code>SledActivityStore</code>.</li>
+<li><code>list_by_domain</code> verifies exact domain-portion match on each indexed key (not just sled <code>scan_prefix</code>) to prevent colon-containing domains from leaking across scopes.</li>
+<li>Domain-membership check added to the three unprotected mutation handlers and layered on top of creator-only in <code>start_meeting</code> / <code>end_meeting</code>.</li>
+<li><code>MeetingCreated/Started/Ended</code> stripped from <code>GatewayEvent</code> (they ship with the digest PR where they&#39;ll have a consumer and emission wiring, under the canonical <code>Governance&lt;Thing&gt;&lt;Verb&gt;</code> name).</li>
+<li>7 sled-backed roundtrip tests added, including the regression guard <code>domain_ids_with_colons_do_not_leak_across_domains</code>.</li>
+<li>Local gates green: <code>cargo fmt --check</code>, <code>cargo clippy --all-targets -- -D warnings</code>, <code>cargo test -p icn-governance-actor -p icn-gateway -p icn-governance</code>.</li>
+</ul>
+<h3>4. Summary of commits landed</h3>
+<pre><code>main:
+  f4be9107  #1544 merged
+    ├─ 468b3138  initial three docs
+    ├─ efee1678  round 1 corrections
+    └─ 2d15e8a3  round 2 corrections
+
+feat/meeting-management:
+  3bb0eb32  review-fix push (this session)
+    └─ 34c929a3  handler review comments (prior session)
+        └─ 4d3aabaa  gateway meeting events (now stripped)
+            └─ a923d77e  initial meeting primitive
+
+docs/nycn-design-correction:
+  3a6b0e66  Codex drift fix (parent_program_id + ActivityKind)
+    └─ d88c4e97  initial correction
+
+docs/handoff-2026-04-15:  &lt;-- this branch, this doc
+</code></pre>
+<hr>
+<h2>Architectural decisions finalized this session</h2>
+<ol>
+<li><p><strong>Layered ontology is locked</strong>: Entities (sovereign) / Structures (non-sovereign, parent-entity-owned) / Activities (time-bounded, parent-entity-owned). Committees are Structures. Summit is Activity. Future <code>Program</code> is a first-class wrapper for Activity cycles, not a subsume.</p>
+</li>
+<li><p><strong><code>Program</code> is a separate primitive</strong> (not Activity extension). Milestones with machine-readable checks, <code>parent_program_id</code> for cycle-handoff, 6-state lifecycle. Spec §5 in <code>NYCN-Repo-Architecture-Spec.md</code>.</p>
+</li>
+<li><p><strong>Authority is capability-string based</strong>, not enum: <code>RoleAssignment.authority_scope: Vec&lt;String&gt;</code>. Backbone/ratification rules key off capability strings in CCL/oracle config.</p>
+</li>
+<li><p><strong>Sled key convention</strong>: primary <code>&lt;thing&gt;:{id}</code> or <code>&lt;thing&gt;:{scope}:{id}</code>; secondary <code>&lt;thing&gt;_by_&lt;scope&gt;:{scope_id}:{id}</code>. Scanning <code>&lt;thing&gt;_by_&lt;scope&gt;:{x}:</code> requires exact-match verification of the domain portion to prevent prefix-collision leaks under colon-containing IDs.</p>
+</li>
+<li><p><strong>Gateway event naming</strong>: <code>Governance&lt;Thing&gt;&lt;Verb&gt;</code> (matches existing <code>GovernanceDomainCreated</code>, <code>GovernanceProposalOpened</code>, <code>GovernanceVoteCast</code>). Events ship with their first consumer + emission wiring, not as dead variants.</p>
+</li>
+<li><p><strong>Tranche 0b (digest PR) scope grew</strong>: adds <code>GovernanceActionItemCreated</code> emission from the decision→action bridge AND re-introduces <code>GovernanceMeetingCreated/Started/Ended</code> that were stripped from #1543. This makes the digest PR the canonical &quot;governance events + first real consumer&quot; landing PR.</p>
+</li>
+</ol>
+<hr>
+<h2>Next session: exact merge order</h2>
+<pre><code>1. #1545          ← smallest, docs-only, safe to merge first
+2. #1543          ← meetings; correctness fixes pushed, awaiting CI + human approve
+3. Open digest PR ← rebase feat/notification-digests on post-#1543 main
+4. Tranche 1      ← feat/program-container
+5. Tranches 2-7   ← per NYCN-Execution-Tranches.md
+</code></pre>
+<h3>Phase 1: Merge #1545 (first 5 minutes of session)</h3>
+<ul>
+<li>Verify CI still green: <code>gh pr checks 1545</code></li>
+<li>Merge: <code>gh pr merge 1545 --squash --delete-branch --admin</code> (docs-only, no code risk)</li>
+<li><code>git checkout main &amp;&amp; git pull --ff-only</code></li>
+</ul>
+<h3>Phase 2: Confirm and merge #1543 (next 10-15 minutes)</h3>
+<ul>
+<li>Re-verify CI on <code>3bb0eb32</code>: <code>gh pr checks 1543</code></li>
+<li>If any new reviewer comments on the fix commit, triage before merging</li>
+<li>Expected: benchmark regression is non-blocking; claude-review is advisory</li>
+<li>Merge: <code>gh pr merge 1543 --squash --delete-branch [--admin]</code></li>
+<li><code>git checkout main &amp;&amp; git pull --ff-only</code></li>
+</ul>
+<p><strong>Note on #1543 PR description</strong>: Copilot flagged that <code>start_meeting</code>/<code>end_meeting</code> creator-only authorization isn&#39;t called out in the PR body (only in the docstrings I added). Quick fix: edit the PR description to note the creator-only policy before merging. Not blocking, just reviewer-polish.</p>
+<h3>Phase 3: Open the digest PR (Tranche 0b)</h3>
+<p>Branch: <code>feat/notification-digests</code> exists locally and remotely at <code>484c285c</code>.</p>
+<p>Required rework before PR:</p>
+<ol>
+<li><strong>Rebase on new main</strong> (<code>main</code> will be at #1543&#39;s merged commit):<pre><code>git checkout feat/notification-digests
+git rebase main
+</code></pre>
+</li>
+<li><strong>Rename assignee index key</strong> from <code>ai_idx:assignee:*</code> to <code>action_item_by_assignee:{did}:{domain_id}:{item_id}</code> — matches the established <code>&lt;thing&gt;_by_&lt;scope&gt;</code> convention.</li>
+<li><strong>Add assignee-index backfill</strong> to <code>SledActionItemStore::open</code> with a <code>_meta:idx_version:assignee</code> marker. Test on both empty and pre-populated stores.</li>
+<li><strong>Unstub <code>upcoming_meetings</code></strong> in <code>generate_digest</code>. Use <code>SledMeetingStore::list_by_domain</code> (or add a <code>list_by_scope</code> helper) filtered to <code>scheduled_at</code> within next 48h.</li>
+<li><strong>Add <code>GovernanceActionItemCreated</code> gateway event</strong> and emit from the decision→action bridge in <code>apps/governance/src/actor.rs</code>. Variant shape: <code>{ item_id, domain_id, linked_proposal, assignee }</code>.</li>
+<li><strong>Re-introduce <code>GovernanceMeetingCreated/Started/Ended</code></strong> variants (stripped from #1543) under canonical naming, with proper <code>GovernanceEventEmitter</code> trait methods and emission from the meeting handlers.</li>
+<li><strong>Scenario test</strong>: create proposal with <code>action_items_on_accept</code>, close, schedule a meeting, call <code>/gov/digest</code> — verify all three sections (pending votes, overdue items, upcoming meetings) populate correctly and <code>GovernanceActionItemCreated</code> fires.</li>
+</ol>
+<p>Estimated scope: ~200-300 LOC.</p>
+<h3>Phase 4: Start Tranche 1 (Program + Milestone)</h3>
+<p>Only after Phase 3 merges. See <code>NYCN-Execution-Tranches.md</code> §2 for full scope:</p>
+<ul>
+<li><code>icn-governance::program</code> new module (Program, ProgramKind, ProgramStatus, Milestone, MilestoneType, MilestoneStatus, CheckRef, InMemoryProgramStore).</li>
+<li><code>SledProgramStore</code> in <code>apps/governance/src/manager.rs</code> with <code>program:{id}</code> + <code>program_by_entity:{entity_id}:{id}</code> + <code>program_by_status:{status}:{id}</code> + <code>program_by_kind:{kind}:{id}</code>.</li>
+<li>HTTP: <code>POST/GET /gov/entities/{entity_id}/programs</code>, <code>GET /gov/programs/{id}</code>, <code>POST /gov/programs/{id}/milestones</code>, <code>PATCH .../{mid}</code>, <code>POST .../close</code>, <code>GET .../dashboard</code>.</li>
+<li>Gateway events: <code>GovernanceProgramOpened/Closed</code>, <code>GovernanceMilestoneCompleted/Blocked</code>.</li>
+<li>Scope-partitioned digest: <code>GET /gov/digest?scope=structure:nycn-finance</code>.</li>
+<li><code>GET /gov/me/scopes</code>, <code>GET /gov/me/work</code> handlers.</li>
+<li>Scenario test S1 (backbone → full-team transition) from spec §15.2.</li>
+</ul>
+<hr>
+<h2>Context the next session needs</h2>
+<h3>Paths</h3>
+<ul>
+<li>Monorepo root: <code>~/projects/icn/</code> (or <code>\\wsl.localhost\Ubuntu-24.04\home\matt\projects\icn</code>)</li>
+<li>Rust workspace: <code>icn/icn/</code> — all <code>cargo</code> commands run from here</li>
+<li>WSL required: cargo is not in Windows path; use <code>wsl -d Ubuntu-24.04 -- bash -lc &#39;cd /home/matt/projects/icn/icn &amp;&amp; cargo ...&#39;</code></li>
+<li>Key code paths:<ul>
+<li><code>icn/crates/icn-governance/src/{meeting,structure,activity,parent,action_item,proposal,delegation}.rs</code></li>
+<li><code>icn/apps/governance/src/{actor,manager}.rs</code></li>
+<li><code>icn/apps/governance/src/http/{configure,handlers,models}.rs</code></li>
+<li><code>icn/crates/icn-gateway/src/{events,server}.rs</code></li>
+</ul>
+</li>
+</ul>
+<h3>Verification commands (run from <code>icn/icn/</code>)</h3>
+<pre><code>cargo check -p icn-governance-actor -p icn-gateway
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test -p icn-governance-actor -p icn-gateway -p icn-governance
+</code></pre>
+<h3>ICN invariants to respect</h3>
+<ol>
+<li>Adversarial-by-default</li>
+<li>Determinism</li>
+<li>Canonical encodings</li>
+<li>No panics</li>
+<li>Kernel/app boundaries — <code>icn-governance</code> and <code>apps/governance</code> are app-layer; do NOT import domain types into kernel crates (<code>icn-core</code>, <code>icn-net</code>, <code>icn-gossip</code>, <code>icn-kernel-api</code>).</li>
+</ol>
+<h3>Naming &amp; convention recap</h3>
+<ul>
+<li>Events: <code>Governance&lt;Thing&gt;&lt;Verb&gt;</code></li>
+<li>Sled primary: <code>&lt;thing&gt;:{id}</code> or <code>&lt;thing&gt;:{scope}:{id}</code></li>
+<li>Sled secondary: <code>&lt;thing&gt;_by_&lt;scope&gt;:{scope_id}:{id}</code></li>
+<li>HTTP routes under <code>/gov/</code> scope; parent-scoped for create/list (<code>/gov/entities/{id}/structures</code>), flat for get-by-id (<code>/gov/structures/{id}</code>)</li>
+<li>Action-item status update: <strong>PUT</strong> (not PATCH)</li>
+<li>Delegation by-id: <strong>DELETE</strong> (revoke) only, no GET</li>
+</ul>
+<h3>Meaning firewall</h3>
+<ul>
+<li>NYCN appears in code only as test fixtures (<code>StructureId::from_raw(&quot;nycn-finance&quot;)</code>) and seed data (CCL charter YAML).</li>
+<li>No NYCN-specific strings in kernel crates.</li>
+<li>Policy rules key off capability strings (<code>authority_scope</code>), not hardcoded NYCN-specific enums.</li>
+</ul>
+<hr>
+<h2>Deferred follow-ups (not blocking next session)</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Source</th>
+<th>Priority</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>end_meeting</code> action-item materialization from unresolved agenda items</td>
+<td>Spec §6.2</td>
+<td>Low</td>
+<td>Tranche 1 or later</td>
+</tr>
+<tr>
+<td><code>update_agenda_item</code> can&#39;t clear fields (no null sentinel)</td>
+<td>Copilot P2 on #1543</td>
+<td>Low</td>
+<td>Follow-up</td>
+</tr>
+<tr>
+<td>No scenario tests for meeting closure loop</td>
+<td>Spec §15.2 S3</td>
+<td>Medium</td>
+<td>With digest PR or Tranche 1</td>
+</tr>
+<tr>
+<td>Full-workspace <code>cargo test</code> not run locally</td>
+<td>—</td>
+<td>Low</td>
+<td>CI handles it</td>
+</tr>
+<tr>
+<td><code>NYCN-Bootstrap-Runbook.md</code> operational artifact</td>
+<td>Matrix §10</td>
+<td>Medium</td>
+<td>With Tranche 1 (when Program seeds matter)</td>
+</tr>
+<tr>
+<td><code>NYCN-Schema-Mapping.md</code> ny-coop-net crosswalk</td>
+<td>Matrix §11</td>
+<td>Medium</td>
+<td>With Tranche 4</td>
+</tr>
+<tr>
+<td>Edit #1543 PR description to document creator-only authz on start/end</td>
+<td>Copilot F3</td>
+<td>Trivial</td>
+<td>Before merging #1543</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Open architectural questions (phase-gated, per matrix §12)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Question</th>
+<th>Must decide before</th>
+<th>Current direction</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Q2</td>
+<td>Does <code>Participation</code> (non-authority) live in <code>icn-governance</code> or <code>icn-entity</code>?</td>
+<td>Tranche 2 branch opens</td>
+<td>Lean <code>icn-governance::participation</code></td>
+</tr>
+<tr>
+<td>Q3</td>
+<td>Does Sponsor+BudgetItem stay in <code>apps/governance</code> or split to <code>apps/programs</code>?</td>
+<td>Tranche 2 branch opens</td>
+<td>Start in <code>apps/governance</code>; split only if needed</td>
+</tr>
+<tr>
+<td>Q4</td>
+<td>Is operational <code>RoleDelegation</code> distinct from <code>icn-governance::delegation</code>?</td>
+<td>Tranche 6 branch opens</td>
+<td>Read <code>delegation.rs</code> fully first; spec assumes distinct</td>
+</tr>
+<tr>
+<td>Q5</td>
+<td>Does <code>InstitutionalDocument</code> gossip from day 1 or sled-only?</td>
+<td>Tranche 5 design review</td>
+<td>Gossip from day 1 preferred</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Success criteria for next session</h2>
+<ol>
+<li><code>main</code> advances by at least #1545 + #1543.</li>
+<li>Either (a) digest PR opened with full Tranche 0b checklist applied, or (b) Tranche 1 branch started with clear scope.</li>
+<li>No new drift introduced: every new sled key, HTTP route, and event name follows the conventions documented in <code>NYCN-Repo-Architecture-Spec.md</code>.</li>
+<li>At least one scenario test added that exercises an institutional loop (meeting closure, digest generation, or proposal→action materialization).</li>
+<li>The decisive test becomes marginally more answerable: after Tranche 1, a new organizer can at least enumerate their scopes (<code>GET /gov/me/scopes</code>), see their obligations (<code>GET /gov/me/work</code>), and see the current program phase (<code>GET /gov/programs/{id}/dashboard</code>).</li>
+</ol>
+<hr>
+<h2>Session log</h2>
+<ul>
+<li><code>2026-04-14 21:07 UTC</code> — Opened #1544 with three NYCN architecture docs.</li>
+<li><code>2026-04-14 21:10-21:11 UTC</code> — First round of automated reviews (Codex + Copilot) flagged 6 substantive drift items.</li>
+<li><code>2026-04-14 21:20-21:30 UTC</code> — <code>efee1678</code> pushed: round-1 corrections (events, RoleAssignment, sled keys, HTTP routes).</li>
+<li><code>2026-04-14 21:35-21:45 UTC</code> — Second round of reviews on <code>efee1678</code>, 4 more drift items.</li>
+<li><code>2026-04-14 21:50-22:00 UTC</code> — <code>2d15e8a3</code> pushed: round-2 corrections (route methods, bootstrap seed routes).</li>
+<li><code>2026-04-15 01:30 UTC</code> — #1544 merged via <code>--admin --squash</code>. Main now <code>f4be9107</code>.</li>
+<li><code>2026-04-15 01:35-01:45 UTC</code> — #1545 opened with design-doc correction. Codex flagged ActivityKind drift (<code>parent_program_id</code> on Activity, non-existent <code>Series</code> variant).</li>
+<li><code>2026-04-15 01:50 UTC</code> — <code>3a6b0e66</code> pushed: ActivityKind/Program-field correction.</li>
+<li><code>2026-04-15 02:00-02:15 UTC</code> — Substantive review of #1543 posted: 3 blocking, 3 strong-preference, 3 deferred items.</li>
+<li><code>2026-04-15 02:15-02:25 UTC</code> — <code>3bb0eb32</code> pushed to <code>feat/meeting-management</code>: sled dual-key scheme with colon-domain regression guard, domain-membership checks on 5 handlers, dead event variants stripped, 7 new sled roundtrip tests. All local gates green.</li>
+</ul>
+<hr>
+<h2>Closing note</h2>
+<p>The repo is no longer missing architectural grounding. It is missing execution on top of grounded architecture — exactly where we hoped to land. Every next move is tightly scoped and dependency-ordered. The path to Tranche 1 (Program) is two merges away, and the fixes needed to get there are all mechanical.</p>
+<p>Good night.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
