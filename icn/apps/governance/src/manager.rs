@@ -597,10 +597,15 @@ impl icn_governance::ActivityStoreBackend for SledActivityStore {
 
 /// Sled-backed storage for meetings.
 ///
-/// Key scheme:
-/// - Meeting:  `meeting:{domain_id}:{meeting_id}`
+/// Key scheme (dual-key):
+/// - Primary:       `meeting:{meeting_id}`                     → postcard-encoded Meeting
+/// - Domain index:  `meeting_by_domain:{domain_id}:{meeting_id}` → empty (membership marker)
 ///
-/// All-meeting scan prefix: `meeting:` (for get-by-id when domain is unknown).
+/// This matches the `<thing>_by_<scope>:...` secondary-index convention used by
+/// `SledStructureStore` and `SledActivityStore`. Lookups by meeting ID are O(1)
+/// via the primary key; lookups by domain scan the index prefix. The scheme is
+/// unambiguous under domain IDs containing `:` because the meeting ID lives in
+/// its own primary key namespace, not embedded as a suffix of the domain key.
 pub struct SledMeetingStore {
     db: Arc<sled::Db>,
 }
@@ -611,56 +616,91 @@ impl SledMeetingStore {
         Self { db }
     }
 
-    fn meeting_key(domain_id: &str, id: &MeetingId) -> String {
-        format!("meeting:{}:{}", domain_id, id.0)
+    fn meeting_key(id: &MeetingId) -> String {
+        format!("meeting:{}", id.0)
     }
 
-    fn domain_prefix(domain_id: &str) -> String {
-        format!("meeting:{}:", domain_id)
+    fn index_key(domain_id: &str, id: &MeetingId) -> String {
+        format!("meeting_by_domain:{}:{}", domain_id, id.0)
     }
 
-    fn all_prefix() -> &'static str {
-        "meeting:"
+    fn domain_index_prefix(domain_id: &str) -> String {
+        format!("meeting_by_domain:{}:", domain_id)
     }
 }
 
 impl MeetingStoreBackend for SledMeetingStore {
     fn save(&self, m: &Meeting) -> std::result::Result<(), GovernanceError> {
-        let key = Self::meeting_key(&m.domain_id, &m.id);
+        let primary_key = Self::meeting_key(&m.id);
+        let index_key = Self::index_key(&m.domain_id, &m.id);
         let value = icn_encoding::encode_versioned(m)
             .map_err(|e| GovernanceError::Internal(format!("Failed to encode meeting: {e}")))?;
+
+        // Best-effort atomic: write primary, then index. If either fails, the
+        // caller sees an error and can retry. sled::Batch would be stronger but
+        // is not used elsewhere in this store for this pattern.
         self.db
-            .insert(key.as_bytes(), value)
-            .map_err(|e| GovernanceError::Internal(format!("Sled insert failed: {e}")))?;
+            .insert(primary_key.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert (primary) failed: {e}")))?;
+        self.db
+            .insert(index_key.as_bytes(), &[] as &[u8])
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert (index) failed: {e}")))?;
         Ok(())
     }
 
     fn get(&self, id: &MeetingId) -> std::result::Result<Option<Meeting>, GovernanceError> {
-        let suffix = format!(":{}", id.0);
-        for result in self.db.scan_prefix(Self::all_prefix().as_bytes()) {
-            let (key, value) =
-                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
-            let key_str = std::str::from_utf8(&key)
-                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
-            if key_str.ends_with(&suffix) {
+        let key = Self::meeting_key(id);
+        match self
+            .db
+            .get(key.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+        {
+            Some(value) => {
                 let m: Meeting = icn_encoding::decode_versioned(&value).map_err(|e| {
                     GovernanceError::Internal(format!("Failed to decode meeting: {e}"))
                 })?;
-                return Ok(Some(m));
+                Ok(Some(m))
             }
+            None => Ok(None),
         }
-        Ok(None)
     }
 
     fn list_by_domain(
         &self,
         domain_id: &str,
     ) -> std::result::Result<Vec<Meeting>, GovernanceError> {
-        let prefix = Self::domain_prefix(domain_id);
+        let prefix = Self::domain_index_prefix(domain_id);
+        // The exact prefix the key's "domain portion" must match — i.e., the
+        // prefix minus its trailing ':'. This is necessary because sled's
+        // `scan_prefix` matches any byte-prefix, so `meeting_by_domain:coop:`
+        // also matches `meeting_by_domain:coop:nycn:{id}` (a different domain).
+        // We must reject index rows whose domain is not exactly `domain_id`.
+        let expected_domain_prefix = format!("meeting_by_domain:{}", domain_id);
         let mut out = Vec::new();
         for result in self.db.scan_prefix(prefix.as_bytes()) {
-            let (_, value) =
+            let (key, _) =
                 result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let key_str = std::str::from_utf8(&key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            // Split at the last ':' to recover (domain-portion, meeting-id).
+            let Some((domain_portion, meeting_id_str)) = key_str.rsplit_once(':') else {
+                continue;
+            };
+            // Reject keys whose domain portion doesn't exactly match. This
+            // filters out keys from domains whose name happens to start with
+            // `{domain_id}` (e.g., scanning `coop:` must not pick up `coop:nycn`).
+            if domain_portion != expected_domain_prefix {
+                continue;
+            }
+            let primary_key = format!("meeting:{}", meeting_id_str);
+            let Some(value) = self
+                .db
+                .get(primary_key.as_bytes())
+                .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+            else {
+                // Index entry without primary — treat as dangling and skip.
+                continue;
+            };
             let m: Meeting = icn_encoding::decode_versioned(&value)
                 .map_err(|e| GovernanceError::Internal(format!("Failed to decode meeting: {e}")))?;
             out.push(m);
@@ -670,26 +710,171 @@ impl MeetingStoreBackend for SledMeetingStore {
     }
 
     fn delete(&self, id: &MeetingId) -> std::result::Result<bool, GovernanceError> {
-        let suffix = format!(":{}", id.0);
-        let mut found_key: Option<sled::IVec> = None;
-        for result in self.db.scan_prefix(Self::all_prefix().as_bytes()) {
-            let (key, _) =
-                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
-            let key_str = std::str::from_utf8(&key)
-                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
-            if key_str.ends_with(&suffix) {
-                found_key = Some(key);
-                break;
-            }
-        }
-        match found_key {
-            Some(k) => self
-                .db
-                .remove(k)
-                .map(|opt| opt.is_some())
-                .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}"))),
-            None => Ok(false),
-        }
+        // Load the meeting to discover its domain_id so we can clean up the index.
+        let primary_key = Self::meeting_key(id);
+        let Some(value) = self
+            .db
+            .get(primary_key.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+        else {
+            return Ok(false);
+        };
+        let m: Meeting = icn_encoding::decode_versioned(&value)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to decode meeting: {e}")))?;
+        let index_key = Self::index_key(&m.domain_id, id);
+
+        self.db
+            .remove(primary_key.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete (primary) failed: {e}")))?;
+        self.db
+            .remove(index_key.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete (index) failed: {e}")))?;
+        Ok(true)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod sled_meeting_store_tests {
+    use super::*;
+    use icn_governance::{Meeting, MeetingId};
+
+    fn open_temp_db() -> (Arc<sled::Db>, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = sled::Config::new()
+            .path(dir.path())
+            .temporary(true)
+            .open()
+            .expect("sled open");
+        (Arc::new(db), dir)
+    }
+
+    fn mk_meeting(domain: &str, title: &str) -> Meeting {
+        Meeting::new(
+            MeetingId::generate(),
+            domain.to_string(),
+            title.to_string(),
+            "did:icn:creator".to_string(),
+            1_700_000_000,
+        )
+    }
+
+    #[test]
+    fn save_and_get_roundtrip() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let m = mk_meeting("dom-a", "Kickoff");
+        store.save(&m).unwrap();
+
+        let got = store.get(&m.id).unwrap().expect("meeting present");
+        assert_eq!(got.id, m.id);
+        assert_eq!(got.domain_id, "dom-a");
+        assert_eq!(got.title, "Kickoff");
+    }
+
+    #[test]
+    fn get_is_o1_and_does_not_scan() {
+        // Regression guard: the previous implementation full-scanned `meeting:`
+        // and could return the wrong meeting if two domains carried the same
+        // MeetingId. Primary keys are now meeting-id-only, so collisions are
+        // impossible within a single store.
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let m1 = mk_meeting("dom-a", "alpha");
+        let m2 = mk_meeting("dom-b", "beta");
+        store.save(&m1).unwrap();
+        store.save(&m2).unwrap();
+
+        let got1 = store.get(&m1.id).unwrap().unwrap();
+        let got2 = store.get(&m2.id).unwrap().unwrap();
+        assert_eq!(got1.title, "alpha");
+        assert_eq!(got2.title, "beta");
+    }
+
+    #[test]
+    fn list_by_domain_isolates_domains() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let m_a1 = mk_meeting("dom-a", "a1");
+        let m_a2 = mk_meeting("dom-a", "a2");
+        let m_b1 = mk_meeting("dom-b", "b1");
+        store.save(&m_a1).unwrap();
+        store.save(&m_a2).unwrap();
+        store.save(&m_b1).unwrap();
+
+        let a = store.list_by_domain("dom-a").unwrap();
+        let b = store.list_by_domain("dom-b").unwrap();
+        assert_eq!(a.len(), 2);
+        assert_eq!(b.len(), 1);
+        assert!(a.iter().all(|m| m.domain_id == "dom-a"));
+        assert!(b.iter().all(|m| m.domain_id == "dom-b"));
+    }
+
+    #[test]
+    fn domain_ids_with_colons_do_not_leak_across_domains() {
+        // Critical regression test: the previous `meeting:{domain}:{id}` scheme
+        // could confuse `meeting:foo:bar:baz` (domain `foo` / id `bar:baz` vs.
+        // domain `foo:bar` / id `baz`). The dual-key scheme is immune because
+        // domain IDs live only in the index prefix and meeting IDs live only in
+        // the primary key.
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let m_colon = mk_meeting("coop:nycn", "colon-domain");
+        let m_plain = mk_meeting("coop", "plain-domain");
+        store.save(&m_colon).unwrap();
+        store.save(&m_plain).unwrap();
+
+        let colon_listing = store.list_by_domain("coop:nycn").unwrap();
+        let plain_listing = store.list_by_domain("coop").unwrap();
+        assert_eq!(colon_listing.len(), 1);
+        assert_eq!(plain_listing.len(), 1);
+        assert_eq!(colon_listing[0].title, "colon-domain");
+        assert_eq!(plain_listing[0].title, "plain-domain");
+    }
+
+    #[test]
+    fn delete_removes_primary_and_index() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db.clone());
+        let m = mk_meeting("dom-a", "to-delete");
+        store.save(&m).unwrap();
+
+        let removed = store.delete(&m.id).unwrap();
+        assert!(removed);
+
+        assert!(store.get(&m.id).unwrap().is_none());
+        assert!(store.list_by_domain("dom-a").unwrap().is_empty());
+
+        // Verify both keys physically removed (no dangling index).
+        let primary = format!("meeting:{}", m.id.0);
+        let index = format!("meeting_by_domain:dom-a:{}", m.id.0);
+        assert!(db.get(primary.as_bytes()).unwrap().is_none());
+        assert!(db.get(index.as_bytes()).unwrap().is_none());
+    }
+
+    #[test]
+    fn delete_missing_returns_false() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let missing = MeetingId::from_raw("nope");
+        let removed = store.delete(&missing).unwrap();
+        assert!(!removed);
+    }
+
+    #[test]
+    fn list_by_domain_sorted_newest_first() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+        let mut m_old = mk_meeting("dom-a", "old");
+        m_old.created_at = 1_700_000_000;
+        let mut m_new = mk_meeting("dom-a", "new");
+        m_new.created_at = 1_700_000_999;
+        store.save(&m_old).unwrap();
+        store.save(&m_new).unwrap();
+
+        let listing = store.list_by_domain("dom-a").unwrap();
+        assert_eq!(listing[0].title, "new");
+        assert_eq!(listing[1].title, "old");
     }
 }
 

@@ -2935,7 +2935,9 @@ pub async fn create_meeting<E: GovernanceEventEmitter + Clone + 'static>(
         )
         .map_err(anyhow_to_api)?;
 
-    // TODO: emit MeetingCreated event when GovernanceEventEmitter gains meeting methods
+    // MeetingCreated event emission is deferred to the notification-digest PR,
+    // where GovernanceEventEmitter will gain meeting methods and the variant
+    // will ship under the canonical Governance<Thing><Verb> naming convention.
     Ok(HttpResponse::Created().json(meeting_to_response(&m)))
 }
 
@@ -2972,6 +2974,15 @@ pub async fn get_meeting<E: GovernanceEventEmitter + Clone + 'static>(
 }
 
 /// POST /gov/meetings/{meeting_id}/start — Transition meeting to InProgress.
+///
+/// Authorization (Phase 3 scope):
+/// - Caller must hold the `governance:write` scope.
+/// - Caller must be a member of the meeting's governance domain.
+/// - Caller must be the `created_by` DID of the meeting.
+///
+/// Longer-term (Tranche 6, operational role delegation): authorization will
+/// derive from `RoleAssignment.authority_scope` capability strings plus a
+/// PolicyOracle rule — e.g., holders of `meeting-admin` on the linked structure.
 pub async fn start_meeting<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
@@ -2986,6 +2997,13 @@ pub async fn start_meeting<E: GovernanceEventEmitter + Clone + 'static>(
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Meeting not found"))?;
 
+    check_domain_membership(
+        &ctx.manager,
+        &GovernanceDomainId(m.domain_id.clone()),
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
+
     if m.created_by != claims.sub {
         return Err(ApiError::Forbidden(
             "Only the meeting creator can start it".into(),
@@ -2999,11 +3017,20 @@ pub async fn start_meeting<E: GovernanceEventEmitter + Clone + 'static>(
     m.started_at = Some(current_time_secs());
     ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
 
-    // TODO: emit MeetingStarted event when GovernanceEventEmitter gains meeting methods
+    // Event emission deferred to the notification-digest PR (see create_meeting).
     Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
 }
 
 /// POST /gov/meetings/{meeting_id}/end — Transition meeting to Completed.
+///
+/// Authorization: same as `start_meeting` (see docs there). Creator-only plus
+/// domain membership is the Phase 3 policy; richer role-based authorization
+/// lands with Tranche 6.
+///
+/// Note: this handler does not yet materialize action items from unresolved
+/// agenda items. `AgendaItem.generated_action_items` is supported in the
+/// schema but the closure trigger is a Tranche 1 follow-up — for now, action
+/// items are created separately via the action-item API with `meeting_id` set.
 pub async fn end_meeting<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
@@ -3018,6 +3045,13 @@ pub async fn end_meeting<E: GovernanceEventEmitter + Clone + 'static>(
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Meeting not found"))?;
 
+    check_domain_membership(
+        &ctx.manager,
+        &GovernanceDomainId(m.domain_id.clone()),
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
+
     if m.created_by != claims.sub {
         return Err(ApiError::Forbidden(
             "Only the meeting creator can end it".into(),
@@ -3031,7 +3065,7 @@ pub async fn end_meeting<E: GovernanceEventEmitter + Clone + 'static>(
     m.ended_at = Some(current_time_secs());
     ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
 
-    // TODO: emit MeetingEnded event when GovernanceEventEmitter gains meeting methods
+    // Event emission deferred to the notification-digest PR (see create_meeting).
     Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
 }
 
@@ -3091,7 +3125,7 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
     meeting_id: web::Path<String>,
     req: web::Json<MarkAttendanceRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
     let id = MeetingId(meeting_id.into_inner());
     let status = parse_attendance_status(&req.status)?;
 
@@ -3100,6 +3134,15 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
         .get_meeting(&id)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    // Domain-membership check: only members of the meeting's governance domain
+    // may mutate its state. `governance:write` alone is insufficient.
+    check_domain_membership(
+        &ctx.manager,
+        &GovernanceDomainId(m.domain_id.clone()),
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
 
     if matches!(
         m.status,
@@ -3127,7 +3170,7 @@ pub async fn add_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
     meeting_id: web::Path<String>,
     req: web::Json<AddAgendaItemRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
     let id = MeetingId(meeting_id.into_inner());
 
     let mut m = ctx
@@ -3135,6 +3178,13 @@ pub async fn add_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
         .get_meeting(&id)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    check_domain_membership(
+        &ctx.manager,
+        &GovernanceDomainId(m.domain_id.clone()),
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
 
     if matches!(
         m.status,
@@ -3161,7 +3211,7 @@ pub async fn update_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
     path: web::Path<(String, String)>,
     req: web::Json<UpdateAgendaItemRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
     let (meeting_id_str, item_id_str) = path.into_inner();
     let meeting_id = MeetingId(meeting_id_str);
     let item_uuid = item_id_str
@@ -3174,6 +3224,13 @@ pub async fn update_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
         .get_meeting(&meeting_id)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Meeting not found"))?;
+
+    check_domain_membership(
+        &ctx.manager,
+        &GovernanceDomainId(m.domain_id.clone()),
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
 
     if matches!(
         m.status,

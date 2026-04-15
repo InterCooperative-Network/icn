@@ -270,31 +270,13 @@ pub enum GatewayEvent {
         transferred_at: u64,
     },
 
-    // === Institutional Events ===
-    /// A meeting was scheduled in a governance domain
-    MeetingCreated {
-        domain_id: String,
-        meeting_id: String,
-        title: String,
-        scheduled_at: u64,
-        created_by: String,
-    },
-
-    /// A meeting transitioned to in-progress
-    MeetingStarted {
-        domain_id: String,
-        meeting_id: String,
-    },
-
-    /// A meeting was completed or cancelled
-    MeetingEnded {
-        domain_id: String,
-        meeting_id: String,
-        /// "completed" or "cancelled"
-        outcome: String,
-    },
-
     // === Control Events ===
+    // Note: meeting-lifecycle events (GovernanceMeetingCreated/Started/Ended)
+    // will ship in the notification-digest PR alongside GovernanceActionItemCreated,
+    // under the canonical `Governance<Thing><Verb>` naming convention locked in
+    // docs/strategy/NYCN-Repo-Architecture-Spec.md §6. The variants were not
+    // emittable from this PR because `GovernanceEventEmitter` does not yet
+    // expose meeting methods, so shipping them here would be dead code.
     /// Server is shutting down gracefully
     ///
     /// Clients should:
