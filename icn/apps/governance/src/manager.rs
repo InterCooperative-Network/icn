@@ -2031,12 +2031,17 @@ impl GovernanceManager {
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
-            action_items: Box::new(SledActionItemStore::new(db)),
+            action_items: Box::new(SledActionItemStore::new(db.clone())),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
             meeting_store: Arc::new(InMemoryMeetingStore::new()),
-            program_store: Arc::new(InMemoryProgramStore::new()),
-            milestone_store: Arc::new(InMemoryMilestoneStore::new()),
+            // Programs and milestones use Sled-backed stores so they persist
+            // across restarts. Structure/activity/meeting are overridden by
+            // the caller (server.rs) via the with_*_store() builder methods;
+            // program/milestone use the same db here to avoid needing further
+            // builder calls for the happy path.
+            program_store: Arc::new(SledProgramStore::new(db.clone())),
+            milestone_store: Arc::new(SledMilestoneStore::new(db)),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -2053,12 +2058,14 @@ impl GovernanceManager {
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
-            action_items: Box::new(SledActionItemStore::new(db)),
+            action_items: Box::new(SledActionItemStore::new(db.clone())),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
             meeting_store: Arc::new(InMemoryMeetingStore::new()),
-            program_store: Arc::new(InMemoryProgramStore::new()),
-            milestone_store: Arc::new(InMemoryMilestoneStore::new()),
+            // Programs and milestones use Sled-backed stores so they persist
+            // across restarts (same db instance, separate key namespaces).
+            program_store: Arc::new(SledProgramStore::new(db.clone())),
+            milestone_store: Arc::new(SledMilestoneStore::new(db)),
             governance_handle: None,
             receipt_store: None,
         }
@@ -3918,8 +3925,25 @@ impl GovernanceManager {
             .save(&m)
             .map_err(|e| anyhow::anyhow!("Failed to save milestone: {e}"))?;
 
-        // Register the milestone ID on the program record (phase order).
-        p.milestones.push(id);
+        // Register the milestone ID on the program record in phase-index order.
+        // Load the full set of existing milestones (including the newly saved one)
+        // so the milestones list is always sorted by phase_index, not insertion order.
+        {
+            let mut indexed: Vec<(u32, MilestoneId)> = p
+                .milestones
+                .iter()
+                .filter_map(|mid| {
+                    self.milestone_store
+                        .get(mid)
+                        .ok()
+                        .flatten()
+                        .map(|ms| (ms.phase_index, mid.clone()))
+                })
+                .collect();
+            indexed.push((m.phase_index, id));
+            indexed.sort_by_key(|&(pi, _)| pi);
+            p.milestones = indexed.into_iter().map(|(_, mid)| mid).collect();
+        }
         self.program_store
             .save(&p)
             .map_err(|e| anyhow::anyhow!("Failed to update program milestones: {e}"))?;
