@@ -819,6 +819,23 @@ impl SledProgramStore {
 impl icn_governance::ProgramStoreBackend for SledProgramStore {
     fn save(&self, p: &icn_governance::Program) -> std::result::Result<(), GovernanceError> {
         let primary = Self::program_primary_key(&p.id);
+
+        // Remove stale scope index entries if domain_id or parent_entity_id changed.
+        if let Ok(Some(existing)) = self.get(&p.id) {
+            if existing.domain_id != p.domain_id {
+                let old = Self::program_domain_idx_key(&existing.domain_id, &p.id);
+                self.db.remove(old.as_bytes()).map_err(|e| {
+                    GovernanceError::Internal(format!("Sled remove (stale domain idx) failed: {e}"))
+                })?;
+            }
+            if existing.parent_entity_id != p.parent_entity_id {
+                let old = Self::program_entity_idx_key(&existing.parent_entity_id, &p.id);
+                self.db.remove(old.as_bytes()).map_err(|e| {
+                    GovernanceError::Internal(format!("Sled remove (stale entity idx) failed: {e}"))
+                })?;
+            }
+        }
+
         let domain_idx = Self::program_domain_idx_key(&p.domain_id, &p.id);
         let entity_idx = Self::program_entity_idx_key(&p.parent_entity_id, &p.id);
         let value = icn_encoding::encode_versioned(p)
@@ -984,6 +1001,19 @@ impl SledMilestoneStore {
 impl icn_governance::MilestoneStoreBackend for SledMilestoneStore {
     fn save(&self, m: &icn_governance::Milestone) -> std::result::Result<(), GovernanceError> {
         let primary = Self::milestone_primary_key(&m.id);
+
+        // Remove stale program index entry if program_id changed on update.
+        if let Ok(Some(existing)) = self.get(&m.id) {
+            if existing.program_id != m.program_id {
+                let old = Self::milestone_program_idx_key(&existing.program_id, &m.id);
+                self.db.remove(old.as_bytes()).map_err(|e| {
+                    GovernanceError::Internal(format!(
+                        "Sled remove (stale program idx) failed: {e}"
+                    ))
+                })?;
+            }
+        }
+
         let idx = Self::milestone_program_idx_key(&m.program_id, &m.id);
         let value = icn_encoding::encode_versioned(m)
             .map_err(|e| GovernanceError::Internal(format!("Failed to encode milestone: {e}")))?;
@@ -1727,6 +1757,75 @@ mod sled_program_store_tests {
         let (db, _dir) = open_temp_db();
         let store = SledMilestoneStore::new(db);
         assert!(!store.delete(&MilestoneId::from_raw("nope")).unwrap());
+    }
+
+    /// Regression: SledProgramStore::save leaked stale domain/entity index rows
+    /// when a program was updated with different domain_id or parent_entity_id.
+    #[test]
+    fn program_stale_scope_index_cleaned_on_update() {
+        let (db, _dir) = open_temp_db();
+        let store = SledProgramStore::new(db);
+
+        let domain_a = GovernanceDomainId::new("dom-alpha");
+        let domain_b = GovernanceDomainId::new("dom-beta");
+        let entity_a = "entity-a";
+        let entity_b = "entity-b";
+
+        let mut p = mk_program("prog-1", "dom-alpha", entity_a);
+        store.save(&p).unwrap();
+        assert_eq!(store.list_by_domain(&domain_a).unwrap().len(), 1);
+        assert_eq!(store.list_by_entity(entity_a).unwrap().len(), 1);
+
+        // Move to a different domain and entity
+        p.domain_id = domain_b.clone();
+        p.parent_entity_id = entity_b.to_string();
+        store.save(&p).unwrap();
+
+        assert_eq!(
+            store.list_by_domain(&domain_a).unwrap().len(),
+            0,
+            "old domain index row must be cleaned on update"
+        );
+        assert_eq!(store.list_by_domain(&domain_b).unwrap().len(), 1);
+        assert_eq!(
+            store.list_by_entity(entity_a).unwrap().len(),
+            0,
+            "old entity index row must be cleaned on update"
+        );
+        assert_eq!(store.list_by_entity(entity_b).unwrap().len(), 1);
+    }
+
+    /// Regression: SledMilestoneStore::save leaked stale program index rows
+    /// when a milestone's program_id changed on update.
+    #[test]
+    fn milestone_stale_program_index_cleaned_on_update() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMilestoneStore::new(db);
+
+        let prog_a = ProgramId::from_raw("prog-a");
+        let prog_b = ProgramId::from_raw("prog-b");
+
+        let mut m = Milestone::new(
+            MilestoneId::from_raw("m-shared"),
+            prog_a.clone(),
+            "Milestone",
+            0,
+            1_000,
+        );
+        store.save(&m).unwrap();
+        assert_eq!(store.list_by_program(&prog_a).unwrap().len(), 1);
+        assert_eq!(store.list_by_program(&prog_b).unwrap().len(), 0);
+
+        // Move milestone to a different program
+        m.program_id = prog_b.clone();
+        store.save(&m).unwrap();
+
+        assert_eq!(
+            store.list_by_program(&prog_a).unwrap().len(),
+            0,
+            "old program index row must be cleaned on update"
+        );
+        assert_eq!(store.list_by_program(&prog_b).unwrap().len(), 1);
     }
 }
 
