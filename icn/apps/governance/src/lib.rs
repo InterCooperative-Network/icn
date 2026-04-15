@@ -41,7 +41,7 @@ pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
 pub use handlers::translate_payload_to_effects;
 pub use manager::{
     DigestSummary, GovernanceManager, OverdueItemDigest, PendingVoteDigest, SledActionItemStore,
-    SledActivityStore, SledMeetingStore, SledStructureStore,
+    SledActivityStore, SledMeetingStore, SledStructureStore, UpcomingMeetingDigest,
 };
 pub use receipt_backend::GovernanceReceiptBackend;
 pub use state_store::{GovernanceStateStore, SledGovernanceStateStore};

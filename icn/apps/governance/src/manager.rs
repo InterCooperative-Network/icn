@@ -58,6 +58,20 @@ pub struct OverdueItemDigest {
     pub due_date: u64,
 }
 
+/// An upcoming meeting in the digest: scheduled within the lookahead window
+/// and the caller is in the attendee list.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UpcomingMeetingDigest {
+    /// The meeting ID
+    pub meeting_id: String,
+    /// Governance domain the meeting belongs to
+    pub domain_id: String,
+    /// Human-readable title
+    pub title: String,
+    /// Unix timestamp when the meeting is scheduled to start
+    pub scheduled_at: u64,
+}
+
 /// DID-scoped notification digest returned by `GET /gov/digest`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DigestSummary {
@@ -71,8 +85,10 @@ pub struct DigestSummary {
     pub overdue_item_count: usize,
     /// Action items assigned to caller that are past their due date
     pub overdue_items: Vec<OverdueItemDigest>,
-    /// Upcoming meetings in the next 48 h (stub = 0 until meeting feature merges)
+    /// Count of upcoming meetings
     pub upcoming_meeting_count: usize,
+    /// Meetings in the next 48 h where the caller is listed as an attendee
+    pub upcoming_meetings: Vec<UpcomingMeetingDigest>,
 }
 
 /// Full provenance chain for a governance proposal (INV-5).
@@ -871,6 +887,41 @@ impl MeetingStoreBackend for SledMeetingStore {
             .remove(index_key.as_bytes())
             .map_err(|e| GovernanceError::Internal(format!("Sled delete (index) failed: {e}")))?;
         Ok(true)
+    }
+
+    /// Scan all meeting primary keys and return those whose `scheduled_at`
+    /// falls within `[now_secs, now_secs + window_secs]` and whose status is
+    /// not `Cancelled` or `Completed`.
+    ///
+    /// Note: this is an O(N) full scan over the meetings table. For the near
+    /// term (few meetings per node), this is acceptable. A dedicated
+    /// `meeting_by_scheduled:{bucket}:{id}` index can be added later as a
+    /// straight mirror of the `action_item_by_assignee` pattern.
+    fn list_upcoming(
+        &self,
+        now_secs: u64,
+        window_secs: u64,
+    ) -> std::result::Result<Vec<Meeting>, GovernanceError> {
+        let upper = now_secs.saturating_add(window_secs);
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(b"meeting:") {
+            let (_, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let m: Meeting = icn_encoding::decode_versioned(&value)
+                .map_err(|e| GovernanceError::Internal(format!("Failed to decode meeting: {e}")))?;
+            if matches!(
+                m.status,
+                icn_governance::MeetingStatus::Cancelled | icn_governance::MeetingStatus::Completed
+            ) {
+                continue;
+            }
+            match m.scheduled_at {
+                Some(t) if t >= now_secs && t <= upper => out.push(m),
+                _ => continue,
+            }
+        }
+        out.sort_by_key(|m| m.scheduled_at.unwrap_or(0));
+        Ok(out)
     }
 }
 
@@ -2690,14 +2741,19 @@ impl GovernanceManager {
     // Notification digest
     // ========================================================================
 
+    /// Digest lookahead window for upcoming meetings: 48 h.
+    const DIGEST_UPCOMING_WINDOW_SECS: u64 = 48 * 60 * 60;
+
     /// Generate a DID-scoped notification digest.
     ///
     /// Returns a summary of pending votes (Open proposals not yet voted on by
     /// `did`), overdue action items (assigned to `did`, past due, not done),
-    /// and a stub of 0 for upcoming meetings (until the meeting feature merges).
+    /// and upcoming meetings (scheduled in the next 48 h where `did` is on
+    /// the attendee list).
     pub async fn generate_digest(&self, did: &Did, now_secs: u64) -> DigestSummary {
         let pending_votes = self.digest_pending_votes(did).await;
         let overdue_items = self.digest_overdue_items(did, now_secs);
+        let upcoming_meetings = self.digest_upcoming_meetings(did, now_secs);
 
         DigestSummary {
             did: did.to_string(),
@@ -2705,8 +2761,42 @@ impl GovernanceManager {
             pending_votes,
             overdue_item_count: overdue_items.len(),
             overdue_items,
-            upcoming_meeting_count: 0,
+            upcoming_meeting_count: upcoming_meetings.len(),
+            upcoming_meetings,
         }
+    }
+
+    /// Collect meetings scheduled in the next `DIGEST_UPCOMING_WINDOW_SECS`
+    /// where `did` appears in the attendee list.
+    ///
+    /// Linked-structure / linked-activity membership expansion is out of
+    /// scope for the digest PR — that join lives with `/me/scopes`/`/me/work`
+    /// in Tranche 1. For now, only explicit attendance counts.
+    fn digest_upcoming_meetings(&self, did: &Did, now_secs: u64) -> Vec<UpcomingMeetingDigest> {
+        let meetings = match self
+            .meeting_store
+            .list_upcoming(now_secs, Self::DIGEST_UPCOMING_WINDOW_SECS)
+        {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(error = %e, "digest: failed to list upcoming meetings");
+                return vec![];
+            }
+        };
+
+        let did_str = did.as_str();
+        meetings
+            .into_iter()
+            .filter(|m| m.attendees.iter().any(|a| a.did == did_str))
+            .filter_map(|m| {
+                m.scheduled_at.map(|scheduled_at| UpcomingMeetingDigest {
+                    meeting_id: m.id.0.clone(),
+                    domain_id: m.domain_id.clone(),
+                    title: m.title.clone(),
+                    scheduled_at,
+                })
+            })
+            .collect()
     }
 
     /// Collect Open proposals the DID has not yet voted on.
@@ -3645,6 +3735,269 @@ mod tests {
         assert!(
             chain.chain_complete,
             "INV-5: chain_complete must be true for accepted Text proposal (no allocations needed)"
+        );
+    }
+
+    // ========================================================================
+    // Notification digest tests (Phase 4)
+    // ========================================================================
+
+    fn sled_db_tmp() -> (Arc<sled::Db>, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = sled::Config::new()
+            .path(dir.path())
+            .temporary(true)
+            .open()
+            .expect("sled open");
+        (Arc::new(db), dir)
+    }
+
+    #[tokio::test]
+    async fn digest_empty_for_did_with_no_activity() {
+        let (mgr, _domain, _member) = make_manager_with_domain().await;
+        let stranger = test_did(99);
+
+        let digest = mgr.generate_digest(&stranger, 1_700_000_000).await;
+
+        assert_eq!(digest.did, stranger.to_string());
+        assert_eq!(digest.pending_vote_count, 0);
+        assert!(digest.pending_votes.is_empty());
+        assert_eq!(digest.overdue_item_count, 0);
+        assert!(digest.overdue_items.is_empty());
+        assert_eq!(digest.upcoming_meeting_count, 0);
+        assert!(digest.upcoming_meetings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn digest_pending_vote_includes_open_proposal_not_yet_voted() {
+        let (mgr, domain_id, proposer) = make_manager_with_domain().await;
+        let voter = test_did(7);
+
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-digest-1".to_string()),
+                domain_id.clone(),
+                proposer.clone(),
+                "Pending".to_string(),
+                "body".to_string(),
+                ProposalPayload::Text {
+                    body: "hello".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+        mgr.open_proposal(prop_id.clone(), 86400).await.unwrap();
+
+        let digest = mgr.generate_digest(&voter, 1_700_000_000).await;
+
+        assert_eq!(digest.pending_vote_count, 1);
+        assert_eq!(digest.pending_votes[0].proposal_id, prop_id.0);
+        assert!(digest.pending_votes[0].closes_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn digest_pending_vote_excluded_after_voting() {
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-digest-2".to_string()),
+                domain_id.clone(),
+                member.clone(),
+                "Voted".to_string(),
+                "body".to_string(),
+                ProposalPayload::Text {
+                    body: "hello".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+        mgr.open_proposal(prop_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(prop_id.clone(), member.clone(), VoteChoice::For, None)
+            .await
+            .unwrap();
+
+        let digest = mgr.generate_digest(&member, 1_700_000_000).await;
+        assert_eq!(
+            digest.pending_vote_count, 0,
+            "member who already voted should not see a pending vote"
+        );
+    }
+
+    #[tokio::test]
+    async fn digest_overdue_item_appears_for_assignee() {
+        // Use Sled-backed action-item store so list_by_assignee actually works.
+        let (db, _dir) = sled_db_tmp();
+        let (mut mgr, domain_id, _member) = make_manager_with_domain().await;
+        mgr.set_action_item_store(Box::new(SledActionItemStore::new(db)));
+        let assignee = fresh_did();
+        let creator = fresh_did();
+
+        // Create an assigned item with a due date in the past.
+        let mut item = ActionItem::new(
+            domain_id.clone(),
+            "Write minutes".to_string(),
+            creator,
+            1_000,
+        );
+        item.assignee = Some(assignee.clone());
+        item.due_date = Some(1_500);
+        mgr.action_items.save(&item).unwrap();
+
+        // Now = 2000, past due.
+        let digest = mgr.generate_digest(&assignee, 2_000).await;
+        assert_eq!(digest.overdue_item_count, 1);
+        assert_eq!(digest.overdue_items[0].title, "Write minutes");
+        assert_eq!(digest.overdue_items[0].due_date, 1_500);
+    }
+
+    #[tokio::test]
+    async fn digest_overdue_excludes_completed_item() {
+        let (db, _dir) = sled_db_tmp();
+        let (mut mgr, domain_id, _member) = make_manager_with_domain().await;
+        mgr.set_action_item_store(Box::new(SledActionItemStore::new(db)));
+        let assignee = fresh_did();
+        let creator = fresh_did();
+
+        let mut item = ActionItem::new(domain_id.clone(), "Done".to_string(), creator, 1_000);
+        item.assignee = Some(assignee.clone());
+        item.due_date = Some(1_500);
+        item.status = ActionItemStatus::Completed;
+        mgr.action_items.save(&item).unwrap();
+
+        let digest = mgr.generate_digest(&assignee, 2_000).await;
+        assert_eq!(digest.overdue_item_count, 0);
+    }
+
+    #[tokio::test]
+    async fn digest_upcoming_meetings_filter_by_window_and_attendee() {
+        let (mgr, domain_id, _member) = make_manager_with_domain().await;
+        let invitee = test_did(21);
+        let bystander_did_str = "did:icn:stranger".to_string();
+
+        let now = 1_700_000_000u64;
+
+        // In-window meeting with invitee listed as attendee.
+        let mut m_in = Meeting::new(
+            MeetingId::generate(),
+            domain_id.0.clone(),
+            "In-window",
+            "did:icn:organizer",
+            now,
+        );
+        m_in.scheduled_at = Some(now + 3_600); // +1h
+        m_in.attendees = vec![icn_governance::MeetingAttendee {
+            did: invitee.as_str().to_owned(),
+            status: icn_governance::AttendanceStatus::Invited,
+            meeting_role: icn_governance::MeetingRole::Participant,
+        }];
+        mgr.meeting_store.save(&m_in).unwrap();
+
+        // Out-of-window meeting (3 days out).
+        let mut m_far = Meeting::new(
+            MeetingId::generate(),
+            domain_id.0.clone(),
+            "Far",
+            "did:icn:organizer",
+            now,
+        );
+        m_far.scheduled_at = Some(now + 3 * 86_400);
+        m_far.attendees = vec![icn_governance::MeetingAttendee {
+            did: invitee.as_str().to_owned(),
+            status: icn_governance::AttendanceStatus::Invited,
+            meeting_role: icn_governance::MeetingRole::Participant,
+        }];
+        mgr.meeting_store.save(&m_far).unwrap();
+
+        // In-window meeting but invitee is NOT an attendee.
+        let mut m_no_invite = Meeting::new(
+            MeetingId::generate(),
+            domain_id.0.clone(),
+            "Not invited",
+            "did:icn:organizer",
+            now,
+        );
+        m_no_invite.scheduled_at = Some(now + 1_800);
+        m_no_invite.attendees = vec![icn_governance::MeetingAttendee {
+            did: bystander_did_str,
+            status: icn_governance::AttendanceStatus::Invited,
+            meeting_role: icn_governance::MeetingRole::Participant,
+        }];
+        mgr.meeting_store.save(&m_no_invite).unwrap();
+
+        let digest = mgr.generate_digest(&invitee, now).await;
+        assert_eq!(digest.upcoming_meeting_count, 1);
+        assert_eq!(digest.upcoming_meetings[0].title, "In-window");
+    }
+
+    // ------------------------------------------------------------------------
+    // SledActionItemStore assignee-secondary-index coverage
+    // ------------------------------------------------------------------------
+
+    /// Helper: generate a valid DID from a fresh Ed25519 key.
+    /// (test_did() uses from_anchor_id which may not decompress as a valid
+    /// Edwards point on deserialize — avoid for Sled roundtrip tests.)
+    fn fresh_did() -> Did {
+        icn_identity::KeyPair::generate().unwrap().did().clone()
+    }
+
+    #[tokio::test]
+    async fn sled_action_items_list_by_assignee_across_domains() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db);
+        let assignee = fresh_did();
+        let creator = fresh_did();
+        let other_assignee = fresh_did();
+
+        let domain_a = GovernanceDomainId::new("dom-a");
+        let domain_b = GovernanceDomainId::new("dom-b");
+
+        let mut item_a = ActionItem::new(domain_a.clone(), "A".to_string(), creator.clone(), 1);
+        item_a.assignee = Some(assignee.clone());
+        let mut item_b = ActionItem::new(domain_b.clone(), "B".to_string(), creator.clone(), 1);
+        item_b.assignee = Some(assignee.clone());
+        let mut item_c = ActionItem::new(domain_a.clone(), "C".to_string(), creator.clone(), 1);
+        item_c.assignee = Some(other_assignee); // different assignee
+
+        store.save(&item_a).unwrap();
+        store.save(&item_b).unwrap();
+        store.save(&item_c).unwrap();
+
+        let items = store.list_by_assignee(&assignee).unwrap();
+        let titles: Vec<&str> = items.iter().map(|i| i.title.as_str()).collect();
+        assert_eq!(
+            items.len(),
+            2,
+            "should find assignee's items in both domains"
+        );
+        assert!(titles.contains(&"A"));
+        assert!(titles.contains(&"B"));
+        assert!(!titles.contains(&"C"));
+    }
+
+    #[tokio::test]
+    async fn sled_action_items_assignee_index_cleaned_on_delete() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db);
+        let assignee = fresh_did();
+        let creator = fresh_did();
+        let domain = GovernanceDomainId::new("dom-x");
+
+        let mut item = ActionItem::new(domain.clone(), "Title".to_string(), creator, 1);
+        item.assignee = Some(assignee.clone());
+        store.save(&item).unwrap();
+        assert_eq!(store.list_by_assignee(&assignee).unwrap().len(), 1);
+
+        let removed = store.delete(&domain, &item.id).unwrap();
+        assert!(removed);
+        assert_eq!(
+            store.list_by_assignee(&assignee).unwrap().len(),
+            0,
+            "assignee index row must be removed on delete"
         );
     }
 }

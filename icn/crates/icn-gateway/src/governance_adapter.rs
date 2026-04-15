@@ -9,6 +9,7 @@
 //! by the broadcast channel's back-pressure.
 
 use crate::events::{EventBroadcaster, GatewayEvent};
+use icn_governance::{ActionItem, Meeting};
 use icn_governance_actor::events::GovernanceEventEmitter;
 use std::sync::Arc;
 
@@ -122,6 +123,84 @@ impl GovernanceEventEmitter for GatewayEventAdapter {
                     domain_id: domain_id.clone(),
                     voter,
                     choice,
+                },
+            )
+            .await;
+        });
+    }
+
+    fn emit_action_item_created(&self, item: &ActionItem) {
+        let b = self.broadcaster.clone();
+        let item_id = item.id.to_string();
+        let domain_id = item.domain_id.0.clone();
+        let parent_proposal = item.linked_proposal.as_ref().map(|p| p.0.clone());
+        let assignee = item.assignee.as_ref().map(|d| d.as_str().to_owned());
+        let created_at = item.created_at;
+        tokio::spawn(async move {
+            b.broadcast(
+                &domain_id,
+                GatewayEvent::GovernanceActionItemCreated {
+                    item_id,
+                    domain_id: domain_id.clone(),
+                    parent_proposal,
+                    assignee,
+                    created_at,
+                },
+            )
+            .await;
+        });
+    }
+
+    fn emit_meeting_scheduled(&self, meeting: &Meeting) {
+        let b = self.broadcaster.clone();
+        let meeting_id = meeting.id.0.clone();
+        let domain_id = meeting.domain_id.clone();
+        let title = meeting.title.clone();
+        let scheduled_at = meeting.scheduled_at;
+        let created_by = meeting.created_by.clone();
+        tokio::spawn(async move {
+            b.broadcast(
+                &domain_id,
+                GatewayEvent::GovernanceMeetingScheduled {
+                    meeting_id,
+                    domain_id: domain_id.clone(),
+                    title,
+                    scheduled_at,
+                    created_by,
+                },
+            )
+            .await;
+        });
+    }
+
+    fn emit_meeting_started(&self, meeting_id: &str, domain_id: &str, started_at: u64) {
+        let b = self.broadcaster.clone();
+        let meeting_id = meeting_id.to_owned();
+        let domain_id = domain_id.to_owned();
+        tokio::spawn(async move {
+            b.broadcast(
+                &domain_id,
+                GatewayEvent::GovernanceMeetingStarted {
+                    meeting_id,
+                    domain_id: domain_id.clone(),
+                    started_at,
+                },
+            )
+            .await;
+        });
+    }
+
+    fn emit_meeting_ended(&self, meeting_id: &str, domain_id: &str, ended_at: u64) {
+        let b = self.broadcaster.clone();
+        let meeting_id = meeting_id.to_owned();
+        let domain_id = domain_id.to_owned();
+        tokio::spawn(async move {
+            b.broadcast(
+                &domain_id,
+                GatewayEvent::GovernanceMeetingEnded {
+                    meeting_id,
+                    domain_id: domain_id.clone(),
+                    ended_at,
                 },
             )
             .await;

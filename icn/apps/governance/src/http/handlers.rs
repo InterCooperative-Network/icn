@@ -1317,6 +1317,32 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
     ctx.emitter
         .emit_proposal_closed(&proposal_id.0, &proposal.domain_id.0, outcome);
 
+    // Decision→action bridge: for accepted proposals, the actor materializes
+    // action items from `action_items_on_accept` specs. Query those freshly
+    // created items (filtered by linked_proposal) and emit
+    // GovernanceActionItemCreated for each — matches the existing pattern
+    // where the HTTP handler (not the actor) emits gateway-layer events.
+    if outcome == "accepted" && !proposal.action_items_on_accept.is_empty() {
+        let filter = icn_governance::ActionItemFilter {
+            linked_proposal: Some(proposal.id.clone()),
+            ..Default::default()
+        };
+        match ctx.manager.list_action_items(&proposal.domain_id, &filter) {
+            Ok(items) => {
+                for item in &items {
+                    ctx.emitter.emit_action_item_created(item);
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    proposal_id = %proposal.id.0,
+                    error = %e,
+                    "Failed to list materialized action items for event emission"
+                );
+            }
+        }
+    }
+
     Ok(HttpResponse::Ok().json(proposal))
 }
 
@@ -2179,7 +2205,8 @@ pub async fn add_action_item_note<E: GovernanceEventEmitter + Clone + 'static>(
 /// The `sub` claim in the token is used as the DID. Returns:
 /// - `pending_votes`: Open proposals the caller has not yet voted on.
 /// - `overdue_items`: Action items assigned to the caller that are past due.
-/// - `upcoming_meeting_count`: Always 0 (stub until meeting feature merges).
+/// - `upcoming_meetings`: Meetings scheduled in the next 48 h where the
+///   caller is listed as an attendee.
 pub async fn get_digest<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
@@ -2959,9 +2986,7 @@ pub async fn create_meeting<E: GovernanceEventEmitter + Clone + 'static>(
         )
         .map_err(anyhow_to_api)?;
 
-    // MeetingCreated event emission is deferred to the notification-digest PR,
-    // where GovernanceEventEmitter will gain meeting methods and the variant
-    // will ship under the canonical Governance<Thing><Verb> naming convention.
+    ctx.emitter.emit_meeting_scheduled(&m);
     Ok(HttpResponse::Created().json(meeting_to_response(&m)))
 }
 
@@ -3037,11 +3062,13 @@ pub async fn start_meeting<E: GovernanceEventEmitter + Clone + 'static>(
         return Err(err_bad("Meeting is not in Scheduled status"));
     }
 
+    let started_at = current_time_secs();
     m.status = MeetingStatus::InProgress;
-    m.started_at = Some(current_time_secs());
+    m.started_at = Some(started_at);
     ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
 
-    // Event emission deferred to the notification-digest PR (see create_meeting).
+    ctx.emitter
+        .emit_meeting_started(&m.id.0, &m.domain_id, started_at);
     Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
 }
 
@@ -3085,11 +3112,13 @@ pub async fn end_meeting<E: GovernanceEventEmitter + Clone + 'static>(
         return Err(err_bad("Meeting is not InProgress"));
     }
 
+    let ended_at = current_time_secs();
     m.status = MeetingStatus::Completed;
-    m.ended_at = Some(current_time_secs());
+    m.ended_at = Some(ended_at);
     ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
 
-    // Event emission deferred to the notification-digest PR (see create_meeting).
+    ctx.emitter
+        .emit_meeting_ended(&m.id.0, &m.domain_id, ended_at);
     Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
 }
 
