@@ -1,10 +1,20 @@
 # NYCN on ICN — Institutional Design Document
 
+> **⚠️ Revision notice (2026-04-15)** — Entity Structure section corrected in-place.
+>
+> This doc's original entity tree (2026-04-13) modeled committees and the summit year as `Community` entities. That is **superseded** by the layered ontology merged in #1540 (2026-04-14) and locked in [`NYCN-Repo-Architecture-Spec.md`](NYCN-Repo-Architecture-Spec.md) §0.3:
+>
+> - **Entities** (sovereign; join federations; hold independent treasury): NYCN federation, `nycn-organizers` co-op, member co-ops.
+> - **Structures** (non-sovereign; owned by a parent entity; delegated authority): committees, working groups, backbone, host pods. `icn-governance::structure::Structure { kind: Committee | WorkingGroup | Team | Office }`.
+> - **Activities** (time-bounded; owned by a parent entity): the summit cycle, regional meetup series. `icn-governance::activity::Activity { kind: Event | Program | Project | Initiative }`, with a proposed first-class `Program` wrapper adding milestones and stage gates (Tranche 1 of the execution plan).
+>
+> For canonical repo state, see the three companion docs: [`NYCN-Repo-Architecture-Spec.md`](NYCN-Repo-Architecture-Spec.md), [`NYCN-Implementation-Matrix.md`](NYCN-Implementation-Matrix.md), [`NYCN-Execution-Tranches.md`](NYCN-Execution-Tranches.md).
+
 ## Introduction
 
 This document formalizes the design for the New York Cooperative Network (NYCN) as a **native institution inside the InterCooperative Network (ICN)**.
 
-NYCN is not an application that uses ICN. NYCN is an institutional structure that lives within ICN. Every entity, relationship, decision, financial event, and communication channel maps to an ICN primitive. There is no separate database, no parallel app, no bespoke backend.
+NYCN is not an application that uses ICN. NYCN is an institutional arrangement that lives within ICN. Every entity, internal structure, activity, decision, financial event, and communication channel maps to an ICN primitive. There is no separate database, no parallel app, no bespoke backend.
 
 The goal is to transform NYCN from an informal coordination network into a **durable, governed federation** with real operational capacity, institutional memory, and long-term continuity — and to prove that ICN can host real institutions in the process.
 
@@ -22,65 +32,64 @@ Every feature NYCN needs is a feature every future ICN institution needs. Nothin
 
 ### ICN Primitive Mapping
 
-ICN's entity model (`icn-entity`) supports four types: `Individual`, `Cooperative(CooperativeProfile)`, `Community(CommunityProfile)`, `Federation(FederationProfile)`. All entities support hierarchical nesting via `parent_id`. Each cooperative and federation has a `governance_domain_id` (links to proposal/voting system) and a `treasury_account` (links to ledger).
+NYCN maps across three layers of ICN governance/identity primitives:
 
-### NYCN Entity Tree
+1. **Entity model** (`icn-entity`): four sovereign types — `Individual`, `Cooperative(CooperativeProfile)`, `Community(CommunityProfile)`, `Federation(FederationProfile)`. Entities nest via `parent_id`, and each cooperative/federation has a `governance_domain_id` and a `treasury_account`. Entities are the only layer that can join federations or hold independent treasury.
+
+2. **Structure model** (`icn-governance::structure`): non-sovereign internal units — `Structure { kind: Committee | WorkingGroup | Team | Office }` — owned by a parent entity and carrying delegated authority. Structures have `RoleAssignment`s (with `authority_scope: Vec<String>` capability strings, not a typed enum). Structures cannot hold independent treasury or join federations.
+
+3. **Activity model** (`icn-governance::activity`): time-bounded work — `Activity { kind: Event | Program | Project | Initiative }` — owned by a parent entity. A proposed first-class `Program` primitive (Tranche 1) will wrap `Activity` with milestones and stage gates for cycle-level containment.
+
+Operational objects (action items, meetings, documents) attach to any of the three layers via `icn-governance::parent::InstitutionalParent`.
+
+### NYCN Entity / Structure / Activity Topology
 
 ```
-nycn                          Federation(FederationProfile)
-├── governance_domain_id:     "nycn-federation-gov"
-├── treasury_account:         "nycn-federation-treasury"
-├── member_entities:          [greenstar, cooperation-buffalo, ica-group, ...]
+nycn                                   Entity: Federation(FederationProfile)
+├── governance_domain_id:              "nycn-federation-gov"
+├── treasury_account:                  "nycn-federation-treasury"
+├── member_entities:                   [greenstar, cooperation-buffalo, ica-group, ...]
 │
-├── nycn-organizers           Cooperative(CooperativeProfile)
-│   ├── parent_id:            "nycn"
-│   ├── governance_domain_id: "nycn-organizers-gov"
-│   ├── treasury_account:     "nycn-ops-treasury"
+├── nycn-organizers                    Entity: Cooperative(CooperativeProfile)
+│   ├── parent_id:                     "nycn"
+│   ├── governance_domain_id:          "nycn-organizers-gov"
+│   ├── treasury_account:              "nycn-ops-treasury"
 │   │
-│   ├── nycn-steering         Community(CommunityProfile)
-│   │   ├── parent_id:        "nycn-organizers"
-│   │   └── governance_domain_id: "nycn-steering-gov"
+│   ├── [STRUCTURES — owned by nycn-organizers]
+│   │   ├── nycn-backbone              Structure { kind: Committee }
+│   │   ├── nycn-steering              Structure { kind: Committee }
+│   │   ├── nycn-content               Structure { kind: Committee }
+│   │   ├── nycn-logistics             Structure { kind: Committee }
+│   │   ├── nycn-marketing             Structure { kind: Committee }
+│   │   ├── nycn-finance               Structure { kind: Committee }
+│   │   └── nycn-accessibility-wg      Structure { kind: WorkingGroup }
 │   │
-│   ├── nycn-content          Community(CommunityProfile)
-│   │   ├── parent_id:        "nycn-organizers"
-│   │   └── governance_domain_id: "nycn-content-gov"
-│   │
-│   ├── nycn-logistics        Community(CommunityProfile)
-│   │   ├── parent_id:        "nycn-organizers"
-│   │   └── governance_domain_id: "nycn-logistics-gov"
-│   │
-│   ├── nycn-marketing        Community(CommunityProfile)
-│   │   ├── parent_id:        "nycn-organizers"
-│   │   └── governance_domain_id: "nycn-marketing-gov"
-│   │
-│   ├── nycn-finance          Community(CommunityProfile)
-│   │   ├── parent_id:        "nycn-organizers"
-│   │   └── governance_domain_id: "nycn-finance-gov"
-│   │
-│   └── nycn-summit-2026      Community(CommunityProfile)
-│       ├── parent_id:        "nycn-organizers"
-│       └── governance_domain_id: "nycn-summit-2026-gov"
+│   └── [ACTIVITIES — owned by nycn-organizers]
+│       ├── summit-2026                Activity { kind: Event }       — to be wrapped by Program (Tranche 1)
+│       ├── summit-2027                Activity { kind: Event }       — future; once Program lands, Program.parent_program_id = summit-2026
+│       └── regional-meetups-2026      Activity { kind: Initiative }  — ongoing regional meetup series (Initiative is the closest existing ActivityKind)
 │
-├── greenstar                 Cooperative(CooperativeProfile)
-│   └── (GreenStar's own entity, independent)
-│
-├── cooperation-buffalo       Cooperative(CooperativeProfile)
-│   └── (Cooperation Buffalo's own entity)
-│
-└── ... (217+ member organizations)
+├── greenstar                          Entity: Cooperative(CooperativeProfile)
+├── cooperation-buffalo                Entity: Cooperative(CooperativeProfile)
+└── ... (N member organizations as independent entities)
 ```
 
-**Key design decisions:**
+**Key design decisions (corrected):**
 
-1. **NYCN Federation** is the top-level entity. It governs network-wide decisions: membership admission, federation charter amendments, shared initiatives.
+1. **NYCN Federation** is the top-level entity. It governs network-wide decisions: membership admission, federation charter amendments, shared initiatives. `FederationProfile.member_entities` lists participating sovereign entities.
 
-2. **NYCN Organizers** is a `Cooperative` (not a Community) because it holds treasury and executes operations. It's the operational body — the people who actually run things.
+2. **NYCN Organizers** is a sovereign `Cooperative` entity because it holds treasury and executes operations. It is the operational body — the legal/economic container for the people and funds that actually run things.
 
-3. **Committees are `Community` entities** nested under the organizer co-op. Each gets its own `governance_domain_id`, meaning each committee can run its own proposals and votes scoped to committee members. A `Community` requires a governance domain but not a treasury — committee spending goes through the parent co-op's treasury with scoped authority.
+3. **Committees are `Structure` records**, not entities. Each committee (`nycn-finance`, `nycn-content`, `nycn-logistics`, `nycn-marketing`, `nycn-backbone`, the accessibility working group) lives in `icn-governance::structure::Structure` with `kind: Committee` (or `WorkingGroup`) and `parent_entity_id: "nycn-organizers"`. A governance domain can optionally be provisioned for a structure where scoped proposals/votes are needed, but the structure itself is not a sovereign entity and does not appear in `FederationProfile.member_entities`. This is important: committees have delegated authority (via `RoleAssignment.authority_scope` capability strings), not sovereignty.
 
-4. **Summit 2026 is a `Community` entity** with time-bounded lifecycle. Status progresses: `Forming` → `Active` → completed (dissolved or archived). Next year, `nycn-summit-2027` is created fresh, inheriting institutional records from 2026.
+4. **Summit 2026 is an `Activity { kind: Event }`**, owned by `nycn-organizers`. Today, `Activity` has four kinds (`Event | Program | Project | Initiative`) and no cycle-level container fields. Tranche 1 introduces a first-class `Program` primitive that wraps the summit Activity and adds:
+   - milestones with machine-readable required-check predicates (`StrategyLocked → VenueLocked → BudgetLocked → PublicLaunchReady → EventReady → ClosureComplete`),
+   - cycle-to-cycle handoff via `Program.parent_program_id` (so `summit-2027`'s Program points back to `summit-2026`'s Program for year-over-year comparison).
+   Note: `parent_program_id` is a proposed field on the proposed `Program` type, not on `Activity`. Activities do not appear in `FederationProfile.member_entities`.
 
 5. **Member organizations are independent entities** that join the federation via the `member_entities` list on `FederationProfile`. They keep their own governance and treasury. The federation relationship is additive, not subordinating.
+
+6. **Authority model**: governance authority is expressed through `RoleAssignment.authority_scope: Vec<String>` (capability strings like `"propose"`, `"approve-budget-<=5000"`, `"backbone-authority"`) combined with PolicyOracle rules. There is no typed authority-level enum; backbone ratification rules key off capability strings declared in CCL/oracle config. See [`NYCN-Repo-Architecture-Spec.md`](NYCN-Repo-Architecture-Spec.md) §4.3.
 
 ---
 

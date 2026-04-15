@@ -383,7 +383,7 @@ Strategic direction and gap analysis (March 2026):
 - [ICN-Scenarios.md](strategy/ICN-Scenarios.md) - Six working scenarios with API calls
 - [ICN-Evolution-Arc.md](strategy/ICN-Evolution-Arc.md) - Two-year project history
 - [NYCN-Institutional-Strategy.md](strategy/NYCN-Institutional-Strategy.md) - NYCN as first real ICN institution (2026-04-13)
-- [NYCN-Institutional-Design.md](strategy/NYCN-Institutional-Design.md) - NYCN entity tree, governance model, and ICN primitive mapping (2026-04-13; partially superseded by Repo-Architecture-Spec §0.3 — committees are Structures, not Communities)
+- [NYCN-Institutional-Design.md](strategy/NYCN-Institutional-Design.md) - NYCN entity/structure/activity topology, governance model, and ICN primitive mapping (2026-04-13; Entity Structure section corrected 2026-04-15 to match layered ontology from #1540)
 - [NYCN-Implementation-Plan.md](strategy/NYCN-Implementation-Plan.md) - 5-phase platform feature plan: decision→action bridge, consent mode, meetings, digests, documents (2026-04-13)
 - [NYCN-Sprint-Plan.md](strategy/NYCN-Sprint-Plan.md) - 3-lane sprint plan: platform closure, institutional model, migration prep (2026-04-13)
 - [NYCN-Repo-Architecture-Spec.md](strategy/NYCN-Repo-Architecture-Spec.md) - Repo-shaped architectural map grounded in current code: bounded domains, canonical objects, authority model, Program/cycle design (2026-04-14)
