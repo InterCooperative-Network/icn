@@ -46,18 +46,19 @@
 | ActionItem `parent: InstitutionalParent` field | ✅ | `main` | `icn-governance::action_item::ActionItem.parent` | — | — | #1540 merged |
 | ActionItem `linked_proposal` + decision→action bridge | ✅ | `main` | `icn-governance::proposal::ActionItemSpec`, `apps/governance/src/actor.rs` | — | — | #1532 merged |
 | ActionItem `meeting_id: Option<MeetingId>` field | 🚧 | `open_pr` (#1543) | `icn-governance::action_item` (on meeting branch) | T (on land) | Merge #1543 | — |
-| ActionItem **assignee secondary index** (`ai_idx:assignee:<did>:<id>`) | 🚧 | `branch_only` | `apps/governance/src/manager.rs::SledActionItemStore` (on `feat/notification-digests`) | S, T (backfill test) | Open PR; add backfill-on-init with `_meta:idx_version:assignee` marker | #1543 merge first |
+| ActionItem **assignee secondary index** (proposed key: `action_item_by_assignee:{did}:{domain_id}:{item_id}`) | 🚧 | `branch_only` | `apps/governance/src/manager.rs::SledActionItemStore` (on `feat/notification-digests`) | S, T (backfill test) | Open PR; align key name to existing `_by_` convention; add backfill-on-init with `_meta:idx_version:assignee` marker | #1543 merge first |
 | ActionItem **assignee-index backfill** for pre-existing items | ❌ | `spec_only` | same file | S, T | Add on same PR as above | — |
-| ActionItem secondary indexes (`ai_idx:parent:*`, `ai_idx:status:*`) | ❌ | `spec_only` | same file | S, T | Add alongside parent-scoped / status-scoped queries (Phase 1 views) | Program views |
+| ActionItem secondary indexes (`action_item_by_parent:*`, `action_item_by_status:*`) | ❌ | `spec_only` | same file | S, T | Add alongside parent-scoped / status-scoped queries (Tranche 1 views) | Program views |
 | ActionItemSpec (proposal materialization) | ✅ | `main` | `icn-governance::proposal::ActionItemSpec` | — | — | #1532 |
 | Structure (Committee / WorkingGroup / Team / Office) | ✅ | `main` | `icn-governance::structure`, `apps/governance/src/manager.rs::SledStructureStore` | — | Seed NYCN committees via charter bootstrap | #1540 |
-| RoleAssignment | ✅ | `main` | `icn-governance::structure::RoleAssignment` | Hh (`GET /me/scopes` handler missing) | Add `GET /me/scopes` in Tranche 1 | — |
+| RoleAssignment (`structure_id`, `person_did`, `role: String`, `authority_scope: Vec<String>`, start/end, `assigned_by_decision`) | ✅ | `main` | `icn-governance::structure::RoleAssignment` | Hh (`GET /me/scopes` handler missing) | Add `GET /me/scopes` in Tranche 1. Authority is capability-string based (`authority_scope`), not a typed enum. | — |
 | Activity (Event / Program / Project / Initiative) | ✅ | `main` | `icn-governance::activity`, `apps/governance/src/manager.rs::SledActivityStore` | — | Keep; wrap into Program for stage-gated cycles | #1540 |
 | InstitutionalParent (polymorphic attachment) | ✅ | `main` | `icn-governance::parent` | — | Use for every new operational object | #1540 |
 | Charter + CharterStore | ✅ | `main` | `icn-governance::{charter,charter_store}` | — | Use NYCN charter YAML draft | — |
 | Steward (SDIS) | ✅ | `main` | `icn-governance::{steward,steward_store}` | — | — | — |
 | Delegation (vote-level) | ✅ | `main` | `icn-governance::delegation` | — | Distinct from operational RoleDelegation (Phase 6) | — |
-| Gateway events (proposal / action / structure / activity) | ✅ | `main` | `icn-gateway::events` | — | Extend per-object | — |
+| Gateway events — governance subset (`GovernanceDomainCreated`, `GovernanceProposalCreated`, `GovernanceProposalOpened`, `GovernanceProposalClosed { outcome, ... }`, `GovernanceVoteCast`) | ✅ | `main` | `icn-gateway::events` (verified) | — | — | — |
+| Gateway events for action-item / structure / activity lifecycle | ❌ | `spec_only` | `icn-gateway::events` | E, wire emission in `apps/governance/src/actor.rs` | Add at least `GovernanceActionItemCreated` in Tranche 0b so digest architecture is event-driven; others per tranche | — |
 | **Meeting** + AgendaItem + attendance + SledMeetingStore + 9 HTTP endpoints | 🚧 | `open_pr` (#1543) | `icn-governance::meeting`, `apps/governance/src/manager.rs::SledMeetingStore`, handlers | T (on land) | Human review + merge #1543 | Benchmark regression tag; no blocking human review yet |
 | Meeting-lifecycle events (`MeetingCreated/Started/Ended`) | 🚧 | `open_pr` (#1543) | `icn-gateway::events` | — | Lands with #1543 | — |
 | **DigestSummary** + `GET /digest` + `list_by_assignee` | 🚧 | `branch_only` | `apps/governance/src/manager.rs`, handlers | Hh, T | PR it after #1543 merges; unstub `upcoming_meetings` against meeting store | #1543 |
@@ -127,19 +128,29 @@
 
 | Store | Index | Status | Source | Required for |
 |-------|-------|--------|--------|--------------|
-| `SledActionItemStore` | `ai_idx:assignee:<did>:<id>` | 🚧 | `branch_only` | Digest performance |
+**On `main`** (verified in `apps/governance/src/manager.rs`):
+
+| Store | Keys | Status | Source |
+|-------|------|--------|--------|
+| `SledActionItemStore` | `action_item:{domain_id}:{item_id}` | ✅ | `main` |
+| `SledStructureStore` | `structure:{structure_id}`, `structure_by_entity:{entity_id}:{structure_id}`, `role:{role_id}`, `role_by_structure:{structure_id}:{role_id}` | ✅ | `main` |
+| `SledActivityStore` | `activity:{activity_id}`, `activity_by_entity:{entity_id}:{activity_id}` | ✅ | `main` |
+
+**Needed** (new keys follow the existing `<thing>_by_<scope>:...` convention, not a fabricated `_idx:` prefix):
+
+| Store | Key | Status | Source | Required for |
+|-------|-----|--------|--------|--------------|
+| `SledActionItemStore` | `action_item_by_assignee:{did}:{domain_id}:{item_id}` | 🚧 | `branch_only` | Digest performance |
 | `SledActionItemStore` | assignee-index backfill on init | ❌ | `spec_only` | Correctness for pre-existing items |
-| `SledActionItemStore` | `ai_idx:parent:<parent_tag>:<parent_id>:<id>` | ❌ | `spec_only` | Scope-scoped queries |
-| `SledActionItemStore` | `ai_idx:status:<status>:<id>` | ❌ | `spec_only` | Dashboard counts |
-| `SledStructureStore` | `structure_idx:parent_entity:<id>:<sid>` | ⚠️ | verify on `main` | Committee listing |
-| `SledActivityStore` | `activity_idx:parent_entity:<id>:<aid>` | ⚠️ | verify on `main` | Activity listing |
-| `SledMeetingStore` | `meeting_idx:scope:<tag>:<id>:<scheduled_at>:<mid>` | ⚠️ | verify on #1543 | Upcoming meetings within 48h for digest |
-| `SledProgramStore` | primary + parent-entity + status + kind indexes | ❌ | `spec_only` | All program views |
-| `SledSponsorStore` | `sponsor_idx:program:<pid>:<sid>` + `...:status:...` | ❌ | `spec_only` | Sponsor pipeline view |
-| `SledBudgetItemStore` | `budget_idx:program:<pid>:<bid>` | ❌ | `spec_only` | Program budget view |
-| `SledSessionStore` | `session_idx:program:<pid>:<sid>` + `...:status:...` | ❌ | `spec_only` | Program content view |
-| `SledRegistrationStore` | `registration_idx:program:<pid>:<rid>` + `...:actor:<did>:...` | ❌ | `spec_only` | Attendee counts, user's registrations |
-| `SledDocumentStore` | `doc_idx:<domain>:<type>:<timestamp>` + `doc_link:<scope>:<id>:<doc_id>` | ❌ | `spec_only` | Phase 5 document queries |
+| `SledActionItemStore` | `action_item_by_parent:{parent_tag}:{parent_id}:{domain_id}:{item_id}` | ❌ | `spec_only` | Scope-scoped queries |
+| `SledActionItemStore` | `action_item_by_status:{status}:{domain_id}:{item_id}` | ❌ | `spec_only` | Dashboard counts |
+| `SledMeetingStore` | `meeting:{meeting_id}`, `meeting_by_scope:{scope_tag}:{scope_id}:{scheduled_at}:{meeting_id}` | ⚠️ | verify on #1543 | Upcoming meetings within 48h for digest |
+| `SledProgramStore` | `program:{id}`, `program_by_entity:{entity_id}:{id}`, `program_by_status:{status}:{id}`, `program_by_kind:{kind}:{id}` | ❌ | `spec_only` | All program views |
+| `SledSponsorStore` | `sponsor:{id}`, `sponsor_by_program:{program_id}:{id}`, `sponsor_by_status:{status}:{id}` | ❌ | `spec_only` | Sponsor pipeline view |
+| `SledBudgetItemStore` | `budget_item:{id}`, `budget_item_by_program:{program_id}:{id}` | ❌ | `spec_only` | Program budget view |
+| `SledSessionStore` | `session:{id}`, `session_by_program:{program_id}:{id}`, `session_by_status:{status}:{id}` | ❌ | `spec_only` | Program content view |
+| `SledRegistrationStore` | `registration:{id}`, `registration_by_program:{program_id}:{id}`, `registration_by_actor:{did}:{id}` | ❌ | `spec_only` | Attendee counts, user's registrations |
+| `SledDocumentStore` | `document:{doc_hash}`, `document_by_domain_type:{domain_id}:{type}:{timestamp}:{doc_hash}`, `document_by_scope:{scope_tag}:{scope_id}:{doc_hash}` | ❌ | `spec_only` | Phase 5 document queries |
 
 **Migration-safe index rule**: every new index gets a `_meta:idx_version:<name>` marker. On store init, if absent or below current version, walk rows and populate. Test coverage must include both "empty store" and "pre-populated store".
 
@@ -147,30 +158,49 @@
 
 ## 5. Gateway events
 
-| Event | Status | Source |
-|-------|--------|--------|
-| `ProposalOpened/Accepted/Rejected` | ✅ | `main` |
-| `ActionItemCreated/Updated/Completed` | ⚠️ | verify coverage in `events.rs` on `main` |
-| `StructureCreated`, `RoleAssigned` | ⚠️ | verify on `main` (via #1540) |
-| `ActivityCreated`, `ActivityStatusChanged` | ⚠️ | verify on `main` (via #1540) |
-| `MeetingCreated/Started/Ended` | 🚧 | `open_pr` #1543 |
-| `ProgramOpened/Closed`, `MilestoneCompleted/Blocked` | ❌ | `spec_only` (Tranche 1) |
-| `SponsorStatusChanged` | ❌ | `spec_only` (Tranche 2) |
-| `BudgetItemCreated/Updated` | ❌ | `spec_only` (Tranche 2) |
-| `SessionPublished`, `SessionStatusChanged` | ❌ | `spec_only` (Tranche 3) |
-| `RegistrationConfirmed`, `RegistrationCheckedIn` | ❌ | `spec_only` (Tranche 3) |
-| `DocumentCreated`, `DocumentUpdated` | ❌ | `spec_only` (Tranche 5) |
+Current `GatewayEvent` governance-related variants on `main` (verified in `icn/crates/icn-gateway/src/events.rs`):
+
+| Event variant | Status | Source |
+|---------------|--------|--------|
+| `GovernanceDomainCreated` | ✅ | `main` |
+| `GovernanceProposalCreated` | ✅ | `main` |
+| `GovernanceProposalOpened` | ✅ | `main` |
+| `GovernanceProposalClosed { outcome: String, ... }` | ✅ | `main` |
+| `GovernanceVoteCast` | ✅ | `main` |
+
+Proposed additions — **none of these exist on `main` yet**:
+
+| Event variant | Status | Source | Tranche |
+|---------------|--------|--------|---------|
+| `GovernanceActionItemCreated` (emitted when decision→action bridge materializes items) | ❌ | `spec_only` | **0b (add alongside digest PR so digest architecture is event-driven from day 1)** |
+| `GovernanceActionItemUpdated/Completed` | ❌ | `spec_only` | 1 |
+| `GovernanceStructureCreated`, `GovernanceRoleAssigned` | ❌ | `spec_only` | 1 |
+| `GovernanceActivityCreated`, `GovernanceActivityStatusChanged` | ❌ | `spec_only` | 1 |
+| `GovernanceMeetingCreated/Started/Ended` | 🚧 | `open_pr` #1543 | 0a |
+| `GovernanceProgramOpened/Closed`, `GovernanceMilestoneCompleted/Blocked` | ❌ | `spec_only` | 1 |
+| `GovernanceSponsorStatusChanged` | ❌ | `spec_only` | 2 |
+| `GovernanceBudgetItemCreated/Updated` | ❌ | `spec_only` | 2 |
+| `GovernanceSessionPublished`, `GovernanceSessionStatusChanged` | ❌ | `spec_only` | 3 |
+| `GovernanceRegistrationConfirmed`, `GovernanceRegistrationCheckedIn` | ❌ | `spec_only` | 3 |
+| `GovernanceDocumentCreated/Updated` | ❌ | `spec_only` | 5 |
+
+**Naming convention**: follow the existing `Governance<Thing><Verb>` pattern on `GatewayEvent`. Do not invent a parallel naming scheme.
 
 ---
 
 ## 6. HTTP API surface
 
-### 6.1 On `main`
+All governance routes are mounted under the `/gov` scope (see `icn/crates/icn-gateway/src/server.rs:2008`).
 
-- `POST/GET /gov/domains/...`, `POST /gov/proposals`, vote/close
-- `POST/GET /gov/action-items`, `PATCH /gov/action-items/{id}`
-- `POST/GET /gov/structures`, `POST /gov/structures/{id}/roles`
-- `POST/GET /gov/activities`
+### 6.1 On `main` (verified in `apps/governance/src/http/configure.rs`)
+
+- **Domains**: `POST/GET /gov/domains`, `GET /gov/domains/{domain_id}`, `POST/DELETE /gov/domains/{domain_id}/members`
+- **Proposals**: `POST/GET /gov/proposals`, `GET /gov/proposals/{id}`, `POST /gov/proposals/{id}/{open,close,vote}`, `GET /gov/proposals/{id}/{tally,proof,chain,discussion}`, discussion comment CRUD
+- **Delegations** (vote-level): `POST/GET /gov/delegations`, `GET /gov/delegations/{id}`
+- **Action items** (domain-scoped): `GET /gov/domains/{domain_id}/action-items`, `GET /gov/domains/{domain_id}/action-items/{item_id}`, `PATCH .../status`, `POST .../notes`
+- **Structures** (entity-scoped): `POST/GET /gov/entities/{entity_id}/structures`, `GET /gov/structures/{structure_id}`, `POST /gov/structures/{structure_id}/roles`
+- **Activities** (entity-scoped): `POST/GET /gov/entities/{entity_id}/activities`, `GET /gov/activities/{activity_id}`
+- **Federation / SDIS proposal shortcuts**: `/gov/proposals/federation/...`, `/gov/proposals/sdis/...`
 
 ### 6.2 On PR #1543
 
@@ -185,7 +215,7 @@
 
 ### 6.4 Proposed per tranche
 
-- **Tranche 1 (Program)**: `/gov/programs` CRUD, `/{id}/milestones` CRUD, `/{id}/close`, `/{id}/dashboard`; `/me/scopes`, `/me/work`; scope-partitioned `/gov/digest?scope=...`
+- **Tranche 1 (Program)**: `POST/GET /gov/entities/{entity_id}/programs`, `GET /gov/programs/{program_id}`, `POST /gov/programs/{id}/milestones`, `PATCH .../{mid}`, `POST /gov/programs/{id}/close`, `GET /gov/programs/{id}/dashboard`; `GET /gov/me/scopes`, `GET /gov/me/work`; scope-partitioned `GET /gov/digest?scope=...`
 - **Tranche 2 (Funding)**: `/gov/sponsors` CRUD, `/gov/programs/{id}/sponsors`, `/gov/budget-items` CRUD, `/gov/programs/{id}/budget`
 - **Tranche 3 (Content/Attendees)**: `/gov/sessions` CRUD, `/gov/programs/{id}/sessions`, `/gov/registrations` CRUD, `/gov/programs/{id}/registrations`, `/gov/programs/{id}/accessibility-status`, `/gov/programs/{id}/representation`
 - **Tranche 4 (Migration)**: provenance reads `/gov/history/{ref}`, `/gov/provenance/{ref}` (if not deferred to Tranche 5)

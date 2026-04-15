@@ -79,7 +79,7 @@ Grounded in direct inspection of `icn/crates/icn-governance/src/` and `icn/apps/
 | Action items (CRUD, status, priority, notes, filter, sled store) | `icn-governance::action_item` (1281 LOC) | Full store trait + `SledActionItemStore` + assignee index |
 | Decision→action bridge: accepted proposals auto-materialize `ActionItemSpec`s with provenance | `icn-governance::proposal::ActionItemSpec`, `apps/governance/src/actor.rs` | #1532 merged |
 | Institutional Structure (Committee / WorkingGroup / Team / Office) + sled store | `icn-governance::structure` (548 LOC), `apps/governance/src/manager.rs::SledStructureStore` | #1540 merged |
-| Role Assignment (scope-aware, authority-typed) | `icn-governance::structure::RoleAssignment` | #1540 merged |
+| Role Assignment (`structure_id`, `person_did`, `role: String`, `authority_scope: Vec<String>`, start/end) | `icn-governance::structure::RoleAssignment` | #1540 merged. Authority is capability-string based, not a typed enum. |
 | Activity (Event / Program / Project / Initiative) + sled store | `icn-governance::activity` (335 LOC), `apps/governance/src/manager.rs::SledActivityStore` | #1540 merged |
 | Polymorphic `InstitutionalParent` attachment for action items | `icn-governance::parent`, `action_item::ActionItem.parent` | #1540 merged |
 | Federation charter / charter store | `icn-governance::{charter, charter_store}` | Mature |
@@ -162,7 +162,7 @@ Every object from the institutional review, mapped to repo reality.
 | `Person / Actor` | `icn-identity::Did` | ✅ | |
 | `Participation` | `icn-governance::membership` + `RoleAssignment` | ✅ for member/role cases | Sponsor / speaker / attendee participation is MISSING (see §3 below) |
 | `Structure` | `icn-governance::structure::Structure` | ✅ | `kind: Committee/WorkingGroup/Team/Office` |
-| `RoleAssignment` | `icn-governance::structure::RoleAssignment` | ✅ | Scope-aware, authority-typed (advisory / binding / delegated / temporary / emergency — verify enum matches) |
+| `RoleAssignment` | `icn-governance::structure::RoleAssignment` | ✅ | Scope-aware; authority represented by `authority_scope: Vec<String>` capability strings + freeform `role` — **not** a typed authority-level enum |
 | **Program** | proposed `icn-governance::program::Program` | ❌ missing | Wraps `Activity` with milestones, phase state, closure hooks |
 | `Activity` | `icn-governance::activity::Activity` | ✅ | Use as building block for Program |
 | `Meeting` | `icn-governance::meeting::Meeting` | 🚧 PR #1543 | |
@@ -199,24 +199,26 @@ Two options:
 
 ## 4. Authority and scope model
 
-### 4.1 What currently supports scope switching
+### 4.1 What currently supports scoped authority
 
-`RoleAssignment` (in `icn-governance::structure`) already carries:
-- `actor_did` (who)
-- `scope` — structure ID the role is for
-- role type + authority level
-- start/end
+`RoleAssignment` (in `icn-governance::structure`) carries:
+- `structure_id` — the structure the assignment belongs to
+- `person_did` — who holds the assignment
+- `role: String` — a freeform role label (e.g. `"coordinator"`, `"facilitator"`, `"note_taker"`, `"member"`)
+- `authority_scope: Vec<String>` — delegated capability strings within that role (narrower than or equal to the structure's scope)
+- `start_date` / `end_date` — time-bounded
+- `assigned_by_decision: Option<ProposalId>` — provenance link if proposal-backed
 
-Combined with `MembershipCapability` on entity membership, a user can already be "Matt acting as finance-committee lead on nycn-finance" vs. "Matt acting as an attendee on summit-2026". **This is the primitive for scope switching.**
+Combined with `MembershipCapability` on entity membership, a user can already hold a structure-specific governance role with delegated capability scopes — e.g., "Matt is assigned as finance-committee lead on `nycn-finance` with `authority_scope: ["propose", "approve-budget-<=5000"]`". **This is the primitive scoped-authority plumbing.**
 
 What is missing:
-- **Active-scope selection** at the HTTP/session layer. The gateway currently takes JWTs with `coop_id` and `scopes`. It does not yet have a first-class "act-as-structure-X-with-role-Y" selection mechanism.
-- **Delegation records** for temporary role handoff ("Matt delegates venue-selection to Priya for 2 weeks").
+- **Active-scope selection** at the HTTP/session layer. The gateway currently takes JWTs with `coop_id` and `scopes`. It does not yet have a first-class "act-as-structure-X-with-role-Y" request-context mechanism resolved against the `RoleAssignment` store.
+- **Operational role delegation** for temporary handoff ("Matt delegates venue-selection to Priya for 2 weeks"), beyond the delegated capabilities already on an assignment.
 
 ### 4.2 Proposed additions
 
-1. **`SessionScope` in gateway request context** — resolved from DID + active scope claim against `RoleAssignment` store. Belongs in `icn-gateway::auth` / wherever JWT claims are validated.
-2. **`RoleDelegation`** — in `icn-governance::structure` or a new `icn-governance::role_delegation` module. Fields: `grantor`, `grantee`, `scope_ref`, `capabilities`, `starts_at`, `ends_at`, `reason`, `revoked_at`. Distinct from `icn-governance::delegation` (which is vote-delegation).
+1. **`SessionScope` in gateway request context** — resolved from DID + active structure/role claim against the `RoleAssignment` store. Belongs in `icn-gateway::auth` / wherever JWT claims are validated.
+2. **`RoleDelegation`** — new `icn-governance::role_delegation` module. Fields: `grantor`, `grantee`, `scope_ref`, `capabilities: Vec<String>` (same capability-string vocabulary as `authority_scope`), `starts_at`, `ends_at`, `reason`, `revoked_at`. Distinct from `icn-governance::delegation` (which is vote-delegation).
 
 ### 4.3 Backbone authority
 
@@ -224,14 +226,14 @@ The backbone group is one of the most politically load-bearing concepts in NYCN 
 
 ```rust
 Structure {
-    id: StructureId("nycn-backbone"),
+    id: StructureId::from_raw("nycn-backbone"),
     parent_entity_id: "nycn-organizers",
     kind: StructureKind::Committee,
     // metadata: { "authority_class": "backbone", "requires_ratification_for": ["...categories..."] }
 }
 ```
 
-Authority-rule enforcement should be a **PolicyOracle decision**, not a hard-coded match. Specifically: when a proposal is opened in a backbone-group domain with a type that requires full-network ratification, the oracle refuses to finalize unilaterally and flags it as requiring downstream ratification in the parent's governance domain. This keeps the meaning firewall intact and makes NYCN's authority rules data-driven rather than NYCN-specific code.
+Role holders on the backbone structure carry capability strings like `"backbone-authority"` in their `authority_scope`. Authority-rule enforcement is then a **PolicyOracle decision** keyed off those capability strings — not hard-coded match arms, not a new enum. Specifically: when a proposal is opened in a backbone-scoped domain with a type that requires full-network ratification, the oracle refuses to finalize unilaterally and flags it as requiring a downstream ratification proposal in the parent entity's governance domain. This keeps the meaning firewall intact (CCL/oracle config expresses which proposal types require ratification; the code does not hard-code NYCN categories) and makes the rule set data-driven.
 
 ---
 
@@ -333,18 +335,31 @@ Add to `icn-gateway::events::GatewayEvent`:
 
 ## 6. Event-driven flow mapping
 
-ICN already has `GatewayEvent` emission on proposal/action-item/structure/activity lifecycle. The NYCN integration does **not** require a new event bus — it requires adding variants and wiring more materializers.
+ICN already has `GatewayEvent` emission on **proposal lifecycle** (domain create, proposal create/open/close, vote cast). It does **not** yet emit events for action-items, structures, or activities. The NYCN integration requires both adding variants **and** wiring the emission sites — not just consumer materializers.
 
-### 6.1 Governance → task chain (already wired)
+Current governance-related variants on `main` (verified in `icn/crates/icn-gateway/src/events.rs`):
+
+- `GovernanceDomainCreated`
+- `GovernanceProposalCreated`
+- `GovernanceProposalOpened`
+- `GovernanceProposalClosed { outcome: String, ... }`
+- `GovernanceVoteCast`
+
+### 6.1 Governance → task chain (partial — consumer side wired, event side missing)
+
+State-change side **already works on `main`** (the decision→action bridge materializes action items in `apps/governance/src/actor.rs` after a proposal is accepted). The **event emission** for downstream consumers is incomplete:
 
 ```
-proposal.accepted
-  → action_item.created (n, via ActionItemSpec materialization in actor.rs)
-  → GatewayEvent::ProposalAccepted
-  → GatewayEvent::ActionItemCreated (per item)
+proposal.accepted (state change)
+  → action_item records created (✅ on main, via ActionItemSpec materialization)
+  → GatewayEvent::GovernanceProposalClosed { outcome: "accepted", ... }  (✅ on main)
+  → GatewayEvent::GovernanceActionItemCreated (per item)                  (❌ not emitted; must be added)
 ```
 
-Gap: no `digest.generated` event is emitted downstream. Add when digest service gets a real task loop.
+Gap 1: no per-action-item event is emitted. Consumers that need to react on materialization (digests, external integrations) cannot today — they must poll stores.
+Gap 2: no `digest.generated` event. Add when digest service gets a real task loop.
+
+**Recommended placement**: add `GovernanceActionItemCreated { item_id, domain_id, linked_proposal, assignee }` as part of the Tranche 0b (notification-digests) PR, so the digest architecture can converge on event-driven materialization from the start.
 
 ### 6.2 Meeting closure chain (after #1543 merges)
 
@@ -590,21 +605,43 @@ Every state transition on a canonical object should be attributable. If the Rust
 
 ## 13. API surface expectations
 
-Consolidated from §5, §6, §8, §9. Group under `/gov/` (existing governance HTTP namespace in `apps/governance/src/http/`):
+All governance routes are mounted under the `/gov` scope in the gateway (see `icn/crates/icn-gateway/src/server.rs:2008`). Routes that act on a specific governance domain or parent entity are nested under the scope segment — they are **not** flat top-level paths.
 
-- Structures: `POST /structures`, `GET /structures`, `GET /structures/{id}`, `POST /structures/{id}/roles`, `GET /structures/{id}/action-items`, `GET /structures/{id}/meetings` (after #1543)
-- Activities: existing
-- **Programs** (new): `POST /programs`, `GET /programs`, `GET /programs/{id}`, `POST /programs/{id}/milestones`, `PATCH /programs/{id}/milestones/{mid}`, `POST /programs/{id}/close`, `GET /programs/{id}/dashboard`, `GET /programs/{id}/sessions`, `GET /programs/{id}/sponsors`, `GET /programs/{id}/registrations`, `GET /programs/{id}/accessibility-status`, `GET /programs/{id}/representation`
-- Meetings: `POST /meetings`, `GET /meetings/{id}`, `POST /meetings/{id}/agenda-items`, `POST /meetings/{id}/close`, `GET /meetings/{id}/summary` (after #1543)
-- Proposals: existing, incl. `action_items_on_accept`
-- Action items: existing + `GET /action-items/my`
-- **Sponsors** (new): `POST /sponsors`, `PATCH /sponsors/{id}`, `GET /sponsors`, `GET /programs/{id}/sponsors`
-- **Budget items** (new): `POST /budget-items`, `GET /programs/{id}/budget`, `PATCH /budget-items/{id}`
-- **Sessions** (new): `POST /sessions`, `PATCH /sessions/{id}`, `GET /programs/{id}/sessions`
-- **Registrations** (new): `POST /registrations`, `GET /programs/{id}/registrations`
-- Digests: `GET /digest` (DID-level), `GET /digest?scope=structure:nycn-finance`, `GET /my/digests/...` (later)
-- Me / scope: `GET /me/scopes` (new), `GET /me/work` (new — composes `MyActionQueueView`)
-- Provenance: `GET /history/{ref}`, `GET /provenance/{ref}` (later)
+### 13.1 Existing on `main` (verified in `apps/governance/src/http/configure.rs`)
+
+- Domains: `POST/GET /gov/domains`, `GET /gov/domains/{domain_id}`, `POST/DELETE /gov/domains/{domain_id}/members`
+- Proposals: `POST/GET /gov/proposals`, `GET /gov/proposals/{id}`, `POST /gov/proposals/{id}/open`, `POST .../close`, `POST .../vote`, `GET .../tally`, `GET .../proof`, `GET .../chain`, `GET .../discussion`, plus `discussion/comments[/{id}[/reactions]]`
+- Delegations: `POST/GET /gov/delegations`, `GET /gov/delegations/{id}`
+- Action items: `GET /gov/domains/{domain_id}/action-items`, `GET /gov/domains/{domain_id}/action-items/{item_id}`, `PATCH .../status`, `POST .../notes`
+- Structures: `POST/GET /gov/entities/{entity_id}/structures`, `GET /gov/structures/{structure_id}`, `POST /gov/structures/{structure_id}/roles`
+- Activities: `POST/GET /gov/entities/{entity_id}/activities`, `GET /gov/activities/{activity_id}`
+- Federation / SDIS proposal shortcuts: `/gov/proposals/federation/...`, `/gov/proposals/sdis/...`
+
+### 13.2 On PR #1543 (meetings)
+
+- `POST/GET /gov/meetings`, `GET /gov/meetings/{id}`, `PATCH /gov/meetings/{id}`
+- `POST /gov/meetings/{id}/agenda-items`, `PATCH .../{aid}`
+- `POST /gov/meetings/{id}/start`, `POST .../end`
+- Attendance endpoint (verify exact path against PR)
+
+### 13.3 Proposed additions (by tranche)
+
+- **Tranche 0b (digest)**: `GET /gov/digest` (DID-level)
+- **Tranche 1 (Program + views)**:
+  - Programs: `POST/GET /gov/entities/{entity_id}/programs`, `GET /gov/programs/{program_id}`, `POST /gov/programs/{id}/milestones`, `PATCH /gov/programs/{id}/milestones/{mid}`, `POST /gov/programs/{id}/close`, `GET /gov/programs/{id}/dashboard`
+  - Scope + work: `GET /gov/me/scopes`, `GET /gov/me/work`
+  - Scope-partitioned digest: `GET /gov/digest?scope=structure:nycn-finance`
+- **Tranche 2 (funding)**:
+  - Sponsors: `POST/GET /gov/sponsors`, `PATCH /gov/sponsors/{id}`, `GET /gov/programs/{id}/sponsors`
+  - Budget: `POST/GET /gov/budget-items`, `PATCH /gov/budget-items/{id}`, `GET /gov/programs/{id}/budget`
+- **Tranche 3 (content/attendees)**:
+  - Sessions: `POST/GET /gov/sessions`, `PATCH /gov/sessions/{id}`, `GET /gov/programs/{id}/sessions`
+  - Registrations: `POST/GET /gov/registrations`, `GET /gov/programs/{id}/registrations`
+  - Derived views: `GET /gov/programs/{id}/accessibility-status`, `GET /gov/programs/{id}/representation`
+- **Tranche 5 (documents)**: `POST/GET /gov/documents`, version history, search
+- **Provenance** (Tranche 4 or 5): `GET /gov/history/{ref}`, `GET /gov/provenance/{ref}`
+
+New parent/entity/program-scoped routes should follow the established `/gov/{parent-type}/{parent-id}/{child}` pattern rather than flat top-level paths.
 
 ### 13.1 TypeScript SDK drift
 
@@ -619,23 +656,32 @@ Every new HTTP model added to `apps/governance/src/http/models.rs` requires rege
 For each new domain object:
 1. Define the struct + store trait in `icn-governance::<module>`.
 2. Implement `InMemory<X>Store` in-module for tests.
-3. Implement `Sled<X>Store` in `apps/governance/src/manager.rs` with sled key prefixes `<module>:<id>` and any secondary indexes (`<module>_idx:<field>:<value>`).
+3. Implement `Sled<X>Store` in `apps/governance/src/manager.rs` following the existing naming pattern: primary keys as `<thing>:{scope}:{id}` (or `<thing>:{id}` when globally scoped), secondary indexes as `<thing>_by_<scope>:{scope_id}:{id}`.
 4. Wire into `GovernanceManager`.
 5. Use content-addressing for document-like objects (blake3 of canonical body).
 
-### 14.2 Indexes to plan
+### 14.2 Indexes — existing on `main` (verified in `apps/governance/src/manager.rs`)
 
-| Store | Primary | Secondary indexes required |
-|-------|---------|---------------------------|
-| ActionItem | `action_item:<id>` | `ai_idx:assignee:<did>:<id>` (on `feat/notification-digests`), plus needed: `ai_idx:parent:<parent_tag>:<parent_id>:<id>`, `ai_idx:status:<status>:<id>` |
-| Structure | `structure:<id>` | `structure_idx:parent_entity:<id>:<sid>` |
-| Activity | `activity:<id>` | `activity_idx:parent_entity:<id>:<aid>` |
-| Program (new) | `program:<id>` | `program_idx:parent_entity:<id>:<pid>`, `program_idx:status:<status>:<pid>`, `program_idx:kind:<kind>:<pid>` |
-| Meeting (PR) | `meeting:<id>` | `meeting_idx:scope:<scope_tag>:<scope_id>:<scheduled_at>:<mid>` |
-| Sponsor (new) | `sponsor:<id>` | `sponsor_idx:program:<pid>:<sid>`, `sponsor_idx:status:<status>:<sid>` |
-| BudgetItem (new) | `budget_item:<id>` | `budget_idx:program:<pid>:<bid>` |
-| Session (new) | `session:<id>` | `session_idx:program:<pid>:<sid>`, `session_idx:status:<status>:<sid>` |
-| Registration (new) | `registration:<id>` | `registration_idx:program:<pid>:<rid>`, `registration_idx:actor:<did>:<rid>` |
+| Store | Primary key | Secondary / scoped keys |
+|-------|-------------|-------------------------|
+| `SledActionItemStore` | `action_item:{domain_id}:{item_id}` | — (no secondary index yet) |
+| `SledStructureStore` | `structure:{structure_id}` | `structure_by_entity:{entity_id}:{structure_id}`, `role:{role_id}`, `role_by_structure:{structure_id}:{role_id}` |
+| `SledActivityStore` | `activity:{activity_id}` | `activity_by_entity:{entity_id}:{activity_id}` |
+
+### 14.3 Indexes — proposed additions (new sled keys must follow the established `<thing>_by_<scope>:...` convention)
+
+| Store | Primary key | Secondary keys | Tranche |
+|-------|-------------|----------------|---------|
+| `SledActionItemStore` | (existing) | `action_item_by_assignee:{did}:{domain_id}:{item_id}` | 0b (digest) |
+| `SledActionItemStore` | (existing) | `action_item_by_parent:{parent_tag}:{parent_id}:{domain_id}:{item_id}` | 1 (views) |
+| `SledActionItemStore` | (existing) | `action_item_by_status:{status}:{domain_id}:{item_id}` | 1 (dashboard counts) |
+| `SledMeetingStore` | verify on #1543 | verify on #1543 — should include `meeting_by_scope:{scope_tag}:{scope_id}:{scheduled_at}:{meeting_id}` to support upcoming-meetings digest | 0a |
+| `SledProgramStore` (new) | `program:{program_id}` | `program_by_entity:{entity_id}:{program_id}`, `program_by_status:{status}:{program_id}`, `program_by_kind:{kind}:{program_id}` | 1 |
+| `SledSponsorStore` (new) | `sponsor:{sponsor_id}` | `sponsor_by_program:{program_id}:{sponsor_id}`, `sponsor_by_status:{status}:{sponsor_id}` | 2 |
+| `SledBudgetItemStore` (new) | `budget_item:{item_id}` | `budget_item_by_program:{program_id}:{item_id}` | 2 |
+| `SledSessionStore` (new) | `session:{session_id}` | `session_by_program:{program_id}:{session_id}`, `session_by_status:{status}:{session_id}` | 3 |
+| `SledRegistrationStore` (new) | `registration:{registration_id}` | `registration_by_program:{program_id}:{registration_id}`, `registration_by_actor:{did}:{registration_id}` | 3 |
+| `SledDocumentStore` (new) | `document:{doc_hash}` | `document_by_domain_type:{domain_id}:{doc_type}:{timestamp}:{doc_hash}`, `document_by_scope:{scope_tag}:{scope_id}:{doc_hash}` | 5 |
 
 ### 14.3 Migration-safe index construction
 
@@ -698,7 +744,7 @@ Phase 0 alone adds ~12 meeting-management endpoints and ~1 digest endpoint. Phas
 
 ### 17.3 Authority ambiguity
 
-The backbone-group question is political-process ambiguity bleeding into code. Keep the code honest: authority is `RoleAssignment.authority_type` + `RoleDelegation` + policy-oracle rules, not hard-coded backbone-group logic.
+The backbone-group question is political-process ambiguity bleeding into code. Keep the code honest: authority is `RoleAssignment.authority_scope` capability strings + `RoleDelegation` + policy-oracle rules keyed off those capability strings, not hard-coded backbone-group logic.
 
 ### 17.4 Organizer-hostile UX
 

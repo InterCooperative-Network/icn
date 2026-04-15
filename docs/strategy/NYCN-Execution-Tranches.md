@@ -54,12 +54,15 @@ Tranches 2 and 3 parallelize once 1 lands. Tranche 4 can start research/scriptin
 - **Required rework before opening the PR**:
   1. **Rebase on post-#1543 main**. Old base (`37ec91e0`) is before meetings land.
   2. **Unstub `upcoming_meetings`** in `GovernanceManager::generate_digest`. Use `SledMeetingStore::list_for_scope` (or equivalent) filtered to `scheduled_at` within the next 48h, where scope is derived from the requesting DID's role assignments.
-  3. **Add assignee-index backfill** to `SledActionItemStore::open` (or equivalent init path). Write a `_meta:idx_version:assignee` marker; if missing or below current version, walk all action items once and populate the secondary index. Add a unit test for the backfill on a pre-populated store.
-  4. **Keep scope partitioning out of scope for this PR** — it's a v1.1 concern; PR scope is "correct DID-level digest".
-  5. Add a scenario test: create proposals, action items, and a meeting; call digest; verify all three sections populate correctly.
+  3. **Rename the assignee index** to follow the existing `<thing>_by_<scope>` convention: `action_item_by_assignee:{did}:{domain_id}:{item_id}` (not `ai_idx:assignee:*`). Match how `SledStructureStore` / `SledActivityStore` name their secondary keys on `main`.
+  4. **Add assignee-index backfill** to `SledActionItemStore::open` (or equivalent init path). Write a `_meta:idx_version:assignee` marker; if missing or below current version, walk all action items once and populate the secondary index. Add a unit test for the backfill on a pre-populated store.
+  5. **Add `GovernanceActionItemCreated` gateway event** — emit from `apps/governance/src/actor.rs` where the decision→action bridge materializes items. This is ~20 LOC and lets the digest architecture (and every future consumer) be event-driven from the start instead of store-polling. Variant fields: `{ item_id, domain_id, linked_proposal, assignee }`. Follow the existing `Governance<Thing><Verb>` naming pattern.
+  6. **Keep scope partitioning out of scope for this PR** — it's a v1.1 concern; PR scope is "correct DID-level digest".
+  7. Add a scenario test: create proposals with `action_items_on_accept`, close them, verify `GovernanceActionItemCreated` fires, and that the digest reflects the materialized items plus upcoming meetings.
 - **PR body must call out**:
   - Depends on #1543 (meeting store).
-  - Notes that `SledActionItemStore` assignee index is being introduced — CI must pass on both empty and pre-populated stores.
+  - Notes that `SledActionItemStore` assignee index is being introduced under the `<thing>_by_<scope>` naming convention — CI must pass on both empty and pre-populated stores.
+  - Introduces `GovernanceActionItemCreated` gateway event (first non-proposal governance-event variant).
 - **Exit condition**: PR open, CI green, review approved, merged.
 
 ### Tranche 0 risks
@@ -97,7 +100,8 @@ Tranches 2 and 3 parallelize once 1 lands. Tranche 4 can start research/scriptin
 
 ### 1.4 Gateway events
 
-- `ProgramOpened`, `ProgramClosed`, `MilestoneCompleted`, `MilestoneBlocked`.
+- `GovernanceProgramOpened`, `GovernanceProgramClosed`, `GovernanceMilestoneCompleted`, `GovernanceMilestoneBlocked`. Follow the existing `Governance<Thing><Verb>` naming pattern on `GatewayEvent`.
+- Also emit `GovernanceStructureCreated`, `GovernanceRoleAssigned`, `GovernanceActivityCreated`, `GovernanceActivityStatusChanged` here if Tranche 0b has not already added them — these were assumed present in earlier planning but are **not** on `main`.
 
 ### 1.5 Scope-partitioned digest (v1.1 of digest)
 
