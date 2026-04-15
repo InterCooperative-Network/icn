@@ -4,5 +4,6 @@ ignore = [
     "RUSTSEC-2024-0384", # instant
     "RUSTSEC-2025-0057", # fxhash
     "RUSTSEC-2026-0009", # time 0.3.x — transitive dep via cookie/x509-parser/yasna
-    "RUSTSEC-2026-0098"  # rustls-webpki 0.103.10 URI name constraints — transitive via reqwest; upgrade pending
+    "RUSTSEC-2026-0098", # rustls-webpki 0.103.10 URI name constraints — transitive via reqwest; upgrade pending
+    "RUSTSEC-2026-0099"  # rustls-webpki 0.103.10 wildcard name constraints — same crate, same fix
 ]
