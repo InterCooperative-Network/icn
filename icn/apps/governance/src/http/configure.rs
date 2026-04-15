@@ -351,6 +351,26 @@ where
             web::resource("/activities/{activity_id}")
                 .route(web::get().to(handlers::get_activity::<E>)),
         )
+        // ── Program endpoints ────────────────────────────────────────────
+        .service(
+            web::resource("/domains/{domain_id}/programs")
+                .route(web::post().to(handlers::create_program::<E>))
+                .route(web::get().to(handlers::list_programs_by_domain::<E>)),
+        )
+        .service(
+            web::resource("/programs/{program_id}")
+                .route(web::get().to(handlers::get_program::<E>)),
+        )
+        .service(
+            web::resource("/programs/{program_id}/milestones")
+                .route(web::post().to(handlers::create_milestone::<E>))
+                .route(web::get().to(handlers::list_milestones_by_program::<E>)),
+        )
+        .service(
+            web::resource("/milestones/{milestone_id}")
+                .route(web::get().to(handlers::get_milestone::<E>))
+                .route(web::patch().to(handlers::update_milestone_status::<E>)),
+        )
         // ── Meeting endpoints ────────────────────────────────────────────
         .service(
             web::resource("/domains/{domain_id}/meetings")

@@ -16,11 +16,12 @@ use icn_governance::{
     Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt, GovernanceDomain,
     GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
     InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore, InMemoryMeetingStore,
-    InMemoryStructureStore, Meeting, MeetingId, MeetingStoreBackend, MembershipConfig,
-    MembershipSource, PaginatedResult, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
-    ProposalPayload, ProposalScope, ProposalState, RoleAssignment, Structure, StructureId,
-    StructureKind, StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally,
-    DEFAULT_MAX_DELEGATION_DEPTH,
+    InMemoryMilestoneStore, InMemoryProgramStore, InMemoryStructureStore, Meeting, MeetingId,
+    MeetingStoreBackend, MembershipConfig, MembershipSource, Milestone, MilestoneId,
+    MilestoneStatus, MilestoneStoreBackend, PaginatedResult, Program, ProgramId, ProgramKind,
+    ProgramStoreBackend, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload,
+    ProposalScope, ProposalState, RoleAssignment, Structure, StructureId, StructureKind,
+    StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -1866,6 +1867,10 @@ pub struct GovernanceManager {
     activity_store: Arc<dyn ActivityStoreBackend>,
     /// Meeting store backend (deliberation trace objects)
     meeting_store: Arc<dyn MeetingStoreBackend>,
+    /// Program store backend (multi-phase institutional endeavors)
+    program_store: Arc<dyn ProgramStoreBackend>,
+    /// Milestone store backend (stage-gates within programs)
+    milestone_store: Arc<dyn MilestoneStoreBackend>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
     /// Optional receipt store for persisting GovernanceDecisionReceipts
@@ -1889,6 +1894,8 @@ impl GovernanceManager {
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
             meeting_store: Arc::new(InMemoryMeetingStore::new()),
+            program_store: Arc::new(InMemoryProgramStore::new()),
+            milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: None,
             receipt_store: None,
         }
@@ -1923,6 +1930,8 @@ impl GovernanceManager {
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
             meeting_store: Arc::new(InMemoryMeetingStore::new()),
+            program_store: Arc::new(InMemoryProgramStore::new()),
+            milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -1969,6 +1978,22 @@ impl GovernanceManager {
         self
     }
 
+    /// Replace the program store backend.
+    ///
+    /// Use this to configure Sled-backed persistent storage for programs.
+    pub fn with_program_store(mut self, store: Arc<dyn ProgramStoreBackend>) -> Self {
+        self.program_store = store;
+        self
+    }
+
+    /// Replace the milestone store backend.
+    ///
+    /// Use this to configure Sled-backed persistent storage for milestones.
+    pub fn with_milestone_store(mut self, store: Arc<dyn MilestoneStoreBackend>) -> Self {
+        self.milestone_store = store;
+        self
+    }
+
     /// Create a governance manager with Sled-backed action item storage
     ///
     /// This is the recommended mode for production with persistent action items.
@@ -1984,6 +2009,8 @@ impl GovernanceManager {
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
             meeting_store: Arc::new(InMemoryMeetingStore::new()),
+            program_store: Arc::new(InMemoryProgramStore::new()),
+            milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -2004,6 +2031,8 @@ impl GovernanceManager {
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
             meeting_store: Arc::new(InMemoryMeetingStore::new()),
+            program_store: Arc::new(InMemoryProgramStore::new()),
+            milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: None,
             receipt_store: None,
         }
@@ -3787,6 +3816,125 @@ impl GovernanceManager {
         self.meeting_store
             .delete(id)
             .map_err(|e| anyhow::anyhow!("Failed to delete meeting: {e}"))
+    }
+
+    // ========================================================================
+    // Program management (multi-phase institutional endeavors)
+    // ========================================================================
+
+    /// Create a new program in a governance domain.
+    pub fn create_program(
+        &self,
+        domain_id: GovernanceDomainId,
+        parent_entity_id: String,
+        kind: ProgramKind,
+        name: String,
+        description: Option<String>,
+        start_at: Option<u64>,
+        end_at: Option<u64>,
+        created_by_decision: Option<icn_governance::ProposalId>,
+    ) -> Result<Program> {
+        let now = icn_time::current_timestamp_secs();
+        let id = ProgramId::generate();
+        let mut p = Program::new(id, domain_id, parent_entity_id, kind, name, now);
+        p.description = description;
+        p.start_at = start_at;
+        p.end_at = end_at;
+        p.created_by_decision = created_by_decision;
+        self.program_store
+            .save(&p)
+            .map_err(|e| anyhow::anyhow!("Failed to save program: {e}"))?;
+        Ok(p)
+    }
+
+    /// Get a program by ID.
+    pub fn get_program(&self, id: &ProgramId) -> Result<Option<Program>> {
+        self.program_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get program: {e}"))
+    }
+
+    /// List all programs in a governance domain, newest first.
+    pub fn list_programs_by_domain(&self, domain_id: &GovernanceDomainId) -> Result<Vec<Program>> {
+        self.program_store
+            .list_by_domain(domain_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list programs: {e}"))
+    }
+
+    // ========================================================================
+    // Milestone management (stage-gates within programs)
+    // ========================================================================
+
+    /// Create a new milestone in a program.
+    pub fn create_milestone(
+        &self,
+        program_id: ProgramId,
+        name: String,
+        description: Option<String>,
+        phase_index: u32,
+        target_date: Option<u64>,
+        completion_criteria: Vec<String>,
+    ) -> Result<Milestone> {
+        // Verify the program exists before creating a milestone against it.
+        let mut p = self
+            .program_store
+            .get(&program_id)
+            .map_err(|e| anyhow::anyhow!("Failed to look up program: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Program not found: {program_id}"))?;
+
+        let now = icn_time::current_timestamp_secs();
+        let id = MilestoneId::generate();
+        let mut m = Milestone::new(id.clone(), program_id.clone(), name, phase_index, now);
+        m.description = description;
+        m.target_date = target_date;
+        m.completion_criteria = completion_criteria;
+        self.milestone_store
+            .save(&m)
+            .map_err(|e| anyhow::anyhow!("Failed to save milestone: {e}"))?;
+
+        // Register the milestone ID on the program record (phase order).
+        p.milestones.push(id);
+        self.program_store
+            .save(&p)
+            .map_err(|e| anyhow::anyhow!("Failed to update program milestones: {e}"))?;
+
+        Ok(m)
+    }
+
+    /// Get a milestone by ID.
+    pub fn get_milestone(&self, id: &MilestoneId) -> Result<Option<Milestone>> {
+        self.milestone_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get milestone: {e}"))
+    }
+
+    /// List milestones belonging to a program, ordered by phase_index.
+    pub fn list_milestones_by_program(&self, program_id: &ProgramId) -> Result<Vec<Milestone>> {
+        self.milestone_store
+            .list_by_program(program_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list milestones: {e}"))
+    }
+
+    /// Update a milestone's status.
+    pub fn update_milestone_status(
+        &self,
+        id: &MilestoneId,
+        status: MilestoneStatus,
+    ) -> Result<Milestone> {
+        let mut m = self
+            .milestone_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get milestone: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Milestone not found: {id}"))?;
+
+        if status == MilestoneStatus::Completed && m.status != MilestoneStatus::Completed {
+            m.completed_at = Some(icn_time::current_timestamp_secs());
+        }
+        m.status = status;
+        self.milestone_store
+            .save(&m)
+            .map_err(|e| anyhow::anyhow!("Failed to save milestone: {e}"))?;
+        Ok(m)
     }
 
     // ========================================================================

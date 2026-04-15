@@ -737,3 +737,105 @@ pub struct MeetingResponse {
     pub created_at: u64,
     pub present_count: usize,
 }
+
+// ============================================================================
+// Program (multi-phase institutional endeavors)
+// ============================================================================
+
+/// Request to create a program
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CreateProgramRequest {
+    /// Entity ID of the owning entity (cooperative, community, federation)
+    pub parent_entity_id: String,
+    /// Kind: "cycle", "campaign", "initiative", "series", or a custom string
+    pub kind: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Optional start time as Unix timestamp
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_at: Option<u64>,
+    /// Optional end time as Unix timestamp
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_at: Option<u64>,
+    /// Proposal ID that authorized this program (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_by_decision: Option<String>,
+}
+
+/// Program response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgramResponse {
+    pub id: String,
+    pub domain_id: String,
+    pub parent_entity_id: String,
+    pub kind: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_at: Option<u64>,
+    pub milestones: Vec<String>,
+    pub activities: Vec<String>,
+    pub created_at: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub closed_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_by_decision: Option<String>,
+}
+
+// ============================================================================
+// Milestone (stage-gates within programs)
+// ============================================================================
+
+/// Request to create a milestone
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CreateMilestoneRequest {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Ordinal position among the program's milestones (0-based)
+    #[serde(default)]
+    pub phase_index: u32,
+    /// Optional target date as Unix timestamp
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_date: Option<u64>,
+    /// Free-form checklist of completion criteria
+    #[serde(default)]
+    pub completion_criteria: Vec<String>,
+}
+
+/// Request to update a milestone's status
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateMilestoneStatusRequest {
+    /// Status: "pending", "in_progress", "completed", "blocked", "skipped"
+    pub status: String,
+}
+
+/// Milestone response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MilestoneResponse {
+    pub id: String,
+    pub program_id: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub phase_index: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_date: Option<u64>,
+    pub status: String,
+    pub completion_criteria: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_by: Option<String>,
+    pub created_at: u64,
+}
