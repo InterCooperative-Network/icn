@@ -3966,10 +3966,16 @@ impl GovernanceManager {
     }
 
     /// Update a milestone's status.
+    ///
+    /// `actor` is the DID of the caller performing the transition. When the
+    /// milestone moves into `Completed`, the actor is recorded as
+    /// `completed_by` for audit. When the milestone is reopened, both
+    /// `completed_at` and `completed_by` are cleared.
     pub fn update_milestone_status(
         &self,
         id: &MilestoneId,
         status: MilestoneStatus,
+        actor: &Did,
     ) -> Result<Milestone> {
         let mut m = self
             .milestone_store
@@ -3980,10 +3986,12 @@ impl GovernanceManager {
         if status == MilestoneStatus::Completed {
             if m.status != MilestoneStatus::Completed {
                 m.completed_at = Some(icn_time::current_timestamp_secs());
+                m.completed_by = Some(actor.clone());
             }
         } else {
-            // Clear completion timestamp when reopening (Pending/InProgress/Blocked).
+            // Clear completion metadata when reopening (Pending/InProgress/Blocked).
             m.completed_at = None;
+            m.completed_by = None;
         }
         m.status = status;
         self.milestone_store

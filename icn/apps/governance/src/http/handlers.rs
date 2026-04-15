@@ -3586,6 +3586,7 @@ pub async fn update_milestone_status<E: GovernanceEventEmitter + Clone + 'static
     let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
     let id = MilestoneId(milestone_id.into_inner());
     let status = parse_milestone_status(&req.status)?;
+    let actor = parse_did(&claims.sub, "Invalid DID in token")?;
 
     // Resolve governance domain via milestone → program → domain for membership check.
     let milestone = ctx
@@ -3598,16 +3599,11 @@ pub async fn update_milestone_status<E: GovernanceEventEmitter + Clone + 'static
         .get_program(&milestone.program_id)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Program not found for milestone"))?;
-    check_domain_membership(
-        &ctx.manager,
-        &prog.domain_id,
-        &parse_did(&claims.sub, "Invalid DID in token")?,
-    )
-    .await?;
+    check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
 
     let m = ctx
         .manager
-        .update_milestone_status(&id, status)
+        .update_milestone_status(&id, status, &actor)
         .map_err(anyhow_to_api)?;
 
     Ok(HttpResponse::Ok().json(milestone_to_response(&m)))
