@@ -9,7 +9,6 @@
 //! by the broadcast channel's back-pressure.
 
 use crate::events::{EventBroadcaster, GatewayEvent};
-use icn_governance::{ActionItem, Meeting};
 use icn_governance_actor::events::GovernanceEventEmitter;
 use std::sync::Arc;
 
@@ -129,13 +128,19 @@ impl GovernanceEventEmitter for GatewayEventAdapter {
         });
     }
 
-    fn emit_action_item_created(&self, item: &ActionItem) {
+    fn emit_action_item_created(
+        &self,
+        item_id: &str,
+        domain_id: &str,
+        parent_proposal: Option<&str>,
+        assignee: Option<&str>,
+        created_at: u64,
+    ) {
         let b = self.broadcaster.clone();
-        let item_id = item.id.to_string();
-        let domain_id = item.domain_id.0.clone();
-        let parent_proposal = item.linked_proposal.as_ref().map(|p| p.0.clone());
-        let assignee = item.assignee.as_ref().map(|d| d.as_str().to_owned());
-        let created_at = item.created_at;
+        let item_id = item_id.to_owned();
+        let domain_id = domain_id.to_owned();
+        let parent_proposal = parent_proposal.map(str::to_owned);
+        let assignee = assignee.map(str::to_owned);
         tokio::spawn(async move {
             b.broadcast(
                 &domain_id,
@@ -151,13 +156,19 @@ impl GovernanceEventEmitter for GatewayEventAdapter {
         });
     }
 
-    fn emit_meeting_scheduled(&self, meeting: &Meeting) {
+    fn emit_meeting_scheduled(
+        &self,
+        meeting_id: &str,
+        domain_id: &str,
+        title: &str,
+        scheduled_at: Option<u64>,
+        created_by: &str,
+    ) {
         let b = self.broadcaster.clone();
-        let meeting_id = meeting.id.0.clone();
-        let domain_id = meeting.domain_id.clone();
-        let title = meeting.title.clone();
-        let scheduled_at = meeting.scheduled_at;
-        let created_by = meeting.created_by.clone();
+        let meeting_id = meeting_id.to_owned();
+        let domain_id = domain_id.to_owned();
+        let title = title.to_owned();
+        let created_by = created_by.to_owned();
         tokio::spawn(async move {
             b.broadcast(
                 &domain_id,

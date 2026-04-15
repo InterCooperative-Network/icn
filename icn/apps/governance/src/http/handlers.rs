@@ -1330,7 +1330,13 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         match ctx.manager.list_action_items(&proposal.domain_id, &filter) {
             Ok(items) => {
                 for item in &items {
-                    ctx.emitter.emit_action_item_created(item);
+                    ctx.emitter.emit_action_item_created(
+                        &item.id.to_string(),
+                        &item.domain_id.0,
+                        item.linked_proposal.as_ref().map(|p| p.0.as_str()),
+                        item.assignee.as_ref().map(|d| d.as_str()),
+                        item.created_at,
+                    );
                 }
             }
             Err(e) => {
@@ -2986,7 +2992,13 @@ pub async fn create_meeting<E: GovernanceEventEmitter + Clone + 'static>(
         )
         .map_err(anyhow_to_api)?;
 
-    ctx.emitter.emit_meeting_scheduled(&m);
+    ctx.emitter.emit_meeting_scheduled(
+        &m.id.0,
+        &m.domain_id,
+        &m.title,
+        m.scheduled_at,
+        &m.created_by,
+    );
     Ok(HttpResponse::Created().json(meeting_to_response(&m)))
 }
 

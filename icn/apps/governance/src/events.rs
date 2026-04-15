@@ -4,12 +4,12 @@
 //! (which forwards to `EventBroadcaster`) and by `NoopEventEmitter` for
 //! testing / standalone mode.
 
-use icn_governance::{ActionItem, Meeting};
-
 /// Emitter for governance lifecycle events.
 ///
-/// Implement this in the hosting process (e.g. gateway) and pass it into
-/// [`configure`] so handlers can broadcast without depending on gateway types.
+/// All methods take primitive arguments (strings and integers) so that
+/// kernel-layer implementations (`GatewayEventAdapter` in `icn-gateway`)
+/// do not need to import domain types from `icn-governance`.  Callers in
+/// the app layer extract the relevant fields before calling the emitter.
 ///
 /// Method naming follows the canonical `Governance<Thing><Verb>` convention
 /// (see docs/strategy/NYCN-Repo-Architecture-Spec.md §6).
@@ -31,10 +31,24 @@ pub trait GovernanceEventEmitter: Send + Sync + 'static {
 
     /// Fire when an action item is materialized from an accepted proposal's
     /// `ActionItemSpec` (decision→action bridge).
-    fn emit_action_item_created(&self, item: &ActionItem);
+    fn emit_action_item_created(
+        &self,
+        item_id: &str,
+        domain_id: &str,
+        parent_proposal: Option<&str>,
+        assignee: Option<&str>,
+        created_at: u64,
+    );
 
     /// Fire when a meeting is scheduled (`POST /gov/domains/{domain}/meetings`).
-    fn emit_meeting_scheduled(&self, meeting: &Meeting);
+    fn emit_meeting_scheduled(
+        &self,
+        meeting_id: &str,
+        domain_id: &str,
+        title: &str,
+        scheduled_at: Option<u64>,
+        created_by: &str,
+    );
 
     /// Fire when a meeting transitions to `InProgress`.
     fn emit_meeting_started(&self, meeting_id: &str, domain_id: &str, started_at: u64);
@@ -53,8 +67,9 @@ impl GovernanceEventEmitter for NoopEventEmitter {
     fn emit_proposal_opened(&self, _: &str, _: &str, _: u64) {}
     fn emit_proposal_closed(&self, _: &str, _: &str, _: &str) {}
     fn emit_vote_cast(&self, _: &str, _: &str, _: &str, _: &str) {}
-    fn emit_action_item_created(&self, _: &ActionItem) {}
-    fn emit_meeting_scheduled(&self, _: &Meeting) {}
+    fn emit_action_item_created(&self, _: &str, _: &str, _: Option<&str>, _: Option<&str>, _: u64) {
+    }
+    fn emit_meeting_scheduled(&self, _: &str, _: &str, _: &str, _: Option<u64>, _: &str) {}
     fn emit_meeting_started(&self, _: &str, _: &str, _: u64) {}
     fn emit_meeting_ended(&self, _: &str, _: &str, _: u64) {}
 }

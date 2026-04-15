@@ -164,6 +164,21 @@ impl SledActionItemStore {
 impl ActionItemStoreBackend for SledActionItemStore {
     fn save(&self, item: &ActionItem) -> std::result::Result<(), GovernanceError> {
         let key = Self::item_key(&item.domain_id, &item.id);
+
+        // Remove stale assignee index entry if the assignee changed on update.
+        if let Ok(Some(existing)) = self.get(&item.domain_id, &item.id) {
+            if existing.assignee != item.assignee {
+                if let Some(ref old_assignee) = existing.assignee {
+                    let old_idx = Self::assignee_idx_key(old_assignee, &item.domain_id, &item.id);
+                    self.db.remove(old_idx.as_bytes()).map_err(|e| {
+                        GovernanceError::Internal(format!(
+                            "Sled assignee-idx remove (stale) failed: {e}"
+                        ))
+                    })?;
+                }
+            }
+        }
+
         let value = icn_encoding::encode_versioned(item)
             .map_err(|e| GovernanceError::Internal(format!("Failed to encode action item: {e}")))?;
         self.db
@@ -265,13 +280,16 @@ impl ActionItemStoreBackend for SledActionItemStore {
             })?;
 
             // Key format after prefix: "{domain_id}:{item_id}"
+            // Use rsplitn so domain IDs containing ':' are parsed correctly.
+            // UUIDs (item IDs) never contain ':', so splitting from the right
+            // always yields the UUID last.
             let key_str = std::str::from_utf8(&raw_key).map_err(|e| {
                 GovernanceError::Internal(format!("Invalid UTF-8 in assignee idx key: {e}"))
             })?;
             let suffix = key_str.strip_prefix(&prefix).unwrap_or(key_str);
-            let mut parts = suffix.splitn(2, ':');
-            let domain_id_str = parts.next().unwrap_or("");
+            let mut parts = suffix.rsplitn(2, ':');
             let item_id_str = parts.next().unwrap_or("");
+            let domain_id_str = parts.next().unwrap_or("");
 
             let domain_id = GovernanceDomainId(domain_id_str.to_string());
             let item_id: ActionItemId = item_id_str.parse().map_err(|e| {
@@ -3998,6 +4016,68 @@ mod tests {
             store.list_by_assignee(&assignee).unwrap().len(),
             0,
             "assignee index row must be removed on delete"
+        );
+    }
+
+    /// Regression: list_by_assignee used splitn(2) which failed when domain_id
+    /// contained ':' characters (e.g. "did:icn:..." style IDs). rsplitn from
+    /// the right correctly isolates the UUID item_id.
+    #[tokio::test]
+    async fn sled_action_items_list_by_assignee_colon_domain_id() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db);
+        let assignee = fresh_did();
+        let creator = fresh_did();
+
+        // Domain ID with colons — would break splitn(2, ':')
+        let domain = GovernanceDomainId::new("did:icn:coop:local");
+
+        let mut item = ActionItem::new(domain.clone(), "Colon domain".to_string(), creator, 1);
+        item.assignee = Some(assignee.clone());
+        store.save(&item).unwrap();
+
+        let found = store.list_by_assignee(&assignee).unwrap();
+        assert_eq!(
+            found.len(),
+            1,
+            "must find item even when domain_id contains colons"
+        );
+        assert_eq!(found[0].id, item.id);
+    }
+
+    /// Regression: SledActionItemStore::save leaked the old assignee index entry
+    /// when an item's assignee was changed on update.
+    #[tokio::test]
+    async fn sled_action_items_assignee_index_updated_on_reassign() {
+        use icn_governance::ActionItemStoreBackend;
+        let (db, _dir) = sled_db_tmp();
+        let store = SledActionItemStore::new(db);
+        let original_assignee = fresh_did();
+        let new_assignee = fresh_did();
+        let creator = fresh_did();
+        let domain = GovernanceDomainId::new("dom-reassign");
+
+        let mut item = ActionItem::new(domain.clone(), "Reassign test".to_string(), creator, 1);
+        item.assignee = Some(original_assignee.clone());
+        store.save(&item).unwrap();
+
+        assert_eq!(store.list_by_assignee(&original_assignee).unwrap().len(), 1);
+        assert_eq!(store.list_by_assignee(&new_assignee).unwrap().len(), 0);
+
+        // Reassign to new_assignee
+        item.assignee = Some(new_assignee.clone());
+        store.save(&item).unwrap();
+
+        assert_eq!(
+            store.list_by_assignee(&original_assignee).unwrap().len(),
+            0,
+            "old assignee index row must be removed after reassignment"
+        );
+        assert_eq!(
+            store.list_by_assignee(&new_assignee).unwrap().len(),
+            1,
+            "new assignee must appear in index"
         );
     }
 }
