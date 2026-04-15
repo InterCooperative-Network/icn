@@ -3502,12 +3502,28 @@ pub async fn create_milestone<E: GovernanceEventEmitter + Clone + 'static>(
     program_id: web::Path<String>,
     req: web::Json<CreateMilestoneRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
     let pid = ProgramId(program_id.into_inner());
 
     if req.name.trim().is_empty() {
         return Err(err_bad("Milestone name must not be empty"));
     }
+
+    // Resolve the program's governance domain so membership can be verified.
+    // A caller with governance:write on an unrelated domain must not be able
+    // to add milestones to any known program.
+    let prog = ctx
+        .manager
+        .get_program(&pid)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found"))?;
+
+    check_domain_membership(
+        &ctx.manager,
+        &prog.domain_id,
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
 
     let m = ctx
         .manager
@@ -3567,9 +3583,27 @@ pub async fn update_milestone_status<E: GovernanceEventEmitter + Clone + 'static
     milestone_id: web::Path<String>,
     req: web::Json<UpdateMilestoneStatusRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
     let id = MilestoneId(milestone_id.into_inner());
     let status = parse_milestone_status(&req.status)?;
+
+    // Resolve governance domain via milestone → program → domain for membership check.
+    let milestone = ctx
+        .manager
+        .get_milestone(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Milestone not found"))?;
+    let prog = ctx
+        .manager
+        .get_program(&milestone.program_id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found for milestone"))?;
+    check_domain_membership(
+        &ctx.manager,
+        &prog.domain_id,
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
 
     let m = ctx
         .manager

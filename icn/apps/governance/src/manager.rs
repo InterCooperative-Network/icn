@@ -822,7 +822,8 @@ impl icn_governance::ProgramStoreBackend for SledProgramStore {
         let primary = Self::program_primary_key(&p.id);
 
         // Remove stale scope index entries if domain_id or parent_entity_id changed.
-        if let Ok(Some(existing)) = self.get(&p.id) {
+        // Propagate read errors rather than silently treating them as "no prior record".
+        if let Some(existing) = self.get(&p.id)? {
             if existing.domain_id != p.domain_id {
                 let old = Self::program_domain_idx_key(&existing.domain_id, &p.id);
                 self.db.remove(old.as_bytes()).map_err(|e| {
@@ -883,14 +884,24 @@ impl icn_governance::ProgramStoreBackend for SledProgramStore {
         domain_id: &GovernanceDomainId,
     ) -> std::result::Result<Vec<icn_governance::Program>, GovernanceError> {
         let prefix = Self::domain_idx_prefix(domain_id);
-        let prefix_len = prefix.len();
+        // The expected left side when splitting at the final ':'.
+        let expected_left = format!("program_by_domain:{}", domain_id.0);
         let mut out = Vec::new();
         for result in self.db.scan_prefix(prefix.as_bytes()) {
             let (idx_key, _) =
                 result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
             let idx_str = std::str::from_utf8(&idx_key)
                 .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
-            let pid = icn_governance::ProgramId(idx_str[prefix_len..].to_string());
+            // Use rsplit_once to isolate the program ID from the domain part.
+            // This guards against prefix collisions where domain "coop" would
+            // match keys belonging to domain "coop:nycn".
+            let Some((left, pid_str)) = idx_str.rsplit_once(':') else {
+                continue;
+            };
+            if left != expected_left {
+                continue;
+            }
+            let pid = icn_governance::ProgramId(pid_str.to_string());
             let primary = Self::program_primary_key(&pid);
             if let Some(v) = self
                 .db
@@ -913,14 +924,21 @@ impl icn_governance::ProgramStoreBackend for SledProgramStore {
         entity_id: &str,
     ) -> std::result::Result<Vec<icn_governance::Program>, GovernanceError> {
         let prefix = Self::entity_idx_prefix(entity_id);
-        let prefix_len = prefix.len();
+        let expected_left = format!("program_by_entity:{}", entity_id);
         let mut out = Vec::new();
         for result in self.db.scan_prefix(prefix.as_bytes()) {
             let (idx_key, _) =
                 result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
             let idx_str = std::str::from_utf8(&idx_key)
                 .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
-            let pid = icn_governance::ProgramId(idx_str[prefix_len..].to_string());
+            // Use rsplit_once to guard against prefix collisions (entity "a" vs "a:b").
+            let Some((left, pid_str)) = idx_str.rsplit_once(':') else {
+                continue;
+            };
+            if left != expected_left {
+                continue;
+            }
+            let pid = icn_governance::ProgramId(pid_str.to_string());
             let primary = Self::program_primary_key(&pid);
             if let Some(v) = self
                 .db
@@ -1004,7 +1022,8 @@ impl icn_governance::MilestoneStoreBackend for SledMilestoneStore {
         let primary = Self::milestone_primary_key(&m.id);
 
         // Remove stale program index entry if program_id changed on update.
-        if let Ok(Some(existing)) = self.get(&m.id) {
+        // Propagate read errors rather than silently treating them as "no prior record".
+        if let Some(existing) = self.get(&m.id)? {
             if existing.program_id != m.program_id {
                 let old = Self::milestone_program_idx_key(&existing.program_id, &m.id);
                 self.db.remove(old.as_bytes()).map_err(|e| {
@@ -1053,14 +1072,21 @@ impl icn_governance::MilestoneStoreBackend for SledMilestoneStore {
         program_id: &icn_governance::ProgramId,
     ) -> std::result::Result<Vec<icn_governance::Milestone>, GovernanceError> {
         let prefix = Self::program_idx_prefix(program_id);
-        let prefix_len = prefix.len();
+        let expected_left = format!("milestone_by_program:{}", program_id.0);
         let mut out = Vec::new();
         for result in self.db.scan_prefix(prefix.as_bytes()) {
             let (idx_key, _) =
                 result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
             let idx_str = std::str::from_utf8(&idx_key)
                 .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
-            let mid = icn_governance::MilestoneId(idx_str[prefix_len..].to_string());
+            // Use rsplit_once to guard against prefix collisions (program "p" vs "p:sub").
+            let Some((left, mid_str)) = idx_str.rsplit_once(':') else {
+                continue;
+            };
+            if left != expected_left {
+                continue;
+            }
+            let mid = icn_governance::MilestoneId(mid_str.to_string());
             let primary = Self::milestone_primary_key(&mid);
             if let Some(v) = self
                 .db
@@ -3927,8 +3953,13 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Failed to get milestone: {e}"))?
             .ok_or_else(|| anyhow::anyhow!("Milestone not found: {id}"))?;
 
-        if status == MilestoneStatus::Completed && m.status != MilestoneStatus::Completed {
-            m.completed_at = Some(icn_time::current_timestamp_secs());
+        if status == MilestoneStatus::Completed {
+            if m.status != MilestoneStatus::Completed {
+                m.completed_at = Some(icn_time::current_timestamp_secs());
+            }
+        } else {
+            // Clear completion timestamp when reopening (Pending/InProgress/Blocked).
+            m.completed_at = None;
         }
         m.status = status;
         self.milestone_store
