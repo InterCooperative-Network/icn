@@ -611,8 +611,8 @@ All governance routes are mounted under the `/gov` scope in the gateway (see `ic
 
 - Domains: `POST/GET /gov/domains`, `GET /gov/domains/{domain_id}`, `POST/DELETE /gov/domains/{domain_id}/members`
 - Proposals: `POST/GET /gov/proposals`, `GET /gov/proposals/{id}`, `POST /gov/proposals/{id}/open`, `POST .../close`, `POST .../vote`, `GET .../tally`, `GET .../proof`, `GET .../chain`, `GET .../discussion`, plus `discussion/comments[/{id}[/reactions]]`
-- Delegations: `POST/GET /gov/delegations`, `GET /gov/delegations/{id}`
-- Action items: `GET /gov/domains/{domain_id}/action-items`, `GET /gov/domains/{domain_id}/action-items/{item_id}`, `PATCH .../status`, `POST .../notes`
+- Delegations: `POST/GET /gov/delegations`, `DELETE /gov/delegations/{id}` (revoke — no GET-by-id handler exists on `main`)
+- Action items: `POST/GET /gov/domains/{domain_id}/action-items`, `GET /gov/domains/{domain_id}/action-items/{item_id}`, `PUT .../status`, `POST .../notes`
 - Structures: `POST/GET /gov/entities/{entity_id}/structures`, `GET /gov/structures/{structure_id}`, `POST /gov/structures/{structure_id}/roles`
 - Activities: `POST/GET /gov/entities/{entity_id}/activities`, `GET /gov/activities/{activity_id}`
 - Federation / SDIS proposal shortcuts: `/gov/proposals/federation/...`, `/gov/proposals/sdis/...`

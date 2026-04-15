@@ -196,8 +196,8 @@ All governance routes are mounted under the `/gov` scope (see `icn/crates/icn-ga
 
 - **Domains**: `POST/GET /gov/domains`, `GET /gov/domains/{domain_id}`, `POST/DELETE /gov/domains/{domain_id}/members`
 - **Proposals**: `POST/GET /gov/proposals`, `GET /gov/proposals/{id}`, `POST /gov/proposals/{id}/{open,close,vote}`, `GET /gov/proposals/{id}/{tally,proof,chain,discussion}`, discussion comment CRUD
-- **Delegations** (vote-level): `POST/GET /gov/delegations`, `GET /gov/delegations/{id}`
-- **Action items** (domain-scoped): `GET /gov/domains/{domain_id}/action-items`, `GET /gov/domains/{domain_id}/action-items/{item_id}`, `PATCH .../status`, `POST .../notes`
+- **Delegations** (vote-level): `POST/GET /gov/delegations`, `DELETE /gov/delegations/{id}` (revoke — no GET-by-id handler exists on `main`)
+- **Action items** (domain-scoped): `POST/GET /gov/domains/{domain_id}/action-items`, `GET /gov/domains/{domain_id}/action-items/{item_id}`, `PUT .../status`, `POST .../notes`
 - **Structures** (entity-scoped): `POST/GET /gov/entities/{entity_id}/structures`, `GET /gov/structures/{structure_id}`, `POST /gov/structures/{structure_id}/roles`
 - **Activities** (entity-scoped): `POST/GET /gov/entities/{entity_id}/activities`, `GET /gov/activities/{activity_id}`
 - **Federation / SDIS proposal shortcuts**: `/gov/proposals/federation/...`, `/gov/proposals/sdis/...`
@@ -289,11 +289,11 @@ Bootstrapping NYCN on a running ICN node requires seed data. This is not current
 |-------------|--------|-----------------|----------------|--------|
 | NYCN federation entity | `icn-entity` create | `EntityId: "nycn"`, `type: Federation`, `FederationProfile { member_entities: [...] }` | 0 (pre-merge) or 1 | ❌ no seed script |
 | `nycn-organizers` co-op entity | `icn-entity` create | `EntityId: "nycn-organizers"`, `parent_id: "nycn"`, `type: Cooperative`, treasury account | 0 or 1 | ❌ |
-| Committee structures (backbone, finance, content, logistics, marketing) | `POST /gov/structures` | `StructureId::from_raw("nycn-{name}")`, `kind: Committee`, `parent_entity_id: "nycn-organizers"` | 1 | ❌ |
-| Accessibility working group | `POST /gov/structures` | `kind: WorkingGroup` | 1 | ❌ |
-| Summit-year program | `POST /gov/programs` | `ProgramId::from_raw("summit-2026")`, `kind: AnnualSummit`, `parent_entity_id: "nycn-organizers"`, milestone set | 1 | ❌ (needs Program impl) |
-| Default milestones for summit cycle | `POST /gov/programs/{id}/milestones` | `StrategyLocked`, `VenueLocked`, `BudgetLocked`, `PublicLaunchReady`, `EventReady`, `ClosureComplete` | 1 | ❌ |
-| Initial RoleAssignments for core organizers | `POST /gov/structures/{id}/roles` | one per committee lead | 1 | ❌ |
+| Committee structures (backbone, finance, content, logistics, marketing) | `POST /gov/entities/nycn-organizers/structures` | `StructureId::from_raw("nycn-{name}")`, `kind: Committee`, `parent_entity_id: "nycn-organizers"` | 1 | ❌ |
+| Accessibility working group | `POST /gov/entities/nycn-organizers/structures` | `kind: WorkingGroup` | 1 | ❌ |
+| Summit-year program | `POST /gov/entities/nycn-organizers/programs` | `ProgramId::from_raw("summit-2026")`, `kind: AnnualSummit`, `parent_entity_id: "nycn-organizers"`, milestone set | 1 | ❌ (needs Program impl) |
+| Default milestones for summit cycle | `POST /gov/programs/{program_id}/milestones` | `StrategyLocked`, `VenueLocked`, `BudgetLocked`, `PublicLaunchReady`, `EventReady`, `ClosureComplete` | 1 | ❌ |
+| Initial RoleAssignments for core organizers | `POST /gov/structures/{structure_id}/roles` | one per committee lead | 1 | ❌ |
 | NYCN charter registration | `CharterStore` via governance actor | CCL body from `NYCN-Charter-Draft.yaml` | 1 | ⚠️ YAML exists, not seeded |
 | PolicyOracle config for backbone ratification rules | oracle registration via governance actor | type-to-rule mapping | 1 or 2 | ❌ |
 
