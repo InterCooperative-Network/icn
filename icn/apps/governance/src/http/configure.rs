@@ -422,5 +422,7 @@ where
         .service(
             web::resource("/proposals/sdis/remove-steward")
                 .route(web::post().to(handlers::create_remove_steward_proposal::<E>)),
-        );
+        )
+        // ── Notification digest ──────────────────────────────────────────
+        .service(web::resource("/digest").route(web::get().to(handlers::get_digest::<E>)));
 }

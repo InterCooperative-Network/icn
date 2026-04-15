@@ -40,6 +40,15 @@ ignore = [
     # during logging — ICN does not implement a custom logger in this pattern.
     # Track: watch for age 0.12.x which should move to rand 0.9.x.
     "RUSTSEC-2026-0097",  # rand unsound with custom logger (transitive via age)
+
+    # rustls-webpki 0.103.10 — two name-constraint advisories filed 2026-04-14.
+    # Both are in the same crate/version and have the same fix (>=0.103.12).
+    # Pulled in transitively by reqwest via rustls-platform-verifier.
+    # Upgrade is pending reqwest/rustls-platform-verifier releasing a compatible
+    # update. Neither advisory is exploitable in ICN's direct usage pattern
+    # (no URI name constraints in ICN's TLS setup; no wildcard cert validation).
+    "RUSTSEC-2026-0098",  # rustls-webpki URI name constraints (transitive via reqwest)
+    "RUSTSEC-2026-0099",  # rustls-webpki wildcard name constraints (transitive via reqwest)
 ]
 
 [licenses]

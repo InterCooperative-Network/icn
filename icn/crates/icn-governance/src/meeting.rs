@@ -364,6 +364,20 @@ pub trait MeetingStoreBackend: Send + Sync {
 
     /// Delete a meeting (hard delete — prefer `Cancelled` status for soft-cancel).
     fn delete(&self, id: &MeetingId) -> std::result::Result<bool, GovernanceError>;
+
+    /// List meetings with a `scheduled_at` in `[now_secs, now_secs + window_secs]`
+    /// whose status is not `Cancelled` or `Completed`.
+    ///
+    /// Backends without a scheduled-time index fall back to the default
+    /// (empty vec). `InMemoryMeetingStore` and `SledMeetingStore` override
+    /// this with in-memory / full-scan implementations.
+    fn list_upcoming(
+        &self,
+        _now_secs: u64,
+        _window_secs: u64,
+    ) -> std::result::Result<Vec<Meeting>, GovernanceError> {
+        Ok(Vec::new())
+    }
 }
 
 // ========== In-Memory Store ==========
@@ -422,6 +436,34 @@ impl MeetingStoreBackend for InMemoryMeetingStore {
             .write()
             .map_err(|e| GovernanceError::Internal(format!("meetings lock poisoned: {e}")))?;
         Ok(guard.remove(id).is_some())
+    }
+
+    fn list_upcoming(
+        &self,
+        now_secs: u64,
+        window_secs: u64,
+    ) -> std::result::Result<Vec<Meeting>, GovernanceError> {
+        let guard = self
+            .meetings
+            .read()
+            .map_err(|e| GovernanceError::Internal(format!("meetings lock poisoned: {e}")))?;
+        let upper = now_secs.saturating_add(window_secs);
+        let mut out: Vec<Meeting> = guard
+            .values()
+            .filter(|m| {
+                !matches!(
+                    m.status,
+                    MeetingStatus::Cancelled | MeetingStatus::Completed
+                )
+            })
+            .filter(|m| match m.scheduled_at {
+                Some(t) => t >= now_secs && t <= upper,
+                None => false,
+            })
+            .cloned()
+            .collect();
+        out.sort_by_key(|m| m.scheduled_at.unwrap_or(0));
+        Ok(out)
     }
 }
 

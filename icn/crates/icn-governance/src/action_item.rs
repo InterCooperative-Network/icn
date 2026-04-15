@@ -438,6 +438,17 @@ pub trait ActionItemStoreBackend: Send + Sync {
 
     /// Delete all action items for a domain
     fn delete_all(&self, domain_id: &GovernanceDomainId) -> Result<usize>;
+
+    /// List all action items assigned to a specific DID across all domains.
+    ///
+    /// Implementations backed by a secondary index (e.g. Sled) override this for
+    /// O(index-hits) performance. The default falls back to returning an empty
+    /// vec — in-memory stores (tests) degrade gracefully; callers that need
+    /// cross-domain assignee results in tests should use the per-domain `list`
+    /// method with `ActionItemFilter::assigned_to`.
+    fn list_by_assignee(&self, _assignee: &Did) -> Result<Vec<ActionItem>> {
+        Ok(vec![])
+    }
 }
 
 /// In-memory action item store for testing
