@@ -1,7 +1,7 @@
 ---
 Status: operational
 Canonical: yes
-Last Reviewed: 2026-04-11
+Last Reviewed: 2026-04-15
 ---
 
 ## Where things live (control plane)
@@ -27,8 +27,8 @@ Last Reviewed: 2026-04-11
 
 Welcome to the ICN (Intercooperative Network) documentation! This index provides clear navigation to all documentation.
 
-**Last Updated**: 2026-03-18  
-**Version**: 2.0 (Post-Phase 2C Reorganization)
+**Last Updated**: 2026-04-15  
+**Version**: 2.1 (canon-sync pass)
 
 ---
 
@@ -62,6 +62,7 @@ Essential reading for all ICN users and contributors.
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Comprehensive system architecture (160KB+) |
 | [GETTING_STARTED.md](GETTING_STARTED.md) | Quick start guide for developers |
 | [PHASE_HISTORY.md](PHASE_HISTORY.md) | Development phase completion history |
+| [PHASE_PROGRESS.md](PHASE_PROGRESS.md) | Active phase tracking and cross-cutting metrics |
 | [STATE.md](STATE.md) | Current project state snapshot |
 | [TODO.md](TODO.md) | Active work items and priorities |
 | [glossary.md](glossary.md) | ICN terminology and definitions |
@@ -386,6 +387,7 @@ Strategic direction and gap analysis (March 2026):
 - [NYCN-Institutional-Design.md](strategy/NYCN-Institutional-Design.md) - NYCN entity/structure/activity topology, governance model, and ICN primitive mapping (2026-04-13; Entity Structure section corrected 2026-04-15 to match layered ontology from #1540)
 - [NYCN-Implementation-Plan.md](strategy/NYCN-Implementation-Plan.md) - 5-phase platform feature plan: decision→action bridge, consent mode, meetings, digests, documents (2026-04-13)
 - [NYCN-Sprint-Plan.md](strategy/NYCN-Sprint-Plan.md) - 3-lane sprint plan: platform closure, institutional model, migration prep (2026-04-13)
+- [NYCN-Charter-Draft.yaml](strategy/NYCN-Charter-Draft.yaml) - NYCN federation charter draft in CCL YAML (2026-04-14)
 - [NYCN-Repo-Architecture-Spec.md](strategy/NYCN-Repo-Architecture-Spec.md) - Repo-shaped architectural map grounded in current code: bounded domains, canonical objects, authority model, Program/cycle design (2026-04-14)
 - [NYCN-Implementation-Matrix.md](strategy/NYCN-Implementation-Matrix.md) - Execution ledger: per-object status (main/open_pr/branch_only/spec_only), touch points, bootstrap seed, ny-coop-net import crosswalk, phase-gated open questions (2026-04-14)
 - [NYCN-Execution-Tranches.md](strategy/NYCN-Execution-Tranches.md) - Merge-order + dependency plan across 7 tranches, rollback strategy, agent assignments (2026-04-14)
@@ -413,6 +415,14 @@ Documentation and code templates for consistency.
 ### Vision Documents (`vision/`)
 
 High-level vision and strategic direction.
+
+### Session Handoffs & Dev Docs (`dev/`)
+
+Session handoffs, development workflow docs, and worktree guidance:
+
+- [WORKTREES.md](dev/WORKTREES.md) - Git worktree guide for parallel agent work
+- [language-guide.md](dev/language-guide.md) - ICN language and terminology guide
+- Session handoffs: `handoff-YYYY-MM-DD.md` files (latest is the current execution state)
 
 ### AI & Automation (`ai/`)
 
