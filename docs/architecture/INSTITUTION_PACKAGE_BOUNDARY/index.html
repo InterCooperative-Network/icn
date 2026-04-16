@@ -1,0 +1,297 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Institution Package Boundary | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yTnaBP6O.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>INSTITUTION PACKAGE BOUNDARY</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: normative
+Authority: architecture
+Canonical: no
+Last Reviewed: 2026-04-16</h2>
+<h1>Institution Package Boundary</h1>
+<blockquote>
+<p>Defines what belongs in ICN platform versus what belongs in an institution-specific package repo (e.g., NYCN). Anchors all future layered implementation decisions.</p>
+</blockquote>
+<p><strong>Grounded against:</strong> <code>main</code> at <code>fde1466a</code> (Program + Milestone primitives landed, PR #1548).
+<strong>Companion docs:</strong> <code>KERNEL_APP_SEPARATION.md</code>, <code>ADR-001-What-ICN-Is.md</code>, <code>NYCN-Repo-Architecture-Spec.md</code>.</p>
+<hr>
+<h2>A. The Two-Layer Model</h2>
+<pre><code>┌──────────────────────────────────────────────────────────┐
+│  Institution Package (e.g., nycn-icn)                    │
+│  Charter YAML • CCL rules • NYCN-specific templates      │
+│  Seed data • External integrations • Custom views        │
+├──────────────────────────────────────────────────────────┤
+│  ICN Platform (this repo)                                │
+│  Generic institutional objects + HTTP + sled stores      │
+│  Constraint enforcement • Event bus • Capability tokens  │
+├──────────────────────────────────────────────────────────┤
+│  ICN Kernel (kernel crates, meaning firewall applies)    │
+│  Identity • Auth • State • Compute • Comms               │
+│  Time • Coordination • Naming                            │
+└──────────────────────────────────────────────────────────┘
+</code></pre>
+<p>The boundary between the top two layers is what this document defines.</p>
+<hr>
+<h2>B. ICN vs Institution Package</h2>
+<h3>Goes in ICN (<code>icn-governance</code> + <code>apps/governance</code>)</h3>
+<p>A type, object, or capability belongs in ICN if:</p>
+<ul>
+<li><strong>A second cooperative would need it with different content but the same shape.</strong> Committee, Meeting, Program, Milestone, ActionItem, Sponsor — every recurring institution has these.</li>
+<li>It has no institution-specific vocabulary baked into enum variants or field names.</li>
+<li>It uses <code>Custom(String)</code> escape hatches for institution-specific extensions rather than named variants.</li>
+<li>Its semantics are expressible as: entities owning structures owning activities with attached operational objects.</li>
+</ul>
+<p><strong>Currently in ICN (verified on main):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>Location</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Entity (Federation/Cooperative/Individual)</td>
+<td><code>icn-governance::entity</code></td>
+<td>Sovereign, holds treasury</td>
+</tr>
+<tr>
+<td>Structure (Committee/WorkingGroup/Team/Office)</td>
+<td><code>icn-governance::structure</code></td>
+<td>Non-sovereign, entity-owned</td>
+</tr>
+<tr>
+<td>Activity (Event/Program/Project/Initiative)</td>
+<td><code>icn-governance::activity</code></td>
+<td>Time-bounded, entity-owned</td>
+</tr>
+<tr>
+<td>Program + Milestone</td>
+<td><code>icn-governance::program</code></td>
+<td>Cycle container with stage gates</td>
+</tr>
+<tr>
+<td>ActionItem + decision bridge</td>
+<td><code>icn-governance::action_item</code></td>
+<td>Provenance-linked to proposals</td>
+</tr>
+<tr>
+<td>RoleAssignment</td>
+<td><code>icn-governance::structure</code></td>
+<td>Authority as <code>Vec&lt;String&gt;</code> capability strings</td>
+</tr>
+<tr>
+<td>Meeting</td>
+<td><code>icn-governance::meeting</code></td>
+<td>PR #1543, landing</td>
+</tr>
+<tr>
+<td>InstitutionalParent attachment</td>
+<td><code>icn-governance::parent</code></td>
+<td>Polymorphic object attachment</td>
+</tr>
+</tbody></table>
+<h3>Goes in the Institution Package (e.g., <code>nycn-icn</code> repo)</h3>
+<ul>
+<li><strong>Charter configuration</strong>: the YAML/CCL document that instantiates ICN objects with NYCN-specific content (entity names, committee membership, role definitions, voting thresholds).</li>
+<li><strong>Institution-specific CCL rules</strong>: quorum rules, term limits, budget approval chains, summit stage-gate predicates with NYCN vocabulary.</li>
+<li><strong>Seed data</strong>: initial members, structure definitions, program templates for <code>summit-2026</code>.</li>
+<li><strong>Custom views and dashboards</strong>: program dashboard shaped for summit operations; sponsor pipeline view with NYCN tier names.</li>
+<li><strong>External integrations</strong>: Google Workspace sync, ny-coop-net membership import, legacy spreadsheet migration.</li>
+<li><strong>NYCN-specific event handlers</strong>: React to <code>ProgramMilestoneCompleted</code> to trigger NYCN-specific follow-on workflows.</li>
+</ul>
+<h3>The Test</h3>
+<blockquote>
+<p>If you find yourself naming an enum variant <code>AnnualSummit</code>, <code>PlatinumSponsor</code>, <code>VenueLocked</code>, or <code>NYCNOrganizer</code> in <code>icn-governance</code>, stop. That belongs in the institution package as CCL data or configuration — not as a core type variant.</p>
+</blockquote>
+<p>No NYCN-specific vocabulary in ICN enums. Use <code>ProgramKind::Custom(&quot;annual-summit&quot;)</code>, <code>SponsorTier::Custom(&quot;platinum&quot;)</code>. The institution package owns the semantics; ICN owns the shape.</p>
+<hr>
+<h2>C. CCL vs Host Runtime</h2>
+<h3>CCL expresses:</h3>
+<ul>
+<li><strong>Authorization conditions</strong>: who can call this action given current state</li>
+<li><strong>State transition guards</strong>: pre-conditions that must hold before a transition fires</li>
+<li><strong>Threshold rules</strong>: quorum, consent threshold, majority percentage</li>
+<li><strong>Completion criteria assertions</strong>: milestone predicates (<code>venue_confirmed AND budget_locked</code>)</li>
+<li><strong>Delegation bounds</strong>: what scopes can be subdelegated and to whom</li>
+<li><strong>Obligation creation</strong>: what action items materialize when a proposal passes</li>
+<li><strong>Expiry and renewal</strong>: lease durations, term limits, review cycles</li>
+</ul>
+<h3>Host runtime (Rust, <code>apps/governance</code>) handles:</h3>
+<ul>
+<li><strong>Storage and indexing</strong>: Sled stores, multi-key indexes, prefix scans</li>
+<li><strong>Transport and serialization</strong>: HTTP handlers, JSON models, gateway events</li>
+<li><strong>Generic object lifecycle</strong>: CRUD, status transitions, soft delete</li>
+<li><strong>Receipt and provenance</strong>: <code>ArtifactReceipt</code>, <code>completed_by</code>, <code>created_by</code>, timestamps</li>
+<li><strong>Low-level execution machinery</strong>: actor mailboxes, sled transactions, tokio tasks</li>
+<li><strong>Capability token issuance and verification</strong>: bearer tokens, DID-TLS binding</li>
+<li><strong>Rendering and API surface</strong>: OpenAPI, TypeScript SDK types, mobile gateway endpoints</li>
+</ul>
+<h3>The Rule</h3>
+<p>CCL describes <em>what is permitted and under what conditions</em>. The host runtime describes <em>how permitted actions are actually executed and stored</em>. Never put storage keys in CCL. Never put semantic authorization logic in a Rust match arm.</p>
+<hr>
+<h2>D. Reusable Primitive Set for NYCN/Summit</h2>
+<p>These belong in ICN because every cooperative institution needs them. Verified against what NYCN concretely requires for an operational summit cycle.</p>
+<table>
+<thead>
+<tr>
+<th>Primitive</th>
+<th>Why ICN</th>
+<th>Institution-specific parts</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Structure</strong> (Committee/WG)</td>
+<td>Every institution delegates authority to sub-groups</td>
+<td>Member list, specific authorities, NYCN committee names</td>
+</tr>
+<tr>
+<td><strong>Meeting</strong></td>
+<td>Every body needs a record of deliberation with decisions and attendance</td>
+<td>Agenda templates, NYCN meeting norms</td>
+</tr>
+<tr>
+<td><strong>Program + Milestone</strong></td>
+<td>Recurring cycles with stage gates exist across institutions</td>
+<td>Summit-specific stage names expressed as <code>completion_criteria: Vec&lt;String&gt;</code> data</td>
+</tr>
+<tr>
+<td><strong>ActionItem</strong></td>
+<td>Work that materializes from decisions is universal</td>
+<td>Assignment rules, NYCN priority conventions</td>
+</tr>
+<tr>
+<td><strong>Sponsor</strong></td>
+<td>Resource partnership with lifecycle is generic across events and programs</td>
+<td>Tier names (platinum/gold/etc.), benefit tables, NYCN ask amounts</td>
+</tr>
+<tr>
+<td><strong>ServiceRequest / Intake</strong></td>
+<td>Member-initiated requests with routing and status apply broadly</td>
+<td>Category taxonomy, routing rules, SLA definitions</td>
+</tr>
+<tr>
+<td><strong>Contact / OrgRelationship</strong></td>
+<td>External relationship management is generic across institutions</td>
+<td>CRM fields, relationship types specific to NYCN&#39;s partner network</td>
+</tr>
+</tbody></table>
+<p><strong>Not proposed for ICN now</strong> (institution-specific without a clear second-cooperative case):</p>
+<ul>
+<li>VolunteerAssignment (could be a RoleAssignment variant with <code>volunteer</code> kind — defer)</li>
+<li>SponsorLead (a status in the Sponsor lifecycle, not a separate type)</li>
+<li>ReviewQueue (implement as an ActionItem filter view, not a new primitive)</li>
+</ul>
+<hr>
+<h2>E. Immediate Implementation Implications</h2>
+<p>In merge order:</p>
+<p><strong>1. <code>GET /gov/me/scopes</code> + <code>GET /gov/me/work</code></strong>
+The member&#39;s entry point. Returns their <code>RoleAssignment</code> set and open <code>ActionItem</code>s filtered by assignee. Unblocks the &quot;new organizer can see their scope&quot; decisive test. Requires no new types — compose from existing <code>SledRoleAssignmentStore</code> + <code>SledActionItemStore</code>. This is Tranche 1c.</p>
+<p><strong>2. <code>Activity.parent_program_id</code> linkage</strong>
+Wire <code>Activity</code> to its parent <code>Program</code> so <code>summit-2026 (Activity)</code> points to <code>annual-summit-cycle (Program)</code>. Enables cycle-over-cycle comparison. One field addition; no schema migration needed (optional field, backward-compatible). Tranche 1c.</p>
+<p><strong>3. Sponsor primitive</strong> (<code>icn-governance::sponsor</code>)
+<code>Sponsor { id, program_id, org_name, contact_did, tier: String, status, committed_amount, confirmed_at }</code>. Sled store with <code>sponsor_by_program</code> and <code>sponsor_by_status</code> indexes. HTTP surface. No NYCN tier names in the enum — <code>tier</code> is a free string. Tranche 2.</p>
+<p><strong>4. Notification digest wired to Meeting</strong>
+<code>feat/notification-digests</code> branch stubs <code>upcoming_meetings: Vec::new()</code> because Meeting didn&#39;t exist when it was written. After Meeting lands (PR #1543), wire the digest to <code>SledMeetingStore.list_upcoming_by_scope()</code>. Tranche 2 follow-on.</p>
+<p><strong>5. <code>GET /gov/programs/{id}/dashboard</code> composite view</strong>
+Returns Program + Milestone statuses + ActionItem counts by status + Sponsor counts by status. Pure composition from existing stores once Sponsor lands. No new primitives. Enables the summit dashboard without a client-side join. Tranche 3.</p>
+<hr>
+<h2>Boundary in One Sentence</h2>
+<p>ICN provides the generic institutional operating system — typed shapes, enforced lifecycles, provenance, capability-gated APIs. The institution package provides the charter, the vocabulary, the seed data, and the specific rules that give those shapes meaning for one community.</p>
+<hr>
+<p><em>This document is normative for future crate and route placement decisions. Update when a new primitive is proposed or when a placement decision is contested.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
