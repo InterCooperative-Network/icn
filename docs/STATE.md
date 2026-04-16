@@ -39,6 +39,7 @@ Active execution: NYCN institutional integration work (meetings, structures, act
 
 | PR | Title | Branch | Status |
 |----|-------|--------|--------|
+| #1550 | docs(state): canon-sync — align canonical docs to verified merged reality | docs/canon-sync-2026-04 | Open |
 | #1549 | docs(ai): constitutional core + workflow architecture migration | docs/workflow-migration | Open |
 | #1548 | feat(governance): Program + Milestone primitives (Tranche 1a) | feat/program-milestone | Open |
 
@@ -66,15 +67,15 @@ Infrastructure:
 - **Authority is capability-string based:** `RoleAssignment.authority_scope: Vec<String>`.
 - **Sled key convention:** primary `<thing>:{id}`; secondary `<thing>_by_<scope>:{scope_id}:{id}`.
 - **Gateway event naming:** `Governance<Thing><Verb>`.
-- **Meaning Firewall preserved:** kernel crates have zero domain imports from governance/trust/ccl/coop.
+- **Meaning Firewall:** CI ratchet enforces no new kernel/domain import regressions. Pre-existing domain imports in icn-core and icn-gateway remain; full extraction is ongoing work.
 
 ## Architecture notes
 
 - Repo root is not a Cargo workspace; Rust workspace lives in `icn/`.
-- Workspace: 39 library crates + 3 binaries = 42 packages.
-  - **Crates:** icn-api, icn-authz, icn-ccl, icn-charter-app, icn-commons, icn-community, icn-compute, icn-coop, icn-core, icn-crypto, icn-crypto-pq, icn-encoding, icn-entity, icn-federation, icn-gateway, icn-gossip, icn-governance, icn-governance-actor, icn-http-kit, icn-identity, icn-kernel-api, icn-ledger, icn-ledger-actor, icn-membership-app, icn-naming, icn-net, icn-obs, icn-privacy, icn-protocol, icn-rpc, icn-security, icn-services, icn-snapshot, icn-steward, icn-store, icn-testkit, icn-time, icn-trust, icn-zkp.
-  - **Binaries:** icnd, icnctl, icn-console.
+- Workspace: 35 crates in `icn/crates/` + 4 app crates in `icn/apps/` + 3 binaries = 42 packages.
+  - **Crates (in `icn/crates/`):** icn-api, icn-authz, icn-ccl, icn-commons, icn-community, icn-compute, icn-coop, icn-core, icn-crypto, icn-crypto-pq, icn-encoding, icn-entity, icn-federation, icn-gateway, icn-gossip, icn-governance, icn-http-kit, icn-identity, icn-kernel-api, icn-ledger, icn-naming, icn-net, icn-obs, icn-privacy, icn-protocol, icn-rpc, icn-security, icn-services, icn-snapshot, icn-steward, icn-store, icn-testkit, icn-time, icn-trust, icn-zkp.
   - **App crates (in `icn/apps/`):** icn-governance-actor, icn-ledger-actor, icn-membership-app, icn-charter-app.
+  - **Binaries:** icnd, icnctl, icn-console.
 - Web UI: web/pilot-ui (PWA), web/dashboard (static).
 - SDKs: sdk/typescript, sdk/react-native.
 - Deployment: native/systemd, Docker Compose, Kubernetes, Helm (deploy/README.md).
