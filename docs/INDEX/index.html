@@ -40,7 +40,7 @@ View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
 <h2>Status: operational
 Canonical: yes
-Last Reviewed: 2026-04-11</h2>
+Last Reviewed: 2026-04-15</h2>
 <h2>Where things live (control plane)</h2>
 <table>
 <thead>
@@ -80,7 +80,7 @@ Last Reviewed: 2026-04-11</h2>
 <p><strong>One-line check:</strong> <code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml</code> (optional <code>--strict</code> before merge).</p>
 <h1>ICN Documentation Index</h1>
 <p>Welcome to the ICN (Intercooperative Network) documentation! This index provides clear navigation to all documentation.</p>
-<p><strong>Last Updated</strong>: 2026-03-18<br><strong>Version</strong>: 2.0 (Post-Phase 2C Reorganization)</p>
+<p><strong>Last Updated</strong>: 2026-04-15<br><strong>Version</strong>: 2.1 (canon-sync pass)</p>
 <hr>
 <h2>📋 Quick Navigation</h2>
 <ul>
@@ -124,6 +124,10 @@ Last Reviewed: 2026-04-11</h2>
 <tr>
 <td><a href="/docs/PHASE_HISTORY">PHASE_HISTORY.md</a></td>
 <td>Development phase completion history</td>
+</tr>
+<tr>
+<td><a href="/docs/PHASE_PROGRESS">PHASE_PROGRESS.md</a></td>
+<td>Active phase tracking and cross-cutting metrics</td>
 </tr>
 <tr>
 <td><a href="/docs/STATE">STATE.md</a></td>
@@ -434,6 +438,7 @@ Last Reviewed: 2026-04-11</h2>
 <li><a href="/docs/strategy/NYCN-Institutional-Design">NYCN-Institutional-Design.md</a> - NYCN entity/structure/activity topology, governance model, and ICN primitive mapping (2026-04-13; Entity Structure section corrected 2026-04-15 to match layered ontology from #1540)</li>
 <li><a href="/docs/strategy/NYCN-Implementation-Plan">NYCN-Implementation-Plan.md</a> - 5-phase platform feature plan: decision→action bridge, consent mode, meetings, digests, documents (2026-04-13)</li>
 <li><a href="/docs/strategy/NYCN-Sprint-Plan">NYCN-Sprint-Plan.md</a> - 3-lane sprint plan: platform closure, institutional model, migration prep (2026-04-13)</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN-Charter-Draft.yaml">NYCN-Charter-Draft.yaml</a> - NYCN federation charter draft in CCL YAML (2026-04-14)</li>
 <li><a href="/docs/strategy/NYCN-Repo-Architecture-Spec">NYCN-Repo-Architecture-Spec.md</a> - Repo-shaped architectural map grounded in current code: bounded domains, canonical objects, authority model, Program/cycle design (2026-04-14)</li>
 <li><a href="/docs/strategy/NYCN-Implementation-Matrix">NYCN-Implementation-Matrix.md</a> - Execution ledger: per-object status (main/open_pr/branch_only/spec_only), touch points, bootstrap seed, ny-coop-net import crosswalk, phase-gated open questions (2026-04-14)</li>
 <li><a href="/docs/strategy/NYCN-Execution-Tranches">NYCN-Execution-Tranches.md</a> - Merge-order + dependency plan across 7 tranches, rollback strategy, agent assignments (2026-04-14)</li>
@@ -456,6 +461,13 @@ Last Reviewed: 2026-04-11</h2>
 <p>Documentation and code templates for consistency.</p>
 <h3>Vision Documents (<code>vision/</code>)</h3>
 <p>High-level vision and strategic direction.</p>
+<h3>Session Handoffs &amp; Dev Docs (<code>dev/</code>)</h3>
+<p>Session handoffs, development workflow docs, and worktree guidance:</p>
+<ul>
+<li><a href="/docs/dev/WORKTREES">WORKTREES.md</a> - Git worktree guide for parallel agent work</li>
+<li><a href="/docs/dev/language-guide">language-guide.md</a> - ICN language and terminology guide</li>
+<li>Session handoffs: <code>handoff-YYYY-MM-DD.md</code> files (latest is the current execution state)</li>
+</ul>
 <h3>AI &amp; Automation (<code>ai/</code>)</h3>
 <ul>
 <li><a href="/docs/ai/CODEX_WORKFLOW">CODEX_WORKFLOW.md</a> - AI workflow and agent rules</li>

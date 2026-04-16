@@ -40,167 +40,247 @@ View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
 <h2>Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-04-10</h2>
+Last Reviewed: 2026-04-15</h2>
 <h1>ICN State (living doc)</h1>
-<h2>Current status (2026-04-11 snapshot)</h2>
+<!-- [sync edit] 2026-04-15: Consolidated stacked changelog into single current snapshot.
+     Aligned crate list, merged PRs, and metrics to verified repo state.
+     Phase model unchanged — phase classification is governance territory (PR C). -->
+
+<h2>Current status (2026-04-15 snapshot)</h2>
+<p><strong>Current phase:</strong> Phase 2 — Pilot Launch (blocked on cooperative partners).
+Active execution: NYCN institutional integration work (meetings, structures, activities, notification digest, Program/Milestone in review). Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions and PR C for any future reclassification.</p>
+<h3>Recently merged (since last STATE.md update 2026-04-11)</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Title</th>
+<th>Merged</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1547</td>
+<td>feat(governance): notification digest + action-item/meeting events</td>
+<td>2026-04-15</td>
+</tr>
+<tr>
+<td>#1546</td>
+<td>docs(dev): session handoff 2026-04-15</td>
+<td>2026-04-15</td>
+</tr>
+<tr>
+<td>#1545</td>
+<td>docs(strategy): correct NYCN-Institutional-Design entity tree</td>
+<td>2026-04-15</td>
+</tr>
+<tr>
+<td>#1544</td>
+<td>docs(strategy): NYCN repo-shaped architecture spec + matrix + tranches</td>
+<td>2026-04-15</td>
+</tr>
+<tr>
+<td>#1543</td>
+<td>feat(governance): Meeting management primitive</td>
+<td>2026-04-15</td>
+</tr>
+<tr>
+<td>#1542</td>
+<td>chore(security): fix Security Audit CI failure</td>
+<td>2026-04-14</td>
+</tr>
+<tr>
+<td>#1540</td>
+<td>feat(governance): institutional structure + event model (Tranche 2, part 1)</td>
+<td>2026-04-14</td>
+</tr>
+<tr>
+<td>#1534</td>
+<td>docs(strategy): NYCN federation charter draft (CCL YAML)</td>
+<td>2026-04-14</td>
+</tr>
+<tr>
+<td>#1533</td>
+<td>feat(governance): consent-based decision mode</td>
+<td>2026-04-14</td>
+</tr>
+<tr>
+<td>#1532</td>
+<td>feat(governance): decision-to-action bridge</td>
+<td>2026-04-14</td>
+</tr>
+<tr>
+<td>#1529</td>
+<td>chore(repo): add GitHub Sponsors funding button</td>
+<td>2026-04-14</td>
+</tr>
+<tr>
+<td>#1527</td>
+<td>fix(ci): add timeout-minutes to docker-build-deploy jobs</td>
+<td>2026-04-11</td>
+</tr>
+<tr>
+<td>#1526</td>
+<td>docs: full refresh — archive 21 stale files</td>
+<td>2026-04-11</td>
+</tr>
+<tr>
+<td>#1525</td>
+<td>docs(architecture): Constitutional Genesis</td>
+<td>2026-04-11</td>
+</tr>
+<tr>
+<td>#1524</td>
+<td>fix(ci): add has_rust dual-signal guard</td>
+<td>2026-04-11</td>
+</tr>
+</tbody></table>
+<h3>Open PRs</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Title</th>
+<th>Branch</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1550</td>
+<td>docs(state): canon-sync — align canonical docs to verified merged reality</td>
+<td>docs/canon-sync-2026-04</td>
+<td>Open</td>
+</tr>
+<tr>
+<td>#1549</td>
+<td>docs(ai): constitutional core + workflow architecture migration</td>
+<td>docs/workflow-migration</td>
+<td>Open</td>
+</tr>
+<tr>
+<td>#1548</td>
+<td>feat(governance): Program + Milestone primitives (Tranche 1a)</td>
+<td>feat/program-milestone</td>
+<td>Open</td>
+</tr>
+</tbody></table>
+<h3>What landed since Phase 1 (Charter Engine)</h3>
+<p>Governance institutional primitives:</p>
 <ul>
-<li><strong>PR #1520</strong> (website cleanup: logo, homepage condensation, light theme, NetworkGraph/d3 removal) merged 2026-04-10</li>
-<li><strong>PR #1522</strong> (<code>fix/coop-store-sled-lock</code>) merged 2026-04-11T00:21Z — resolves two main CI blockers:<ul>
-<li>Security Audit gate: wasmtime bumped 24.0.6 → 36.0.7 (RUSTSEC-2026-0095, critical sandbox escape)</li>
-<li>Test gate: <code>icn_coop::store::tests::test_treasury_nonce_survives_reopen</code> sled lock contention fixed via explicit <code>drop(store)</code> before reopen</li>
+<li>Governance domains, structures, activities, parent (scope container) — #1540</li>
+<li>Decision-to-action bridge: accepted proposals create linked action items — #1532</li>
+<li>Consent-based decision mode — #1533</li>
+<li>Meeting management (schedule, agenda, attendance, minutes) — #1543</li>
+<li>Notification digest (pending votes, overdue items, upcoming meetings) — #1547</li>
+<li>NYCN architecture docs (repo-shaped spec, implementation matrix, execution tranches) — #1544</li>
+<li>NYCN institutional design correction (layered ontology) — #1545</li>
 </ul>
-</li>
-<li><strong>PR #1521</strong> (<code>fix/wasmtime-security-audit</code>) closed as superseded by #1522 (strict superset)</li>
-<li><strong>Pilot Vertical Slice Hardening sprint complete</strong>: #1214, #1221, #1220, #1222 all closed</li>
-<li><strong>Issue #862</strong> (naming primitive) closed as superseded — implemented as <code>icn-naming</code> crate</li>
-<li><strong>Issue #1401</strong> (hung docker-build-deploy CI) closed — root cause (Test job) already removed in PR #1403</li>
-<li>Main CI post-merge: all real gates green. Security Audit was skipping due to missing <code>has_rust</code> dual-signal guard in CI workflow (fix: PR #1524)</li>
+<p>Infrastructure:</p>
+<ul>
+<li>Security Audit CI fix (wasmtime bump) — #1522, #1542</li>
+<li>CI dual-signal guard — #1524</li>
+<li>Docker-build-deploy timeout fix — #1527</li>
+<li>21-file doc refresh and archive — #1526</li>
+</ul>
+<h3>Architectural decisions in force</h3>
+<ul>
+<li><strong>Layered ontology (locked 2026-04-14):</strong> Entities (sovereign) / Structures (non-sovereign, entity-owned) / Activities (time-bounded, entity-owned). Committees are Structures. Summit is Activity.</li>
+<li><strong>Program is a separate primitive</strong> (not Activity extension): Milestones with machine-readable checks, parent_program_id for cycle-handoff. Spec in NYCN-Repo-Architecture-Spec.md §5.</li>
+<li><strong>Authority is capability-string based:</strong> <code>RoleAssignment.authority_scope: Vec&lt;String&gt;</code>.</li>
+<li><strong>Sled key convention:</strong> primary <code>&lt;thing&gt;:{id}</code>; secondary <code>&lt;thing&gt;_by_&lt;scope&gt;:{scope_id}:{id}</code>.</li>
+<li><strong>Gateway event naming:</strong> <code>Governance&lt;Thing&gt;&lt;Verb&gt;</code>.</li>
+<li><strong>Meaning Firewall:</strong> CI ratchet enforces no new kernel/domain import regressions. Pre-existing domain imports in icn-core and icn-gateway remain; full extraction is ongoing work.</li>
 </ul>
 <h2>Architecture notes</h2>
 <ul>
-<li>Repo root is not a Cargo workspace; Rust workspace lives in icn/.</li>
-<li>Workspace members (icn/Cargo.toml):<ul>
-<li>Crates: icn-core, icn-identity, icn-trust, icn-net, icn-gossip, icn-ledger, icn-ccl, icn-store, icn-rpc, icn-obs, icn-snapshot, icn-testkit, icn-gateway, icn-governance, icn-compute, icn-security, icn-time, icn-privacy, icn-federation, icn-crypto-pq, icn-steward, icn-zkp, icn-community, icn-coop, icn-entity, icn-encoding.</li>
-<li>Binaries: icnd, icnctl, icn-console.</li>
+<li>Repo root is not a Cargo workspace; Rust workspace lives in <code>icn/</code>.</li>
+<li>Workspace: 35 crates in <code>icn/crates/</code> + 4 app crates in <code>icn/apps/</code> + 3 binaries = 42 packages.<ul>
+<li><strong>Crates (in <code>icn/crates/</code>):</strong> icn-api, icn-authz, icn-ccl, icn-commons, icn-community, icn-compute, icn-coop, icn-core, icn-crypto, icn-crypto-pq, icn-encoding, icn-entity, icn-federation, icn-gateway, icn-gossip, icn-governance, icn-http-kit, icn-identity, icn-kernel-api, icn-ledger, icn-naming, icn-net, icn-obs, icn-privacy, icn-protocol, icn-rpc, icn-security, icn-services, icn-snapshot, icn-steward, icn-store, icn-testkit, icn-time, icn-trust, icn-zkp.</li>
+<li><strong>App crates (in <code>icn/apps/</code>):</strong> icn-governance-actor, icn-ledger-actor, icn-membership-app, icn-charter-app.</li>
+<li><strong>Binaries:</strong> icnd, icnctl, icn-console.</li>
 </ul>
 </li>
-<li>Web UI:<ul>
-<li>web/pilot-ui: static PWA; tests via npm run test, test:e2e, test:a11y, test:all.</li>
-<li>web/dashboard: static admin dashboard; start via python3 -m http.server 8080.</li>
+<li>Web UI: web/pilot-ui (PWA), web/dashboard (static).</li>
+<li>SDKs: sdk/typescript, sdk/react-native.</li>
+<li>Deployment: native/systemd, Docker Compose, Kubernetes, Helm (deploy/README.md).</li>
 </ul>
-</li>
-<li>SDKs:<ul>
-<li>sdk/typescript: npm run build/dev/test/lint; generate-types uses docs/api/openapi.generated.yaml.</li>
-<li>sdk/react-native: npm run build/dev/test.</li>
-</ul>
-</li>
-<li>Deployment options (deploy/README.md): native/systemd, Docker Compose, Kubernetes, Helm. Secrets required (JWT/Grafana/keystore).</li>
-</ul>
-<h2>Decisions</h2>
+<h2>Decisions (durable)</h2>
 <ul>
-<li>Mutual TLS with client certificates enabled (2025-12-18 session).</li>
-<li>DID-TLS binding verification enabled; IdentityBundle TLS certs used by SessionManager.</li>
-<li>Some QUIC/chaos tests are ignored in CI due to timing; run manually as needed.</li>
+<li>Mutual TLS with client certificates enabled (2025-12-18).</li>
+<li>DID-TLS binding verification enabled.</li>
+<li>Some QUIC/chaos tests ignored in CI due to timing; run manually as needed.</li>
 </ul>
-<h2>Constraints</h2>
+<h2>Constraints (durable)</h2>
 <ul>
-<li>Run Rust build/test commands from icn/.</li>
+<li>Run Rust build/test commands from <code>icn/</code>.</li>
 <li>Tokio async only; avoid blocking operations in async paths.</li>
 <li>No panics in protocol/network/actor runtime paths.</li>
-<li>Demo status docs note STUN discovery disabled for local-only testing; re-validate before demo.</li>
-</ul>
-<h2>Governance Demo Sprint (2026-03-14)</h2>
-<ul>
-<li><strong>Fixed:</strong> Gateway governance routes returning 404 — actix-web <code>web::scope(&quot;&quot;)</code> ordering bug<ul>
-<li><code>web::scope(&quot;/gov&quot;)</code> now registered before empty-scope services in <code>server.rs</code></li>
-<li><code>configure.rs</code> route paths stripped of <code>/gov/</code> prefix (scope provides it)</li>
-</ul>
-</li>
-<li><strong>Fixed:</strong> Vote tally showing 1 instead of 2 — <code>GovernanceCommand::CastVote</code> was missing voter DID<ul>
-<li>All votes attributed to node&#39;s own DID; KV store key <code>(proposal_id, voter_did)</code> caused overwrites</li>
-<li>Threaded authenticated voter DID through <code>GovernanceOps</code> trait, actor command, and handle</li>
-</ul>
-</li>
-<li><strong>Built:</strong> Complete demo pipeline<ul>
-<li><code>demo/scripts/start-demo.sh</code> — cold-start script (build → init → start → health check)</li>
-<li><code>demo/scripts/demo-governance.py</code> — 18-step governance flow (auth, domains, proposals, votes, proofs)</li>
-<li><code>crates/icn-gateway/static/demo.html</code> — browser demo UI at <code>/static/demo.html</code></li>
-</ul>
-</li>
-<li><strong>Verified:</strong> 547 tests passing, cold-start demo 18/18, tally correct (2/2 votes)</li>
-<li><strong>API routes:</strong> Governance at <code>/v1/gov/*</code> (previously 404 due to scope shadowing)</li>
-</ul>
-<h2>Current status (2026-03-18 evening snapshot)</h2>
-<ul>
-<li><strong>Phase 1 (Charter Engine) complete</strong> — PRs #1336 + #1337 merged</li>
-<li>Charter bridge (<code>charter_to_constraints()</code>), <code>CharterPolicyOracle</code>, 5 CCL templates, <code>icnctl charter</code> CLI, and governance ratification flow all landed</li>
-<li><code>ProposalPayload::Charter</code> wired end-to-end: vote passes → <code>close_proposal</code> fires type-erased hook → oracle deploys charter → constraints active for subsequent requests</li>
-<li>Demo governance script (Phase 2) now submits real CCL charter YAML for member ratification instead of a plain text proposal</li>
-<li>Meaning Firewall preserved: kernel crates (<code>icn-core</code>, <code>icn-gateway</code>) hold only <code>Arc&lt;dyn Fn(String, String) + Send + Sync&gt;</code> — no <code>icn-charter-app</code> import</li>
-<li>Phase 2 (Pilot Launch) is next — requires cooperative partners identified and committed</li>
-</ul>
-<h2>Current status (2026-02-18 snapshot)</h2>
-<ul>
-<li><strong>Sprint 8-10 Economics Consolidation complete</strong> - Full deterministic economic receipt chain implemented:<ul>
-<li>CanonicalReceipt trait with Blake3-based deterministic hashing</li>
-<li>AllocationReceipt and SettlementIntent types with order-independent canonical hashes</li>
-<li>ReceiptStore with sled persistence and decision_hash indexing</li>
-<li>6 REST endpoints for receipt and ledger provenance queries</li>
-<li>Pilot UI Receipts tab with sorted verification badge</li>
-<li>icnctl receipts commands (chain/allocation/intent)</li>
-<li>Demo scripts and E2E tests for cross-node determinism</li>
-</ul>
-</li>
-<li>Historical roadmap reference: <code>docs/strategy/ICN-Roadmap-Live.md</code> (point-in-time planning document).</li>
-<li>Current architecture and migration direction: <code>docs/PHASE_HISTORY.md</code> and <code>docs/architecture/KERNEL_APP_SEPARATION.md</code>.</li>
-<li>CI status docs (docs/ci/CI_CURRENT_STATUS.md) are snapshot-based; re-verify before release decisions.</li>
-<li>Local CI baseline 2026-02-11 passed with rustc 1.88.0 (icn/rust-toolchain.toml).</li>
-<li>K3s/self-hosted runner node down (2026-01-20 per user report); deploy workflows blocked.</li>
-<li>Demo status docs include 2025-12 historical snapshots; use docs/demo/ and live smoke checks for current operational truth.</li>
-<li>Homelab deployment (docs/operations/deployment/HOMELAB_DEPLOYMENT.md): K3s cluster running with self-hosted runner and monitoring stack (deployed 2025-12-03).</li>
-</ul>
-<h2>Code review findings (2026-01-20)</h2>
-<ul>
-<li>Repo-wide TODO scan across icn/ captured items below.</li>
-<li>icn-core supervisor: personhood store and anchor rate limit config are TODOs (icn-core/src/supervisor/mod.rs:499-500). [Requires config schema extension]</li>
-<li>✅ icn-core governance handlers: treasury disbursement/redemption/bond issuance implemented (icn-core/src/supervisor/governance_handlers.rs).</li>
-<li>✅ icn-core notifications: evidence validator wired up (icn-core/src/supervisor/init_notifications.rs).</li>
-<li>✅ icn-governance proposal cleanup: metrics implemented, archive store stubbed (icn-governance/src/proposal_cleanup.rs).</li>
-<li>✅ icn-gateway agreements: compensation_model and terms parsing implemented (icn-gateway/src/api/agreements.rs).</li>
-<li>icn-gateway governance domains: performance note for large domain counts (icn-gateway/src/api/governance.rs:174-176).</li>
-<li>icn-gateway SDIS enrollment: temporary VUI hash and steward rate limit TODOs (icn-gateway/src/api/sdis/simple_enrollment.rs:11-77, 477-484).</li>
-<li>✅ icn-steward: message-level signatures implemented for VUI sync (icn-steward/src/gossip.rs).</li>
-<li>icn-compute: federated task settlement TODO (icn-compute/src/actor/placement.rs:983-988).</li>
-<li>✅ icn-gossip storage challenge: ContentNotFound response implemented (icn-gossip/src/handlers/storage_challenge.rs).</li>
-<li>✅ icn-gossip storage challenge: timestamp validation for replay attack prevention added (icn-gossip/src/handlers/storage_challenge.rs).</li>
-<li>✅ icn-gossip storage challenge: comprehensive metrics added (icn-obs/src/metrics/storage.rs).</li>
-<li>✅ icn-gateway agreements: comprehensive input validation for all API types (icn-gateway/src/api/agreements.rs).</li>
-<li>icnctl: automatic daemon start TODO (bins/icnctl/src/main.rs:6532-6541).</li>
-<li>✅ deny.toml: license field added to all crates (icn/deny.toml).</li>
-</ul>
-<h2>Code quality notes (2026-01-20)</h2>
-<ul>
-<li>No dead code warnings from clippy or rustc.</li>
-<li>Large module candidates for future modularization:<ul>
-<li>bins/icnctl/src/main.rs (9445 lines) - CLI should be split into subcommand modules</li>
-<li>crates/icn-ledger/src/ledger.rs (5447 lines)</li>
-<li>crates/icn-gateway/src/api/governance.rs (4650 lines)</li>
-<li>crates/icn-core/src/supervisor/governance_handlers.rs (4243 lines)</li>
-</ul>
-</li>
+<li>Demo status docs note STUN discovery disabled for local-only testing.</li>
 </ul>
 <h2>References</h2>
 <ul>
-<li>docs/strategy/ICN-Roadmap-Live.md</li>
-<li>docs/architecture/KERNEL_APP_SEPARATION.md</li>
-<li>docs/ci/CI_CURRENT_STATUS.md</li>
-<li>docs/status/TESTS_FIXED_STATUS.md</li>
-<li>docs/status/CURRENT_SYSTEM_STATUS.md</li>
-<li>docs/operations/deployment/HOMELAB_DEPLOYMENT.md</li>
-<li>deploy/README.md</li>
+<li>docs/PHASE_PROGRESS.md — phase tracking</li>
+<li>docs/architecture/KERNEL_APP_SEPARATION.md — kernel/app boundary</li>
+<li>docs/strategy/NYCN-Repo-Architecture-Spec.md — NYCN institutional architecture</li>
+<li>docs/strategy/NYCN-Execution-Tranches.md — NYCN 7-tranche execution plan</li>
+<li>docs/dev/handoff-2026-04-15.md — latest session handoff</li>
+<li>deploy/README.md — deployment options</li>
 </ul>
-<h3>Planning &amp; Strategy (March 2026)</h3>
+<hr>
+<h2>Historical snapshots</h2>
+<details>
+<summary>2026-04-11 snapshot (PR #1520–#1522)</summary>
+
 <ul>
-<li>docs/planning/icn-crate-reference.md ? 38-crate inventory</li>
-<li>docs/planning/icn-ecosystem-map.md ? surfaces, funnels, entity hierarchy</li>
-<li>docs/planning/icn-vertical-slice-assessment.md ? gateway endpoint inventory</li>
-<li>docs/planning/FORWARD_PLAN_2026-03.md ? Phase 2-4 roadmap</li>
-<li>docs/strategy/ICN-Gap-Analysis-March-2026.md ? subsystem reality check</li>
-<li>docs/strategy/ICN-Sprint-March17.md ? active sprint plan</li>
-<li>docs/strategy/ICN-Roadmap-Live.md ? grounded 90-day roadmap</li>
-<li>docs/mobile/icn-mobile-ux-spec-v1.md ? mobile member UX spec</li>
-<li>docs/status/icn-status-march-2026.md ? March 2026 status report</li>
+<li><strong>PR #1520</strong> (website cleanup) merged 2026-04-10</li>
+<li><strong>PR #1522</strong> (<code>fix/coop-store-sled-lock</code>) merged 2026-04-11 — wasmtime bump + sled lock fix</li>
+<li><strong>PR #1521</strong> closed as superseded by #1522</li>
+<li>Pilot Vertical Slice Hardening sprint complete: #1214, #1221, #1220, #1222</li>
+<li>Issue #862 (naming) closed as superseded — implemented as <code>icn-naming</code></li>
+<li>Issue #1401 (hung docker CI) closed — root cause already removed in #1403</li>
 </ul>
-<h2>Current status (2026-03-18 snapshot)</h2>
+</details>
+
+<details>
+<summary>2026-03-18 snapshot (Phase 0 + Phase 1 complete)</summary>
+
 <ul>
-<li><strong>Phase 0 (Close the Demo) nearly complete</strong> — all 4 flows passing on K3s cluster</li>
-<li>New binary deployed: icn:20260318 (includes all S14 PRs through #1327, settlements:* and treasury:* scopes)</li>
-<li>Init container keystore fix deployed across all 4 coop pods — eliminates manual copy-after-restart toil</li>
-<li>Governance demo (demo-governance.py): 19/19 steps green including cryptographic proof</li>
-<li>All 4 script flows: green (Flow 1 governance, Flow 2 patronage, Flow 3 federation, Flow 4 reporting)</li>
-<li>Remaining: recorded demo asset + handoff documentation for Layer 3</li>
-<li>Two non-blocking bugs filed: Flow 2 receipts/allocations 400 (decision_hash deserialization), Flow 3 clearing ID capture</li>
+<li>Phase 1 (Charter Engine) complete — PRs #1336 + #1337</li>
+<li>Charter bridge, CharterPolicyOracle, 5 CCL templates, icnctl charter CLI, ratification flow all landed</li>
+<li>Phase 0 (Close the Demo) complete — all 4 flows passing on K3s cluster</li>
+<li>4,287 tests, ~420K Rust LOC</li>
 </ul>
+</details>
+
+<details>
+<summary>2026-03-14 snapshot (Governance Demo Sprint)</summary>
+
+<ul>
+<li>Fixed: Gateway governance routes 404 (actix-web scope ordering)</li>
+<li>Fixed: Vote tally (CastVote missing voter DID)</li>
+<li>Built: demo pipeline (start-demo.sh, demo-governance.py, demo.html)</li>
+<li>547 tests passing, cold-start demo 18/18</li>
+</ul>
+</details>
+
+<details>
+<summary>2026-02-18 snapshot (Economics Consolidation)</summary>
+
+<ul>
+<li>Sprint 8-10 complete: deterministic economic receipt chain</li>
+<li>CanonicalReceipt, AllocationReceipt, SettlementIntent, ReceiptStore</li>
+<li>6 REST endpoints for receipt/ledger provenance</li>
+<li>Pilot UI Receipts tab, icnctl receipts commands</li>
+</ul>
+</details>
+
+<details>
+<summary>2026-01-20 snapshot (Code review findings)</summary>
+
+<ul>
+<li>Repo-wide TODO scan captured</li>
+<li>Large module candidates: icnctl/main.rs (9445 lines), icn-ledger (5447), icn-gateway governance (4650), icn-core governance_handlers (4243)</li>
+</ul>
+</details>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
