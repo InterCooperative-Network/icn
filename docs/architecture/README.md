@@ -31,6 +31,7 @@ This directory contains in-depth architectural documentation for the ICN system,
 |----------|-------------|
 | [CANONICAL_ENCODING.md](CANONICAL_ENCODING.md) | Wire format and encoding specifications (critical) |
 | [KERNEL_APP_SEPARATION.md](KERNEL_APP_SEPARATION.md) | Kernel/application boundary design (53KB) |
+| [INSTITUTION_PACKAGE_BOUNDARY.md](INSTITUTION_PACKAGE_BOUNDARY.md) | ICN platform vs institution package boundary (normative) |
 | [CELLS_AND_SCOPES.md](CELLS_AND_SCOPES.md) | Cell-based federation model |
 | [SCOPE_BOUNDED_TRUST.md](SCOPE_BOUNDED_TRUST.md) | Trust scope architecture |
 

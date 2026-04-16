@@ -762,6 +762,20 @@ audiences = ["agents", "developers"]
 # ARCHITECTURE SUBSYSTEM DOCUMENTS
 # ============================================================================
 
+[docs."docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "Institution Package Boundary"
+description = "Normative definition of ICN platform vs institution package boundary, CCL vs host runtime split, and reusable primitive set for NYCN/Summit"
+last_updated = "2026-04-16"
+last_reviewed = "2026-04-16"
+owner = "matt"
+audiences = ["developers", "architects"]
+depends_on = ["docs/architecture/KERNEL_APP_SEPARATION.md", "docs/strategy/ADR-001-What-ICN-Is.md"]
+recommended_action = "keep"
+freshness = "current"
+
 [docs."docs/architecture/KERNEL_APP_SEPARATION.md"]
 category = "architecture"
 status = "living"
