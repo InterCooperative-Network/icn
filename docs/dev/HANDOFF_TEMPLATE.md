@@ -13,7 +13,7 @@ Each section explicitly labels its truth type. Do not blend verified facts with 
 
 ---
 
-```markdown
+````markdown
 # Session Handoff — YYYY-MM-DD
 
 ## Session Goal
@@ -100,7 +100,7 @@ Each section explicitly labels its truth type. Do not blend verified facts with 
 - Execution truth: <branch/PR/CI state confirmed?>
 - Narrative truth: <any strategy doc claims that may be stale?>
 - Known conflicts: <any divergence between layers discovered this session?>
-```
+````
 
 ---
 

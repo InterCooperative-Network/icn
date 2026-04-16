@@ -21,10 +21,11 @@ constitutional core (`docs/ai/ICN_CONSTITUTIONAL_CORE.md`).
 Before coding, load in this order:
 
 1. `docs/ai/ICN_CONSTITUTIONAL_CORE.md` (reasoning foundation)
-2. `CLAUDE.md` (repo architecture and workflows)
-3. Latest handoff in `docs/dev/` (execution state)
-4. `docs/ai/ICN_SESSION_FRAME_TEMPLATE.md` (fill before non-trivial work)
-5. Relevant path instruction from `.github/instructions/` (if applicable)
+2. `AGENTS.md` (operating mode and change routing)
+3. `CLAUDE.md` (repo architecture and workflows)
+4. Latest handoff in `docs/dev/` (execution state)
+5. `docs/ai/ICN_SESSION_FRAME_TEMPLATE.md` (fill before non-trivial work)
+6. Relevant path instruction from `.github/instructions/` (if applicable)
 
 See `docs/ai/WORKFLOW_ARCHITECTURE.md` for the full four-doc architecture.
 

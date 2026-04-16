@@ -623,7 +623,7 @@ impl PolicyOracle for CharterPolicyOracle {
 
 # §10 — CONTEXT FOR THE HUMAN
 
-Matt Faherty is the sole developer. He's a systems-oriented thinker and cooperative infrastructure builder based in Rochester/Palmyra, NY. He works from SSI disability income. His partner Katie is also his caregiver post-shoulder surgery. He organizes with the NY Cooperative Network.
+Matt Faherty is the sole developer. He's a systems-oriented thinker and cooperative infrastructure builder. He organizes with the NY Cooperative Network. [Personal details redacted from archive.]
 
 His development style: mechanism-first, sharp, no-bullshit. He prefers concise output over verbose narration. He builds because he must, not because he's confident it will work. The fatalism and the building run parallel.
 

@@ -23,7 +23,7 @@ Session startup. Load canonical docs, produce session frame, then verify environ
 
 1. Read `docs/ai/ICN_CONSTITUTIONAL_CORE.md` (reasoning foundation — scan, do not restate).
 2. Read `docs/STATE.md` and `docs/PHASE_PROGRESS.md` (declared project truth).
-3. Find and read the latest handoff: `ls -t docs/dev/handoff-*.md | head -1`.
+3. Find and read the latest handoff: `ls -t docs/dev/handoff-*.md 2>/dev/null | head -1`. If no handoff files exist (fresh clone), note "no prior handoff found" and continue.
 4. Note any divergences between declared state and handoff execution state.
 
 ## Step 0.5 — Produce abbreviated session frame
