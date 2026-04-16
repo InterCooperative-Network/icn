@@ -1,6 +1,10 @@
 # ICN Phase Progress
-**Last Updated:** 2026-04-11
+**Last Updated:** 2026-04-15
 **Current Phase:** Phase 2 — Pilot Launch (blocked on cooperative partners)
+
+<!-- [sync edit] 2026-04-15: Updated metrics tables with current measurements.
+     Phase model, phase definitions, and completion criteria unchanged.
+     Phase classification for NYCN institutional work is deferred to PR C. -->
 
 ---
 
@@ -190,14 +194,18 @@ Emerges from Phases 1–5. Municipal governance, cooperative health networks, cl
 |------|--------------------------|----------------------|--------------------|-----------------|
 | 2026-03-18 (baseline) | 43 | 31 | 32 | 11 |
 
+*Note: Re-measurement deferred. NYCN governance work (#1540, #1543, #1547) added app-layer crates (icn-governance-actor), not kernel imports. Kernel infection delta is expected to be 0 but not yet verified.*
+
 ### Test Count
 
 | Date | Total Tests | Delta |
 |------|-------------|-------|
 | 2026-03-18 (baseline) | 4,287 | — |
+| 2026-04-15 | 6,463 | +2,176 |
 
 ### Codebase Size
 
 | Date | Rust Lines (crates+bins) | App Lines | Delta |
 |------|--------------------------|-----------|-------|
 | 2026-03-18 (baseline) | ~420,000 | ~7,000 | — |
+| 2026-04-15 | ~458,000 | ~35,000 | +38K crates/bins, +28K apps |

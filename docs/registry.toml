@@ -624,7 +624,7 @@ category = "reference"
 status = "canonical"
 title = "ICN Documentation Index"
 description = "Master navigation and directory of all documentation with cross-references"
-last_updated = "2026-03-15"
+last_updated = "2026-04-15"
 owner = "matt"
 audiences = ["all"]
 truth_class = "operational"
@@ -633,14 +633,14 @@ canonical = "yes"
 freshness = "current"
 domain_tags = ["navigation", "index"]
 recommended_action = "keep"
-last_reviewed = "2026-04-11"
+last_reviewed = "2026-04-15"
 
 [docs."docs/STATE.md"]
 category = "status"
 status = "living"
 title = "ICN State (living doc)"
 description = "Living snapshot of repo layout, decisions, constraints, and current engineering status"
-last_updated = "2026-04-10"
+last_updated = "2026-04-15"
 owner = "matt"
 audiences = ["developers", "agents"]
 truth_class = "descriptive"
@@ -649,7 +649,7 @@ canonical = "yes"
 freshness = "current"
 domain_tags = ["status", "project"]
 recommended_action = "keep"
-last_reviewed = "2026-04-10"
+last_reviewed = "2026-04-15"
 
 [docs."docs/DOCUMENTATION_CONTROL_SYSTEM.md"]
 category = "reference"
