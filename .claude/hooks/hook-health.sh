@@ -19,9 +19,11 @@ fi
 WARNINGS=""
 CRITICAL=""
 
-# Critical: jq — required by firewall-guard.sh (blocking hook that parses JSON stdin)
+# Critical: jq — required by all stdin-parsing hooks (firewall-guard, panic-guard,
+# scope-guard, dep-guard, todo-guard, openapi-sync-guard). Without jq, both blocking
+# hooks (firewall-guard, panic-guard) silently pass and advisory hooks do not function.
 if ! command -v jq &>/dev/null; then
-  CRITICAL="${CRITICAL}\n  CRITICAL: jq not found — firewall-guard.sh (blocking) will silently pass without it"
+  CRITICAL="${CRITICAL}\n  CRITICAL: jq not found — blocking hooks (firewall-guard, panic-guard) will silently pass; advisory hooks will not function"
 fi
 
 # Critical: git — required by scope-guard.sh, pre-bash-guard.py

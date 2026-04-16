@@ -26,15 +26,16 @@ session and exits 2 (BLOCK) when critical dependencies are absent.
 
 | Tool | Required by | Severity if missing |
 |------|------------|---------------------|
-| jq | firewall-guard.sh | CRITICAL — blocking hook silently passes |
+| jq | firewall-guard.sh, panic-guard.sh, + all advisory hooks | CRITICAL — blocking hooks silently pass; advisory hooks non-functional |
 | git | scope-guard.sh, pre-bash-guard.py | CRITICAL — branch checks fail |
 | cargo | build verification | WARN — can't verify compilation |
 | rg | advisory hooks | WARN — advisory checks degrade |
 | gh | PR workflows | WARN — PR workflows unavailable |
 
-Kernel and domain crate lists are centralized in `kernel-crates.conf`.
-Update that file when crates are added or removed — do not edit hardcoded
-lists in individual hook scripts.
+The kernel and domain crate lists used by `firewall-guard.sh` (the blocking
+firewall hook) are centralized in `kernel-crates.conf`. Update that file when
+crates are added or removed. Advisory hooks (`scope-guard.sh`, `pre-tool-guard.py`)
+still use their own hardcoded lists — centralizing those is deferred.
 
 ## Hook Inventory
 

@@ -1,6 +1,14 @@
+---
+Status: normative
+Authority: process
+Canonical: no
+Last verified: 2026-04-15
+---
+
 # Codex Workflow for ICN
 
-This guide aligns Codex usage with existing ICN agent guidance from `AGENTS.md`, `CLAUDE.md`, and `.github/agents/`.
+This guide aligns Codex usage with existing ICN agent guidance from `CLAUDE.md` and the
+constitutional core (`docs/ai/ICN_CONSTITUTIONAL_CORE.md`).
 
 ## Goals
 

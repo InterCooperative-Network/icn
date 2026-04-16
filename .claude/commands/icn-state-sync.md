@@ -55,9 +55,9 @@ If a change needed an ADR and doesn't have one, flag it.
 
 Update `docs/STATE.md` directly (the canonical project state file).
 
-**Label each update explicitly:**
-- `[sync edit]` — aligning canon to verified code, verified merges, or already-ratified truth
-- `[governance edit proposal]` — changing project status classification, completion meaning, or public claims (must be reviewed separately)
+**Label each update** per the edit classification in `docs/ai/ICN_CONSTITUTIONAL_CORE.md`:
+- `[sync edit]` — aligning canon to verified reality
+- `[governance edit proposal]` — changing project status classification (must be reviewed separately)
 
 Include:
 - Current phase

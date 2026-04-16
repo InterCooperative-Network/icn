@@ -2,6 +2,8 @@
 
 This document was archived 2026-04-15 as a historical synthesis.
 It is **not** the current reasoning foundation for agent sessions.
+Do **not** load this document alongside `ICN_CONSTITUTIONAL_CORE.md`
+or blend their content — the constitutional core is the sole authority.
 
 The 26KB of subsystem context remains at
 `docs/archive/2026/GOLDEN_PROMPT.md` for historical reference.
