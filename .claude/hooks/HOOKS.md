@@ -18,10 +18,30 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 path checks (see website worktree hooks), but stdin is preferred for consistency
 and works regardless of Claude Code version.
 
+## Hook Dependencies
+
+Blocking hooks require `jq` to parse stdin JSON. If `jq` is missing, blocking hooks
+silently pass — this is enforcement theater. The `hook-health.sh` check runs once per
+session and exits 2 (BLOCK) when critical dependencies are absent.
+
+| Tool | Required by | Severity if missing |
+|------|------------|---------------------|
+| jq | firewall-guard.sh, panic-guard.sh, + all advisory hooks | CRITICAL — blocking hooks silently pass; advisory hooks non-functional |
+| git | scope-guard.sh, pre-bash-guard.py | CRITICAL — branch checks fail |
+| cargo | build verification | WARN — can't verify compilation |
+| rg | advisory hooks | WARN — advisory checks degrade |
+| gh | PR workflows | WARN — PR workflows unavailable |
+
+The kernel and domain crate lists used by `firewall-guard.sh` (the blocking
+firewall hook) are centralized in `kernel-crates.conf`. Update that file when
+crates are added or removed. Advisory hooks (`scope-guard.sh`, `pre-tool-guard.py`)
+still use their own hardcoded lists — centralizing those is deferred.
+
 ## Hook Inventory
 
 | File | Trigger | Effect |
 |------|---------|--------|
+| hook-health.sh | Any tool (once per session) | BLOCKS if jq or git missing; WARNS otherwise |
 | firewall-guard.sh | Edit/Write .rs in kernel crates | BLOCKS domain imports in kernel |
 | panic-guard.sh | Edit/Write .rs in non-test files | BLOCKS panic!(), WARNS unwrap() |
 | scope-guard.sh | Edit/Write any file | WARNS if edit is outside branch scope |

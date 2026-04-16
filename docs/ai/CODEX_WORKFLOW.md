@@ -1,6 +1,14 @@
+---
+Status: normative
+Authority: process
+Canonical: no
+Last verified: 2026-04-15
+---
+
 # Codex Workflow for ICN
 
-This guide aligns Codex usage with existing ICN agent guidance from `AGENTS.md`, `CLAUDE.md`, and `.github/agents/`.
+This guide aligns Codex usage with existing ICN agent guidance from `CLAUDE.md` and the
+constitutional core (`docs/ai/ICN_CONSTITUTIONAL_CORE.md`).
 
 ## Goals
 
@@ -10,12 +18,16 @@ This guide aligns Codex usage with existing ICN agent guidance from `AGENTS.md`,
 
 ## Required Inputs for Every Task
 
-Before coding, Codex should load:
+Before coding, load in this order:
 
-1. `AGENTS.md` (authoritative operating rules)
-2. `CLAUDE.md` (repo architecture and workflows)
-3. `.github/copilot-instructions.md`
-4. Relevant path instruction from `.github/instructions/`
+1. `docs/ai/ICN_CONSTITUTIONAL_CORE.md` (reasoning foundation)
+2. `AGENTS.md` (operating mode and change routing)
+3. `CLAUDE.md` (repo architecture and workflows)
+4. Latest handoff in `docs/dev/` (execution state)
+5. `docs/ai/ICN_SESSION_FRAME_TEMPLATE.md` (fill before non-trivial work)
+6. Relevant path instruction from `.github/instructions/` (if applicable)
+
+See `docs/ai/WORKFLOW_ARCHITECTURE.md` for the full four-doc architecture.
 
 ## Codex Task Flow
 
@@ -37,13 +49,8 @@ Before coding, Codex should load:
 
 ## Skill Mapping (Codex)
 
-Repo-local Codex skills are defined under `.codex/skills/`.
-
-- `.codex/skills/icn-orchestrator/SKILL.md`
-  - Routing and decomposition for single vs multi-scope requests.
-  - Mirrors intent of `.github/agents/icn-orchestrator.md`.
-- `.codex/skills/icn-shipping/SKILL.md`
-  - PR readiness checklist and release-quality verification.
+If `.codex/skills/` exists in the repo, use those skills. Otherwise, fall back to
+`.claude/skills/` which provide equivalent functionality for Claude Code sessions.
 
 ## MCP Server Configuration
 

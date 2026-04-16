@@ -2,6 +2,7 @@
 paths:
   - "icn/crates/icn-gossip/**"
   - "icn/crates/icn-net/**"
+  - "icn/crates/icn-gateway/**"
   - "icn/crates/icn-ledger/**"
   - "icn/crates/icn-core/**"
   - "icn/crates/icn-kernel-api/**"

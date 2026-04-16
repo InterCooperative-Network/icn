@@ -1,5 +1,11 @@
 # ICN Project Rules (supplements CLAUDE.md)
 
+## Reasoning Foundation
+
+Agent reasoning derives from `docs/ai/ICN_CONSTITUTIONAL_CORE.md`.
+Session grounding follows `docs/ai/ICN_SESSION_FRAME_TEMPLATE.md`.
+See `docs/ai/WORKFLOW_ARCHITECTURE.md` for the full four-doc architecture.
+
 > Meaning firewall, kernel boundary, error handling, PR conventions, and testing patterns
 > are covered in CLAUDE.md and `.claude/rules/{kernel-boundary,rust-core,gateway,deploy}.md`.
 > This file contains ONLY rules not covered elsewhere.
@@ -24,3 +30,4 @@
 - [ ] Error paths use `ErrCode`, not ad-hoc strings
 - [ ] Tests cover error paths, not just happy path
 - [ ] TTL/cache values have documented security trade-offs
+- [ ] Canon edits labeled: `[sync edit]` vs `[governance edit proposal]`
