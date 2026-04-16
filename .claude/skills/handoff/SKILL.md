@@ -74,7 +74,7 @@ If a file for today already exists, use suffix: `handoff-YYYY-MM-DD-b.md`.
 
 Print:
 ```
-Handoff written to docs/dev-journal/session-YYYY-MM-DD.md
+Handoff written to docs/dev/handoff-YYYY-MM-DD.md
 Branch: <name> | Commits: <n> | Open PRs: <n> | Open threads: <n>
 ```
 

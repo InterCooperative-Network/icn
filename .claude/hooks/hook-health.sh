@@ -7,11 +7,9 @@
 #   0 — all critical deps present (or already checked this session)
 #   2 — critical dependency missing; blocking hooks would silently pass
 
-GUARD_FILE="/tmp/.icn-hook-health-done-$$"
-
 # Only run once per session (keyed to shell PID parent)
 PARENT_PID=$(ps -o ppid= $$ 2>/dev/null | tr -d ' ')
-GUARD_FILE="/tmp/.icn-hook-health-done-${PARENT_PID:-unknown}"
+GUARD_FILE="/tmp/.icn-hook-health-done-${PARENT_PID:-$$}"
 if [[ -f "$GUARD_FILE" ]]; then
   exit 0
 fi
@@ -63,7 +61,7 @@ fi
 
 if [[ -n "$WARNINGS" ]]; then
   # Emit advisory as JSON systemMessage so Claude sees it
-  echo "{\"hook_status\":\"degraded\",\"message\":\"Hook health: some advisory tools missing.${WARNINGS}\"}"
+  echo "{\"continue\":true,\"systemMessage\":\"Hook health: some advisory tools missing.${WARNINGS}\"}"
 fi
 
 exit 0

@@ -150,6 +150,12 @@
         "hooks": [
           {
             "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/hook-health.sh",
+            "timeout": 10,
+            "statusMessage": "Checking hook dependencies..."
+          },
+          {
+            "type": "command",
             "command": "BRANCH=$(git branch --show-current 2>/dev/null || echo 'detached'); SPRINT=$(grep -m1 '^## ' docs/strategy/ICN-Active-Sprint.md 2>/dev/null || grep -m1 'Phase 2' docs/planning/FORWARD_PLAN_2026-03.md 2>/dev/null | head -c80 || echo 'see docs/planning/FORWARD_PLAN_2026-03.md'); echo \"ICN Session | branch: $BRANCH | sprint: $SPRINT\"; SKILLS=$(ls $CLAUDE_PROJECT_DIR/.claude/skills/ | tr '\\n' ' '); echo \"Skills: $SKILLS\"; echo 'Invariants: adversarial-by-default | determinism | canonical-encodings | no-panics | kernel/app-boundaries'"
           }
         ]

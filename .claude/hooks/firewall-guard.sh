@@ -15,12 +15,12 @@ fi
 # Load kernel crate list from centralized config, with hardcoded fallback
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONF_FILE="${HOOK_DIR}/kernel-crates.conf"
+FALLBACK_KERNEL_CRATES="icn-net|icn-gateway|icn-gossip|icn-ledger|icn-core|icn-store|icn-kernel-api"
 if [[ -f "$CONF_FILE" ]]; then
   KERNEL_CRATES=$(sed -n '/^\[kernel\]/,/^\[/p' "$CONF_FILE" | grep -v '^\[' | grep -v '^#' | grep -v '^$' | tr '\n' '|' | sed 's/|$//')
-else
-  # Fallback: hardcoded list (update kernel-crates.conf to avoid drift)
-  KERNEL_CRATES="icn-net|icn-gateway|icn-gossip|icn-ledger|icn-core|icn-store|icn-kernel-api"
 fi
+# Fallback if config absent or [kernel] section empty/malformed
+KERNEL_CRATES="${KERNEL_CRATES:-$FALLBACK_KERNEL_CRATES}"
 
 # Check if file is in a kernel crate
 if ! echo "$FILE_PATH" | grep -qE "crates/(${KERNEL_CRATES})/"; then
