@@ -1,12 +1,14 @@
 ---
 name: icn-preflight
-description: 30-60s session startup check — repo, branch, gh auth, port 8080, toolchain, cargo check. Stop on mismatch.
+description: Session startup — load canonical docs, latest handoff, produce session frame, then verify repo/branch/auth/toolchain/compile.
 user-invocable: true
 allowed-tools: "Bash, Read"
 truth_contract:
   canonical_sources:
-    - ops/state/config/repo-map.json    # workspace root, cluster topology
-    - ops/state/truth/policy.json       # validation commands
+    - docs/ai/ICN_CONSTITUTIONAL_CORE.md  # reasoning foundation
+    - docs/STATE.md                        # declared project state
+    - docs/PHASE_PROGRESS.md               # phase tracking
+    - docs/dev/                            # latest handoff by date
   live_load_required:
     - "git branch --show-current"
     - "gh auth status"
@@ -15,16 +17,25 @@ truth_contract:
   note: "This skill reads rust-toolchain.toml for the expected toolchain version. Do not hardcode the version."
 ---
 
-Quick preflight. 10 lines max output. Stop on first mismatch.
+Session startup. Load canonical docs, produce session frame, then verify environment. Stop on first mismatch.
 
-## Step 0 — Live truth synthesis (optional, run if available)
+## Step 0 — Load canonical docs and latest handoff
 
-```bash
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
-bash "${REPO_ROOT}/ops/scripts/what-matters-now.sh" 2>/dev/null || true
-```
+1. Read `docs/ai/ICN_CONSTITUTIONAL_CORE.md` (reasoning foundation — scan, do not restate).
+2. Read `docs/STATE.md` and `docs/PHASE_PROGRESS.md` (declared project truth).
+3. Find and read the latest handoff: `ls -t docs/dev/handoff-*.md | head -1`.
+4. Note any divergences between declared state and handoff execution state.
 
-If `what-matters-now.sh` is available, run it first. It synthesizes sprint state, open PRs, symlink health, and drift warnings in one pass. Continue with the steps below regardless.
+## Step 0.5 — Produce abbreviated session frame
+
+Using the template from `docs/ai/ICN_SESSION_FRAME_TEMPLATE.md`, fill in at minimum:
+- Task (from user or inferred)
+- Branch
+- Current canonical phase
+- Current execution target
+- Main risk
+
+This frame is required for non-trivial work. Skip only for single-file typo fixes.
 
 ## Steps
 

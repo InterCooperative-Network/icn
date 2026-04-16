@@ -1,12 +1,13 @@
 ---
 name: handoff
-description: Write a session summary to docs/dev-journal/ capturing branch state, decisions, open threads, and next steps.
+description: Write a session handoff to docs/dev/ using the structured template with truth-plane labeling.
 argument-hint: "[--push]"
 user-invocable: true
 allowed-tools: "Bash, Read, Write, Grep"
 truth_contract:
   canonical_sources:
-    - ops/state/sprint/current.json     # sprint state (read live — never hardcode sprint number)
+    - docs/dev/HANDOFF_TEMPLATE.md        # structured handoff template
+    - docs/ai/ICN_SESSION_FRAME_TEMPLATE.md  # session frame (include in handoff)
   live_load_required:
     - "git branch --show-current"
     - "git log --oneline -10"
@@ -49,43 +50,20 @@ git diff origin/main...HEAD 2>/dev/null | grep '^+.*// TODO' | head -20
 
 ### 3. Write the handoff file
 
-Target: `docs/dev-journal/session-YYYY-MM-DD.md`
+Target: `docs/dev/handoff-YYYY-MM-DD.md`
 
 Where `YYYY-MM-DD` = today's date (`date +%Y-%m-%d`).
 
-If a file for today already exists, append to it (don't overwrite).
+If a file for today already exists, use suffix: `handoff-YYYY-MM-DD-b.md`.
 
-Format:
-```markdown
-# Session Handoff — YYYY-MM-DD
+**Use the structured template from `docs/dev/HANDOFF_TEMPLATE.md`.** Each section explicitly labels its truth type. At minimum include:
 
-## Branch
-`<branch-name>`
-
-## Commits this session
-- <sha> <message>
-- ...
-
-## Open PRs
-- #<N>: <title> (<state>)
-
-## Open threads
-- [ ] <description of unfinished work>
-- [ ] <decision that needs follow-up>
-
-## TODOs added
-- `<file>:<line>` — <todo text>
-
-## Uncommitted changes
-- <file> (<status>)
-
-## Next steps
-1. <first thing to do next session>
-2. ...
-
-## Notes
-<any decisions, trade-offs, or context worth preserving>
-```
+- **Final State (Verified)** — only facts confirmed by commands
+- **What Changed** — execution truth from this session
+- **What's Open** — known incomplete work
+- **Unsafe Assumptions** — anything relied on but not verified (do NOT skip this)
+- **Next Move** — exact sequence for next session
+- **Truth-Plane Notes** — which truth types were relied on, any known conflicts
 
 ### 4. Clean up
 
@@ -103,5 +81,6 @@ Branch: <name> | Commits: <n> | Open PRs: <n> | Open threads: <n>
 ## Important
 
 - Do NOT commit the handoff file automatically. User decides.
-- If `docs/dev-journal/` doesn't exist, create it.
+- If `docs/dev/` doesn't exist, create it.
 - Keep notes concise — this is for the next session, not a full PR description.
+- The "Unsafe Assumptions" section is the most important section. If you skip one, do not skip that one.
