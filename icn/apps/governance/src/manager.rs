@@ -16,11 +16,12 @@ use icn_governance::{
     Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt, GovernanceDomain,
     GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
     InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore, InMemoryMeetingStore,
-    InMemoryStructureStore, Meeting, MeetingId, MeetingStoreBackend, MembershipConfig,
-    MembershipSource, PaginatedResult, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
-    ProposalPayload, ProposalScope, ProposalState, RoleAssignment, Structure, StructureId,
-    StructureKind, StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally,
-    DEFAULT_MAX_DELEGATION_DEPTH,
+    InMemoryMilestoneStore, InMemoryProgramStore, InMemoryStructureStore, Meeting, MeetingId,
+    MeetingStoreBackend, MembershipConfig, MembershipSource, Milestone, MilestoneId,
+    MilestoneStatus, MilestoneStoreBackend, PaginatedResult, Program, ProgramId, ProgramKind,
+    ProgramStoreBackend, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload,
+    ProposalScope, ProposalState, RoleAssignment, Structure, StructureId, StructureKind,
+    StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -767,6 +768,369 @@ impl icn_governance::ActivityStoreBackend for SledActivityStore {
 }
 
 // ============================================================================
+// Sled-Backed Program Store
+// ============================================================================
+
+/// Sled-backed storage for programs.
+///
+/// Key scheme (triple-key):
+/// - Primary:        `program:{program_id}`                         → postcard-encoded Program
+/// - Domain index:   `program_by_domain:{domain_id}:{program_id}`   → empty (membership marker)
+/// - Entity index:   `program_by_entity:{entity_id}:{program_id}`   → empty (membership marker)
+///
+/// Matches the `<thing>_by_<scope>:...` secondary-index convention used by
+/// `SledActivityStore`/`SledMeetingStore`/`SledStructureStore`. Programs are
+/// queryable both by governance domain and by parent entity; both indexes are
+/// maintained by [`save`](SledProgramStore::save) and cleaned by
+/// [`delete`](SledProgramStore::delete).
+pub struct SledProgramStore {
+    db: Arc<sled::Db>,
+}
+
+impl SledProgramStore {
+    /// Create a new Sled-backed program store.
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    fn program_primary_key(id: &icn_governance::ProgramId) -> String {
+        format!("program:{}", id.0)
+    }
+
+    fn program_domain_idx_key(
+        domain_id: &GovernanceDomainId,
+        id: &icn_governance::ProgramId,
+    ) -> String {
+        format!("program_by_domain:{}:{}", domain_id.0, id.0)
+    }
+
+    fn program_entity_idx_key(entity_id: &str, id: &icn_governance::ProgramId) -> String {
+        format!("program_by_entity:{}:{}", entity_id, id.0)
+    }
+
+    fn domain_idx_prefix(domain_id: &GovernanceDomainId) -> String {
+        format!("program_by_domain:{}:", domain_id.0)
+    }
+
+    fn entity_idx_prefix(entity_id: &str) -> String {
+        format!("program_by_entity:{}:", entity_id)
+    }
+}
+
+impl icn_governance::ProgramStoreBackend for SledProgramStore {
+    fn save(&self, p: &icn_governance::Program) -> std::result::Result<(), GovernanceError> {
+        let primary = Self::program_primary_key(&p.id);
+
+        // Remove stale scope index entries if domain_id or parent_entity_id changed.
+        // Propagate read errors rather than silently treating them as "no prior record".
+        if let Some(existing) = self.get(&p.id)? {
+            if existing.domain_id != p.domain_id {
+                let old = Self::program_domain_idx_key(&existing.domain_id, &p.id);
+                self.db.remove(old.as_bytes()).map_err(|e| {
+                    GovernanceError::Internal(format!("Sled remove (stale domain idx) failed: {e}"))
+                })?;
+            }
+            if existing.parent_entity_id != p.parent_entity_id {
+                let old = Self::program_entity_idx_key(&existing.parent_entity_id, &p.id);
+                self.db.remove(old.as_bytes()).map_err(|e| {
+                    GovernanceError::Internal(format!("Sled remove (stale entity idx) failed: {e}"))
+                })?;
+            }
+        }
+
+        let domain_idx = Self::program_domain_idx_key(&p.domain_id, &p.id);
+        let entity_idx = Self::program_entity_idx_key(&p.parent_entity_id, &p.id);
+        let value = icn_encoding::encode_versioned(p)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode program: {e}")))?;
+        self.db
+            .insert(primary.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert (primary) failed: {e}")))?;
+        self.db
+            .insert(domain_idx.as_bytes(), b"1".as_ref())
+            .map_err(|e| {
+                GovernanceError::Internal(format!("Sled insert (domain idx) failed: {e}"))
+            })?;
+        self.db
+            .insert(entity_idx.as_bytes(), b"1".as_ref())
+            .map_err(|e| {
+                GovernanceError::Internal(format!("Sled insert (entity idx) failed: {e}"))
+            })?;
+        Ok(())
+    }
+
+    fn get(
+        &self,
+        id: &icn_governance::ProgramId,
+    ) -> std::result::Result<Option<icn_governance::Program>, GovernanceError> {
+        let key = Self::program_primary_key(id);
+        match self
+            .db
+            .get(key.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+        {
+            Some(value) => {
+                let p: icn_governance::Program =
+                    icn_encoding::decode_versioned(&value).map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode program: {e}"))
+                    })?;
+                Ok(Some(p))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn list_by_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+    ) -> std::result::Result<Vec<icn_governance::Program>, GovernanceError> {
+        let prefix = Self::domain_idx_prefix(domain_id);
+        // The expected left side when splitting at the final ':'.
+        let expected_left = format!("program_by_domain:{}", domain_id.0);
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (idx_key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let idx_str = std::str::from_utf8(&idx_key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            // Use rsplit_once to isolate the program ID from the domain part.
+            // This guards against prefix collisions where domain "coop" would
+            // match keys belonging to domain "coop:nycn".
+            let Some((left, pid_str)) = idx_str.rsplit_once(':') else {
+                continue;
+            };
+            if left != expected_left {
+                continue;
+            }
+            let pid = icn_governance::ProgramId(pid_str.to_string());
+            let primary = Self::program_primary_key(&pid);
+            if let Some(v) = self
+                .db
+                .get(primary.as_bytes())
+                .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+            {
+                let p: icn_governance::Program =
+                    icn_encoding::decode_versioned(&v).map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode program: {e}"))
+                    })?;
+                out.push(p);
+            }
+        }
+        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(out)
+    }
+
+    fn list_by_entity(
+        &self,
+        entity_id: &str,
+    ) -> std::result::Result<Vec<icn_governance::Program>, GovernanceError> {
+        let prefix = Self::entity_idx_prefix(entity_id);
+        let expected_left = format!("program_by_entity:{}", entity_id);
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (idx_key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let idx_str = std::str::from_utf8(&idx_key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            // Use rsplit_once to guard against prefix collisions (entity "a" vs "a:b").
+            let Some((left, pid_str)) = idx_str.rsplit_once(':') else {
+                continue;
+            };
+            if left != expected_left {
+                continue;
+            }
+            let pid = icn_governance::ProgramId(pid_str.to_string());
+            let primary = Self::program_primary_key(&pid);
+            if let Some(v) = self
+                .db
+                .get(primary.as_bytes())
+                .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+            {
+                let p: icn_governance::Program =
+                    icn_encoding::decode_versioned(&v).map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode program: {e}"))
+                    })?;
+                out.push(p);
+            }
+        }
+        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(out)
+    }
+
+    fn delete(&self, id: &icn_governance::ProgramId) -> std::result::Result<bool, GovernanceError> {
+        let primary = Self::program_primary_key(id);
+        let Some(value) = self
+            .db
+            .get(primary.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+        else {
+            return Ok(false);
+        };
+        let p: icn_governance::Program = icn_encoding::decode_versioned(&value)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to decode program: {e}")))?;
+        let domain_idx = Self::program_domain_idx_key(&p.domain_id, id);
+        let entity_idx = Self::program_entity_idx_key(&p.parent_entity_id, id);
+
+        self.db
+            .remove(primary.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete (primary) failed: {e}")))?;
+        self.db.remove(domain_idx.as_bytes()).map_err(|e| {
+            GovernanceError::Internal(format!("Sled delete (domain idx) failed: {e}"))
+        })?;
+        self.db.remove(entity_idx.as_bytes()).map_err(|e| {
+            GovernanceError::Internal(format!("Sled delete (entity idx) failed: {e}"))
+        })?;
+        Ok(true)
+    }
+}
+
+// ============================================================================
+// Sled-Backed Milestone Store
+// ============================================================================
+
+/// Sled-backed storage for milestones.
+///
+/// Key scheme (dual-key):
+/// - Primary:        `milestone:{milestone_id}`                       → postcard-encoded Milestone
+/// - Program index:  `milestone_by_program:{program_id}:{milestone_id}` → empty (membership marker)
+pub struct SledMilestoneStore {
+    db: Arc<sled::Db>,
+}
+
+impl SledMilestoneStore {
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    fn milestone_primary_key(id: &icn_governance::MilestoneId) -> String {
+        format!("milestone:{}", id.0)
+    }
+
+    fn milestone_program_idx_key(
+        program_id: &icn_governance::ProgramId,
+        id: &icn_governance::MilestoneId,
+    ) -> String {
+        format!("milestone_by_program:{}:{}", program_id.0, id.0)
+    }
+
+    fn program_idx_prefix(program_id: &icn_governance::ProgramId) -> String {
+        format!("milestone_by_program:{}:", program_id.0)
+    }
+}
+
+impl icn_governance::MilestoneStoreBackend for SledMilestoneStore {
+    fn save(&self, m: &icn_governance::Milestone) -> std::result::Result<(), GovernanceError> {
+        let primary = Self::milestone_primary_key(&m.id);
+
+        // Remove stale program index entry if program_id changed on update.
+        // Propagate read errors rather than silently treating them as "no prior record".
+        if let Some(existing) = self.get(&m.id)? {
+            if existing.program_id != m.program_id {
+                let old = Self::milestone_program_idx_key(&existing.program_id, &m.id);
+                self.db.remove(old.as_bytes()).map_err(|e| {
+                    GovernanceError::Internal(format!(
+                        "Sled remove (stale program idx) failed: {e}"
+                    ))
+                })?;
+            }
+        }
+
+        let idx = Self::milestone_program_idx_key(&m.program_id, &m.id);
+        let value = icn_encoding::encode_versioned(m)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode milestone: {e}")))?;
+        self.db
+            .insert(primary.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert (primary) failed: {e}")))?;
+        self.db
+            .insert(idx.as_bytes(), b"1".as_ref())
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert (idx) failed: {e}")))?;
+        Ok(())
+    }
+
+    fn get(
+        &self,
+        id: &icn_governance::MilestoneId,
+    ) -> std::result::Result<Option<icn_governance::Milestone>, GovernanceError> {
+        let key = Self::milestone_primary_key(id);
+        match self
+            .db
+            .get(key.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+        {
+            Some(value) => {
+                let m: icn_governance::Milestone =
+                    icn_encoding::decode_versioned(&value).map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode milestone: {e}"))
+                    })?;
+                Ok(Some(m))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn list_by_program(
+        &self,
+        program_id: &icn_governance::ProgramId,
+    ) -> std::result::Result<Vec<icn_governance::Milestone>, GovernanceError> {
+        let prefix = Self::program_idx_prefix(program_id);
+        let expected_left = format!("milestone_by_program:{}", program_id.0);
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (idx_key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let idx_str = std::str::from_utf8(&idx_key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            // Use rsplit_once to guard against prefix collisions (program "p" vs "p:sub").
+            let Some((left, mid_str)) = idx_str.rsplit_once(':') else {
+                continue;
+            };
+            if left != expected_left {
+                continue;
+            }
+            let mid = icn_governance::MilestoneId(mid_str.to_string());
+            let primary = Self::milestone_primary_key(&mid);
+            if let Some(v) = self
+                .db
+                .get(primary.as_bytes())
+                .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+            {
+                let m: icn_governance::Milestone =
+                    icn_encoding::decode_versioned(&v).map_err(|e| {
+                        GovernanceError::Internal(format!("Failed to decode milestone: {e}"))
+                    })?;
+                out.push(m);
+            }
+        }
+        out.sort_by_key(|m| m.phase_index);
+        Ok(out)
+    }
+
+    fn delete(
+        &self,
+        id: &icn_governance::MilestoneId,
+    ) -> std::result::Result<bool, GovernanceError> {
+        let primary = Self::milestone_primary_key(id);
+        let Some(value) = self
+            .db
+            .get(primary.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+        else {
+            return Ok(false);
+        };
+        let m: icn_governance::Milestone = icn_encoding::decode_versioned(&value)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to decode milestone: {e}")))?;
+        let idx = Self::milestone_program_idx_key(&m.program_id, id);
+
+        self.db
+            .remove(primary.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete (primary) failed: {e}")))?;
+        self.db
+            .remove(idx.as_bytes())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete (idx) failed: {e}")))?;
+        Ok(true)
+    }
+}
+
+// ============================================================================
 // Sled-Backed Meeting Store
 // ============================================================================
 
@@ -1088,6 +1452,410 @@ mod sled_meeting_store_tests {
     }
 }
 
+// ============================================================================
+// Sled Program/Milestone store tests
+// ============================================================================
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod sled_program_store_tests {
+    use super::*;
+    use icn_governance::{
+        Milestone, MilestoneId, MilestoneStoreBackend, Program, ProgramId, ProgramKind,
+        ProgramStatus, ProgramStoreBackend,
+    };
+
+    fn open_temp_db() -> (Arc<sled::Db>, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = sled::Config::new()
+            .path(dir.path())
+            .temporary(true)
+            .open()
+            .expect("sled open");
+        (Arc::new(db), dir)
+    }
+
+    fn mk_program(id: &str, domain: &str, entity: &str) -> Program {
+        Program::new(
+            ProgramId::from_raw(id),
+            GovernanceDomainId::new(domain),
+            entity,
+            ProgramKind::Cycle,
+            format!("Program {id}"),
+            1_700_000_000,
+        )
+    }
+
+    // ---------- Program store ----------
+
+    #[test]
+    fn program_save_and_get_roundtrip() {
+        let (db, _dir) = open_temp_db();
+        let store = SledProgramStore::new(db);
+        let p = mk_program("cycle-2026", "dom-a", "ent-a");
+        store.save(&p).unwrap();
+
+        let got = store.get(&p.id).unwrap().expect("program present");
+        assert_eq!(got.id, p.id);
+        assert_eq!(got.domain_id, p.domain_id);
+        assert_eq!(got.parent_entity_id, "ent-a");
+        assert_eq!(got.status, ProgramStatus::Draft);
+    }
+
+    #[test]
+    fn program_list_by_domain_isolates_domains() {
+        let (db, _dir) = open_temp_db();
+        let store = SledProgramStore::new(db);
+        store.save(&mk_program("a1", "dom-a", "ent-a")).unwrap();
+        store.save(&mk_program("a2", "dom-a", "ent-a")).unwrap();
+        store.save(&mk_program("b1", "dom-b", "ent-b")).unwrap();
+
+        let dom_a = store
+            .list_by_domain(&GovernanceDomainId::new("dom-a"))
+            .unwrap();
+        let dom_b = store
+            .list_by_domain(&GovernanceDomainId::new("dom-b"))
+            .unwrap();
+        assert_eq!(dom_a.len(), 2);
+        assert_eq!(dom_b.len(), 1);
+    }
+
+    #[test]
+    fn program_list_by_domain_rejects_prefix_collisions() {
+        // Regression guard: scan_prefix("program_by_domain:coop:") must NOT
+        // match keys under `program_by_domain:coop:nycn:...` (a different
+        // domain whose name starts with "coop").
+        let (db, _dir) = open_temp_db();
+        let store = SledProgramStore::new(db);
+        store.save(&mk_program("p1", "coop", "ent")).unwrap();
+        store.save(&mk_program("p2", "coop:nycn", "ent")).unwrap();
+
+        let coop_only = store
+            .list_by_domain(&GovernanceDomainId::new("coop"))
+            .unwrap();
+        let nycn_only = store
+            .list_by_domain(&GovernanceDomainId::new("coop:nycn"))
+            .unwrap();
+        assert_eq!(coop_only.len(), 1);
+        assert_eq!(coop_only[0].id.0, "p1");
+        assert_eq!(nycn_only.len(), 1);
+        assert_eq!(nycn_only[0].id.0, "p2");
+    }
+
+    #[test]
+    fn program_list_by_entity_isolates_entities() {
+        let (db, _dir) = open_temp_db();
+        let store = SledProgramStore::new(db);
+        store.save(&mk_program("p1", "dom-a", "ent-a")).unwrap();
+        store.save(&mk_program("p2", "dom-a", "ent-b")).unwrap();
+
+        let ent_a = store.list_by_entity("ent-a").unwrap();
+        let ent_b = store.list_by_entity("ent-b").unwrap();
+        assert_eq!(ent_a.len(), 1);
+        assert_eq!(ent_b.len(), 1);
+        assert_eq!(ent_a[0].parent_entity_id, "ent-a");
+        assert_eq!(ent_b[0].parent_entity_id, "ent-b");
+    }
+
+    #[test]
+    fn program_delete_cleans_both_indexes() {
+        let (db, _dir) = open_temp_db();
+        let store = SledProgramStore::new(db.clone());
+        let p = mk_program("cycle-2026", "dom-a", "ent-a");
+        store.save(&p).unwrap();
+
+        assert!(store.delete(&p.id).unwrap());
+        assert!(store.get(&p.id).unwrap().is_none());
+        assert!(
+            store
+                .list_by_domain(&GovernanceDomainId::new("dom-a"))
+                .unwrap()
+                .is_empty(),
+            "domain index row must be removed on delete"
+        );
+        assert!(
+            store.list_by_entity("ent-a").unwrap().is_empty(),
+            "entity index row must be removed on delete"
+        );
+        // No primary or index rows left.
+        for result in db.iter() {
+            let (k, _) = result.unwrap();
+            let k_str = std::str::from_utf8(&k).unwrap();
+            assert!(
+                !k_str.starts_with("program:") && !k_str.starts_with("program_by_"),
+                "dangling key after delete: {k_str}"
+            );
+        }
+    }
+
+    #[test]
+    fn program_delete_missing_is_idempotent() {
+        let (db, _dir) = open_temp_db();
+        let store = SledProgramStore::new(db);
+        assert!(!store
+            .delete(&ProgramId::from_raw("does-not-exist"))
+            .unwrap());
+    }
+
+    #[test]
+    fn program_list_by_domain_sorted_newest_first() {
+        let (db, _dir) = open_temp_db();
+        let store = SledProgramStore::new(db);
+        let mut old = mk_program("old", "dom-a", "ent-a");
+        old.created_at = 1_700_000_000;
+        let mut new = mk_program("new", "dom-a", "ent-a");
+        new.created_at = 1_700_000_999;
+        store.save(&old).unwrap();
+        store.save(&new).unwrap();
+
+        let listing = store
+            .list_by_domain(&GovernanceDomainId::new("dom-a"))
+            .unwrap();
+        assert_eq!(listing[0].id.0, "new");
+        assert_eq!(listing[1].id.0, "old");
+    }
+
+    // ---------- Milestone store ----------
+
+    #[test]
+    fn milestone_save_and_get_roundtrip() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMilestoneStore::new(db);
+        let prog = ProgramId::from_raw("cycle-2026");
+        let m = Milestone::new(
+            MilestoneId::from_raw("m-venue"),
+            prog,
+            "Venue confirmed",
+            0,
+            1_700_000_000,
+        );
+        store.save(&m).unwrap();
+
+        let got = store.get(&m.id).unwrap().expect("milestone present");
+        assert_eq!(got.name, "Venue confirmed");
+        assert_eq!(got.phase_index, 0);
+    }
+
+    #[test]
+    fn milestone_list_by_program_orders_by_phase_index() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMilestoneStore::new(db);
+        let prog = ProgramId::from_raw("cycle-2026");
+
+        // Save out of phase order.
+        store
+            .save(&Milestone::new(
+                MilestoneId::from_raw("m-launch"),
+                prog.clone(),
+                "Launch",
+                2,
+                1_000,
+            ))
+            .unwrap();
+        store
+            .save(&Milestone::new(
+                MilestoneId::from_raw("m-venue"),
+                prog.clone(),
+                "Venue",
+                0,
+                1_000,
+            ))
+            .unwrap();
+        store
+            .save(&Milestone::new(
+                MilestoneId::from_raw("m-budget"),
+                prog.clone(),
+                "Budget",
+                1,
+                1_000,
+            ))
+            .unwrap();
+
+        let listing = store.list_by_program(&prog).unwrap();
+        assert_eq!(listing.len(), 3);
+        assert_eq!(listing[0].name, "Venue");
+        assert_eq!(listing[1].name, "Budget");
+        assert_eq!(listing[2].name, "Launch");
+    }
+
+    #[test]
+    fn milestone_list_by_program_isolates_programs() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMilestoneStore::new(db);
+        let prog_a = ProgramId::from_raw("cycle-2026");
+        let prog_b = ProgramId::from_raw("campaign-q3");
+
+        store
+            .save(&Milestone::new(
+                MilestoneId::from_raw("m-a"),
+                prog_a.clone(),
+                "A",
+                0,
+                1_000,
+            ))
+            .unwrap();
+        store
+            .save(&Milestone::new(
+                MilestoneId::from_raw("m-b"),
+                prog_b.clone(),
+                "B",
+                0,
+                1_000,
+            ))
+            .unwrap();
+
+        let a = store.list_by_program(&prog_a).unwrap();
+        let b = store.list_by_program(&prog_b).unwrap();
+        assert_eq!(a.len(), 1);
+        assert_eq!(b.len(), 1);
+        assert_eq!(a[0].name, "A");
+        assert_eq!(b[0].name, "B");
+    }
+
+    #[test]
+    fn milestone_list_by_program_rejects_prefix_collisions() {
+        // Same regression guard as program_list_by_domain: scanning
+        // `milestone_by_program:cycle:` must not match keys from
+        // `cycle-2026` (a different program whose id starts with "cycle").
+        let (db, _dir) = open_temp_db();
+        let store = SledMilestoneStore::new(db);
+        let short = ProgramId::from_raw("cycle");
+        let long = ProgramId::from_raw("cycle-2026");
+
+        store
+            .save(&Milestone::new(
+                MilestoneId::from_raw("m-short"),
+                short.clone(),
+                "short-side",
+                0,
+                1_000,
+            ))
+            .unwrap();
+        store
+            .save(&Milestone::new(
+                MilestoneId::from_raw("m-long"),
+                long.clone(),
+                "long-side",
+                0,
+                1_000,
+            ))
+            .unwrap();
+
+        let short_only = store.list_by_program(&short).unwrap();
+        assert_eq!(short_only.len(), 1);
+        assert_eq!(short_only[0].name, "short-side");
+        let long_only = store.list_by_program(&long).unwrap();
+        assert_eq!(long_only.len(), 1);
+        assert_eq!(long_only[0].name, "long-side");
+    }
+
+    #[test]
+    fn milestone_delete_cleans_index() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMilestoneStore::new(db.clone());
+        let prog = ProgramId::from_raw("cycle-2026");
+        let m = Milestone::new(
+            MilestoneId::from_raw("m-venue"),
+            prog.clone(),
+            "Venue",
+            0,
+            1_000,
+        );
+        store.save(&m).unwrap();
+
+        assert!(store.delete(&m.id).unwrap());
+        assert!(store.get(&m.id).unwrap().is_none());
+        assert!(
+            store.list_by_program(&prog).unwrap().is_empty(),
+            "index row must be removed on delete"
+        );
+        for result in db.iter() {
+            let (k, _) = result.unwrap();
+            let k_str = std::str::from_utf8(&k).unwrap();
+            assert!(
+                !k_str.starts_with("milestone:") && !k_str.starts_with("milestone_by_"),
+                "dangling key after delete: {k_str}"
+            );
+        }
+    }
+
+    #[test]
+    fn milestone_delete_missing_is_idempotent() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMilestoneStore::new(db);
+        assert!(!store.delete(&MilestoneId::from_raw("nope")).unwrap());
+    }
+
+    /// Regression: SledProgramStore::save leaked stale domain/entity index rows
+    /// when a program was updated with different domain_id or parent_entity_id.
+    #[test]
+    fn program_stale_scope_index_cleaned_on_update() {
+        let (db, _dir) = open_temp_db();
+        let store = SledProgramStore::new(db);
+
+        let domain_a = GovernanceDomainId::new("dom-alpha");
+        let domain_b = GovernanceDomainId::new("dom-beta");
+        let entity_a = "entity-a";
+        let entity_b = "entity-b";
+
+        let mut p = mk_program("prog-1", "dom-alpha", entity_a);
+        store.save(&p).unwrap();
+        assert_eq!(store.list_by_domain(&domain_a).unwrap().len(), 1);
+        assert_eq!(store.list_by_entity(entity_a).unwrap().len(), 1);
+
+        // Move to a different domain and entity
+        p.domain_id = domain_b.clone();
+        p.parent_entity_id = entity_b.to_string();
+        store.save(&p).unwrap();
+
+        assert_eq!(
+            store.list_by_domain(&domain_a).unwrap().len(),
+            0,
+            "old domain index row must be cleaned on update"
+        );
+        assert_eq!(store.list_by_domain(&domain_b).unwrap().len(), 1);
+        assert_eq!(
+            store.list_by_entity(entity_a).unwrap().len(),
+            0,
+            "old entity index row must be cleaned on update"
+        );
+        assert_eq!(store.list_by_entity(entity_b).unwrap().len(), 1);
+    }
+
+    /// Regression: SledMilestoneStore::save leaked stale program index rows
+    /// when a milestone's program_id changed on update.
+    #[test]
+    fn milestone_stale_program_index_cleaned_on_update() {
+        let (db, _dir) = open_temp_db();
+        let store = SledMilestoneStore::new(db);
+
+        let prog_a = ProgramId::from_raw("prog-a");
+        let prog_b = ProgramId::from_raw("prog-b");
+
+        let mut m = Milestone::new(
+            MilestoneId::from_raw("m-shared"),
+            prog_a.clone(),
+            "Milestone",
+            0,
+            1_000,
+        );
+        store.save(&m).unwrap();
+        assert_eq!(store.list_by_program(&prog_a).unwrap().len(), 1);
+        assert_eq!(store.list_by_program(&prog_b).unwrap().len(), 0);
+
+        // Move milestone to a different program
+        m.program_id = prog_b.clone();
+        store.save(&m).unwrap();
+
+        assert_eq!(
+            store.list_by_program(&prog_a).unwrap().len(),
+            0,
+            "old program index row must be cleaned on update"
+        );
+        assert_eq!(store.list_by_program(&prog_b).unwrap().len(), 1);
+    }
+}
+
 /// Handle type for actor-backed governance
 ///
 /// This uses the `GovernanceOps` trait to avoid direct dependency on `icn-core`.
@@ -1125,6 +1893,10 @@ pub struct GovernanceManager {
     activity_store: Arc<dyn ActivityStoreBackend>,
     /// Meeting store backend (deliberation trace objects)
     meeting_store: Arc<dyn MeetingStoreBackend>,
+    /// Program store backend (multi-phase institutional endeavors)
+    program_store: Arc<dyn ProgramStoreBackend>,
+    /// Milestone store backend (stage-gates within programs)
+    milestone_store: Arc<dyn MilestoneStoreBackend>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
     /// Optional receipt store for persisting GovernanceDecisionReceipts
@@ -1148,6 +1920,8 @@ impl GovernanceManager {
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
             meeting_store: Arc::new(InMemoryMeetingStore::new()),
+            program_store: Arc::new(InMemoryProgramStore::new()),
+            milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: None,
             receipt_store: None,
         }
@@ -1182,6 +1956,8 @@ impl GovernanceManager {
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
             meeting_store: Arc::new(InMemoryMeetingStore::new()),
+            program_store: Arc::new(InMemoryProgramStore::new()),
+            milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -1228,6 +2004,22 @@ impl GovernanceManager {
         self
     }
 
+    /// Replace the program store backend.
+    ///
+    /// Use this to configure Sled-backed persistent storage for programs.
+    pub fn with_program_store(mut self, store: Arc<dyn ProgramStoreBackend>) -> Self {
+        self.program_store = store;
+        self
+    }
+
+    /// Replace the milestone store backend.
+    ///
+    /// Use this to configure Sled-backed persistent storage for milestones.
+    pub fn with_milestone_store(mut self, store: Arc<dyn MilestoneStoreBackend>) -> Self {
+        self.milestone_store = store;
+        self
+    }
+
     /// Create a governance manager with Sled-backed action item storage
     ///
     /// This is the recommended mode for production with persistent action items.
@@ -1239,10 +2031,17 @@ impl GovernanceManager {
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
-            action_items: Box::new(SledActionItemStore::new(db)),
+            action_items: Box::new(SledActionItemStore::new(db.clone())),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
             meeting_store: Arc::new(InMemoryMeetingStore::new()),
+            // Programs and milestones use Sled-backed stores so they persist
+            // across restarts. Structure/activity/meeting are overridden by
+            // the caller (server.rs) via the with_*_store() builder methods;
+            // program/milestone use the same db here to avoid needing further
+            // builder calls for the happy path.
+            program_store: Arc::new(SledProgramStore::new(db.clone())),
+            milestone_store: Arc::new(SledMilestoneStore::new(db)),
             governance_handle: Some(handle),
             receipt_store: None,
         }
@@ -1259,10 +2058,14 @@ impl GovernanceManager {
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
-            action_items: Box::new(SledActionItemStore::new(db)),
+            action_items: Box::new(SledActionItemStore::new(db.clone())),
             structure_store: Arc::new(InMemoryStructureStore::new()),
             activity_store: Arc::new(InMemoryActivityStore::new()),
             meeting_store: Arc::new(InMemoryMeetingStore::new()),
+            // Programs and milestones use Sled-backed stores so they persist
+            // across restarts (same db instance, separate key namespaces).
+            program_store: Arc::new(SledProgramStore::new(db.clone())),
+            milestone_store: Arc::new(SledMilestoneStore::new(db)),
             governance_handle: None,
             receipt_store: None,
         }
@@ -3046,6 +3849,155 @@ impl GovernanceManager {
         self.meeting_store
             .delete(id)
             .map_err(|e| anyhow::anyhow!("Failed to delete meeting: {e}"))
+    }
+
+    // ========================================================================
+    // Program management (multi-phase institutional endeavors)
+    // ========================================================================
+
+    /// Create a new program in a governance domain.
+    pub fn create_program(
+        &self,
+        domain_id: GovernanceDomainId,
+        parent_entity_id: String,
+        kind: ProgramKind,
+        name: String,
+        description: Option<String>,
+        start_at: Option<u64>,
+        end_at: Option<u64>,
+        created_by_decision: Option<icn_governance::ProposalId>,
+    ) -> Result<Program> {
+        let now = icn_time::current_timestamp_secs();
+        let id = ProgramId::generate();
+        let mut p = Program::new(id, domain_id, parent_entity_id, kind, name, now);
+        p.description = description;
+        p.start_at = start_at;
+        p.end_at = end_at;
+        p.created_by_decision = created_by_decision;
+        self.program_store
+            .save(&p)
+            .map_err(|e| anyhow::anyhow!("Failed to save program: {e}"))?;
+        Ok(p)
+    }
+
+    /// Get a program by ID.
+    pub fn get_program(&self, id: &ProgramId) -> Result<Option<Program>> {
+        self.program_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get program: {e}"))
+    }
+
+    /// List all programs in a governance domain, newest first.
+    pub fn list_programs_by_domain(&self, domain_id: &GovernanceDomainId) -> Result<Vec<Program>> {
+        self.program_store
+            .list_by_domain(domain_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list programs: {e}"))
+    }
+
+    // ========================================================================
+    // Milestone management (stage-gates within programs)
+    // ========================================================================
+
+    /// Create a new milestone in a program.
+    pub fn create_milestone(
+        &self,
+        program_id: ProgramId,
+        name: String,
+        description: Option<String>,
+        phase_index: u32,
+        target_date: Option<u64>,
+        completion_criteria: Vec<String>,
+    ) -> Result<Milestone> {
+        // Verify the program exists before creating a milestone against it.
+        let mut p = self
+            .program_store
+            .get(&program_id)
+            .map_err(|e| anyhow::anyhow!("Failed to look up program: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Program not found: {program_id}"))?;
+
+        let now = icn_time::current_timestamp_secs();
+        let id = MilestoneId::generate();
+        let mut m = Milestone::new(id.clone(), program_id.clone(), name, phase_index, now);
+        m.description = description;
+        m.target_date = target_date;
+        m.completion_criteria = completion_criteria;
+        self.milestone_store
+            .save(&m)
+            .map_err(|e| anyhow::anyhow!("Failed to save milestone: {e}"))?;
+
+        // Register the milestone ID on the program record in phase-index order.
+        // Load the full set of existing milestones (including the newly saved one)
+        // so the milestones list is always sorted by phase_index, not insertion order.
+        {
+            let mut indexed: Vec<(u32, MilestoneId)> = p
+                .milestones
+                .iter()
+                .filter_map(|mid| {
+                    self.milestone_store
+                        .get(mid)
+                        .ok()
+                        .flatten()
+                        .map(|ms| (ms.phase_index, mid.clone()))
+                })
+                .collect();
+            indexed.push((m.phase_index, id));
+            indexed.sort_by_key(|&(pi, _)| pi);
+            p.milestones = indexed.into_iter().map(|(_, mid)| mid).collect();
+        }
+        self.program_store
+            .save(&p)
+            .map_err(|e| anyhow::anyhow!("Failed to update program milestones: {e}"))?;
+
+        Ok(m)
+    }
+
+    /// Get a milestone by ID.
+    pub fn get_milestone(&self, id: &MilestoneId) -> Result<Option<Milestone>> {
+        self.milestone_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get milestone: {e}"))
+    }
+
+    /// List milestones belonging to a program, ordered by phase_index.
+    pub fn list_milestones_by_program(&self, program_id: &ProgramId) -> Result<Vec<Milestone>> {
+        self.milestone_store
+            .list_by_program(program_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list milestones: {e}"))
+    }
+
+    /// Update a milestone's status.
+    ///
+    /// `actor` is the DID of the caller performing the transition. When the
+    /// milestone moves into `Completed`, the actor is recorded as
+    /// `completed_by` for audit. When the milestone is reopened, both
+    /// `completed_at` and `completed_by` are cleared.
+    pub fn update_milestone_status(
+        &self,
+        id: &MilestoneId,
+        status: MilestoneStatus,
+        actor: &Did,
+    ) -> Result<Milestone> {
+        let mut m = self
+            .milestone_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get milestone: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Milestone not found: {id}"))?;
+
+        if status == MilestoneStatus::Completed {
+            if m.status != MilestoneStatus::Completed {
+                m.completed_at = Some(icn_time::current_timestamp_secs());
+                m.completed_by = Some(actor.clone());
+            }
+        } else {
+            // Clear completion metadata when reopening (Pending/InProgress/Blocked).
+            m.completed_at = None;
+            m.completed_by = None;
+        }
+        m.status = status;
+        self.milestone_store
+            .save(&m)
+            .map_err(|e| anyhow::anyhow!("Failed to save milestone: {e}"))?;
+        Ok(m)
     }
 
     // ========================================================================

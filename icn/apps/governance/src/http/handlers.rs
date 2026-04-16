@@ -11,8 +11,8 @@ use icn_governance::{
     ActivityStatus, AttendanceStatus, DataSharingLevel, Delegation, DelegationId, DelegationScope,
     DisputeResolutionMethod, FederationProposal, FederationTerms, GovernanceDomainId,
     GovernanceParams, MeetingId, MeetingRole, MeetingStatus, MembershipAction, MembershipConfig,
-    ProposalId, ProposalPayload, ProposalScope, StructureId, StructureKind, StructureStatus,
-    VoteChoice,
+    MilestoneId, MilestoneStatus, ProgramId, ProgramKind, ProposalId, ProposalPayload,
+    ProposalScope, StructureId, StructureKind, StructureStatus, VoteChoice,
 };
 use icn_http_kit::{
     auth::{require_scope, BasicClaims},
@@ -3318,6 +3318,295 @@ pub async fn update_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
 
     ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
     Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
+}
+
+// ── Program helpers ──────────────────────────────────────────────────────────
+
+fn parse_program_kind(s: &str) -> Result<ProgramKind, ApiError> {
+    match s {
+        "cycle" => Ok(ProgramKind::Cycle),
+        "campaign" => Ok(ProgramKind::Campaign),
+        "initiative" => Ok(ProgramKind::Initiative),
+        "series" => Ok(ProgramKind::Series),
+        other if !other.is_empty() => Ok(ProgramKind::Custom(other.to_string())),
+        _ => Err(err_bad("program kind must not be empty")),
+    }
+}
+
+fn program_kind_str(k: &ProgramKind) -> String {
+    match k {
+        ProgramKind::Cycle => "cycle".to_string(),
+        ProgramKind::Campaign => "campaign".to_string(),
+        ProgramKind::Initiative => "initiative".to_string(),
+        ProgramKind::Series => "series".to_string(),
+        ProgramKind::Custom(s) => s.clone(),
+    }
+}
+
+fn program_status_str(s: &icn_governance::ProgramStatus) -> &'static str {
+    use icn_governance::ProgramStatus;
+    match s {
+        ProgramStatus::Draft => "draft",
+        ProgramStatus::ActivePlanning => "active_planning",
+        ProgramStatus::PublicLaunch => "public_launch",
+        ProgramStatus::InExecution => "in_execution",
+        ProgramStatus::Closed => "closed",
+        ProgramStatus::Archived => "archived",
+    }
+}
+
+fn milestone_status_str(s: &MilestoneStatus) -> &'static str {
+    match s {
+        MilestoneStatus::Pending => "pending",
+        MilestoneStatus::InProgress => "in_progress",
+        MilestoneStatus::Completed => "completed",
+        MilestoneStatus::Blocked => "blocked",
+        MilestoneStatus::Skipped => "skipped",
+    }
+}
+
+fn parse_milestone_status(s: &str) -> Result<MilestoneStatus, ApiError> {
+    match s {
+        "pending" => Ok(MilestoneStatus::Pending),
+        "in_progress" => Ok(MilestoneStatus::InProgress),
+        "completed" => Ok(MilestoneStatus::Completed),
+        "blocked" => Ok(MilestoneStatus::Blocked),
+        "skipped" => Ok(MilestoneStatus::Skipped),
+        _ => Err(err_bad(format!("Unknown milestone status: {s}"))),
+    }
+}
+
+fn program_to_response(p: &icn_governance::Program) -> ProgramResponse {
+    ProgramResponse {
+        id: p.id.0.clone(),
+        domain_id: p.domain_id.0.clone(),
+        parent_entity_id: p.parent_entity_id.clone(),
+        kind: program_kind_str(&p.kind),
+        name: p.name.clone(),
+        description: p.description.clone(),
+        status: program_status_str(&p.status).to_string(),
+        start_at: p.start_at,
+        end_at: p.end_at,
+        milestones: p.milestones.iter().map(|m| m.0.clone()).collect(),
+        activities: p.activities.iter().map(|a| a.0.clone()).collect(),
+        created_at: p.created_at,
+        closed_at: p.closed_at,
+        created_by_decision: p.created_by_decision.as_ref().map(|d| d.0.clone()),
+    }
+}
+
+fn milestone_to_response(m: &icn_governance::Milestone) -> MilestoneResponse {
+    MilestoneResponse {
+        id: m.id.0.clone(),
+        program_id: m.program_id.0.clone(),
+        name: m.name.clone(),
+        description: m.description.clone(),
+        phase_index: m.phase_index,
+        target_date: m.target_date,
+        status: milestone_status_str(&m.status).to_string(),
+        completion_criteria: m.completion_criteria.clone(),
+        completed_at: m.completed_at,
+        completed_by: m.completed_by.as_ref().map(|d| d.to_string()),
+        created_at: m.created_at,
+    }
+}
+
+// ── Program endpoints ────────────────────────────────────────────────────────
+
+/// POST /gov/domains/{domain_id}/programs — Create a program.
+pub async fn create_program<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    domain_id: web::Path<String>,
+    req: web::Json<CreateProgramRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let domain = GovernanceDomainId(domain_id.into_inner());
+
+    check_domain_membership(
+        &ctx.manager,
+        &domain,
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
+
+    if req.name.trim().is_empty() {
+        return Err(err_bad("Program name must not be empty"));
+    }
+
+    let kind = parse_program_kind(&req.kind)?;
+    let created_by_decision = req
+        .created_by_decision
+        .as_deref()
+        .map(|s| icn_governance::ProposalId(s.to_string()));
+
+    let p = ctx
+        .manager
+        .create_program(
+            domain,
+            req.parent_entity_id.clone(),
+            kind,
+            req.name.clone(),
+            req.description.clone(),
+            req.start_at,
+            req.end_at,
+            created_by_decision,
+        )
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Created().json(program_to_response(&p)))
+}
+
+/// GET /gov/domains/{domain_id}/programs — List programs in a domain.
+pub async fn list_programs_by_domain<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    domain_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let domain = GovernanceDomainId(domain_id.into_inner());
+
+    let programs = ctx
+        .manager
+        .list_programs_by_domain(&domain)
+        .map_err(anyhow_to_api)?;
+
+    let responses: Vec<ProgramResponse> = programs.iter().map(program_to_response).collect();
+    Ok(HttpResponse::Ok().json(responses))
+}
+
+/// GET /gov/programs/{program_id} — Get a specific program.
+pub async fn get_program<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    program_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let id = ProgramId(program_id.into_inner());
+
+    let p = ctx
+        .manager
+        .get_program(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found"))?;
+
+    Ok(HttpResponse::Ok().json(program_to_response(&p)))
+}
+
+// ── Milestone endpoints ──────────────────────────────────────────────────────
+
+/// POST /gov/programs/{program_id}/milestones — Create a milestone.
+pub async fn create_milestone<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    program_id: web::Path<String>,
+    req: web::Json<CreateMilestoneRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let pid = ProgramId(program_id.into_inner());
+
+    if req.name.trim().is_empty() {
+        return Err(err_bad("Milestone name must not be empty"));
+    }
+
+    // Resolve the program's governance domain so membership can be verified.
+    // A caller with governance:write on an unrelated domain must not be able
+    // to add milestones to any known program.
+    let prog = ctx
+        .manager
+        .get_program(&pid)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found"))?;
+
+    check_domain_membership(
+        &ctx.manager,
+        &prog.domain_id,
+        &parse_did(&claims.sub, "Invalid DID in token")?,
+    )
+    .await?;
+
+    let m = ctx
+        .manager
+        .create_milestone(
+            pid,
+            req.name.clone(),
+            req.description.clone(),
+            req.phase_index,
+            req.target_date,
+            req.completion_criteria.clone(),
+        )
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Created().json(milestone_to_response(&m)))
+}
+
+/// GET /gov/milestones/{milestone_id} — Get a specific milestone.
+pub async fn get_milestone<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    milestone_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let id = MilestoneId(milestone_id.into_inner());
+
+    let m = ctx
+        .manager
+        .get_milestone(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Milestone not found"))?;
+
+    Ok(HttpResponse::Ok().json(milestone_to_response(&m)))
+}
+
+/// GET /gov/programs/{program_id}/milestones — List milestones for a program.
+pub async fn list_milestones_by_program<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    program_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let pid = ProgramId(program_id.into_inner());
+
+    let milestones = ctx
+        .manager
+        .list_milestones_by_program(&pid)
+        .map_err(anyhow_to_api)?;
+
+    let responses: Vec<MilestoneResponse> = milestones.iter().map(milestone_to_response).collect();
+    Ok(HttpResponse::Ok().json(responses))
+}
+
+/// PATCH /gov/milestones/{milestone_id} — Update milestone status.
+pub async fn update_milestone_status<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    milestone_id: web::Path<String>,
+    req: web::Json<UpdateMilestoneStatusRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let id = MilestoneId(milestone_id.into_inner());
+    let status = parse_milestone_status(&req.status)?;
+    let actor = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    // Resolve governance domain via milestone → program → domain for membership check.
+    let milestone = ctx
+        .manager
+        .get_milestone(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Milestone not found"))?;
+    let prog = ctx
+        .manager
+        .get_program(&milestone.program_id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found for milestone"))?;
+    check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
+
+    let m = ctx
+        .manager
+        .update_milestone_status(&id, status, &actor)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(milestone_to_response(&m)))
 }
 
 // ============================================================================

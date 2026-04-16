@@ -86,6 +86,7 @@ pub mod action_item;
 pub mod activity;
 pub mod meeting;
 pub mod parent;
+pub mod program;
 pub mod structure;
 
 // Orphan cleanup (Phase 21)
@@ -190,6 +191,10 @@ pub use meeting::{
     MeetingId, MeetingRole, MeetingStatus, MeetingStoreBackend,
 };
 pub use parent::InstitutionalParent;
+pub use program::{
+    InMemoryMilestoneStore, InMemoryProgramStore, Milestone, MilestoneId, MilestoneStatus,
+    MilestoneStoreBackend, Program, ProgramId, ProgramKind, ProgramStatus, ProgramStoreBackend,
+};
 pub use structure::{
     InMemoryStructureStore, RoleAssignment, RoleAssignmentId, Structure, StructureId,
     StructureKind, StructureStatus, StructureStoreBackend,
