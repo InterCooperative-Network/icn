@@ -13,11 +13,12 @@
 //! milestone record at the time of the completion attempt.  The following
 //! named variables are available:
 //!
-//! | Variable                  | Type  | Meaning                                                |
-//! |---------------------------|-------|--------------------------------------------------------|
-//! | `criteria_count`          | `Int` | `completion_criteria.len()` at eval time               |
-//! | `phase_index`             | `Int` | milestone `phase_index` (0-based ordinal)              |
-//! | `action_items_done_count` | `Int` | completed action items in the milestone's program      |
+//! | Variable                  | Type     | Meaning                                                |
+//! |---------------------------|----------|--------------------------------------------------------|
+//! | `criteria_count`          | `Int`    | `completion_criteria.len()` at eval time               |
+//! | `phase_index`             | `Int`    | milestone `phase_index` (0-based ordinal)              |
+//! | `action_items_done_count` | `Int`    | completed action items in the milestone's program      |
+//! | `program_status`          | `String` | current lifecycle status of the parent program         |
 //!
 //! **What is NOT available (deferred):**
 //! - Trust scores or ledger balances (no CCL capabilities granted)
@@ -72,11 +73,20 @@ const GATE_FUEL: u64 = 1_000;
 /// Built from the milestone record immediately before the completion
 /// attempt.  All fields are passed as named CCL variables.
 ///
-/// | Variable                  | Type  | Meaning                                                |
-/// |---------------------------|-------|--------------------------------------------------------|
-/// | `criteria_count`          | `Int` | `completion_criteria.len()` at eval time               |
-/// | `phase_index`             | `Int` | milestone `phase_index` (0-based ordinal)              |
-/// | `action_items_done_count` | `Int` | `ActionItemStatus::Completed` items in the program     |
+/// | Variable                  | Type     | Meaning                                                       |
+/// |---------------------------|----------|---------------------------------------------------------------|
+/// | `criteria_count`          | `Int`    | `completion_criteria.len()` at eval time                      |
+/// | `phase_index`             | `Int`    | milestone `phase_index` (0-based ordinal)                     |
+/// | `action_items_done_count` | `Int`    | `ActionItemStatus::Completed` items in the program            |
+/// | `program_status`          | `String` | current lifecycle status of the parent program (snake_case)   |
+///
+/// ## `program_status` values
+///
+/// The value is the snake_case serialization of [`crate::program::ProgramStatus`]:
+/// `"draft"`, `"active_planning"`, `"public_launch"`, `"in_execution"`,
+/// `"closed"`, `"archived"`.
+///
+/// Example gate: `program_status == "in_execution"`
 #[derive(Debug, Clone)]
 pub struct MilestoneGateContext {
     /// Number of strings in `completion_criteria`.
@@ -87,6 +97,9 @@ pub struct MilestoneGateContext {
     /// activity belongs to the milestone's program.  Zero when the milestone
     /// has no associated program or when the program has no action items.
     pub action_items_done_count: i64,
+    /// Current lifecycle status of the parent program, as a snake_case
+    /// string matching [`crate::program::ProgramStatus::as_str`].
+    pub program_status: String,
     /// DID of the actor requesting completion (used as CCL caller).
     pub actor: Did,
     /// Current Unix timestamp (seconds).
@@ -101,6 +114,10 @@ impl MilestoneGateContext {
         map.insert(
             "action_items_done_count".into(),
             Value::Int(self.action_items_done_count),
+        );
+        map.insert(
+            "program_status".into(),
+            Value::String(self.program_status.clone()),
         );
         map
     }
@@ -201,11 +218,30 @@ mod tests {
         phase_index: i64,
         action_items_done_count: i64,
     ) -> MilestoneGateContext {
+        ctx_full(
+            criteria_count,
+            phase_index,
+            action_items_done_count,
+            "in_execution",
+        )
+    }
+
+    fn ctx_with_status(program_status: &str) -> MilestoneGateContext {
+        ctx_full(0, 0, 0, program_status)
+    }
+
+    fn ctx_full(
+        criteria_count: i64,
+        phase_index: i64,
+        action_items_done_count: i64,
+        program_status: &str,
+    ) -> MilestoneGateContext {
         let did = KeyPair::generate().unwrap().did().clone();
         MilestoneGateContext {
             criteria_count,
             phase_index,
             action_items_done_count,
+            program_status: program_status.to_string(),
             actor: did,
             now: 1_700_000_000,
         }
@@ -353,5 +389,117 @@ mod tests {
             evaluate_milestone_gate(Some(&gate), &c).unwrap_err(),
             MilestoneGateError::Blocked { .. }
         ));
+    }
+
+    // -------------------------------------------------------------------------
+    // program_status tests
+    // -------------------------------------------------------------------------
+
+    fn status_eq(expected: &str) -> Expr {
+        Expr::BinOp {
+            op: BinOp::Eq,
+            left: Box::new(Expr::Var("program_status".into())),
+            right: Box::new(Expr::Literal(Value::String(expected.into()))),
+        }
+    }
+
+    fn status_ne(expected: &str) -> Expr {
+        Expr::BinOp {
+            op: BinOp::Ne,
+            left: Box::new(Expr::Var("program_status".into())),
+            right: Box::new(Expr::Literal(Value::String(expected.into()))),
+        }
+    }
+
+    /// Gate `program_status == "in_execution"` passes when status matches.
+    #[test]
+    fn gate_program_status_eq_passes_when_matching() {
+        let gate = status_eq("in_execution");
+        let c = ctx_with_status("in_execution");
+        assert!(evaluate_milestone_gate(Some(&gate), &c).is_ok());
+    }
+
+    /// Gate `program_status == "in_execution"` blocks when status differs.
+    #[test]
+    fn gate_program_status_eq_blocks_when_not_matching() {
+        let gate = status_eq("in_execution");
+        let c = ctx_with_status("draft");
+        assert!(matches!(
+            evaluate_milestone_gate(Some(&gate), &c).unwrap_err(),
+            MilestoneGateError::Blocked { .. }
+        ));
+    }
+
+    /// Gate `program_status != "draft"` passes when status is not draft.
+    #[test]
+    fn gate_program_status_ne_passes_when_not_draft() {
+        let gate = status_ne("draft");
+        let c = ctx_with_status("active_planning");
+        assert!(evaluate_milestone_gate(Some(&gate), &c).is_ok());
+    }
+
+    /// Gate `program_status != "draft"` blocks when status is draft.
+    #[test]
+    fn gate_program_status_ne_blocks_when_draft() {
+        let gate = status_ne("draft");
+        let c = ctx_with_status("draft");
+        assert!(matches!(
+            evaluate_milestone_gate(Some(&gate), &c).unwrap_err(),
+            MilestoneGateError::Blocked { .. }
+        ));
+    }
+
+    /// Comparing program_status (String) to an Int literal is a type mismatch
+    /// in CCL equality.  The interpreter returns Bool(false) — the strings are
+    /// not equal to the integer — so the gate is Blocked, not EvalError.
+    /// This is the expected CCL behavior for cross-type Eq comparisons.
+    #[test]
+    fn gate_program_status_compared_to_int_blocks_not_errors() {
+        let gate = Expr::BinOp {
+            op: BinOp::Eq,
+            left: Box::new(Expr::Var("program_status".into())),
+            right: Box::new(Expr::Literal(Value::Int(1))),
+        };
+        let c = ctx_with_status("in_execution");
+        // String != Int → false → Blocked (not EvalError).
+        assert!(matches!(
+            evaluate_milestone_gate(Some(&gate), &c).unwrap_err(),
+            MilestoneGateError::Blocked { .. }
+        ));
+    }
+
+    /// Compound gate: `program_status == "in_execution" && criteria_count >= 1`.
+    #[test]
+    fn gate_compound_status_and_criteria_passes() {
+        let gate = Expr::BinOp {
+            op: BinOp::And,
+            left: Box::new(status_eq("in_execution")),
+            right: Box::new(gte("criteria_count", 1)),
+        };
+        let c = ctx_full(2, 0, 0, "in_execution");
+        assert!(evaluate_milestone_gate(Some(&gate), &c).is_ok());
+    }
+
+    /// Same compound gate blocks when program is still in draft.
+    #[test]
+    fn gate_compound_status_and_criteria_blocks_when_draft() {
+        let gate = Expr::BinOp {
+            op: BinOp::And,
+            left: Box::new(status_eq("in_execution")),
+            right: Box::new(gte("criteria_count", 1)),
+        };
+        let c = ctx_full(2, 0, 0, "draft");
+        assert!(matches!(
+            evaluate_milestone_gate(Some(&gate), &c).unwrap_err(),
+            MilestoneGateError::Blocked { .. }
+        ));
+    }
+
+    /// Existing gates that do not reference program_status continue to work.
+    #[test]
+    fn gate_without_program_status_ref_still_passes() {
+        let gate = gte("criteria_count", 1);
+        let c = ctx_full(2, 0, 0, "draft"); // program_status present but not used
+        assert!(evaluate_milestone_gate(Some(&gate), &c).is_ok());
     }
 }

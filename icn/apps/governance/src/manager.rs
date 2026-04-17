@@ -4108,6 +4108,27 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Failed to get program: {e}"))
     }
 
+    /// Advance (or revert) the lifecycle status of a program.
+    ///
+    /// Returns the updated `Program` on success, or `Err` if the program does
+    /// not exist.
+    pub fn update_program_status(
+        &self,
+        id: &ProgramId,
+        status: icn_governance::program::ProgramStatus,
+    ) -> Result<Program> {
+        let mut p = self
+            .program_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get program: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Program not found: {id}"))?;
+        p.status = status;
+        self.program_store
+            .save(&p)
+            .map_err(|e| anyhow::anyhow!("Failed to save program: {e}"))?;
+        Ok(p)
+    }
+
     /// List all programs in a governance domain, newest first.
     pub fn list_programs_by_domain(&self, domain_id: &GovernanceDomainId) -> Result<Vec<Program>> {
         self.program_store
@@ -4245,10 +4266,21 @@ impl GovernanceManager {
                         .map_err(|e| anyhow::anyhow!("{e}"))?;
                     let action_items_done_count =
                         self.count_completed_action_items_for_program(&m.program_id)?;
+                    // Resolve the parent program to include its current status
+                    // in the gate context.  A missing program is unusual
+                    // (milestones reference programs by ID), so we fail rather
+                    // than silently defaulting.
+                    let program = self.get_program(&m.program_id)?.ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "Program not found for milestone gate context: {}",
+                            m.program_id
+                        )
+                    })?;
                     let gate_ctx = icn_governance::milestone_gate::MilestoneGateContext {
                         criteria_count: m.completion_criteria.len() as i64,
                         phase_index: m.phase_index as i64,
                         action_items_done_count,
+                        program_status: program.status.as_str().to_string(),
                         actor: actor.clone(),
                         now: icn_time::current_timestamp_secs(),
                     };
@@ -5941,6 +5973,93 @@ mod tests {
         assert!(
             result.is_err(),
             "non-completed items must not satisfy action_items_done_count gate"
+        );
+    }
+
+    // ── program_status gate tests ────────────────────────────────────────────
+
+    /// Gate `program_status == "in_execution"` passes when the program is
+    /// actually in InExecution status.
+    #[tokio::test]
+    async fn milestone_gate_program_status_in_execution_passes() {
+        use icn_ccl::types::Value;
+        use icn_ccl::{BinOp, Expr};
+
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "P".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Advance to InExecution.
+        mgr.update_program_status(
+            &prog.id,
+            icn_governance::program::ProgramStatus::InExecution,
+        )
+        .unwrap();
+
+        let gate = Expr::BinOp {
+            op: BinOp::Eq,
+            left: Box::new(Expr::Var("program_status".into())),
+            right: Box::new(Expr::Literal(Value::String("in_execution".into()))),
+        };
+
+        let m = mgr
+            .create_milestone(prog.id.clone(), "M".into(), None, 0, None, vec![])
+            .unwrap();
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        let updated = mgr
+            .update_milestone_status(&m.id, MilestoneStatus::Completed, &member)
+            .expect("gate should pass for in_execution program");
+        assert_eq!(updated.status, MilestoneStatus::Completed);
+    }
+
+    /// Gate `program_status == "in_execution"` blocks when the program is
+    /// still in Draft status.
+    #[tokio::test]
+    async fn milestone_gate_program_status_draft_blocks() {
+        use icn_ccl::types::Value;
+        use icn_ccl::{BinOp, Expr};
+
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "P".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        // Program remains in Draft (the default) — do not advance status.
+
+        let gate = Expr::BinOp {
+            op: BinOp::Eq,
+            left: Box::new(Expr::Var("program_status".into())),
+            right: Box::new(Expr::Literal(Value::String("in_execution".into()))),
+        };
+
+        let m = mgr
+            .create_milestone(prog.id.clone(), "M".into(), None, 0, None, vec![])
+            .unwrap();
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        let result = mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &member);
+        assert!(
+            result.is_err(),
+            "gate must block completion when program is in Draft status"
         );
     }
 }

@@ -220,6 +220,22 @@ pub struct Program {
     pub created_by_decision: Option<ProposalId>,
 }
 
+impl ProgramStatus {
+    /// The canonical snake_case string for this status, matching the serde
+    /// `rename_all = "snake_case"` wire representation used in the HTTP API
+    /// and the milestone gate context variable `program_status`.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ProgramStatus::Draft => "draft",
+            ProgramStatus::ActivePlanning => "active_planning",
+            ProgramStatus::PublicLaunch => "public_launch",
+            ProgramStatus::InExecution => "in_execution",
+            ProgramStatus::Closed => "closed",
+            ProgramStatus::Archived => "archived",
+        }
+    }
+}
+
 impl Program {
     /// Create a new draft program with minimal required fields.
     pub fn new(
@@ -314,10 +330,14 @@ pub struct Milestone {
     /// postcard-safe for Sled persistence.  Use
     /// [`crate::milestone_gate::parse_gate`] to obtain a typed `Expr`.
     ///
-    /// The gate context exposes two named variables (see
+    /// The gate context exposes named variables (see
     /// [`crate::milestone_gate::MilestoneGateContext`]):
     /// - `criteria_count: Int` — `completion_criteria.len()`
     /// - `phase_index: Int` — this milestone's `phase_index`
+    /// - `action_items_done_count: Int` — completed action items in the program
+    /// - `program_status: String` — current status of the parent program (e.g.
+    ///   `"draft"`, `"active_planning"`, `"public_launch"`, `"in_execution"`,
+    ///   `"closed"`, `"archived"`)
     ///
     /// Only pure read-only boolean predicates are supported in this first
     /// slice; ledger access, state writes, and function calls are not
