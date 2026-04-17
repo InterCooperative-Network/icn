@@ -3651,6 +3651,25 @@ fn dashboard_milestone_summary(m: &icn_governance::Milestone) -> DashboardMilest
     }
 }
 
+fn meeting_status_str(s: &MeetingStatus) -> &'static str {
+    match s {
+        MeetingStatus::Scheduled => "scheduled",
+        MeetingStatus::InProgress => "in_progress",
+        MeetingStatus::Completed => "completed",
+        MeetingStatus::Cancelled => "cancelled",
+    }
+}
+
+fn dashboard_meeting_summary(m: &icn_governance::Meeting) -> DashboardMeetingSummary {
+    DashboardMeetingSummary {
+        id: m.id.0.clone(),
+        title: m.title.clone(),
+        status: meeting_status_str(&m.status).to_string(),
+        scheduled_at: m.scheduled_at,
+        linked_activity_ids: m.linked_activities.iter().map(|a| a.0.clone()).collect(),
+    }
+}
+
 fn dashboard_activity_summary(a: &icn_governance::Activity) -> DashboardActivitySummary {
     DashboardActivitySummary {
         id: a.id.0.clone(),
@@ -3681,11 +3700,6 @@ fn dashboard_activity_summary(a: &icn_governance::Activity) -> DashboardActivity
 /// - action item counts scoped to the program's activities
 ///
 /// Requires `governance:read` scope. No write gates — this is a pure read.
-///
-/// **Meetings** are absent from this response. `Meeting` records link to
-/// activities via `linked_activities` but there is no activity-keyed index
-/// on the meeting store. Resolving meetings would require a full domain scan.
-/// Deferred until a `list_by_activity` index is available.
 pub async fn get_program_dashboard<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
@@ -3745,6 +3759,7 @@ pub async fn get_program_dashboard<E: GovernanceEventEmitter + Clone + 'static>(
             cancelled: ai.cancelled,
             total: ai.total(),
         },
+        meetings: d.meetings.iter().map(dashboard_meeting_summary).collect(),
     };
 
     Ok(HttpResponse::Ok().json(resp))
@@ -5147,5 +5162,148 @@ mod tests {
         let activities = body["activities"].as_array().unwrap();
         assert_eq!(activities.len(), 1);
         assert_eq!(activities[0]["name"], "Summit Event");
+    }
+
+    /// Meetings linked to program activities are included in the dashboard.
+    /// A meeting linked to two activities in the same program appears once
+    /// (dedup). Meetings not linked to any program activity are excluded.
+    #[actix_web::test]
+    async fn dashboard_includes_meetings_linked_through_activities() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let domain_id = GovernanceDomainId("dom-d".to_string());
+        let creator = test_did(3);
+
+        mgr.create_domain(
+            domain_id.clone(),
+            "Domain D".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![creator.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "entity-d".to_string(),
+                icn_governance::ProgramKind::Initiative,
+                "Initiative 2026".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Two activities in this program
+        let act1 = mgr
+            .create_activity(
+                "entity-d".to_string(),
+                icn_governance::ActivityKind::Event,
+                "Kickoff Event".to_string(),
+                None,
+                None,
+                None,
+                Some(prog.id.clone()),
+            )
+            .unwrap();
+
+        let act2 = mgr
+            .create_activity(
+                "entity-d".to_string(),
+                icn_governance::ActivityKind::Event,
+                "Review Session".to_string(),
+                None,
+                None,
+                None,
+                Some(prog.id.clone()),
+            )
+            .unwrap();
+
+        // meeting_a: linked to act1 only, scheduled at 2000
+        let mut meeting_a = mgr
+            .create_meeting(
+                domain_id.0.clone(),
+                "Kickoff Meeting".to_string(),
+                None,
+                Some(2000),
+                creator.to_string(),
+            )
+            .unwrap();
+        meeting_a.linked_activities = vec![act1.id.clone()];
+        mgr.update_meeting(&meeting_a).unwrap();
+
+        // meeting_b: linked to BOTH act1 and act2, scheduled at 1000 (earlier)
+        let mut meeting_b = mgr
+            .create_meeting(
+                domain_id.0.clone(),
+                "Joint Meeting".to_string(),
+                None,
+                Some(1000),
+                creator.to_string(),
+            )
+            .unwrap();
+        meeting_b.linked_activities = vec![act1.id.clone(), act2.id.clone()];
+        mgr.update_meeting(&meeting_b).unwrap();
+
+        // meeting_c: linked to an activity NOT in this program — should be excluded
+        let other_act = mgr
+            .create_activity(
+                "entity-d".to_string(),
+                icn_governance::ActivityKind::Event,
+                "Other Event".to_string(),
+                None,
+                None,
+                None,
+                None, // no parent_program_id
+            )
+            .unwrap();
+        let mut meeting_c = mgr
+            .create_meeting(
+                domain_id.0.clone(),
+                "Unrelated Meeting".to_string(),
+                None,
+                None,
+                creator.to_string(),
+            )
+            .unwrap();
+        meeting_c.linked_activities = vec![other_act.id.clone()];
+        mgr.update_meeting(&meeting_c).unwrap();
+
+        let app = dashboard_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/programs/{}/dashboard", prog.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let meetings = body["meetings"].as_array().unwrap();
+
+        // meeting_b (scheduled 1000) and meeting_a (scheduled 2000);
+        // meeting_b also links to act2 — should NOT be duplicated.
+        assert_eq!(meetings.len(), 2, "two distinct meetings in program");
+        assert_eq!(
+            meetings[0]["title"], "Joint Meeting",
+            "earliest scheduled first"
+        );
+        assert_eq!(meetings[1]["title"], "Kickoff Meeting");
+
+        // meeting_b is linked to both activities
+        let joint_linked: Vec<&str> = meetings[0]["linked_activity_ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert_eq!(joint_linked.len(), 2);
+
+        assert_eq!(meetings[0]["status"], "scheduled");
     }
 }
