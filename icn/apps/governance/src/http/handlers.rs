@@ -2711,6 +2711,7 @@ fn activity_to_response(a: &icn_governance::Activity) -> ActivityResponse {
         start_date: a.start_date,
         end_date: a.end_date,
         linked_structures: a.linked_structures.iter().map(|s| s.0.clone()).collect(),
+        parent_program_id: a.parent_program_id.as_ref().map(|p| p.0.clone()),
         created_at: a.created_at,
     }
 }
@@ -2819,6 +2820,10 @@ pub async fn create_activity<E: GovernanceEventEmitter + Clone + 'static>(
     let entity = entity_id.into_inner();
     let kind = parse_activity_kind(&req.kind)?;
 
+    let parent_program_id = req
+        .parent_program_id
+        .as_deref()
+        .map(|s| icn_governance::program::ProgramId(s.to_string()));
     let a = ctx
         .manager
         .create_activity(
@@ -2828,6 +2833,7 @@ pub async fn create_activity<E: GovernanceEventEmitter + Clone + 'static>(
             req.description.clone(),
             req.start_date,
             req.end_date,
+            parent_program_id,
         )
         .map_err(anyhow_to_api)?;
 

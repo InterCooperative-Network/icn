@@ -3808,6 +3808,7 @@ impl GovernanceManager {
         description: Option<String>,
         start_date: Option<u64>,
         end_date: Option<u64>,
+        parent_program_id: Option<icn_governance::program::ProgramId>,
     ) -> Result<Activity> {
         // Validate date range when both are provided
         if let (Some(start), Some(end)) = (start_date, end_date) {
@@ -3821,6 +3822,7 @@ impl GovernanceManager {
         a.description = description;
         a.start_date = start_date;
         a.end_date = end_date;
+        a.parent_program_id = parent_program_id;
         self.activity_store
             .save(&a)
             .map_err(|e| anyhow::anyhow!("Failed to save activity: {e}"))?;

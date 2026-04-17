@@ -7,6 +7,7 @@
 //!
 //! See `docs/design/institutional-structure-spec.md` for the full design.
 
+use crate::program::ProgramId;
 use crate::structure::StructureId;
 use crate::{GovernanceError, ProposalId, Timestamp};
 use serde::{Deserialize, Serialize};
@@ -102,6 +103,16 @@ pub struct Activity {
     #[serde(default)]
     pub linked_structures: Vec<StructureId>,
 
+    /// Optional link to the parent `Program` that this activity executes within.
+    ///
+    /// An `Event` activity (e.g., "NY Cooperative Summit 2026") can point to the
+    /// `Program` that frames it (e.g., "annual-summit-cycle"), enabling cycle-over-cycle
+    /// dashboards and the work-spine display without requiring a second round-trip.
+    ///
+    /// `None` is valid — stand-alone activities with no program affiliation are common.
+    #[serde(default)]
+    pub parent_program_id: Option<ProgramId>,
+
     /// Unix timestamp when the activity was created
     pub created_at: Timestamp,
 
@@ -129,6 +140,7 @@ impl Activity {
             start_date: None,
             end_date: None,
             linked_structures: Vec::new(),
+            parent_program_id: None,
             created_at: now,
             created_by_decision: None,
         }
@@ -314,6 +326,41 @@ mod tests {
         assert!(a.start_date.is_none());
         assert!(a.linked_structures.is_empty());
         assert!(a.created_by_decision.is_none());
+    }
+
+    #[test]
+    fn test_activity_parent_program_id() {
+        // Create with parent_program_id set
+        let id = ActivityId::from_raw("summit-2026");
+        let mut a = Activity::new(
+            id.clone(),
+            "nycn-organizers".to_string(),
+            ActivityKind::Event,
+            "NY Cooperative Summit 2026".to_string(),
+            1000,
+        );
+        assert!(a.parent_program_id.is_none());
+
+        a.parent_program_id = Some(ProgramId("annual-summit-cycle".to_string()));
+
+        // Roundtrip through serde
+        let json = serde_json::to_string(&a).unwrap();
+        let restored: Activity = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            restored.parent_program_id.as_ref().unwrap().0,
+            "annual-summit-cycle"
+        );
+
+        // Activities without parent_program_id deserialize cleanly
+        let minimal = r#"{
+            "id": "standalone",
+            "parent_entity_id": "org",
+            "kind": "initiative",
+            "name": "Standalone",
+            "created_at": 1000
+        }"#;
+        let b: Activity = serde_json::from_str(minimal).unwrap();
+        assert!(b.parent_program_id.is_none());
     }
 
     #[test]
