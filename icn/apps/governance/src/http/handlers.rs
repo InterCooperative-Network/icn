@@ -189,6 +189,29 @@ fn build_action_item_filter(query: &ActionItemFilterParams) -> Result<ActionItem
     Ok(filter)
 }
 
+/// Build an [`ActionItemFilter`] from `/me/work` query parameters.
+///
+/// Identical to [`build_action_item_filter`] except it accepts [`MyWorkFilterParams`]
+/// (no `assignee` field — the caller's DID is always the implicit assignee).
+fn build_my_work_filter(
+    query: &MyWorkFilterParams,
+) -> Result<icn_governance::ActionItemFilter, ApiError> {
+    let mut filter = icn_governance::ActionItemFilter::default();
+    if let Some(ref status) = query.status {
+        filter.status = Some(parse_status(status)?);
+    }
+    if let Some(ref priority) = query.priority {
+        filter.priority = Some(parse_priority(priority)?);
+    }
+    if query.overdue == Some(true) {
+        filter.overdue_only = Some(current_time_secs());
+    }
+    if let Some(ref tag) = query.tag {
+        filter.tag = Some(tag.clone());
+    }
+    Ok(filter)
+}
+
 fn action_item_to_response(item: &icn_governance::ActionItem) -> ActionItemResponse {
     let now = current_time_secs();
     ActionItemResponse {
@@ -3639,25 +3662,32 @@ pub async fn get_my_scopes<E: GovernanceEventEmitter + Clone + 'static>(
     Ok(HttpResponse::Ok().json(responses))
 }
 
-/// GET /gov/me/work — Return all action items assigned to the authenticated DID.
+/// GET /gov/me/work — Return action items assigned to the authenticated DID.
 ///
-/// Returns items across **all** governance domains, sorted by creation date
-/// (oldest first). No filtering is applied — the caller receives their full
-/// open work queue. Filtering by status, priority, or tag will be added
-/// in a follow-up endpoint iteration.
+/// Returns items across **all** governance domains, sorted oldest-first
+/// (`created_at` ascending) so the longest-outstanding work surfaces at the top.
 ///
-/// **Note**: Items in any status are returned. Callers should filter client-side
-/// by `status` if they only want pending or in-progress items.
+/// **Query parameters** (all optional):
+/// - `status` — filter by status: `pending`, `in_progress`, `completed`, `deferred`, `cancelled`
+/// - `priority` — filter by priority: `low`, `medium`, `high`, `critical`
+/// - `overdue` — if `true`, return only items whose `due_date` is in the past
+/// - `tag` — filter to items that include this tag string
+///
+/// When no parameters are provided all items in any status are returned.
+/// Typical usage: `?status=pending` or `?overdue=true&priority=high`.
 pub async fn get_my_work<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
+    query: web::Query<MyWorkFilterParams>,
 ) -> Result<HttpResponse, ApiError> {
     let claims = require_scope::<BasicClaims>(&http_req, "governance:read")?;
     let caller = parse_did(&claims.sub, "Invalid DID in token")?;
 
+    let filter = build_my_work_filter(&query)?;
+
     let items = ctx
         .manager
-        .list_work_for_person(&caller)
+        .list_work_for_person(&caller, &filter)
         .map_err(anyhow_to_api)?;
 
     let responses: Vec<ActionItemResponse> = items.iter().map(action_item_to_response).collect();
@@ -4212,5 +4242,496 @@ mod tests {
         for item in &body {
             assert_eq!(item["assignee"], caller.to_string());
         }
+    }
+
+    // ── /me/work filter tests ────────────────────────────────────────────────
+
+    /// Build a context + test app for /me/work filter tests.
+    macro_rules! work_app {
+        ($mgr:expr, $caller:expr) => {{
+            let ctx = GovernanceContext {
+                manager: $mgr,
+                emitter: NoopEventEmitter,
+                on_proposal_accepted: None,
+                on_charter_accepted: None,
+                member_checker: None,
+                steward_checker: None,
+                suspension_checker: None,
+                membership_resolver: None,
+                sdis_service: None,
+            };
+            me_test_app!(ctx, $caller)
+        }};
+    }
+
+    /// Create a single-domain governance manager with the caller as a member.
+    async fn single_domain_mgr(
+        caller: &Did,
+        domain_str: &str,
+    ) -> (Arc<GovernanceManager>, GovernanceDomainId) {
+        let mgr = Arc::new(GovernanceManager::new());
+        let domain_id = GovernanceDomainId(domain_str.to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            format!("{domain_str}-coop"),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 51, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![caller.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+        (mgr, domain_id)
+    }
+
+    #[actix_web::test]
+    async fn my_work_filter_by_status() {
+        let caller = test_did(11); // seed 11 produces a valid Ed25519 point
+        let (mgr, domain_id) = single_domain_mgr(&caller, "filter-status").await;
+
+        // One pending, one completed item.
+        let pending = mgr
+            .create_action_item(
+                domain_id.clone(),
+                "Pending task".to_string(),
+                None,
+                caller.clone(),
+                Some(caller.clone()),
+                None,
+                icn_governance::ActionItemPriority::Medium,
+                None,
+                None,
+                vec![],
+            )
+            .unwrap();
+        let mut completed = mgr
+            .create_action_item(
+                domain_id.clone(),
+                "Completed task".to_string(),
+                None,
+                caller.clone(),
+                Some(caller.clone()),
+                None,
+                icn_governance::ActionItemPriority::Medium,
+                None,
+                None,
+                vec![],
+            )
+            .unwrap();
+        completed.status = icn_governance::ActionItemStatus::Completed;
+        mgr.update_action_item(&completed).unwrap();
+
+        let app = work_app!(mgr, caller.clone());
+
+        // ?status=pending → 1 item
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/me/work?status=pending")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: Vec<serde_json::Value> = test::read_body_json(resp).await;
+        assert_eq!(body.len(), 1, "only pending items");
+        assert_eq!(body[0]["id"], pending.id.to_string());
+
+        // ?status=completed → 1 item
+        let resp2 = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/me/work?status=completed")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp2.status().as_u16(), 200);
+        let body2: Vec<serde_json::Value> = test::read_body_json(resp2).await;
+        assert_eq!(body2.len(), 1, "only completed items");
+        assert_eq!(body2[0]["id"], completed.id.to_string());
+    }
+
+    #[actix_web::test]
+    async fn my_work_filter_by_priority() {
+        let caller = test_did(12); // seed 12 produces a valid Ed25519 point
+        let (mgr, domain_id) = single_domain_mgr(&caller, "filter-prio").await;
+
+        mgr.create_action_item(
+            domain_id.clone(),
+            "Low task".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            icn_governance::ActionItemPriority::Low,
+            None,
+            None,
+            vec![],
+        )
+        .unwrap();
+        let high = mgr
+            .create_action_item(
+                domain_id.clone(),
+                "High task".to_string(),
+                None,
+                caller.clone(),
+                Some(caller.clone()),
+                None,
+                icn_governance::ActionItemPriority::High,
+                None,
+                None,
+                vec![],
+            )
+            .unwrap();
+
+        let app = work_app!(mgr, caller.clone());
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/me/work?priority=high")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: Vec<serde_json::Value> = test::read_body_json(resp).await;
+        assert_eq!(body.len(), 1, "only high-priority items");
+        assert_eq!(body[0]["id"], high.id.to_string());
+    }
+
+    #[actix_web::test]
+    async fn my_work_filter_by_tag() {
+        let caller = test_did(22);
+        let (mgr, domain_id) = single_domain_mgr(&caller, "filter-tag").await;
+
+        mgr.create_action_item(
+            domain_id.clone(),
+            "Untagged".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            icn_governance::ActionItemPriority::Medium,
+            None,
+            None,
+            vec![],
+        )
+        .unwrap();
+        let tagged = mgr
+            .create_action_item(
+                domain_id.clone(),
+                "Tagged outreach".to_string(),
+                None,
+                caller.clone(),
+                Some(caller.clone()),
+                None,
+                icn_governance::ActionItemPriority::Medium,
+                None,
+                None,
+                vec!["outreach".to_string()],
+            )
+            .unwrap();
+
+        let app = work_app!(mgr, caller.clone());
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/me/work?tag=outreach")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: Vec<serde_json::Value> = test::read_body_json(resp).await;
+        assert_eq!(body.len(), 1, "only items tagged 'outreach'");
+        assert_eq!(body[0]["id"], tagged.id.to_string());
+    }
+
+    #[actix_web::test]
+    async fn my_work_filter_overdue() {
+        let caller = test_did(23);
+        let (mgr, domain_id) = single_domain_mgr(&caller, "filter-overdue").await;
+
+        // Past due_date (10s in the past).
+        let now = icn_time::current_timestamp_secs();
+        let mut overdue = mgr
+            .create_action_item(
+                domain_id.clone(),
+                "Overdue task".to_string(),
+                None,
+                caller.clone(),
+                Some(caller.clone()),
+                None,
+                icn_governance::ActionItemPriority::High,
+                None,
+                None,
+                vec![],
+            )
+            .unwrap();
+        overdue.due_date = Some(now.saturating_sub(10));
+        mgr.update_action_item(&overdue).unwrap();
+
+        // No due_date — not overdue.
+        mgr.create_action_item(
+            domain_id.clone(),
+            "No deadline".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            icn_governance::ActionItemPriority::Low,
+            None,
+            None,
+            vec![],
+        )
+        .unwrap();
+
+        let app = work_app!(mgr, caller.clone());
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/me/work?overdue=true")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: Vec<serde_json::Value> = test::read_body_json(resp).await;
+        assert_eq!(body.len(), 1, "only overdue items");
+        assert_eq!(body[0]["id"], overdue.id.to_string());
+    }
+
+    #[actix_web::test]
+    async fn my_work_sorted_oldest_first() {
+        let caller = test_did(10); // seed 10 produces a valid Ed25519 point
+        let (mgr, domain_id) = single_domain_mgr(&caller, "filter-sort").await;
+
+        let mut first = mgr
+            .create_action_item(
+                domain_id.clone(),
+                "Old task".to_string(),
+                None,
+                caller.clone(),
+                Some(caller.clone()),
+                None,
+                icn_governance::ActionItemPriority::Medium,
+                None,
+                None,
+                vec![],
+            )
+            .unwrap();
+        let mut second = mgr
+            .create_action_item(
+                domain_id.clone(),
+                "New task".to_string(),
+                None,
+                caller.clone(),
+                Some(caller.clone()),
+                None,
+                icn_governance::ActionItemPriority::Medium,
+                None,
+                None,
+                vec![],
+            )
+            .unwrap();
+
+        // Force deterministic timestamps independent of wall clock.
+        first.created_at = 1_000;
+        second.created_at = 2_000;
+        mgr.update_action_item(&first).unwrap();
+        mgr.update_action_item(&second).unwrap();
+
+        let app = work_app!(mgr, caller.clone());
+        let resp =
+            test::call_service(&app, test::TestRequest::get().uri("/me/work").to_request()).await;
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: Vec<serde_json::Value> = test::read_body_json(resp).await;
+        assert_eq!(body.len(), 2);
+        assert_eq!(
+            body[0]["id"],
+            first.id.to_string(),
+            "oldest item must be first"
+        );
+        assert_eq!(
+            body[1]["id"],
+            second.id.to_string(),
+            "newest item must be last"
+        );
+    }
+
+    // ── Governance-to-execution bridge tests ─────────────────────────────────
+
+    /// Proves: when a proposal with `action_items_on_accept` is accepted via
+    /// `close_proposal`, the specs are materialized as concrete `ActionItem`s
+    /// with correct provenance (`linked_proposal` set to the proposal ID).
+    ///
+    /// This tests the standalone/in-memory path (no actor). The actor path is
+    /// tested separately in `actor.rs`. Both paths must produce the same result.
+    #[tokio::test]
+    async fn accepted_proposal_materializes_action_items() {
+        // Seeds 1 and 2 produce valid Ed25519 compressed points.
+        let member_did = test_did(1);
+        let assignee_did = test_did(2);
+        let mgr = Arc::new(GovernanceManager::new());
+        let domain_id = GovernanceDomainId("bridge-test-coop".to_string());
+
+        // quorum=0, approval=0 → any close is Accepted.
+        mgr.create_domain(
+            domain_id.clone(),
+            "Bridge Test Coop".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 0, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Proposal with two obligation specs.
+        let proposal_id = icn_governance::ProposalId("obligation-proposal-1".to_string());
+        let specs = vec![
+            icn_governance::ActionItemSpec {
+                title: "Send meeting recap to members".to_string(),
+                description: Some("Within 48h of decision".to_string()),
+                assignee: Some(assignee_did.clone()),
+                due_offset_seconds: Some(48 * 3600),
+                priority: icn_governance::ActionItemPriority::High,
+                tags: vec!["comms".to_string()],
+            },
+            icn_governance::ActionItemSpec {
+                title: "Update website".to_string(),
+                description: None,
+                assignee: None,
+                due_offset_seconds: None,
+                priority: icn_governance::ActionItemPriority::Medium,
+                tags: vec![],
+            },
+        ];
+
+        mgr.create_proposal_with_actions(
+            proposal_id.clone(),
+            domain_id.clone(),
+            member_did.clone(),
+            "Accepted Proposal".to_string(),
+            String::new(),
+            icn_governance::ProposalPayload::Text {
+                body: "obligation test".to_string(),
+            },
+            icn_governance::ProposalScope::Local,
+            specs,
+        )
+        .await
+        .unwrap();
+
+        // Open → Vote For → close (quorum=0, approval=0 → Accepted).
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            icn_governance::VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        // Verify action items were materialized.
+        let filter = icn_governance::ActionItemFilter {
+            linked_proposal: Some(proposal_id.clone()),
+            ..Default::default()
+        };
+        let items = mgr.list_action_items(&domain_id, &filter).unwrap();
+        assert_eq!(items.len(), 2, "two specs → two ActionItems");
+
+        // Find the "recap" item by title.
+        let recap = items
+            .iter()
+            .find(|i| i.title.contains("recap"))
+            .expect("recap item must exist");
+
+        assert_eq!(recap.linked_proposal.as_ref(), Some(&proposal_id));
+        assert_eq!(recap.assignee.as_ref(), Some(&assignee_did));
+        assert_eq!(recap.priority, icn_governance::ActionItemPriority::High);
+        assert!(recap.tags.contains(&"comms".to_string()));
+        // due_date = creation time + 48h offset
+        assert_eq!(
+            recap.due_date,
+            Some(recap.created_at.saturating_add(48 * 3600)),
+            "due_date must equal created_at + due_offset_seconds"
+        );
+    }
+
+    /// Proves: a rejected proposal does NOT create action items.
+    #[tokio::test]
+    async fn rejected_proposal_does_not_materialize_action_items() {
+        let member_did = test_did(3);
+        let mgr = Arc::new(GovernanceManager::new());
+        let domain_id = GovernanceDomainId("reject-test-coop".to_string());
+
+        // quorum=0, approval=100 → any close is Rejected.
+        mgr.create_domain(
+            domain_id.clone(),
+            "Reject Test Coop".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 100, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = icn_governance::ProposalId("reject-proposal-1".to_string());
+        let specs = vec![icn_governance::ActionItemSpec {
+            title: "This must not appear".to_string(),
+            description: None,
+            assignee: None,
+            due_offset_seconds: None,
+            priority: icn_governance::ActionItemPriority::Medium,
+            tags: vec![],
+        }];
+
+        mgr.create_proposal_with_actions(
+            proposal_id.clone(),
+            domain_id.clone(),
+            member_did.clone(),
+            "Rejected Proposal".to_string(),
+            String::new(),
+            icn_governance::ProposalPayload::Text {
+                body: "rejection test".to_string(),
+            },
+            icn_governance::ProposalScope::Local,
+            specs,
+        )
+        .await
+        .unwrap();
+
+        // Open → Vote Against → close (quorum=0, approval=100 → Rejected).
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            icn_governance::VoteChoice::Against,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        let filter = icn_governance::ActionItemFilter {
+            linked_proposal: Some(proposal_id.clone()),
+            ..Default::default()
+        };
+        let items = mgr.list_action_items(&domain_id, &filter).unwrap();
+        assert_eq!(
+            items.len(),
+            0,
+            "rejected proposal must not produce ActionItems"
+        );
     }
 }

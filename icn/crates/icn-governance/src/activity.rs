@@ -103,6 +103,13 @@ pub struct Activity {
     #[serde(default)]
     pub linked_structures: Vec<StructureId>,
 
+    /// Unix timestamp when the activity was created
+    pub created_at: Timestamp,
+
+    /// If proposal-backed, the proposal that authorized creation
+    #[serde(default)]
+    pub created_by_decision: Option<ProposalId>,
+
     /// Optional link to the parent `Program` that this activity executes within.
     ///
     /// An `Event` activity (e.g., "NY Cooperative Summit 2026") can point to the
@@ -110,15 +117,13 @@ pub struct Activity {
     /// dashboards and the work-spine display without requiring a second round-trip.
     ///
     /// `None` is valid — stand-alone activities with no program affiliation are common.
+    ///
+    /// **Field ordering note**: This field is intentionally placed AFTER `created_at` and
+    /// `created_by_decision`. ICN uses postcard (positional) binary encoding for persistence;
+    /// new optional fields must be appended to preserve backward compatibility with records
+    /// written before this field existed. Old records decode with `parent_program_id = None`.
     #[serde(default)]
     pub parent_program_id: Option<ProgramId>,
-
-    /// Unix timestamp when the activity was created
-    pub created_at: Timestamp,
-
-    /// If proposal-backed, the proposal that authorized creation
-    #[serde(default)]
-    pub created_by_decision: Option<ProposalId>,
 }
 
 impl Activity {
@@ -140,9 +145,9 @@ impl Activity {
             start_date: None,
             end_date: None,
             linked_structures: Vec::new(),
-            parent_program_id: None,
             created_at: now,
             created_by_decision: None,
+            parent_program_id: None,
         }
     }
 
@@ -361,6 +366,65 @@ mod tests {
         }"#;
         let b: Activity = serde_json::from_str(minimal).unwrap();
         assert!(b.parent_program_id.is_none());
+    }
+
+    /// Documents the postcard compat boundary: old Activity records (written before
+    /// `parent_program_id` was added) cannot be decoded directly as the new `Activity`
+    /// struct because postcard uses positional encoding and will return
+    /// `DeserializeUnexpectedEnd` when the trailing field is absent.
+    ///
+    /// The `SledActivityStore` in `apps/governance` handles this via a V0 fallback:
+    /// it decodes as `ActivityV0` on failure, then converts with `parent_program_id: None`.
+    /// See `decode_activity_with_migration` in `apps/governance/src/manager.rs`.
+    #[test]
+    fn test_activity_postcard_old_layout_needs_migration() {
+        /// Mirrors the Activity field layout BEFORE `parent_program_id` was added.
+        /// Do NOT update this struct when Activity changes — it intentionally
+        /// represents the OLD on-disk format to produce old-format bytes.
+        #[derive(serde::Serialize, serde::Deserialize)]
+        struct ActivityV0 {
+            id: ActivityId,
+            parent_entity_id: String,
+            kind: ActivityKind,
+            name: String,
+            description: Option<String>,
+            status: ActivityStatus,
+            start_date: Option<Timestamp>,
+            end_date: Option<Timestamp>,
+            linked_structures: Vec<StructureId>,
+            created_at: Timestamp,
+            created_by_decision: Option<ProposalId>,
+        }
+
+        let old = ActivityV0 {
+            id: ActivityId::from_raw("legacy-summit"),
+            parent_entity_id: "nycn".to_string(),
+            kind: ActivityKind::Event,
+            name: "Legacy Event".to_string(),
+            description: None,
+            status: ActivityStatus::Planned,
+            start_date: None,
+            end_date: None,
+            linked_structures: vec![],
+            created_at: 9999,
+            created_by_decision: None,
+        };
+
+        let bytes = icn_encoding::encode_versioned(&old).expect("encode old layout");
+
+        // Direct decode fails — postcard returns DeserializeUnexpectedEnd because
+        // `parent_program_id` bytes are absent.
+        let direct_result = icn_encoding::decode_versioned::<Activity>(&bytes);
+        assert!(
+            direct_result.is_err(),
+            "expected DeserializeUnexpectedEnd; old records REQUIRE migration in the Sled store"
+        );
+
+        // V0 decode still works (migration fallback path).
+        let v0: ActivityV0 =
+            icn_encoding::decode_versioned(&bytes).expect("decode as ActivityV0 must succeed");
+        assert_eq!(v0.id.0, "legacy-summit");
+        assert_eq!(v0.created_at, 9999);
     }
 
     #[test]
