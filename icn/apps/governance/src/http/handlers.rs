@@ -3638,6 +3638,81 @@ pub async fn update_milestone_status<E: GovernanceEventEmitter + Clone + 'static
     Ok(HttpResponse::Ok().json(milestone_to_response(&m)))
 }
 
+// ── Program ↔ Activity relationship management ────────────────────────────────
+
+/// PUT /gov/programs/{program_id}/activities/{activity_id}
+///
+/// Link an activity to a program, keeping `Program.activities` and
+/// `Activity.parent_program_id` in sync. Idempotent — calling this when the
+/// relationship already exists returns 204 without error.
+///
+/// Requires `governance:write` scope. The caller must be a member of the
+/// program's governance domain.
+pub async fn link_activity_to_program<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let (program_id_str, activity_id_str) = path.into_inner();
+    let pid = ProgramId(program_id_str);
+    let aid = ActivityId(activity_id_str);
+    let actor = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    let prog = ctx
+        .manager
+        .get_program(&pid)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found"))?;
+    check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
+
+    ctx.manager
+        .link_activity_to_program(&pid, &aid)
+        .map_err(|e| {
+            // link_activity_to_program returns an error if the activity doesn't exist
+            if e.to_string().contains("not found") {
+                err_not_found(e.to_string())
+            } else {
+                anyhow_to_api(e)
+            }
+        })?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+/// DELETE /gov/programs/{program_id}/activities/{activity_id}
+///
+/// Remove the link between a program and an activity. Clears both
+/// `Program.activities` and `Activity.parent_program_id`. Idempotent —
+/// returns 204 whether or not the relationship existed.
+///
+/// Requires `governance:write` scope. The caller must be a member of the
+/// program's governance domain.
+pub async fn unlink_activity_from_program<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let (program_id_str, activity_id_str) = path.into_inner();
+    let pid = ProgramId(program_id_str);
+    let aid = ActivityId(activity_id_str);
+    let actor = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    let prog = ctx
+        .manager
+        .get_program(&pid)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found"))?;
+    check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
+
+    ctx.manager
+        .unlink_activity_from_program(&pid, &aid)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
 // ── Program dashboard ─────────────────────────────────────────────────────────
 
 fn dashboard_milestone_summary(m: &icn_governance::Milestone) -> DashboardMilestoneSummary {
