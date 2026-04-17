@@ -10,6 +10,9 @@ publish = false
 # Kernel API for EventEmitter trait and SystemEvent types
 icn-kernel-api = { path = "../../crates/icn-kernel-api" }
 
+# CCL expression types (for milestone gate API and tests)
+icn-ccl = { path = "../../crates/icn-ccl" }
+
 # Governance domain types (proposals, votes, domains, etc.)
 icn-governance = { path = "../../crates/icn-governance" }
 

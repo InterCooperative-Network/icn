@@ -302,6 +302,29 @@ pub struct Milestone {
     #[serde(default)]
     pub completion_criteria: Vec<String>,
 
+    /// Optional CCL boolean expression that gates milestone completion,
+    /// stored as a JSON-encoded `icn_ccl::Expr` string.
+    ///
+    /// When present, the expression is parsed and evaluated before the
+    /// status is changed to `Completed`.  If it evaluates to `false` the
+    /// completion is rejected.  If absent, no evaluation is performed and
+    /// completion proceeds as before.
+    ///
+    /// Stored as `Option<String>` (JSON-encoded) so the field is
+    /// postcard-safe for Sled persistence.  Use
+    /// [`crate::milestone_gate::parse_gate`] to obtain a typed `Expr`.
+    ///
+    /// The gate context exposes two named variables (see
+    /// [`crate::milestone_gate::MilestoneGateContext`]):
+    /// - `criteria_count: Int` — `completion_criteria.len()`
+    /// - `phase_index: Int` — this milestone's `phase_index`
+    ///
+    /// Only pure read-only boolean predicates are supported in this first
+    /// slice; ledger access, state writes, and function calls are not
+    /// permitted.
+    #[serde(default)]
+    pub completion_gate: Option<String>,
+
     /// Unix timestamp when the milestone was marked completed (if it has).
     #[serde(default)]
     pub completed_at: Option<Timestamp>,
@@ -332,6 +355,7 @@ impl Milestone {
             target_date: None,
             status: MilestoneStatus::Pending,
             completion_criteria: Vec::new(),
+            completion_gate: None,
             completed_at: None,
             completed_by: None,
             created_at: now,

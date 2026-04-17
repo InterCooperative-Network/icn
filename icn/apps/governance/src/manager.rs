@@ -4179,6 +4179,32 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Failed to get milestone: {e}"))
     }
 
+    /// Set or clear the optional CCL completion gate on a milestone.
+    ///
+    /// The expression is JSON-serialized so it can be stored in the
+    /// postcard-encoded Sled record.  Pass `None` to remove the gate.
+    pub fn set_milestone_gate(
+        &self,
+        id: &MilestoneId,
+        gate: Option<icn_ccl::Expr>,
+    ) -> Result<Milestone> {
+        let mut m = self
+            .milestone_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to get milestone: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Milestone not found: {id}"))?;
+        m.completion_gate = gate
+            .map(|expr| {
+                serde_json::to_string(&expr)
+                    .map_err(|e| anyhow::anyhow!("Failed to serialize gate: {e}"))
+            })
+            .transpose()?;
+        self.milestone_store
+            .save(&m)
+            .map_err(|e| anyhow::anyhow!("Failed to save milestone: {e}"))?;
+        Ok(m)
+    }
+
     /// List milestones belonging to a program, ordered by phase_index.
     pub fn list_milestones_by_program(&self, program_id: &ProgramId) -> Result<Vec<Milestone>> {
         self.milestone_store
@@ -4192,6 +4218,11 @@ impl GovernanceManager {
     /// milestone moves into `Completed`, the actor is recorded as
     /// `completed_by` for audit. When the milestone is reopened, both
     /// `completed_at` and `completed_by` are cleared.
+    ///
+    /// If the milestone has a `completion_gate`, it is evaluated before the
+    /// status is changed to `Completed`.  A gate that returns `false`
+    /// produces an error and leaves the milestone unchanged.  Gates are not
+    /// evaluated for any other status transition.
     pub fn update_milestone_status(
         &self,
         id: &MilestoneId,
@@ -4205,7 +4236,25 @@ impl GovernanceManager {
             .ok_or_else(|| anyhow::anyhow!("Milestone not found: {id}"))?;
 
         if status == MilestoneStatus::Completed {
+            // Evaluate the optional CCL gate before accepting the transition.
             if m.status != MilestoneStatus::Completed {
+                if let Some(gate_json) = &m.completion_gate {
+                    // Parse the JSON-encoded Expr (stored as String for
+                    // postcard compatibility) and evaluate it.
+                    let gate_expr = icn_governance::milestone_gate::parse_gate(gate_json)
+                        .map_err(|e| anyhow::anyhow!("{e}"))?;
+                    let gate_ctx = icn_governance::milestone_gate::MilestoneGateContext {
+                        criteria_count: m.completion_criteria.len() as i64,
+                        phase_index: m.phase_index as i64,
+                        actor: actor.clone(),
+                        now: icn_time::current_timestamp_secs(),
+                    };
+                    icn_governance::milestone_gate::evaluate_milestone_gate(
+                        Some(&gate_expr),
+                        &gate_ctx,
+                    )
+                    .map_err(|e| anyhow::anyhow!("{e}"))?;
+                }
                 m.completed_at = Some(icn_time::current_timestamp_secs());
                 m.completed_by = Some(actor.clone());
             }
@@ -5343,5 +5392,207 @@ mod tests {
             1,
             "new assignee must appear in index"
         );
+    }
+
+    // =========================================================================
+    // Milestone completion gate tests (manager integration)
+    // =========================================================================
+
+    /// Completing a milestone with no gate must proceed as before.
+    #[tokio::test]
+    async fn milestone_completion_no_gate_succeeds() {
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "P".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        let m = mgr
+            .create_milestone(prog.id.clone(), "M".into(), None, 0, None, vec![])
+            .unwrap();
+
+        let updated = mgr
+            .update_milestone_status(&m.id, MilestoneStatus::Completed, &member)
+            .unwrap();
+        assert_eq!(updated.status, MilestoneStatus::Completed);
+        assert!(updated.completed_at.is_some());
+        assert_eq!(updated.completed_by.as_ref(), Some(&member));
+    }
+
+    /// Completing a milestone whose gate evaluates true must succeed.
+    #[tokio::test]
+    async fn milestone_completion_gate_true_succeeds() {
+        use icn_ccl::types::Value;
+        use icn_ccl::{BinOp, Expr};
+
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "P".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Gate: criteria_count >= 1. We'll create 2 criteria → passes.
+        let gate = Expr::BinOp {
+            op: BinOp::Ge,
+            left: Box::new(Expr::Var("criteria_count".into())),
+            right: Box::new(Expr::Literal(Value::Int(1))),
+        };
+
+        let m = mgr
+            .create_milestone(
+                prog.id.clone(),
+                "M".into(),
+                None,
+                0,
+                None,
+                vec!["Criterion A".into(), "Criterion B".into()],
+            )
+            .unwrap();
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        let updated = mgr
+            .update_milestone_status(&m.id, MilestoneStatus::Completed, &member)
+            .unwrap();
+        assert_eq!(updated.status, MilestoneStatus::Completed);
+    }
+
+    /// Completing a milestone whose gate evaluates false must return an error
+    /// and leave the milestone unchanged.
+    #[tokio::test]
+    async fn milestone_completion_gate_false_blocks() {
+        use icn_ccl::types::Value;
+        use icn_ccl::{BinOp, Expr};
+
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "P".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Gate: criteria_count >= 3. We'll create 0 criteria → fails.
+        let gate = Expr::BinOp {
+            op: BinOp::Ge,
+            left: Box::new(Expr::Var("criteria_count".into())),
+            right: Box::new(Expr::Literal(Value::Int(3))),
+        };
+
+        let m = mgr
+            .create_milestone(prog.id.clone(), "M".into(), None, 0, None, vec![])
+            .unwrap();
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        let result = mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &member);
+        assert!(result.is_err(), "gate should have blocked completion");
+
+        // Milestone must be unmodified.
+        let reloaded = mgr.get_milestone(&m.id).unwrap().unwrap();
+        assert_eq!(
+            reloaded.status,
+            MilestoneStatus::Pending,
+            "status must not change when gate blocks"
+        );
+        assert!(
+            reloaded.completed_at.is_none(),
+            "completed_at must not be set when gate blocks"
+        );
+    }
+
+    /// A gate with a CCL syntax / evaluation error (e.g. unknown variable)
+    /// must return a clear error, not panic or silently succeed.
+    #[tokio::test]
+    async fn milestone_completion_gate_eval_error_is_surfaced() {
+        use icn_ccl::types::Value;
+        use icn_ccl::{BinOp, Expr};
+
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "P".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Gate references a variable that is not in the context.
+        let gate = Expr::BinOp {
+            op: BinOp::Ge,
+            left: Box::new(Expr::Var("no_such_variable".into())),
+            right: Box::new(Expr::Literal(Value::Int(1))),
+        };
+
+        let m = mgr
+            .create_milestone(prog.id.clone(), "M".into(), None, 0, None, vec![])
+            .unwrap();
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        let result = mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &member);
+        assert!(
+            result.is_err(),
+            "unknown variable in gate should produce an error"
+        );
+    }
+
+    /// Non-completion status transitions (e.g. InProgress) must NOT evaluate
+    /// the gate even when one is present.
+    #[tokio::test]
+    async fn milestone_gate_not_evaluated_for_non_completion_transitions() {
+        use icn_ccl::types::Value;
+        use icn_ccl::Expr;
+
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "P".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        // A gate that would always block (literal false).
+        let gate = Expr::Literal(Value::Bool(false));
+
+        let m = mgr
+            .create_milestone(prog.id.clone(), "M".into(), None, 0, None, vec![])
+            .unwrap();
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        // Transitioning to InProgress must succeed even though the gate would block.
+        let updated = mgr
+            .update_milestone_status(&m.id, MilestoneStatus::InProgress, &member)
+            .unwrap();
+        assert_eq!(updated.status, MilestoneStatus::InProgress);
     }
 }

@@ -85,6 +85,7 @@ pub mod action_item;
 // Institutional structure + event model (Tranche 2)
 pub mod activity;
 pub mod meeting;
+pub mod milestone_gate;
 pub mod parent;
 pub mod program;
 pub mod structure;
