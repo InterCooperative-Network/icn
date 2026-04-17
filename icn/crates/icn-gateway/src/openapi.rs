@@ -16,6 +16,12 @@ use crate::models::{
     UpdateRoleRequest, UpdateSettingsRequest, VerifyRequest, VoteChoiceResponse,
 };
 
+// Governance actor milestone models (for schema registration and doc stubs)
+use icn_governance_actor::http::models::{
+    CreateMilestoneRequest, MilestoneResponse, SetMilestoneGateRequest,
+    UpdateMilestoneStatusRequest,
+};
+
 // API module types
 use crate::api::charter::{
     CharterDetailResponse, CharterSummaryResponse, CreateCharterRequest, FounderDetailResponse,
@@ -45,10 +51,132 @@ use crate::api::steward::{
 use crate::identity_mgr::DeviceInfo;
 use crate::notification_store::{InAppNotification, Platform};
 
+/// Non-generic documentation stubs for milestone endpoints.
+///
+/// The real handlers are generic over `GovernanceEventEmitter` which prevents
+/// `#[utoipa::path]` from being referenced in `paths(...)` directly. These
+/// stubs carry the path metadata; the types are resolved via schema registration.
+mod milestone_paths {
+    use icn_governance_actor::http::models::{
+        CreateMilestoneRequest, MilestoneResponse, SetMilestoneGateRequest,
+        UpdateMilestoneStatusRequest,
+    };
+
+    /// POST /gov/programs/{program_id}/milestones — create a milestone.
+    #[utoipa::path(
+        post,
+        path = "/gov/programs/{program_id}/milestones",
+        tag = "milestones",
+        params(
+            ("program_id" = String, Path, description = "Program ID")
+        ),
+        request_body = CreateMilestoneRequest,
+        responses(
+            (status = 201, body = MilestoneResponse, description = "Milestone created"),
+            (status = 400, description = "Bad request — invalid gate expression or empty name"),
+            (status = 401, description = "Unauthorized"),
+            (status = 403, description = "Caller is not a member of the program's domain"),
+            (status = 404, description = "Program not found"),
+        ),
+        security(("bearer_auth" = []))
+    )]
+    #[allow(dead_code)]
+    pub(super) async fn create_milestone() {}
+
+    /// GET /gov/milestones/{milestone_id} — get a specific milestone.
+    #[utoipa::path(
+        get,
+        path = "/gov/milestones/{milestone_id}",
+        tag = "milestones",
+        params(
+            ("milestone_id" = String, Path, description = "Milestone ID")
+        ),
+        responses(
+            (status = 200, body = MilestoneResponse, description = "Milestone detail"),
+            (status = 401, description = "Unauthorized"),
+            (status = 404, description = "Milestone not found"),
+        ),
+        security(("bearer_auth" = []))
+    )]
+    #[allow(dead_code)]
+    pub(super) async fn get_milestone() {}
+
+    /// GET /gov/programs/{program_id}/milestones — list milestones for a program.
+    #[utoipa::path(
+        get,
+        path = "/gov/programs/{program_id}/milestones",
+        tag = "milestones",
+        params(
+            ("program_id" = String, Path, description = "Program ID")
+        ),
+        responses(
+            (status = 200, body = Vec<MilestoneResponse>, description = "Ordered milestone list"),
+            (status = 401, description = "Unauthorized"),
+            (status = 404, description = "Program not found"),
+        ),
+        security(("bearer_auth" = []))
+    )]
+    #[allow(dead_code)]
+    pub(super) async fn list_milestones_by_program() {}
+
+    /// PATCH /gov/milestones/{milestone_id} — update milestone status.
+    #[utoipa::path(
+        patch,
+        path = "/gov/milestones/{milestone_id}",
+        tag = "milestones",
+        params(
+            ("milestone_id" = String, Path, description = "Milestone ID")
+        ),
+        request_body = UpdateMilestoneStatusRequest,
+        responses(
+            (status = 200, body = MilestoneResponse, description = "Milestone updated"),
+            (status = 400, description = "Invalid status or gate blocked completion"),
+            (status = 401, description = "Unauthorized"),
+            (status = 403, description = "Caller is not a member of the program's domain"),
+            (status = 404, description = "Milestone not found"),
+        ),
+        security(("bearer_auth" = []))
+    )]
+    #[allow(dead_code)]
+    pub(super) async fn update_milestone_status() {}
+
+    /// PUT /gov/milestones/{milestone_id}/gate — set or clear the CCL completion gate.
+    ///
+    /// Accepts a JSON-encoded `icn_ccl::Expr` object to install a gate, or `null` /
+    /// an absent field to remove any existing gate. The expression is validated
+    /// immediately; a malformed expression is rejected with 400.
+    #[utoipa::path(
+        put,
+        path = "/gov/milestones/{milestone_id}/gate",
+        tag = "milestones",
+        params(
+            ("milestone_id" = String, Path, description = "Milestone ID")
+        ),
+        request_body = SetMilestoneGateRequest,
+        responses(
+            (status = 200, body = MilestoneResponse, description = "Gate installed or cleared"),
+            (status = 400, description = "Invalid CCL gate expression"),
+            (status = 401, description = "Unauthorized"),
+            (status = 403, description = "Caller is not a member of the program's domain"),
+            (status = 404, description = "Milestone not found"),
+        ),
+        security(("bearer_auth" = []))
+    )]
+    #[allow(dead_code)]
+    pub(super) async fn set_milestone_gate() {}
+}
+
 /// OpenAPI documentation for ICN Gateway
 #[derive(OpenApi)]
 #[openapi(
-    paths(crate::api::federation::propose_clearing_adoption),
+    paths(
+        crate::api::federation::propose_clearing_adoption,
+        milestone_paths::create_milestone,
+        milestone_paths::get_milestone,
+        milestone_paths::list_milestones_by_program,
+        milestone_paths::update_milestone_status,
+        milestone_paths::set_milestone_gate,
+    ),
     info(
         title = "ICN Gateway API",
         version = "0.1.0",
@@ -119,6 +247,9 @@ use crate::notification_store::{InAppNotification, Platform};
             ProposeAdoptionRequest, ProposeAdoptionResponse,
             // Shared types
             DeviceInfo, Platform, InAppNotification,
+            // Milestones
+            CreateMilestoneRequest, UpdateMilestoneStatusRequest,
+            SetMilestoneGateRequest, MilestoneResponse,
         )
     ),
     tags(
@@ -137,6 +268,7 @@ use crate::notification_store::{InAppNotification, Platform};
         (name = "charter", description = "Charter creation and management"),
         (name = "steward", description = "Steward management and attestations"),
         (name = "devices", description = "Multi-device management"),
+        (name = "milestones", description = "Program milestone tracking with CCL completion gates"),
     )
 )]
 pub struct ApiDoc;

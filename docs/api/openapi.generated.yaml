@@ -82,6 +82,170 @@ paths:
           description: Internal server error
       security:
       - bearer_auth: []
+  /gov/milestones/{milestone_id}:
+    get:
+      tags:
+      - milestones
+      summary: GET /gov/milestones/{milestone_id} — get a specific milestone.
+      operationId: get_milestone
+      parameters:
+      - name: milestone_id
+        in: path
+        description: Milestone ID
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Milestone detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MilestoneResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Milestone not found
+      security:
+      - bearer_auth: []
+    patch:
+      tags:
+      - milestones
+      summary: PATCH /gov/milestones/{milestone_id} — update milestone status.
+      operationId: update_milestone_status
+      parameters:
+      - name: milestone_id
+        in: path
+        description: Milestone ID
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMilestoneStatusRequest'
+        required: true
+      responses:
+        '200':
+          description: Milestone updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MilestoneResponse'
+        '400':
+          description: Invalid status or gate blocked completion
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not a member of the program's domain
+        '404':
+          description: Milestone not found
+      security:
+      - bearer_auth: []
+  /gov/milestones/{milestone_id}/gate:
+    put:
+      tags:
+      - milestones
+      summary: PUT /gov/milestones/{milestone_id}/gate — set or clear the CCL completion gate.
+      description: |-
+        Accepts a JSON-encoded `icn_ccl::Expr` object to install a gate, or `null` /
+        an absent field to remove any existing gate. The expression is validated
+        immediately; a malformed expression is rejected with 400.
+      operationId: set_milestone_gate
+      parameters:
+      - name: milestone_id
+        in: path
+        description: Milestone ID
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetMilestoneGateRequest'
+        required: true
+      responses:
+        '200':
+          description: Gate installed or cleared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MilestoneResponse'
+        '400':
+          description: Invalid CCL gate expression
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not a member of the program's domain
+        '404':
+          description: Milestone not found
+      security:
+      - bearer_auth: []
+  /gov/programs/{program_id}/milestones:
+    get:
+      tags:
+      - milestones
+      summary: GET /gov/programs/{program_id}/milestones — list milestones for a program.
+      operationId: list_milestones_by_program
+      parameters:
+      - name: program_id
+        in: path
+        description: Program ID
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Ordered milestone list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MilestoneResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Program not found
+      security:
+      - bearer_auth: []
+    post:
+      tags:
+      - milestones
+      summary: POST /gov/programs/{program_id}/milestones — create a milestone.
+      operationId: create_milestone
+      parameters:
+      - name: program_id
+        in: path
+        description: Program ID
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMilestoneRequest'
+        required: true
+      responses:
+        '201':
+          description: Milestone created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MilestoneResponse'
+        '400':
+          description: Bad request — invalid gate expression or empty name
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not a member of the program's domain
+        '404':
+          description: Program not found
+      security:
+      - bearer_auth: []
 components:
   schemas:
     AccountDeltaResponse:
@@ -550,6 +714,44 @@ components:
         role:
           type: string
           description: 'Role for the invitee: "member", "admin", "participant", "facilitator"'
+    CreateMilestoneRequest:
+      type: object
+      description: Request to create a milestone
+      required:
+      - name
+      properties:
+        completion_criteria:
+          type: array
+          items:
+            type: string
+          description: Free-form checklist of completion criteria
+        completion_gate:
+          type:
+          - object
+          - 'null'
+          description: |-
+            Optional CCL completion gate expression (JSON-encoded `icn_ccl::Expr`).
+            When present the gate is validated immediately; a malformed expression
+            causes the whole create request to be rejected with 400.
+        description:
+          type:
+          - string
+          - 'null'
+        name:
+          type: string
+        phase_index:
+          type: integer
+          format: int32
+          description: Ordinal position among the program's milestones (0-based)
+          minimum: 0
+        target_date:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: Optional target date as Unix timestamp
+          minimum: 0
+      additionalProperties: false
     CreateProposalRequest:
       type: object
       description: Create a new proposal
@@ -1071,6 +1273,66 @@ components:
           type: string
         jurisdiction_id:
           type: string
+    MilestoneResponse:
+      type: object
+      description: Milestone response
+      required:
+      - id
+      - programId
+      - name
+      - phaseIndex
+      - status
+      - completionCriteria
+      - createdAt
+      properties:
+        completedAt:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        completedBy:
+          type:
+          - string
+          - 'null'
+        completionCriteria:
+          type: array
+          items:
+            type: string
+        completionGate:
+          type:
+          - object
+          - 'null'
+          description: |-
+            The active CCL completion gate expression, if any.
+            Returned as a JSON object (the `icn_ccl::Expr` tree) so clients can
+            inspect or display it without additional decoding.
+        createdAt:
+          type: integer
+          format: int64
+          minimum: 0
+        description:
+          type:
+          - string
+          - 'null'
+        id:
+          type: string
+        name:
+          type: string
+        phaseIndex:
+          type: integer
+          format: int32
+          minimum: 0
+        programId:
+          type: string
+        status:
+          type: string
+        targetDate:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
     NotificationCountResponse:
       type: object
       description: Response for notification count
@@ -1468,6 +1730,24 @@ components:
           format: int64
           description: Token expiry in seconds (only present when status is "approved")
           minimum: 0
+    SetMilestoneGateRequest:
+      type: object
+      description: |-
+        Request to set or clear the CCL completion gate on a milestone.
+
+        `PUT /gov/milestones/{milestone_id}/gate`
+
+        Set `completion_gate` to a JSON-encoded `icn_ccl::Expr` object to install a
+        gate.  Set it to `null` (or omit the field) to remove an existing gate.
+      properties:
+        completion_gate:
+          type:
+          - object
+          - 'null'
+          description: |-
+            The CCL gate expression as a JSON object matching `icn_ccl::Expr`, or
+            `null` to remove the gate.
+      additionalProperties: false
     SignCharterRequest:
       type: object
       description: Sign charter request
@@ -1720,6 +2000,16 @@ components:
           - 'null'
         status:
           type: string
+    UpdateMilestoneStatusRequest:
+      type: object
+      description: Request to update a milestone's status
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          description: 'Status: "pending", "in_progress", "completed", "blocked", "skipped"'
+      additionalProperties: false
     UpdateRoleRequest:
       type: object
       description: Update member role
@@ -1820,3 +2110,5 @@ tags:
   description: Steward management and attestations
 - name: devices
   description: Multi-device management
+- name: milestones
+  description: Program milestone tracking with CCL completion gates

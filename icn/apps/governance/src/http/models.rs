@@ -839,6 +839,7 @@ pub struct CreateMilestoneRequest {
     /// When present the gate is validated immediately; a malformed expression
     /// causes the whole create request to be rejected with 400.
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[schema(value_type = Object, nullable = true)]
     pub completion_gate: Option<serde_json::Value>,
 }
 
@@ -862,6 +863,7 @@ pub struct SetMilestoneGateRequest {
     /// The CCL gate expression as a JSON object matching `icn_ccl::Expr`, or
     /// `null` to remove the gate.
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[schema(value_type = Object, nullable = true)]
     pub completion_gate: Option<serde_json::Value>,
 }
 
@@ -883,6 +885,7 @@ pub struct MilestoneResponse {
     /// Returned as a JSON object (the `icn_ccl::Expr` tree) so clients can
     /// inspect or display it without additional decoding.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Object, nullable = true)]
     pub completion_gate: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<u64>,

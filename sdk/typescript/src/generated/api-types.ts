@@ -38,6 +38,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/gov/milestones/{milestone_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /gov/milestones/{milestone_id} — get a specific milestone. */
+        get: operations["get_milestone"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** PATCH /gov/milestones/{milestone_id} — update milestone status. */
+        patch: operations["update_milestone_status"];
+        trace?: never;
+    };
+    "/gov/milestones/{milestone_id}/gate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * PUT /gov/milestones/{milestone_id}/gate — set or clear the CCL completion gate.
+         * @description Accepts a JSON-encoded `icn_ccl::Expr` object to install a gate, or `null` /
+         *     an absent field to remove any existing gate. The expression is validated
+         *     immediately; a malformed expression is rejected with 400.
+         */
+        put: operations["set_milestone_gate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gov/programs/{program_id}/milestones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /gov/programs/{program_id}/milestones — list milestones for a program. */
+        get: operations["list_milestones_by_program"];
+        put?: never;
+        /** POST /gov/programs/{program_id}/milestones — create a milestone. */
+        post: operations["create_milestone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -235,6 +293,29 @@ export interface components {
             expires_in_seconds?: number | null;
             /** @description Role for the invitee: "member", "admin", "participant", "facilitator" */
             role: string;
+        };
+        /** @description Request to create a milestone */
+        CreateMilestoneRequest: {
+            /** @description Free-form checklist of completion criteria */
+            completion_criteria?: string[];
+            /**
+             * @description Optional CCL completion gate expression (JSON-encoded `icn_ccl::Expr`).
+             *     When present the gate is validated immediately; a malformed expression
+             *     causes the whole create request to be rejected with 400.
+             */
+            completion_gate?: Record<string, never> | null;
+            description?: string | null;
+            name: string;
+            /**
+             * Format: int32
+             * @description Ordinal position among the program's milestones (0-based)
+             */
+            phase_index?: number;
+            /**
+             * Format: int64
+             * @description Optional target date as Unix timestamp
+             */
+            target_date?: number | null;
         };
         /** @description Create a new proposal */
         CreateProposalRequest: {
@@ -466,6 +547,30 @@ export interface components {
             holder_id: string;
             jurisdiction_id: string;
         };
+        /** @description Milestone response */
+        MilestoneResponse: {
+            /** Format: int64 */
+            completedAt?: number | null;
+            completedBy?: string | null;
+            completionCriteria: string[];
+            /**
+             * @description The active CCL completion gate expression, if any.
+             *     Returned as a JSON object (the `icn_ccl::Expr` tree) so clients can
+             *     inspect or display it without additional decoding.
+             */
+            completionGate?: Record<string, never> | null;
+            /** Format: int64 */
+            createdAt: number;
+            description?: string | null;
+            id: string;
+            name: string;
+            /** Format: int32 */
+            phaseIndex: number;
+            programId: string;
+            status: string;
+            /** Format: int64 */
+            targetDate?: number | null;
+        };
         /** @description Response for notification count */
         NotificationCountResponse: {
             /** @description Total notification count */
@@ -646,6 +751,21 @@ export interface components {
              */
             token_expires_in?: number | null;
         };
+        /**
+         * @description Request to set or clear the CCL completion gate on a milestone.
+         *
+         *     `PUT /gov/milestones/{milestone_id}/gate`
+         *
+         *     Set `completion_gate` to a JSON-encoded `icn_ccl::Expr` object to install a
+         *     gate.  Set it to `null` (or omit the field) to remove an existing gate.
+         */
+        SetMilestoneGateRequest: {
+            /**
+             * @description The CCL gate expression as a JSON object matching `icn_ccl::Expr`, or
+             *     `null` to remove the gate.
+             */
+            completion_gate?: Record<string, never> | null;
+        };
         /** @description Sign charter request */
         SignCharterRequest: {
             role?: string | null;
@@ -753,6 +873,11 @@ export interface components {
             reason?: string | null;
             status: string;
         };
+        /** @description Request to update a milestone's status */
+        UpdateMilestoneStatusRequest: {
+            /** @description Status: "pending", "in_progress", "completed", "blocked", "skipped" */
+            status: string;
+        };
         /** @description Update member role */
         UpdateRoleRequest: {
             /**
@@ -835,6 +960,245 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_milestone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Milestone ID */
+                milestone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Milestone detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MilestoneResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Milestone not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_milestone_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Milestone ID */
+                milestone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMilestoneStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Milestone updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MilestoneResponse"];
+                };
+            };
+            /** @description Invalid status or gate blocked completion */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Caller is not a member of the program's domain */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Milestone not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    set_milestone_gate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Milestone ID */
+                milestone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetMilestoneGateRequest"];
+            };
+        };
+        responses: {
+            /** @description Gate installed or cleared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MilestoneResponse"];
+                };
+            };
+            /** @description Invalid CCL gate expression */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Caller is not a member of the program's domain */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Milestone not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_milestones_by_program: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Program ID */
+                program_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ordered milestone list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MilestoneResponse"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Program not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_milestone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Program ID */
+                program_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMilestoneRequest"];
+            };
+        };
+        responses: {
+            /** @description Milestone created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MilestoneResponse"];
+                };
+            };
+            /** @description Bad request — invalid gate expression or empty name */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Caller is not a member of the program's domain */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Program not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
