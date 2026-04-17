@@ -266,6 +266,12 @@ pub trait StructureStoreBackend: Send + Sync {
 
     /// Delete a role assignment.
     fn delete_role(&self, id: &RoleAssignmentId) -> std::result::Result<bool, GovernanceError>;
+
+    /// List all role assignments held by a given person (cross-structure).
+    fn list_roles_by_person(
+        &self,
+        did: &icn_identity::Did,
+    ) -> std::result::Result<Vec<RoleAssignment>, GovernanceError>;
 }
 
 // ========== In-Memory Store (for tests and default config) ==========
@@ -382,6 +388,23 @@ impl StructureStoreBackend for InMemoryStructureStore {
             .write()
             .map_err(|e| GovernanceError::Internal(format!("roles lock poisoned: {e}")))?;
         Ok(guard.remove(id).is_some())
+    }
+
+    fn list_roles_by_person(
+        &self,
+        did: &icn_identity::Did,
+    ) -> std::result::Result<Vec<RoleAssignment>, GovernanceError> {
+        let guard = self
+            .roles
+            .read()
+            .map_err(|e| GovernanceError::Internal(format!("roles lock poisoned: {e}")))?;
+        let mut out: Vec<RoleAssignment> = guard
+            .values()
+            .filter(|r| &r.person_did == did)
+            .cloned()
+            .collect();
+        out.sort_by(|a, b| a.start_date.cmp(&b.start_date));
+        Ok(out)
     }
 }
 

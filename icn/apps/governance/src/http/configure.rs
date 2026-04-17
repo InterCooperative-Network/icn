@@ -444,5 +444,8 @@ where
                 .route(web::post().to(handlers::create_remove_steward_proposal::<E>)),
         )
         // ── Notification digest ──────────────────────────────────────────
-        .service(web::resource("/digest").route(web::get().to(handlers::get_digest::<E>)));
+        .service(web::resource("/digest").route(web::get().to(handlers::get_digest::<E>)))
+        // ── Me (caller-scoped views) ─────────────────────────────────────
+        .service(web::resource("/me/scopes").route(web::get().to(handlers::get_my_scopes::<E>)))
+        .service(web::resource("/me/work").route(web::get().to(handlers::get_my_work::<E>)));
 }

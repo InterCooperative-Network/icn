@@ -641,6 +641,29 @@ impl icn_governance::StructureStoreBackend for SledStructureStore {
             .map(|opt| opt.is_some())
             .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}")))
     }
+
+    /// Scan all `role:` primary keys and collect those belonging to the given DID.
+    ///
+    /// This is a full scan (O(roles)) — acceptable for cooperative-scale deployments.
+    /// A `role_by_person` secondary index can be added later if profiling warrants it.
+    fn list_roles_by_person(
+        &self,
+        did: &icn_identity::Did,
+    ) -> std::result::Result<Vec<icn_governance::RoleAssignment>, GovernanceError> {
+        let prefix = "role:";
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) = result
+                .map_err(|e| GovernanceError::Internal(format!("Sled scan (roles) failed: {e}")))?;
+            let r: icn_governance::RoleAssignment = icn_encoding::decode_versioned(&value)
+                .map_err(|e| GovernanceError::Internal(format!("Failed to decode role: {e}")))?;
+            if &r.person_did == did {
+                out.push(r);
+            }
+        }
+        out.sort_by(|a, b| a.start_date.cmp(&b.start_date));
+        Ok(out)
+    }
 }
 
 // ========== Sled store for Activities (Tranche 2) ==========
@@ -3751,6 +3774,25 @@ impl GovernanceManager {
         self.structure_store
             .list_roles_by_structure(structure_id)
             .map_err(|e| anyhow::anyhow!("Failed to list roles: {e}"))
+    }
+
+    /// List all role assignments held by the given DID across all structures.
+    ///
+    /// Used by `GET /gov/me/scopes` to return the caller's authority scope without
+    /// requiring them to know which structures they belong to.
+    pub fn list_roles_for_person(&self, did: &icn_identity::Did) -> Result<Vec<RoleAssignment>> {
+        self.structure_store
+            .list_roles_by_person(did)
+            .map_err(|e| anyhow::anyhow!("Failed to list roles for person: {e}"))
+    }
+
+    /// List all open action items assigned to the given DID across all domains.
+    ///
+    /// Used by `GET /gov/me/work` to return the caller's pending work queue.
+    pub fn list_work_for_person(&self, did: &icn_identity::Did) -> Result<Vec<ActionItem>> {
+        self.action_items
+            .list_by_assignee(did)
+            .map_err(|e| anyhow::anyhow!("Failed to list work for person: {e}"))
     }
 
     // ========================================================================
