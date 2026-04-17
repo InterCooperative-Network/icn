@@ -3966,4 +3966,253 @@ mod tests {
             "membership_resolver.resolve_members() must be invoked for TrustThreshold domains"
         );
     }
+
+    // ── Governance-to-execution bridge ──────────────────────────────────────
+
+    /// Proves: when a proposal with `action_items_on_accept` is accepted via
+    /// `close_proposal`, the specs are materialized as concrete `ActionItem`s
+    /// with correct provenance (`linked_proposal` set to the proposal ID).
+    ///
+    /// This tests the standalone/in-memory path (no actor). The actor path is
+    /// tested separately in `actor.rs`. Both paths must produce the same result.
+    #[tokio::test]
+    async fn accepted_proposal_materializes_action_items() {
+        // Seeds 1 and 2 are verified valid Ed25519 compressed points (used in
+        // hook_fires_with_correct_payload_on_acceptance).
+        let member_did = test_did(1);
+        let assignee_did = test_did(2);
+        let mgr = Arc::new(GovernanceManager::new());
+        let domain_id = GovernanceDomainId("bridge-test-coop".to_string());
+
+        // Domain: quorum=0, approval=0 → any close is Accepted.
+        mgr.create_domain(
+            domain_id.clone(),
+            "Bridge Test Coop".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 0, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Proposal with two obligation specs.
+        let proposal_id = ProposalId("obligation-proposal-1".to_string());
+        let specs = vec![
+            icn_governance::ActionItemSpec {
+                title: "Send meeting recap to members".to_string(),
+                description: Some("Within 48h of decision".to_string()),
+                assignee: Some(assignee_did.clone()),
+                due_offset_seconds: Some(48 * 60 * 60),
+                priority: icn_governance::ActionItemPriority::High,
+                tags: vec!["comms".to_string()],
+            },
+            icn_governance::ActionItemSpec {
+                title: "Update charter document".to_string(),
+                description: None,
+                assignee: None,
+                due_offset_seconds: None,
+                priority: icn_governance::ActionItemPriority::Medium,
+                tags: vec![],
+            },
+        ];
+
+        mgr.create_proposal_with_actions(
+            proposal_id.clone(),
+            domain_id.clone(),
+            member_did.clone(),
+            "Adopt new communication policy".to_string(),
+            "Governs how decisions are communicated to members".to_string(),
+            ProposalPayload::Text {
+                body: "Adopt new communication policy: meeting recaps within 48h, charter updates within 1 week.".to_string(),
+            },
+            ProposalScope::Local,
+            specs,
+        )
+        .await
+        .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+
+        let ctx = GovernanceContext {
+            manager: mgr.clone(),
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        };
+
+        let app = test_app!(ctx, member_did);
+
+        // Close the proposal (quorum=0, approval=0 → Accepted immediately).
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri(&format!("/proposals/{}/close", proposal_id.0))
+                .to_request(),
+        )
+        .await;
+
+        assert_eq!(
+            resp.status().as_u16(),
+            200,
+            "close_proposal should return 200 OK"
+        );
+
+        // Verify ActionItems were materialized with correct provenance.
+        let filter = icn_governance::ActionItemFilter {
+            linked_proposal: Some(proposal_id.clone()),
+            ..Default::default()
+        };
+        let items = mgr
+            .list_action_items(&domain_id, &filter)
+            .expect("list_action_items must not fail");
+
+        assert_eq!(
+            items.len(),
+            2,
+            "both obligation specs must be materialized as ActionItems"
+        );
+
+        let recap = items
+            .iter()
+            .find(|i| i.title == "Send meeting recap to members")
+            .expect("recap item must exist");
+        assert_eq!(
+            recap.linked_proposal.as_ref().map(|p| &p.0),
+            Some(&proposal_id.0),
+            "linked_proposal must be set to the originating proposal"
+        );
+        assert_eq!(
+            recap.assignee,
+            Some(assignee_did),
+            "assignee DID must be preserved from spec"
+        );
+        assert_eq!(
+            recap.priority,
+            icn_governance::ActionItemPriority::High,
+            "priority must be preserved from spec"
+        );
+        assert!(
+            recap.due_date.is_some(),
+            "due_date must be set from due_offset_seconds"
+        );
+        assert_eq!(recap.tags, vec!["comms".to_string()]);
+
+        let charter = items
+            .iter()
+            .find(|i| i.title == "Update charter document")
+            .expect("charter update item must exist");
+        assert_eq!(
+            charter.linked_proposal.as_ref().map(|p| &p.0),
+            Some(&proposal_id.0)
+        );
+        assert_eq!(charter.assignee, None);
+        assert_eq!(charter.priority, icn_governance::ActionItemPriority::Medium);
+    }
+
+    /// Proves: action items are NOT created when a proposal is Rejected.
+    ///
+    /// GovernanceParams(quorum=0, approval=100) + Against vote → Rejected.
+    #[tokio::test]
+    async fn rejected_proposal_does_not_materialize_action_items() {
+        // Seed 3 verified valid Ed25519 point (used in hook_not_fired_on_rejection).
+        let member_did = test_did(3);
+        let mgr = Arc::new(GovernanceManager::new());
+        let domain_id = GovernanceDomainId("rejection-test-coop".to_string());
+
+        mgr.create_domain(
+            domain_id.clone(),
+            "Rejection Test Coop".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 100, 86_400), // 100% approval required → one Against vote → Rejected
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = ProposalId("rejected-obligation-1".to_string());
+        let specs = vec![icn_governance::ActionItemSpec {
+            title: "Should not be created".to_string(),
+            description: None,
+            assignee: None,
+            due_offset_seconds: None,
+            priority: icn_governance::ActionItemPriority::Medium,
+            tags: vec![],
+        }];
+
+        mgr.create_proposal_with_actions(
+            proposal_id.clone(),
+            domain_id.clone(),
+            member_did.clone(),
+            "Proposal that will be rejected".to_string(),
+            "Test rejection does not materialize obligations".to_string(),
+            ProposalPayload::Text {
+                body: "This will be rejected.".to_string(),
+            },
+            ProposalScope::Local,
+            specs,
+        )
+        .await
+        .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+
+        // Cast an Against vote so the proposal is Rejected.
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::Against,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let ctx = GovernanceContext {
+            manager: mgr.clone(),
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        };
+
+        let app = test_app!(ctx, member_did);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri(&format!("/proposals/{}/close", proposal_id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let filter = icn_governance::ActionItemFilter {
+            linked_proposal: Some(proposal_id.clone()),
+            ..Default::default()
+        };
+        let items = mgr
+            .list_action_items(&domain_id, &filter)
+            .expect("list_action_items must not fail");
+
+        assert!(
+            items.is_empty(),
+            "rejected proposal must NOT create action items; got {items:?}"
+        );
+    }
 }

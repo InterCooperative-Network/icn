@@ -2658,6 +2658,53 @@ impl GovernanceManager {
                 }
             }
 
+            // Decision→action bridge (standalone path).
+            //
+            // When the proposal is Accepted and carries `action_items_on_accept`
+            // specs, materialize them into concrete ActionItems now. This mirrors
+            // what the GovernanceActor does in the actor-backed path (see
+            // `actor.rs::materialize_action_items`). Without this, the
+            // in-memory/standalone path (used in tests and HTTP-only deployments)
+            // would silently skip obligation creation.
+            //
+            // Dedup guard: if items already exist for this proposal (e.g. because
+            // the actor path ran first on a re-close), skip to avoid duplicates.
+            if matches!(outcome, ProofOutcome::Accepted)
+                && !proposal.action_items_on_accept.is_empty()
+            {
+                let filter = icn_governance::ActionItemFilter {
+                    linked_proposal: Some(proposal_id.clone()),
+                    ..Default::default()
+                };
+                let already_exists = self
+                    .action_items
+                    .list(&proposal.domain_id, &filter)
+                    .map(|v| !v.is_empty())
+                    .unwrap_or(false);
+
+                if !already_exists {
+                    let domain_id = proposal.domain_id.clone();
+                    let proposer = proposal.proposer.clone();
+                    for spec in &proposal.action_items_on_accept {
+                        let item = spec.materialize(
+                            domain_id.clone(),
+                            proposal_id.clone(),
+                            proposer.clone(),
+                            now,
+                        );
+                        if let Err(e) = self.action_items.save(&item) {
+                            tracing::warn!(
+                                proposal_id = %proposal_id.0,
+                                action_item_title = %spec.title,
+                                error = %e,
+                                "Failed to materialize action item from accepted proposal — \
+                                 obligation may be lost"
+                            );
+                        }
+                    }
+                }
+            }
+
             Ok(())
         } else {
             anyhow::bail!(
