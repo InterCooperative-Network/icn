@@ -42,7 +42,7 @@ View source on GitHub →
 <h2>Status: normative
 Authority: architecture
 Canonical: no
-Last Reviewed: 2026-04-16</h2>
+Last Reviewed: 2026-04-17</h2>
 <h1>Institution Package Boundary</h1>
 <blockquote>
 <p>Defines what belongs in ICN platform versus what belongs in an institution-specific package repo (e.g., NYCN). Anchors all future layered implementation decisions.</p>
@@ -71,7 +71,7 @@ Last Reviewed: 2026-04-16</h2>
 <h3>Goes in ICN (<code>icn-governance</code> + <code>apps/governance</code>)</h3>
 <p>A type, object, or capability belongs in ICN if:</p>
 <ul>
-<li><strong>A second cooperative would need it with different content but the same shape.</strong> Committee, Meeting, Program, Milestone, ActionItem, Sponsor — every recurring institution has these.</li>
+<li><strong>A second cooperative would need it with different content but the same shape.</strong> Committee, Meeting, Program, Milestone, ActionItem — every recurring institution has these.</li>
 <li>It has no institution-specific vocabulary baked into enum variants or field names.</li>
 <li>It uses <code>Custom(String)</code> escape hatches for institution-specific extensions rather than named variants.</li>
 <li>Its semantics are expressible as: entities owning structures owning activities with attached operational objects.</li>
@@ -118,12 +118,22 @@ Last Reviewed: 2026-04-16</h2>
 <tr>
 <td>Meeting</td>
 <td><code>icn-governance::meeting</code></td>
-<td>PR #1543, landing</td>
+<td>Landed; HTTP routes wired</td>
 </tr>
 <tr>
 <td>InstitutionalParent attachment</td>
 <td><code>icn-governance::parent</code></td>
 <td>Polymorphic object attachment</td>
+</tr>
+<tr>
+<td><code>/gov/me/scopes</code> + <code>/gov/me/work</code></td>
+<td><code>apps/governance</code> handlers</td>
+<td>PR #1552; assignee-indexed work spine</td>
+</tr>
+<tr>
+<td><code>Activity.parent_program_id</code></td>
+<td><code>icn-governance::activity</code></td>
+<td>PR #1553; cycle-over-cycle linkage</td>
 </tr>
 </tbody></table>
 <h3>Goes in the Institution Package (e.g., <code>nycn-icn</code> repo)</h3>
@@ -165,8 +175,8 @@ Last Reviewed: 2026-04-16</h2>
 <h3>The Rule</h3>
 <p>CCL describes <em>what is permitted and under what conditions</em>. The host runtime describes <em>how permitted actions are actually executed and stored</em>. Never put storage keys in CCL. Never put semantic authorization logic in a Rust match arm.</p>
 <hr>
-<h2>D. Reusable Primitive Set for NYCN/Summit</h2>
-<p>These belong in ICN because every cooperative institution needs them. Verified against what NYCN concretely requires for an operational summit cycle.</p>
+<h2>D. Reusable Primitive Set</h2>
+<p>These belong in ICN because every cooperative institution needs them — verified against both what NYCN requires and what a second unrelated institution (housing federation, mutual aid collective) would also need unchanged.</p>
 <table>
 <thead>
 <tr>
@@ -176,60 +186,92 @@ Last Reviewed: 2026-04-16</h2>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>Structure</strong> (Committee/WG)</td>
+<td><strong>Structure</strong> (Committee/WG/Team/Office)</td>
 <td>Every institution delegates authority to sub-groups</td>
-<td>Member list, specific authorities, NYCN committee names</td>
+<td>Member list, specific authorities, committee names</td>
 </tr>
 <tr>
 <td><strong>Meeting</strong></td>
 <td>Every body needs a record of deliberation with decisions and attendance</td>
-<td>Agenda templates, NYCN meeting norms</td>
+<td>Agenda templates, meeting norms</td>
 </tr>
 <tr>
 <td><strong>Program + Milestone</strong></td>
 <td>Recurring cycles with stage gates exist across institutions</td>
-<td>Summit-specific stage names expressed as <code>completion_criteria: Vec&lt;String&gt;</code> data</td>
+<td>Stage names as <code>completion_criteria: Vec&lt;String&gt;</code> data, not enum variants</td>
 </tr>
 <tr>
 <td><strong>ActionItem</strong></td>
 <td>Work that materializes from decisions is universal</td>
-<td>Assignment rules, NYCN priority conventions</td>
+<td>Assignment rules, priority conventions</td>
 </tr>
 <tr>
+<td><strong>Activity + parent_program_id</strong></td>
+<td>Time-bounded endeavors linked to program cycles</td>
+<td>Activity names, cycle vocabularies</td>
+</tr>
+<tr>
+<td><strong>RoleAssignment</strong></td>
+<td>Authority grants as capability strings, scoped to structures</td>
+<td>Capability definitions, role names</td>
+</tr>
+</tbody></table>
+<p><strong>Not proposed for ICN now</strong> (institution-specific; no confirmed second-cooperative case):</p>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>Why it stays out</th>
+<th>How NYCN models it</th>
+</tr>
+</thead>
+<tbody><tr>
 <td><strong>Sponsor</strong></td>
-<td>Resource partnership with lifecycle is generic across events and programs</td>
-<td>Tier names (platinum/gold/etc.), benefit tables, NYCN ask amounts</td>
+<td>A housing federation calls this &quot;Funder&quot;; a mutual aid network calls it &quot;Partner&quot;; a coop calls it &quot;Donor.&quot; Tier semantics, benefit tables, and commitment lifecycle are institution-specific business logic.</td>
+<td>NYCN institution package: Activity-linked entity with CCL-governed commitment lifecycle; tiers as CCL data, not ICN enum variants</td>
 </tr>
 <tr>
 <td><strong>ServiceRequest / Intake</strong></td>
-<td>Member-initiated requests with routing and status apply broadly</td>
-<td>Category taxonomy, routing rules, SLA definitions</td>
+<td>Reducible to Activity (kind=project) + ActionItem chain with a routing tag</td>
+<td>Compose in institution package; add <code>intake</code> tag to Activity kind Custom</td>
 </tr>
 <tr>
 <td><strong>Contact / OrgRelationship</strong></td>
-<td>External relationship management is generic across institutions</td>
-<td>CRM fields, relationship types specific to NYCN&#39;s partner network</td>
+<td>CRM is institution-specific; shape and field semantics vary too much</td>
+<td>Institution package data model</td>
+</tr>
+<tr>
+<td><strong>VolunteerAssignment</strong></td>
+<td>A RoleAssignment with <code>capabilities: [&quot;volunteer&quot;]</code>; no new type needed</td>
+<td>RoleAssignment variant</td>
+</tr>
+<tr>
+<td><strong>ReviewQueue</strong></td>
+<td>An ActionItemFilter view, not a primitive</td>
+<td><code>/gov/me/work?status=pending&amp;tag=review</code></td>
 </tr>
 </tbody></table>
-<p><strong>Not proposed for ICN now</strong> (institution-specific without a clear second-cooperative case):</p>
-<ul>
-<li>VolunteerAssignment (could be a RoleAssignment variant with <code>volunteer</code> kind — defer)</li>
-<li>SponsorLead (a status in the Sponsor lifecycle, not a separate type)</li>
-<li>ReviewQueue (implement as an ActionItem filter view, not a new primitive)</li>
-</ul>
 <hr>
-<h2>E. Immediate Implementation Implications</h2>
-<p>In merge order:</p>
-<p><strong>1. <code>GET /gov/me/scopes</code> + <code>GET /gov/me/work</code></strong>
-The member&#39;s entry point. Returns their <code>RoleAssignment</code> set and open <code>ActionItem</code>s filtered by assignee. Unblocks the &quot;new organizer can see their scope&quot; decisive test. Requires no new types — compose from existing <code>SledRoleAssignmentStore</code> + <code>SledActionItemStore</code>. This is Tranche 1c.</p>
-<p><strong>2. <code>Activity.parent_program_id</code> linkage</strong>
-Wire <code>Activity</code> to its parent <code>Program</code> so <code>summit-2026 (Activity)</code> points to <code>annual-summit-cycle (Program)</code>. Enables cycle-over-cycle comparison. One field addition; no schema migration needed (optional field, backward-compatible). Tranche 1c.</p>
-<p><strong>3. Sponsor primitive</strong> (<code>icn-governance::sponsor</code>)
-<code>Sponsor { id, program_id, org_name, contact_did, tier: String, status, committed_amount, confirmed_at }</code>. Sled store with <code>sponsor_by_program</code> and <code>sponsor_by_status</code> indexes. HTTP surface. No NYCN tier names in the enum — <code>tier</code> is a free string. Tranche 2.</p>
-<p><strong>4. Notification digest wired to Meeting</strong>
-<code>feat/notification-digests</code> branch stubs <code>upcoming_meetings: Vec::new()</code> because Meeting didn&#39;t exist when it was written. After Meeting lands (PR #1543), wire the digest to <code>SledMeetingStore.list_upcoming_by_scope()</code>. Tranche 2 follow-on.</p>
-<p><strong>5. <code>GET /gov/programs/{id}/dashboard</code> composite view</strong>
-Returns Program + Milestone statuses + ActionItem counts by status + Sponsor counts by status. Pure composition from existing stores once Sponsor lands. No new primitives. Enables the summit dashboard without a client-side join. Tranche 3.</p>
+<h2>E. Implementation Backlog (in priority order)</h2>
+<p>Items 1 and 2 are landed or in open PRs. Items 3–6 are the next platform moves.</p>
+<p><strong>1. <code>GET /gov/me/scopes</code> + <code>GET /gov/me/work</code></strong> <em>(PR #1552, open)</em>
+Returns <code>RoleAssignment</code> set and open <code>ActionItem</code>s for the authenticated DID. No new types — compose from existing stores.</p>
+<p><strong>2. <code>Activity.parent_program_id</code> linkage</strong> <em>(PR #1553, open)</em>
+Optional field linking an Activity to its parent Program. Backward-compatible; enables cycle-over-cycle dashboards.</p>
+<p><strong>3. Governance-to-execution bridge: <code>ObligationEffect</code> in <code>GovernanceEffect</code></strong> <em>(Tranche 2)</em>
+When a proposal passes, the current path only handles member sanctions and charter deployment. Add:</p>
+<pre><code>GovernanceEffect::CreateObligations {
+    proposal_id, domain_id, items: Vec&lt;ObligationSpec&gt;
+}
+GovernanceEffect::AdvanceMilestone { proposal_id, program_id, milestone_id }
+</code></pre>
+<p>Institution packages express which proposal types trigger which obligations in their CCL charter. No NYCN vocabulary in the enum variants — <code>ObligationSpec.title</code> is a free string.</p>
+<p><strong>4. Work spine filter support on <code>/gov/me/work</code></strong> <em>(Tranche 2)</em>
+<code>MyWorkFilterParams</code> (<code>status</code>, <code>priority</code>, <code>overdue</code>, <code>tag</code>) is defined but the handler ignores it. Wire it through <code>list_work_for_person</code> so callers can ask for open, high-priority, or overdue items specifically.</p>
+<p><strong>5. <code>GET /gov/programs/{id}/dashboard</code> composite view</strong> <em>(Tranche 2)</em>
+Returns Program + ordered Milestone statuses + ActionItem counts by status + Meeting count. Pure composition from existing stores. No new primitives.</p>
+<p><strong>6. CCL milestone completion gate</strong> <em>(Tranche 3)</em>
+<code>completion_criteria: Vec&lt;String&gt;</code> on Milestone is currently plain text. Add an optional CCL evaluation path: if a criterion starts with <code>ccl:</code>, evaluate the expression against current domain state before allowing milestone completion. Enables institution packages to write stage-gate logic in CCL without those predicates existing in ICN core.</p>
 <hr>
 <h2>Boundary in One Sentence</h2>
 <p>ICN provides the generic institutional operating system — typed shapes, enforced lifecycles, provenance, capability-gated APIs. The institution package provides the charter, the vocabulary, the seed data, and the specific rules that give those shapes meaning for one community.</p>
