@@ -453,15 +453,17 @@ pub struct ActionItemFilterParams {
 /// because `me/work` implicitly filters by the authenticated caller's DID.
 /// All fields default to `None` (no filtering applied).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
-#[serde(default)]
 pub struct MyWorkFilterParams {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    // Per-field `serde(default)` is required for serde_urlencoded (used by
+    // actix-web `web::Query`) to fill absent query params with `None`. Struct-level
+    // `#[serde(default)]` is not sufficient for key-value formats.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub priority: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overdue: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
 }
 

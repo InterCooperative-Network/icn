@@ -695,6 +695,69 @@ impl SledActivityStore {
     fn entity_activity_index_prefix(entity_id: &str) -> String {
         format!("activity_by_entity:{}:", entity_id)
     }
+
+    /// Decode an Activity from stored bytes with V0 → V1 migration support.
+    ///
+    /// Postcard encodes structs positionally, so records written before
+    /// `parent_program_id` was added (`ActivityV0`) will fail to decode as the
+    /// current `Activity` struct with `DeserializeUnexpectedEnd`. This function
+    /// falls back to decoding as `ActivityV0` and upgrading with
+    /// `parent_program_id: None` so reads of old records succeed without a
+    /// full store migration scan.
+    fn decode_activity(
+        bytes: &[u8],
+    ) -> std::result::Result<icn_governance::Activity, GovernanceError> {
+        // Fast path: current layout (all records written after parent_program_id landed).
+        match icn_encoding::decode_versioned::<icn_governance::Activity>(bytes) {
+            Ok(a) => return Ok(a),
+            Err(icn_encoding::Error::Postcard(_)) => {
+                // May be a V0 record (no parent_program_id). Try the old layout.
+                tracing::debug!("activity decode failed with postcard error; trying V0 migration");
+            }
+            Err(e) => {
+                return Err(GovernanceError::Internal(format!(
+                    "Failed to decode activity (non-postcard error): {e}"
+                )));
+            }
+        }
+
+        // V0 layout: same fields as Activity minus `parent_program_id`.
+        #[derive(serde::Deserialize)]
+        struct ActivityV0 {
+            id: icn_governance::ActivityId,
+            parent_entity_id: String,
+            kind: icn_governance::ActivityKind,
+            name: String,
+            description: Option<String>,
+            status: icn_governance::ActivityStatus,
+            start_date: Option<icn_governance::Timestamp>,
+            end_date: Option<icn_governance::Timestamp>,
+            linked_structures: Vec<icn_governance::StructureId>,
+            created_at: icn_governance::Timestamp,
+            created_by_decision: Option<icn_governance::ProposalId>,
+        }
+
+        let v0: ActivityV0 = icn_encoding::decode_versioned(bytes).map_err(|e| {
+            GovernanceError::Internal(format!(
+                "Failed to decode activity (V0 fallback also failed): {e}"
+            ))
+        })?;
+
+        Ok(icn_governance::Activity {
+            id: v0.id,
+            parent_entity_id: v0.parent_entity_id,
+            kind: v0.kind,
+            name: v0.name,
+            description: v0.description,
+            status: v0.status,
+            start_date: v0.start_date,
+            end_date: v0.end_date,
+            linked_structures: v0.linked_structures,
+            created_at: v0.created_at,
+            created_by_decision: v0.created_by_decision,
+            parent_program_id: None,
+        })
+    }
 }
 
 impl icn_governance::ActivityStoreBackend for SledActivityStore {
@@ -718,13 +781,7 @@ impl icn_governance::ActivityStoreBackend for SledActivityStore {
     ) -> std::result::Result<Option<icn_governance::Activity>, GovernanceError> {
         let key = Self::activity_primary_key(id);
         match self.db.get(key.as_bytes()) {
-            Ok(Some(value)) => {
-                let a: icn_governance::Activity =
-                    icn_encoding::decode_versioned(&value).map_err(|e| {
-                        GovernanceError::Internal(format!("Failed to decode activity: {e}"))
-                    })?;
-                Ok(Some(a))
-            }
+            Ok(Some(value)) => Ok(Some(Self::decode_activity(&value)?)),
             Ok(None) => Ok(None),
             Err(e) => Err(GovernanceError::Internal(format!("Sled get failed: {e}"))),
         }
@@ -750,11 +807,7 @@ impl icn_governance::ActivityStoreBackend for SledActivityStore {
                 .get(primary.as_bytes())
                 .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
             {
-                let a: icn_governance::Activity =
-                    icn_encoding::decode_versioned(&value).map_err(|e| {
-                        GovernanceError::Internal(format!("Failed to decode activity: {e}"))
-                    })?;
-                out.push(a);
+                out.push(Self::decode_activity(&value)?);
             }
         }
         out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -772,9 +825,7 @@ impl icn_governance::ActivityStoreBackend for SledActivityStore {
             .get(primary.as_bytes())
             .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?;
         let a: icn_governance::Activity = match existing {
-            Some(v) => icn_encoding::decode_versioned(&v).map_err(|e| {
-                GovernanceError::Internal(format!("Failed to decode activity: {e}"))
-            })?,
+            Some(v) => Self::decode_activity(&v)?,
             None => return Ok(false),
         };
         // Delete index key
@@ -2681,6 +2732,72 @@ impl GovernanceManager {
                 }
             }
 
+            // Decision→action bridge (standalone path).
+            //
+            // When the proposal is Accepted and carries `action_items_on_accept`
+            // specs, materialize them into concrete ActionItems now. This mirrors
+            // what the GovernanceActor does in the actor-backed path (see
+            // `actor.rs::materialize_action_items`). Without this, the
+            // in-memory/standalone path (used in tests and HTTP-only deployments)
+            // would silently skip obligation creation.
+            //
+            // Lock scope note: this block runs while the proposals write lock is
+            // still held (the lock is taken earlier in close_proposal_inner and
+            // held for the whole function). The action_items store I/O here adds
+            // to the lock duration. For the pilot's single-gateway deployment this
+            // is acceptable; a future refactor can clone the needed fields and drop
+            // the proposals lock before the I/O if contention becomes a concern.
+            //
+            // Dedup guard: if items already exist for this proposal (e.g. because
+            // the actor path ran first on a re-close), skip to avoid duplicates.
+            if matches!(outcome, ProofOutcome::Accepted)
+                && !proposal.action_items_on_accept.is_empty()
+            {
+                let filter = icn_governance::ActionItemFilter {
+                    linked_proposal: Some(proposal_id.clone()),
+                    ..Default::default()
+                };
+                let already_exists = match self.action_items.list(&proposal.domain_id, &filter) {
+                    Ok(existing) => !existing.is_empty(),
+                    Err(e) => {
+                        // List failure means we cannot confirm absence of duplicates.
+                        // Log a warning and proceed — risk is a duplicate item, not
+                        // a missing one. A duplicate is recoverable; a missing
+                        // obligation is silent data loss.
+                        tracing::warn!(
+                            proposal_id = %proposal_id.0,
+                            domain_id = %proposal.domain_id.0,
+                            error = %e,
+                            "Failed to check for existing action items before materialization; \
+                             proceeding (risk: duplicate items)"
+                        );
+                        false
+                    }
+                };
+
+                if !already_exists {
+                    let domain_id = proposal.domain_id.clone();
+                    let proposer = proposal.proposer.clone();
+                    for spec in &proposal.action_items_on_accept {
+                        let item = spec.materialize(
+                            domain_id.clone(),
+                            proposal_id.clone(),
+                            proposer.clone(),
+                            now,
+                        );
+                        if let Err(e) = self.action_items.save(&item) {
+                            tracing::warn!(
+                                proposal_id = %proposal_id.0,
+                                action_item_title = %spec.title,
+                                error = %e,
+                                "Failed to materialize action item from accepted proposal — \
+                                 obligation may be lost"
+                            );
+                        }
+                    }
+                }
+            }
+
             Ok(())
         } else {
             anyhow::bail!(
@@ -3786,13 +3903,37 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Failed to list roles for person: {e}"))
     }
 
-    /// List all open action items assigned to the given DID across all domains.
+    /// List action items assigned to the given DID across all domains, with optional filtering.
     ///
-    /// Used by `GET /gov/me/work` to return the caller's pending work queue.
-    pub fn list_work_for_person(&self, did: &icn_identity::Did) -> Result<Vec<ActionItem>> {
-        self.action_items
+    /// Used by `GET /gov/me/work`. The filter is applied in-memory after the index scan;
+    /// all filter fields default to `None` (no restriction). Results are sorted
+    /// oldest-first (`created_at` ascending) so callers see their longest-outstanding
+    /// items at the top.
+    ///
+    /// The `filter.assignee` field is **ignored** here — the caller DID is always used
+    /// as the assignee query key. Setting it would be a no-op or would produce empty results.
+    pub fn list_work_for_person(
+        &self,
+        did: &icn_identity::Did,
+        filter: &icn_governance::ActionItemFilter,
+    ) -> Result<Vec<ActionItem>> {
+        let mut items = self
+            .action_items
             .list_by_assignee(did)
-            .map_err(|e| anyhow::anyhow!("Failed to list work for person: {e}"))
+            .map_err(|e| anyhow::anyhow!("Failed to list work for person: {e}"))?;
+
+        // Apply filter predicates (status, priority, overdue, tag, open_only).
+        // The assignee check is skipped — items from the index are already scoped to `did`.
+        let filter_no_assignee = icn_governance::ActionItemFilter {
+            assignee: None,
+            ..filter.clone()
+        };
+        items.retain(|item| filter_no_assignee.matches(item));
+
+        // Oldest-first: surfaces the longest-outstanding work at the top.
+        items.sort_by_key(|item| item.created_at);
+
+        Ok(items)
     }
 
     // ========================================================================
