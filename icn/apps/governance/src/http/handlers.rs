@@ -3425,6 +3425,14 @@ fn program_to_response(p: &icn_governance::Program) -> ProgramResponse {
 }
 
 fn milestone_to_response(m: &icn_governance::Milestone) -> MilestoneResponse {
+    // Deserialize the JSON-encoded gate string back to a Value for HTTP clients.
+    // An unparseable stored gate is treated as absent rather than surfaced as an
+    // error here — parse failures are surfaced at write time.
+    let completion_gate = m
+        .completion_gate
+        .as_deref()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok());
+
     MilestoneResponse {
         id: m.id.0.clone(),
         program_id: m.program_id.0.clone(),
@@ -3434,6 +3442,7 @@ fn milestone_to_response(m: &icn_governance::Milestone) -> MilestoneResponse {
         target_date: m.target_date,
         status: milestone_status_str(&m.status).to_string(),
         completion_criteria: m.completion_criteria.clone(),
+        completion_gate,
         completed_at: m.completed_at,
         completed_by: m.completed_by.as_ref().map(|d| d.to_string()),
         created_at: m.created_at,
@@ -3522,6 +3531,22 @@ pub async fn get_program<E: GovernanceEventEmitter + Clone + 'static>(
     Ok(HttpResponse::Ok().json(program_to_response(&p)))
 }
 
+// ── Milestone gate helpers ───────────────────────────────────────────────────
+
+/// Parse and validate a `serde_json::Value` as a `icn_ccl::Expr`.
+///
+/// Used at HTTP write boundaries to reject malformed gate expressions before
+/// they are persisted.  The round-trip is:
+///   HTTP Value → `serde_json::to_string` → `parse_gate` → `icn_ccl::Expr`
+///
+/// Returns `ApiError::BadRequest` on any parse failure.
+fn parse_gate_value(value: &serde_json::Value) -> Result<icn_ccl::Expr, ApiError> {
+    let json_str = serde_json::to_string(value)
+        .map_err(|e| err_bad(format!("Invalid gate expression JSON: {e}")))?;
+    icn_governance::milestone_gate::parse_gate(&json_str)
+        .map_err(|e| err_bad(format!("Invalid gate expression: {e}")))
+}
+
 // ── Milestone endpoints ──────────────────────────────────────────────────────
 
 /// POST /gov/programs/{program_id}/milestones — Create a milestone.
@@ -3554,7 +3579,7 @@ pub async fn create_milestone<E: GovernanceEventEmitter + Clone + 'static>(
     )
     .await?;
 
-    let m = ctx
+    let mut m = ctx
         .manager
         .create_milestone(
             pid,
@@ -3565,6 +3590,15 @@ pub async fn create_milestone<E: GovernanceEventEmitter + Clone + 'static>(
             req.completion_criteria.clone(),
         )
         .map_err(anyhow_to_api)?;
+
+    // If a gate was included in the create request, validate and store it now.
+    if let Some(gate_value) = &req.completion_gate {
+        let gate_expr = parse_gate_value(gate_value)?;
+        m = ctx
+            .manager
+            .set_milestone_gate(&m.id, Some(gate_expr))
+            .map_err(anyhow_to_api)?;
+    }
 
     Ok(HttpResponse::Created().json(milestone_to_response(&m)))
 }
@@ -3633,6 +3667,51 @@ pub async fn update_milestone_status<E: GovernanceEventEmitter + Clone + 'static
     let m = ctx
         .manager
         .update_milestone_status(&id, status, &actor)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(milestone_to_response(&m)))
+}
+
+/// PUT /gov/milestones/{milestone_id}/gate — Set or clear the CCL completion gate.
+///
+/// Accepts `{ "completion_gate": <Expr JSON> }` to install a gate, or
+/// `{ "completion_gate": null }` / `{}` to remove any existing gate.
+///
+/// The gate expression is validated immediately; a malformed expression is
+/// rejected with 400 before anything is persisted.
+pub async fn set_milestone_gate<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    milestone_id: web::Path<String>,
+    req: web::Json<SetMilestoneGateRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let id = MilestoneId(milestone_id.into_inner());
+    let actor = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    // Resolve governance domain via milestone → program for membership check.
+    let milestone = ctx
+        .manager
+        .get_milestone(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Milestone not found"))?;
+    let prog = ctx
+        .manager
+        .get_program(&milestone.program_id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found for milestone"))?;
+    check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
+
+    // Parse and validate the gate expression (if any) before persisting.
+    let gate_expr = req
+        .completion_gate
+        .as_ref()
+        .map(parse_gate_value)
+        .transpose()?;
+
+    let m = ctx
+        .manager
+        .set_milestone_gate(&id, gate_expr)
         .map_err(anyhow_to_api)?;
 
     Ok(HttpResponse::Ok().json(milestone_to_response(&m)))
@@ -5147,5 +5226,283 @@ mod tests {
         let activities = body["activities"].as_array().unwrap();
         assert_eq!(activities.len(), 1);
         assert_eq!(activities[0]["name"], "Summit Event");
+    }
+
+    // =========================================================================
+    // Milestone gate HTTP surface tests
+    // =========================================================================
+
+    /// Build a `GovernanceContext` wired for milestone gate tests.
+    /// Uses `governance:write` scope so the same context works for both reads
+    /// and writes (write scope is a superset in these tests).
+    fn make_gate_ctx(mgr: Arc<GovernanceManager>) -> GovernanceContext<NoopEventEmitter> {
+        GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_proposal_accepted: None,
+            on_charter_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        }
+    }
+
+    /// Actix test app for milestone gate endpoints.
+    ///
+    /// Exposes:
+    ///   POST /programs/{program_id}/milestones
+    ///   GET  /milestones/{milestone_id}
+    ///   PUT  /milestones/{milestone_id}/gate
+    macro_rules! gate_app {
+        ($ctx:expr, $caller_did:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            let caller_did_str = $caller_did.to_string();
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: caller_did_str.clone(),
+                            // Space-separated: satisfies both governance:read
+                            // (GET milestone) and governance:write (POST/PUT).
+                            scope: Some("governance:read governance:write".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/programs/{program_id}/milestones",
+                        web::post().to(create_milestone::<NoopEventEmitter>),
+                    )
+                    .route(
+                        "/milestones/{milestone_id}",
+                        web::get().to(get_milestone::<NoopEventEmitter>),
+                    )
+                    .route(
+                        "/milestones/{milestone_id}/gate",
+                        web::put().to(set_milestone_gate::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// Set up a domain + member + program and return (mgr, program_id, member_did).
+    async fn setup_gate_fixture() -> (Arc<GovernanceManager>, String, Did) {
+        use icn_governance::{
+            GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource,
+        };
+
+        let mgr = Arc::new(GovernanceManager::new());
+        // Use a real keypair: parse_did validates Ed25519 key validity, so a fake
+        // anchor-id DID (test_did) causes a 400 when the handler calls parse_did.
+        let did = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let domain_id = GovernanceDomainId("gate-coop".into());
+
+        mgr.create_domain(
+            domain_id.clone(),
+            "Gate Coop".into(),
+            "cooperative_default".into(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let prog = mgr
+            .create_program(
+                domain_id,
+                "ent-1".into(),
+                icn_governance::ProgramKind::Cycle,
+                "Test Program".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        (mgr, prog.id.0.clone(), did)
+    }
+
+    /// A valid `icn_ccl::Expr` as a JSON Value.
+    ///
+    /// Uses `Literal(Bool(true))` — the simplest well-typed expression.  Its
+    /// serde form is `{"Literal":{"Bool":true}}` which roundtrips cleanly
+    /// through `parse_gate_value`.
+    fn valid_gate_json() -> serde_json::Value {
+        // Derive the canonical JSON from the actual Expr type so this stays
+        // in sync if the serde representation ever changes.
+        let expr = icn_ccl::Expr::Literal(icn_ccl::types::Value::Bool(true));
+        serde_json::to_value(&expr).expect("Expr must serialize")
+    }
+
+    /// Creating a milestone with a valid `completion_gate` succeeds and the
+    /// response body includes the gate.
+    #[actix_web::test]
+    async fn http_create_milestone_with_gate_roundtrips() {
+        let (mgr, prog_id, did) = setup_gate_fixture().await;
+        let app = gate_app!(make_gate_ctx(mgr), did);
+
+        let body = serde_json::json!({
+            "name": "M1",
+            "completion_gate": valid_gate_json(),
+        });
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri(&format!("/programs/{prog_id}/milestones"))
+                .set_json(&body)
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 201, "create should succeed");
+
+        let json: serde_json::Value = test::read_body_json(resp).await;
+        assert!(
+            json["completionGate"].is_object(),
+            "response must include completionGate as a JSON object, got: {json}"
+        );
+    }
+
+    /// GET /gov/milestones/{id} includes `completionGate` when a gate is set.
+    #[actix_web::test]
+    async fn http_get_milestone_returns_gate() {
+        let (mgr, prog_id, did) = setup_gate_fixture().await;
+
+        // Create milestone then set gate directly via manager.
+        let m = mgr
+            .create_milestone(
+                icn_governance::ProgramId(prog_id.clone()),
+                "M2".into(),
+                None,
+                0,
+                None,
+                vec![],
+            )
+            .unwrap();
+        let gate = icn_ccl::Expr::Literal(icn_ccl::types::Value::Bool(true));
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        let app = gate_app!(make_gate_ctx(mgr), did);
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let json: serde_json::Value = test::read_body_json(resp).await;
+        assert!(
+            !json["completionGate"].is_null() && json["completionGate"] != serde_json::Value::Null,
+            "completionGate should be present when gate is set, got: {json}"
+        );
+    }
+
+    /// PUT /gov/milestones/{id}/gate sets a new gate; response reflects the change.
+    #[actix_web::test]
+    async fn http_put_gate_sets_gate() {
+        let (mgr, prog_id, did) = setup_gate_fixture().await;
+        let m = mgr
+            .create_milestone(
+                icn_governance::ProgramId(prog_id),
+                "M3".into(),
+                None,
+                0,
+                None,
+                vec![],
+            )
+            .unwrap();
+
+        let app = gate_app!(make_gate_ctx(mgr), did);
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::put()
+                .uri(&format!("/milestones/{}/gate", m.id.0))
+                .set_json(serde_json::json!({ "completion_gate": valid_gate_json() }))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200, "PUT gate should succeed");
+
+        let json: serde_json::Value = test::read_body_json(resp).await;
+        assert!(
+            json["completionGate"].is_object(),
+            "response must include updated completionGate"
+        );
+    }
+
+    /// PUT with `completion_gate: null` removes an existing gate.
+    #[actix_web::test]
+    async fn http_put_gate_null_clears_gate() {
+        let (mgr, prog_id, did) = setup_gate_fixture().await;
+        let m = mgr
+            .create_milestone(
+                icn_governance::ProgramId(prog_id),
+                "M4".into(),
+                None,
+                0,
+                None,
+                vec![],
+            )
+            .unwrap();
+
+        // Set a gate first.
+        let gate = icn_ccl::Expr::Literal(icn_ccl::types::Value::Bool(true));
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        let app = gate_app!(make_gate_ctx(mgr), did);
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::put()
+                .uri(&format!("/milestones/{}/gate", m.id.0))
+                .set_json(serde_json::json!({ "completion_gate": null }))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200, "clearing gate should succeed");
+
+        let json: serde_json::Value = test::read_body_json(resp).await;
+        assert!(
+            json.get("completionGate").is_none() || json["completionGate"].is_null(),
+            "completionGate should be absent after clearing, got: {json}"
+        );
+    }
+
+    /// PUT with a malformed gate expression returns 400.
+    #[actix_web::test]
+    async fn http_put_gate_malformed_returns_400() {
+        let (mgr, prog_id, did) = setup_gate_fixture().await;
+        let m = mgr
+            .create_milestone(
+                icn_governance::ProgramId(prog_id),
+                "M5".into(),
+                None,
+                0,
+                None,
+                vec![],
+            )
+            .unwrap();
+
+        let app = gate_app!(make_gate_ctx(mgr), did);
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::put()
+                .uri(&format!("/milestones/{}/gate", m.id.0))
+                .set_json(serde_json::json!({ "completion_gate": { "NotAnExpr": true } }))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(
+            resp.status().as_u16(),
+            400,
+            "malformed gate must be rejected with 400"
+        );
     }
 }

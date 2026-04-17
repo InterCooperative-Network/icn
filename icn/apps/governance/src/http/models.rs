@@ -835,6 +835,11 @@ pub struct CreateMilestoneRequest {
     /// Free-form checklist of completion criteria
     #[serde(default)]
     pub completion_criteria: Vec<String>,
+    /// Optional CCL completion gate expression (JSON-encoded `icn_ccl::Expr`).
+    /// When present the gate is validated immediately; a malformed expression
+    /// causes the whole create request to be rejected with 400.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub completion_gate: Option<serde_json::Value>,
 }
 
 /// Request to update a milestone's status
@@ -843,6 +848,21 @@ pub struct CreateMilestoneRequest {
 pub struct UpdateMilestoneStatusRequest {
     /// Status: "pending", "in_progress", "completed", "blocked", "skipped"
     pub status: String,
+}
+
+/// Request to set or clear the CCL completion gate on a milestone.
+///
+/// `PUT /gov/milestones/{milestone_id}/gate`
+///
+/// Set `completion_gate` to a JSON-encoded `icn_ccl::Expr` object to install a
+/// gate.  Set it to `null` (or omit the field) to remove an existing gate.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetMilestoneGateRequest {
+    /// The CCL gate expression as a JSON object matching `icn_ccl::Expr`, or
+    /// `null` to remove the gate.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub completion_gate: Option<serde_json::Value>,
 }
 
 /// Milestone response
@@ -859,6 +879,11 @@ pub struct MilestoneResponse {
     pub target_date: Option<u64>,
     pub status: String,
     pub completion_criteria: Vec<String>,
+    /// The active CCL completion gate expression, if any.
+    /// Returned as a JSON object (the `icn_ccl::Expr` tree) so clients can
+    /// inspect or display it without additional decoding.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completion_gate: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]

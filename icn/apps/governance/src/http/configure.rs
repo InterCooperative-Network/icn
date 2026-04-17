@@ -375,6 +375,10 @@ where
                 .route(web::get().to(handlers::get_milestone::<E>))
                 .route(web::patch().to(handlers::update_milestone_status::<E>)),
         )
+        .service(
+            web::resource("/milestones/{milestone_id}/gate")
+                .route(web::put().to(handlers::set_milestone_gate::<E>)),
+        )
         // ── Meeting endpoints ────────────────────────────────────────────
         .service(
             web::resource("/domains/{domain_id}/meetings")
