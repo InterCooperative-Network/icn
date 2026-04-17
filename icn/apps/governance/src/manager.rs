@@ -4243,9 +4243,12 @@ impl GovernanceManager {
                     // postcard compatibility) and evaluate it.
                     let gate_expr = icn_governance::milestone_gate::parse_gate(gate_json)
                         .map_err(|e| anyhow::anyhow!("{e}"))?;
+                    let action_items_done_count =
+                        self.count_completed_action_items_for_program(&m.program_id)?;
                     let gate_ctx = icn_governance::milestone_gate::MilestoneGateContext {
                         criteria_count: m.completion_criteria.len() as i64,
                         phase_index: m.phase_index as i64,
+                        action_items_done_count,
                         actor: actor.clone(),
                         now: icn_time::current_timestamp_secs(),
                     };
@@ -4309,6 +4312,54 @@ impl GovernanceManager {
         id: &str,
     ) -> Result<Option<icn_governance::GovernanceProofV2>> {
         self.get_proof(&ProposalId(id.to_string())).await
+    }
+
+    // ========================================================================
+    // Gate context helpers
+    // ========================================================================
+
+    /// Count `ActionItemStatus::Completed` action items whose parent activity
+    /// belongs to the given program.
+    ///
+    /// The program activity set is the union of:
+    /// - `program.activities` (forward list maintained by the program lead), and
+    /// - all entity activities whose `parent_program_id` matches `program_id`
+    ///   (reverse link set by the activity at creation time).
+    ///
+    /// Returns `0` when the program does not exist, avoiding a hard error
+    /// in the gate context construction path.
+    fn count_completed_action_items_for_program(&self, program_id: &ProgramId) -> Result<i64> {
+        let program = match self.get_program(program_id)? {
+            Some(p) => p,
+            None => return Ok(0),
+        };
+
+        // Build the set of activity IDs that belong to this program.
+        let mut activity_ids: HashSet<ActivityId> = program.activities.iter().cloned().collect();
+        let entity_activities = self.list_activities(&program.parent_entity_id)?;
+        for a in &entity_activities {
+            if a.parent_program_id.as_ref() == Some(program_id) {
+                activity_ids.insert(a.id.clone());
+            }
+        }
+
+        // Load all action items in the domain once, filter in memory.
+        let all_items = self.list_action_items(&program.domain_id, &ActionItemFilter::default())?;
+
+        let count = all_items
+            .iter()
+            .filter(|item| {
+                let belongs = match &item.parent {
+                    Some(icn_governance::InstitutionalParent::Activity { id }) => {
+                        activity_ids.contains(id)
+                    }
+                    _ => false,
+                };
+                belongs && item.status == ActionItemStatus::Completed
+            })
+            .count();
+
+        Ok(count as i64)
     }
 
     // ========================================================================
@@ -5594,5 +5645,302 @@ mod tests {
             .update_milestone_status(&m.id, MilestoneStatus::InProgress, &member)
             .unwrap();
         assert_eq!(updated.status, MilestoneStatus::InProgress);
+    }
+
+    // -------------------------------------------------------------------------
+    // action_items_done_count gate tests (manager integration)
+    // -------------------------------------------------------------------------
+
+    /// Helper: create a completed action item attached to an activity.
+    fn make_completed_item_for_activity(
+        mgr: &GovernanceManager,
+        domain_id: &GovernanceDomainId,
+        activity_id: &ActivityId,
+        member: &Did,
+    ) -> ActionItem {
+        let mut item = mgr
+            .create_action_item(
+                domain_id.clone(),
+                "Task".into(),
+                None,
+                member.clone(),
+                None,
+                None,
+                ActionItemPriority::Medium,
+                None,
+                None,
+                vec![],
+            )
+            .unwrap();
+        item.parent = Some(icn_governance::InstitutionalParent::Activity {
+            id: activity_id.clone(),
+        });
+        item.status = ActionItemStatus::Completed;
+        mgr.update_action_item(&item).unwrap();
+        item
+    }
+
+    /// Gate on `action_items_done_count >= 2` passes when 2 completed items
+    /// belong to the program's activity.
+    #[tokio::test]
+    async fn milestone_gate_action_items_done_count_passes() {
+        use icn_ccl::types::Value;
+        use icn_ccl::{BinOp, Expr};
+
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "P".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Create an activity linked to the program via parent_program_id.
+        let act = mgr
+            .create_activity(
+                "ent-1".into(),
+                ActivityKind::Project,
+                "Act A".into(),
+                None,
+                None,
+                None,
+                Some(prog.id.clone()),
+            )
+            .unwrap();
+
+        // 2 completed items under the activity.
+        make_completed_item_for_activity(&mgr, &domain_id, &act.id, &member);
+        make_completed_item_for_activity(&mgr, &domain_id, &act.id, &member);
+
+        // Gate: need at least 2 completed items.
+        let gate = Expr::BinOp {
+            op: BinOp::Ge,
+            left: Box::new(Expr::Var("action_items_done_count".into())),
+            right: Box::new(Expr::Literal(Value::Int(2))),
+        };
+
+        let m = mgr
+            .create_milestone(prog.id.clone(), "M".into(), None, 0, None, vec![])
+            .unwrap();
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        let updated = mgr
+            .update_milestone_status(&m.id, MilestoneStatus::Completed, &member)
+            .unwrap();
+        assert_eq!(updated.status, MilestoneStatus::Completed);
+    }
+
+    /// Gate on `action_items_done_count >= 3` blocks when only 1 completed item
+    /// belongs to the program.
+    #[tokio::test]
+    async fn milestone_gate_action_items_done_count_blocks() {
+        use icn_ccl::types::Value;
+        use icn_ccl::{BinOp, Expr};
+
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "P".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let act = mgr
+            .create_activity(
+                "ent-1".into(),
+                ActivityKind::Project,
+                "Act B".into(),
+                None,
+                None,
+                None,
+                Some(prog.id.clone()),
+            )
+            .unwrap();
+
+        // Only 1 completed item — gate needs 3.
+        make_completed_item_for_activity(&mgr, &domain_id, &act.id, &member);
+
+        let gate = Expr::BinOp {
+            op: BinOp::Ge,
+            left: Box::new(Expr::Var("action_items_done_count".into())),
+            right: Box::new(Expr::Literal(Value::Int(3))),
+        };
+
+        let m = mgr
+            .create_milestone(prog.id.clone(), "M".into(), None, 0, None, vec![])
+            .unwrap();
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        let result = mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &member);
+        assert!(
+            result.is_err(),
+            "gate should block with insufficient done count"
+        );
+
+        // Milestone must be unmodified.
+        let reloaded = mgr.get_milestone(&m.id).unwrap().unwrap();
+        assert_eq!(reloaded.status, MilestoneStatus::Pending);
+    }
+
+    /// Completed items outside the program's activity set must NOT be counted.
+    #[tokio::test]
+    async fn milestone_gate_action_items_outside_program_not_counted() {
+        use icn_ccl::types::Value;
+        use icn_ccl::{BinOp, Expr};
+
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+
+        // Two separate programs.
+        let prog_a = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "Prog A".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        let prog_b = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "Prog B".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Activity for prog_b only.
+        let act_b = mgr
+            .create_activity(
+                "ent-1".into(),
+                ActivityKind::Project,
+                "Act B".into(),
+                None,
+                None,
+                None,
+                Some(prog_b.id.clone()),
+            )
+            .unwrap();
+
+        // 5 completed items under prog_b's activity — none belong to prog_a.
+        for _ in 0..5 {
+            make_completed_item_for_activity(&mgr, &domain_id, &act_b.id, &member);
+        }
+
+        // Gate on prog_a's milestone: needs 1 done item (but prog_a has 0).
+        let gate = Expr::BinOp {
+            op: BinOp::Ge,
+            left: Box::new(Expr::Var("action_items_done_count".into())),
+            right: Box::new(Expr::Literal(Value::Int(1))),
+        };
+
+        let m = mgr
+            .create_milestone(prog_a.id.clone(), "M".into(), None, 0, None, vec![])
+            .unwrap();
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        let result = mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &member);
+        assert!(
+            result.is_err(),
+            "items from a different program must not satisfy the gate"
+        );
+    }
+
+    /// Non-completed items (Pending, InProgress, Deferred, Cancelled) must
+    /// NOT be counted even when they belong to the program's activity.
+    #[tokio::test]
+    async fn milestone_gate_non_completed_items_not_counted() {
+        use icn_ccl::types::Value;
+        use icn_ccl::{BinOp, Expr};
+
+        let (mgr, domain_id, member) = make_manager_with_domain().await;
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "P".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let act = mgr
+            .create_activity(
+                "ent-1".into(),
+                ActivityKind::Project,
+                "Act".into(),
+                None,
+                None,
+                None,
+                Some(prog.id.clone()),
+            )
+            .unwrap();
+
+        // Create items in every non-completed status.
+        for status in [
+            ActionItemStatus::Pending,
+            ActionItemStatus::InProgress,
+            ActionItemStatus::Deferred,
+            ActionItemStatus::Cancelled,
+        ] {
+            let mut item = mgr
+                .create_action_item(
+                    domain_id.clone(),
+                    "Task".into(),
+                    None,
+                    member.clone(),
+                    None,
+                    None,
+                    ActionItemPriority::Medium,
+                    None,
+                    None,
+                    vec![],
+                )
+                .unwrap();
+            item.parent =
+                Some(icn_governance::InstitutionalParent::Activity { id: act.id.clone() });
+            item.status = status;
+            mgr.update_action_item(&item).unwrap();
+        }
+
+        // Gate: need at least 1 completed item. Should block since all are non-completed.
+        let gate = Expr::BinOp {
+            op: BinOp::Ge,
+            left: Box::new(Expr::Var("action_items_done_count".into())),
+            right: Box::new(Expr::Literal(Value::Int(1))),
+        };
+
+        let m = mgr
+            .create_milestone(prog.id.clone(), "M".into(), None, 0, None, vec![])
+            .unwrap();
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        let result = mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &member);
+        assert!(
+            result.is_err(),
+            "non-completed items must not satisfy action_items_done_count gate"
+        );
     }
 }

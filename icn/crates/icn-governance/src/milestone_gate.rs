@@ -13,13 +13,13 @@
 //! milestone record at the time of the completion attempt.  The following
 //! named variables are available:
 //!
-//! | Variable          | Type  | Meaning                                     |
-//! |-------------------|-------|---------------------------------------------|
-//! | `criteria_count`  | `Int` | `completion_criteria.len()` at eval time    |
-//! | `phase_index`     | `Int` | milestone `phase_index` (0-based ordinal)   |
+//! | Variable                  | Type  | Meaning                                                |
+//! |---------------------------|-------|--------------------------------------------------------|
+//! | `criteria_count`          | `Int` | `completion_criteria.len()` at eval time               |
+//! | `phase_index`             | `Int` | milestone `phase_index` (0-based ordinal)              |
+//! | `action_items_done_count` | `Int` | completed action items in the milestone's program      |
 //!
 //! **What is NOT available (deferred):**
-//! - Action-item completion counts (requires a separate store query)
 //! - Trust scores or ledger balances (no CCL capabilities granted)
 //! - Proposal or vote state
 //! - Cross-milestone dependency checks
@@ -71,12 +71,22 @@ const GATE_FUEL: u64 = 1_000;
 ///
 /// Built from the milestone record immediately before the completion
 /// attempt.  All fields are passed as named CCL variables.
+///
+/// | Variable                  | Type  | Meaning                                                |
+/// |---------------------------|-------|--------------------------------------------------------|
+/// | `criteria_count`          | `Int` | `completion_criteria.len()` at eval time               |
+/// | `phase_index`             | `Int` | milestone `phase_index` (0-based ordinal)              |
+/// | `action_items_done_count` | `Int` | `ActionItemStatus::Completed` items in the program     |
 #[derive(Debug, Clone)]
 pub struct MilestoneGateContext {
     /// Number of strings in `completion_criteria`.
     pub criteria_count: i64,
     /// Ordinal phase index of the milestone (0-based).
     pub phase_index: i64,
+    /// Count of `ActionItemStatus::Completed` action items whose parent
+    /// activity belongs to the milestone's program.  Zero when the milestone
+    /// has no associated program or when the program has no action items.
+    pub action_items_done_count: i64,
     /// DID of the actor requesting completion (used as CCL caller).
     pub actor: Did,
     /// Current Unix timestamp (seconds).
@@ -88,6 +98,10 @@ impl MilestoneGateContext {
         let mut map = HashMap::new();
         map.insert("criteria_count".into(), Value::Int(self.criteria_count));
         map.insert("phase_index".into(), Value::Int(self.phase_index));
+        map.insert(
+            "action_items_done_count".into(),
+            Value::Int(self.action_items_done_count),
+        );
         map
     }
 }
@@ -179,10 +193,19 @@ mod tests {
     use icn_identity::KeyPair;
 
     fn ctx(criteria_count: i64, phase_index: i64) -> MilestoneGateContext {
+        ctx_with_done(criteria_count, phase_index, 0)
+    }
+
+    fn ctx_with_done(
+        criteria_count: i64,
+        phase_index: i64,
+        action_items_done_count: i64,
+    ) -> MilestoneGateContext {
         let did = KeyPair::generate().unwrap().did().clone();
         MilestoneGateContext {
             criteria_count,
             phase_index,
+            action_items_done_count,
             actor: did,
             now: 1_700_000_000,
         }
@@ -278,6 +301,57 @@ mod tests {
         assert!(matches!(
             evaluate_milestone_gate(Some(&gate), &c).unwrap_err(),
             MilestoneGateError::EvalError { .. }
+        ));
+    }
+
+    // -------------------------------------------------------------------------
+    // action_items_done_count tests
+    // -------------------------------------------------------------------------
+
+    /// Gate on `action_items_done_count >= 2` passes when count is 3.
+    #[test]
+    fn gate_action_items_done_passes() {
+        let gate = gte("action_items_done_count", 2);
+        let c = ctx_with_done(0, 0, 3);
+        assert!(evaluate_milestone_gate(Some(&gate), &c).is_ok());
+    }
+
+    /// Gate on `action_items_done_count >= 5` blocks when count is 2.
+    #[test]
+    fn gate_action_items_done_blocks() {
+        let gate = gte("action_items_done_count", 5);
+        let c = ctx_with_done(0, 0, 2);
+        assert!(matches!(
+            evaluate_milestone_gate(Some(&gate), &c).unwrap_err(),
+            MilestoneGateError::Blocked { .. }
+        ));
+    }
+
+    /// Compound gate: `criteria_count >= 1 && action_items_done_count >= 2`.
+    #[test]
+    fn gate_compound_criteria_and_done_passes() {
+        let gate = Expr::BinOp {
+            op: BinOp::And,
+            left: Box::new(gte("criteria_count", 1)),
+            right: Box::new(gte("action_items_done_count", 2)),
+        };
+        let c = ctx_with_done(2, 0, 3);
+        assert!(evaluate_milestone_gate(Some(&gate), &c).is_ok());
+    }
+
+    /// Compound gate blocks when only one condition is satisfied.
+    #[test]
+    fn gate_compound_blocks_when_done_count_low() {
+        let gate = Expr::BinOp {
+            op: BinOp::And,
+            left: Box::new(gte("criteria_count", 1)),
+            right: Box::new(gte("action_items_done_count", 5)),
+        };
+        // criteria_count=2 passes first condition, but done_count=1 fails second.
+        let c = ctx_with_done(2, 0, 1);
+        assert!(matches!(
+            evaluate_milestone_gate(Some(&gate), &c).unwrap_err(),
+            MilestoneGateError::Blocked { .. }
         ));
     }
 }
