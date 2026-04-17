@@ -106,6 +106,42 @@ pub struct ProvenanceChain {
 }
 
 // ============================================================================
+// Program dashboard aggregate types
+// ============================================================================
+
+/// Action item status counts for the program dashboard.
+///
+/// Only counts items whose `parent` is an `InstitutionalParent::Activity`
+/// belonging to the program. Domain items not attached to a program activity
+/// are excluded.
+#[derive(Debug, Clone, Default)]
+pub struct ProgramActionItemCounts {
+    pub pending: usize,
+    pub in_progress: usize,
+    pub completed: usize,
+    pub deferred: usize,
+    pub cancelled: usize,
+}
+
+impl ProgramActionItemCounts {
+    pub fn total(&self) -> usize {
+        self.pending + self.in_progress + self.completed + self.deferred + self.cancelled
+    }
+}
+
+/// Composite program dashboard: program + ordered milestones + linked
+/// activities + action item counts.
+///
+/// Assembled by [`GovernanceManager::get_program_dashboard`] and converted to
+/// [`crate::http::models::ProgramDashboardResponse`] by the HTTP handler.
+pub struct ProgramDashboard {
+    pub program: Program,
+    pub milestones: Vec<Milestone>,
+    pub activities: Vec<Activity>,
+    pub action_item_counts: ProgramActionItemCounts,
+}
+
+// ============================================================================
 // Sled-Backed Action Item Store
 // ============================================================================
 
@@ -4224,6 +4260,97 @@ impl GovernanceManager {
         id: &str,
     ) -> Result<Option<icn_governance::GovernanceProofV2>> {
         self.get_proof(&ProposalId(id.to_string())).await
+    }
+
+    // ========================================================================
+    // Program dashboard (composite read surface)
+    // ========================================================================
+
+    /// Compose a compact dashboard for a program.
+    ///
+    /// Returns `None` when the program does not exist.
+    ///
+    /// Composition strategy:
+    /// - **Program**: single `get_program` lookup.
+    /// - **Milestones**: `list_milestones_by_program` (already sorted by
+    ///   `phase_index`).
+    /// - **Activities**: fetched individually from `program.activities` (the
+    ///   program record is the source of truth for which activities belong to
+    ///   it). Missing activity records are silently skipped (soft-reference
+    ///   semantics: the program outlives individual activity deletions).
+    /// - **Action item counts**: all items in the program's domain are loaded
+    ///   once, then filtered in memory to those whose `parent` is an
+    ///   `InstitutionalParent::Activity` with an ID present in
+    ///   `program.activities`. Grouped by `ActionItemStatus`.
+    /// - **Meetings**: intentionally absent from v1 — no activity-keyed index
+    ///   on the meeting store; resolving would require a full domain scan.
+    pub fn get_program_dashboard(
+        &self,
+        program_id: &ProgramId,
+    ) -> Result<Option<ProgramDashboard>> {
+        // 1. Program record
+        let program = match self.get_program(program_id)? {
+            Some(p) => p,
+            None => return Ok(None),
+        };
+
+        // 2. Milestones (sorted by phase_index from the store)
+        let milestones = self.list_milestones_by_program(program_id)?;
+
+        // 3. Activities — two complementary sources, merged and deduped:
+        //    (a) program.activities: explicit list maintained by the program lead.
+        //    (b) list_activities(parent_entity_id) filtered by parent_program_id:
+        //        activities that declared their own parent program at creation time.
+        //
+        // Both sources are truthful; either can be populated independently.
+        // The union ensures dashboard completeness regardless of which
+        // linkage direction was used.
+        let mut seen_ids: HashSet<ActivityId> = program.activities.iter().cloned().collect();
+        let entity_activities = self.list_activities(&program.parent_entity_id)?;
+        for a in &entity_activities {
+            if a.parent_program_id.as_ref() == Some(program_id) {
+                seen_ids.insert(a.id.clone());
+            }
+        }
+
+        let mut activities: Vec<Activity> = Vec::with_capacity(seen_ids.len());
+        for act_id in &seen_ids {
+            if let Some(a) = self.get_activity(act_id)? {
+                activities.push(a);
+            }
+        }
+        // Stable ordering: sort by name so response is deterministic
+        activities.sort_by(|a, b| a.name.cmp(&b.name));
+
+        // 4. Action item counts — one domain list, in-memory filter
+        let activity_ids: HashSet<ActivityId> = seen_ids;
+        let all_items = self.list_action_items(&program.domain_id, &ActionItemFilter::default())?;
+
+        let mut counts = ProgramActionItemCounts::default();
+        for item in &all_items {
+            let belongs = match &item.parent {
+                Some(icn_governance::InstitutionalParent::Activity { id }) => {
+                    activity_ids.contains(id)
+                }
+                _ => false,
+            };
+            if belongs {
+                match item.status {
+                    ActionItemStatus::Pending => counts.pending += 1,
+                    ActionItemStatus::InProgress => counts.in_progress += 1,
+                    ActionItemStatus::Completed => counts.completed += 1,
+                    ActionItemStatus::Deferred => counts.deferred += 1,
+                    ActionItemStatus::Cancelled => counts.cancelled += 1,
+                }
+            }
+        }
+
+        Ok(Some(ProgramDashboard {
+            program,
+            milestones,
+            activities,
+            action_item_counts: counts,
+        }))
     }
 }
 

@@ -865,3 +865,89 @@ pub struct MilestoneResponse {
     pub completed_by: Option<String>,
     pub created_at: u64,
 }
+
+// ============================================================================
+// Program dashboard (composite read surface)
+// ============================================================================
+
+/// Compact milestone row inside the program dashboard.
+///
+/// Uses the full `MilestoneResponse` field set minus `completion_criteria` and
+/// `created_at`, which are detail-level and inflate the composite response
+/// without helping a dashboard consumer understand program progress.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DashboardMilestoneSummary {
+    pub id: String,
+    pub name: String,
+    pub phase_index: u32,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_date: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<u64>,
+}
+
+/// Milestone status counts for the program dashboard.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+pub struct DashboardMilestoneCounts {
+    pub total: usize,
+    pub completed: usize,
+    pub in_progress: usize,
+    pub blocked: usize,
+    pub pending: usize,
+    pub skipped: usize,
+}
+
+/// Compact activity row inside the program dashboard.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DashboardActivitySummary {
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    pub status: String,
+}
+
+/// Action item status counts for the program dashboard.
+///
+/// Counts only items whose `parent` is an `Activity` listed in the program's
+/// `activities` vec. Domain items with no activity parent or a parent that
+/// does not belong to this program are excluded.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+pub struct DashboardActionItemCounts {
+    pub pending: usize,
+    pub in_progress: usize,
+    pub completed: usize,
+    pub deferred: usize,
+    pub cancelled: usize,
+    pub total: usize,
+}
+
+/// Composite program dashboard response.
+///
+/// Returned by `GET /gov/programs/{program_id}/dashboard`. Combines the program
+/// record, its ordered milestones (with status counts), its linked activities,
+/// and action item counts scoped to those activities.
+///
+/// Meetings are intentionally absent from v1: the `Meeting` type links to
+/// activities via `linked_activities: Vec<ActivityId>`, but there is no
+/// activity-keyed index on the meeting store. Resolving meetings would require
+/// a full domain scan. Deferred until a `list_by_activity` index exists.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ProgramDashboardResponse {
+    pub program_id: String,
+    pub domain_id: String,
+    pub parent_entity_id: String,
+    pub name: String,
+    pub kind: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_at: Option<u64>,
+    pub milestones: Vec<DashboardMilestoneSummary>,
+    pub milestone_counts: DashboardMilestoneCounts,
+    pub activities: Vec<DashboardActivitySummary>,
+    pub action_item_counts: DashboardActionItemCounts,
+}
