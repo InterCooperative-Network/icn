@@ -3609,6 +3609,55 @@ pub async fn update_milestone_status<E: GovernanceEventEmitter + Clone + 'static
     Ok(HttpResponse::Ok().json(milestone_to_response(&m)))
 }
 
+// ── /me endpoints ─────────────────────────────────────────────────────────────
+
+/// GET /gov/me/scopes — Return all role assignments held by the authenticated DID.
+///
+/// The response is a flat list of [`RoleAssignmentResponse`] across every
+/// structure in the system where the caller holds a role. This is the primary
+/// entry point for an organizer or member to discover their authority scope
+/// without knowing which structures they belong to in advance.
+pub async fn get_my_scopes<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let caller = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    let roles = ctx
+        .manager
+        .list_roles_for_person(&caller)
+        .map_err(anyhow_to_api)?;
+
+    let responses: Vec<RoleAssignmentResponse> = roles.iter().map(role_to_response).collect();
+    Ok(HttpResponse::Ok().json(responses))
+}
+
+/// GET /gov/me/work — Return all action items assigned to the authenticated DID.
+///
+/// Returns items across **all** governance domains, sorted by creation date
+/// (oldest first). No filtering is applied — the caller receives their full
+/// open work queue. Filtering by status, priority, or tag will be added
+/// in a follow-up endpoint iteration.
+///
+/// **Note**: Items in any status are returned. Callers should filter client-side
+/// by `status` if they only want pending or in-progress items.
+pub async fn get_my_work<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let caller = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    let items = ctx
+        .manager
+        .list_work_for_person(&caller)
+        .map_err(anyhow_to_api)?;
+
+    let responses: Vec<ActionItemResponse> = items.iter().map(action_item_to_response).collect();
+    Ok(HttpResponse::Ok().json(responses))
+}
+
 // ============================================================================
 // Tests — governance → execution bridge
 // ============================================================================
@@ -3965,5 +4014,197 @@ mod tests {
             *resolver_called.lock().unwrap(),
             "membership_resolver.resolve_members() must be invoked for TrustThreshold domains"
         );
+    }
+
+    // ── /me endpoint tests ──────────────────────────────────────────────────
+
+    /// Build a minimal test app wired to both /me/scopes and /me/work.
+    macro_rules! me_test_app {
+        ($ctx:expr, $caller_did:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            let caller_did_str = $caller_did.to_string();
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: caller_did_str.clone(),
+                            scope: Some("governance:read".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/me/scopes",
+                        web::get().to(get_my_scopes::<NoopEventEmitter>),
+                    )
+                    .route("/me/work", web::get().to(get_my_work::<NoopEventEmitter>)),
+            )
+            .await
+        }};
+    }
+
+    #[actix_web::test]
+    async fn get_my_scopes_empty() {
+        let caller = test_did(10);
+        let mgr = Arc::new(GovernanceManager::new());
+        let ctx = GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_proposal_accepted: None,
+            on_charter_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        };
+
+        let app = me_test_app!(ctx, caller);
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get().uri("/me/scopes").to_request(),
+        )
+        .await;
+
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body, serde_json::json!([]));
+    }
+
+    #[actix_web::test]
+    async fn get_my_scopes_returns_assigned_roles() {
+        let caller = test_did(11);
+        let other = test_did(12);
+        let mgr = Arc::new(GovernanceManager::new());
+
+        // Create a structure and assign roles
+        let s = mgr
+            .create_structure(
+                "entity-abc".to_string(),
+                icn_governance::StructureKind::Committee,
+                "Tech Committee".to_string(),
+                None,
+            )
+            .unwrap();
+
+        mgr.assign_role(s.id.clone(), caller.clone(), "coordinator".to_string())
+            .unwrap();
+        mgr.assign_role(s.id.clone(), other.clone(), "member".to_string())
+            .unwrap();
+
+        let ctx = GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_proposal_accepted: None,
+            on_charter_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        };
+
+        let app = me_test_app!(ctx, caller.clone());
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get().uri("/me/scopes").to_request(),
+        )
+        .await;
+
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: Vec<serde_json::Value> = test::read_body_json(resp).await;
+        // Only the caller's role should appear, not `other`'s
+        assert_eq!(body.len(), 1);
+        assert_eq!(body[0]["person_did"], caller.to_string());
+        assert_eq!(body[0]["role"], "coordinator");
+    }
+
+    #[actix_web::test]
+    async fn get_my_work_empty() {
+        let caller = test_did(10); // seed 10 produces a valid Ed25519 point
+        let mgr = Arc::new(GovernanceManager::new());
+        let ctx = GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_proposal_accepted: None,
+            on_charter_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        };
+
+        let app = me_test_app!(ctx, caller);
+        let resp =
+            test::call_service(&app, test::TestRequest::get().uri("/me/work").to_request()).await;
+
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body, serde_json::json!([]));
+    }
+
+    #[actix_web::test]
+    async fn get_my_work_returns_assigned_items_across_domains() {
+        let caller = test_did(11); // seed 11 produces a valid Ed25519 point
+        let mgr = Arc::new(GovernanceManager::new());
+
+        // Create domains and action items
+        for domain_str in ["alpha", "beta"] {
+            let domain_id = GovernanceDomainId(domain_str.to_string());
+            mgr.create_domain(
+                domain_id.clone(),
+                format!("{domain_str} coop"),
+                "cooperative_default".to_string(),
+                GovernanceParams::new(0, 51, 86_400),
+                MembershipConfig {
+                    source: MembershipSource::StaticList(vec![caller.clone()]),
+                },
+            )
+            .await
+            .unwrap();
+
+            mgr.create_action_item(
+                domain_id,
+                format!("Task in {domain_str}"),
+                None,
+                caller.clone(),       // created_by
+                Some(caller.clone()), // assignee
+                None,
+                icn_governance::ActionItemPriority::Medium,
+                None,
+                None,
+                vec![],
+            )
+            .unwrap();
+        }
+
+        let ctx = GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_proposal_accepted: None,
+            on_charter_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        };
+
+        let app = me_test_app!(ctx, caller.clone());
+        let resp =
+            test::call_service(&app, test::TestRequest::get().uri("/me/work").to_request()).await;
+
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: Vec<serde_json::Value> = test::read_body_json(resp).await;
+        assert_eq!(
+            body.len(),
+            2,
+            "should return items from both alpha and beta domains"
+        );
+        // All items belong to the caller
+        for item in &body {
+            assert_eq!(item["assignee"], caller.to_string());
+        }
     }
 }

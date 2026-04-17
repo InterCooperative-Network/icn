@@ -571,6 +571,21 @@ impl ActionItemStoreBackend for InMemoryActionItemStore {
 
         Ok(count)
     }
+
+    /// In-memory cross-domain assignee scan. Used by `GET /gov/me/work`.
+    fn list_by_assignee(&self, assignee: &Did) -> Result<Vec<ActionItem>> {
+        let items = self
+            .items
+            .read()
+            .map_err(|_| crate::GovernanceError::LockPoisoned("action item store".to_string()))?;
+        let mut out: Vec<ActionItem> = items
+            .values()
+            .filter(|i| i.assignee.as_ref() == Some(assignee))
+            .cloned()
+            .collect();
+        out.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        Ok(out)
+    }
 }
 
 /// Sled key version for schema migration support.
