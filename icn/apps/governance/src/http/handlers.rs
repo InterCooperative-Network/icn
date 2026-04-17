@@ -3638,6 +3638,118 @@ pub async fn update_milestone_status<E: GovernanceEventEmitter + Clone + 'static
     Ok(HttpResponse::Ok().json(milestone_to_response(&m)))
 }
 
+// ── Program dashboard ─────────────────────────────────────────────────────────
+
+fn dashboard_milestone_summary(m: &icn_governance::Milestone) -> DashboardMilestoneSummary {
+    DashboardMilestoneSummary {
+        id: m.id.0.clone(),
+        name: m.name.clone(),
+        phase_index: m.phase_index,
+        status: milestone_status_str(&m.status).to_string(),
+        target_date: m.target_date,
+        completed_at: m.completed_at,
+    }
+}
+
+fn dashboard_activity_summary(a: &icn_governance::Activity) -> DashboardActivitySummary {
+    DashboardActivitySummary {
+        id: a.id.0.clone(),
+        name: a.name.clone(),
+        kind: match a.kind {
+            ActivityKind::Event => "event",
+            ActivityKind::Program => "program",
+            ActivityKind::Project => "project",
+            ActivityKind::Initiative => "initiative",
+        }
+        .to_string(),
+        status: match a.status {
+            ActivityStatus::Planned => "planned",
+            ActivityStatus::Active => "active",
+            ActivityStatus::Completed => "completed",
+            ActivityStatus::Cancelled => "cancelled",
+        }
+        .to_string(),
+    }
+}
+
+/// GET /gov/programs/{program_id}/dashboard — Composite program view.
+///
+/// Returns a compact read surface combining:
+/// - program metadata
+/// - ordered milestones with status counts
+/// - linked activity summaries
+/// - action item counts scoped to the program's activities
+///
+/// Requires `governance:read` scope. No write gates — this is a pure read.
+///
+/// **Meetings** are absent from this response. `Meeting` records link to
+/// activities via `linked_activities` but there is no activity-keyed index
+/// on the meeting store. Resolving meetings would require a full domain scan.
+/// Deferred until a `list_by_activity` index is available.
+pub async fn get_program_dashboard<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    program_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let pid = ProgramId(program_id.into_inner());
+
+    let d = ctx
+        .manager
+        .get_program_dashboard(&pid)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found"))?;
+
+    // Build milestone counts
+    let mut mc = DashboardMilestoneCounts {
+        total: d.milestones.len(),
+        ..Default::default()
+    };
+    for m in &d.milestones {
+        match m.status {
+            MilestoneStatus::Completed => mc.completed += 1,
+            MilestoneStatus::InProgress => mc.in_progress += 1,
+            MilestoneStatus::Blocked => mc.blocked += 1,
+            MilestoneStatus::Pending => mc.pending += 1,
+            MilestoneStatus::Skipped => mc.skipped += 1,
+        }
+    }
+
+    let ai = &d.action_item_counts;
+    let resp = ProgramDashboardResponse {
+        program_id: d.program.id.0.clone(),
+        domain_id: d.program.domain_id.0.clone(),
+        parent_entity_id: d.program.parent_entity_id.clone(),
+        name: d.program.name.clone(),
+        kind: program_kind_str(&d.program.kind),
+        status: program_status_str(&d.program.status).to_string(),
+        description: d.program.description.clone(),
+        start_at: d.program.start_at,
+        end_at: d.program.end_at,
+        milestones: d
+            .milestones
+            .iter()
+            .map(dashboard_milestone_summary)
+            .collect(),
+        milestone_counts: mc,
+        activities: d
+            .activities
+            .iter()
+            .map(dashboard_activity_summary)
+            .collect(),
+        action_item_counts: DashboardActionItemCounts {
+            pending: ai.pending,
+            in_progress: ai.in_progress,
+            completed: ai.completed,
+            deferred: ai.deferred,
+            cancelled: ai.cancelled,
+            total: ai.total(),
+        },
+    };
+
+    Ok(HttpResponse::Ok().json(resp))
+}
+
 // ── /me endpoints ─────────────────────────────────────────────────────────────
 
 /// GET /gov/me/scopes — Return all role assignments held by the authenticated DID.
@@ -4733,5 +4845,307 @@ mod tests {
             0,
             "rejected proposal must not produce ActionItems"
         );
+    }
+
+    // ── Program dashboard tests ────────────────────────────────────────────
+
+    macro_rules! dashboard_app {
+        ($ctx:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: "did:icn:reader".to_string(),
+                            scope: Some("governance:read".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/programs/{program_id}/dashboard",
+                        web::get().to(get_program_dashboard::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    fn make_dashboard_ctx(mgr: Arc<GovernanceManager>) -> GovernanceContext<NoopEventEmitter> {
+        GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_proposal_accepted: None,
+            on_charter_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        }
+    }
+
+    /// 404 when program does not exist.
+    #[actix_web::test]
+    async fn dashboard_404_for_missing_program() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let app = dashboard_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/programs/nonexistent/dashboard")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 404);
+    }
+
+    /// Empty program returns zero counts and empty lists.
+    #[actix_web::test]
+    async fn dashboard_empty_program() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let domain_id = GovernanceDomainId("dom-a".to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            "Domain A".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let prog = mgr
+            .create_program(
+                domain_id,
+                "entity-a".to_string(),
+                icn_governance::ProgramKind::Cycle,
+                "Summit Cycle 2026".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let app = dashboard_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/programs/{}/dashboard", prog.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["program_id"], prog.id.0.as_str());
+        assert_eq!(body["name"], "Summit Cycle 2026");
+        assert_eq!(body["status"], "draft");
+        assert_eq!(body["kind"], "cycle");
+        assert_eq!(body["milestones"], serde_json::json!([]));
+        assert_eq!(body["activities"], serde_json::json!([]));
+        assert_eq!(body["milestone_counts"]["total"], 0);
+        assert_eq!(body["action_item_counts"]["total"], 0);
+    }
+
+    /// Milestones are returned ordered by phase_index; counts are correct.
+    #[actix_web::test]
+    async fn dashboard_milestones_ordered_and_counted() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let domain_id = GovernanceDomainId("dom-b".to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            "Domain B".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "entity-b".to_string(),
+                icn_governance::ProgramKind::Campaign,
+                "Q3 Campaign".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Add milestones out of phase order
+        mgr.create_milestone(
+            prog.id.clone(),
+            "Phase 2 work".to_string(),
+            None,
+            2,
+            None,
+            vec![],
+        )
+        .unwrap();
+        let m0 = mgr
+            .create_milestone(
+                prog.id.clone(),
+                "Phase 0 kickoff".to_string(),
+                None,
+                0,
+                None,
+                vec![],
+            )
+            .unwrap();
+        let m1 = mgr
+            .create_milestone(
+                prog.id.clone(),
+                "Phase 1 plan".to_string(),
+                None,
+                1,
+                None,
+                vec![],
+            )
+            .unwrap();
+
+        // Mark m0 completed, m1 blocked
+        let caller = test_did(1);
+        mgr.update_milestone_status(&m0.id, MilestoneStatus::Completed, &caller)
+            .unwrap();
+        mgr.update_milestone_status(&m1.id, MilestoneStatus::Blocked, &caller)
+            .unwrap();
+
+        let app = dashboard_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/programs/{}/dashboard", prog.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let milestones = body["milestones"].as_array().unwrap();
+        assert_eq!(milestones.len(), 3);
+        // Phase order preserved (snake_case field names — no camelCase rename on summary)
+        assert_eq!(milestones[0]["phase_index"], 0);
+        assert_eq!(milestones[1]["phase_index"], 1);
+        assert_eq!(milestones[2]["phase_index"], 2);
+        assert_eq!(milestones[0]["status"], "completed");
+        assert_eq!(milestones[1]["status"], "blocked");
+
+        let mc = &body["milestone_counts"];
+        assert_eq!(mc["total"], 3);
+        assert_eq!(mc["completed"], 1);
+        assert_eq!(mc["blocked"], 1);
+        assert_eq!(mc["pending"], 1);
+    }
+
+    /// Action items attached to program activities appear in counts;
+    /// domain items not attached to a program activity are excluded.
+    #[actix_web::test]
+    async fn dashboard_action_item_counts_scoped_to_program_activities() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let domain_id = GovernanceDomainId("dom-c".to_string());
+        let creator = test_did(2);
+
+        mgr.create_domain(
+            domain_id.clone(),
+            "Domain C".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![creator.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Create program and link an activity
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "entity-c".to_string(),
+                icn_governance::ProgramKind::Cycle,
+                "Cycle".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Activity declares its own parent_program_id — dashboard discovers
+        // it via the reverse-link scan (activity → program direction).
+        let activity = mgr
+            .create_activity(
+                "entity-c".to_string(),
+                icn_governance::ActivityKind::Event,
+                "Summit Event".to_string(),
+                None,
+                None,
+                None,
+                Some(prog.id.clone()),
+            )
+            .unwrap();
+
+        // Action item attached to the program's activity (should be counted)
+        let mut item_in = mgr
+            .create_action_item(
+                domain_id.clone(),
+                "In-scope task".to_string(),
+                None,
+                creator.clone(),
+                None,
+                None,
+                icn_governance::ActionItemPriority::Medium,
+                None,
+                None,
+                vec![],
+            )
+            .unwrap();
+        item_in.parent = Some(icn_governance::InstitutionalParent::Activity {
+            id: activity.id.clone(),
+        });
+        mgr.update_action_item(&item_in).unwrap();
+
+        // Domain action item with no parent (should NOT be counted)
+        mgr.create_action_item(
+            domain_id.clone(),
+            "Unattached task".to_string(),
+            None,
+            creator.clone(),
+            None,
+            None,
+            icn_governance::ActionItemPriority::Medium,
+            None,
+            None,
+            vec![],
+        )
+        .unwrap();
+
+        let app = dashboard_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/programs/{}/dashboard", prog.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let ai = &body["action_item_counts"];
+        assert_eq!(ai["pending"], 1, "only the attached item should be counted");
+        assert_eq!(ai["total"], 1);
+
+        let activities = body["activities"].as_array().unwrap();
+        assert_eq!(activities.len(), 1);
+        assert_eq!(activities[0]["name"], "Summit Event");
     }
 }
