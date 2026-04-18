@@ -1182,97 +1182,13 @@ impl GatewayServer {
                             }
                         });
                     }
-                    GovernanceEffect::AppointSteward {
-                        proposal_id,
-                        domain_id,
-                        candidate,
-                        region: _,
-                        bond_amount,
-                        term_length_seconds,
-                    } => {
-                        // Register the candidate as a steward in commons, scoped to the
-                        // governance domain that approved the appointment.  The domain must
-                        // have a ratified charter (via DeployCharter) for the jurisdiction
-                        // binding to succeed.
-                        // If the candidate has no Commons Holder record or the charter is not
-                        // yet registered, register_steward returns Err and we log a warning.
-                        let commons_mgr = commons_mgr_for_gov.clone();
-                        tokio::spawn(async move {
-                            let term_days = term_length_seconds / 86_400;
-                            let bond = bond_amount.max(0) as u64;
-                            match commons_mgr
-                                .register_steward(
-                                    &candidate,
-                                    &candidate,
-                                    term_days,
-                                    bond,
-                                    proposal_id,
-                                    Some(domain_id.clone()),
-                                    vec![],
-                                )
-                                .await
-                            {
-                                Ok(_) => {
-                                    tracing::info!(
-                                        did = %candidate,
-                                        jurisdiction = %domain_id,
-                                        "AppointSteward: steward registered in commons"
-                                    );
-                                }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        error = %e,
-                                        did = %candidate,
-                                        jurisdiction = %domain_id,
-                                        "AppointSteward: failed to register steward"
-                                    );
-                                }
-                            }
-                        });
-                    }
-                    GovernanceEffect::RevokeSteward {
-                        proposal_id: _,
-                        steward,
-                        reason,
-                    } => {
-                        // Revoke the steward's appointment in commons.
-                        // If no steward record exists for this DID, this is a no-op.
-                        let commons_mgr = commons_mgr_for_gov.clone();
-                        tokio::spawn(async move {
-                            match commons_mgr.get_steward_by_did(&steward).await {
-                                Ok(Some(record)) => {
-                                    let steward_id = record.id().to_hex();
-                                    if let Err(e) = commons_mgr
-                                        .revoke_steward(&steward_id, reason, vec![])
-                                        .await
-                                    {
-                                        tracing::warn!(
-                                            error = %e,
-                                            did = %steward,
-                                            "RevokeSteward: failed to revoke steward"
-                                        );
-                                    } else {
-                                        tracing::info!(
-                                            did = %steward,
-                                            "RevokeSteward: steward revoked in commons"
-                                        );
-                                    }
-                                }
-                                Ok(None) => {
-                                    tracing::debug!(
-                                        did = %steward,
-                                        "RevokeSteward: no steward record found, skipping"
-                                    );
-                                }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        error = %e,
-                                        did = %steward,
-                                        "RevokeSteward: steward lookup failed"
-                                    );
-                                }
-                            }
-                        });
+                    GovernanceEffect::AppointSteward { .. }
+                    | GovernanceEffect::RevokeSteward { .. } => {
+                        // Handled by the evidence-returning hook
+                        // `on_proposal_accepted_with_evidence` wired below, which awaits
+                        // the commons call and persists the outcome as a durable
+                        // `EffectDispatchEvidence` record against the institutional
+                        // effect. Skipping here avoids double-execution.
                     }
                     GovernanceEffect::Unhandled {
                         proposal_id,
@@ -1332,12 +1248,175 @@ impl GatewayServer {
                 Box::pin(async move { mgr.is_member_suspended(&domain_id, &did).await })
             });
 
+        // Evidence-returning dispatch hook for steward authority effects.
+        //
+        // Unlike `on_proposal_accepted` (fire-and-forget), this hook awaits the
+        // commons mutation and returns a `DispatchEvidenceSpec` describing the
+        // real outcome. The governance app persists that spec as an
+        // `EffectDispatchEvidence` record tied to the `InstitutionalEffectRecord`
+        // emitted at acceptance, bringing the effect's `reconciliation_status`
+        // out of `emitted_only`:
+        //   * success → `ExecutionEvidenced` with a commons steward-id receipt_ref
+        //   * failure → `ExecutionFailed` with a durable error_message
+        // Sticky-failure semantics (failures shadow later successes) are enforced
+        // in the app layer, so a once-failed effect stays auditable even if a
+        // later retry succeeds elsewhere.
+        //
+        // Only `AppointSteward` and `RevokeSteward` are wired through this hook
+        // in this slice — these are the first production effects with real
+        // execution evidence. Other effects fall through to `None` and remain
+        // `emitted_only` until their dispatcher is promoted to evidence-returning.
+        let commons_mgr_for_evidence = commons_manager.clone();
+        let on_proposal_accepted_with_evidence: icn_governance_actor::http::configure::ProposalDispatchEvidenceHook =
+            std::sync::Arc::new(move |effect| {
+                use icn_governance_actor::http::configure::{
+                    DispatchEvidenceSpec, GovernanceEffect,
+                };
+                let commons = commons_mgr_for_evidence.clone();
+                let effect = effect.clone();
+                Box::pin(async move {
+                    match effect {
+                        GovernanceEffect::AppointSteward {
+                            proposal_id,
+                            domain_id,
+                            candidate,
+                            region: _,
+                            bond_amount,
+                            term_length_seconds,
+                        } => {
+                            let term_days = term_length_seconds / 86_400;
+                            let bond = bond_amount.max(0) as u64;
+                            match commons
+                                .register_steward(
+                                    &candidate,
+                                    &candidate,
+                                    term_days,
+                                    bond,
+                                    proposal_id,
+                                    Some(domain_id.clone()),
+                                    vec![],
+                                )
+                                .await
+                            {
+                                Ok(record) => {
+                                    let steward_id = record.id().to_hex();
+                                    tracing::info!(
+                                        did = %candidate,
+                                        jurisdiction = %domain_id,
+                                        steward_id = %steward_id,
+                                        "AppointSteward: steward registered in commons"
+                                    );
+                                    Some(DispatchEvidenceSpec {
+                                        subsystem: "commons".to_string(),
+                                        receipt_ref: Some(steward_id),
+                                        success: true,
+                                        error_message: None,
+                                    })
+                                }
+                                Err(e) => {
+                                    let msg = e.to_string();
+                                    tracing::warn!(
+                                        error = %msg,
+                                        did = %candidate,
+                                        jurisdiction = %domain_id,
+                                        "AppointSteward: failed to register steward"
+                                    );
+                                    Some(DispatchEvidenceSpec {
+                                        subsystem: "commons".to_string(),
+                                        receipt_ref: None,
+                                        success: false,
+                                        error_message: Some(msg),
+                                    })
+                                }
+                            }
+                        }
+                        GovernanceEffect::RevokeSteward {
+                            proposal_id: _,
+                            steward,
+                            reason,
+                        } => match commons.get_steward_by_did(&steward).await {
+                            Ok(Some(record)) => {
+                                let steward_id = record.id().to_hex();
+                                match commons
+                                    .revoke_steward(&steward_id, reason, vec![])
+                                    .await
+                                {
+                                    Ok(()) => {
+                                        tracing::info!(
+                                            did = %steward,
+                                            steward_id = %steward_id,
+                                            "RevokeSteward: steward revoked in commons"
+                                        );
+                                        Some(DispatchEvidenceSpec {
+                                            subsystem: "commons".to_string(),
+                                            receipt_ref: Some(steward_id),
+                                            success: true,
+                                            error_message: None,
+                                        })
+                                    }
+                                    Err(e) => {
+                                        let msg = e.to_string();
+                                        tracing::warn!(
+                                            error = %msg,
+                                            did = %steward,
+                                            "RevokeSteward: failed to revoke steward"
+                                        );
+                                        Some(DispatchEvidenceSpec {
+                                            subsystem: "commons".to_string(),
+                                            receipt_ref: Some(steward_id),
+                                            success: false,
+                                            error_message: Some(msg),
+                                        })
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                // No steward record exists — treat as failed
+                                // dispatch with a durable explanation rather
+                                // than silent no-op. Reconciliation should
+                                // surface this truthfully.
+                                tracing::warn!(
+                                    did = %steward,
+                                    "RevokeSteward: no steward record found"
+                                );
+                                Some(DispatchEvidenceSpec {
+                                    subsystem: "commons".to_string(),
+                                    receipt_ref: None,
+                                    success: false,
+                                    error_message: Some(
+                                        "no active steward record for DID".to_string(),
+                                    ),
+                                })
+                            }
+                            Err(e) => {
+                                let msg = e.to_string();
+                                tracing::warn!(
+                                    error = %msg,
+                                    did = %steward,
+                                    "RevokeSteward: steward lookup failed"
+                                );
+                                Some(DispatchEvidenceSpec {
+                                    subsystem: "commons".to_string(),
+                                    receipt_ref: None,
+                                    success: false,
+                                    error_message: Some(msg),
+                                })
+                            }
+                        },
+                        // Other effects: no evidence-returning dispatcher wired
+                        // yet. Reconciliation stays `emitted_only` for them —
+                        // this is truthful given current implementation.
+                        _ => None,
+                    }
+                })
+            });
+
         let gov_ctx = GovernanceContext {
             manager: governance_manager.clone(),
             emitter: GatewayEventAdapter::new(event_broadcaster.clone()),
             on_charter_accepted: self.charter_accepted_hook,
             on_proposal_accepted: Some(on_proposal_accepted),
-            on_proposal_accepted_with_evidence: None,
+            on_proposal_accepted_with_evidence: Some(on_proposal_accepted_with_evidence),
             member_checker: Some(member_checker),
             steward_checker: Some(steward_checker),
             suspension_checker: Some(suspension_checker),
