@@ -3666,16 +3666,16 @@ pub async fn link_activity_to_program<E: GovernanceEventEmitter + Clone + 'stati
         .ok_or_else(|| err_not_found("Program not found"))?;
     check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
 
+    // Pre-check the activity exists so we return a deterministic 404 rather
+    // than relying on string-matching the manager's error message.
+    ctx.manager
+        .get_activity(&aid)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Activity not found"))?;
+
     ctx.manager
         .link_activity_to_program(&pid, &aid)
-        .map_err(|e| {
-            // link_activity_to_program returns an error if the activity doesn't exist
-            if e.to_string().contains("not found") {
-                err_not_found(e.to_string())
-            } else {
-                anyhow_to_api(e)
-            }
-        })?;
+        .map_err(anyhow_to_api)?;
 
     Ok(HttpResponse::NoContent().finish())
 }
