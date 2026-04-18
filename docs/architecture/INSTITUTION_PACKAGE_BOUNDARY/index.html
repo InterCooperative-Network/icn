@@ -40,15 +40,23 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
 <h2>Status: normative
-Authority: architecture
+Authority: architecture (authoritative on substrate/institution placement)
 Canonical: no
-Last Reviewed: 2026-04-17</h2>
+Last Reviewed: 2026-04-17
+Supersedes on routing conflicts: <code>docs/strategy/NYCN-Repo-Architecture-Spec.md</code>, <code>docs/strategy/NYCN-Implementation-Matrix.md</code></h2>
 <h1>Institution Package Boundary</h1>
 <blockquote>
-<p>Defines what belongs in ICN platform versus what belongs in an institution-specific package repo (e.g., NYCN). Anchors all future layered implementation decisions.</p>
+<p>Defines what belongs in ICN platform versus what belongs in an institution-specific package (e.g., NYCN). Anchors all future layered implementation decisions. <strong>Where this doc and any NYCN strategy doc disagree about where a type goes, this doc wins.</strong></p>
 </blockquote>
-<p><strong>Grounded against:</strong> <code>main</code> at <code>fde1466a</code> (Program + Milestone primitives landed, PR #1548).
-<strong>Companion docs:</strong> <code>KERNEL_APP_SEPARATION.md</code>, <code>ADR-001-What-ICN-Is.md</code>, <code>NYCN-Repo-Architecture-Spec.md</code>.</p>
+<p><strong>Grounded against:</strong> <code>main</code> at <code>fde1466a</code> (Program + Milestone primitives landed, PR #1548). Subsequent Tranche 1a/1b work — milestone CCL gates and <code>PATCH /gov/programs/{id}/status</code> — is in progress on open PRs and is <em>not</em> yet landed on main at the time of this doc&#39;s last review.
+<strong>Companion docs:</strong> <code>KERNEL_APP_SEPARATION.md</code>, <code>../strategy/ADR-001-What-ICN-Is.md</code>.
+<strong>Docs governed by this one (must not contradict):</strong> <code>docs/strategy/NYCN-Repo-Architecture-Spec.md</code>, <code>docs/strategy/NYCN-Implementation-Matrix.md</code>, <code>docs/strategy/NYCN-Execution-Tranches.md</code>.</p>
+<hr>
+<h2>Practical rule (keep in front of every decision)</h2>
+<blockquote>
+<p><strong>ICN should know what a proposal, milestone, action item, meeting, scope, allocation, and receipt are. ICN should not know what a sponsor packet, session catalog, conference track, or summit registration flow is.</strong></p>
+</blockquote>
+<p>If you find yourself about to add a noun from a specific institution&#39;s workflow — sponsor tiers, speaker bios, conference sessions, registration forms, summit blocks, accessibility questionnaires, donor levels, volunteer shift patterns — <strong>stop</strong>. That concept does not belong in <code>icn-governance</code>, <code>icn-ledger</code>, or any other substrate crate. It belongs in an institution package (see §F).</p>
 <hr>
 <h2>A. The Two-Layer Model</h2>
 <pre><code>┌──────────────────────────────────────────────────────────┐
@@ -216,41 +224,103 @@ Last Reviewed: 2026-04-17</h2>
 <td>Capability definitions, role names</td>
 </tr>
 </tbody></table>
-<p><strong>Not proposed for ICN now</strong> (institution-specific; no confirmed second-cooperative case):</p>
+<p><strong>Stays out of ICN core</strong> (institution-specific; no confirmed cross-institution generality; must be composed in an institution package):</p>
 <table>
 <thead>
 <tr>
 <th>Object</th>
 <th>Why it stays out</th>
-<th>How NYCN models it</th>
+<th>Where it goes instead</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>Sponsor</strong></td>
-<td>A housing federation calls this &quot;Funder&quot;; a mutual aid network calls it &quot;Partner&quot;; a coop calls it &quot;Donor.&quot; Tier semantics, benefit tables, and commitment lifecycle are institution-specific business logic.</td>
-<td>NYCN institution package: Activity-linked entity with CCL-governed commitment lifecycle; tiers as CCL data, not ICN enum variants</td>
+<td><strong>Sponsor</strong> / funder / donor</td>
+<td>A housing federation calls it &quot;Funder&quot;; a mutual-aid network calls it &quot;Partner&quot;; tier semantics, benefit tables, and commitment lifecycle vary per institution.</td>
+<td>Institution package. In NYCN: Activity- or Program-linked entity with CCL-governed commitment lifecycle; tiers as CCL data, not ICN enum variants.</td>
+</tr>
+<tr>
+<td><strong>Session / speaker</strong> (conference content)</td>
+<td>Speaker bios, session tracks, publication state, language availability, representation metadata are conference-specific. A housing federation does not have &quot;sessions.&quot;</td>
+<td>Institution package. Compose from <code>Activity</code> + <code>Participation</code> (if Participation ever lands as a generic relational primitive) + <code>ActionItem</code>.</td>
+</tr>
+<tr>
+<td><strong>Registration / attendee</strong></td>
+<td>Registration flow, accessibility questionnaires, childcare fields, dietary fields, payment state are all conference/event-specific.</td>
+<td>Institution package. An institution that needs registration defines its own form schema and attendance model.</td>
+</tr>
+<tr>
+<td><strong>AccessibilityState / venue accessibility score</strong></td>
+<td>Scoring rubric and fields are institution- and venue-type-specific.</td>
+<td>Institution package. Universal base (e.g., venue address, ADA-compliant yes/no) can eventually be modeled generically, but the scoring rubric is institutional.</td>
+</tr>
+<tr>
+<td><strong>BudgetItem as sponsor-commitment</strong></td>
+<td>If shaped as &quot;program-scoped sponsor pledge with status&quot;, it is institutional. If re-shaped as a generic &quot;program budget line&quot; (direction, amount, status, linked entity), it <em>may</em> qualify as an ICN primitive — but <strong>only after de-institutional redesign</strong>. Default: stays out.</td>
+<td>Institution package unless explicitly re-scoped as a generic program-budget primitive (requires a separate design RFC).</td>
+</tr>
+<tr>
+<td><strong>SourceRef / InstitutionalDocument</strong></td>
+<td>The primitive is legitimately general (external system link with provenance classification), but <strong>current proposals are tangled with sponsor/session/registration semantics</strong>. Must be designed independent of those before it can land in ICN.</td>
+<td>Deferred. A cleanly-generic provenance primitive may land in ICN later as <code>icn-provenance</code> or similar — but not as part of any NYCN tranche.</td>
+</tr>
+<tr>
+<td><strong>Participation (non-authority: speaker/attendee/volunteer/sponsor-contact)</strong></td>
+<td>A generic subject→object→relation-kind primitive is plausible, but current proposals (<code>kind: Speaker/Sponsor/Attendee</code>) import institutional vocabulary into enum variants.</td>
+<td>Institution package — or, if landed as ICN, must use <code>kind: String</code> (opaque tag) or a minimal generic enum, <em>not</em> institution-specific variants.</td>
 </tr>
 <tr>
 <td><strong>ServiceRequest / Intake</strong></td>
-<td>Reducible to Activity (kind=project) + ActionItem chain with a routing tag</td>
-<td>Compose in institution package; add <code>intake</code> tag to Activity kind Custom</td>
+<td>Reducible to Activity (kind=project) + ActionItem chain with a routing tag.</td>
+<td>Compose in institution package; add an <code>intake</code> tag to Activity <code>Custom</code> kind.</td>
 </tr>
 <tr>
-<td><strong>Contact / OrgRelationship</strong></td>
-<td>CRM is institution-specific; shape and field semantics vary too much</td>
-<td>Institution package data model</td>
+<td><strong>Contact / OrgRelationship / CRM</strong></td>
+<td>CRM shape and field semantics vary too much across institutions.</td>
+<td>Institution package data model.</td>
 </tr>
 <tr>
 <td><strong>VolunteerAssignment</strong></td>
-<td>A RoleAssignment with <code>capabilities: [&quot;volunteer&quot;]</code>; no new type needed</td>
-<td>RoleAssignment variant</td>
+<td>A <code>RoleAssignment</code> with <code>authority_scope: [&quot;volunteer&quot;]</code> already covers this.</td>
+<td>Use the existing <code>RoleAssignment</code>.</td>
 </tr>
 <tr>
 <td><strong>ReviewQueue</strong></td>
-<td>An ActionItemFilter view, not a primitive</td>
-<td><code>/gov/me/work?status=pending&amp;tag=review</code></td>
+<td>An <code>ActionItem</code> filter view, not a new primitive.</td>
+<td><code>/gov/me/work?status=pending&amp;tag=review</code>.</td>
+</tr>
+<tr>
+<td><strong>Institution-specific ProgramKind variants</strong> (<code>AnnualSummit</code>, <code>PolicyDay</code>, etc.)</td>
+<td>Tenant vocabulary leaking into a core enum.</td>
+<td><code>ProgramKind::Custom(&quot;annual-summit&quot;)</code>. The landed <code>icn-governance::program::ProgramKind</code> includes generic variants (<code>Campaign</code>, <code>Initiative</code>, <code>Series</code>, <code>Cycle</code>) that cross-institution workloads use directly; only institution-specific kinds map to <code>Custom(String)</code>. See the module doc for the rationale.</td>
+</tr>
+<tr>
+<td><strong>Institution-specific MilestoneType variants</strong> (<code>VenueLocked</code>, <code>BudgetLocked</code>, <code>PublicLaunchReady</code>, etc.)</td>
+<td>Tenant vocabulary leaking into a core enum.</td>
+<td>Free-form <code>completion_criteria: Vec&lt;String&gt;</code> on <code>Milestone</code>, optionally gated by a CCL <code>completion_gate</code> expression. The landed code uses strings, not enum variants.</td>
 </tr>
 </tbody></table>
+<h3>Forbidden module paths (hard rule)</h3>
+<p>These module paths must not be created in <code>icn-governance</code>, <code>icn-ledger</code>, <code>icn-entity</code>, or any other substrate crate. If a future PR proposes one of these, it should be rejected in review with a link to this section.</p>
+<ul>
+<li>❌ <code>icn-governance::sponsor</code></li>
+<li>❌ <code>icn-governance::session</code></li>
+<li>❌ <code>icn-governance::registration</code></li>
+<li>❌ <code>icn-governance::accessibility</code></li>
+<li>❌ <code>icn-governance::source_ref</code> <em>(reconsider only under a cleanly-generic <code>icn-provenance</code> design, separate from sponsor/session work)</em></li>
+<li>❌ <code>icn-governance::document</code> / <code>icn-governance::institutional_document</code> <em>(same condition as source_ref)</em></li>
+<li>❌ <code>icn-governance::budget_item</code> <em>(reconsider only under a de-institutional redesign that is not a sponsor-commitment lookalike)</em></li>
+<li>❌ <code>icn-governance::participation</code> with institution-shaped enum variants <em>(see §Stays Out table)</em></li>
+<li>❌ any new substrate enum variant named after a specific institution&#39;s workflow (<code>AnnualSummit</code>, <code>VenueLocked</code>, <code>PlatinumSponsor</code>, <code>NYCNOrganizer</code>, etc.)</li>
+</ul>
+<h3>The working pattern (already landed, must be preserved)</h3>
+<p><code>icn-governance/src/program.rs</code> demonstrates the correct discipline. Its module-level doc explicitly states:</p>
+<blockquote>
+<p>The canonical spec originally proposed richly named variants — <code>AnnualSummit</code>, <code>PolicyDay</code>, <code>VenueLocked</code> — which bake a specific institution&#39;s vocabulary into core enums. That violates the anti-ontology-laundering rule: Layer 1 primitives should be generic enough for a second institution (a housing federation, a mutual-aid collective) to consume unchanged.</p>
+</blockquote>
+<blockquote>
+<p>This module therefore ships a deliberately small kind enum with a <code>Custom(String)</code> escape hatch, and a free-form <code>completion_criteria: Vec&lt;String&gt;</code> for milestones. Institution-specific kinds and checklist semantics belong in the institution package / template layer (Layer 2) or the institution&#39;s own repo (Layer 3), not here.</p>
+</blockquote>
+<p><strong>Every future substrate primitive must follow this pattern.</strong> Narrow enum, <code>Custom(String)</code> escape, free-form strings where institutions disagree, CCL for semantics.</p>
 <hr>
 <h2>E. Implementation Backlog (in priority order)</h2>
 <p>Items 1 and 2 are landed or in open PRs. Items 3–6 are the next platform moves.</p>

@@ -43,6 +43,59 @@ View source on GitHub →
 <strong>Companions</strong>: <code>NYCN-Repo-Architecture-Spec.md</code> (architectural map), <code>NYCN-Execution-Tranches.md</code> (merge-order plan)
 <strong>Working instruction</strong>: Treat the architecture spec as the map and this matrix as the execution ledger. Before writing code, reconcile any disagreement between them and current repo state — reality wins.</p>
 <hr>
+<blockquote>
+<h2>⚠️ Authoritative routing correction (2026-04-17)</h2>
+<p>This document predates <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code>. On any routing conflict between this matrix and the boundary doc, <strong>the boundary doc wins.</strong></p>
+<p>Several rows below route institution-specific nouns (sponsor, budget-item, session, registration, venue accessibility, source-ref, institutional-document, speaker/attendee/sponsor-contact participation variants, institution-specific <code>ProgramKind</code> / <code>MilestoneType</code> names like <code>AnnualSummit</code> / <code>VenueLocked</code> / <code>BudgetLocked</code> / <code>PublicLaunchReady</code>) into <code>icn-governance::*</code>. That is drift. ICN core — <code>icn-governance</code> and <code>apps/governance</code> — must stay institution-agnostic.</p>
+<p><strong>Corrected routing (authoritative):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Originally routed to</th>
+<th>Re-routed to</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-governance::sponsor</code></td>
+<td>Institution package (future <code>apps/nycn/</code> or external <code>nycn-icn</code>)</td>
+</tr>
+<tr>
+<td><code>icn-governance::budget_item</code></td>
+<td>Institution package (or <code>icn-ledger</code> integration if generic treasury)</td>
+</tr>
+<tr>
+<td><code>icn-governance::session</code></td>
+<td>Institution package</td>
+</tr>
+<tr>
+<td><code>icn-governance::registration</code></td>
+<td>Institution package</td>
+</tr>
+<tr>
+<td><code>icn-governance::accessibility</code></td>
+<td>Institution package</td>
+</tr>
+<tr>
+<td><code>icn-governance::source_ref</code></td>
+<td>Institution package (deferred)</td>
+</tr>
+<tr>
+<td><code>icn-governance::document</code></td>
+<td>Institution package or a generic content-addressed crate; <strong>not</strong> a governance-core concept</td>
+</tr>
+<tr>
+<td><code>icn-governance::participation</code> with sponsor-contact / speaker / attendee / volunteer variants</td>
+<td>Institution package; ICN core only knows authority-bearing membership/roles</td>
+</tr>
+<tr>
+<td><code>Program { kind: AnnualSummit }</code> and <code>MilestoneType::{VenueLocked, BudgetLocked, PublicLaunchReady, EventReady, ClosureComplete}</code></td>
+<td>ICN core uses <code>ProgramKind::Custom(&quot;annual_summit&quot;)</code> and free-form <code>completion_criteria: Vec&lt;String&gt;</code> — see <code>icn-governance/src/program.rs</code>. Named summit-shaped variants live in the institution package (or in CCL contract bodies) only.</td>
+</tr>
+</tbody></table>
+<p>Touchpoint shorthand (<code>D</code> = domain module in <code>icn-governance::&lt;name&gt;</code>, etc.) should be read as &quot;institution-package equivalent&quot; for any corrected row. The rows themselves are left intact below as historical context for the drift.</p>
+<p><strong>Rule going forward</strong>: before adding anything to <code>icn-governance</code> or <code>apps/governance</code>, ask: &quot;Could a different institution (a worker co-op federation, a credit union, a housing co-op) use this without renaming?&quot; If no, it belongs in the institution package.</p>
+</blockquote>
+<hr>
 <h2>Legend</h2>
 <p><strong>Lifecycle</strong></p>
 <ul>
