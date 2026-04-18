@@ -1225,6 +1225,40 @@ pub struct DeliberationMeetingResponse {
     pub generated_action_items: Vec<String>,
 }
 
+/// A persisted institutional effect record, shaped for the HTTP wire.
+///
+/// Mirrors [`crate::institutional_effect::InstitutionalEffectRecord`] with
+/// the binary `decision_hash` rendered as a lowercase hex string. See the
+/// record module docs for semantics.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct InstitutionalEffectResponse {
+    pub record_id: String,
+    pub proposal_id: String,
+    pub domain_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decision_hash: Option<String>,
+    /// `"freeze_member"`, `"unfreeze_member"`, `"deploy_charter"`,
+    /// `"appoint_steward"`, or `"revoke_steward"`.
+    pub effect_kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_did: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    pub recorded_at: u64,
+    /// Full translation detail as JSON. Callers that need specifics beyond
+    /// the typed fields read from here.
+    pub payload: serde_json::Value,
+}
+
+/// Response body for `GET /gov/proposals/{proposal_id}/effects`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ProposalEffectsResponse {
+    pub proposal_id: String,
+    pub effects: Vec<InstitutionalEffectResponse>,
+}
+
 /// Reverse read-model: a proposal's deliberation trail.
 ///
 /// Returned by `GET /gov/proposals/{proposal_id}/deliberation`. Links a
@@ -1261,4 +1295,9 @@ pub struct ProposalDeliberationResponse {
     /// Decision receipt summary if the proposal has been closed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub governance_decision: Option<DeliberationDecisionResponse>,
+    /// Durable institutional effect records emitted at acceptance, oldest
+    /// first. Empty when the proposal was not accepted or when the payload
+    /// translated to `Unhandled`.
+    #[serde(default)]
+    pub emitted_effects: Vec<InstitutionalEffectResponse>,
 }

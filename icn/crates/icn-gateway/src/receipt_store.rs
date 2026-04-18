@@ -9,6 +9,7 @@
 
 #[cfg_attr(not(test), allow(unused_imports))]
 use icn_governance::{GovernanceDecisionReceipt, ProofOutcome, VoteTally};
+use icn_governance_actor::institutional_effect::InstitutionalEffectRecord;
 use icn_governance_actor::receipt_backend::GovernanceReceiptBackend;
 use icn_kernel_api::economics::SettlementIntent;
 use icn_kernel_api::receipts::{AllocationReceipt, CanonicalReceipt, Hash};
@@ -24,6 +25,10 @@ const INTENT_PREFIX: &[u8] = b"receipt:intent:";
 const DECISION_INDEX_PREFIX: &[u8] = b"receipt:by_decision:";
 /// Index prefix for proposal ID lookups (governance receipts only)
 const PROPOSAL_INDEX_PREFIX: &[u8] = b"receipt:by_proposal:";
+/// Key prefix for institutional effect records (primary by record_id)
+const INSTITUTIONAL_EFFECT_PREFIX: &[u8] = b"effect:institutional:";
+/// Secondary index: effect records by proposal_id (sortable by recorded_at)
+const INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX: &[u8] = b"effect:institutional:by_proposal:";
 
 /// Receipt storage service for governance and economic chain artifacts.
 ///
@@ -363,6 +368,79 @@ impl ReceiptStore {
     }
 }
 
+impl ReceiptStore {
+    // ========================================================================
+    // InstitutionalEffectRecord operations (governance app-layer artifact)
+    // ========================================================================
+
+    /// Persist an `InstitutionalEffectRecord` keyed by `record_id` with a
+    /// secondary index on `(proposal_id, recorded_at, record_id)` so
+    /// reads can recover records in chronological order per proposal.
+    ///
+    /// Benign duplicate writes (same `record_id`) overwrite the existing
+    /// entry with identical bytes; the index key is idempotent by
+    /// construction. The store does NOT enforce one-record-per-proposal —
+    /// callers enforce that invariant upstream.
+    pub fn put_institutional_effect(
+        &self,
+        record: &InstitutionalEffectRecord,
+    ) -> Result<(), String> {
+        let mut primary_key = INSTITUTIONAL_EFFECT_PREFIX.to_vec();
+        primary_key.extend_from_slice(record.record_id.as_bytes());
+        let value = serde_json::to_vec(record)
+            .map_err(|e| format!("Failed to serialize InstitutionalEffectRecord: {e}"))?;
+        self.db
+            .insert(&primary_key, value)
+            .map_err(|e| format!("sled insert primary: {e}"))?;
+
+        // Secondary index: effect:institutional:by_proposal:{proposal_id}:{recorded_at_be}:{record_id}
+        // recorded_at encoded big-endian so lexicographic scan yields ascending order.
+        let mut idx_key = INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX.to_vec();
+        idx_key.extend_from_slice(record.proposal_id.as_bytes());
+        idx_key.push(b':');
+        idx_key.extend_from_slice(&record.recorded_at.to_be_bytes());
+        idx_key.push(b':');
+        idx_key.extend_from_slice(record.record_id.as_bytes());
+        self.db
+            .insert(&idx_key, record.record_id.as_bytes())
+            .map_err(|e| format!("sled insert index: {e}"))?;
+
+        Ok(())
+    }
+
+    /// Scan the secondary index for a proposal and hydrate records in
+    /// chronological order (oldest-first).
+    pub fn list_institutional_effects_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<InstitutionalEffectRecord>, String> {
+        let mut prefix = INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX.to_vec();
+        prefix.extend_from_slice(proposal_id.as_bytes());
+        prefix.push(b':');
+
+        let mut out = Vec::new();
+        for entry in self.db.scan_prefix(&prefix) {
+            let (_k, v) = entry.map_err(|e| format!("sled scan: {e}"))?;
+            let record_id =
+                std::str::from_utf8(&v).map_err(|e| format!("index value not UTF-8: {e}"))?;
+            let mut primary_key = INSTITUTIONAL_EFFECT_PREFIX.to_vec();
+            primary_key.extend_from_slice(record_id.as_bytes());
+            let Some(bytes) = self
+                .db
+                .get(&primary_key)
+                .map_err(|e| format!("sled get primary: {e}"))?
+            else {
+                // Index-primary skew — log and skip rather than hard-fail.
+                continue;
+            };
+            let record: InstitutionalEffectRecord = serde_json::from_slice(&bytes)
+                .map_err(|e| format!("deserialize InstitutionalEffectRecord: {e}"))?;
+            out.push(record);
+        }
+        Ok(out)
+    }
+}
+
 impl GovernanceReceiptBackend for ReceiptStore {
     fn put_governance(&self, receipt: &GovernanceDecisionReceipt) -> Result<(), String> {
         self.put_governance(receipt).map(|_| ())
@@ -392,6 +470,17 @@ impl GovernanceReceiptBackend for ReceiptStore {
         decision_hash: &Hash,
     ) -> Result<Vec<AllocationReceipt>, String> {
         self.list_allocations_by_decision(decision_hash)
+    }
+
+    fn put_institutional_effect(&self, record: &InstitutionalEffectRecord) -> Result<(), String> {
+        self.put_institutional_effect(record)
+    }
+
+    fn list_institutional_effects_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Vec<InstitutionalEffectRecord>, String> {
+        self.list_institutional_effects_by_proposal(proposal_id)
     }
 }
 
@@ -588,5 +677,115 @@ mod tests {
             .list_intents_by_decision(&decision_hash)
             .unwrap();
         assert_eq!(intents.len(), 1); // Deduplicated by canonical hash
+    }
+
+    #[test]
+    fn institutional_effects_roundtrip_in_chronological_order() {
+        let store = ReceiptStore::new(temp_db());
+
+        let older = InstitutionalEffectRecord::new(
+            "prop-1",
+            "coop-a",
+            Some([7u8; 32]),
+            "freeze_member",
+            Some("did:icn:x".into()),
+            None,
+            Some("cause".into()),
+            100,
+            serde_json::json!({"n": 1}),
+        );
+        let newer = InstitutionalEffectRecord::new(
+            "prop-1",
+            "coop-a",
+            Some([7u8; 32]),
+            "unfreeze_member",
+            Some("did:icn:x".into()),
+            None,
+            Some("resolved".into()),
+            250,
+            serde_json::json!({"n": 2}),
+        );
+
+        // Write out of order.
+        store.put_institutional_effect(&newer).unwrap();
+        store.put_institutional_effect(&older).unwrap();
+
+        let list = store
+            .list_institutional_effects_by_proposal("prop-1")
+            .unwrap();
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].effect_kind, "freeze_member");
+        assert_eq!(list[1].effect_kind, "unfreeze_member");
+        assert!(list[0].recorded_at < list[1].recorded_at);
+    }
+
+    #[test]
+    fn institutional_effects_are_scoped_by_proposal_id() {
+        let store = ReceiptStore::new(temp_db());
+
+        let a = InstitutionalEffectRecord::new(
+            "prop-a",
+            "coop-a",
+            None,
+            "freeze_member",
+            Some("did:icn:1".into()),
+            None,
+            None,
+            10,
+            serde_json::json!({}),
+        );
+        let b = InstitutionalEffectRecord::new(
+            "prop-b",
+            "coop-a",
+            None,
+            "freeze_member",
+            Some("did:icn:2".into()),
+            None,
+            None,
+            20,
+            serde_json::json!({}),
+        );
+
+        store.put_institutional_effect(&a).unwrap();
+        store.put_institutional_effect(&b).unwrap();
+
+        let a_list = store
+            .list_institutional_effects_by_proposal("prop-a")
+            .unwrap();
+        let b_list = store
+            .list_institutional_effects_by_proposal("prop-b")
+            .unwrap();
+        let none_list = store
+            .list_institutional_effects_by_proposal("prop-missing")
+            .unwrap();
+
+        assert_eq!(a_list.len(), 1);
+        assert_eq!(b_list.len(), 1);
+        assert!(none_list.is_empty());
+        assert_eq!(a_list[0].target_did.as_deref(), Some("did:icn:1"));
+        assert_eq!(b_list[0].target_did.as_deref(), Some("did:icn:2"));
+    }
+
+    #[test]
+    fn institutional_effects_duplicate_write_is_idempotent() {
+        let store = ReceiptStore::new(temp_db());
+        let rec = InstitutionalEffectRecord::new(
+            "prop-dup",
+            "coop-a",
+            None,
+            "freeze_member",
+            None,
+            None,
+            None,
+            100,
+            serde_json::json!({}),
+        );
+        store.put_institutional_effect(&rec).unwrap();
+        store.put_institutional_effect(&rec).unwrap();
+
+        let list = store
+            .list_institutional_effects_by_proposal("prop-dup")
+            .unwrap();
+        assert_eq!(list.len(), 1, "same record_id must not produce two entries");
     }
 }

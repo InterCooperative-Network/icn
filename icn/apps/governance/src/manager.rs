@@ -6,6 +6,7 @@
 //! [`GovernanceReceiptBackend`] trait so this crate does not depend on
 //! `icn-gateway`.
 
+use crate::institutional_effect::InstitutionalEffectRecord;
 use crate::receipt_backend::GovernanceReceiptBackend;
 use anyhow::Result;
 use icn_federation::BilateralClearingAgreement;
@@ -144,6 +145,10 @@ pub struct ProposalDeliberation {
     pub effect_kind: &'static str,
     pub deliberations: Vec<DeliberationMeetingEntry>,
     pub governance_receipt: Option<icn_governance::GovernanceDecisionReceipt>,
+    /// Institutional effect records emitted at acceptance, oldest-first.
+    /// Empty when the proposal was not accepted, when the payload translated
+    /// to `Unhandled`, or when no receipt store is wired.
+    pub emitted_effects: Vec<InstitutionalEffectRecord>,
 }
 
 /// Label the translated [`crate::http::configure::GovernanceEffect`] shape
@@ -3645,6 +3650,39 @@ impl GovernanceManager {
         })
     }
 
+    /// Persist an institutional effect record via the attached receipt store.
+    ///
+    /// No-op when no receipt store is wired (callers should consider the
+    /// effect "not durably recorded" in that case — the HTTP handler logs
+    /// accordingly). Backend write failures are returned — the caller
+    /// decides whether to escalate or degrade.
+    pub fn record_institutional_effect(
+        &self,
+        record: &InstitutionalEffectRecord,
+    ) -> Result<(), anyhow::Error> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(());
+        };
+        store
+            .put_institutional_effect(record)
+            .map_err(|e| anyhow::anyhow!("Failed to persist institutional effect record: {e}"))
+    }
+
+    /// Retrieve all institutional effect records emitted for a proposal,
+    /// oldest-first (backend contract). Returns an empty list when no store
+    /// is wired.
+    pub fn list_institutional_effects(
+        &self,
+        proposal_id: &ProposalId,
+    ) -> Result<Vec<InstitutionalEffectRecord>, anyhow::Error> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_institutional_effects_by_proposal(&proposal_id.0)
+            .map_err(|e| anyhow::anyhow!("Failed to list institutional effect records: {e}"))
+    }
+
     /// Assemble a proposal's deliberation trail.
     ///
     /// Returns the proposal's header fields together with every meeting in
@@ -3729,6 +3767,20 @@ impl GovernanceManager {
         let effect_kind = payload_effect_kind(&proposal.payload);
         let decided_at = proposal_decided_at(&proposal.state);
 
+        // Include any emitted institutional effect records. Store errors are
+        // downgraded to empty rather than failing the read — the deliberation
+        // trail remains useful even if the effect index is unavailable.
+        let emitted_effects = self
+            .list_institutional_effects(proposal_id)
+            .unwrap_or_else(|e| {
+                tracing::warn!(
+                    proposal_id = %proposal_id.0,
+                    error = %e,
+                    "get_deliberation: effect index read failed; returning empty list",
+                );
+                vec![]
+            });
+
         Ok(Some(ProposalDeliberation {
             proposal_id: proposal.id.clone(),
             domain_id: proposal.domain_id.clone(),
@@ -3738,6 +3790,7 @@ impl GovernanceManager {
             effect_kind,
             deliberations: entries,
             governance_receipt,
+            emitted_effects,
         }))
     }
 
@@ -5729,6 +5782,7 @@ mod tests {
     struct InMemoryReceiptBackend {
         governance: std::sync::Mutex<Vec<icn_governance::GovernanceDecisionReceipt>>,
         allocations: std::sync::Mutex<Vec<AllocationReceipt>>,
+        institutional_effects: std::sync::Mutex<Vec<InstitutionalEffectRecord>>,
     }
 
     impl InMemoryReceiptBackend {
@@ -5736,6 +5790,7 @@ mod tests {
             Self {
                 governance: std::sync::Mutex::new(vec![]),
                 allocations: std::sync::Mutex::new(vec![]),
+                institutional_effects: std::sync::Mutex::new(vec![]),
             }
         }
     }
@@ -5792,6 +5847,31 @@ mod tests {
                 .filter(|a| a.decision_hash == *decision_hash)
                 .cloned()
                 .collect())
+        }
+        fn put_institutional_effect(
+            &self,
+            record: &InstitutionalEffectRecord,
+        ) -> Result<(), String> {
+            self.institutional_effects
+                .lock()
+                .unwrap()
+                .push(record.clone());
+            Ok(())
+        }
+        fn list_institutional_effects_by_proposal(
+            &self,
+            proposal_id: &str,
+        ) -> Result<Vec<InstitutionalEffectRecord>, String> {
+            let mut items: Vec<InstitutionalEffectRecord> = self
+                .institutional_effects
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|r| r.proposal_id == proposal_id)
+                .cloned()
+                .collect();
+            items.sort_by_key(|r| r.recorded_at);
+            Ok(items)
         }
     }
 
@@ -6322,6 +6402,135 @@ mod tests {
             "closed proposal must carry its decision receipt in the deliberation trail",
         );
         assert_eq!(trail.deliberations.len(), 1);
+    }
+
+    // ========================================================================
+    // Institutional effect record persistence (acceptance-time artifact)
+    // ========================================================================
+
+    #[tokio::test]
+    async fn institutional_effects_empty_without_receipt_store() {
+        let (mgr, _domain, _member) = make_manager_with_domain().await;
+        // No receipt store wired: list returns empty, write is a no-op Ok.
+        let pid = ProposalId("prop-none".to_string());
+        let list = mgr.list_institutional_effects(&pid).unwrap();
+        assert!(list.is_empty());
+
+        let rec = InstitutionalEffectRecord::new(
+            "prop-none",
+            "test-coop",
+            None,
+            "freeze_member",
+            None,
+            None,
+            None,
+            1,
+            serde_json::json!({}),
+        );
+        assert!(mgr.record_institutional_effect(&rec).is_ok());
+        // Still empty — no store to read from.
+        let list = mgr.list_institutional_effects(&pid).unwrap();
+        assert!(list.is_empty());
+    }
+
+    #[tokio::test]
+    async fn institutional_effects_roundtrip_and_ordering() {
+        let (mgr, _domain, _member) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let pid = ProposalId("prop-rt".to_string());
+
+        let older = InstitutionalEffectRecord::new(
+            pid.0.clone(),
+            "test-coop",
+            None,
+            "freeze_member",
+            Some("did:icn:a".into()),
+            None,
+            Some("cause".into()),
+            100,
+            serde_json::json!({"n": 1}),
+        );
+        let newer = InstitutionalEffectRecord::new(
+            pid.0.clone(),
+            "test-coop",
+            None,
+            "unfreeze_member",
+            Some("did:icn:a".into()),
+            None,
+            Some("resolved".into()),
+            200,
+            serde_json::json!({"n": 2}),
+        );
+
+        // Write out-of-order to prove ordering is by recorded_at, not insert order.
+        mgr.record_institutional_effect(&newer).unwrap();
+        mgr.record_institutional_effect(&older).unwrap();
+
+        let list = mgr.list_institutional_effects(&pid).unwrap();
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].effect_kind, "freeze_member");
+        assert_eq!(list[1].effect_kind, "unfreeze_member");
+        assert!(list[0].recorded_at < list[1].recorded_at);
+
+        // Unrelated proposal_id returns empty, not the above.
+        let empty = mgr
+            .list_institutional_effects(&ProposalId("prop-other".into()))
+            .unwrap();
+        assert!(empty.is_empty());
+    }
+
+    #[tokio::test]
+    async fn deliberation_surfaces_emitted_effects() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let target = test_did(9);
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-freeze-surface".into()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Freeze".into(),
+                "Reason".into(),
+                ProposalPayload::FreezeMember {
+                    member: target.clone(),
+                    reason: "audit".into(),
+                    duration_seconds: None,
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        // Simulate the HTTP handler's post-accept persistence by writing the
+        // record through the manager directly (the HTTP handler drives the
+        // same code path on real accept).
+        let rec = crate::institutional_effect::record_from_accepted_payload(
+            &prop_id.0,
+            &domain_id.0,
+            None,
+            &ProposalPayload::FreezeMember {
+                member: target.clone(),
+                reason: "audit".into(),
+                duration_seconds: None,
+            },
+            42,
+        )
+        .expect("FreezeMember must translate to a record");
+        mgr.record_institutional_effect(&rec).unwrap();
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        assert_eq!(trail.emitted_effects.len(), 1);
+        let surfaced = &trail.emitted_effects[0];
+        assert_eq!(surfaced.effect_kind, "freeze_member");
+        assert_eq!(
+            surfaced.target_did.as_deref(),
+            Some(target.to_string().as_str())
+        );
+        assert_eq!(surfaced.reason.as_deref(), Some("audit"));
     }
 
     #[tokio::test]
