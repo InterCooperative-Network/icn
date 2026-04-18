@@ -4107,6 +4107,109 @@ pub async fn get_program_dashboard<E: GovernanceEventEmitter + Clone + 'static>(
     Ok(HttpResponse::Ok().json(resp))
 }
 
+// ── Program summary ───────────────────────────────────────────────────────────
+
+/// GET /gov/programs/{program_id}/summary — Read-only milestone progression view.
+///
+/// Returns a lightweight roll-up of a program's current progression state:
+/// - program status
+/// - milestone counts by status
+/// - all milestones ordered by `phase_index`
+/// - the first open (not `completed` / `skipped`) milestone — i.e. where
+///   work currently needs to go — as `next_unfinished_milestone`
+/// - the `phase_index` of that milestone as `current_phase_index`
+///
+/// This is a focused alternative to `/dashboard`, which includes activities
+/// and action items. The summary answers "where is this program in its
+/// lifecycle?" without loading the heavier composite surfaces.
+///
+/// **Progression basis**: milestones are ordered by `phase_index` (the only
+/// programmatic ordering signal in the current model). Milestone names and
+/// `completion_criteria` text are surfaced verbatim and are **not** interpreted
+/// — semantic meaning belongs in the institution package layer.
+///
+/// Requires `governance:read`. No mutation; no event emission.
+///
+/// Returns 404 if the program does not exist.
+pub async fn get_program_summary<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    program_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let pid = ProgramId(program_id.into_inner());
+
+    let program = ctx
+        .manager
+        .get_program(&pid)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found"))?;
+
+    // Milestones come back ordered by phase_index (store contract).
+    let milestones = ctx
+        .manager
+        .list_milestones_by_program(&pid)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(build_program_summary(&program, &milestones)))
+}
+
+/// Pure function composing a [`ProgramSummaryResponse`] from the program record
+/// and its ordered milestones. Split out for unit-testability.
+///
+/// **`current_phase_index`**: the `phase_index` of the first open milestone
+/// (lowest phase_index where status is not `Completed` / `Skipped`). If all
+/// milestones are terminal, falls back to the highest `phase_index` present
+/// (program likely closing / archived). `None` when there are no milestones.
+fn build_program_summary(
+    program: &icn_governance::Program,
+    milestones: &[icn_governance::Milestone],
+) -> ProgramSummaryResponse {
+    // Count by status.
+    let mut counts = DashboardMilestoneCounts {
+        total: milestones.len(),
+        ..Default::default()
+    };
+    for m in milestones {
+        match m.status {
+            MilestoneStatus::Completed => counts.completed += 1,
+            MilestoneStatus::InProgress => counts.in_progress += 1,
+            MilestoneStatus::Blocked => counts.blocked += 1,
+            MilestoneStatus::Pending => counts.pending += 1,
+            MilestoneStatus::Skipped => counts.skipped += 1,
+        }
+    }
+
+    // First open milestone by phase_index (milestones already sorted ascending).
+    let next_unfinished: Option<NextUnfinishedMilestone> = milestones
+        .iter()
+        .find(|m| m.is_open())
+        .map(|m| NextUnfinishedMilestone {
+            milestone_id: m.id.0.clone(),
+            name: m.name.clone(),
+            phase_index: m.phase_index,
+            status: milestone_status_str(&m.status).to_string(),
+        });
+
+    // current_phase_index: open milestone's phase, falling back to highest
+    // terminal phase when all milestones are done.
+    let current_phase_index: Option<u32> = next_unfinished
+        .as_ref()
+        .map(|n| n.phase_index)
+        .or_else(|| milestones.last().map(|m| m.phase_index));
+
+    ProgramSummaryResponse {
+        program_id: program.id.0.clone(),
+        name: program.name.clone(),
+        program_status: program_status_str(&program.status).to_string(),
+        milestone_counts: counts,
+        milestones: milestones.iter().map(dashboard_milestone_summary).collect(),
+        next_unfinished_milestone: next_unfinished,
+        current_phase_index,
+        progress_basis: "phase_index_ordering".to_string(),
+    }
+}
+
 // ── /me endpoints ─────────────────────────────────────────────────────────────
 
 /// GET /gov/me/scopes — Return all role assignments held by the authenticated DID.
@@ -5647,6 +5750,237 @@ mod tests {
         assert_eq!(joint_linked.len(), 2);
 
         assert_eq!(meetings[0]["status"], "scheduled");
+    }
+
+    // ── Program summary tests ──────────────────────────────────────────────
+
+    macro_rules! summary_app {
+        ($ctx:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: "did:icn:reader".to_string(),
+                            scope: Some("governance:read".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/programs/{program_id}/summary",
+                        web::get().to(get_program_summary::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// Helper: create domain + program, return program.
+    async fn setup_summary_program(
+        mgr: &Arc<GovernanceManager>,
+        domain: &str,
+        entity: &str,
+    ) -> icn_governance::Program {
+        let domain_id = GovernanceDomainId(domain.to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            format!("{domain} domain"),
+            "cooperative_default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![]),
+            },
+        )
+        .await
+        .unwrap();
+
+        mgr.create_program(
+            domain_id,
+            entity.to_string(),
+            icn_governance::ProgramKind::Cycle,
+            "Test Cycle".to_string(),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap()
+    }
+
+    /// 404 when program does not exist.
+    #[actix_web::test]
+    async fn summary_404_for_missing_program() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let app = summary_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/programs/nonexistent/summary")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 404);
+    }
+
+    /// Program with no milestones: zero counts, null next_unfinished and
+    /// current_phase_index.
+    #[actix_web::test]
+    async fn summary_no_milestones() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let prog = setup_summary_program(&mgr, "dom-sum0", "ent-sum0").await;
+
+        let app = summary_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/programs/{}/summary", prog.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["progress_basis"], "phase_index_ordering");
+        assert_eq!(body["milestone_counts"]["total"], 0);
+        assert!(body["next_unfinished_milestone"].is_null());
+        assert!(body["current_phase_index"].is_null());
+        let milestones = body["milestones"].as_array().unwrap();
+        assert!(milestones.is_empty());
+    }
+
+    /// Mixed milestone states: counts are correct; next_unfinished is the
+    /// first open milestone by phase_index; current_phase_index matches.
+    #[actix_web::test]
+    async fn summary_mixed_milestone_states() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let prog = setup_summary_program(&mgr, "dom-sum1", "ent-sum1").await;
+
+        // phase 0: completed
+        let m0 = mgr
+            .create_milestone(
+                prog.id.clone(),
+                "Phase 0".to_string(),
+                None,
+                0,
+                None,
+                vec![],
+            )
+            .unwrap();
+        let actor = Did::from_anchor_id(&[20u8; 32]);
+        mgr.update_milestone_status(&m0.id, MilestoneStatus::Completed, &actor)
+            .unwrap();
+
+        // phase 1: skipped
+        let m1 = mgr
+            .create_milestone(
+                prog.id.clone(),
+                "Phase 1".to_string(),
+                None,
+                1,
+                None,
+                vec![],
+            )
+            .unwrap();
+        mgr.update_milestone_status(&m1.id, MilestoneStatus::Skipped, &actor)
+            .unwrap();
+
+        // phase 2: in_progress (first open)
+        let m2 = mgr
+            .create_milestone(
+                prog.id.clone(),
+                "Phase 2".to_string(),
+                None,
+                2,
+                None,
+                vec![],
+            )
+            .unwrap();
+        mgr.update_milestone_status(&m2.id, MilestoneStatus::InProgress, &actor)
+            .unwrap();
+
+        // phase 3: pending
+        mgr.create_milestone(
+            prog.id.clone(),
+            "Phase 3".to_string(),
+            None,
+            3,
+            None,
+            vec![],
+        )
+        .unwrap();
+
+        let app = summary_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/programs/{}/summary", prog.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["milestone_counts"]["total"], 4);
+        assert_eq!(body["milestone_counts"]["completed"], 1);
+        assert_eq!(body["milestone_counts"]["skipped"], 1);
+        assert_eq!(body["milestone_counts"]["in_progress"], 1);
+        assert_eq!(body["milestone_counts"]["pending"], 1);
+
+        // next_unfinished is phase 2 (in_progress, lowest open phase_index)
+        let nxt = &body["next_unfinished_milestone"];
+        assert_eq!(nxt["phase_index"], 2);
+        assert_eq!(nxt["status"], "in_progress");
+        assert_eq!(body["current_phase_index"], 2);
+
+        // milestones returned in phase_index order
+        let ms = body["milestones"].as_array().unwrap();
+        assert_eq!(ms.len(), 4);
+        assert_eq!(ms[0]["phase_index"], 0);
+        assert_eq!(ms[1]["phase_index"], 1);
+        assert_eq!(ms[2]["phase_index"], 2);
+        assert_eq!(ms[3]["phase_index"], 3);
+    }
+
+    /// All milestones terminal (completed/skipped): next_unfinished is null;
+    /// current_phase_index is the highest phase_index.
+    #[actix_web::test]
+    async fn summary_all_milestones_terminal() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let prog = setup_summary_program(&mgr, "dom-sum2", "ent-sum2").await;
+
+        let actor = Did::from_anchor_id(&[21u8; 32]);
+        for phase in 0..3u32 {
+            let m = mgr
+                .create_milestone(
+                    prog.id.clone(),
+                    format!("Phase {phase}"),
+                    None,
+                    phase,
+                    None,
+                    vec![],
+                )
+                .unwrap();
+            mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &actor)
+                .unwrap();
+        }
+
+        let app = summary_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/programs/{}/summary", prog.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["milestone_counts"]["completed"], 3);
+        assert_eq!(body["milestone_counts"]["pending"], 0);
+        assert!(body["next_unfinished_milestone"].is_null());
+        // current_phase_index falls back to highest terminal phase_index
+        assert_eq!(body["current_phase_index"], 2);
     }
 
     // ── Milestone preview tests ────────────────────────────────────────────

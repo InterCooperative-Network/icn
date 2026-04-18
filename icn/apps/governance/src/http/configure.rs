@@ -366,6 +366,10 @@ where
                 .route(web::get().to(handlers::get_program_dashboard::<E>)),
         )
         .service(
+            web::resource("/programs/{program_id}/summary")
+                .route(web::get().to(handlers::get_program_summary::<E>)),
+        )
+        .service(
             web::resource("/programs/{program_id}/milestones")
                 .route(web::post().to(handlers::create_milestone::<E>))
                 .route(web::get().to(handlers::list_milestones_by_program::<E>)),

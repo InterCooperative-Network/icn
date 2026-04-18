@@ -1110,3 +1110,58 @@ pub struct MilestoneHistoryResponse {
     /// Lifecycle bookmarks, oldest first.
     pub entries: Vec<MilestoneHistoryEntry>,
 }
+
+// ============================================================================
+// Program summary (read-only progression view)
+// ============================================================================
+
+/// Compact reference to the next milestone that has not yet reached a terminal
+/// state (`completed` or `skipped`), ordered by `phase_index`.
+///
+/// `null` in [`ProgramSummaryResponse`] when all milestones are terminal or
+/// when the program has no milestones.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct NextUnfinishedMilestone {
+    pub milestone_id: String,
+    pub name: String,
+    pub phase_index: u32,
+    pub status: String,
+}
+
+/// Read-only progression summary for a program.
+///
+/// Returned by `GET /gov/programs/{program_id}/summary`. Complements the
+/// richer `/dashboard` surface (which includes activities and action items)
+/// by focusing solely on the program's milestone progression state.
+///
+/// The `progress_basis` field names the mechanism used to derive
+/// `current_phase_index` and `next_unfinished_milestone`. Currently always
+/// `"phase_index_ordering"` — milestones are ordered by their `phase_index`
+/// field (0-based), which is the only programmatic ordering signal in the
+/// current model.
+///
+/// Milestone semantics are deliberately not interpreted: this endpoint reports
+/// observable state and ordering, not what any milestone "means" institutionally.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ProgramSummaryResponse {
+    pub program_id: String,
+    pub name: String,
+    /// Current program lifecycle status.
+    pub program_status: String,
+    /// Milestone status counts.
+    pub milestone_counts: DashboardMilestoneCounts,
+    /// All milestones for this program, ordered by `phase_index` ascending.
+    pub milestones: Vec<DashboardMilestoneSummary>,
+    /// The lowest-`phase_index` milestone that is not yet `completed` or
+    /// `skipped`. `null` when all milestones are terminal or there are none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_unfinished_milestone: Option<NextUnfinishedMilestone>,
+    /// `phase_index` of [`next_unfinished_milestone`] when one exists, else
+    /// the highest `phase_index` among terminal milestones, else `null`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_phase_index: Option<u32>,
+    /// Basis used to derive `current_phase_index` and
+    /// `next_unfinished_milestone`. Currently always
+    /// `"phase_index_ordering"`.
+    pub progress_basis: String,
+}
