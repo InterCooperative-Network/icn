@@ -867,6 +867,91 @@ pub struct MilestoneResponse {
 }
 
 // ============================================================================
+// Milestone preview (read-only readiness view)
+// ============================================================================
+
+/// Summary row describing a milestone that blocks another milestone from
+/// advancing.
+///
+/// Emitted inside [`MilestonePreviewResponse::blocking_milestones`]: any
+/// earlier-phase milestone that has not reached a terminal status
+/// (`Completed` or `Skipped`). Order matches `phase_index`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct BlockingMilestoneSummary {
+    pub id: String,
+    pub name: String,
+    pub phase_index: u32,
+    pub status: String,
+}
+
+/// Composite read-only preview describing whether a milestone is currently
+/// ready to be advanced, and what observable state drove that answer.
+///
+/// Returned by `GET /gov/milestones/{milestone_id}/preview`. Purely read-only:
+/// no mutation, no status transition, no event emission. The preview reflects
+/// the same ordering semantics a human operator would use when deciding
+/// whether to mark a milestone complete — earlier-phase milestones must be
+/// `Completed` or `Skipped`, and the target milestone itself must be open and
+/// not `Blocked`.
+///
+/// `completion_criteria` is surfaced verbatim for caller inspection but is
+/// **not evaluated**. The governance core deliberately treats criteria as
+/// free-form declarative text; interpretation of what "satisfied" means is an
+/// institution-package concern. This endpoint therefore reports what the
+/// milestone *declares* it needs, not whether any individual criterion has
+/// been met.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MilestonePreviewResponse {
+    /// Milestone identifier.
+    pub milestone_id: String,
+    /// Program the milestone belongs to.
+    pub program_id: String,
+    /// Milestone display name.
+    pub name: String,
+    /// Ordinal position among the program's milestones (0-based).
+    pub phase_index: u32,
+    /// Current milestone status (`pending`, `in_progress`, `completed`,
+    /// `blocked`, `skipped`).
+    pub status: String,
+    /// `true` while the milestone is not in a terminal (`completed` /
+    /// `skipped`) state.
+    pub is_open: bool,
+    /// Enclosing program's current lifecycle status (`draft`,
+    /// `active_planning`, `public_launch`, `in_execution`, `closed`,
+    /// `archived`). Informational — the preview does not require any specific
+    /// program status.
+    pub program_status: String,
+    /// `true` when every earlier-phase milestone (strictly lower
+    /// `phase_index`) is `completed` or `skipped`.
+    pub earlier_milestones_complete: bool,
+    /// Earlier-phase milestones that are not yet `completed` or `skipped`,
+    /// ordered by `phase_index`. Empty when `earlier_milestones_complete` is
+    /// `true`.
+    pub blocking_milestones: Vec<BlockingMilestoneSummary>,
+    /// Free-form checklist declared on the milestone at creation. Surfaced
+    /// verbatim for caller inspection; **not evaluated** by this endpoint.
+    pub completion_criteria: Vec<String>,
+    /// Count of declared completion criteria (equivalent to
+    /// `completion_criteria.len()`). Provided for callers that only need the
+    /// count without transferring the strings.
+    pub criteria_count: usize,
+    /// Observable readiness for advancement.
+    ///
+    /// `true` iff all of:
+    /// - milestone is open (not `completed` or `skipped`),
+    /// - milestone status is not `blocked`,
+    /// - every earlier-phase milestone is `completed` or `skipped`.
+    ///
+    /// Does **not** evaluate `completion_criteria` — that is out of scope for
+    /// ICN governance core.
+    pub ready_to_advance: bool,
+    /// Human-readable reason when `ready_to_advance` is `false`. `None` when
+    /// the milestone is ready.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+// ============================================================================
 // Program dashboard (composite read surface)
 // ============================================================================
 

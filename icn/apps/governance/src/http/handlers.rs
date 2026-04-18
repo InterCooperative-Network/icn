@@ -3713,6 +3713,129 @@ pub async fn unlink_activity_from_program<E: GovernanceEventEmitter + Clone + 's
     Ok(HttpResponse::NoContent().finish())
 }
 
+// ── Milestone preview (read-only readiness) ───────────────────────────────────
+
+/// GET /gov/milestones/{milestone_id}/preview — Read-only milestone readiness.
+///
+/// Reports whether the milestone is currently ready to advance, based on the
+/// same observable ordering state a human operator would inspect before
+/// marking it complete:
+///
+/// - the milestone is open (not `completed` / `skipped`) and not `blocked`,
+/// - every earlier-phase milestone in the same program is `completed` or
+///   `skipped`.
+///
+/// This endpoint performs **no mutation**, no status transition, and emits
+/// no events. It deliberately does **not** evaluate `completion_criteria` —
+/// the governance core treats criteria as free-form declarative text whose
+/// interpretation belongs to an institution package. The criteria are
+/// surfaced verbatim for caller inspection only.
+///
+/// Requires `governance:read`.
+///
+/// Returns 404 if the milestone does not exist. Also returns 404 if the
+/// milestone's program is missing (orphaned milestone — should not occur,
+/// but handled defensively rather than panicking).
+pub async fn preview_milestone<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    milestone_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let id = MilestoneId(milestone_id.into_inner());
+
+    // 1. Load the milestone (404 when absent).
+    let milestone = ctx
+        .manager
+        .get_milestone(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Milestone not found"))?;
+
+    // 2. Load the enclosing program for its status (informational context).
+    //    An orphaned milestone (program deleted under it) returns 404 rather
+    //    than crashing or fabricating a status.
+    let program = ctx
+        .manager
+        .get_program(&milestone.program_id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found for milestone"))?;
+
+    // 3. Load siblings ordered by phase_index (store guarantees ordering).
+    let siblings = ctx
+        .manager
+        .list_milestones_by_program(&milestone.program_id)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(build_milestone_preview(&milestone, &program, &siblings)))
+}
+
+/// Pure function composing a [`MilestonePreviewResponse`] from the three
+/// pieces of observable state. Split out so the readiness logic can be unit
+/// tested without spinning up an HTTP stack.
+fn build_milestone_preview(
+    milestone: &icn_governance::Milestone,
+    program: &icn_governance::Program,
+    siblings: &[icn_governance::Milestone],
+) -> MilestonePreviewResponse {
+    // Collect earlier-phase milestones that are not yet terminal.
+    let blocking: Vec<BlockingMilestoneSummary> = siblings
+        .iter()
+        .filter(|m| {
+            m.phase_index < milestone.phase_index
+                && !matches!(
+                    m.status,
+                    MilestoneStatus::Completed | MilestoneStatus::Skipped
+                )
+        })
+        .map(|m| BlockingMilestoneSummary {
+            id: m.id.0.clone(),
+            name: m.name.clone(),
+            phase_index: m.phase_index,
+            status: milestone_status_str(&m.status).to_string(),
+        })
+        .collect();
+
+    let earlier_complete = blocking.is_empty();
+    let is_open = milestone.is_open();
+
+    // Readiness: open, not blocked, earlier phases clear.
+    let (ready, reason) = match milestone.status {
+        MilestoneStatus::Completed => (false, Some("milestone is already completed".to_string())),
+        MilestoneStatus::Skipped => (false, Some("milestone is skipped".to_string())),
+        MilestoneStatus::Blocked => (false, Some("milestone is blocked".to_string())),
+        MilestoneStatus::Pending | MilestoneStatus::InProgress => {
+            if earlier_complete {
+                (true, None)
+            } else {
+                let first = &blocking[0];
+                (
+                    false,
+                    Some(format!(
+                        "earlier milestone '{}' (phase {}) is {}",
+                        first.name, first.phase_index, first.status
+                    )),
+                )
+            }
+        }
+    };
+
+    MilestonePreviewResponse {
+        milestone_id: milestone.id.0.clone(),
+        program_id: milestone.program_id.0.clone(),
+        name: milestone.name.clone(),
+        phase_index: milestone.phase_index,
+        status: milestone_status_str(&milestone.status).to_string(),
+        is_open,
+        program_status: program_status_str(&program.status).to_string(),
+        earlier_milestones_complete: earlier_complete,
+        blocking_milestones: blocking,
+        criteria_count: milestone.completion_criteria.len(),
+        completion_criteria: milestone.completion_criteria.clone(),
+        ready_to_advance: ready,
+        reason,
+    }
+}
+
 // ── Program dashboard ─────────────────────────────────────────────────────────
 
 fn dashboard_milestone_summary(m: &icn_governance::Milestone) -> DashboardMilestoneSummary {
@@ -5398,5 +5521,277 @@ mod tests {
         assert_eq!(joint_linked.len(), 2);
 
         assert_eq!(meetings[0]["status"], "scheduled");
+    }
+
+    // ── Milestone preview tests ────────────────────────────────────────────
+
+    macro_rules! preview_app {
+        ($ctx:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: "did:icn:reader".to_string(),
+                            scope: Some("governance:read".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/milestones/{milestone_id}/preview",
+                        web::get().to(preview_milestone::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// Helper: create a domain + program and return `(manager, program_id)`.
+    async fn setup_preview_program(
+        mgr: &Arc<GovernanceManager>,
+        domain: &str,
+        entity: &str,
+    ) -> icn_governance::ProgramId {
+        let domain_id = GovernanceDomainId(domain.to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            format!("{domain} domain"),
+            "cooperative_default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let prog = mgr
+            .create_program(
+                domain_id,
+                entity.to_string(),
+                icn_governance::ProgramKind::Cycle,
+                "Preview Cycle".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        prog.id
+    }
+
+    /// 404 when the milestone does not exist.
+    #[actix_web::test]
+    async fn preview_404_for_missing_milestone() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/milestones/nonexistent/preview")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 404);
+    }
+
+    /// Phase-0 milestone with no earlier phases → ready, reason null.
+    #[actix_web::test]
+    async fn preview_ready_when_first_phase_and_open() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-ready", "ent-ready").await;
+
+        let m = mgr
+            .create_milestone(
+                pid,
+                "Kickoff".to_string(),
+                None,
+                0,
+                None,
+                vec!["plan drafted".to_string(), "team named".to_string()],
+            )
+            .unwrap();
+
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/preview", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["milestone_id"], m.id.0.as_str());
+        assert_eq!(body["phase_index"], 0);
+        assert_eq!(body["status"], "pending");
+        assert_eq!(body["is_open"], true);
+        assert_eq!(body["earlier_milestones_complete"], true);
+        assert_eq!(body["blocking_milestones"], serde_json::json!([]));
+        assert_eq!(body["criteria_count"], 2);
+        assert_eq!(
+            body["completion_criteria"],
+            serde_json::json!(["plan drafted", "team named"])
+        );
+        assert_eq!(body["ready_to_advance"], true);
+        assert!(
+            body.get("reason").is_none_or(|v| v.is_null()),
+            "reason should be absent or null when ready: {body:?}"
+        );
+        assert_eq!(body["program_status"], "draft");
+    }
+
+    /// Later-phase milestone is blocked by an uncompleted earlier phase.
+    /// `blocking_milestones` is ordered by `phase_index`; `reason` names the
+    /// first blocker.
+    #[actix_web::test]
+    async fn preview_blocked_by_earlier_phase() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-block", "ent-block").await;
+
+        // Create out of order to prove ordering comes from phase_index.
+        let m_launch = mgr
+            .create_milestone(pid.clone(), "Launch".to_string(), None, 2, None, vec![])
+            .unwrap();
+        let _m_plan = mgr
+            .create_milestone(pid.clone(), "Plan".to_string(), None, 1, None, vec![])
+            .unwrap();
+        let m_kick = mgr
+            .create_milestone(pid, "Kickoff".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        // Complete phase-0 so phase-1 becomes the first blocker for phase-2.
+        let caller = test_did(1);
+        mgr.update_milestone_status(&m_kick.id, MilestoneStatus::Completed, &caller)
+            .unwrap();
+
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/preview", m_launch.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["ready_to_advance"], false);
+        assert_eq!(body["earlier_milestones_complete"], false);
+        let blocking = body["blocking_milestones"].as_array().unwrap();
+        // Only phase-1 is still blocking (phase-0 is completed).
+        assert_eq!(blocking.len(), 1);
+        assert_eq!(blocking[0]["name"], "Plan");
+        assert_eq!(blocking[0]["phase_index"], 1);
+        assert_eq!(blocking[0]["status"], "pending");
+        let reason = body["reason"].as_str().unwrap();
+        assert!(
+            reason.contains("Plan") && reason.contains("phase 1"),
+            "reason should name the first blocker: {reason}"
+        );
+    }
+
+    /// Skipped earlier milestones also clear the blocker.
+    #[actix_web::test]
+    async fn preview_skipped_earlier_phase_clears_blocker() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-skip", "ent-skip").await;
+
+        let m_a = mgr
+            .create_milestone(pid.clone(), "A".to_string(), None, 0, None, vec![])
+            .unwrap();
+        let m_b = mgr
+            .create_milestone(pid, "B".to_string(), None, 1, None, vec![])
+            .unwrap();
+
+        let caller = test_did(2);
+        mgr.update_milestone_status(&m_a.id, MilestoneStatus::Skipped, &caller)
+            .unwrap();
+
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/preview", m_b.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["earlier_milestones_complete"], true);
+        assert_eq!(body["ready_to_advance"], true);
+        assert_eq!(body["blocking_milestones"], serde_json::json!([]));
+    }
+
+    /// Already-completed milestone reports not-ready with a descriptive reason
+    /// and surfaces `is_open = false`.
+    #[actix_web::test]
+    async fn preview_already_completed_is_not_ready() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-done", "ent-done").await;
+
+        let m = mgr
+            .create_milestone(pid, "Done".to_string(), None, 0, None, vec![])
+            .unwrap();
+        let caller = test_did(3);
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &caller)
+            .unwrap();
+
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/preview", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["status"], "completed");
+        assert_eq!(body["is_open"], false);
+        assert_eq!(body["ready_to_advance"], false);
+        let reason = body["reason"].as_str().unwrap();
+        assert!(
+            reason.contains("completed"),
+            "reason should explain completion: {reason}"
+        );
+    }
+
+    /// Blocked status prevents readiness even when earlier phases are clear.
+    #[actix_web::test]
+    async fn preview_blocked_status_is_not_ready() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-blk", "ent-blk").await;
+
+        let m = mgr
+            .create_milestone(pid, "Stuck".to_string(), None, 0, None, vec![])
+            .unwrap();
+        let caller = test_did(4);
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Blocked, &caller)
+            .unwrap();
+
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/preview", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["status"], "blocked");
+        assert_eq!(body["earlier_milestones_complete"], true);
+        assert_eq!(body["ready_to_advance"], false);
+        let reason = body["reason"].as_str().unwrap();
+        assert!(
+            reason.contains("blocked"),
+            "reason should mention block: {reason}"
+        );
     }
 }
