@@ -2,9 +2,37 @@
 
 **Status**: Spec (docs-only, grounded against `main` at `37ec91e0` — 2026-04-14)
 **Supersedes**: portions of `NYCN-Institutional-Design.md` (see §0.3)
+**Superseded on routing conflicts by**: `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md` (2026-04-17)
 **Companion docs**:
 - `NYCN-Implementation-Matrix.md` — per-object gap table (exists / partial / missing)
 - `NYCN-Execution-Tranches.md` — merge-order + dependency plan
+
+---
+
+> ## ⚠️ Authoritative routing correction (2026-04-17)
+>
+> On any disagreement between this spec and `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md`, **the boundary doc wins.**
+>
+> This document, written before the boundary was pinned down, routes several institution-specific nouns into `icn-governance::*`. That is drift. ICN core — `icn-governance` crate and `apps/governance` — must remain institution-agnostic. Anything shaped specifically by NYCN or the NY Cooperative Summit (sponsor packets, session catalogs, conference registrations, venue-accessibility scoring, summit-year milestone names) belongs in the **institution package** (future `icn/apps/nycn/` or external `nycn-icn` repo), not in governance core. Per the App topology rule (`AGENTS.md`), runtime-integrated apps live under `icn/apps/`; no new top-level `apps/*` crates.
+>
+> **Corrected routing (authoritative):**
+>
+> | Section | As written | Corrected |
+> |---------|-----------|-----------|
+> | §2, §3, §5.1 `ProgramKind::AnnualSummit / Campaign / Initiative / Series / PolicyDay` | Named variants in core | Generic kinds use existing core variants — `ProgramKind::{Campaign, Initiative, Series}` — while institution-specific kinds (`AnnualSummit`, `PolicyDay`) map to `ProgramKind::Custom("annual-summit")` / `ProgramKind::Custom("policy-day")`. See `icn-governance/src/program.rs`. Institution names live in contract bodies or the institution package. |
+> | §5.1 `MilestoneType::{StrategyLocked, VenueLocked, BudgetLocked, PublicLaunchReady, EventReady, ClosureComplete}` | Named variants in core | Landed code uses free-form `completion_criteria: Vec<String>` + generic `MilestoneStatus`. Named summit-shaped checks live in CCL contract bodies, not a core enum. |
+> | §2 / §6 / §10 / §13 sponsor pipeline, §3 `Sponsor` | `icn-governance::sponsor` | Institution package |
+> | §2 / §3 / §7 `BudgetItem` | `icn-governance::budget_item` | Institution package (or generic `icn-ledger` integration if it can be made institution-neutral) |
+> | §2 / §3 / §8 `Session` | `icn-governance::session` | Institution package |
+> | §2 / §3 / §9 `Registration` | `icn-governance::registration` | Institution package |
+> | §10 `VenueAccessibility` / `AccessibilityScore` | `icn-governance::accessibility` | Institution package |
+> | §11 `SourceRef` | `icn-governance::source_ref` | Institution package (deferred) |
+> | §12 `InstitutionalDocument` | `icn-governance::document` | Institution package or generic content-addressed crate — not governance-core |
+> | `Participation` with sponsor-contact / speaker / attendee / volunteer variants | Core participation module | Institution package. Core only knows authority-bearing membership and roles. |
+>
+> The full-scope code sketches below are left intact for historical context — treat them as **illustrative of the institution package's shape**, not as a commitment about `icn-governance` module layout. The canonical working pattern lives in `icn-governance/src/program.rs`: generic kind enum with `Custom(String)` escape, free-form `completion_criteria`, capability-string authority.
+>
+> **Practical rule**: before adding anything below to `icn-governance` or `apps/governance`, ask: "Could a different institution (a worker co-op federation, a credit union, a housing co-op) use this without renaming?" If no, it belongs in the institution package.
 
 ---
 
@@ -242,6 +270,8 @@ Role holders on the backbone structure carry capability strings like `"backbone-
 **Decision**: `Activity` is not enough. `Activity { kind: Event }` captures the summit-as-thing; it does not capture the summit-as-cycle-with-stage-gates. Promote to a `Program` primitive that wraps `Activity`.
 
 ### 5.1 Proposed module: `icn-governance::program`
+
+> **⚠ Illustrative only — not the landed shape.** The named `ProgramKind` variants (`AnnualSummit`, `Campaign`, `Initiative`, `Series`, `PolicyDay`) and named `MilestoneType` variants (`StrategyLocked`, `VenueLocked`, `BudgetLocked`, `PublicLaunchReady`, `EventReady`, `ClosureComplete`) below are institution-specific and **do not belong in `icn-governance`**. The canonical core shape lives in `icn-governance/src/program.rs`: `ProgramKind::Custom(String)` and a free-form `completion_criteria: Vec<String>`, with institution semantics supplied by the institution package or CCL contract bodies. Read the sketch below as a picture of the institution-package surface, not of governance core.
 
 ```rust
 pub struct ProgramId(pub String);

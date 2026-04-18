@@ -6,6 +6,32 @@
 
 ---
 
+> ## ⚠️ Authoritative routing correction (2026-04-17)
+>
+> This document predates `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md`. On any routing conflict between this matrix and the boundary doc, **the boundary doc wins.**
+>
+> Several rows below route institution-specific nouns (sponsor, budget-item, session, registration, venue accessibility, source-ref, institutional-document, speaker/attendee/sponsor-contact participation variants, institution-specific `ProgramKind` / `MilestoneType` names like `AnnualSummit` / `VenueLocked` / `BudgetLocked` / `PublicLaunchReady`) into `icn-governance::*`. That is drift. ICN core — `icn-governance` and `apps/governance` — must stay institution-agnostic.
+>
+> **Corrected routing (authoritative):**
+>
+> | Originally routed to | Re-routed to |
+> |----------------------|--------------|
+> | `icn-governance::sponsor` | Institution package (future `apps/nycn/` or external `nycn-icn`) |
+> | `icn-governance::budget_item` | Institution package (or `icn-ledger` integration if generic treasury) |
+> | `icn-governance::session` | Institution package |
+> | `icn-governance::registration` | Institution package |
+> | `icn-governance::accessibility` | Institution package |
+> | `icn-governance::source_ref` | Institution package (deferred) |
+> | `icn-governance::document` | Institution package or a generic content-addressed crate; **not** a governance-core concept |
+> | `icn-governance::participation` with sponsor-contact / speaker / attendee / volunteer variants | Institution package; ICN core only knows authority-bearing membership/roles |
+> | `Program { kind: AnnualSummit }` and `MilestoneType::{VenueLocked, BudgetLocked, PublicLaunchReady, EventReady, ClosureComplete}` | ICN core uses `ProgramKind::Custom("annual_summit")` and free-form `completion_criteria: Vec<String>` — see `icn-governance/src/program.rs`. Named summit-shaped variants live in the institution package (or in CCL contract bodies) only. |
+>
+> Touchpoint shorthand (`D` = domain module in `icn-governance::<name>`, etc.) should be read as "institution-package equivalent" for any corrected row. The rows themselves are left intact below as historical context for the drift.
+>
+> **Rule going forward**: before adding anything to `icn-governance` or `apps/governance`, ask: "Could a different institution (a worker co-op federation, a credit union, a housing co-op) use this without renaming?" If no, it belongs in the institution package.
+
+---
+
 ## Legend
 
 **Lifecycle**
