@@ -1522,6 +1522,78 @@ pub async fn get_chain<E: GovernanceEventEmitter + Clone + 'static>(
     Ok(HttpResponse::Ok().json(chain))
 }
 
+/// GET /gov/proposals/{proposal_id}/deliberation — Reverse read-model.
+///
+/// Returns the proposal's deliberation trail: every meeting in the proposal's
+/// domain whose agenda linked back to this proposal, with the agenda item's
+/// discussion notes, outcome, and generated action items. When the proposal
+/// is closed, the governance decision receipt is included. The `effect_kind`
+/// field labels the [`crate::http::configure::GovernanceEffect`] variant the
+/// payload would translate into on acceptance (`"freeze_member"`, etc., or
+/// `"unhandled"`). It is a shape label only — dispatch evidence lives in
+/// `.../chain`, and cryptographic evidence in `.../proof`.
+///
+/// This endpoint is NOT an activity/progress tracker. It answers:
+/// "what deliberation produced the institutional decision on this proposal?"
+pub async fn get_proposal_deliberation<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    proposal_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+
+    let id = ProposalId(proposal_id.into_inner());
+    let trail = ctx
+        .manager
+        .get_deliberation(&id)
+        .await
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found(format!("Proposal not found: {}", id.0)))?;
+
+    let governance_decision =
+        trail
+            .governance_receipt
+            .as_ref()
+            .map(|r| DeliberationDecisionResponse {
+                outcome: r.outcome.to_string(),
+                decided_at: trail.decided_at.unwrap_or(0),
+                decision_hash: hex::encode(r.decision_hash),
+            });
+
+    let deliberations = trail
+        .deliberations
+        .into_iter()
+        .map(|e| DeliberationMeetingResponse {
+            meeting_id: e.meeting_id.0.clone(),
+            meeting_title: e.meeting_title,
+            meeting_status: meeting_status_str(&e.meeting_status).to_string(),
+            scheduled_at: e.scheduled_at,
+            started_at: e.started_at,
+            ended_at: e.ended_at,
+            agenda_item_id: e.agenda_item_id.0.to_string(),
+            agenda_item_title: e.agenda_item_title,
+            presenter: e.presenter,
+            discussion_notes: e.discussion_notes,
+            outcome: e.outcome,
+            generated_action_items: e
+                .generated_action_items
+                .into_iter()
+                .map(|aid| aid.0.to_string())
+                .collect(),
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(ProposalDeliberationResponse {
+        proposal_id: trail.proposal_id.0,
+        domain_id: trail.domain_id.0,
+        payload_type: trail.payload_type.to_string(),
+        state: trail.state_label.to_string(),
+        effect_kind: trail.effect_kind.to_string(),
+        deliberations,
+        governance_decision,
+    }))
+}
+
 /// GET /gov/proposals/{proposal_id}/proof — Get cryptographic proof of proposal outcome.
 pub async fn get_proof<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
