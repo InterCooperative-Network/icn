@@ -1337,6 +1337,7 @@ impl GatewayServer {
             emitter: GatewayEventAdapter::new(event_broadcaster.clone()),
             on_charter_accepted: self.charter_accepted_hook,
             on_proposal_accepted: Some(on_proposal_accepted),
+            on_proposal_accepted_with_evidence: None,
             member_checker: Some(member_checker),
             steward_checker: Some(steward_checker),
             suspension_checker: Some(suspension_checker),

@@ -165,6 +165,7 @@ async fn test_suspended_member_cannot_submit_proposals() {
         emitter: NoopEventEmitter,
         on_charter_accepted: None,
         on_proposal_accepted: Some(on_proposal_accepted),
+        on_proposal_accepted_with_evidence: None,
         member_checker: None,
         steward_checker: None,
         suspension_checker: Some(suspension_checker),

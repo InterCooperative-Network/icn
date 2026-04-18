@@ -21,6 +21,8 @@
 use icn_kernel_api::receipts::Hash;
 use serde::{Deserialize, Serialize};
 
+use crate::receipt_backend::GovernanceReceiptBackend;
+
 /// Persisted artifact of an accepted proposal's translated institutional effect.
 ///
 /// One record per accepted proposal that translates to a structured
@@ -243,6 +245,79 @@ pub fn record_from_accepted_payload(
     }
 }
 
+/// Outcome of a canonical acceptance-effect emission attempt.
+///
+/// - `Emitted { record_id }` — a new record was just written.
+/// - `AlreadyEmitted { record_id }` — a record for this
+///   (proposal_id, effect_kind) already existed; no write occurred.
+/// - `NoEffect` — the payload translates to no structured effect (Unhandled).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AcceptanceEmissionOutcome {
+    Emitted { record_id: String },
+    AlreadyEmitted { record_id: String },
+    NoEffect,
+}
+
+impl AcceptanceEmissionOutcome {
+    /// Record id if one was produced or already existed, else None.
+    pub fn record_id(&self) -> Option<&str> {
+        match self {
+            AcceptanceEmissionOutcome::Emitted { record_id }
+            | AcceptanceEmissionOutcome::AlreadyEmitted { record_id } => Some(record_id),
+            AcceptanceEmissionOutcome::NoEffect => None,
+        }
+    }
+}
+
+/// Canonical institutional-effect emission for an accepted proposal.
+///
+/// This is the ONE code path where the translation
+/// `ProposalPayload → InstitutionalEffectRecord` is turned into a durable
+/// artifact. Called from both:
+///
+/// - the HTTP `close_proposal` handler (standalone or actor-backed normal
+///   close) through `GovernanceManager::apply_acceptance_effects`;
+/// - the actor's `CloseProposal::Accept` and `ForceCloseProposal::Accept`
+///   branches (when the actor has been given a receipt store).
+///
+/// Idempotent: if a record for `(proposal_id, effect_kind)` already exists,
+/// returns `AlreadyEmitted` and does NOT write again. This is what lets
+/// the HTTP and actor paths both call through without duplicating records,
+/// and lets the same acceptance be re-handled (e.g. on retry) safely.
+///
+/// Caller contract: only invoke after the proposal has been recorded as
+/// accepted and after any governance decision receipt has been stored
+/// (so `decision_hash` can be non-None and bind into the INV-5 chain).
+pub fn emit_accepted_effect(
+    backend: &dyn GovernanceReceiptBackend,
+    proposal_id: &str,
+    domain_id: &str,
+    decision_hash: Option<Hash>,
+    payload: &icn_governance::ProposalPayload,
+    now: u64,
+) -> Result<AcceptanceEmissionOutcome, String> {
+    let Some(record) =
+        record_from_accepted_payload(proposal_id, domain_id, decision_hash, payload, now)
+    else {
+        return Ok(AcceptanceEmissionOutcome::NoEffect);
+    };
+
+    // Dedup: same (proposal_id, effect_kind) keyspace.
+    let existing = backend.list_institutional_effects_by_proposal(proposal_id)?;
+    if let Some(prior) = existing
+        .iter()
+        .find(|r| r.effect_kind == record.effect_kind)
+    {
+        return Ok(AcceptanceEmissionOutcome::AlreadyEmitted {
+            record_id: prior.record_id.clone(),
+        });
+    }
+
+    let record_id = record.record_id.clone();
+    backend.put_institutional_effect(&record)?;
+    Ok(AcceptanceEmissionOutcome::Emitted { record_id })
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -332,5 +407,152 @@ mod tests {
         // Body is NOT duplicated — only a length reference is kept.
         assert!(r.payload.get("charter_yaml").is_none());
         assert_eq!(r.payload["charter_yaml_bytes"], 21);
+    }
+
+    // ------------------------------------------------------------------
+    // emit_accepted_effect — canonical helper tests
+    //
+    // Proves the dedup contract that makes the unified canonical path
+    // safe to call from BOTH the HTTP handler and the actor's
+    // ForceCloseProposal / CloseProposal accept branches.
+    // ------------------------------------------------------------------
+
+    use crate::receipt_backend::GovernanceReceiptBackend;
+    use std::sync::Mutex;
+
+    struct MemoryBackend {
+        effects: Mutex<Vec<InstitutionalEffectRecord>>,
+    }
+
+    impl MemoryBackend {
+        fn new() -> Self {
+            Self {
+                effects: Mutex::new(vec![]),
+            }
+        }
+    }
+
+    impl GovernanceReceiptBackend for MemoryBackend {
+        fn put_governance(
+            &self,
+            _: &icn_governance::GovernanceDecisionReceipt,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+        fn get_governance_by_proposal(
+            &self,
+            _: &str,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn put_allocation(
+            &self,
+            _: &icn_kernel_api::AllocationReceipt,
+        ) -> Result<icn_kernel_api::Hash, String> {
+            Ok([0u8; 32])
+        }
+        fn get_governance_by_decision(
+            &self,
+            _: &icn_kernel_api::Hash,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn list_allocations_by_decision(
+            &self,
+            _: &icn_kernel_api::Hash,
+        ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
+            Ok(vec![])
+        }
+        fn put_institutional_effect(
+            &self,
+            record: &InstitutionalEffectRecord,
+        ) -> Result<(), String> {
+            self.effects.lock().unwrap().push(record.clone());
+            Ok(())
+        }
+        fn list_institutional_effects_by_proposal(
+            &self,
+            proposal_id: &str,
+        ) -> Result<Vec<InstitutionalEffectRecord>, String> {
+            Ok(self
+                .effects
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|r| r.proposal_id == proposal_id)
+                .cloned()
+                .collect())
+        }
+    }
+
+    fn freeze_payload() -> ProposalPayload {
+        ProposalPayload::FreezeMember {
+            member: did(7),
+            reason: "audit".into(),
+            duration_seconds: None,
+        }
+    }
+
+    #[test]
+    fn emit_accepted_effect_writes_on_first_call() {
+        let backend = MemoryBackend::new();
+        let outcome = emit_accepted_effect(&backend, "p1", "coop-a", None, &freeze_payload(), 100)
+            .expect("emit must not error");
+        match outcome {
+            AcceptanceEmissionOutcome::Emitted { record_id } => assert!(!record_id.is_empty()),
+            other => panic!("expected Emitted, got {other:?}"),
+        }
+        assert_eq!(backend.effects.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn emit_accepted_effect_dedups_by_effect_kind() {
+        let backend = MemoryBackend::new();
+        let a = emit_accepted_effect(&backend, "p1", "coop", None, &freeze_payload(), 100).unwrap();
+        let first_id = a.record_id().unwrap().to_string();
+
+        // Same proposal + same effect_kind → AlreadyEmitted, no new record.
+        let b = emit_accepted_effect(&backend, "p1", "coop", None, &freeze_payload(), 200).unwrap();
+        match b {
+            AcceptanceEmissionOutcome::AlreadyEmitted { record_id } => {
+                assert_eq!(record_id, first_id);
+            }
+            other => panic!("expected AlreadyEmitted, got {other:?}"),
+        }
+        assert_eq!(backend.effects.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn emit_accepted_effect_distinct_effect_kinds_coexist_on_same_proposal() {
+        // Pathological case: if the same proposal could ever yield two
+        // different effect_kinds (future payloads), dedup is scoped to
+        // effect_kind not proposal_id, so both records are preserved.
+        let backend = MemoryBackend::new();
+        emit_accepted_effect(&backend, "p1", "coop", None, &freeze_payload(), 10).unwrap();
+        let unfreeze = ProposalPayload::UnfreezeMember {
+            member: did(7),
+            reason: "resolved".into(),
+        };
+        emit_accepted_effect(&backend, "p1", "coop", None, &unfreeze, 20).unwrap();
+        let stored = backend
+            .list_institutional_effects_by_proposal("p1")
+            .unwrap();
+        assert_eq!(stored.len(), 2);
+    }
+
+    #[test]
+    fn emit_accepted_effect_text_payload_is_no_effect() {
+        let backend = MemoryBackend::new();
+        let outcome = emit_accepted_effect(
+            &backend,
+            "p1",
+            "coop",
+            None,
+            &ProposalPayload::Text { body: "x".into() },
+            10,
+        )
+        .unwrap();
+        assert_eq!(outcome, AcceptanceEmissionOutcome::NoEffect);
+        assert!(backend.effects.lock().unwrap().is_empty());
     }
 }

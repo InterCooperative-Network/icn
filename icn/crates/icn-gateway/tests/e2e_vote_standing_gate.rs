@@ -155,6 +155,7 @@ async fn build_app_with_open_proposal(
         emitter: NoopEventEmitter,
         on_charter_accepted: None,
         on_proposal_accepted: None,
+        on_proposal_accepted_with_evidence: None,
         member_checker: Some(make_checker(commons_mgr)),
         steward_checker: None,
         suspension_checker: None,
@@ -406,6 +407,7 @@ async fn build_app_with_suspension_checker(
         emitter: NoopEventEmitter,
         on_charter_accepted: None,
         on_proposal_accepted: None,
+        on_proposal_accepted_with_evidence: None,
         member_checker: None, // omit commons gate — isolate suspension gate
         steward_checker: None,
         suspension_checker: Some(suspension_checker),

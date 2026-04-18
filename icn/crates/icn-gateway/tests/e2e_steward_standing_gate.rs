@@ -132,6 +132,7 @@ async fn build_app(
         emitter: NoopEventEmitter,
         on_charter_accepted: None,
         on_proposal_accepted: None,
+        on_proposal_accepted_with_evidence: None,
         member_checker: Some(make_member_checker(commons_mgr.clone())),
         steward_checker: Some(make_steward_checker(commons_mgr)),
         suspension_checker: None,

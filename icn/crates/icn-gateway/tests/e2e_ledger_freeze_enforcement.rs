@@ -146,6 +146,7 @@ async fn test_freeze_member_blocks_ledger_entries_after_governance_acceptance() 
         emitter: NoopEventEmitter,
         on_charter_accepted: None,
         on_proposal_accepted: Some(on_proposal_accepted),
+        on_proposal_accepted_with_evidence: None,
         member_checker: None,
         steward_checker: None,
         suspension_checker: None,

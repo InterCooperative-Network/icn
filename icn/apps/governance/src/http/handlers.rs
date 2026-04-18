@@ -21,7 +21,7 @@ use icn_http_kit::{
 };
 use icn_identity::Did;
 
-use super::configure::{GovernanceContext, GovernanceEffect};
+use super::configure::{DispatchEvidenceSpec, GovernanceContext, GovernanceEffect};
 use super::models::*;
 use super::validation as val;
 use crate::events::GovernanceEventEmitter;
@@ -1220,23 +1220,19 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
             .ok()
             .and_then(|chain| chain.governance_receipt.map(|r| r.decision_hash));
 
-        if let Some(record) = crate::institutional_effect::record_from_accepted_payload(
-            &proposal.id.0,
-            &proposal.domain_id.0,
-            decision_hash,
-            &proposal.payload,
-            current_time_secs(),
-        ) {
-            if let Err(e) = ctx.manager.record_institutional_effect(&record) {
-                // Non-fatal — the dispatch hook still fires below. Log so
-                // operators can detect a partial-audit state.
-                tracing::error!(
-                    proposal_id = %proposal.id.0,
-                    effect_kind = %record.effect_kind,
-                    error = %e,
-                    "Failed to persist institutional effect record",
-                );
-            }
+        // Canonical emission path: same method called from the actor's
+        // force-close accept branch. Idempotent on (proposal_id, effect_kind)
+        // so when the actor has already emitted (actor-backed normal close),
+        // this call returns AlreadyEmitted instead of duplicating.
+        if let Err(e) =
+            ctx.manager
+                .apply_acceptance_effects(&proposal, decision_hash, current_time_secs())
+        {
+            tracing::error!(
+                proposal_id = %proposal.id.0,
+                error = %e,
+                "apply_acceptance_effects failed; proposal acceptance recorded but no institutional artifact",
+            );
         }
     }
 
@@ -1297,7 +1293,35 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                     payload_type: proposal.payload.type_name().to_owned(),
                 },
             };
-            hook(effect);
+            // Fire the fire-and-forget hook first.
+            hook(effect.clone());
+
+            // Evidence-returning hook: when wired, persist the returned
+            // dispatch evidence against the just-emitted institutional
+            // effect record. Effect kind must match one of our translated
+            // labels — for Unhandled we skip (no record was emitted).
+            if let Some(ev_hook) = &ctx.on_proposal_accepted_with_evidence {
+                if let Some(spec) = ev_hook(&effect) {
+                    let effect_kind = match &effect {
+                        GovernanceEffect::FreezeMember { .. } => Some("freeze_member"),
+                        GovernanceEffect::UnfreezeMember { .. } => Some("unfreeze_member"),
+                        GovernanceEffect::DeployCharter { .. } => Some("deploy_charter"),
+                        GovernanceEffect::AppointSteward { .. } => Some("appoint_steward"),
+                        GovernanceEffect::RevokeSteward { .. } => Some("revoke_steward"),
+                        GovernanceEffect::Unhandled { .. } => None,
+                    };
+                    if let Some(kind) = effect_kind {
+                        record_hook_dispatch_evidence(
+                            &ctx,
+                            &proposal.id.0,
+                            kind,
+                            spec,
+                            current_time_secs(),
+                        )
+                        .await;
+                    }
+                }
+            }
         }
 
         // SDIS service dispatch (test path only — daemon uses actor event system).
@@ -1635,6 +1659,63 @@ pub async fn get_chain<E: GovernanceEventEmitter + Clone + 'static>(
     let chain = ctx.manager.get_chain(&id).await.map_err(anyhow_to_api)?;
 
     Ok(HttpResponse::Ok().json(chain))
+}
+
+/// Record downstream dispatch evidence returned by the
+/// evidence-returning hook against the institutional effect record for
+/// `(proposal_id, effect_kind)`. Looks up the emitted record by scanning
+/// the proposal's records for a matching `effect_kind`. Logs and skips
+/// on any failure — dispatch evidence is best-effort reconciliation
+/// metadata, not a correctness condition.
+async fn record_hook_dispatch_evidence<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: &web::Data<GovernanceContext<E>>,
+    proposal_id: &str,
+    effect_kind: &str,
+    spec: DispatchEvidenceSpec,
+    now: u64,
+) {
+    use crate::dispatch_evidence::EffectDispatchEvidence;
+
+    let records = match ctx
+        .manager
+        .list_institutional_effects(&icn_governance::ProposalId(proposal_id.to_string()))
+    {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(
+                proposal_id = %proposal_id,
+                error = %e,
+                "dispatch-evidence hook: failed to list institutional effects; skipping"
+            );
+            return;
+        }
+    };
+    let Some(rec) = records.iter().find(|r| r.effect_kind == effect_kind) else {
+        tracing::warn!(
+            proposal_id = %proposal_id,
+            effect_kind = %effect_kind,
+            "dispatch-evidence hook returned Some but no matching effect record exists; skipping"
+        );
+        return;
+    };
+
+    let evidence = EffectDispatchEvidence::new(
+        rec.record_id.clone(),
+        proposal_id.to_string(),
+        spec.subsystem,
+        spec.receipt_ref,
+        spec.success,
+        spec.error_message,
+        now,
+    );
+    if let Err(e) = ctx.manager.record_dispatch_evidence(&evidence) {
+        tracing::error!(
+            proposal_id = %proposal_id,
+            effect_kind = %effect_kind,
+            error = %e,
+            "Failed to persist hook-returned dispatch evidence"
+        );
+    }
 }
 
 /// GET /gov/proposals/{proposal_id}/deliberation — Reverse read-model.
@@ -4657,6 +4738,104 @@ mod tests {
         Did::from_anchor_id(&[seed; 32])
     }
 
+    /// In-memory receipt backend usable from HTTP handler tests.
+    ///
+    /// Covers the minimum backend surface the HTTP close path touches:
+    /// institutional effect records + dispatch evidence. Governance
+    /// receipts and allocation receipts are no-ops here — these tests
+    /// prove the canonical emission and evidence-hook behavior, not
+    /// the economic chain.
+    struct HandlerTestReceiptBackend {
+        effects: Mutex<Vec<crate::institutional_effect::InstitutionalEffectRecord>>,
+        evidence: Mutex<Vec<crate::dispatch_evidence::EffectDispatchEvidence>>,
+    }
+
+    impl HandlerTestReceiptBackend {
+        fn new() -> Self {
+            Self {
+                effects: Mutex::new(vec![]),
+                evidence: Mutex::new(vec![]),
+            }
+        }
+    }
+
+    impl crate::receipt_backend::GovernanceReceiptBackend for HandlerTestReceiptBackend {
+        fn put_governance(
+            &self,
+            _receipt: &icn_governance::GovernanceDecisionReceipt,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+        fn get_governance_by_proposal(
+            &self,
+            _proposal_id: &str,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn put_allocation(
+            &self,
+            _receipt: &icn_kernel_api::AllocationReceipt,
+        ) -> Result<icn_kernel_api::Hash, String> {
+            Ok([0u8; 32])
+        }
+        fn get_governance_by_decision(
+            &self,
+            _decision_hash: &icn_kernel_api::Hash,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn list_allocations_by_decision(
+            &self,
+            _decision_hash: &icn_kernel_api::Hash,
+        ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
+            Ok(vec![])
+        }
+        fn put_institutional_effect(
+            &self,
+            record: &crate::institutional_effect::InstitutionalEffectRecord,
+        ) -> Result<(), String> {
+            self.effects.lock().unwrap().push(record.clone());
+            Ok(())
+        }
+        fn list_institutional_effects_by_proposal(
+            &self,
+            proposal_id: &str,
+        ) -> Result<Vec<crate::institutional_effect::InstitutionalEffectRecord>, String> {
+            let mut items: Vec<_> = self
+                .effects
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|r| r.proposal_id == proposal_id)
+                .cloned()
+                .collect();
+            items.sort_by_key(|r| r.recorded_at);
+            Ok(items)
+        }
+        fn put_effect_dispatch_evidence(
+            &self,
+            evidence: &crate::dispatch_evidence::EffectDispatchEvidence,
+        ) -> Result<(), String> {
+            self.evidence.lock().unwrap().push(evidence.clone());
+            Ok(())
+        }
+        fn list_effect_dispatch_evidence_by_record(
+            &self,
+            effect_record_id: &str,
+        ) -> Result<Vec<crate::dispatch_evidence::EffectDispatchEvidence>, String> {
+            let mut items: Vec<_> = self
+                .evidence
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|e| e.effect_record_id == effect_record_id)
+                .cloned()
+                .collect();
+            items.sort_by_key(|e| e.recorded_at);
+            Ok(items)
+        }
+    }
+
     /// Build a test app that injects the given claims into every request
     /// extension — bypasses JWT validation without touching production code.
     macro_rules! test_app {
@@ -4760,6 +4939,7 @@ mod tests {
             emitter: NoopEventEmitter,
             on_charter_accepted: None,
             on_proposal_accepted: Some(hook),
+            on_proposal_accepted_with_evidence: None,
             member_checker: None,
             steward_checker: None,
             suspension_checker: None,
@@ -4802,6 +4982,114 @@ mod tests {
         }
     }
 
+    /// Proves the evidence-returning hook end-to-end through the HTTP
+    /// `close_proposal` path:
+    ///   normal accept
+    ///   → canonical emission writes `InstitutionalEffectRecord`
+    ///   → `on_proposal_accepted` fires
+    ///   → `on_proposal_accepted_with_evidence` returns `DispatchEvidenceSpec`
+    ///   → hook-returned evidence is persisted against the just-emitted record
+    ///   → `list_dispatch_evidence` returns exactly that evidence entry
+    ///   → derived `ReconciliationStatus` is `ExecutionEvidenced`.
+    ///
+    /// This is the narrow reconciliation bridge for the freeze dispatch lane
+    /// — the lane was `emitted_only` before the evidence hook existed, and
+    /// this test proves it is now wired through a supported path.
+    #[tokio::test]
+    async fn evidence_hook_persists_dispatch_evidence_on_accept() {
+        use crate::dispatch_evidence::ReconciliationStatus;
+        use crate::http::configure::{DispatchEvidenceSpec, ProposalDispatchEvidenceHook};
+
+        let member_did = test_did(11);
+        let target_did = test_did(12);
+
+        // Build a manager wired with a receipt store so emission + evidence
+        // are actually persistent (the base helper uses a bare manager).
+        let mgr = Arc::new(
+            GovernanceManager::new().with_receipt_store(Arc::new(HandlerTestReceiptBackend::new())),
+        );
+        let domain_id = GovernanceDomainId("evidence-coop".to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            "evidence coop".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 0, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = ProposalId("evidence-freeze-1".to_string());
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id.clone(),
+            member_did.clone(),
+            "Freeze for evidence test".to_string(),
+            "audit".to_string(),
+            ProposalPayload::FreezeMember {
+                member: target_did.clone(),
+                reason: "audit".to_string(),
+                duration_seconds: None,
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .unwrap();
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+
+        // The evidence hook simulates a downstream dispatcher reporting back
+        // with a state_change_hash after successful side-effects.
+        let ev_hook: ProposalDispatchEvidenceHook = Arc::new(move |effect| match effect {
+            GovernanceEffect::FreezeMember { .. } => Some(DispatchEvidenceSpec {
+                subsystem: "commons".to_string(),
+                receipt_ref: Some("state-hash-abc".to_string()),
+                success: true,
+                error_message: None,
+            }),
+            _ => None,
+        });
+
+        let ctx = GovernanceContext {
+            manager: mgr.clone(),
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: Some(Arc::new(|_| {})), // fire-and-forget, also present
+            on_proposal_accepted_with_evidence: Some(ev_hook),
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        };
+
+        let app = test_app!(ctx, member_did);
+        let req = test::TestRequest::post()
+            .uri(&format!("/proposals/{}/close", proposal_id.0))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        // Exactly one effect record was emitted.
+        let records = mgr.list_institutional_effects(&proposal_id).unwrap();
+        assert_eq!(records.len(), 1, "one emitted record expected");
+        assert_eq!(records[0].effect_kind, "freeze_member");
+
+        // Exactly one dispatch evidence entry was attached to that record.
+        let evidence = mgr.list_dispatch_evidence(&records[0].record_id).unwrap();
+        assert_eq!(evidence.len(), 1, "one dispatch evidence entry expected");
+        assert_eq!(evidence[0].subsystem, "commons");
+        assert_eq!(evidence[0].receipt_ref.as_deref(), Some("state-hash-abc"));
+        assert!(evidence[0].success);
+
+        // Reconciliation derives to ExecutionEvidenced on success.
+        let status = crate::dispatch_evidence::derive_reconciliation_status(&records[0], &evidence);
+        assert_eq!(status, ReconciliationStatus::ExecutionEvidenced);
+    }
+
     /// Proves: hook is NOT fired when the proposal closes as `Rejected`.
     ///
     /// GovernanceParams(quorum=0, approval=100) with a vote AGAINST → Rejected.
@@ -4840,6 +5128,7 @@ mod tests {
             emitter: NoopEventEmitter,
             on_charter_accepted: None,
             on_proposal_accepted: Some(hook),
+            on_proposal_accepted_with_evidence: None,
             member_checker: None,
             steward_checker: None,
             suspension_checker: None,
@@ -4959,6 +5248,7 @@ mod tests {
             emitter: NoopEventEmitter,
             on_charter_accepted: None,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             member_checker: None,
             steward_checker: None,
             suspension_checker: Some(suspension_checker),
@@ -5021,6 +5311,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,
@@ -5066,6 +5357,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,
@@ -5097,6 +5389,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,
@@ -5153,6 +5446,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,
@@ -5187,6 +5481,7 @@ mod tests {
                 manager: $mgr,
                 emitter: NoopEventEmitter,
                 on_proposal_accepted: None,
+                on_proposal_accepted_with_evidence: None,
                 on_charter_accepted: None,
                 member_checker: None,
                 steward_checker: None,
@@ -5698,6 +5993,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,
@@ -6750,6 +7046,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,
