@@ -135,6 +135,7 @@ pub async fn run_supervisor(
             trust_service: gateway_handles.trust_service,
             ledger_service: gateway_handles.ledger_service,
             governance: gateway_handles.governance,
+            governance_actor_handle: gateway_handles.governance_actor_handle,
             treasury: gateway_handles.treasury,
             ledger: gateway_handles.ledger,
             entity: gateway_handles.entity,
@@ -684,6 +685,9 @@ async fn spawn_actors_with_identity(
 
     // Store handles for gateway
     gateway_handles.governance = Some(Arc::new(governance_handle.clone()));
+    // Also expose the concrete actor handle so the gateway can install its
+    // receipt_store on the actor (closes actor-path force-close parity gap).
+    gateway_handles.governance_actor_handle = Some(governance_handle.clone());
     gateway_handles.treasury = Some(treasury_manager_handle.clone());
     gateway_handles.ledger = Some(ledger_handle.clone());
 

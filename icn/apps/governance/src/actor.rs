@@ -552,10 +552,40 @@ impl GovernanceHandle {
         self,
         store: Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>,
     ) -> Self {
+        self.install_receipt_store(store);
+        self
+    }
+
+    /// Shared-ref variant of `with_receipt_store`: install the receipt backend
+    /// on an already-cloned handle.
+    ///
+    /// The builder-style `with_receipt_store` consumes `self`, which is
+    /// incompatible with production wiring where the concrete
+    /// `GovernanceHandle` has already been cloned into `Arc<dyn GovernanceOps>`
+    /// before the receipt_store is created (receipt_store's backing DB is only
+    /// opened when the gateway server starts, after the actor is spawned).
+    ///
+    /// This setter mutates the shared actor state via the same
+    /// `Arc<RwLock<GovernanceActor>>`, so every clone of the handle sees the
+    /// newly-installed store. Closes the actor-path parity gap: without this,
+    /// force-close accept and deadline auto-close emit no
+    /// `InstitutionalEffectRecord` in daemon deployments (the HTTP-close path
+    /// remained the sole writer).
+    ///
+    /// Idempotent: repeat calls replace the previously-installed store.
+    pub fn install_receipt_store(
+        &self,
+        store: Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>,
+    ) {
         if let Ok(mut actor) = self.inner.try_write() {
             actor.receipt_store = Some(store);
+        } else {
+            tracing::error!(
+                "install_receipt_store: actor inner lock contended; receipt_store \
+                 not installed. Actor-backed force-close will not emit \
+                 InstitutionalEffectRecord until this is retried."
+            );
         }
-        self
     }
 
     /// List all protocol parameters

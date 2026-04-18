@@ -29,6 +29,16 @@ pub struct GatewayHandles {
     pub ledger_service: Option<Arc<dyn icn_kernel_api::services::LedgerService>>,
     /// Governance handle for governance operations
     pub governance: Option<icn_gateway::governance_mgr::GovernanceHandle>,
+    /// Concrete actor-backed governance handle (parallel to the trait-object
+    /// `governance` handle above). Needed so the gateway can install its
+    /// receipt_store on the actor via `install_receipt_store`, closing the
+    /// actor-path parity gap for force-close accept and deadline auto-close
+    /// (which would otherwise emit no `InstitutionalEffectRecord`).
+    ///
+    /// The trait-object `governance` alias (`Arc<dyn GovernanceOps>`) does
+    /// not expose the setter because doing so would pull
+    /// `GovernanceReceiptBackend` (app-layer) into the kernel trait.
+    pub governance_actor_handle: Option<icn_governance_actor::GovernanceHandle>,
     /// Treasury handle for treasury operations
     pub treasury: Option<icn_gateway::TreasuryHandle>,
     /// Ledger handle for balance queries
@@ -111,6 +121,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let trust_service_handle = handles.trust_service;
     let ledger_service_handle = handles.ledger_service;
     let governance_handle = handles.governance;
+    let governance_actor_handle = handles.governance_actor_handle;
     let treasury_handle = handles.treasury;
     let ledger_handle = handles.ledger;
     let entity_handle = handles.entity;
@@ -164,6 +175,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(handle) = governance_handle {
                 gateway_server = gateway_server.with_governance_handle(handle);
+            }
+
+            if let Some(handle) = governance_actor_handle {
+                gateway_server = gateway_server.with_governance_actor_handle(handle);
             }
 
             if let Some(handle) = treasury_handle {
