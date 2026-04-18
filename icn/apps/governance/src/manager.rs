@@ -3663,6 +3663,40 @@ impl GovernanceManager {
         })
     }
 
+    /// Canonical acceptance-effect emission for a just-accepted proposal.
+    ///
+    /// This is the single app-layer entry point that turns an accepted
+    /// proposal's payload into a durable `InstitutionalEffectRecord`.
+    /// Idempotent on `(proposal_id, effect_kind)` — a second call for the
+    /// same pair returns `AlreadyEmitted` without writing.
+    ///
+    /// Used by the HTTP `close_proposal` handler for both standalone and
+    /// actor-backed normal closes, by the actor's force-close accept branch
+    /// (when a receipt store is wired into the actor), and by tests that
+    /// need to stamp emission without going through HTTP.
+    ///
+    /// Returns `AcceptanceEmissionOutcome::NoEffect` when no receipt store
+    /// is wired; callers treat that as "not durably recorded".
+    pub fn apply_acceptance_effects(
+        &self,
+        proposal: &icn_governance::Proposal,
+        decision_hash: Option<icn_kernel_api::receipts::Hash>,
+        now: u64,
+    ) -> Result<crate::institutional_effect::AcceptanceEmissionOutcome, anyhow::Error> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(crate::institutional_effect::AcceptanceEmissionOutcome::NoEffect);
+        };
+        crate::institutional_effect::emit_accepted_effect(
+            store.as_ref(),
+            &proposal.id.0,
+            &proposal.domain_id.0,
+            decision_hash,
+            &proposal.payload,
+            now,
+        )
+        .map_err(|e| anyhow::anyhow!("apply_acceptance_effects: {e}"))
+    }
+
     /// Persist an institutional effect record via the attached receipt store.
     ///
     /// No-op when no receipt store is wired (callers should consider the
@@ -6810,6 +6844,196 @@ mod tests {
             }
             other => panic!("expected ExecutionFailed, got {other:?}"),
         }
+    }
+
+    // ========================================================================
+    // Canonical acceptance-pipeline tests
+    //
+    // These prove that `apply_acceptance_effects` is the one authoritative
+    // emission path: it is idempotent on (proposal_id, effect_kind), works
+    // regardless of which call site invoked it, and is consistent with
+    // direct writes through `record_institutional_effect`. The goal is
+    // that force-accept (actor path) and normal-accept (HTTP path) produce
+    // the same durable artifacts.
+    // ========================================================================
+
+    use crate::institutional_effect::AcceptanceEmissionOutcome;
+
+    async fn make_freeze_proposal(
+        mgr: &GovernanceManager,
+        domain_id: &GovernanceDomainId,
+        proposer: &Did,
+        target: &Did,
+        id: &str,
+    ) -> icn_governance::Proposal {
+        let pid = mgr
+            .create_proposal(
+                ProposalId(id.to_string()),
+                domain_id.clone(),
+                proposer.clone(),
+                "Freeze".into(),
+                "reason".into(),
+                ProposalPayload::FreezeMember {
+                    member: target.clone(),
+                    reason: "audit".into(),
+                    duration_seconds: None,
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+        mgr.get_proposal(&pid).await.unwrap().unwrap()
+    }
+
+    #[tokio::test]
+    async fn apply_acceptance_effects_noop_without_receipt_store() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let target = test_did(42);
+        let proposal = make_freeze_proposal(&mgr, &domain_id, &member_did, &target, "p-noop").await;
+
+        let outcome = mgr
+            .apply_acceptance_effects(&proposal, None, 100)
+            .expect("apply_acceptance_effects must not error without a store");
+        assert_eq!(
+            outcome,
+            AcceptanceEmissionOutcome::NoEffect,
+            "with no receipt store wired, emission is NoEffect (and a no-op)"
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_acceptance_effects_emits_freeze_record_once() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let target = test_did(42);
+        let proposal = make_freeze_proposal(&mgr, &domain_id, &member_did, &target, "p-once").await;
+
+        let first = mgr
+            .apply_acceptance_effects(&proposal, Some([9u8; 32]), 100)
+            .unwrap();
+        let first_id = match first {
+            AcceptanceEmissionOutcome::Emitted { record_id } => record_id,
+            other => panic!("expected Emitted, got {other:?}"),
+        };
+
+        // Idempotence: second call on the same (proposal_id, effect_kind) is
+        // AlreadyEmitted with the same record_id and does not write again.
+        let second = mgr
+            .apply_acceptance_effects(&proposal, Some([9u8; 32]), 200)
+            .unwrap();
+        match second {
+            AcceptanceEmissionOutcome::AlreadyEmitted { record_id } => {
+                assert_eq!(
+                    record_id, first_id,
+                    "idempotent call must return same record_id"
+                );
+            }
+            other => panic!("expected AlreadyEmitted, got {other:?}"),
+        }
+
+        // Exactly one record persisted.
+        let records = mgr.list_institutional_effects(&proposal.id).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].effect_kind, "freeze_member");
+        assert_eq!(records[0].record_id, first_id);
+        // recorded_at is the first call's timestamp — second call did not overwrite.
+        assert_eq!(records[0].recorded_at, 100);
+    }
+
+    #[tokio::test]
+    async fn apply_acceptance_effects_returns_no_effect_for_unhandled_payload() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let pid = mgr
+            .create_proposal(
+                ProposalId("p-text".into()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Text".into(),
+                "body".into(),
+                ProposalPayload::Text { body: "hi".into() },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+        let proposal = mgr.get_proposal(&pid).await.unwrap().unwrap();
+
+        let outcome = mgr.apply_acceptance_effects(&proposal, None, 100).unwrap();
+        assert_eq!(outcome, AcceptanceEmissionOutcome::NoEffect);
+        assert!(mgr.list_institutional_effects(&pid).unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn apply_acceptance_effects_dedups_across_http_and_actor_callers() {
+        // Simulates the HTTP+actor double-invocation pattern: an actor-backed
+        // normal close emits first (actor call site), then the HTTP handler
+        // returns and calls emission again (HTTP call site). The second call
+        // MUST be AlreadyEmitted, not a second record. This is the property
+        // that makes the unified canonical path safe to enable on both sites.
+        let (mgr, domain_id, proposer) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+        let target = test_did(55);
+        let p = make_freeze_proposal(&mgr, &domain_id, &proposer, &target, "p-dedup").await;
+
+        // Actor call site: uses the gate-receipt decision hash.
+        let first = mgr
+            .apply_acceptance_effects(&p, Some([3u8; 32]), 1000)
+            .unwrap();
+        let first_id = first.record_id().unwrap().to_string();
+
+        // HTTP call site: uses the governance_receipt.decision_hash (same
+        // hash in production since both compute GovernanceDecisionReceipt
+        // from the same inputs). The dedup key is (proposal_id, effect_kind)
+        // so AlreadyEmitted even if decision_hash differed.
+        let second = mgr
+            .apply_acceptance_effects(&p, Some([3u8; 32]), 2000)
+            .unwrap();
+        assert!(
+            matches!(second, AcceptanceEmissionOutcome::AlreadyEmitted { .. }),
+            "HTTP-after-actor invocation must dedup to AlreadyEmitted, got {second:?}"
+        );
+        assert_eq!(second.record_id(), Some(first_id.as_str()));
+        let records = mgr.list_institutional_effects(&p.id).unwrap();
+        assert_eq!(records.len(), 1, "exactly one record after both callers");
+    }
+
+    #[tokio::test]
+    async fn apply_acceptance_effects_emits_same_record_semantics_regardless_of_caller() {
+        // Proves path-agnostic semantics: whether the caller is the HTTP
+        // handler (normal accept) or the actor's force-close branch, the
+        // resulting InstitutionalEffectRecord has identical effect_kind,
+        // target_did, reason, and payload shape for the same payload.
+        let (mgr, domain_id, proposer) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let target = test_did(77);
+        let p_normal = make_freeze_proposal(&mgr, &domain_id, &proposer, &target, "p-normal").await;
+        let p_forced = make_freeze_proposal(&mgr, &domain_id, &proposer, &target, "p-forced").await;
+
+        // Simulate the HTTP normal-accept caller.
+        mgr.apply_acceptance_effects(&p_normal, Some([1u8; 32]), 1000)
+            .unwrap();
+        // Simulate the actor force-accept caller (distinct decision_hash because
+        // the force-close constructs VoteTally::empty()).
+        mgr.apply_acceptance_effects(&p_forced, Some([2u8; 32]), 2000)
+            .unwrap();
+
+        let r_normal = &mgr.list_institutional_effects(&p_normal.id).unwrap()[0];
+        let r_forced = &mgr.list_institutional_effects(&p_forced.id).unwrap()[0];
+
+        assert_eq!(r_normal.effect_kind, r_forced.effect_kind);
+        assert_eq!(r_normal.target_did, r_forced.target_did);
+        assert_eq!(r_normal.reason, r_forced.reason);
+        // Payload JSON shape must match exactly (duration_seconds, reason, member).
+        assert_eq!(r_normal.payload, r_forced.payload);
+        // decision_hash distinguishes the two receipts (expected and honest).
+        assert_ne!(r_normal.decision_hash, r_forced.decision_hash);
     }
 
     #[tokio::test]
