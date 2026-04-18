@@ -3818,15 +3818,20 @@ impl GovernanceManager {
             }
         }
 
-        // Order deliberations chronologically by when the meeting actually
-        // occurred: started_at preferred, falling back to scheduled_at.
-        // Meetings with neither timestamp sort last (u64::MAX). We deliberately
-        // do not tie-break on meeting creation time — meetings without either
-        // timestamp are rare enough that a stable-but-underspecified order is
-        // acceptable here.
+        // Order deliberations chronologically by a single effective timestamp:
+        // prefer `started_at` (when the meeting actually began), fall back to
+        // `scheduled_at` (when it was planned). Meetings with neither sort
+        // last (u64::MAX). A secondary key on the raw `scheduled_at` breaks
+        // ties deterministically when two meetings share the same effective
+        // timestamp.
+        //
+        // Using `started_at.or(scheduled_at)` (rather than a tuple with
+        // `started_at` as the first slot) means that a meeting with only
+        // `scheduled_at` populated is interleaved correctly against meetings
+        // with `started_at`, instead of being pushed to the end.
         entries.sort_by_key(|e| {
             (
-                e.started_at.unwrap_or(u64::MAX),
+                e.started_at.or(e.scheduled_at).unwrap_or(u64::MAX),
                 e.scheduled_at.unwrap_or(u64::MAX),
             )
         });
@@ -7037,6 +7042,61 @@ mod tests {
         assert_eq!(r_normal.payload, r_forced.payload);
         // decision_hash distinguishes the two receipts (expected and honest).
         assert_ne!(r_normal.decision_hash, r_forced.decision_hash);
+    }
+
+    /// Regression guard for the deliberation sort key.
+    ///
+    /// Prior sort key `(started_at.unwrap_or(MAX), scheduled_at.unwrap_or(MAX))`
+    /// always pushed entries without `started_at` to the end, even when their
+    /// `scheduled_at` placed them earlier in the timeline. The corrected key
+    /// uses `started_at.or(scheduled_at)` for the primary slot so a meeting
+    /// that was scheduled but never started is interleaved correctly with
+    /// meetings that did start.
+    #[test]
+    fn deliberation_sort_interleaves_scheduled_only_entries() {
+        use icn_governance::{AgendaItemId, MeetingId, MeetingStatus};
+
+        fn entry(
+            id: &str,
+            started_at: Option<u64>,
+            scheduled_at: Option<u64>,
+        ) -> DeliberationMeetingEntry {
+            DeliberationMeetingEntry {
+                meeting_id: MeetingId(id.to_string()),
+                meeting_title: id.to_string(),
+                meeting_status: MeetingStatus::Scheduled,
+                scheduled_at,
+                started_at,
+                ended_at: None,
+                agenda_item_id: AgendaItemId(uuid::Uuid::nil()),
+                agenda_item_title: String::new(),
+                presenter: None,
+                discussion_notes: None,
+                outcome: None,
+                generated_action_items: vec![],
+            }
+        }
+
+        // Three meetings:
+        //   A: started_at = 2000
+        //   B: scheduled_at = 1000, no started_at
+        //   C: started_at = 3000
+        // By effective-timestamp ordering the sequence must be B (1000),
+        // A (2000), C (3000). The old key would have produced A, C, B —
+        // pushing B to the end because its `started_at` was None.
+        let mut xs = vec![
+            entry("A", Some(2000), None),
+            entry("B", None, Some(1000)),
+            entry("C", Some(3000), None),
+        ];
+        xs.sort_by_key(|e| {
+            (
+                e.started_at.or(e.scheduled_at).unwrap_or(u64::MAX),
+                e.scheduled_at.unwrap_or(u64::MAX),
+            )
+        });
+        let ids: Vec<&str> = xs.iter().map(|e| e.meeting_title.as_str()).collect();
+        assert_eq!(ids, vec!["B", "A", "C"]);
     }
 
     #[tokio::test]
