@@ -378,6 +378,26 @@ pub trait MeetingStoreBackend: Send + Sync {
     ) -> std::result::Result<Vec<Meeting>, GovernanceError> {
         Ok(Vec::new())
     }
+
+    /// List meetings linked to a specific activity, ordered by `scheduled_at`
+    /// ascending (earliest first, unscheduled last).
+    ///
+    /// A meeting is included if its `linked_activities` vec contains
+    /// `activity_id`. This is the primary read path for the program dashboard:
+    /// given a program's activities, collect meetings attached to those
+    /// activities without a full domain scan.
+    ///
+    /// This method has no default implementation: every backend must provide
+    /// one explicitly. Stores with an activity index (e.g. `SledMeetingStore`)
+    /// should serve this in O(log N) via the secondary index; stores without
+    /// one (e.g. `InMemoryMeetingStore`) fall back to a linear scan over their
+    /// own state. A correct default cannot be provided here because it would
+    /// require access to each backend's internal iteration, which varies per
+    /// implementation.
+    fn list_by_activity(
+        &self,
+        activity_id: &crate::activity::ActivityId,
+    ) -> std::result::Result<Vec<Meeting>, GovernanceError>;
 }
 
 // ========== In-Memory Store ==========
@@ -463,6 +483,24 @@ impl MeetingStoreBackend for InMemoryMeetingStore {
             .cloned()
             .collect();
         out.sort_by_key(|m| m.scheduled_at.unwrap_or(0));
+        Ok(out)
+    }
+
+    fn list_by_activity(
+        &self,
+        activity_id: &crate::activity::ActivityId,
+    ) -> std::result::Result<Vec<Meeting>, GovernanceError> {
+        let guard = self
+            .meetings
+            .read()
+            .map_err(|e| GovernanceError::Internal(format!("meetings lock poisoned: {e}")))?;
+        let mut out: Vec<Meeting> = guard
+            .values()
+            .filter(|m| m.linked_activities.contains(activity_id))
+            .cloned()
+            .collect();
+        // Earliest scheduled first; unscheduled (None) sort last (u64::MAX)
+        out.sort_by_key(|m| m.scheduled_at.unwrap_or(u64::MAX));
         Ok(out)
     }
 }
@@ -602,5 +640,78 @@ mod tests {
         // They serialize to snake_case strings, not special authority tokens.
         let s = serde_json::to_string(&facilitator).unwrap();
         assert_eq!(s, "\"facilitator\"");
+    }
+
+    #[test]
+    fn test_list_by_activity_filters_and_sorts() {
+        let store = InMemoryMeetingStore::new();
+        let act_a = ActivityId("act-alpha".to_string());
+        let act_b = ActivityId("act-beta".to_string());
+
+        // m1: linked to act_a, scheduled at 2000
+        let mut m1 = make_meeting("m1", "dom");
+        m1.scheduled_at = Some(2000);
+        m1.linked_activities = vec![act_a.clone()];
+        store.save(&m1).unwrap();
+
+        // m2: linked to act_a + act_b, scheduled at 1000 (earlier)
+        let mut m2 = make_meeting("m2", "dom");
+        m2.scheduled_at = Some(1000);
+        m2.linked_activities = vec![act_a.clone(), act_b.clone()];
+        store.save(&m2).unwrap();
+
+        // m3: linked only to act_b, unscheduled
+        let mut m3 = make_meeting("m3", "dom");
+        m3.linked_activities = vec![act_b.clone()];
+        store.save(&m3).unwrap();
+
+        // m4: no linked activities
+        store.save(&make_meeting("m4", "dom")).unwrap();
+
+        let by_a = store.list_by_activity(&act_a).unwrap();
+        assert_eq!(by_a.len(), 2, "act_a has two meetings");
+        assert_eq!(by_a[0].id.0, "m2", "earlier scheduled_at sorts first");
+        assert_eq!(by_a[1].id.0, "m1");
+
+        let by_b = store.list_by_activity(&act_b).unwrap();
+        assert_eq!(by_b.len(), 2, "act_b has two meetings");
+        // m2 (scheduled 1000) < m3 (unscheduled → u64::MAX)
+        assert_eq!(by_b[0].id.0, "m2");
+        assert_eq!(by_b[1].id.0, "m3", "unscheduled sorts last");
+
+        let by_c = store
+            .list_by_activity(&ActivityId("no-such".to_string()))
+            .unwrap();
+        assert!(by_c.is_empty());
+    }
+
+    #[test]
+    fn test_list_by_activity_updates_on_relink() {
+        // Verify that saving a meeting again with different linked_activities
+        // correctly changes which activity queries return it.
+        let store = InMemoryMeetingStore::new();
+        let act_a = ActivityId("act-a".to_string());
+        let act_b = ActivityId("act-b".to_string());
+
+        let mut m = make_meeting("m-relink", "dom");
+        m.linked_activities = vec![act_a.clone()];
+        store.save(&m).unwrap();
+
+        assert_eq!(store.list_by_activity(&act_a).unwrap().len(), 1);
+        assert!(store.list_by_activity(&act_b).unwrap().is_empty());
+
+        // Re-save with act_b instead of act_a
+        m.linked_activities = vec![act_b.clone()];
+        store.save(&m).unwrap();
+
+        assert!(
+            store.list_by_activity(&act_a).unwrap().is_empty(),
+            "stale link removed"
+        );
+        assert_eq!(
+            store.list_by_activity(&act_b).unwrap().len(),
+            1,
+            "new link added"
+        );
     }
 }

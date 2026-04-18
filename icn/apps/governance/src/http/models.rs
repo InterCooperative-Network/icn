@@ -922,16 +922,28 @@ pub struct DashboardActionItemCounts {
     pub total: usize,
 }
 
+/// Compact meeting row inside the program dashboard.
+///
+/// Returned as part of [`ProgramDashboardResponse`]. Only includes the fields
+/// a dashboard consumer needs to render meeting status; full meeting details
+/// (agenda, attendees, notes) are available via `GET /gov/meetings/{id}`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DashboardMeetingSummary {
+    pub id: String,
+    pub title: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scheduled_at: Option<u64>,
+    /// Activity IDs from this program that the meeting is linked to.
+    pub linked_activity_ids: Vec<String>,
+}
+
 /// Composite program dashboard response.
 ///
 /// Returned by `GET /gov/programs/{program_id}/dashboard`. Combines the program
 /// record, its ordered milestones (with status counts), its linked activities,
-/// and action item counts scoped to those activities.
-///
-/// Meetings are intentionally absent from v1: the `Meeting` type links to
-/// activities via `linked_activities: Vec<ActivityId>`, but there is no
-/// activity-keyed index on the meeting store. Resolving meetings would require
-/// a full domain scan. Deferred until a `list_by_activity` index exists.
+/// action item counts scoped to those activities, and meetings linked through
+/// those activities.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ProgramDashboardResponse {
     pub program_id: String,
@@ -950,4 +962,8 @@ pub struct ProgramDashboardResponse {
     pub milestone_counts: DashboardMilestoneCounts,
     pub activities: Vec<DashboardActivitySummary>,
     pub action_item_counts: DashboardActionItemCounts,
+    /// Meetings linked to at least one activity that belongs to this program.
+    /// Deduped (a meeting linked to multiple activities appears once), sorted
+    /// earliest `scheduled_at` first; unscheduled meetings sort last.
+    pub meetings: Vec<DashboardMeetingSummary>,
 }

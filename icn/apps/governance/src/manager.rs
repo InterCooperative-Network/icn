@@ -130,7 +130,7 @@ impl ProgramActionItemCounts {
 }
 
 /// Composite program dashboard: program + ordered milestones + linked
-/// activities + action item counts.
+/// activities + action item counts + meetings linked through those activities.
 ///
 /// Assembled by [`GovernanceManager::get_program_dashboard`] and converted to
 /// [`crate::http::models::ProgramDashboardResponse`] by the HTTP handler.
@@ -139,6 +139,10 @@ pub struct ProgramDashboard {
     pub milestones: Vec<Milestone>,
     pub activities: Vec<Activity>,
     pub action_item_counts: ProgramActionItemCounts,
+    /// All meetings linked to at least one activity that belongs to this
+    /// program. Deduped (a meeting linked to two activities appears once),
+    /// sorted earliest `scheduled_at` first; unscheduled meetings sort last.
+    pub meetings: Vec<Meeting>,
 }
 
 // ============================================================================
@@ -1276,24 +1280,78 @@ impl SledMeetingStore {
     fn domain_index_prefix(domain_id: &str) -> String {
         format!("meeting_by_domain:{}:", domain_id)
     }
+
+    fn activity_index_key(activity_id: &ActivityId, meeting_id: &MeetingId) -> String {
+        format!("meeting_by_activity:{}:{}", activity_id.0, meeting_id.0)
+    }
+
+    fn activity_index_prefix(activity_id: &ActivityId) -> String {
+        format!("meeting_by_activity:{}:", activity_id.0)
+    }
 }
 
 impl MeetingStoreBackend for SledMeetingStore {
     fn save(&self, m: &Meeting) -> std::result::Result<(), GovernanceError> {
         let primary_key = Self::meeting_key(&m.id);
         let index_key = Self::index_key(&m.domain_id, &m.id);
+
+        // Load the existing record (if any) to diff linked_activities for
+        // index maintenance. On first save this returns empty. If an existing
+        // record cannot be decoded, surface the decode failure rather than
+        // silently treating it as "no prior activities" — that would leave
+        // stale activity-index rows pointing at a now-absent meeting.
+        let old_activities: Vec<ActivityId> =
+            match self.db.get(primary_key.as_bytes()).map_err(|e| {
+                GovernanceError::Internal(format!("Sled get (pre-save) failed: {e}"))
+            })? {
+                Some(v) => {
+                    icn_encoding::decode_versioned::<Meeting>(&v)
+                        .map_err(|e| {
+                            GovernanceError::Internal(format!(
+                                "Failed to decode existing meeting for index diff: {e}"
+                            ))
+                        })?
+                        .linked_activities
+                }
+                None => Vec::new(),
+            };
+
         let value = icn_encoding::encode_versioned(m)
             .map_err(|e| GovernanceError::Internal(format!("Failed to encode meeting: {e}")))?;
 
-        // Best-effort atomic: write primary, then index. If either fails, the
-        // caller sees an error and can retry. sled::Batch would be stronger but
-        // is not used elsewhere in this store for this pattern.
+        // Best-effort atomic: write primary, then domain index. If either
+        // fails the caller sees an error and can retry. sled::Batch would be
+        // stronger but is not used elsewhere in this store for this pattern.
         self.db
             .insert(primary_key.as_bytes(), value)
             .map_err(|e| GovernanceError::Internal(format!("Sled insert (primary) failed: {e}")))?;
         self.db
             .insert(index_key.as_bytes(), &[] as &[u8])
             .map_err(|e| GovernanceError::Internal(format!("Sled insert (index) failed: {e}")))?;
+
+        // Reconcile the activity secondary index against the *desired* set
+        // (`m.linked_activities`). We take the union of the old record's
+        // activities and the new record's activities as the set to touch —
+        // this means a retry after a partial-failure previous save still
+        // rebuilds any missing index rows for activities that are listed in
+        // the new primary record.
+        let desired: std::collections::HashSet<&ActivityId> = m.linked_activities.iter().collect();
+        let union: std::collections::HashSet<&ActivityId> = old_activities
+            .iter()
+            .chain(m.linked_activities.iter())
+            .collect();
+        for act_id in union {
+            let k = Self::activity_index_key(act_id, &m.id);
+            if desired.contains(act_id) {
+                self.db.insert(k.as_bytes(), &[] as &[u8]).map_err(|e| {
+                    GovernanceError::Internal(format!("Sled insert (activity index) failed: {e}"))
+                })?;
+            } else {
+                self.db.remove(k.as_bytes()).map_err(|e| {
+                    GovernanceError::Internal(format!("Sled remove (activity index) failed: {e}"))
+                })?;
+            }
+        }
         Ok(())
     }
 
@@ -1359,7 +1417,8 @@ impl MeetingStoreBackend for SledMeetingStore {
     }
 
     fn delete(&self, id: &MeetingId) -> std::result::Result<bool, GovernanceError> {
-        // Load the meeting to discover its domain_id so we can clean up the index.
+        // Load the meeting to discover domain_id + linked_activities so we
+        // can clean up both the domain index and all activity index entries.
         let primary_key = Self::meeting_key(id);
         let Some(value) = self
             .db
@@ -1378,6 +1437,16 @@ impl MeetingStoreBackend for SledMeetingStore {
         self.db
             .remove(index_key.as_bytes())
             .map_err(|e| GovernanceError::Internal(format!("Sled delete (index) failed: {e}")))?;
+
+        // Clean up all activity index entries for this meeting.
+        for act_id in &m.linked_activities {
+            let k = Self::activity_index_key(act_id, id);
+            self.db.remove(k.as_bytes()).map_err(|e| {
+                GovernanceError::Internal(format!(
+                    "Sled remove (activity index on delete) failed: {e}"
+                ))
+            })?;
+        }
         Ok(true)
     }
 
@@ -1413,6 +1482,47 @@ impl MeetingStoreBackend for SledMeetingStore {
             }
         }
         out.sort_by_key(|m| m.scheduled_at.unwrap_or(0));
+        Ok(out)
+    }
+
+    fn list_by_activity(
+        &self,
+        activity_id: &ActivityId,
+    ) -> std::result::Result<Vec<Meeting>, GovernanceError> {
+        let prefix = Self::activity_index_prefix(activity_id);
+        // `meeting_by_activity:{activity_id}:` — split on last ':' to get the
+        // meeting ID, then load from primary. Activity IDs may contain ':' so
+        // we use rsplit_once (same convention as list_by_domain).
+        let expected_prefix = format!("meeting_by_activity:{}", activity_id.0);
+        let mut out = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (key, _) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let key_str = std::str::from_utf8(&key)
+                .map_err(|e| GovernanceError::Internal(format!("Invalid UTF-8 key: {e}")))?;
+            let Some((activity_portion, meeting_id_str)) = key_str.rsplit_once(':') else {
+                continue;
+            };
+            // Reject keys whose activity portion doesn't exactly match — guards
+            // against activity IDs that are prefixes of other activity IDs.
+            if activity_portion != expected_prefix {
+                continue;
+            }
+            let primary_key = format!("meeting:{}", meeting_id_str);
+            let Some(value) = self
+                .db
+                .get(primary_key.as_bytes())
+                .map_err(|e| GovernanceError::Internal(format!("Sled get failed: {e}")))?
+            else {
+                // Dangling index entry — skip.
+                continue;
+            };
+            let m: Meeting = icn_encoding::decode_versioned(&value)
+                .map_err(|e| GovernanceError::Internal(format!("Failed to decode meeting: {e}")))?;
+            out.push(m);
+        }
+        // Earliest scheduled first; unscheduled (None) sort last.
+        out.sort_by_key(|m| m.scheduled_at.unwrap_or(u64::MAX));
         Ok(out)
     }
 }
@@ -1559,6 +1669,148 @@ mod sled_meeting_store_tests {
         let listing = store.list_by_domain("dom-a").unwrap();
         assert_eq!(listing[0].title, "new");
         assert_eq!(listing[1].title, "old");
+    }
+
+    #[test]
+    fn list_by_activity_filters_and_sorts() {
+        use icn_governance::ActivityId;
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db.clone());
+
+        let act_a = ActivityId("act-alpha".to_string());
+        let act_b = ActivityId("act-beta".to_string());
+
+        // m1: linked to act_a, scheduled at 2000
+        let mut m1 = mk_meeting("dom", "meeting-1");
+        m1.scheduled_at = Some(2000);
+        m1.linked_activities = vec![act_a.clone()];
+        store.save(&m1).unwrap();
+
+        // m2: linked to act_a + act_b, scheduled at 1000 (earlier)
+        let mut m2 = mk_meeting("dom", "meeting-2");
+        m2.scheduled_at = Some(1000);
+        m2.linked_activities = vec![act_a.clone(), act_b.clone()];
+        store.save(&m2).unwrap();
+
+        // m3: linked only to act_b, unscheduled
+        let mut m3 = mk_meeting("dom", "meeting-3");
+        m3.linked_activities = vec![act_b.clone()];
+        store.save(&m3).unwrap();
+
+        // m4: no linked activities
+        store.save(&mk_meeting("dom", "meeting-4")).unwrap();
+
+        let by_a = store.list_by_activity(&act_a).unwrap();
+        assert_eq!(by_a.len(), 2, "act_a has two meetings");
+        assert_eq!(
+            by_a[0].title, "meeting-2",
+            "earlier scheduled_at sorts first"
+        );
+        assert_eq!(by_a[1].title, "meeting-1");
+
+        let by_b = store.list_by_activity(&act_b).unwrap();
+        assert_eq!(by_b.len(), 2, "act_b has two meetings");
+        assert_eq!(by_b[0].title, "meeting-2");
+        assert_eq!(by_b[1].title, "meeting-3", "unscheduled sorts last");
+
+        assert!(store
+            .list_by_activity(&ActivityId("no-such".to_string()))
+            .unwrap()
+            .is_empty());
+
+        // Verify index keys physically exist in sled
+        let idx = format!("meeting_by_activity:act-alpha:{}", m1.id.0);
+        assert!(
+            db.get(idx.as_bytes()).unwrap().is_some(),
+            "activity index entry present"
+        );
+    }
+
+    #[test]
+    fn list_by_activity_activity_id_prefix_isolation() {
+        // Regression: "act-a:" must not match "act-alpha:" entries
+        use icn_governance::ActivityId;
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db);
+
+        let act_a = ActivityId("act-a".to_string());
+        let act_alpha = ActivityId("act-alpha".to_string());
+
+        let mut m_a = mk_meeting("dom", "for-act-a");
+        m_a.linked_activities = vec![act_a.clone()];
+        store.save(&m_a).unwrap();
+
+        let mut m_alpha = mk_meeting("dom", "for-act-alpha");
+        m_alpha.linked_activities = vec![act_alpha.clone()];
+        store.save(&m_alpha).unwrap();
+
+        let by_a = store.list_by_activity(&act_a).unwrap();
+        let by_alpha = store.list_by_activity(&act_alpha).unwrap();
+        assert_eq!(by_a.len(), 1, "act-a must not pick up act-alpha entries");
+        assert_eq!(by_alpha.len(), 1);
+        assert_eq!(by_a[0].title, "for-act-a");
+        assert_eq!(by_alpha[0].title, "for-act-alpha");
+    }
+
+    #[test]
+    fn activity_index_cleaned_on_update() {
+        // Removing an activity from linked_activities on re-save must remove
+        // the corresponding index entry.
+        use icn_governance::ActivityId;
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db.clone());
+
+        let act_a = ActivityId("act-a".to_string());
+        let act_b = ActivityId("act-b".to_string());
+
+        let mut m = mk_meeting("dom", "relink");
+        m.linked_activities = vec![act_a.clone()];
+        store.save(&m).unwrap();
+
+        // Confirm act_a index entry is present
+        let k_a = format!("meeting_by_activity:act-a:{}", m.id.0);
+        assert!(db.get(k_a.as_bytes()).unwrap().is_some());
+
+        // Re-save with act_b only
+        m.linked_activities = vec![act_b.clone()];
+        store.save(&m).unwrap();
+
+        // act_a index must be removed; act_b must be present
+        assert!(
+            db.get(k_a.as_bytes()).unwrap().is_none(),
+            "stale act-a index entry should be removed"
+        );
+        let k_b = format!("meeting_by_activity:act-b:{}", m.id.0);
+        assert!(
+            db.get(k_b.as_bytes()).unwrap().is_some(),
+            "act-b index entry added"
+        );
+
+        assert!(store.list_by_activity(&act_a).unwrap().is_empty());
+        assert_eq!(store.list_by_activity(&act_b).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn activity_index_cleaned_on_delete() {
+        use icn_governance::ActivityId;
+        let (db, _dir) = open_temp_db();
+        let store = SledMeetingStore::new(db.clone());
+
+        let act = ActivityId("act-x".to_string());
+        let mut m = mk_meeting("dom", "will-delete");
+        m.linked_activities = vec![act.clone()];
+        store.save(&m).unwrap();
+
+        let k = format!("meeting_by_activity:act-x:{}", m.id.0);
+        assert!(db.get(k.as_bytes()).unwrap().is_some());
+
+        store.delete(&m.id).unwrap();
+
+        assert!(
+            db.get(k.as_bytes()).unwrap().is_none(),
+            "activity index entry must be removed on delete"
+        );
+        assert!(store.list_by_activity(&act).unwrap().is_empty());
     }
 }
 
@@ -4425,8 +4677,8 @@ impl GovernanceManager {
     ///   once, then filtered in memory to those whose `parent` is an
     ///   `InstitutionalParent::Activity` with an ID present in
     ///   `program.activities`. Grouped by `ActionItemStatus`.
-    /// - **Meetings**: intentionally absent from v1 — no activity-keyed index
-    ///   on the meeting store; resolving would require a full domain scan.
+    /// - **Meetings**: all meetings linked to at least one program activity,
+    ///   deduped and sorted by `scheduled_at` (earliest first).
     pub fn get_program_dashboard(
         &self,
         program_id: &ProgramId,
@@ -4488,11 +4740,35 @@ impl GovernanceManager {
             }
         }
 
+        // 5. Meetings — one list_by_activity call per discovered activity,
+        //    deduped by meeting ID (same meeting may link to several activities).
+        let mut seen_meeting_ids: HashSet<MeetingId> = HashSet::new();
+        let mut meetings: Vec<Meeting> = Vec::new();
+        for act_id in &activity_ids {
+            let act_meetings = self.meeting_store.list_by_activity(act_id)?;
+            for m in act_meetings {
+                if seen_meeting_ids.insert(m.id.clone()) {
+                    meetings.push(m);
+                }
+            }
+        }
+        // Deterministic ordering: primary key is `scheduled_at` (earliest
+        // first, `None` sorts last), secondary key is `MeetingId` so meetings
+        // with identical timestamps (common for `None`) have a stable order
+        // independent of `HashSet` iteration order.
+        meetings.sort_by(|a, b| {
+            a.scheduled_at
+                .unwrap_or(u64::MAX)
+                .cmp(&b.scheduled_at.unwrap_or(u64::MAX))
+                .then_with(|| a.id.0.cmp(&b.id.0))
+        });
+
         Ok(Some(ProgramDashboard {
             program,
             milestones,
             activities,
             action_item_counts: counts,
+            meetings,
         }))
     }
 }
