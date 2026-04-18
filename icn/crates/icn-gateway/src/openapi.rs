@@ -16,10 +16,10 @@ use crate::models::{
     UpdateRoleRequest, UpdateSettingsRequest, VerifyRequest, VoteChoiceResponse,
 };
 
-// Governance actor milestone models (for schema registration and doc stubs)
+// Governance actor milestone/program models (for schema registration and doc stubs)
 use icn_governance_actor::http::models::{
-    CreateMilestoneRequest, MilestoneResponse, SetMilestoneGateRequest,
-    UpdateMilestoneStatusRequest,
+    CreateMilestoneRequest, MilestoneResponse, ProgramResponse, SetMilestoneGateRequest,
+    UpdateMilestoneStatusRequest, UpdateProgramStatusRequest,
 };
 
 // API module types
@@ -58,8 +58,8 @@ use crate::notification_store::{InAppNotification, Platform};
 /// stubs carry the path metadata; the types are resolved via schema registration.
 mod milestone_paths {
     use icn_governance_actor::http::models::{
-        CreateMilestoneRequest, MilestoneResponse, SetMilestoneGateRequest,
-        UpdateMilestoneStatusRequest,
+        CreateMilestoneRequest, MilestoneResponse, ProgramResponse, SetMilestoneGateRequest,
+        UpdateMilestoneStatusRequest, UpdateProgramStatusRequest,
     };
 
     /// POST /gov/programs/{program_id}/milestones — create a milestone.
@@ -140,6 +140,27 @@ mod milestone_paths {
     #[allow(dead_code)]
     pub(super) async fn update_milestone_status() {}
 
+    /// PATCH /gov/programs/{program_id}/status — advance or revert program lifecycle status.
+    #[utoipa::path(
+        patch,
+        path = "/gov/programs/{program_id}/status",
+        tag = "milestones",
+        params(
+            ("program_id" = String, Path, description = "Program ID")
+        ),
+        request_body = UpdateProgramStatusRequest,
+        responses(
+            (status = 200, body = ProgramResponse, description = "Program with updated status"),
+            (status = 400, description = "Unknown status string"),
+            (status = 401, description = "Unauthorized"),
+            (status = 403, description = "Caller is not a member of the program's domain"),
+            (status = 404, description = "Program not found"),
+        ),
+        security(("bearer_auth" = []))
+    )]
+    #[allow(dead_code)]
+    pub(super) async fn update_program_status() {}
+
     /// PUT /gov/milestones/{milestone_id}/gate — set or clear the CCL completion gate.
     ///
     /// Accepts a JSON-encoded `icn_ccl::Expr` object to install a gate, or `null` /
@@ -171,6 +192,7 @@ mod milestone_paths {
 #[openapi(
     paths(
         crate::api::federation::propose_clearing_adoption,
+        milestone_paths::update_program_status,
         milestone_paths::create_milestone,
         milestone_paths::get_milestone,
         milestone_paths::list_milestones_by_program,
@@ -247,9 +269,10 @@ mod milestone_paths {
             ProposeAdoptionRequest, ProposeAdoptionResponse,
             // Shared types
             DeviceInfo, Platform, InAppNotification,
-            // Milestones
+            // Milestones and program status
             CreateMilestoneRequest, UpdateMilestoneStatusRequest,
             SetMilestoneGateRequest, MilestoneResponse,
+            UpdateProgramStatusRequest, ProgramResponse,
         )
     ),
     tags(

@@ -362,6 +362,10 @@ where
                 .route(web::get().to(handlers::get_program::<E>)),
         )
         .service(
+            web::resource("/programs/{program_id}/status")
+                .route(web::patch().to(handlers::update_program_status::<E>)),
+        )
+        .service(
             web::resource("/programs/{program_id}/dashboard")
                 .route(web::get().to(handlers::get_program_dashboard::<E>)),
         )

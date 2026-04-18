@@ -3394,6 +3394,22 @@ fn milestone_status_str(s: &MilestoneStatus) -> &'static str {
     }
 }
 
+fn parse_program_status(s: &str) -> Result<icn_governance::ProgramStatus, ApiError> {
+    use icn_governance::ProgramStatus;
+    match s {
+        "draft" => Ok(ProgramStatus::Draft),
+        "active_planning" => Ok(ProgramStatus::ActivePlanning),
+        "public_launch" => Ok(ProgramStatus::PublicLaunch),
+        "in_execution" => Ok(ProgramStatus::InExecution),
+        "closed" => Ok(ProgramStatus::Closed),
+        "archived" => Ok(ProgramStatus::Archived),
+        _ => Err(err_bad(format!(
+            "Unknown program status '{s}'. Valid values: \
+             draft, active_planning, public_launch, in_execution, closed, archived"
+        ))),
+    }
+}
+
 fn parse_milestone_status(s: &str) -> Result<MilestoneStatus, ApiError> {
     match s {
         "pending" => Ok(MilestoneStatus::Pending),
@@ -3529,6 +3545,38 @@ pub async fn get_program<E: GovernanceEventEmitter + Clone + 'static>(
         .ok_or_else(|| err_not_found("Program not found"))?;
 
     Ok(HttpResponse::Ok().json(program_to_response(&p)))
+}
+
+/// PATCH /gov/programs/{program_id}/status — Advance or revert program lifecycle status.
+///
+/// Requires `governance:write` scope and domain membership.  Accepts any of
+/// the six canonical `ProgramStatus` snake_case strings.  Returns the updated
+/// program record on success.
+pub async fn update_program_status<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    program_id: web::Path<String>,
+    req: web::Json<UpdateProgramStatusRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let id = ProgramId(program_id.into_inner());
+    let new_status = parse_program_status(&req.status)?;
+    let caller = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    // Resolve domain for membership check.
+    let p = ctx
+        .manager
+        .get_program(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found"))?;
+    check_domain_membership(&ctx.manager, &p.domain_id, &caller).await?;
+
+    let updated = ctx
+        .manager
+        .update_program_status(&id, new_status)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(program_to_response(&updated)))
 }
 
 // ── Milestone gate helpers ───────────────────────────────────────────────────
@@ -5503,6 +5551,267 @@ mod tests {
             resp.status().as_u16(),
             400,
             "malformed gate must be rejected with 400"
+        );
+    }
+}
+
+// =============================================================================
+// Program status route tests
+// =============================================================================
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod program_status_route_tests {
+    use super::*;
+    use actix_web::dev::Service as _;
+    use actix_web::{test, web, App, HttpMessage};
+    use icn_governance::{
+        GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource, ProgramKind,
+    };
+    use icn_http_kit::auth::BasicClaims;
+    use icn_identity::Did;
+    use std::sync::Arc;
+
+    use crate::events::NoopEventEmitter;
+    use crate::http::configure::GovernanceContext;
+    use crate::manager::GovernanceManager;
+
+    fn make_ctx(mgr: Arc<GovernanceManager>) -> GovernanceContext<NoopEventEmitter> {
+        GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_proposal_accepted: None,
+            on_charter_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        }
+    }
+
+    /// Macro: mount only the routes under test; inject JWT claims.
+    macro_rules! status_app {
+        ($mgr:expr, $caller_did:expr) => {{
+            let ctx = make_ctx($mgr);
+            let ctx_data = web::Data::new(ctx);
+            let caller_did_str = $caller_did.to_string();
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: caller_did_str.clone(),
+                            scope: Some("governance:read governance:write".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/programs/{program_id}/status",
+                        web::patch().to(update_program_status::<NoopEventEmitter>),
+                    )
+                    .route(
+                        "/programs/{program_id}",
+                        web::get().to(get_program::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    async fn setup() -> (Arc<GovernanceManager>, String, Did) {
+        let mgr = Arc::new(GovernanceManager::new());
+        let did = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let domain_id = GovernanceDomainId("status-coop".into());
+
+        mgr.create_domain(
+            domain_id.clone(),
+            "Status Coop".into(),
+            "cooperative_default".into(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let prog = mgr
+            .create_program(
+                domain_id,
+                "ent-1".into(),
+                ProgramKind::Cycle,
+                "Cycle".into(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        (mgr, prog.id.0.clone(), did)
+    }
+
+    /// PATCH /programs/{id}/status with a valid status advances the program
+    /// and returns the updated record.
+    #[actix_web::test]
+    async fn update_program_status_returns_updated_record() {
+        let (mgr, prog_id, did) = setup().await;
+        let app = status_app!(mgr, did);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri(&format!("/programs/{prog_id}/status"))
+                .set_json(serde_json::json!({ "status": "in_execution" }))
+                .to_request(),
+        )
+        .await;
+
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["status"], "in_execution");
+    }
+
+    /// Subsequent GET confirms the status change persisted.
+    #[actix_web::test]
+    async fn status_change_is_visible_on_get() {
+        let (mgr, prog_id, did) = setup().await;
+        let app = status_app!(mgr, did);
+
+        // Advance to public_launch.
+        let patch = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri(&format!("/programs/{prog_id}/status"))
+                .set_json(serde_json::json!({ "status": "public_launch" }))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(patch.status().as_u16(), 200);
+
+        // GET confirms persistence.
+        let get = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/programs/{prog_id}"))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(get.status().as_u16(), 200);
+        let body: serde_json::Value = test::read_body_json(get).await;
+        assert_eq!(body["status"], "public_launch");
+    }
+
+    /// An unknown status string is rejected with 400.
+    #[actix_web::test]
+    async fn unknown_status_rejected_with_400() {
+        let (mgr, prog_id, did) = setup().await;
+        let app = status_app!(mgr, did);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri(&format!("/programs/{prog_id}/status"))
+                .set_json(serde_json::json!({ "status": "flying" }))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(
+            resp.status().as_u16(),
+            400,
+            "unrecognised status must be rejected with 400"
+        );
+    }
+
+    /// Missing `status` field in the JSON body is rejected with 400/422.
+    #[actix_web::test]
+    async fn missing_status_field_rejected() {
+        let (mgr, prog_id, did) = setup().await;
+        let app = status_app!(mgr, did);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri(&format!("/programs/{prog_id}/status"))
+                .set_json(serde_json::json!({}))
+                .to_request(),
+        )
+        .await;
+        assert!(
+            resp.status().as_u16() >= 400,
+            "missing status field must be rejected"
+        );
+    }
+
+    /// A non-member caller receives 403.
+    #[actix_web::test]
+    async fn non_member_receives_403() {
+        let (mgr, prog_id, _member_did) = setup().await;
+        // Generate a different DID not added to the domain.
+        let outsider = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let app = status_app!(mgr, outsider);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri(&format!("/programs/{prog_id}/status"))
+                .set_json(serde_json::json!({ "status": "in_execution" }))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 403);
+    }
+
+    /// A non-existent program ID returns 404.
+    #[actix_web::test]
+    async fn nonexistent_program_returns_404() {
+        let (mgr, _prog_id, did) = setup().await;
+        let app = status_app!(mgr, did);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri("/programs/prog-does-not-exist/status")
+                .set_json(serde_json::json!({ "status": "in_execution" }))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 404);
+    }
+
+    /// End-to-end: advance program to in_execution, set a gate on a milestone,
+    /// then complete the milestone — the gate sees the live program_status.
+    #[actix_web::test]
+    async fn milestone_gate_observes_updated_program_status() {
+        use icn_ccl::types::Value;
+        use icn_ccl::{BinOp, Expr};
+
+        let (mgr, prog_id, did) = setup().await;
+
+        // Advance program to in_execution via manager directly
+        // (route test; status already validated by other tests above).
+        let pid = icn_governance::ProgramId(prog_id.clone());
+        mgr.update_program_status(&pid, icn_governance::ProgramStatus::InExecution)
+            .unwrap();
+
+        // Install gate: program_status == "in_execution"
+        let gate = Expr::BinOp {
+            op: BinOp::Eq,
+            left: Box::new(Expr::Var("program_status".into())),
+            right: Box::new(Expr::Literal(Value::String("in_execution".into()))),
+        };
+        let m = mgr
+            .create_milestone(pid, "M".into(), None, 0, None, vec![])
+            .unwrap();
+        mgr.set_milestone_gate(&m.id, Some(gate)).unwrap();
+
+        // Completing the milestone should pass because program is in_execution.
+        let result =
+            mgr.update_milestone_status(&m.id, icn_governance::MilestoneStatus::Completed, &did);
+        assert!(
+            result.is_ok(),
+            "gate must pass when program_status matches in_execution"
         );
     }
 }

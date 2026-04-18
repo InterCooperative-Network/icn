@@ -843,6 +843,19 @@ pub struct CreateMilestoneRequest {
     pub completion_gate: Option<serde_json::Value>,
 }
 
+/// Request to advance (or revert) the lifecycle status of a program.
+///
+/// `PATCH /gov/programs/{program_id}/status`
+///
+/// Accepted values: `"draft"`, `"active_planning"`, `"public_launch"`,
+/// `"in_execution"`, `"closed"`, `"archived"`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateProgramStatusRequest {
+    /// Target program lifecycle status (snake_case).
+    pub status: String,
+}
+
 /// Request to update a milestone's status
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
