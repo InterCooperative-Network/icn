@@ -4210,6 +4210,55 @@ fn build_program_summary(
     }
 }
 
+fn parse_program_status(s: &str) -> Result<icn_governance::ProgramStatus, ApiError> {
+    use icn_governance::ProgramStatus;
+    match s {
+        "draft" => Ok(ProgramStatus::Draft),
+        "active_planning" => Ok(ProgramStatus::ActivePlanning),
+        "public_launch" => Ok(ProgramStatus::PublicLaunch),
+        "in_execution" => Ok(ProgramStatus::InExecution),
+        "closed" => Ok(ProgramStatus::Closed),
+        "archived" => Ok(ProgramStatus::Archived),
+        _ => Err(err_bad(format!("Unknown program status: {s}"))),
+    }
+}
+
+/// PATCH /gov/programs/{program_id}/status — Update a program's lifecycle status.
+///
+/// Records a [`ProgramEvent`] in the append-only event log when the status
+/// actually changes (no-op transitions are silently ignored). The event log is
+/// non-fatal: a write failure is logged but does not fail the request.
+///
+/// Requires `governance:write`. Caller must be a member of the program's domain.
+///
+/// Returns 404 if the program does not exist.
+pub async fn update_program_status<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    program_id: web::Path<String>,
+    req: web::Json<UpdateProgramStatusRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let pid = ProgramId(program_id.into_inner());
+    let status = parse_program_status(&req.status)?;
+    let actor = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    // Load program first to resolve domain for membership check.
+    let prog = ctx
+        .manager
+        .get_program(&pid)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found"))?;
+    check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
+
+    let p = ctx
+        .manager
+        .update_program_status(&pid, status, &actor)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(program_to_response(&p)))
+}
+
 // ── /me endpoints ─────────────────────────────────────────────────────────────
 
 /// GET /gov/me/scopes — Return all role assignments held by the authenticated DID.
@@ -6579,5 +6628,170 @@ mod tests {
         let entries = body["entries"].as_array().unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0]["source"], "creation");
+    }
+
+    // ── Program status update tests ────────────────────────────────────────
+
+    /// Helper: build a GovernanceManager with an InMemoryProgramEventLog wired in.
+    fn new_mgr_with_program_event_log() -> Arc<GovernanceManager> {
+        use crate::manager::InMemoryProgramEventLog;
+        let log = Arc::new(InMemoryProgramEventLog::new());
+        Arc::new(GovernanceManager::new().with_program_event_log(log))
+    }
+
+    /// Helper: create domain + program with TrustThreshold membership (all callers pass).
+    ///
+    /// Used by write-path tests that go through `check_domain_membership`. The
+    /// threshold is 0.0 so every DID is considered a member; this avoids having
+    /// to add specific test DIDs to the static list.
+    async fn setup_writable_program(
+        mgr: &Arc<GovernanceManager>,
+        domain: &str,
+        entity: &str,
+    ) -> icn_governance::Program {
+        let domain_id = GovernanceDomainId(domain.to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            format!("{domain} domain"),
+            "cooperative_default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::TrustThreshold(0.0),
+            },
+        )
+        .await
+        .unwrap();
+        mgr.create_program(
+            domain_id,
+            entity.to_string(),
+            icn_governance::ProgramKind::Cycle,
+            "Test Cycle".to_string(),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap()
+    }
+
+    macro_rules! program_status_app {
+        ($ctx:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            let caller_did_str = test_did(1).to_string();
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .app_data(web::JsonConfig::default())
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: caller_did_str.clone(),
+                            scope: Some("governance:write".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/programs/{program_id}/status",
+                        web::patch().to(update_program_status::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// PATCH /programs/{id}/status — basic transition: Draft → ActivePlanning.
+    #[actix_web::test]
+    async fn program_status_update_draft_to_active_planning() {
+        let mgr = new_mgr_with_program_event_log();
+        let prog = setup_writable_program(&mgr, "dom-ps1", "ent-ps1").await;
+        assert_eq!(prog.status, icn_governance::ProgramStatus::Draft);
+
+        let app = program_status_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri(&format!("/programs/{}/status", prog.id.0))
+                .set_json(serde_json::json!({"status": "active_planning"}))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["status"], "active_planning");
+    }
+
+    /// Multiple ordered transitions are recorded in the event log.
+    #[actix_web::test]
+    async fn program_status_multiple_transitions_recorded() {
+        let mgr = new_mgr_with_program_event_log();
+        let prog = setup_summary_program(&mgr, "dom-ps2", "ent-ps2").await;
+        let actor = Did::from_anchor_id(&[20u8; 32]);
+
+        use icn_governance::ProgramStatus;
+        mgr.update_program_status(&prog.id, ProgramStatus::ActivePlanning, &actor)
+            .unwrap();
+        mgr.update_program_status(&prog.id, ProgramStatus::InExecution, &actor)
+            .unwrap();
+        mgr.update_program_status(&prog.id, ProgramStatus::Closed, &actor)
+            .unwrap();
+
+        let events = mgr.list_program_events(&prog.id).unwrap();
+        assert_eq!(events.len(), 3);
+        assert_eq!(events[0].from_status, ProgramStatus::Draft);
+        assert_eq!(events[0].to_status, ProgramStatus::ActivePlanning);
+        assert_eq!(events[1].from_status, ProgramStatus::ActivePlanning);
+        assert_eq!(events[1].to_status, ProgramStatus::InExecution);
+        assert_eq!(events[2].from_status, ProgramStatus::InExecution);
+        assert_eq!(events[2].to_status, ProgramStatus::Closed);
+    }
+
+    /// Re-applying the same status does not produce a duplicate log entry.
+    #[actix_web::test]
+    async fn program_status_no_duplicate_on_same_status() {
+        let mgr = new_mgr_with_program_event_log();
+        let prog = setup_summary_program(&mgr, "dom-ps3", "ent-ps3").await;
+        let actor = Did::from_anchor_id(&[21u8; 32]);
+
+        use icn_governance::ProgramStatus;
+        mgr.update_program_status(&prog.id, ProgramStatus::Closed, &actor)
+            .unwrap();
+        mgr.update_program_status(&prog.id, ProgramStatus::Closed, &actor)
+            .unwrap();
+
+        let events = mgr.list_program_events(&prog.id).unwrap();
+        assert_eq!(events.len(), 1, "duplicate event on same-status update");
+    }
+
+    /// 404 when program does not exist.
+    #[actix_web::test]
+    async fn program_status_update_404_for_missing_program() {
+        let mgr = new_mgr_with_program_event_log();
+        let app = program_status_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri("/programs/nonexistent/status")
+                .set_json(serde_json::json!({"status": "active_planning"}))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 404);
+    }
+
+    /// Unknown status string returns 400.
+    #[actix_web::test]
+    async fn program_status_update_400_for_unknown_status() {
+        let mgr = new_mgr_with_program_event_log();
+        let prog = setup_writable_program(&mgr, "dom-ps4", "ent-ps4").await;
+        let app = program_status_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri(&format!("/programs/{}/status", prog.id.0))
+                .set_json(serde_json::json!({"status": "flying_saucer"}))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 400);
     }
 }

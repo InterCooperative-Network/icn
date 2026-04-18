@@ -19,9 +19,10 @@ use icn_governance::{
     InMemoryMilestoneStore, InMemoryProgramStore, InMemoryStructureStore, Meeting, MeetingId,
     MeetingStoreBackend, MembershipConfig, MembershipSource, Milestone, MilestoneId,
     MilestoneStatus, MilestoneStoreBackend, PaginatedResult, Program, ProgramId, ProgramKind,
-    ProgramStoreBackend, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload,
-    ProposalScope, ProposalState, RoleAssignment, Structure, StructureId, StructureKind,
-    StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
+    ProgramStatus, ProgramStoreBackend, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
+    ProposalPayload, ProposalScope, ProposalState, RoleAssignment, Structure, StructureId,
+    StructureKind, StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally,
+    DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -1397,6 +1398,152 @@ impl MilestoneEventLogBackend for SledMilestoneEventLog {
 }
 
 // ============================================================================
+// Program Event Log
+// ============================================================================
+
+/// A single status-transition event recorded when `update_program_status` runs.
+///
+/// App-layer record only — lives in `manager.rs` because it is produced and
+/// consumed entirely within the governance app's persistence layer.
+///
+/// Fields are limited to what is truthfully known at the write site:
+/// `program_id`, `changed_at`, `changed_by`, `from_status`, `to_status` are
+/// always present. No "reason" or "comment" field is added; those require a
+/// Layer-2 call-site decision the substrate does not currently model.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ProgramEvent {
+    pub program_id: ProgramId,
+    /// Unix seconds when the transition was recorded.
+    pub changed_at: u64,
+    /// DID of the actor who triggered the transition.
+    pub changed_by: Did,
+    /// Status before the transition.
+    pub from_status: ProgramStatus,
+    /// Status after the transition.
+    pub to_status: ProgramStatus,
+}
+
+/// Append-only log of program status transitions.
+///
+/// `append` is called by `update_program_status` after a successful save.
+/// `list_by_program` is called by the history endpoint (future slice) to
+/// populate the ordered entry list.
+///
+/// Ordering contract: entries returned by `list_by_program` must be
+/// oldest-to-newest by `changed_at`.
+pub trait ProgramEventLogBackend: Send + Sync {
+    fn append(&self, event: &ProgramEvent) -> std::result::Result<(), GovernanceError>;
+    fn list_by_program(
+        &self,
+        program_id: &ProgramId,
+    ) -> std::result::Result<Vec<ProgramEvent>, GovernanceError>;
+}
+
+// ── In-memory implementation (for tests and standalone mode) ─────────────────
+
+#[derive(Default)]
+pub struct InMemoryProgramEventLog {
+    events: RwLock<HashMap<ProgramId, Vec<ProgramEvent>>>,
+}
+
+impl InMemoryProgramEventLog {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl ProgramEventLogBackend for InMemoryProgramEventLog {
+    fn append(&self, event: &ProgramEvent) -> std::result::Result<(), GovernanceError> {
+        let mut guard = self.events.write().map_err(|e| {
+            GovernanceError::Internal(format!("program event log lock poisoned: {e}"))
+        })?;
+        guard
+            .entry(event.program_id.clone())
+            .or_default()
+            .push(event.clone());
+        Ok(())
+    }
+
+    fn list_by_program(
+        &self,
+        program_id: &ProgramId,
+    ) -> std::result::Result<Vec<ProgramEvent>, GovernanceError> {
+        let guard = self.events.read().map_err(|e| {
+            GovernanceError::Internal(format!("program event log lock poisoned: {e}"))
+        })?;
+        Ok(guard.get(program_id).cloned().unwrap_or_default())
+    }
+}
+
+// ── Sled-backed implementation (for production) ───────────────────────────────
+
+/// Sled-backed append-only log for program status transitions.
+///
+/// Key scheme:
+///   `program_event:{program_id}:{changed_at:020}:{uuid}`
+///
+/// The timestamp is zero-padded to 20 digits so lexicographic scan order
+/// matches chronological order. The UUID suffix ensures uniqueness within
+/// the same second.
+///
+/// Scan prefix: `program_event:{program_id}:` — yields all events for a
+/// program in chronological order.
+pub struct SledProgramEventLog {
+    db: Arc<sled::Db>,
+}
+
+impl SledProgramEventLog {
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    fn event_key(program_id: &ProgramId, changed_at: u64) -> String {
+        format!(
+            "program_event:{}:{:020}:{}",
+            program_id.0,
+            changed_at,
+            uuid::Uuid::new_v4()
+        )
+    }
+
+    fn events_prefix(program_id: &ProgramId) -> String {
+        format!("program_event:{}:", program_id.0)
+    }
+}
+
+impl ProgramEventLogBackend for SledProgramEventLog {
+    fn append(&self, event: &ProgramEvent) -> std::result::Result<(), GovernanceError> {
+        let key = Self::event_key(&event.program_id, event.changed_at);
+        let value = icn_encoding::encode_versioned(event).map_err(|e| {
+            GovernanceError::Internal(format!("Failed to encode program event: {e}"))
+        })?;
+        self.db.insert(key.as_bytes(), value).map_err(|e| {
+            GovernanceError::Internal(format!("Sled insert (program event log) failed: {e}"))
+        })?;
+        Ok(())
+    }
+
+    fn list_by_program(
+        &self,
+        program_id: &ProgramId,
+    ) -> std::result::Result<Vec<ProgramEvent>, GovernanceError> {
+        let prefix = Self::events_prefix(program_id);
+        let mut events = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_key, value) = result.map_err(|e| {
+                GovernanceError::Internal(format!("Sled scan (program event log) failed: {e}"))
+            })?;
+            let event: ProgramEvent = icn_encoding::decode_versioned(&value).map_err(|e| {
+                GovernanceError::Internal(format!("Failed to decode program event: {e}"))
+            })?;
+            events.push(event);
+        }
+        events.sort_by_key(|e| e.changed_at);
+        Ok(events)
+    }
+}
+
+// ============================================================================
 // Sled-Backed Meeting Store
 // ============================================================================
 
@@ -2421,6 +2568,11 @@ pub struct GovernanceManager {
     /// to lifecycle bookmarks). Set by sled-backed constructors so production
     /// deployments record every status change.
     milestone_event_log: Option<Arc<dyn MilestoneEventLogBackend>>,
+    /// Optional append-only log of program status transitions.
+    ///
+    /// `None` in tests and standalone mode. Set by sled-backed constructors so
+    /// production deployments record every status change.
+    program_event_log: Option<Arc<dyn ProgramEventLogBackend>>,
 }
 
 impl GovernanceManager {
@@ -2445,6 +2597,7 @@ impl GovernanceManager {
             governance_handle: None,
             receipt_store: None,
             milestone_event_log: None,
+            program_event_log: None,
         }
     }
 
@@ -2482,6 +2635,7 @@ impl GovernanceManager {
             governance_handle: Some(handle),
             receipt_store: None,
             milestone_event_log: None,
+            program_event_log: None,
         }
     }
 
@@ -2552,6 +2706,15 @@ impl GovernanceManager {
         self
     }
 
+    /// Attach an append-only program event log.
+    ///
+    /// When set, `update_program_status` appends a [`ProgramEvent`] on every
+    /// successful status transition.
+    pub fn with_program_event_log(mut self, log: Arc<dyn ProgramEventLogBackend>) -> Self {
+        self.program_event_log = Some(log);
+        self
+    }
+
     /// Create a governance manager with Sled-backed action item storage
     ///
     /// This is the recommended mode for production with persistent action items.
@@ -2576,7 +2739,8 @@ impl GovernanceManager {
             milestone_store: Arc::new(SledMilestoneStore::new(db.clone())),
             governance_handle: Some(handle),
             receipt_store: None,
-            milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db))),
+            milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db.clone()))),
+            program_event_log: Some(Arc::new(SledProgramEventLog::new(db))),
         }
     }
 
@@ -2601,7 +2765,8 @@ impl GovernanceManager {
             milestone_store: Arc::new(SledMilestoneStore::new(db.clone())),
             governance_handle: None,
             receipt_store: None,
-            milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db))),
+            milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db.clone()))),
+            program_event_log: Some(Arc::new(SledProgramEventLog::new(db))),
         }
     }
 
@@ -4680,6 +4845,64 @@ impl GovernanceManager {
         self.program_store
             .list_by_domain(domain_id)
             .map_err(|e| anyhow::anyhow!("Failed to list programs: {e}"))
+    }
+
+    /// Update a program's lifecycle status.
+    ///
+    /// Records a [`ProgramEvent`] when the status actually changes. Event-log
+    /// failures are logged but do not fail the mutation — the program record is
+    /// the source of truth.
+    pub fn update_program_status(
+        &self,
+        id: &ProgramId,
+        status: ProgramStatus,
+        actor: &Did,
+    ) -> Result<Program> {
+        let mut p = self
+            .program_store
+            .get(id)
+            .map_err(|e| anyhow::anyhow!("Failed to look up program: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Program not found: {id}"))?;
+
+        let from_status = p.status;
+        p.status = status;
+        self.program_store
+            .save(&p)
+            .map_err(|e| anyhow::anyhow!("Failed to save program: {e}"))?;
+
+        if from_status != status {
+            if let Some(ref log) = self.program_event_log {
+                let event = ProgramEvent {
+                    program_id: id.clone(),
+                    changed_at: icn_time::current_timestamp_secs(),
+                    changed_by: actor.clone(),
+                    from_status,
+                    to_status: status,
+                };
+                if let Err(e) = log.append(&event) {
+                    tracing::warn!(
+                        program_id = %id,
+                        error = %e,
+                        "Failed to append program event (non-fatal)"
+                    );
+                }
+            }
+        }
+
+        Ok(p)
+    }
+
+    /// Return all recorded status transitions for a program, oldest-to-newest.
+    ///
+    /// Returns an empty `Vec` when no event log is configured. Callers should
+    /// treat an empty result as "no log available."
+    pub fn list_program_events(&self, id: &ProgramId) -> Result<Vec<ProgramEvent>> {
+        match &self.program_event_log {
+            None => Ok(Vec::new()),
+            Some(log) => log
+                .list_by_program(id)
+                .map_err(|e| anyhow::anyhow!("Failed to list program events: {e}")),
+        }
     }
 
     // ========================================================================

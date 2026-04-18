@@ -845,6 +845,14 @@ pub struct UpdateMilestoneStatusRequest {
     pub status: String,
 }
 
+/// Request to update a program's lifecycle status
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateProgramStatusRequest {
+    /// Status: "draft", "active_planning", "public_launch", "in_execution", "completed", "archived"
+    pub status: String,
+}
+
 /// Milestone response
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

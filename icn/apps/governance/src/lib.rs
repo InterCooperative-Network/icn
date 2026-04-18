@@ -40,10 +40,11 @@ pub use events::{GovernanceEventEmitter, NoopEventEmitter};
 pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
 pub use handlers::translate_payload_to_effects;
 pub use manager::{
-    DigestSummary, GovernanceManager, InMemoryMilestoneEventLog, MilestoneEvent,
-    MilestoneEventLogBackend, OverdueItemDigest, PendingVoteDigest, SledActionItemStore,
-    SledActivityStore, SledMeetingStore, SledMilestoneEventLog, SledMilestoneStore,
-    SledProgramStore, SledStructureStore, UpcomingMeetingDigest,
+    DigestSummary, GovernanceManager, InMemoryMilestoneEventLog, InMemoryProgramEventLog,
+    MilestoneEvent, MilestoneEventLogBackend, OverdueItemDigest, PendingVoteDigest, ProgramEvent,
+    ProgramEventLogBackend, SledActionItemStore, SledActivityStore, SledMeetingStore,
+    SledMilestoneEventLog, SledMilestoneStore, SledProgramEventLog, SledProgramStore,
+    SledStructureStore, UpcomingMeetingDigest,
 };
 pub use receipt_backend::GovernanceReceiptBackend;
 pub use state_store::{GovernanceStateStore, SledGovernanceStateStore};
