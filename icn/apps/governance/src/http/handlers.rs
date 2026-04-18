@@ -3713,6 +3713,255 @@ pub async fn unlink_activity_from_program<E: GovernanceEventEmitter + Clone + 's
     Ok(HttpResponse::NoContent().finish())
 }
 
+// ── Milestone preview (read-only readiness) ───────────────────────────────────
+
+/// GET /gov/milestones/{milestone_id}/preview — Read-only milestone readiness.
+///
+/// Reports whether the milestone is currently ready to advance, based on the
+/// same observable ordering state a human operator would inspect before
+/// marking it complete:
+///
+/// - the milestone is open (not `completed` / `skipped`) and not `blocked`,
+/// - every earlier-phase milestone in the same program is `completed` or
+///   `skipped`.
+///
+/// This endpoint performs **no mutation**, no status transition, and emits
+/// no events. It deliberately does **not** evaluate `completion_criteria` —
+/// the governance core treats criteria as free-form declarative text whose
+/// interpretation belongs to an institution package. The criteria are
+/// surfaced verbatim for caller inspection only.
+///
+/// Requires `governance:read`.
+///
+/// Returns 404 if the milestone does not exist. Also returns 404 if the
+/// milestone's program is missing (orphaned milestone — should not occur,
+/// but handled defensively rather than panicking).
+pub async fn preview_milestone<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    milestone_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let id = MilestoneId(milestone_id.into_inner());
+
+    // 1. Load the milestone (404 when absent).
+    let milestone = ctx
+        .manager
+        .get_milestone(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Milestone not found"))?;
+
+    // 2. Load the enclosing program for its status (informational context).
+    //    An orphaned milestone (program deleted under it) returns 404 rather
+    //    than crashing or fabricating a status.
+    let program = ctx
+        .manager
+        .get_program(&milestone.program_id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found for milestone"))?;
+
+    // 3. Load siblings ordered by phase_index (store guarantees ordering).
+    let siblings = ctx
+        .manager
+        .list_milestones_by_program(&milestone.program_id)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(build_milestone_preview(&milestone, &program, &siblings)))
+}
+
+/// Pure function composing a [`MilestonePreviewResponse`] from the three
+/// pieces of observable state. Split out so the readiness logic can be unit
+/// tested without spinning up an HTTP stack.
+fn build_milestone_preview(
+    milestone: &icn_governance::Milestone,
+    program: &icn_governance::Program,
+    siblings: &[icn_governance::Milestone],
+) -> MilestonePreviewResponse {
+    // Collect earlier-phase milestones that are not yet terminal.
+    let blocking: Vec<BlockingMilestoneSummary> = siblings
+        .iter()
+        .filter(|m| {
+            m.phase_index < milestone.phase_index
+                && !matches!(
+                    m.status,
+                    MilestoneStatus::Completed | MilestoneStatus::Skipped
+                )
+        })
+        .map(|m| BlockingMilestoneSummary {
+            id: m.id.0.clone(),
+            name: m.name.clone(),
+            phase_index: m.phase_index,
+            status: milestone_status_str(&m.status).to_string(),
+        })
+        .collect();
+
+    let earlier_complete = blocking.is_empty();
+    let is_open = milestone.is_open();
+
+    // Readiness: open, not blocked, earlier phases clear.
+    let (ready, reason) = match milestone.status {
+        MilestoneStatus::Completed => (false, Some("milestone is already completed".to_string())),
+        MilestoneStatus::Skipped => (false, Some("milestone is skipped".to_string())),
+        MilestoneStatus::Blocked => (false, Some("milestone is blocked".to_string())),
+        MilestoneStatus::Pending | MilestoneStatus::InProgress => {
+            if earlier_complete {
+                (true, None)
+            } else {
+                let first = &blocking[0];
+                (
+                    false,
+                    Some(format!(
+                        "earlier milestone '{}' (phase {}) is {}",
+                        first.name, first.phase_index, first.status
+                    )),
+                )
+            }
+        }
+    };
+
+    MilestonePreviewResponse {
+        milestone_id: milestone.id.0.clone(),
+        program_id: milestone.program_id.0.clone(),
+        name: milestone.name.clone(),
+        phase_index: milestone.phase_index,
+        status: milestone_status_str(&milestone.status).to_string(),
+        is_open,
+        program_status: program_status_str(&program.status).to_string(),
+        earlier_milestones_complete: earlier_complete,
+        blocking_milestones: blocking,
+        criteria_count: milestone.completion_criteria.len(),
+        completion_criteria: milestone.completion_criteria.clone(),
+        ready_to_advance: ready,
+        reason,
+    }
+}
+
+// ── Milestone history ──────────────────────────────────────────────────────────
+
+/// GET /gov/milestones/{milestone_id}/history — Read-only lifecycle bookmark view.
+///
+/// Returns the observable status-transition history for a milestone.
+///
+/// **Coverage limitation**: the governance store records only two temporal
+/// facts about a milestone:
+/// - `created_at` — when the milestone was first persisted (initial status is
+///   always `pending`).
+/// - `completed_at` + `completed_by` — set only when the milestone moves into
+///   `Completed`.
+///
+/// Intermediate transitions (`pending → in_progress`, `→ blocked`, etc.) are
+/// **not** persisted. They will not appear in this response. The `coverage`
+/// field in the response is always `"lifecycle_bookmarks"` in the current
+/// implementation; callers must treat the entry list as a partial view, not a
+/// complete audit log.
+///
+/// Requires `governance:read`.
+///
+/// Returns 404 if the milestone does not exist.
+pub async fn get_milestone_history<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    milestone_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let id = MilestoneId(milestone_id.into_inner());
+
+    let milestone = ctx
+        .manager
+        .get_milestone(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Milestone not found"))?;
+
+    // Load event log entries (empty Vec when no log is configured).
+    let events = ctx
+        .manager
+        .list_milestone_events(&id)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(build_milestone_history(&milestone, &events)))
+}
+
+/// Pure function assembling a [`MilestoneHistoryResponse`] from a milestone
+/// record and an optional list of recorded transition events.
+///
+/// **Two paths:**
+///
+/// 1. **Transition log** (`events` is non-empty): entries are built directly
+///    from the event log. Coverage is `"transition_log"`. Each entry has
+///    `from_status`, `to_status`, `changed_by`, and `changed_at` from the
+///    recorded event. A synthetic creation entry is prepended (from
+///    `milestone.created_at`) because the event log records status *changes*
+///    only, not the initial creation.
+///
+/// 2. **Lifecycle bookmarks** (`events` is empty — no log configured or no
+///    transitions recorded yet): same fallback as the previous implementation.
+///    Coverage is `"lifecycle_bookmarks"`. Returns creation bookmark + optional
+///    completion bookmark from milestone struct fields.
+///
+/// Entries are always ordered oldest-to-newest.
+fn build_milestone_history(
+    milestone: &icn_governance::Milestone,
+    events: &[crate::manager::MilestoneEvent],
+) -> MilestoneHistoryResponse {
+    if events.is_empty() {
+        // ── Fallback: lifecycle bookmarks (no event log available) ──────────
+        let mut entries = Vec::new();
+
+        // Creation (always present; initial status is always pending).
+        entries.push(MilestoneHistoryEntry {
+            changed_at: milestone.created_at,
+            changed_by: None, // creator not recorded on milestone struct
+            to_status: "pending".to_string(),
+            source: "creation".to_string(),
+        });
+
+        // Completion (only when the milestone has completed).
+        if let Some(completed_at) = milestone.completed_at {
+            entries.push(MilestoneHistoryEntry {
+                changed_at: completed_at,
+                changed_by: milestone.completed_by.as_ref().map(|d| d.to_string()),
+                to_status: "completed".to_string(),
+                source: "completion_record".to_string(),
+            });
+        }
+
+        MilestoneHistoryResponse {
+            milestone_id: milestone.id.0.clone(),
+            coverage: "lifecycle_bookmarks".to_string(),
+            entries,
+        }
+    } else {
+        // ── Full path: event log entries ────────────────────────────────────
+        //
+        // Prepend a synthetic creation entry. The event log records transitions
+        // only; the creation itself is not emitted as a log entry. The creation
+        // bookmark is always accurate (from milestone.created_at, initial status
+        // is always pending) and provides the anchor for the entry sequence.
+        let mut entries = Vec::with_capacity(events.len() + 1);
+        entries.push(MilestoneHistoryEntry {
+            changed_at: milestone.created_at,
+            changed_by: None,
+            to_status: "pending".to_string(),
+            source: "creation".to_string(),
+        });
+
+        for event in events {
+            entries.push(MilestoneHistoryEntry {
+                changed_at: event.changed_at,
+                changed_by: Some(event.changed_by.to_string()),
+                to_status: milestone_status_str(&event.to_status).to_string(),
+                source: "transition_log".to_string(),
+            });
+        }
+
+        MilestoneHistoryResponse {
+            milestone_id: milestone.id.0.clone(),
+            coverage: "transition_log".to_string(),
+            entries,
+        }
+    }
+}
+
 // ── Program dashboard ─────────────────────────────────────────────────────────
 
 fn dashboard_milestone_summary(m: &icn_governance::Milestone) -> DashboardMilestoneSummary {
@@ -3858,6 +4107,158 @@ pub async fn get_program_dashboard<E: GovernanceEventEmitter + Clone + 'static>(
     Ok(HttpResponse::Ok().json(resp))
 }
 
+// ── Program summary ───────────────────────────────────────────────────────────
+
+/// GET /gov/programs/{program_id}/summary — Read-only milestone progression view.
+///
+/// Returns a lightweight roll-up of a program's current progression state:
+/// - program status
+/// - milestone counts by status
+/// - all milestones ordered by `phase_index`
+/// - the first open (not `completed` / `skipped`) milestone — i.e. where
+///   work currently needs to go — as `next_unfinished_milestone`
+/// - the `phase_index` of that milestone as `current_phase_index`
+///
+/// This is a focused alternative to `/dashboard`, which includes activities
+/// and action items. The summary answers "where is this program in its
+/// lifecycle?" without loading the heavier composite surfaces.
+///
+/// **Progression basis**: milestones are ordered by `phase_index` (the only
+/// programmatic ordering signal in the current model). Milestone names and
+/// `completion_criteria` text are surfaced verbatim and are **not** interpreted
+/// — semantic meaning belongs in the institution package layer.
+///
+/// Requires `governance:read`. No mutation; no event emission.
+///
+/// Returns 404 if the program does not exist.
+pub async fn get_program_summary<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    program_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let pid = ProgramId(program_id.into_inner());
+
+    let program = ctx
+        .manager
+        .get_program(&pid)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found"))?;
+
+    // Milestones come back ordered by phase_index (store contract).
+    let milestones = ctx
+        .manager
+        .list_milestones_by_program(&pid)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(build_program_summary(&program, &milestones)))
+}
+
+/// Pure function composing a [`ProgramSummaryResponse`] from the program record
+/// and its ordered milestones. Split out for unit-testability.
+///
+/// **`current_phase_index`**: the `phase_index` of the first open milestone
+/// (lowest phase_index where status is not `Completed` / `Skipped`). If all
+/// milestones are terminal, falls back to the highest `phase_index` present
+/// (program likely closing / archived). `None` when there are no milestones.
+fn build_program_summary(
+    program: &icn_governance::Program,
+    milestones: &[icn_governance::Milestone],
+) -> ProgramSummaryResponse {
+    // Count by status.
+    let mut counts = DashboardMilestoneCounts {
+        total: milestones.len(),
+        ..Default::default()
+    };
+    for m in milestones {
+        match m.status {
+            MilestoneStatus::Completed => counts.completed += 1,
+            MilestoneStatus::InProgress => counts.in_progress += 1,
+            MilestoneStatus::Blocked => counts.blocked += 1,
+            MilestoneStatus::Pending => counts.pending += 1,
+            MilestoneStatus::Skipped => counts.skipped += 1,
+        }
+    }
+
+    // First open milestone by phase_index (milestones already sorted ascending).
+    let next_unfinished: Option<NextUnfinishedMilestone> = milestones
+        .iter()
+        .find(|m| m.is_open())
+        .map(|m| NextUnfinishedMilestone {
+            milestone_id: m.id.0.clone(),
+            name: m.name.clone(),
+            phase_index: m.phase_index,
+            status: milestone_status_str(&m.status).to_string(),
+        });
+
+    // current_phase_index: open milestone's phase, falling back to highest
+    // terminal phase when all milestones are done.
+    let current_phase_index: Option<u32> = next_unfinished
+        .as_ref()
+        .map(|n| n.phase_index)
+        .or_else(|| milestones.last().map(|m| m.phase_index));
+
+    ProgramSummaryResponse {
+        program_id: program.id.0.clone(),
+        name: program.name.clone(),
+        program_status: program_status_str(&program.status).to_string(),
+        milestone_counts: counts,
+        milestones: milestones.iter().map(dashboard_milestone_summary).collect(),
+        next_unfinished_milestone: next_unfinished,
+        current_phase_index,
+        progress_basis: "phase_index_ordering".to_string(),
+    }
+}
+
+fn parse_program_status(s: &str) -> Result<icn_governance::ProgramStatus, ApiError> {
+    use icn_governance::ProgramStatus;
+    match s {
+        "draft" => Ok(ProgramStatus::Draft),
+        "active_planning" => Ok(ProgramStatus::ActivePlanning),
+        "public_launch" => Ok(ProgramStatus::PublicLaunch),
+        "in_execution" => Ok(ProgramStatus::InExecution),
+        "closed" => Ok(ProgramStatus::Closed),
+        "archived" => Ok(ProgramStatus::Archived),
+        _ => Err(err_bad(format!("Unknown program status: {s}"))),
+    }
+}
+
+/// PATCH /gov/programs/{program_id}/status — Update a program's lifecycle status.
+///
+/// Records a [`ProgramEvent`] in the append-only event log when the status
+/// actually changes (no-op transitions are silently ignored). The event log is
+/// non-fatal: a write failure is logged but does not fail the request.
+///
+/// Requires `governance:write`. Caller must be a member of the program's domain.
+///
+/// Returns 404 if the program does not exist.
+pub async fn update_program_status<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    program_id: web::Path<String>,
+    req: web::Json<UpdateProgramStatusRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let pid = ProgramId(program_id.into_inner());
+    let status = parse_program_status(&req.status)?;
+    let actor = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    // Load program first to resolve domain for membership check.
+    let prog = ctx
+        .manager
+        .get_program(&pid)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Program not found"))?;
+    check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
+
+    let p = ctx
+        .manager
+        .update_program_status(&pid, status, &actor)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(program_to_response(&p)))
+}
+
 // ── /me endpoints ─────────────────────────────────────────────────────────────
 
 /// GET /gov/me/scopes — Return all role assignments held by the authenticated DID.
@@ -3937,7 +4338,7 @@ mod tests {
     use crate::http::configure::{
         GovernanceContext, GovernanceEffect, ProposalAcceptedHook, SuspensionChecker,
     };
-    use crate::manager::GovernanceManager;
+    use crate::manager::{GovernanceManager, InMemoryMilestoneEventLog};
 
     fn test_did(seed: u8) -> Did {
         Did::from_anchor_id(&[seed; 32])
@@ -5398,5 +5799,999 @@ mod tests {
         assert_eq!(joint_linked.len(), 2);
 
         assert_eq!(meetings[0]["status"], "scheduled");
+    }
+
+    // ── Program summary tests ──────────────────────────────────────────────
+
+    macro_rules! summary_app {
+        ($ctx:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: "did:icn:reader".to_string(),
+                            scope: Some("governance:read".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/programs/{program_id}/summary",
+                        web::get().to(get_program_summary::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// Helper: create domain + program, return program.
+    async fn setup_summary_program(
+        mgr: &Arc<GovernanceManager>,
+        domain: &str,
+        entity: &str,
+    ) -> icn_governance::Program {
+        let domain_id = GovernanceDomainId(domain.to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            format!("{domain} domain"),
+            "cooperative_default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![]),
+            },
+        )
+        .await
+        .unwrap();
+
+        mgr.create_program(
+            domain_id,
+            entity.to_string(),
+            icn_governance::ProgramKind::Cycle,
+            "Test Cycle".to_string(),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap()
+    }
+
+    /// 404 when program does not exist.
+    #[actix_web::test]
+    async fn summary_404_for_missing_program() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let app = summary_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/programs/nonexistent/summary")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 404);
+    }
+
+    /// Program with no milestones: zero counts, null next_unfinished and
+    /// current_phase_index.
+    #[actix_web::test]
+    async fn summary_no_milestones() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let prog = setup_summary_program(&mgr, "dom-sum0", "ent-sum0").await;
+
+        let app = summary_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/programs/{}/summary", prog.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["progress_basis"], "phase_index_ordering");
+        assert_eq!(body["milestone_counts"]["total"], 0);
+        assert!(body["next_unfinished_milestone"].is_null());
+        assert!(body["current_phase_index"].is_null());
+        let milestones = body["milestones"].as_array().unwrap();
+        assert!(milestones.is_empty());
+    }
+
+    /// Mixed milestone states: counts are correct; next_unfinished is the
+    /// first open milestone by phase_index; current_phase_index matches.
+    #[actix_web::test]
+    async fn summary_mixed_milestone_states() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let prog = setup_summary_program(&mgr, "dom-sum1", "ent-sum1").await;
+
+        // phase 0: completed
+        let m0 = mgr
+            .create_milestone(
+                prog.id.clone(),
+                "Phase 0".to_string(),
+                None,
+                0,
+                None,
+                vec![],
+            )
+            .unwrap();
+        let actor = Did::from_anchor_id(&[20u8; 32]);
+        mgr.update_milestone_status(&m0.id, MilestoneStatus::Completed, &actor)
+            .unwrap();
+
+        // phase 1: skipped
+        let m1 = mgr
+            .create_milestone(
+                prog.id.clone(),
+                "Phase 1".to_string(),
+                None,
+                1,
+                None,
+                vec![],
+            )
+            .unwrap();
+        mgr.update_milestone_status(&m1.id, MilestoneStatus::Skipped, &actor)
+            .unwrap();
+
+        // phase 2: in_progress (first open)
+        let m2 = mgr
+            .create_milestone(
+                prog.id.clone(),
+                "Phase 2".to_string(),
+                None,
+                2,
+                None,
+                vec![],
+            )
+            .unwrap();
+        mgr.update_milestone_status(&m2.id, MilestoneStatus::InProgress, &actor)
+            .unwrap();
+
+        // phase 3: pending
+        mgr.create_milestone(
+            prog.id.clone(),
+            "Phase 3".to_string(),
+            None,
+            3,
+            None,
+            vec![],
+        )
+        .unwrap();
+
+        let app = summary_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/programs/{}/summary", prog.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["milestone_counts"]["total"], 4);
+        assert_eq!(body["milestone_counts"]["completed"], 1);
+        assert_eq!(body["milestone_counts"]["skipped"], 1);
+        assert_eq!(body["milestone_counts"]["in_progress"], 1);
+        assert_eq!(body["milestone_counts"]["pending"], 1);
+
+        // next_unfinished is phase 2 (in_progress, lowest open phase_index)
+        let nxt = &body["next_unfinished_milestone"];
+        assert_eq!(nxt["phase_index"], 2);
+        assert_eq!(nxt["status"], "in_progress");
+        assert_eq!(body["current_phase_index"], 2);
+
+        // milestones returned in phase_index order
+        let ms = body["milestones"].as_array().unwrap();
+        assert_eq!(ms.len(), 4);
+        assert_eq!(ms[0]["phase_index"], 0);
+        assert_eq!(ms[1]["phase_index"], 1);
+        assert_eq!(ms[2]["phase_index"], 2);
+        assert_eq!(ms[3]["phase_index"], 3);
+    }
+
+    /// All milestones terminal (completed/skipped): next_unfinished is null;
+    /// current_phase_index is the highest phase_index.
+    #[actix_web::test]
+    async fn summary_all_milestones_terminal() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let prog = setup_summary_program(&mgr, "dom-sum2", "ent-sum2").await;
+
+        let actor = Did::from_anchor_id(&[21u8; 32]);
+        for phase in 0..3u32 {
+            let m = mgr
+                .create_milestone(
+                    prog.id.clone(),
+                    format!("Phase {phase}"),
+                    None,
+                    phase,
+                    None,
+                    vec![],
+                )
+                .unwrap();
+            mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &actor)
+                .unwrap();
+        }
+
+        let app = summary_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/programs/{}/summary", prog.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["milestone_counts"]["completed"], 3);
+        assert_eq!(body["milestone_counts"]["pending"], 0);
+        assert!(body["next_unfinished_milestone"].is_null());
+        // current_phase_index falls back to highest terminal phase_index
+        assert_eq!(body["current_phase_index"], 2);
+    }
+
+    // ── Milestone preview tests ────────────────────────────────────────────
+
+    macro_rules! preview_app {
+        ($ctx:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: "did:icn:reader".to_string(),
+                            scope: Some("governance:read".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/milestones/{milestone_id}/preview",
+                        web::get().to(preview_milestone::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// Helper: create a domain + program and return `(manager, program_id)`.
+    async fn setup_preview_program(
+        mgr: &Arc<GovernanceManager>,
+        domain: &str,
+        entity: &str,
+    ) -> icn_governance::ProgramId {
+        let domain_id = GovernanceDomainId(domain.to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            format!("{domain} domain"),
+            "cooperative_default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let prog = mgr
+            .create_program(
+                domain_id,
+                entity.to_string(),
+                icn_governance::ProgramKind::Cycle,
+                "Preview Cycle".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        prog.id
+    }
+
+    /// 404 when the milestone does not exist.
+    #[actix_web::test]
+    async fn preview_404_for_missing_milestone() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/milestones/nonexistent/preview")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 404);
+    }
+
+    /// Phase-0 milestone with no earlier phases → ready, reason null.
+    #[actix_web::test]
+    async fn preview_ready_when_first_phase_and_open() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-ready", "ent-ready").await;
+
+        let m = mgr
+            .create_milestone(
+                pid,
+                "Kickoff".to_string(),
+                None,
+                0,
+                None,
+                vec!["plan drafted".to_string(), "team named".to_string()],
+            )
+            .unwrap();
+
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/preview", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["milestone_id"], m.id.0.as_str());
+        assert_eq!(body["phase_index"], 0);
+        assert_eq!(body["status"], "pending");
+        assert_eq!(body["is_open"], true);
+        assert_eq!(body["earlier_milestones_complete"], true);
+        assert_eq!(body["blocking_milestones"], serde_json::json!([]));
+        assert_eq!(body["criteria_count"], 2);
+        assert_eq!(
+            body["completion_criteria"],
+            serde_json::json!(["plan drafted", "team named"])
+        );
+        assert_eq!(body["ready_to_advance"], true);
+        assert!(
+            body.get("reason").is_none_or(|v| v.is_null()),
+            "reason should be absent or null when ready: {body:?}"
+        );
+        assert_eq!(body["program_status"], "draft");
+    }
+
+    /// Later-phase milestone is blocked by an uncompleted earlier phase.
+    /// `blocking_milestones` is ordered by `phase_index`; `reason` names the
+    /// first blocker.
+    #[actix_web::test]
+    async fn preview_blocked_by_earlier_phase() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-block", "ent-block").await;
+
+        // Create out of order to prove ordering comes from phase_index.
+        let m_launch = mgr
+            .create_milestone(pid.clone(), "Launch".to_string(), None, 2, None, vec![])
+            .unwrap();
+        let _m_plan = mgr
+            .create_milestone(pid.clone(), "Plan".to_string(), None, 1, None, vec![])
+            .unwrap();
+        let m_kick = mgr
+            .create_milestone(pid, "Kickoff".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        // Complete phase-0 so phase-1 becomes the first blocker for phase-2.
+        let caller = test_did(1);
+        mgr.update_milestone_status(&m_kick.id, MilestoneStatus::Completed, &caller)
+            .unwrap();
+
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/preview", m_launch.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["ready_to_advance"], false);
+        assert_eq!(body["earlier_milestones_complete"], false);
+        let blocking = body["blocking_milestones"].as_array().unwrap();
+        // Only phase-1 is still blocking (phase-0 is completed).
+        assert_eq!(blocking.len(), 1);
+        assert_eq!(blocking[0]["name"], "Plan");
+        assert_eq!(blocking[0]["phase_index"], 1);
+        assert_eq!(blocking[0]["status"], "pending");
+        let reason = body["reason"].as_str().unwrap();
+        assert!(
+            reason.contains("Plan") && reason.contains("phase 1"),
+            "reason should name the first blocker: {reason}"
+        );
+    }
+
+    /// Skipped earlier milestones also clear the blocker.
+    #[actix_web::test]
+    async fn preview_skipped_earlier_phase_clears_blocker() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-skip", "ent-skip").await;
+
+        let m_a = mgr
+            .create_milestone(pid.clone(), "A".to_string(), None, 0, None, vec![])
+            .unwrap();
+        let m_b = mgr
+            .create_milestone(pid, "B".to_string(), None, 1, None, vec![])
+            .unwrap();
+
+        let caller = test_did(2);
+        mgr.update_milestone_status(&m_a.id, MilestoneStatus::Skipped, &caller)
+            .unwrap();
+
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/preview", m_b.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["earlier_milestones_complete"], true);
+        assert_eq!(body["ready_to_advance"], true);
+        assert_eq!(body["blocking_milestones"], serde_json::json!([]));
+    }
+
+    /// Already-completed milestone reports not-ready with a descriptive reason
+    /// and surfaces `is_open = false`.
+    #[actix_web::test]
+    async fn preview_already_completed_is_not_ready() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-done", "ent-done").await;
+
+        let m = mgr
+            .create_milestone(pid, "Done".to_string(), None, 0, None, vec![])
+            .unwrap();
+        let caller = test_did(3);
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &caller)
+            .unwrap();
+
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/preview", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["status"], "completed");
+        assert_eq!(body["is_open"], false);
+        assert_eq!(body["ready_to_advance"], false);
+        let reason = body["reason"].as_str().unwrap();
+        assert!(
+            reason.contains("completed"),
+            "reason should explain completion: {reason}"
+        );
+    }
+
+    /// Blocked status prevents readiness even when earlier phases are clear.
+    #[actix_web::test]
+    async fn preview_blocked_status_is_not_ready() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-blk", "ent-blk").await;
+
+        let m = mgr
+            .create_milestone(pid, "Stuck".to_string(), None, 0, None, vec![])
+            .unwrap();
+        let caller = test_did(4);
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Blocked, &caller)
+            .unwrap();
+
+        let app = preview_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/preview", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["status"], "blocked");
+        assert_eq!(body["earlier_milestones_complete"], true);
+        assert_eq!(body["ready_to_advance"], false);
+        let reason = body["reason"].as_str().unwrap();
+        assert!(
+            reason.contains("blocked"),
+            "reason should mention block: {reason}"
+        );
+    }
+
+    // ── Milestone history tests ────────────────────────────────────────────
+
+    macro_rules! history_app {
+        ($ctx:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: "did:icn:reader".to_string(),
+                            scope: Some("governance:read".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/milestones/{milestone_id}/history",
+                        web::get().to(get_milestone_history::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// 404 when the milestone does not exist.
+    #[actix_web::test]
+    async fn history_404_for_missing_milestone() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let app = history_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/milestones/ghost/history")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 404);
+    }
+
+    /// Open (pending) milestone has exactly one entry: the creation bookmark.
+    /// `completed_at` and `completed_by` are absent → completion entry omitted.
+    #[actix_web::test]
+    async fn history_pending_milestone_has_one_entry() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-h1", "ent-h1").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        let app = history_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["coverage"], "lifecycle_bookmarks");
+        let entries = body["entries"].as_array().unwrap();
+        assert_eq!(
+            entries.len(),
+            1,
+            "only creation entry for pending milestone"
+        );
+        assert_eq!(entries[0]["to_status"], "pending");
+        assert_eq!(entries[0]["source"], "creation");
+        // changed_by is omitted (no creator recorded on milestone record)
+        assert!(entries[0]["changed_by"].is_null());
+    }
+
+    /// Completed milestone has two entries: creation + completion.
+    /// `completed_by` is present on the completion entry.
+    #[actix_web::test]
+    async fn history_completed_milestone_has_two_entries() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-h2", "ent-h2").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        let actor = Did::from_anchor_id(&[42u8; 32]);
+        let actor_str = actor.to_string();
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &actor)
+            .unwrap();
+
+        let app = history_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["coverage"], "lifecycle_bookmarks");
+        let entries = body["entries"].as_array().unwrap();
+        assert_eq!(
+            entries.len(),
+            2,
+            "creation + completion for completed milestone"
+        );
+
+        assert_eq!(entries[0]["to_status"], "pending");
+        assert_eq!(entries[0]["source"], "creation");
+        assert!(entries[0]["changed_by"].is_null());
+
+        assert_eq!(entries[1]["to_status"], "completed");
+        assert_eq!(entries[1]["source"], "completion_record");
+        assert_eq!(entries[1]["changed_by"], actor_str);
+        // completion entry must be at or after creation
+        let t0 = entries[0]["changed_at"].as_u64().unwrap();
+        let t1 = entries[1]["changed_at"].as_u64().unwrap();
+        assert!(t1 >= t0, "completion must not precede creation");
+    }
+
+    // ── Event log path tests ───────────────────────────────────────────────
+    //
+    // These tests use a GovernanceManager configured with an InMemoryMilestoneEventLog
+    // so that status transitions are recorded. The history endpoint should return
+    // coverage: "transition_log" and the actual recorded events.
+
+    fn make_event_log_ctx(mgr: Arc<GovernanceManager>) -> GovernanceContext<NoopEventEmitter> {
+        GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_proposal_accepted: None,
+            on_charter_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        }
+    }
+
+    macro_rules! event_log_history_app {
+        ($ctx:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: "did:icn:reader".to_string(),
+                            scope: Some("governance:read".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/milestones/{milestone_id}/history",
+                        web::get().to(get_milestone_history::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// Helper: build a GovernanceManager with an InMemoryMilestoneEventLog wired in.
+    fn new_mgr_with_event_log() -> Arc<GovernanceManager> {
+        let log = Arc::new(InMemoryMilestoneEventLog::new());
+        Arc::new(GovernanceManager::new().with_milestone_event_log(log))
+    }
+
+    /// Status transitions are recorded; history returns transition_log coverage
+    /// with one creation entry + one log entry per unique status change.
+    #[actix_web::test]
+    async fn event_log_single_transition_appears_in_history() {
+        let mgr = new_mgr_with_event_log();
+        let pid = setup_preview_program(&mgr, "dom-el1", "ent-el1").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        let actor = Did::from_anchor_id(&[10u8; 32]);
+        mgr.update_milestone_status(&m.id, MilestoneStatus::InProgress, &actor)
+            .unwrap();
+
+        let app = event_log_history_app!(make_event_log_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["coverage"], "transition_log");
+
+        let entries = body["entries"].as_array().unwrap();
+        // 1 creation + 1 logged transition
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0]["source"], "creation");
+        assert_eq!(entries[0]["to_status"], "pending");
+        assert!(entries[0]["changed_by"].is_null());
+
+        assert_eq!(entries[1]["source"], "transition_log");
+        assert_eq!(entries[1]["to_status"], "in_progress");
+        assert_eq!(entries[1]["changed_by"], actor.to_string());
+    }
+
+    /// Multiple transitions appear in chronological order.
+    #[actix_web::test]
+    async fn event_log_multiple_transitions_ordered_oldest_first() {
+        let mgr = new_mgr_with_event_log();
+        let pid = setup_preview_program(&mgr, "dom-el2", "ent-el2").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        let actor = Did::from_anchor_id(&[11u8; 32]);
+        mgr.update_milestone_status(&m.id, MilestoneStatus::InProgress, &actor)
+            .unwrap();
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Blocked, &actor)
+            .unwrap();
+        mgr.update_milestone_status(&m.id, MilestoneStatus::InProgress, &actor)
+            .unwrap();
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &actor)
+            .unwrap();
+
+        let app = event_log_history_app!(make_event_log_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["coverage"], "transition_log");
+
+        let entries = body["entries"].as_array().unwrap();
+        // 1 creation + 4 transitions
+        assert_eq!(entries.len(), 5);
+        assert_eq!(entries[0]["source"], "creation");
+        assert_eq!(entries[1]["to_status"], "in_progress");
+        assert_eq!(entries[2]["to_status"], "blocked");
+        assert_eq!(entries[3]["to_status"], "in_progress");
+        assert_eq!(entries[4]["to_status"], "completed");
+
+        // Chronological order: each changed_at >= previous
+        let times: Vec<u64> = entries
+            .iter()
+            .map(|e| e["changed_at"].as_u64().unwrap())
+            .collect();
+        for pair in times.windows(2) {
+            assert!(pair[1] >= pair[0], "entries not in chronological order");
+        }
+    }
+
+    /// Re-marking an already-Completed milestone does not add a duplicate log entry.
+    #[actix_web::test]
+    async fn event_log_no_duplicate_on_same_status() {
+        let mgr = new_mgr_with_event_log();
+        let pid = setup_preview_program(&mgr, "dom-el3", "ent-el3").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        let actor = Did::from_anchor_id(&[12u8; 32]);
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &actor)
+            .unwrap();
+        // Call again with same status — should not produce a second log entry.
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &actor)
+            .unwrap();
+
+        let app = event_log_history_app!(make_event_log_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let entries = body["entries"].as_array().unwrap();
+        // 1 creation + 1 completion — no duplicate
+        assert_eq!(entries.len(), 2, "duplicate entry on same-status update");
+    }
+
+    /// A milestone without any transitions still has one entry (creation bookmark)
+    /// and coverage "transition_log" (log is configured but empty for this milestone).
+    /// Actually: no events → falls back to lifecycle_bookmarks.
+    #[actix_web::test]
+    async fn event_log_no_transitions_falls_back_to_lifecycle_bookmarks() {
+        let mgr = new_mgr_with_event_log();
+        let pid = setup_preview_program(&mgr, "dom-el4", "ent-el4").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+        // No status updates — event log for this milestone is empty.
+
+        let app = event_log_history_app!(make_event_log_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        // Empty event list → fallback path
+        assert_eq!(body["coverage"], "lifecycle_bookmarks");
+        let entries = body["entries"].as_array().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["source"], "creation");
+    }
+
+    // ── Program status update tests ────────────────────────────────────────
+
+    /// Helper: build a GovernanceManager with an InMemoryProgramEventLog wired in.
+    fn new_mgr_with_program_event_log() -> Arc<GovernanceManager> {
+        use crate::manager::InMemoryProgramEventLog;
+        let log = Arc::new(InMemoryProgramEventLog::new());
+        Arc::new(GovernanceManager::new().with_program_event_log(log))
+    }
+
+    /// Helper: create domain + program with TrustThreshold membership (all callers pass).
+    ///
+    /// Used by write-path tests that go through `check_domain_membership`. The
+    /// threshold is 0.0 so every DID is considered a member; this avoids having
+    /// to add specific test DIDs to the static list.
+    async fn setup_writable_program(
+        mgr: &Arc<GovernanceManager>,
+        domain: &str,
+        entity: &str,
+    ) -> icn_governance::Program {
+        let domain_id = GovernanceDomainId(domain.to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            format!("{domain} domain"),
+            "cooperative_default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::TrustThreshold(0.0),
+            },
+        )
+        .await
+        .unwrap();
+        mgr.create_program(
+            domain_id,
+            entity.to_string(),
+            icn_governance::ProgramKind::Cycle,
+            "Test Cycle".to_string(),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap()
+    }
+
+    macro_rules! program_status_app {
+        ($ctx:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            let caller_did_str = test_did(1).to_string();
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .app_data(web::JsonConfig::default())
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: caller_did_str.clone(),
+                            scope: Some("governance:write".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/programs/{program_id}/status",
+                        web::patch().to(update_program_status::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// PATCH /programs/{id}/status — basic transition: Draft → ActivePlanning.
+    #[actix_web::test]
+    async fn program_status_update_draft_to_active_planning() {
+        let mgr = new_mgr_with_program_event_log();
+        let prog = setup_writable_program(&mgr, "dom-ps1", "ent-ps1").await;
+        assert_eq!(prog.status, icn_governance::ProgramStatus::Draft);
+
+        let app = program_status_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri(&format!("/programs/{}/status", prog.id.0))
+                .set_json(serde_json::json!({"status": "active_planning"}))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["status"], "active_planning");
+    }
+
+    /// Multiple ordered transitions are recorded in the event log.
+    #[actix_web::test]
+    async fn program_status_multiple_transitions_recorded() {
+        let mgr = new_mgr_with_program_event_log();
+        let prog = setup_summary_program(&mgr, "dom-ps2", "ent-ps2").await;
+        let actor = Did::from_anchor_id(&[20u8; 32]);
+
+        use icn_governance::ProgramStatus;
+        mgr.update_program_status(&prog.id, ProgramStatus::ActivePlanning, &actor)
+            .unwrap();
+        mgr.update_program_status(&prog.id, ProgramStatus::InExecution, &actor)
+            .unwrap();
+        mgr.update_program_status(&prog.id, ProgramStatus::Closed, &actor)
+            .unwrap();
+
+        let events = mgr.list_program_events(&prog.id).unwrap();
+        assert_eq!(events.len(), 3);
+        assert_eq!(events[0].from_status, ProgramStatus::Draft);
+        assert_eq!(events[0].to_status, ProgramStatus::ActivePlanning);
+        assert_eq!(events[1].from_status, ProgramStatus::ActivePlanning);
+        assert_eq!(events[1].to_status, ProgramStatus::InExecution);
+        assert_eq!(events[2].from_status, ProgramStatus::InExecution);
+        assert_eq!(events[2].to_status, ProgramStatus::Closed);
+    }
+
+    /// Re-applying the same status does not produce a duplicate log entry.
+    #[actix_web::test]
+    async fn program_status_no_duplicate_on_same_status() {
+        let mgr = new_mgr_with_program_event_log();
+        let prog = setup_summary_program(&mgr, "dom-ps3", "ent-ps3").await;
+        let actor = Did::from_anchor_id(&[21u8; 32]);
+
+        use icn_governance::ProgramStatus;
+        mgr.update_program_status(&prog.id, ProgramStatus::Closed, &actor)
+            .unwrap();
+        mgr.update_program_status(&prog.id, ProgramStatus::Closed, &actor)
+            .unwrap();
+
+        let events = mgr.list_program_events(&prog.id).unwrap();
+        assert_eq!(events.len(), 1, "duplicate event on same-status update");
+    }
+
+    /// 404 when program does not exist.
+    #[actix_web::test]
+    async fn program_status_update_404_for_missing_program() {
+        let mgr = new_mgr_with_program_event_log();
+        let app = program_status_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri("/programs/nonexistent/status")
+                .set_json(serde_json::json!({"status": "active_planning"}))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 404);
+    }
+
+    /// Unknown status string returns 400.
+    #[actix_web::test]
+    async fn program_status_update_400_for_unknown_status() {
+        let mgr = new_mgr_with_program_event_log();
+        let prog = setup_writable_program(&mgr, "dom-ps4", "ent-ps4").await;
+        let app = program_status_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::patch()
+                .uri(&format!("/programs/{}/status", prog.id.0))
+                .set_json(serde_json::json!({"status": "flying_saucer"}))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 400);
     }
 }

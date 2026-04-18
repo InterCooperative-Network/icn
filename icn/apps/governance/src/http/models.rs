@@ -845,6 +845,14 @@ pub struct UpdateMilestoneStatusRequest {
     pub status: String,
 }
 
+/// Request to update a program's lifecycle status
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateProgramStatusRequest {
+    /// Status: "draft", "active_planning", "public_launch", "in_execution", "completed", "archived"
+    pub status: String,
+}
+
 /// Milestone response
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -864,6 +872,91 @@ pub struct MilestoneResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completed_by: Option<String>,
     pub created_at: u64,
+}
+
+// ============================================================================
+// Milestone preview (read-only readiness view)
+// ============================================================================
+
+/// Summary row describing a milestone that blocks another milestone from
+/// advancing.
+///
+/// Emitted inside [`MilestonePreviewResponse::blocking_milestones`]: any
+/// earlier-phase milestone that has not reached a terminal status
+/// (`Completed` or `Skipped`). Order matches `phase_index`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct BlockingMilestoneSummary {
+    pub id: String,
+    pub name: String,
+    pub phase_index: u32,
+    pub status: String,
+}
+
+/// Composite read-only preview describing whether a milestone is currently
+/// ready to be advanced, and what observable state drove that answer.
+///
+/// Returned by `GET /gov/milestones/{milestone_id}/preview`. Purely read-only:
+/// no mutation, no status transition, no event emission. The preview reflects
+/// the same ordering semantics a human operator would use when deciding
+/// whether to mark a milestone complete — earlier-phase milestones must be
+/// `Completed` or `Skipped`, and the target milestone itself must be open and
+/// not `Blocked`.
+///
+/// `completion_criteria` is surfaced verbatim for caller inspection but is
+/// **not evaluated**. The governance core deliberately treats criteria as
+/// free-form declarative text; interpretation of what "satisfied" means is an
+/// institution-package concern. This endpoint therefore reports what the
+/// milestone *declares* it needs, not whether any individual criterion has
+/// been met.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MilestonePreviewResponse {
+    /// Milestone identifier.
+    pub milestone_id: String,
+    /// Program the milestone belongs to.
+    pub program_id: String,
+    /// Milestone display name.
+    pub name: String,
+    /// Ordinal position among the program's milestones (0-based).
+    pub phase_index: u32,
+    /// Current milestone status (`pending`, `in_progress`, `completed`,
+    /// `blocked`, `skipped`).
+    pub status: String,
+    /// `true` while the milestone is not in a terminal (`completed` /
+    /// `skipped`) state.
+    pub is_open: bool,
+    /// Enclosing program's current lifecycle status (`draft`,
+    /// `active_planning`, `public_launch`, `in_execution`, `closed`,
+    /// `archived`). Informational — the preview does not require any specific
+    /// program status.
+    pub program_status: String,
+    /// `true` when every earlier-phase milestone (strictly lower
+    /// `phase_index`) is `completed` or `skipped`.
+    pub earlier_milestones_complete: bool,
+    /// Earlier-phase milestones that are not yet `completed` or `skipped`,
+    /// ordered by `phase_index`. Empty when `earlier_milestones_complete` is
+    /// `true`.
+    pub blocking_milestones: Vec<BlockingMilestoneSummary>,
+    /// Free-form checklist declared on the milestone at creation. Surfaced
+    /// verbatim for caller inspection; **not evaluated** by this endpoint.
+    pub completion_criteria: Vec<String>,
+    /// Count of declared completion criteria (equivalent to
+    /// `completion_criteria.len()`). Provided for callers that only need the
+    /// count without transferring the strings.
+    pub criteria_count: usize,
+    /// Observable readiness for advancement.
+    ///
+    /// `true` iff all of:
+    /// - milestone is open (not `completed` or `skipped`),
+    /// - milestone status is not `blocked`,
+    /// - every earlier-phase milestone is `completed` or `skipped`.
+    ///
+    /// Does **not** evaluate `completion_criteria` — that is out of scope for
+    /// ICN governance core.
+    pub ready_to_advance: bool,
+    /// Human-readable reason when `ready_to_advance` is `false`. `None` when
+    /// the milestone is ready.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 // ============================================================================
@@ -966,4 +1059,117 @@ pub struct ProgramDashboardResponse {
     /// Deduped (a meeting linked to multiple activities appears once), sorted
     /// earliest `scheduled_at` first; unscheduled meetings sort last.
     pub meetings: Vec<DashboardMeetingSummary>,
+}
+
+// ============================================================================
+// Milestone history (read-only lifecycle bookmark view)
+// ============================================================================
+
+/// A single lifecycle bookmark extracted from the milestone record.
+///
+/// **Coverage limitation**: the governance store records only two temporal
+/// facts about a milestone — when it was created (`created_at`) and when it
+/// reached `Completed` (`completed_at` + `completed_by`). Intermediate
+/// transitions (e.g. `pending → in_progress → blocked`) are not currently
+/// persisted; they will not appear in this list. `source` names which field
+/// on the record the entry was derived from, so callers know exactly what
+/// persisted data backs each entry.
+///
+/// Fields that are genuinely unknown are `null` (`changed_by` on the
+/// creation entry; `to_status` would always be the entry's status).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MilestoneHistoryEntry {
+    /// Unix seconds when this lifecycle event occurred (always present).
+    pub changed_at: u64,
+    /// DID of the actor who caused the transition, if recorded.
+    /// `null` for the creation entry (the creator is not currently stored on
+    /// the milestone record itself).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub changed_by: Option<String>,
+    /// The status the milestone moved INTO at this event.
+    pub to_status: String,
+    /// Persisted-data source backing this entry.
+    /// `"creation"` → derived from `created_at` (initial status is always
+    /// `pending`). `"completion_record"` → derived from `completed_at` +
+    /// `completed_by`.
+    pub source: String,
+}
+
+/// Ordered collection of lifecycle bookmarks for a milestone.
+///
+/// Returned by `GET /gov/milestones/{milestone_id}/history`. Entries are
+/// ordered oldest-to-newest (creation first).
+///
+/// `coverage` describes the fidelity of the history: `"lifecycle_bookmarks"`
+/// means only creation and completion events are available because the
+/// governance store does not persist intermediate status transitions.
+/// Callers MUST treat this list as a partial view, not a complete audit log.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MilestoneHistoryResponse {
+    /// Milestone identifier.
+    pub milestone_id: String,
+    /// Fidelity annotation.
+    ///
+    /// Always `"lifecycle_bookmarks"` in the current implementation: only
+    /// `created_at` and `completed_at` are persisted on the milestone record.
+    /// Future store migrations (e.g. an append-only transition log) would
+    /// change this to `"full_transition_log"`.
+    pub coverage: String,
+    /// Lifecycle bookmarks, oldest first.
+    pub entries: Vec<MilestoneHistoryEntry>,
+}
+
+// ============================================================================
+// Program summary (read-only progression view)
+// ============================================================================
+
+/// Compact reference to the next milestone that has not yet reached a terminal
+/// state (`completed` or `skipped`), ordered by `phase_index`.
+///
+/// `null` in [`ProgramSummaryResponse`] when all milestones are terminal or
+/// when the program has no milestones.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct NextUnfinishedMilestone {
+    pub milestone_id: String,
+    pub name: String,
+    pub phase_index: u32,
+    pub status: String,
+}
+
+/// Read-only progression summary for a program.
+///
+/// Returned by `GET /gov/programs/{program_id}/summary`. Complements the
+/// richer `/dashboard` surface (which includes activities and action items)
+/// by focusing solely on the program's milestone progression state.
+///
+/// The `progress_basis` field names the mechanism used to derive
+/// `current_phase_index` and `next_unfinished_milestone`. Currently always
+/// `"phase_index_ordering"` — milestones are ordered by their `phase_index`
+/// field (0-based), which is the only programmatic ordering signal in the
+/// current model.
+///
+/// Milestone semantics are deliberately not interpreted: this endpoint reports
+/// observable state and ordering, not what any milestone "means" institutionally.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ProgramSummaryResponse {
+    pub program_id: String,
+    pub name: String,
+    /// Current program lifecycle status.
+    pub program_status: String,
+    /// Milestone status counts.
+    pub milestone_counts: DashboardMilestoneCounts,
+    /// All milestones for this program, ordered by `phase_index` ascending.
+    pub milestones: Vec<DashboardMilestoneSummary>,
+    /// The lowest-`phase_index` milestone that is not yet `completed` or
+    /// `skipped`. `null` when all milestones are terminal or there are none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_unfinished_milestone: Option<NextUnfinishedMilestone>,
+    /// `phase_index` of [`next_unfinished_milestone`] when one exists, else
+    /// the highest `phase_index` among terminal milestones, else `null`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_phase_index: Option<u32>,
+    /// Basis used to derive `current_phase_index` and
+    /// `next_unfinished_milestone`. Currently always
+    /// `"phase_index_ordering"`.
+    pub progress_basis: String,
 }

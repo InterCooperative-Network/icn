@@ -362,8 +362,16 @@ where
                 .route(web::get().to(handlers::get_program::<E>)),
         )
         .service(
+            web::resource("/programs/{program_id}/status")
+                .route(web::patch().to(handlers::update_program_status::<E>)),
+        )
+        .service(
             web::resource("/programs/{program_id}/dashboard")
                 .route(web::get().to(handlers::get_program_dashboard::<E>)),
+        )
+        .service(
+            web::resource("/programs/{program_id}/summary")
+                .route(web::get().to(handlers::get_program_summary::<E>)),
         )
         .service(
             web::resource("/programs/{program_id}/milestones")
@@ -379,6 +387,14 @@ where
             web::resource("/milestones/{milestone_id}")
                 .route(web::get().to(handlers::get_milestone::<E>))
                 .route(web::patch().to(handlers::update_milestone_status::<E>)),
+        )
+        .service(
+            web::resource("/milestones/{milestone_id}/preview")
+                .route(web::get().to(handlers::preview_milestone::<E>)),
+        )
+        .service(
+            web::resource("/milestones/{milestone_id}/history")
+                .route(web::get().to(handlers::get_milestone_history::<E>)),
         )
         // ── Meeting endpoints ────────────────────────────────────────────
         .service(
