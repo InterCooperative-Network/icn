@@ -125,6 +125,36 @@ pub enum GovernanceEffect {
 /// Errors are non-fatal. Implementations should log internally and not panic.
 pub type ProposalAcceptedHook = Arc<dyn Fn(GovernanceEffect) + Send + Sync>;
 
+/// Evidence returned by a dispatcher that successfully (or unsuccessfully)
+/// acted on an accepted effect. The governance app persists this as an
+/// `EffectDispatchEvidence` record tied to the emitted
+/// `InstitutionalEffectRecord` for the proposal.
+///
+/// `subsystem` is lowercase stable (`"commons"`, `"ledger"`, `"sdis"`).
+/// `receipt_ref` is opaque — governance does not interpret or validate it.
+#[derive(Debug, Clone)]
+pub struct DispatchEvidenceSpec {
+    pub subsystem: String,
+    pub receipt_ref: Option<String>,
+    pub success: bool,
+    pub error_message: Option<String>,
+}
+
+/// Optional parallel hook that, when wired, returns downstream dispatch
+/// evidence for an accepted effect. Runs immediately after
+/// `on_proposal_accepted`. A returned `Some(spec)` is persisted against the
+/// just-emitted `InstitutionalEffectRecord` (matching on `effect_kind`),
+/// bringing that effect's `reconciliation_status` out of `emitted_only`.
+///
+/// Returning `None` is valid and means "this dispatcher does not report
+/// evidence" — reconciliation stays `emitted_only` for that effect.
+///
+/// This is additive to `ProposalAcceptedHook`. Gateways that do not
+/// provide evidence-returning dispatchers can leave this `None` and keep
+/// using the fire-and-forget hook.
+pub type ProposalDispatchEvidenceHook =
+    Arc<dyn Fn(&GovernanceEffect) -> Option<DispatchEvidenceSpec> + Send + Sync>;
+
 /// Async predicate: is `did` an active steward in the commons layer?
 ///
 /// Called by SDIS proposal handlers (AppointSteward, RemoveSteward) before
@@ -185,6 +215,12 @@ pub struct GovernanceContext<E> {
     /// Receives the translated [`GovernanceEffect`] for the accepted proposal,
     /// allowing gateway dispatch without importing governance domain types.
     pub on_proposal_accepted: Option<ProposalAcceptedHook>,
+    /// Optional evidence-returning dispatch hook, called right after
+    /// `on_proposal_accepted`. When wired, the returned `DispatchEvidenceSpec`
+    /// is persisted as `EffectDispatchEvidence` against the just-emitted
+    /// institutional effect record, bringing its `reconciliation_status`
+    /// out of `emitted_only`. Additive to `on_proposal_accepted`.
+    pub on_proposal_accepted_with_evidence: Option<ProposalDispatchEvidenceHook>,
     /// Optional gate: if set, `create_proposal` calls this before accepting the
     /// submission. Returns `true` if the caller has active Member standing in the
     /// target domain; `false` → 403 Forbidden.
@@ -275,6 +311,14 @@ where
         .service(
             web::resource("/proposals/{proposal_id}/chain")
                 .route(web::get().to(handlers::get_chain::<E>)),
+        )
+        .service(
+            web::resource("/proposals/{proposal_id}/deliberation")
+                .route(web::get().to(handlers::get_proposal_deliberation::<E>)),
+        )
+        .service(
+            web::resource("/proposals/{proposal_id}/effects")
+                .route(web::get().to(handlers::list_proposal_effects::<E>)),
         )
         // ── Discussion endpoints ─────────────────────────────────────────
         .service(

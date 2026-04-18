@@ -220,6 +220,7 @@ async fn build_app_with_proposal(
         emitter: NoopEventEmitter,
         on_charter_accepted: None,
         on_proposal_accepted: None,
+        on_proposal_accepted_with_evidence: None,
         member_checker: Some(make_checker(commons_mgr)),
         steward_checker: None,
         suspension_checker: None,

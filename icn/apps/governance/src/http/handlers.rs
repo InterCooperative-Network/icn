@@ -21,7 +21,7 @@ use icn_http_kit::{
 };
 use icn_identity::Did;
 
-use super::configure::{GovernanceContext, GovernanceEffect};
+use super::configure::{DispatchEvidenceSpec, GovernanceContext, GovernanceEffect};
 use super::models::*;
 use super::validation as val;
 use crate::events::GovernanceEventEmitter;
@@ -1203,6 +1203,39 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         _ => "unknown",
     };
 
+    // On accepted: persist an institutional effect record (non-economic
+    // effects only — economic effects are recorded as AllocationReceipts in
+    // the manager). This runs regardless of dispatch path (standalone vs
+    // actor-backed) so the durable artifact is available via
+    // GET /gov/proposals/{id}/effects and GET /gov/proposals/{id}/deliberation.
+    if outcome == "accepted" {
+        // Best-effort decision_hash lookup to bind the record into the
+        // INV-5 provenance chain. If the governance receipt is not yet
+        // available (e.g. actor-path timing), record with decision_hash=None
+        // — the proposal_id still locates the record.
+        let decision_hash = ctx
+            .manager
+            .get_chain(&proposal_id)
+            .await
+            .ok()
+            .and_then(|chain| chain.governance_receipt.map(|r| r.decision_hash));
+
+        // Canonical emission path: same method called from the actor's
+        // force-close accept branch. Idempotent on (proposal_id, effect_kind)
+        // so when the actor has already emitted (actor-backed normal close),
+        // this call returns AlreadyEmitted instead of duplicating.
+        if let Err(e) =
+            ctx.manager
+                .apply_acceptance_effects(&proposal, decision_hash, current_time_secs())
+        {
+            tracing::error!(
+                proposal_id = %proposal.id.0,
+                error = %e,
+                "apply_acceptance_effects failed; proposal acceptance recorded but no institutional artifact",
+            );
+        }
+    }
+
     // On charter acceptance: deploy the document to the charter policy oracle.
     if outcome == "accepted" {
         if let icn_governance::ProposalPayload::Charter {
@@ -1260,19 +1293,81 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                     payload_type: proposal.payload.type_name().to_owned(),
                 },
             };
-            hook(effect);
+            // Fire the fire-and-forget hook first.
+            hook(effect.clone());
+
+            // Evidence-returning hook: when wired, persist the returned
+            // dispatch evidence against the just-emitted institutional
+            // effect record. Effect kind must match one of our translated
+            // labels — for Unhandled we skip (no record was emitted).
+            if let Some(ev_hook) = &ctx.on_proposal_accepted_with_evidence {
+                if let Some(spec) = ev_hook(&effect) {
+                    let effect_kind = match &effect {
+                        GovernanceEffect::FreezeMember { .. } => Some("freeze_member"),
+                        GovernanceEffect::UnfreezeMember { .. } => Some("unfreeze_member"),
+                        GovernanceEffect::DeployCharter { .. } => Some("deploy_charter"),
+                        GovernanceEffect::AppointSteward { .. } => Some("appoint_steward"),
+                        GovernanceEffect::RevokeSteward { .. } => Some("revoke_steward"),
+                        GovernanceEffect::Unhandled { .. } => None,
+                    };
+                    if let Some(kind) = effect_kind {
+                        record_hook_dispatch_evidence(
+                            &ctx,
+                            &proposal.id.0,
+                            kind,
+                            spec,
+                            current_time_secs(),
+                        )
+                        .await;
+                    }
+                }
+            }
         }
 
         // SDIS service dispatch (test path only — daemon uses actor event system).
         // When sdis_service is wired and the accepted payload is an SDIS proposal,
         // call the service directly so tests can prove steward creation without an
         // actor runtime.
+        //
+        // The SDIS service returns structured {success, state_change_hash, error},
+        // so this is the one dispatch path in close_proposal that yields real
+        // in-process evidence. After each call we record an
+        // `EffectDispatchEvidence` tied to the institutional effect record
+        // persisted earlier in this handler. Other dispatch paths (charter/
+        // freeze hooks) are fire-and-forget and remain `emitted_only`.
         if let Some(ref svc) = ctx.sdis_service {
             use icn_kernel_api::{AppointStewardRequest, RevokeStewardRequest};
             if let icn_governance::ProposalPayload::Sdis {
                 proposal: ref sdis_proposal,
             } = proposal.payload
             {
+                // Look up the institutional effect record persisted earlier
+                // in this handler. We match by effect_kind to disambiguate if
+                // historical records exist — for accept/revoke that is a
+                // singleton per proposal in normal flow.
+                let effect_kind_needed = match sdis_proposal {
+                    icn_governance::sdis::SdisProposal::AppointSteward { .. } => {
+                        Some("appoint_steward")
+                    }
+                    icn_governance::sdis::SdisProposal::RemoveSteward { .. } => {
+                        Some("revoke_steward")
+                    }
+                    _ => None,
+                };
+                let target_record_id: Option<String> = match effect_kind_needed {
+                    Some(kind) => ctx
+                        .manager
+                        .list_institutional_effects(&proposal_id)
+                        .ok()
+                        .and_then(|records| {
+                            records
+                                .into_iter()
+                                .find(|r| r.effect_kind == kind)
+                                .map(|r| r.record_id)
+                        }),
+                    None => None,
+                };
+
                 match sdis_proposal {
                     icn_governance::sdis::SdisProposal::AppointSteward {
                         candidate,
@@ -1288,13 +1383,16 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                             region: None,
                             proposal_id: proposal.id.0.clone(),
                         };
-                        match svc.appoint_steward(req) {
-                            Ok(result) if !result.success => {
-                                tracing::warn!(
-                                    proposal_id = %proposal.id.0,
-                                    error = ?result.error,
-                                    "SDIS test-path: appoint_steward returned success=false"
-                                );
+                        let (success, receipt_ref, error) = match svc.appoint_steward(req) {
+                            Ok(result) => {
+                                if !result.success {
+                                    tracing::warn!(
+                                        proposal_id = %proposal.id.0,
+                                        error = ?result.error,
+                                        "SDIS test-path: appoint_steward returned success=false"
+                                    );
+                                }
+                                (result.success, Some(result.state_change_hash), result.error)
                             }
                             Err(e) => {
                                 tracing::warn!(
@@ -1302,8 +1400,27 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                                     error = %e,
                                     "SDIS test-path: appoint_steward call failed"
                                 );
+                                (false, None, Some(e.to_string()))
                             }
-                            Ok(_) => {}
+                        };
+                        if let Some(record_id) = target_record_id.as_ref() {
+                            let evidence = crate::dispatch_evidence::EffectDispatchEvidence::new(
+                                record_id.clone(),
+                                proposal.id.0.clone(),
+                                "sdis",
+                                receipt_ref,
+                                success,
+                                error,
+                                current_time_secs(),
+                            );
+                            if let Err(e) = ctx.manager.record_dispatch_evidence(&evidence) {
+                                tracing::error!(
+                                    proposal_id = %proposal.id.0,
+                                    effect_record_id = %record_id,
+                                    error = %e,
+                                    "Failed to persist SDIS appoint_steward dispatch evidence",
+                                );
+                            }
                         }
                     }
                     icn_governance::sdis::SdisProposal::RemoveSteward {
@@ -1313,13 +1430,16 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                             steward_did: steward.to_string(),
                             reason: reason.clone(),
                         };
-                        match svc.revoke_steward(req) {
-                            Ok(result) if !result.success => {
-                                tracing::warn!(
-                                    proposal_id = %proposal.id.0,
-                                    error = ?result.error,
-                                    "SDIS test-path: revoke_steward returned success=false"
-                                );
+                        let (success, receipt_ref, error) = match svc.revoke_steward(req) {
+                            Ok(result) => {
+                                if !result.success {
+                                    tracing::warn!(
+                                        proposal_id = %proposal.id.0,
+                                        error = ?result.error,
+                                        "SDIS test-path: revoke_steward returned success=false"
+                                    );
+                                }
+                                (result.success, Some(result.state_change_hash), result.error)
                             }
                             Err(e) => {
                                 tracing::warn!(
@@ -1327,8 +1447,27 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                                     error = %e,
                                     "SDIS test-path: revoke_steward call failed"
                                 );
+                                (false, None, Some(e.to_string()))
                             }
-                            Ok(_) => {}
+                        };
+                        if let Some(record_id) = target_record_id.as_ref() {
+                            let evidence = crate::dispatch_evidence::EffectDispatchEvidence::new(
+                                record_id.clone(),
+                                proposal.id.0.clone(),
+                                "sdis",
+                                receipt_ref,
+                                success,
+                                error,
+                                current_time_secs(),
+                            );
+                            if let Err(e) = ctx.manager.record_dispatch_evidence(&evidence) {
+                                tracing::error!(
+                                    proposal_id = %proposal.id.0,
+                                    effect_record_id = %record_id,
+                                    error = %e,
+                                    "Failed to persist SDIS revoke_steward dispatch evidence",
+                                );
+                            }
                         }
                     }
                     _ => {}
@@ -1520,6 +1659,265 @@ pub async fn get_chain<E: GovernanceEventEmitter + Clone + 'static>(
     let chain = ctx.manager.get_chain(&id).await.map_err(anyhow_to_api)?;
 
     Ok(HttpResponse::Ok().json(chain))
+}
+
+/// Record downstream dispatch evidence returned by the
+/// evidence-returning hook against the institutional effect record for
+/// `(proposal_id, effect_kind)`. Looks up the emitted record by scanning
+/// the proposal's records for a matching `effect_kind`. Logs and skips
+/// on any failure — dispatch evidence is best-effort reconciliation
+/// metadata, not a correctness condition.
+async fn record_hook_dispatch_evidence<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: &web::Data<GovernanceContext<E>>,
+    proposal_id: &str,
+    effect_kind: &str,
+    spec: DispatchEvidenceSpec,
+    now: u64,
+) {
+    use crate::dispatch_evidence::EffectDispatchEvidence;
+
+    let records = match ctx
+        .manager
+        .list_institutional_effects(&icn_governance::ProposalId(proposal_id.to_string()))
+    {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(
+                proposal_id = %proposal_id,
+                error = %e,
+                "dispatch-evidence hook: failed to list institutional effects; skipping"
+            );
+            return;
+        }
+    };
+    let Some(rec) = records.iter().find(|r| r.effect_kind == effect_kind) else {
+        tracing::warn!(
+            proposal_id = %proposal_id,
+            effect_kind = %effect_kind,
+            "dispatch-evidence hook returned Some but no matching effect record exists; skipping"
+        );
+        return;
+    };
+
+    let evidence = EffectDispatchEvidence::new(
+        rec.record_id.clone(),
+        proposal_id.to_string(),
+        spec.subsystem,
+        spec.receipt_ref,
+        spec.success,
+        spec.error_message,
+        now,
+    );
+    if let Err(e) = ctx.manager.record_dispatch_evidence(&evidence) {
+        tracing::error!(
+            proposal_id = %proposal_id,
+            effect_kind = %effect_kind,
+            error = %e,
+            "Failed to persist hook-returned dispatch evidence"
+        );
+    }
+}
+
+/// GET /gov/proposals/{proposal_id}/deliberation — Reverse read-model.
+///
+/// Returns the proposal's deliberation trail: every meeting in the proposal's
+/// domain whose agenda linked back to this proposal, with the agenda item's
+/// discussion notes, outcome, and generated action items. When the proposal
+/// is closed, the governance decision receipt is included. The `effect_kind`
+/// field labels the [`crate::http::configure::GovernanceEffect`] variant the
+/// payload would translate into on acceptance (`"freeze_member"`, etc., or
+/// `"unhandled"`). It is a shape label only — dispatch evidence lives in
+/// `.../chain`, and cryptographic evidence in `.../proof`.
+///
+/// This endpoint is NOT an activity/progress tracker. It answers:
+/// "what deliberation produced the institutional decision on this proposal?"
+pub async fn get_proposal_deliberation<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    proposal_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+
+    let id = ProposalId(proposal_id.into_inner());
+    let trail = ctx
+        .manager
+        .get_deliberation(&id)
+        .await
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found(format!("Proposal not found: {}", id.0)))?;
+
+    // Only surface a governance decision when we have *both* a receipt and a
+    // terminal `decided_at`. A receipt without a decided_at would otherwise
+    // serialize as `decided_at: 0` (Unix epoch), which is a misleading
+    // timestamp for consumers in the rare receipt-store/state-skew case.
+    let governance_decision = trail.governance_receipt.as_ref().and_then(|r| {
+        trail
+            .decided_at
+            .map(|decided_at| DeliberationDecisionResponse {
+                outcome: r.outcome.to_string(),
+                decided_at,
+                decision_hash: hex::encode(r.decision_hash),
+            })
+    });
+
+    let deliberations = trail
+        .deliberations
+        .into_iter()
+        .map(|e| DeliberationMeetingResponse {
+            meeting_id: e.meeting_id.0.clone(),
+            meeting_title: e.meeting_title,
+            meeting_status: meeting_status_str(&e.meeting_status).to_string(),
+            scheduled_at: e.scheduled_at,
+            started_at: e.started_at,
+            ended_at: e.ended_at,
+            agenda_item_id: e.agenda_item_id.0.to_string(),
+            agenda_item_title: e.agenda_item_title,
+            presenter: e.presenter,
+            discussion_notes: e.discussion_notes,
+            outcome: e.outcome,
+            generated_action_items: e
+                .generated_action_items
+                .into_iter()
+                .map(|aid| aid.0.to_string())
+                .collect(),
+        })
+        .collect();
+
+    let emitted_effects = trail
+        .emitted_effects
+        .iter()
+        .map(reconciled_effect_to_response)
+        .collect();
+
+    Ok(HttpResponse::Ok().json(ProposalDeliberationResponse {
+        proposal_id: trail.proposal_id.0,
+        domain_id: trail.domain_id.0,
+        payload_type: trail.payload_type.to_string(),
+        state: trail.state_label.to_string(),
+        effect_kind: trail.effect_kind.to_string(),
+        deliberations,
+        governance_decision,
+        emitted_effects,
+    }))
+}
+
+/// Translate a persisted effect record into its HTTP response shape.
+fn effect_record_to_response(
+    r: &crate::institutional_effect::InstitutionalEffectRecord,
+) -> InstitutionalEffectResponse {
+    InstitutionalEffectResponse {
+        record_id: r.record_id.clone(),
+        proposal_id: r.proposal_id.clone(),
+        domain_id: r.domain_id.clone(),
+        decision_hash: r.decision_hash.map(hex::encode),
+        effect_kind: r.effect_kind.clone(),
+        target_did: r.target_did.clone(),
+        target_ref: r.target_ref.clone(),
+        reason: r.reason.clone(),
+        recorded_at: r.recorded_at,
+        payload: r.payload.clone(),
+    }
+}
+
+/// Translate a dispatch evidence record into its HTTP response shape.
+fn dispatch_evidence_to_response(
+    e: &crate::dispatch_evidence::EffectDispatchEvidence,
+) -> DispatchEvidenceResponse {
+    DispatchEvidenceResponse {
+        evidence_id: e.evidence_id.clone(),
+        effect_record_id: e.effect_record_id.clone(),
+        proposal_id: e.proposal_id.clone(),
+        subsystem: e.subsystem.clone(),
+        receipt_ref: e.receipt_ref.clone(),
+        success: e.success,
+        error_message: e.error_message.clone(),
+        recorded_at: e.recorded_at,
+    }
+}
+
+/// Render a reconciled effect entry (record + evidence + derived status).
+fn reconciled_effect_to_response(
+    entry: &crate::manager::ReconciledEffectEntry,
+) -> ReconciledEffectResponse {
+    use crate::dispatch_evidence::{reconciliation_label, ReconciliationStatus};
+    let reconciliation_error = match &entry.reconciliation_status {
+        ReconciliationStatus::ExecutionFailed { error } => error.clone(),
+        _ => None,
+    };
+    ReconciledEffectResponse {
+        record: effect_record_to_response(&entry.record),
+        reconciliation_status: reconciliation_label(&entry.reconciliation_status).to_string(),
+        reconciliation_error,
+        dispatch_evidence: entry
+            .dispatch_evidence
+            .iter()
+            .map(dispatch_evidence_to_response)
+            .collect(),
+    }
+}
+
+/// GET /gov/proposals/{proposal_id}/effects — List persisted institutional
+/// effect records emitted at acceptance.
+///
+/// Returns an empty list when the proposal was not accepted, when the
+/// payload translated to `Unhandled`, or when no receipt store is wired.
+/// Records are oldest-first.
+///
+/// Durable counterpart to the `effect_kind` shape label on `/deliberation`:
+/// this endpoint answers "what governance artifact was actually created?"
+/// rather than "what shape would this imply?"
+pub async fn list_proposal_effects<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    proposal_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+
+    let id = ProposalId(proposal_id.into_inner());
+
+    // 404 when the proposal itself is unknown — distinguishes a missing
+    // proposal from an accepted-but-no-effect proposal (which returns []).
+    let _ = ctx
+        .manager
+        .get_proposal(&id)
+        .await
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found(format!("Proposal not found: {}", id.0)))?;
+
+    let records = ctx
+        .manager
+        .list_institutional_effects(&id)
+        .map_err(anyhow_to_api)?;
+
+    let effects = records
+        .iter()
+        .map(|record| {
+            let evidence = ctx
+                .manager
+                .list_dispatch_evidence(&record.record_id)
+                .unwrap_or_else(|e| {
+                    tracing::warn!(
+                        record_id = %record.record_id,
+                        error = %e,
+                        "list_proposal_effects: evidence read failed; treating as empty",
+                    );
+                    vec![]
+                });
+            let reconciliation_status =
+                crate::dispatch_evidence::derive_reconciliation_status(record, &evidence);
+            crate::manager::ReconciledEffectEntry {
+                record: record.clone(),
+                dispatch_evidence: evidence,
+                reconciliation_status,
+            }
+        })
+        .map(|entry| reconciled_effect_to_response(&entry))
+        .collect();
+
+    Ok(HttpResponse::Ok().json(ProposalEffectsResponse {
+        proposal_id: id.0,
+        effects,
+    }))
 }
 
 /// GET /gov/proposals/{proposal_id}/proof — Get cryptographic proof of proposal outcome.
@@ -4344,6 +4742,104 @@ mod tests {
         Did::from_anchor_id(&[seed; 32])
     }
 
+    /// In-memory receipt backend usable from HTTP handler tests.
+    ///
+    /// Covers the minimum backend surface the HTTP close path touches:
+    /// institutional effect records + dispatch evidence. Governance
+    /// receipts and allocation receipts are no-ops here — these tests
+    /// prove the canonical emission and evidence-hook behavior, not
+    /// the economic chain.
+    struct HandlerTestReceiptBackend {
+        effects: Mutex<Vec<crate::institutional_effect::InstitutionalEffectRecord>>,
+        evidence: Mutex<Vec<crate::dispatch_evidence::EffectDispatchEvidence>>,
+    }
+
+    impl HandlerTestReceiptBackend {
+        fn new() -> Self {
+            Self {
+                effects: Mutex::new(vec![]),
+                evidence: Mutex::new(vec![]),
+            }
+        }
+    }
+
+    impl crate::receipt_backend::GovernanceReceiptBackend for HandlerTestReceiptBackend {
+        fn put_governance(
+            &self,
+            _receipt: &icn_governance::GovernanceDecisionReceipt,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+        fn get_governance_by_proposal(
+            &self,
+            _proposal_id: &str,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn put_allocation(
+            &self,
+            _receipt: &icn_kernel_api::AllocationReceipt,
+        ) -> Result<icn_kernel_api::Hash, String> {
+            Ok([0u8; 32])
+        }
+        fn get_governance_by_decision(
+            &self,
+            _decision_hash: &icn_kernel_api::Hash,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn list_allocations_by_decision(
+            &self,
+            _decision_hash: &icn_kernel_api::Hash,
+        ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
+            Ok(vec![])
+        }
+        fn put_institutional_effect(
+            &self,
+            record: &crate::institutional_effect::InstitutionalEffectRecord,
+        ) -> Result<(), String> {
+            self.effects.lock().unwrap().push(record.clone());
+            Ok(())
+        }
+        fn list_institutional_effects_by_proposal(
+            &self,
+            proposal_id: &str,
+        ) -> Result<Vec<crate::institutional_effect::InstitutionalEffectRecord>, String> {
+            let mut items: Vec<_> = self
+                .effects
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|r| r.proposal_id == proposal_id)
+                .cloned()
+                .collect();
+            items.sort_by_key(|r| r.recorded_at);
+            Ok(items)
+        }
+        fn put_effect_dispatch_evidence(
+            &self,
+            evidence: &crate::dispatch_evidence::EffectDispatchEvidence,
+        ) -> Result<(), String> {
+            self.evidence.lock().unwrap().push(evidence.clone());
+            Ok(())
+        }
+        fn list_effect_dispatch_evidence_by_record(
+            &self,
+            effect_record_id: &str,
+        ) -> Result<Vec<crate::dispatch_evidence::EffectDispatchEvidence>, String> {
+            let mut items: Vec<_> = self
+                .evidence
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|e| e.effect_record_id == effect_record_id)
+                .cloned()
+                .collect();
+            items.sort_by_key(|e| e.recorded_at);
+            Ok(items)
+        }
+    }
+
     /// Build a test app that injects the given claims into every request
     /// extension — bypasses JWT validation without touching production code.
     macro_rules! test_app {
@@ -4447,6 +4943,7 @@ mod tests {
             emitter: NoopEventEmitter,
             on_charter_accepted: None,
             on_proposal_accepted: Some(hook),
+            on_proposal_accepted_with_evidence: None,
             member_checker: None,
             steward_checker: None,
             suspension_checker: None,
@@ -4489,6 +4986,114 @@ mod tests {
         }
     }
 
+    /// Proves the evidence-returning hook end-to-end through the HTTP
+    /// `close_proposal` path:
+    ///   normal accept
+    ///   → canonical emission writes `InstitutionalEffectRecord`
+    ///   → `on_proposal_accepted` fires
+    ///   → `on_proposal_accepted_with_evidence` returns `DispatchEvidenceSpec`
+    ///   → hook-returned evidence is persisted against the just-emitted record
+    ///   → `list_dispatch_evidence` returns exactly that evidence entry
+    ///   → derived `ReconciliationStatus` is `ExecutionEvidenced`.
+    ///
+    /// This is the narrow reconciliation bridge for the freeze dispatch lane
+    /// — the lane was `emitted_only` before the evidence hook existed, and
+    /// this test proves it is now wired through a supported path.
+    #[tokio::test]
+    async fn evidence_hook_persists_dispatch_evidence_on_accept() {
+        use crate::dispatch_evidence::ReconciliationStatus;
+        use crate::http::configure::{DispatchEvidenceSpec, ProposalDispatchEvidenceHook};
+
+        let member_did = test_did(11);
+        let target_did = test_did(12);
+
+        // Build a manager wired with a receipt store so emission + evidence
+        // are actually persistent (the base helper uses a bare manager).
+        let mgr = Arc::new(
+            GovernanceManager::new().with_receipt_store(Arc::new(HandlerTestReceiptBackend::new())),
+        );
+        let domain_id = GovernanceDomainId("evidence-coop".to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            "evidence coop".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 0, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = ProposalId("evidence-freeze-1".to_string());
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id.clone(),
+            member_did.clone(),
+            "Freeze for evidence test".to_string(),
+            "audit".to_string(),
+            ProposalPayload::FreezeMember {
+                member: target_did.clone(),
+                reason: "audit".to_string(),
+                duration_seconds: None,
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .unwrap();
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+
+        // The evidence hook simulates a downstream dispatcher reporting back
+        // with a state_change_hash after successful side-effects.
+        let ev_hook: ProposalDispatchEvidenceHook = Arc::new(move |effect| match effect {
+            GovernanceEffect::FreezeMember { .. } => Some(DispatchEvidenceSpec {
+                subsystem: "commons".to_string(),
+                receipt_ref: Some("state-hash-abc".to_string()),
+                success: true,
+                error_message: None,
+            }),
+            _ => None,
+        });
+
+        let ctx = GovernanceContext {
+            manager: mgr.clone(),
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: Some(Arc::new(|_| {})), // fire-and-forget, also present
+            on_proposal_accepted_with_evidence: Some(ev_hook),
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        };
+
+        let app = test_app!(ctx, member_did);
+        let req = test::TestRequest::post()
+            .uri(&format!("/proposals/{}/close", proposal_id.0))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        // Exactly one effect record was emitted.
+        let records = mgr.list_institutional_effects(&proposal_id).unwrap();
+        assert_eq!(records.len(), 1, "one emitted record expected");
+        assert_eq!(records[0].effect_kind, "freeze_member");
+
+        // Exactly one dispatch evidence entry was attached to that record.
+        let evidence = mgr.list_dispatch_evidence(&records[0].record_id).unwrap();
+        assert_eq!(evidence.len(), 1, "one dispatch evidence entry expected");
+        assert_eq!(evidence[0].subsystem, "commons");
+        assert_eq!(evidence[0].receipt_ref.as_deref(), Some("state-hash-abc"));
+        assert!(evidence[0].success);
+
+        // Reconciliation derives to ExecutionEvidenced on success.
+        let status = crate::dispatch_evidence::derive_reconciliation_status(&records[0], &evidence);
+        assert_eq!(status, ReconciliationStatus::ExecutionEvidenced);
+    }
+
     /// Proves: hook is NOT fired when the proposal closes as `Rejected`.
     ///
     /// GovernanceParams(quorum=0, approval=100) with a vote AGAINST → Rejected.
@@ -4527,6 +5132,7 @@ mod tests {
             emitter: NoopEventEmitter,
             on_charter_accepted: None,
             on_proposal_accepted: Some(hook),
+            on_proposal_accepted_with_evidence: None,
             member_checker: None,
             steward_checker: None,
             suspension_checker: None,
@@ -4646,6 +5252,7 @@ mod tests {
             emitter: NoopEventEmitter,
             on_charter_accepted: None,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             member_checker: None,
             steward_checker: None,
             suspension_checker: Some(suspension_checker),
@@ -4708,6 +5315,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,
@@ -4753,6 +5361,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,
@@ -4784,6 +5393,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,
@@ -4840,6 +5450,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,
@@ -4874,6 +5485,7 @@ mod tests {
                 manager: $mgr,
                 emitter: NoopEventEmitter,
                 on_proposal_accepted: None,
+                on_proposal_accepted_with_evidence: None,
                 on_charter_accepted: None,
                 member_checker: None,
                 steward_checker: None,
@@ -5385,6 +5997,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,
@@ -6437,6 +7050,7 @@ mod tests {
             manager: mgr,
             emitter: NoopEventEmitter,
             on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
             on_charter_accepted: None,
             member_checker: None,
             steward_checker: None,

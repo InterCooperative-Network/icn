@@ -6,6 +6,10 @@
 //! [`GovernanceReceiptBackend`] trait so this crate does not depend on
 //! `icn-gateway`.
 
+use crate::dispatch_evidence::{
+    derive_reconciliation_status, EffectDispatchEvidence, ReconciliationStatus,
+};
+use crate::institutional_effect::InstitutionalEffectRecord;
 use crate::receipt_backend::GovernanceReceiptBackend;
 use anyhow::Result;
 use icn_federation::BilateralClearingAgreement;
@@ -104,6 +108,109 @@ pub struct ProvenanceChain {
     pub allocations: Vec<AllocationReceipt>,
     /// True if the chain is complete for this proposal type
     pub chain_complete: bool,
+}
+
+/// A single meeting/agenda-item pair in a proposal's deliberation trail.
+///
+/// Produced by [`GovernanceManager::get_deliberation`] and rendered into
+/// [`crate::http::models::DeliberationMeetingResponse`] at the HTTP boundary.
+#[derive(Debug, Clone)]
+pub struct DeliberationMeetingEntry {
+    pub meeting_id: icn_governance::MeetingId,
+    pub meeting_title: String,
+    pub meeting_status: icn_governance::MeetingStatus,
+    pub scheduled_at: Option<u64>,
+    pub started_at: Option<u64>,
+    pub ended_at: Option<u64>,
+    pub agenda_item_id: icn_governance::AgendaItemId,
+    pub agenda_item_title: String,
+    pub presenter: Option<String>,
+    pub discussion_notes: Option<String>,
+    pub outcome: Option<String>,
+    pub generated_action_items: Vec<icn_governance::ActionItemId>,
+}
+
+/// Reverse read-model: a proposal's institutional trail.
+///
+/// Returned by [`GovernanceManager::get_deliberation`]. The `effect_kind`
+/// field labels which `http::configure::GovernanceEffect` variant this
+/// proposal would translate into on acceptance — shape only, not a claim
+/// that the effect was dispatched.
+#[derive(Debug, Clone)]
+pub struct ProposalDeliberation {
+    pub proposal_id: ProposalId,
+    pub domain_id: GovernanceDomainId,
+    pub payload_type: &'static str,
+    pub state_label: &'static str,
+    /// Unix seconds the proposal reached a terminal state, if any.
+    /// Sourced from `ProposalState`, not the receipt (receipts do not carry timestamps).
+    pub decided_at: Option<u64>,
+    pub effect_kind: &'static str,
+    pub deliberations: Vec<DeliberationMeetingEntry>,
+    pub governance_receipt: Option<icn_governance::GovernanceDecisionReceipt>,
+    /// Institutional effect records emitted at acceptance plus their
+    /// downstream reconciliation state, oldest-first.  Empty when the
+    /// proposal was not accepted, when the payload translated to
+    /// `Unhandled`, or when no receipt store is wired.
+    pub emitted_effects: Vec<ReconciledEffectEntry>,
+}
+
+/// An emitted institutional effect record paired with its dispatch evidence
+/// and derived reconciliation status.
+#[derive(Debug, Clone)]
+pub struct ReconciledEffectEntry {
+    pub record: InstitutionalEffectRecord,
+    pub dispatch_evidence: Vec<EffectDispatchEvidence>,
+    pub reconciliation_status: ReconciliationStatus,
+}
+
+/// Label the translated [`crate::http::configure::GovernanceEffect`] shape
+/// for a proposal payload. Pure projection — must stay in sync with the
+/// match in `http::handlers::close_proposal`.
+fn payload_effect_kind(payload: &ProposalPayload) -> &'static str {
+    match payload {
+        ProposalPayload::FreezeMember { .. } => "freeze_member",
+        ProposalPayload::UnfreezeMember { .. } => "unfreeze_member",
+        ProposalPayload::Charter { .. } => "deploy_charter",
+        ProposalPayload::Sdis { proposal: sdis } => match sdis {
+            icn_governance::sdis::SdisProposal::AppointSteward { .. } => "appoint_steward",
+            icn_governance::sdis::SdisProposal::RemoveSteward { .. } => "revoke_steward",
+            _ => "unhandled",
+        },
+        _ => "unhandled",
+    }
+}
+
+/// Unix-seconds timestamp the proposal reached a terminal lifecycle state,
+/// or `None` if still in-flight. Used by the deliberation endpoint to tag
+/// when a decision was recorded without depending on receipt fields.
+fn proposal_decided_at(state: &icn_governance::ProposalState) -> Option<u64> {
+    match state {
+        icn_governance::ProposalState::Accepted { closed_at }
+        | icn_governance::ProposalState::Rejected { closed_at }
+        | icn_governance::ProposalState::NoQuorum { closed_at } => Some(*closed_at),
+        icn_governance::ProposalState::Cancelled { cancelled_at } => Some(*cancelled_at),
+        icn_governance::ProposalState::Vetoed { vetoed_at, .. } => Some(*vetoed_at),
+        icn_governance::ProposalState::ForceClosed { closed_at, .. } => Some(*closed_at),
+        icn_governance::ProposalState::Draft
+        | icn_governance::ProposalState::Deliberation { .. }
+        | icn_governance::ProposalState::Open { .. } => None,
+    }
+}
+
+/// Short lowercase label for a proposal lifecycle state.
+fn proposal_state_label(state: &icn_governance::ProposalState) -> &'static str {
+    match state {
+        icn_governance::ProposalState::Draft => "draft",
+        icn_governance::ProposalState::Deliberation { .. } => "deliberation",
+        icn_governance::ProposalState::Open { .. } => "open",
+        icn_governance::ProposalState::Accepted { .. } => "accepted",
+        icn_governance::ProposalState::Rejected { .. } => "rejected",
+        icn_governance::ProposalState::NoQuorum { .. } => "no_quorum",
+        icn_governance::ProposalState::Cancelled { .. } => "cancelled",
+        icn_governance::ProposalState::Vetoed { .. } => "vetoed",
+        icn_governance::ProposalState::ForceClosed { .. } => "force_closed",
+    }
 }
 
 // ============================================================================
@@ -3556,6 +3663,248 @@ impl GovernanceManager {
         })
     }
 
+    /// Canonical acceptance-effect emission for a just-accepted proposal.
+    ///
+    /// This is the single app-layer entry point that turns an accepted
+    /// proposal's payload into a durable `InstitutionalEffectRecord`.
+    /// Idempotent on `(proposal_id, effect_kind)` — a second call for the
+    /// same pair returns `AlreadyEmitted` without writing.
+    ///
+    /// Used by the HTTP `close_proposal` handler for both standalone and
+    /// actor-backed normal closes, by the actor's force-close accept branch
+    /// (when a receipt store is wired into the actor), and by tests that
+    /// need to stamp emission without going through HTTP.
+    ///
+    /// Returns `AcceptanceEmissionOutcome::NoEffect` when no receipt store
+    /// is wired; callers treat that as "not durably recorded".
+    pub fn apply_acceptance_effects(
+        &self,
+        proposal: &icn_governance::Proposal,
+        decision_hash: Option<icn_kernel_api::receipts::Hash>,
+        now: u64,
+    ) -> Result<crate::institutional_effect::AcceptanceEmissionOutcome, anyhow::Error> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(crate::institutional_effect::AcceptanceEmissionOutcome::NoEffect);
+        };
+        crate::institutional_effect::emit_accepted_effect(
+            store.as_ref(),
+            &proposal.id.0,
+            &proposal.domain_id.0,
+            decision_hash,
+            &proposal.payload,
+            now,
+        )
+        .map_err(|e| anyhow::anyhow!("apply_acceptance_effects: {e}"))
+    }
+
+    /// Persist an institutional effect record via the attached receipt store.
+    ///
+    /// No-op when no receipt store is wired (callers should consider the
+    /// effect "not durably recorded" in that case — the HTTP handler logs
+    /// accordingly). Backend write failures are returned — the caller
+    /// decides whether to escalate or degrade.
+    pub fn record_institutional_effect(
+        &self,
+        record: &InstitutionalEffectRecord,
+    ) -> Result<(), anyhow::Error> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(());
+        };
+        store
+            .put_institutional_effect(record)
+            .map_err(|e| anyhow::anyhow!("Failed to persist institutional effect record: {e}"))
+    }
+
+    /// Retrieve all institutional effect records emitted for a proposal,
+    /// oldest-first (backend contract). Returns an empty list when no store
+    /// is wired.
+    pub fn list_institutional_effects(
+        &self,
+        proposal_id: &ProposalId,
+    ) -> Result<Vec<InstitutionalEffectRecord>, anyhow::Error> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_institutional_effects_by_proposal(&proposal_id.0)
+            .map_err(|e| anyhow::anyhow!("Failed to list institutional effect records: {e}"))
+    }
+
+    /// Persist downstream dispatch evidence attached to a previously
+    /// emitted institutional effect record.
+    ///
+    /// No-op when no receipt store is wired. Called by the HTTP close
+    /// handler after a downstream subsystem returns synchronously with
+    /// structured success/error data — currently only the SDIS test-path
+    /// `appoint_steward` / `revoke_steward` calls.
+    pub fn record_dispatch_evidence(
+        &self,
+        evidence: &EffectDispatchEvidence,
+    ) -> Result<(), anyhow::Error> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(());
+        };
+        store
+            .put_effect_dispatch_evidence(evidence)
+            .map_err(|e| anyhow::anyhow!("Failed to persist dispatch evidence: {e}"))
+    }
+
+    /// List dispatch evidence for an effect record, oldest-first. Empty
+    /// list when no evidence or no store wired.
+    pub fn list_dispatch_evidence(
+        &self,
+        effect_record_id: &str,
+    ) -> Result<Vec<EffectDispatchEvidence>, anyhow::Error> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_effect_dispatch_evidence_by_record(effect_record_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list dispatch evidence: {e}"))
+    }
+
+    /// Assemble a proposal's deliberation trail.
+    ///
+    /// Returns the proposal's header fields together with every meeting in
+    /// the proposal's domain whose agenda references this proposal — each
+    /// meeting entry carries the per-agenda-item discussion notes, outcome,
+    /// and generated action items. When the proposal has been closed, the
+    /// governance decision receipt is included.
+    ///
+    /// `effect_kind` is a pure label derived from `proposal.payload` describing
+    /// which `GovernanceEffect` variant this proposal would translate into on
+    /// acceptance (matching the mapping in `http::handlers::close_proposal`).
+    /// It reports shape only — not whether the effect was actually dispatched.
+    ///
+    /// This is a reverse read-model (proposal → meetings); no new state is
+    /// written. Implementation scans `list_meetings(domain_id)` and filters
+    /// matching agenda items — acceptable at per-domain meeting scale.
+    pub async fn get_deliberation(
+        &self,
+        proposal_id: &ProposalId,
+    ) -> Result<Option<ProposalDeliberation>> {
+        let Some(proposal) = self.get_proposal(proposal_id).await? else {
+            return Ok(None);
+        };
+
+        let meetings = self
+            .meeting_store
+            .list_by_domain(&proposal.domain_id.0)
+            .map_err(|e| anyhow::anyhow!("Failed to list meetings: {e}"))?;
+
+        let mut entries: Vec<DeliberationMeetingEntry> = Vec::new();
+        for m in &meetings {
+            for item in &m.agenda {
+                if item
+                    .linked_proposal
+                    .as_ref()
+                    .is_some_and(|pid| pid == proposal_id)
+                {
+                    entries.push(DeliberationMeetingEntry {
+                        meeting_id: m.id.clone(),
+                        meeting_title: m.title.clone(),
+                        meeting_status: m.status,
+                        scheduled_at: m.scheduled_at,
+                        started_at: m.started_at,
+                        ended_at: m.ended_at,
+                        agenda_item_id: item.id.clone(),
+                        agenda_item_title: item.title.clone(),
+                        presenter: item.presenter.clone(),
+                        discussion_notes: item.discussion_notes.clone(),
+                        outcome: item.outcome.clone(),
+                        generated_action_items: item.generated_action_items.clone(),
+                    });
+                }
+            }
+        }
+
+        // Order deliberations chronologically by a single effective timestamp:
+        // prefer `started_at` (when the meeting actually began), fall back to
+        // `scheduled_at` (when it was planned). Meetings with neither sort
+        // last (u64::MAX). A secondary key on the raw `scheduled_at` breaks
+        // ties deterministically when two meetings share the same effective
+        // timestamp.
+        //
+        // Using `started_at.or(scheduled_at)` (rather than a tuple with
+        // `started_at` as the first slot) means that a meeting with only
+        // `scheduled_at` populated is interleaved correctly against meetings
+        // with `started_at`, instead of being pushed to the end.
+        entries.sort_by_key(|e| {
+            (
+                e.started_at.or(e.scheduled_at).unwrap_or(u64::MAX),
+                e.scheduled_at.unwrap_or(u64::MAX),
+            )
+        });
+
+        let governance_receipt = if let Some(ref store) = self.receipt_store {
+            match store.get_governance_by_proposal(&proposal_id.0) {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::warn!(
+                        proposal_id = %proposal_id.0,
+                        error = %e,
+                        "Receipt store error in get_deliberation",
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        let effect_kind = payload_effect_kind(&proposal.payload);
+        let decided_at = proposal_decided_at(&proposal.state);
+
+        // Include any emitted institutional effect records. Store errors are
+        // downgraded to empty rather than failing the read — the deliberation
+        // trail remains useful even if the effect index is unavailable.
+        let records = self
+            .list_institutional_effects(proposal_id)
+            .unwrap_or_else(|e| {
+                tracing::warn!(
+                    proposal_id = %proposal_id.0,
+                    error = %e,
+                    "get_deliberation: effect index read failed; returning empty list",
+                );
+                vec![]
+            });
+
+        let emitted_effects: Vec<ReconciledEffectEntry> = records
+            .into_iter()
+            .map(|record| {
+                let dispatch_evidence = self
+                    .list_dispatch_evidence(&record.record_id)
+                    .unwrap_or_else(|e| {
+                        tracing::warn!(
+                            record_id = %record.record_id,
+                            error = %e,
+                            "get_deliberation: evidence read failed; treating as empty",
+                        );
+                        vec![]
+                    });
+                let reconciliation_status =
+                    derive_reconciliation_status(&record, &dispatch_evidence);
+                ReconciledEffectEntry {
+                    record,
+                    dispatch_evidence,
+                    reconciliation_status,
+                }
+            })
+            .collect();
+
+        Ok(Some(ProposalDeliberation {
+            proposal_id: proposal.id.clone(),
+            domain_id: proposal.domain_id.clone(),
+            payload_type: proposal.payload.type_name(),
+            state_label: proposal_state_label(&proposal.state),
+            decided_at,
+            effect_kind,
+            deliberations: entries,
+            governance_receipt,
+            emitted_effects,
+        }))
+    }
+
     /// Create an AllocationReceipt from an accepted proposal's payload.
     ///
     /// Returns `None` for proposal types that don't produce economic effects
@@ -3670,7 +4019,7 @@ impl GovernanceManager {
                         SettlementIntent::new(
                             &proposal_id.0,
                             decision_hash,
-                            &domain_id.0,
+                            domain_id.0.clone(),
                             opt.recipient.to_string(),
                             opt.requested_amount as u64,
                             unit,
@@ -5544,6 +5893,8 @@ mod tests {
     struct InMemoryReceiptBackend {
         governance: std::sync::Mutex<Vec<icn_governance::GovernanceDecisionReceipt>>,
         allocations: std::sync::Mutex<Vec<AllocationReceipt>>,
+        institutional_effects: std::sync::Mutex<Vec<InstitutionalEffectRecord>>,
+        dispatch_evidence: std::sync::Mutex<Vec<EffectDispatchEvidence>>,
     }
 
     impl InMemoryReceiptBackend {
@@ -5551,6 +5902,8 @@ mod tests {
             Self {
                 governance: std::sync::Mutex::new(vec![]),
                 allocations: std::sync::Mutex::new(vec![]),
+                institutional_effects: std::sync::Mutex::new(vec![]),
+                dispatch_evidence: std::sync::Mutex::new(vec![]),
             }
         }
     }
@@ -5607,6 +5960,56 @@ mod tests {
                 .filter(|a| a.decision_hash == *decision_hash)
                 .cloned()
                 .collect())
+        }
+        fn put_institutional_effect(
+            &self,
+            record: &InstitutionalEffectRecord,
+        ) -> Result<(), String> {
+            self.institutional_effects
+                .lock()
+                .unwrap()
+                .push(record.clone());
+            Ok(())
+        }
+        fn list_institutional_effects_by_proposal(
+            &self,
+            proposal_id: &str,
+        ) -> Result<Vec<InstitutionalEffectRecord>, String> {
+            let mut items: Vec<InstitutionalEffectRecord> = self
+                .institutional_effects
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|r| r.proposal_id == proposal_id)
+                .cloned()
+                .collect();
+            items.sort_by_key(|r| r.recorded_at);
+            Ok(items)
+        }
+        fn put_effect_dispatch_evidence(
+            &self,
+            evidence: &EffectDispatchEvidence,
+        ) -> Result<(), String> {
+            self.dispatch_evidence
+                .lock()
+                .unwrap()
+                .push(evidence.clone());
+            Ok(())
+        }
+        fn list_effect_dispatch_evidence_by_record(
+            &self,
+            effect_record_id: &str,
+        ) -> Result<Vec<EffectDispatchEvidence>, String> {
+            let mut items: Vec<EffectDispatchEvidence> = self
+                .dispatch_evidence
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|e| e.effect_record_id == effect_record_id)
+                .cloned()
+                .collect();
+            items.sort_by_key(|e| e.recorded_at);
+            Ok(items)
         }
     }
 
@@ -5910,6 +6313,816 @@ mod tests {
             chain.chain_complete,
             "INV-5: chain_complete must be true for accepted Text proposal (no allocations needed)"
         );
+    }
+
+    // ========================================================================
+    // Deliberation trail tests (proposal → meetings reverse read-model)
+    // ========================================================================
+
+    /// Helper: add an agenda item linked to `proposal_id` onto `meeting_id`,
+    /// with an optional outcome string. Goes through `update_meeting` so it
+    /// exercises the same store path the HTTP handler uses.
+    async fn push_linked_agenda_item(
+        mgr: &GovernanceManager,
+        meeting_id: &icn_governance::MeetingId,
+        proposal_id: &ProposalId,
+        title: &str,
+        outcome: Option<&str>,
+        notes: Option<&str>,
+    ) {
+        let mut m = mgr.get_meeting(meeting_id).unwrap().unwrap();
+        let mut item = icn_governance::AgendaItem::new(title);
+        item.linked_proposal = Some(proposal_id.clone());
+        item.outcome = outcome.map(|s| s.to_string());
+        item.discussion_notes = notes.map(|s| s.to_string());
+        m.agenda.push(item);
+        mgr.update_meeting(&m).unwrap();
+    }
+
+    #[tokio::test]
+    async fn deliberation_none_when_proposal_missing() {
+        let (mgr, _domain, _member) = make_manager_with_domain().await;
+        let missing = ProposalId("prop-does-not-exist".to_string());
+        let result = mgr.get_deliberation(&missing).await.unwrap();
+        assert!(
+            result.is_none(),
+            "get_deliberation must return None for an unknown proposal_id"
+        );
+    }
+
+    #[tokio::test]
+    async fn deliberation_empty_when_no_meeting_references_proposal() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-no-meetings".to_string()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Standalone".to_string(),
+                "No meeting ever touched this".to_string(),
+                ProposalPayload::Text {
+                    body: "body".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        // Create a meeting in the same domain whose agenda does NOT link this proposal.
+        let m = mgr
+            .create_meeting(
+                domain_id.0.clone(),
+                "Unrelated meeting".to_string(),
+                None,
+                None,
+                member_did.to_string(),
+            )
+            .unwrap();
+        // Add an agenda item linked to a different proposal id — should NOT match.
+        let other = ProposalId("prop-other".to_string());
+        push_linked_agenda_item(&mgr, &m.id, &other, "Unrelated item", None, None).await;
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        assert_eq!(trail.proposal_id, prop_id);
+        assert_eq!(trail.domain_id, domain_id);
+        assert!(trail.deliberations.is_empty());
+        assert!(trail.governance_receipt.is_none());
+        assert_eq!(trail.state_label, "draft");
+        assert_eq!(trail.effect_kind, "unhandled"); // Text payload has no structured effect.
+        assert!(trail.decided_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn deliberation_collects_linked_agenda_items_across_meetings() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-deliberated".to_string()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Multi-meeting".to_string(),
+                "Discussed twice, decided once".to_string(),
+                ProposalPayload::Text {
+                    body: "body".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        // Meeting A scheduled earlier, tabled discussion.
+        let mut m_a = mgr
+            .create_meeting(
+                domain_id.0.clone(),
+                "March review".to_string(),
+                None,
+                Some(1_700_000_000),
+                member_did.to_string(),
+            )
+            .unwrap();
+        m_a.started_at = Some(1_700_000_100);
+        mgr.update_meeting(&m_a).unwrap();
+        push_linked_agenda_item(
+            &mgr,
+            &m_a.id,
+            &prop_id,
+            "Initial discussion",
+            Some("tabled"),
+            Some("Needs more research"),
+        )
+        .await;
+
+        // Meeting B scheduled later, resolved.
+        let mut m_b = mgr
+            .create_meeting(
+                domain_id.0.clone(),
+                "April decision".to_string(),
+                None,
+                Some(1_700_500_000),
+                member_did.to_string(),
+            )
+            .unwrap();
+        m_b.started_at = Some(1_700_500_100);
+        mgr.update_meeting(&m_b).unwrap();
+        push_linked_agenda_item(&mgr, &m_b.id, &prop_id, "Vote", Some("resolved"), None).await;
+
+        // A meeting in a different domain must not leak in.
+        let other_domain = GovernanceDomainId::new("other-coop");
+        mgr.create_domain(
+            other_domain.clone(),
+            "Other Coop".to_string(),
+            "default".to_string(),
+            GovernanceParams {
+                quorum_percentage: 1,
+                approval_threshold_percentage: 51,
+                voting_period_seconds: 86400,
+                require_deliberation: false,
+                ..GovernanceParams::default()
+            },
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+        let m_other = mgr
+            .create_meeting(
+                other_domain.0.clone(),
+                "Other domain".to_string(),
+                None,
+                Some(1_700_250_000),
+                member_did.to_string(),
+            )
+            .unwrap();
+        push_linked_agenda_item(&mgr, &m_other.id, &prop_id, "Cross-domain", None, None).await;
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+
+        assert_eq!(
+            trail.deliberations.len(),
+            2,
+            "only same-domain meetings linking the proposal should appear",
+        );
+        // Chronological order by started_at (earliest first).
+        assert_eq!(trail.deliberations[0].meeting_title, "March review");
+        assert_eq!(trail.deliberations[0].outcome.as_deref(), Some("tabled"));
+        assert_eq!(
+            trail.deliberations[0].discussion_notes.as_deref(),
+            Some("Needs more research"),
+        );
+        assert_eq!(trail.deliberations[1].meeting_title, "April decision");
+        assert_eq!(trail.deliberations[1].outcome.as_deref(), Some("resolved"));
+    }
+
+    #[tokio::test]
+    async fn deliberation_includes_decision_receipt_after_close() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-closed".to_string()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Decided text".to_string(),
+                "Will be accepted".to_string(),
+                ProposalPayload::Text {
+                    body: "body".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        let m = mgr
+            .create_meeting(
+                domain_id.0.clone(),
+                "Decision meeting".to_string(),
+                None,
+                Some(1_700_000_000),
+                member_did.to_string(),
+            )
+            .unwrap();
+        push_linked_agenda_item(&mgr, &m.id, &prop_id, "Vote", Some("resolved"), None).await;
+
+        mgr.open_proposal(prop_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(prop_id.clone(), member_did.clone(), VoteChoice::For, None)
+            .await
+            .unwrap();
+        mgr.close_proposal(prop_id.clone()).await.unwrap();
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        assert_eq!(trail.state_label, "accepted");
+        assert!(trail.decided_at.is_some());
+        assert!(
+            trail.governance_receipt.is_some(),
+            "closed proposal must carry its decision receipt in the deliberation trail",
+        );
+        assert_eq!(trail.deliberations.len(), 1);
+    }
+
+    // ========================================================================
+    // Institutional effect record persistence (acceptance-time artifact)
+    // ========================================================================
+
+    #[tokio::test]
+    async fn institutional_effects_empty_without_receipt_store() {
+        let (mgr, _domain, _member) = make_manager_with_domain().await;
+        // No receipt store wired: list returns empty, write is a no-op Ok.
+        let pid = ProposalId("prop-none".to_string());
+        let list = mgr.list_institutional_effects(&pid).unwrap();
+        assert!(list.is_empty());
+
+        let rec = InstitutionalEffectRecord::new(
+            "prop-none",
+            "test-coop",
+            None,
+            "freeze_member",
+            None,
+            None,
+            None,
+            1,
+            serde_json::json!({}),
+        );
+        assert!(mgr.record_institutional_effect(&rec).is_ok());
+        // Still empty — no store to read from.
+        let list = mgr.list_institutional_effects(&pid).unwrap();
+        assert!(list.is_empty());
+    }
+
+    #[tokio::test]
+    async fn institutional_effects_roundtrip_and_ordering() {
+        let (mgr, _domain, _member) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let pid = ProposalId("prop-rt".to_string());
+
+        let older = InstitutionalEffectRecord::new(
+            pid.0.clone(),
+            "test-coop",
+            None,
+            "freeze_member",
+            Some("did:icn:a".into()),
+            None,
+            Some("cause".into()),
+            100,
+            serde_json::json!({"n": 1}),
+        );
+        let newer = InstitutionalEffectRecord::new(
+            pid.0.clone(),
+            "test-coop",
+            None,
+            "unfreeze_member",
+            Some("did:icn:a".into()),
+            None,
+            Some("resolved".into()),
+            200,
+            serde_json::json!({"n": 2}),
+        );
+
+        // Write out-of-order to prove ordering is by recorded_at, not insert order.
+        mgr.record_institutional_effect(&newer).unwrap();
+        mgr.record_institutional_effect(&older).unwrap();
+
+        let list = mgr.list_institutional_effects(&pid).unwrap();
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].effect_kind, "freeze_member");
+        assert_eq!(list[1].effect_kind, "unfreeze_member");
+        assert!(list[0].recorded_at < list[1].recorded_at);
+
+        // Unrelated proposal_id returns empty, not the above.
+        let empty = mgr
+            .list_institutional_effects(&ProposalId("prop-other".into()))
+            .unwrap();
+        assert!(empty.is_empty());
+    }
+
+    #[tokio::test]
+    async fn deliberation_surfaces_emitted_effects() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let target = test_did(9);
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-freeze-surface".into()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Freeze".into(),
+                "Reason".into(),
+                ProposalPayload::FreezeMember {
+                    member: target.clone(),
+                    reason: "audit".into(),
+                    duration_seconds: None,
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        // Simulate the HTTP handler's post-accept persistence by writing the
+        // record through the manager directly (the HTTP handler drives the
+        // same code path on real accept).
+        let rec = crate::institutional_effect::record_from_accepted_payload(
+            &prop_id.0,
+            &domain_id.0,
+            None,
+            &ProposalPayload::FreezeMember {
+                member: target.clone(),
+                reason: "audit".into(),
+                duration_seconds: None,
+            },
+            42,
+        )
+        .expect("FreezeMember must translate to a record");
+        mgr.record_institutional_effect(&rec).unwrap();
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        assert_eq!(trail.emitted_effects.len(), 1);
+        let surfaced = &trail.emitted_effects[0];
+        assert_eq!(surfaced.record.effect_kind, "freeze_member");
+        assert_eq!(
+            surfaced.record.target_did.as_deref(),
+            Some(target.to_string().as_str())
+        );
+        assert_eq!(surfaced.record.reason.as_deref(), Some("audit"));
+        // No dispatch evidence wired for freeze_member → emitted_only.
+        assert!(surfaced.dispatch_evidence.is_empty());
+        assert_eq!(
+            surfaced.reconciliation_status,
+            ReconciliationStatus::EmittedOnly
+        );
+    }
+
+    // ========================================================================
+    // Dispatch evidence + reconciliation status (governance → execution bridge)
+    // ========================================================================
+
+    #[tokio::test]
+    async fn dispatch_evidence_roundtrip_and_ordering_per_record() {
+        let (mgr, _domain, _member) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let older = EffectDispatchEvidence::new(
+            "rec-a",
+            "prop-1",
+            "sdis",
+            Some("state-hash-1".into()),
+            true,
+            None,
+            100,
+        );
+        let newer = EffectDispatchEvidence::new(
+            "rec-a",
+            "prop-1",
+            "sdis",
+            Some("state-hash-2".into()),
+            true,
+            None,
+            200,
+        );
+        // Unrelated record — must not leak into rec-a's list.
+        let other_record =
+            EffectDispatchEvidence::new("rec-b", "prop-2", "sdis", None, true, None, 150);
+
+        mgr.record_dispatch_evidence(&newer).unwrap();
+        mgr.record_dispatch_evidence(&older).unwrap();
+        mgr.record_dispatch_evidence(&other_record).unwrap();
+
+        let list = mgr.list_dispatch_evidence("rec-a").unwrap();
+        assert_eq!(list.len(), 2, "must scope by effect_record_id");
+        assert_eq!(list[0].recorded_at, 100, "oldest first");
+        assert_eq!(list[1].recorded_at, 200);
+        assert_eq!(list[0].receipt_ref.as_deref(), Some("state-hash-1"));
+    }
+
+    #[tokio::test]
+    async fn deliberation_surfaces_execution_evidenced_when_success_recorded() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let target = test_did(8);
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-evid".into()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Freeze".into(),
+                "r".into(),
+                ProposalPayload::FreezeMember {
+                    member: target.clone(),
+                    reason: "audit".into(),
+                    duration_seconds: None,
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        let rec = crate::institutional_effect::record_from_accepted_payload(
+            &prop_id.0,
+            &domain_id.0,
+            None,
+            &ProposalPayload::FreezeMember {
+                member: target.clone(),
+                reason: "audit".into(),
+                duration_seconds: None,
+            },
+            10,
+        )
+        .expect("must produce record");
+        let rec_id = rec.record_id.clone();
+        mgr.record_institutional_effect(&rec).unwrap();
+
+        mgr.record_dispatch_evidence(&EffectDispatchEvidence::new(
+            rec_id.clone(),
+            prop_id.0.clone(),
+            "commons",
+            Some("commons-receipt-abc".into()),
+            true,
+            None,
+            20,
+        ))
+        .unwrap();
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        assert_eq!(trail.emitted_effects.len(), 1);
+        let e = &trail.emitted_effects[0];
+        assert_eq!(e.dispatch_evidence.len(), 1);
+        assert_eq!(e.dispatch_evidence[0].subsystem, "commons");
+        assert_eq!(
+            e.reconciliation_status,
+            ReconciliationStatus::ExecutionEvidenced
+        );
+    }
+
+    #[tokio::test]
+    async fn deliberation_surfaces_execution_failed_with_subsystem_error() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let target = test_did(11);
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-evid-fail".into()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Freeze".into(),
+                "r".into(),
+                ProposalPayload::FreezeMember {
+                    member: target.clone(),
+                    reason: "audit".into(),
+                    duration_seconds: None,
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        let rec = crate::institutional_effect::record_from_accepted_payload(
+            &prop_id.0,
+            &domain_id.0,
+            None,
+            &ProposalPayload::FreezeMember {
+                member: target.clone(),
+                reason: "audit".into(),
+                duration_seconds: None,
+            },
+            10,
+        )
+        .unwrap();
+        let rec_id = rec.record_id.clone();
+        mgr.record_institutional_effect(&rec).unwrap();
+
+        // Subsystem reports failure, then a later success. Audit-discipline:
+        // failure should stick and the most recent failure message surfaces.
+        mgr.record_dispatch_evidence(&EffectDispatchEvidence::new(
+            rec_id.clone(),
+            prop_id.0.clone(),
+            "commons",
+            None,
+            false,
+            Some("member not found".into()),
+            20,
+        ))
+        .unwrap();
+        mgr.record_dispatch_evidence(&EffectDispatchEvidence::new(
+            rec_id.clone(),
+            prop_id.0.clone(),
+            "commons",
+            Some("later-hash".into()),
+            true,
+            None,
+            30,
+        ))
+        .unwrap();
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        let e = &trail.emitted_effects[0];
+        assert_eq!(e.dispatch_evidence.len(), 2);
+        match &e.reconciliation_status {
+            ReconciliationStatus::ExecutionFailed { error } => {
+                assert_eq!(error.as_deref(), Some("member not found"));
+            }
+            other => panic!("expected ExecutionFailed, got {other:?}"),
+        }
+    }
+
+    // ========================================================================
+    // Canonical acceptance-pipeline tests
+    //
+    // These prove that `apply_acceptance_effects` is the one authoritative
+    // emission path: it is idempotent on (proposal_id, effect_kind), works
+    // regardless of which call site invoked it, and is consistent with
+    // direct writes through `record_institutional_effect`. The goal is
+    // that force-accept (actor path) and normal-accept (HTTP path) produce
+    // the same durable artifacts.
+    // ========================================================================
+
+    use crate::institutional_effect::AcceptanceEmissionOutcome;
+
+    async fn make_freeze_proposal(
+        mgr: &GovernanceManager,
+        domain_id: &GovernanceDomainId,
+        proposer: &Did,
+        target: &Did,
+        id: &str,
+    ) -> icn_governance::Proposal {
+        let pid = mgr
+            .create_proposal(
+                ProposalId(id.to_string()),
+                domain_id.clone(),
+                proposer.clone(),
+                "Freeze".into(),
+                "reason".into(),
+                ProposalPayload::FreezeMember {
+                    member: target.clone(),
+                    reason: "audit".into(),
+                    duration_seconds: None,
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+        mgr.get_proposal(&pid).await.unwrap().unwrap()
+    }
+
+    #[tokio::test]
+    async fn apply_acceptance_effects_noop_without_receipt_store() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let target = test_did(42);
+        let proposal = make_freeze_proposal(&mgr, &domain_id, &member_did, &target, "p-noop").await;
+
+        let outcome = mgr
+            .apply_acceptance_effects(&proposal, None, 100)
+            .expect("apply_acceptance_effects must not error without a store");
+        assert_eq!(
+            outcome,
+            AcceptanceEmissionOutcome::NoEffect,
+            "with no receipt store wired, emission is NoEffect (and a no-op)"
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_acceptance_effects_emits_freeze_record_once() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let target = test_did(42);
+        let proposal = make_freeze_proposal(&mgr, &domain_id, &member_did, &target, "p-once").await;
+
+        let first = mgr
+            .apply_acceptance_effects(&proposal, Some([9u8; 32]), 100)
+            .unwrap();
+        let first_id = match first {
+            AcceptanceEmissionOutcome::Emitted { record_id } => record_id,
+            other => panic!("expected Emitted, got {other:?}"),
+        };
+
+        // Idempotence: second call on the same (proposal_id, effect_kind) is
+        // AlreadyEmitted with the same record_id and does not write again.
+        let second = mgr
+            .apply_acceptance_effects(&proposal, Some([9u8; 32]), 200)
+            .unwrap();
+        match second {
+            AcceptanceEmissionOutcome::AlreadyEmitted { record_id } => {
+                assert_eq!(
+                    record_id, first_id,
+                    "idempotent call must return same record_id"
+                );
+            }
+            other => panic!("expected AlreadyEmitted, got {other:?}"),
+        }
+
+        // Exactly one record persisted.
+        let records = mgr.list_institutional_effects(&proposal.id).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].effect_kind, "freeze_member");
+        assert_eq!(records[0].record_id, first_id);
+        // recorded_at is the first call's timestamp — second call did not overwrite.
+        assert_eq!(records[0].recorded_at, 100);
+    }
+
+    #[tokio::test]
+    async fn apply_acceptance_effects_returns_no_effect_for_unhandled_payload() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let pid = mgr
+            .create_proposal(
+                ProposalId("p-text".into()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Text".into(),
+                "body".into(),
+                ProposalPayload::Text { body: "hi".into() },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+        let proposal = mgr.get_proposal(&pid).await.unwrap().unwrap();
+
+        let outcome = mgr.apply_acceptance_effects(&proposal, None, 100).unwrap();
+        assert_eq!(outcome, AcceptanceEmissionOutcome::NoEffect);
+        assert!(mgr.list_institutional_effects(&pid).unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn apply_acceptance_effects_dedups_across_http_and_actor_callers() {
+        // Simulates the HTTP+actor double-invocation pattern: an actor-backed
+        // normal close emits first (actor call site), then the HTTP handler
+        // returns and calls emission again (HTTP call site). The second call
+        // MUST be AlreadyEmitted, not a second record. This is the property
+        // that makes the unified canonical path safe to enable on both sites.
+        let (mgr, domain_id, proposer) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+        let target = test_did(55);
+        let p = make_freeze_proposal(&mgr, &domain_id, &proposer, &target, "p-dedup").await;
+
+        // Actor call site: uses the gate-receipt decision hash.
+        let first = mgr
+            .apply_acceptance_effects(&p, Some([3u8; 32]), 1000)
+            .unwrap();
+        let first_id = first.record_id().unwrap().to_string();
+
+        // HTTP call site: uses the governance_receipt.decision_hash (same
+        // hash in production since both compute GovernanceDecisionReceipt
+        // from the same inputs). The dedup key is (proposal_id, effect_kind)
+        // so AlreadyEmitted even if decision_hash differed.
+        let second = mgr
+            .apply_acceptance_effects(&p, Some([3u8; 32]), 2000)
+            .unwrap();
+        assert!(
+            matches!(second, AcceptanceEmissionOutcome::AlreadyEmitted { .. }),
+            "HTTP-after-actor invocation must dedup to AlreadyEmitted, got {second:?}"
+        );
+        assert_eq!(second.record_id(), Some(first_id.as_str()));
+        let records = mgr.list_institutional_effects(&p.id).unwrap();
+        assert_eq!(records.len(), 1, "exactly one record after both callers");
+    }
+
+    #[tokio::test]
+    async fn apply_acceptance_effects_emits_same_record_semantics_regardless_of_caller() {
+        // Proves path-agnostic semantics: whether the caller is the HTTP
+        // handler (normal accept) or the actor's force-close branch, the
+        // resulting InstitutionalEffectRecord has identical effect_kind,
+        // target_did, reason, and payload shape for the same payload.
+        let (mgr, domain_id, proposer) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let target = test_did(77);
+        let p_normal = make_freeze_proposal(&mgr, &domain_id, &proposer, &target, "p-normal").await;
+        let p_forced = make_freeze_proposal(&mgr, &domain_id, &proposer, &target, "p-forced").await;
+
+        // Simulate the HTTP normal-accept caller.
+        mgr.apply_acceptance_effects(&p_normal, Some([1u8; 32]), 1000)
+            .unwrap();
+        // Simulate the actor force-accept caller (distinct decision_hash because
+        // the force-close constructs VoteTally::empty()).
+        mgr.apply_acceptance_effects(&p_forced, Some([2u8; 32]), 2000)
+            .unwrap();
+
+        let r_normal = &mgr.list_institutional_effects(&p_normal.id).unwrap()[0];
+        let r_forced = &mgr.list_institutional_effects(&p_forced.id).unwrap()[0];
+
+        assert_eq!(r_normal.effect_kind, r_forced.effect_kind);
+        assert_eq!(r_normal.target_did, r_forced.target_did);
+        assert_eq!(r_normal.reason, r_forced.reason);
+        // Payload JSON shape must match exactly (duration_seconds, reason, member).
+        assert_eq!(r_normal.payload, r_forced.payload);
+        // decision_hash distinguishes the two receipts (expected and honest).
+        assert_ne!(r_normal.decision_hash, r_forced.decision_hash);
+    }
+
+    /// Regression guard for the deliberation sort key.
+    ///
+    /// Prior sort key `(started_at.unwrap_or(MAX), scheduled_at.unwrap_or(MAX))`
+    /// always pushed entries without `started_at` to the end, even when their
+    /// `scheduled_at` placed them earlier in the timeline. The corrected key
+    /// uses `started_at.or(scheduled_at)` for the primary slot so a meeting
+    /// that was scheduled but never started is interleaved correctly with
+    /// meetings that did start.
+    #[test]
+    fn deliberation_sort_interleaves_scheduled_only_entries() {
+        use icn_governance::{AgendaItemId, MeetingId, MeetingStatus};
+
+        fn entry(
+            id: &str,
+            started_at: Option<u64>,
+            scheduled_at: Option<u64>,
+        ) -> DeliberationMeetingEntry {
+            DeliberationMeetingEntry {
+                meeting_id: MeetingId(id.to_string()),
+                meeting_title: id.to_string(),
+                meeting_status: MeetingStatus::Scheduled,
+                scheduled_at,
+                started_at,
+                ended_at: None,
+                agenda_item_id: AgendaItemId(uuid::Uuid::nil()),
+                agenda_item_title: String::new(),
+                presenter: None,
+                discussion_notes: None,
+                outcome: None,
+                generated_action_items: vec![],
+            }
+        }
+
+        // Three meetings:
+        //   A: started_at = 2000
+        //   B: scheduled_at = 1000, no started_at
+        //   C: started_at = 3000
+        // By effective-timestamp ordering the sequence must be B (1000),
+        // A (2000), C (3000). The old key would have produced A, C, B —
+        // pushing B to the end because its `started_at` was None.
+        let mut xs = vec![
+            entry("A", Some(2000), None),
+            entry("B", None, Some(1000)),
+            entry("C", Some(3000), None),
+        ];
+        xs.sort_by_key(|e| {
+            (
+                e.started_at.or(e.scheduled_at).unwrap_or(u64::MAX),
+                e.scheduled_at.unwrap_or(u64::MAX),
+            )
+        });
+        let ids: Vec<&str> = xs.iter().map(|e| e.meeting_title.as_str()).collect();
+        assert_eq!(ids, vec!["B", "A", "C"]);
+    }
+
+    #[tokio::test]
+    async fn deliberation_effect_kind_labels_freeze_member() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let target = test_did(42);
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-freeze".to_string()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Freeze".to_string(),
+                "Reason".to_string(),
+                ProposalPayload::FreezeMember {
+                    member: target,
+                    reason: "cause".to_string(),
+                    duration_seconds: None,
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        assert_eq!(trail.effect_kind, "freeze_member");
+        assert_eq!(trail.payload_type, "freeze_member");
     }
 
     // ========================================================================

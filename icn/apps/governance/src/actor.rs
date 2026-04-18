@@ -538,6 +538,26 @@ impl GovernanceHandle {
         self
     }
 
+    /// Attach the receipt backend used to persist `InstitutionalEffectRecord`
+    /// on proposal acceptance.
+    ///
+    /// With this wired, the actor's `CloseProposal` and `ForceCloseProposal`
+    /// accept branches call the canonical emission path. Without it, those
+    /// branches still fire their SystemEvent and materialize action items
+    /// but emit no institutional record — leaving acceptance artifacts only
+    /// to the HTTP close handler's post-actor emission (which does not run
+    /// for actor-only force-close). Wire this for any deployment where
+    /// force-accept must produce the same audit trail as normal accept.
+    pub fn with_receipt_store(
+        self,
+        store: Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>,
+    ) -> Self {
+        if let Ok(mut actor) = self.inner.try_write() {
+            actor.receipt_store = Some(store);
+        }
+        self
+    }
+
     /// List all protocol parameters
     pub fn list_protocol_parameters(&self) -> Result<Vec<ProtocolParameter>> {
         match &self.protocol_params {
@@ -1145,6 +1165,13 @@ pub struct GovernanceActor {
     /// When present, proposals with `action_items_on_accept` specs will auto-create
     /// linked action items on acceptance (decision-to-action bridge).
     action_item_store: Option<Arc<dyn icn_governance::ActionItemStoreBackend>>,
+    /// Optional receipt backend for emitting `InstitutionalEffectRecord` on
+    /// proposal acceptance. When wired, the actor calls the canonical
+    /// emission path (same as the HTTP handler) from both `CloseProposal`
+    /// and `ForceCloseProposal` accept branches. Idempotence on
+    /// (proposal_id, effect_kind) keeps this safe when the HTTP handler
+    /// also invokes emission after the actor-backed close returns.
+    receipt_store: Option<Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>>,
 }
 
 impl GovernanceActor {
@@ -1221,6 +1248,7 @@ impl GovernanceActor {
             signing_key,
             executor: None,
             action_item_store: None,
+            receipt_store: None,
         };
 
         // Slot for the scheduler task JoinHandle; filled in after spawn.
@@ -2033,6 +2061,55 @@ impl GovernanceActor {
                     }
                 }
 
+                // Canonical institutional-effect emission for actor-backed
+                // normal close. Idempotent on (proposal_id, effect_kind), so
+                // the HTTP close handler's post-actor emission will return
+                // AlreadyEmitted rather than duplicate. When no receipt store
+                // is wired, emission is a no-op and the HTTP handler remains
+                // the sole writer.
+                if matches!(outcome_result, DecisionOutcome::Accepted) {
+                    if let Some(ref store) = self.receipt_store {
+                        let decision_hash_bytes: Option<icn_kernel_api::receipts::Hash> = {
+                            use icn_governance::proof::ProofOutcome;
+                            let receipt = GovernanceDecisionReceipt::new(
+                                proposal_id.0.clone(),
+                                proposal.domain_id.0.clone(),
+                                ProofOutcome::Accepted,
+                                tally.clone(),
+                                &votes,
+                            );
+                            Some(receipt.decision_hash)
+                        };
+                        match crate::institutional_effect::emit_accepted_effect(
+                            store.as_ref(),
+                            &proposal_id.0,
+                            &proposal.domain_id.0,
+                            decision_hash_bytes,
+                            &proposal.payload,
+                            now,
+                        ) {
+                            Ok(
+                                crate::institutional_effect::AcceptanceEmissionOutcome::Emitted {
+                                    ..
+                                },
+                            ) => {
+                                debug!(
+                                    proposal_id = %proposal_id.0,
+                                    "Actor emitted InstitutionalEffectRecord"
+                                );
+                            }
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!(
+                                    proposal_id = %proposal_id.0,
+                                    error = %e,
+                                    "Actor failed to emit InstitutionalEffectRecord (non-fatal)"
+                                );
+                            }
+                        }
+                    }
+                }
+
                 info!(
                     "✓ Proposal closed: {} ({:?})",
                     proposal_id.0, outcome_result
@@ -2178,6 +2255,56 @@ impl GovernanceActor {
                     if let Some(ref store) = self.action_item_store {
                         let now = now_seconds();
                         Self::materialize_action_items(store, &proposal, &proposal_id, now);
+                    }
+                }
+
+                // Canonical institutional-effect emission for force-accepted
+                // proposals. This closes the historical divergence where
+                // force-accept produced no InstitutionalEffectRecord while
+                // normal accept did. Uses the same translation helper so
+                // audit semantics are path-agnostic. Idempotent on
+                // (proposal_id, effect_kind).
+                if matches!(forced_outcome, ForcedOutcome::Accept) {
+                    if let Some(ref store) = self.receipt_store {
+                        let now = now_seconds();
+                        let decision_hash_bytes: Option<icn_kernel_api::receipts::Hash> = {
+                            use icn_governance::proof::ProofOutcome;
+                            let receipt = GovernanceDecisionReceipt::new(
+                                proposal_id.0.clone(),
+                                proposal.domain_id.0.clone(),
+                                ProofOutcome::Accepted,
+                                VoteTally::empty(),
+                                &[],
+                            );
+                            Some(receipt.decision_hash)
+                        };
+                        match crate::institutional_effect::emit_accepted_effect(
+                            store.as_ref(),
+                            &proposal_id.0,
+                            &proposal.domain_id.0,
+                            decision_hash_bytes,
+                            &proposal.payload,
+                            now,
+                        ) {
+                            Ok(
+                                crate::institutional_effect::AcceptanceEmissionOutcome::Emitted {
+                                    ..
+                                },
+                            ) => {
+                                debug!(
+                                    proposal_id = %proposal_id.0,
+                                    "Force-accept emitted InstitutionalEffectRecord"
+                                );
+                            }
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!(
+                                    proposal_id = %proposal_id.0,
+                                    error = %e,
+                                    "Force-accept failed to emit InstitutionalEffectRecord (non-fatal)"
+                                );
+                            }
+                        }
                     }
                 }
 

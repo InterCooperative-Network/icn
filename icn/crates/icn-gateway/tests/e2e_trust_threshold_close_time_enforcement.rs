@@ -173,6 +173,7 @@ async fn build_app_with_trust_resolver(
         emitter: NoopEventEmitter,
         on_charter_accepted: None,
         on_proposal_accepted: None,
+        on_proposal_accepted_with_evidence: None,
         member_checker: None,
         steward_checker: None,
         suspension_checker: Some(suspension_checker),

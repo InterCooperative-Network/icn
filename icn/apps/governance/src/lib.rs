@@ -25,20 +25,27 @@
 //! [`ProtocolExecutor`]: icn_kernel_api::governance::ProtocolExecutor
 
 pub mod actor;
+pub mod dispatch_evidence;
 pub mod events;
 pub mod executor;
 pub mod handlers;
 pub mod http;
 pub mod init;
+pub mod institutional_effect;
 pub mod manager;
 pub mod receipt_backend;
 pub mod registry;
 pub mod state_store;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
+pub use dispatch_evidence::{
+    derive_reconciliation_status, reconciliation_label, EffectDispatchEvidence,
+    ReconciliationStatus,
+};
 pub use events::{GovernanceEventEmitter, NoopEventEmitter};
 pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
 pub use handlers::translate_payload_to_effects;
+pub use institutional_effect::InstitutionalEffectRecord;
 pub use manager::{
     DigestSummary, GovernanceManager, InMemoryMilestoneEventLog, InMemoryProgramEventLog,
     MilestoneEvent, MilestoneEventLogBackend, OverdueItemDigest, PendingVoteDigest, ProgramEvent,
