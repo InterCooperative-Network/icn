@@ -371,6 +371,11 @@ where
                 .route(web::get().to(handlers::list_milestones_by_program::<E>)),
         )
         .service(
+            web::resource("/programs/{program_id}/activities/{activity_id}")
+                .route(web::put().to(handlers::link_activity_to_program::<E>))
+                .route(web::delete().to(handlers::unlink_activity_from_program::<E>)),
+        )
+        .service(
             web::resource("/milestones/{milestone_id}")
                 .route(web::get().to(handlers::get_milestone::<E>))
                 .route(web::patch().to(handlers::update_milestone_status::<E>)),

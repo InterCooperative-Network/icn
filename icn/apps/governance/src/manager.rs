@@ -3977,6 +3977,14 @@ impl GovernanceManager {
     // ========================================================================
 
     /// Create a new activity owned by an entity.
+    ///
+    /// If `parent_program_id` is `Some`, the new activity is registered on the
+    /// program's forward-link list (`program.activities`) in addition to having
+    /// its own `parent_program_id` set. This keeps both sides of the
+    /// Program↔Activity relationship in sync from the moment of creation.
+    ///
+    /// If the referenced program does not exist the activity is still created
+    /// (soft-reference semantics) but the forward-link update is skipped.
     pub fn create_activity(
         &self,
         parent_entity_id: String,
@@ -3999,11 +4007,146 @@ impl GovernanceManager {
         a.description = description;
         a.start_date = start_date;
         a.end_date = end_date;
-        a.parent_program_id = parent_program_id;
+        a.parent_program_id = parent_program_id.clone();
         self.activity_store
             .save(&a)
             .map_err(|e| anyhow::anyhow!("Failed to save activity: {e}"))?;
+
+        // Keep Program.activities forward list in sync with the reverse link.
+        if let Some(prog_id) = &parent_program_id {
+            if let Some(mut p) = self
+                .program_store
+                .get(prog_id)
+                .map_err(|e| anyhow::anyhow!("Failed to look up program: {e}"))?
+            {
+                if !p.activities.contains(&a.id) {
+                    p.activities.push(a.id.clone());
+                    self.program_store
+                        .save(&p)
+                        .map_err(|e| anyhow::anyhow!("Failed to update program activities: {e}"))?;
+                }
+            }
+            // Program not found → soft-reference, activity still created.
+        }
+
         Ok(a)
+    }
+
+    /// Link an existing activity to a program, keeping both sides in sync.
+    ///
+    /// Idempotent when the relationship already exists.
+    ///
+    /// If the activity is currently linked to a *different* program, this
+    /// performs a move: the activity ID is removed from the previous
+    /// program's `activities` list before the new forward link is written.
+    /// That preserves the single-parent invariant across Program↔Activity.
+    ///
+    /// Errors if either the program or the activity does not exist.
+    pub fn link_activity_to_program(
+        &self,
+        program_id: &ProgramId,
+        activity_id: &ActivityId,
+    ) -> Result<()> {
+        let mut p = self
+            .program_store
+            .get(program_id)
+            .map_err(|e| anyhow::anyhow!("Failed to look up program: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Program not found: {program_id}"))?;
+
+        let mut a = self
+            .activity_store
+            .get(activity_id)
+            .map_err(|e| anyhow::anyhow!("Failed to look up activity: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Activity not found: {activity_id}"))?;
+
+        // If moving from a different program, remove the stale forward link
+        // on the old program first so it does not claim the activity.
+        if let Some(old_program_id) = a.parent_program_id.clone() {
+            if &old_program_id != program_id {
+                if let Some(mut old_p) = self
+                    .program_store
+                    .get(&old_program_id)
+                    .map_err(|e| anyhow::anyhow!("Failed to look up old program: {e}"))?
+                {
+                    if old_p.activities.contains(activity_id) {
+                        old_p.activities.retain(|id| id != activity_id);
+                        self.program_store.save(&old_p).map_err(|e| {
+                            anyhow::anyhow!("Failed to update old program activities: {e}")
+                        })?;
+                    }
+                }
+            }
+        }
+
+        // Forward link: program → activity
+        if !p.activities.contains(activity_id) {
+            p.activities.push(activity_id.clone());
+            self.program_store
+                .save(&p)
+                .map_err(|e| anyhow::anyhow!("Failed to update program activities: {e}"))?;
+        }
+
+        // Reverse link: activity → program
+        if a.parent_program_id.as_ref() != Some(program_id) {
+            a.parent_program_id = Some(program_id.clone());
+            self.activity_store
+                .save(&a)
+                .map_err(|e| anyhow::anyhow!("Failed to update activity parent: {e}"))?;
+        }
+
+        Ok(())
+    }
+
+    /// Remove the link between an activity and a program, clearing both sides.
+    ///
+    /// Returns `true` if either side changed (forward list entry removed or
+    /// reverse `parent_program_id` cleared), `false` if neither side needed
+    /// updating. This deliberately handles the legacy / inconsistent case
+    /// where only the reverse link was set (pre-consistency-fix records):
+    /// the reverse link is always cleared if it points at `program_id`,
+    /// even when the forward list has no entry.
+    ///
+    /// Errors if the program does not exist.
+    pub fn unlink_activity_from_program(
+        &self,
+        program_id: &ProgramId,
+        activity_id: &ActivityId,
+    ) -> Result<bool> {
+        let mut p = self
+            .program_store
+            .get(program_id)
+            .map_err(|e| anyhow::anyhow!("Failed to look up program: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Program not found: {program_id}"))?;
+
+        let mut changed = false;
+
+        // Forward link: remove from program if present
+        if p.activities.contains(activity_id) {
+            p.activities.retain(|id| id != activity_id);
+            self.program_store
+                .save(&p)
+                .map_err(|e| anyhow::anyhow!("Failed to update program activities: {e}"))?;
+            changed = true;
+        }
+
+        // Reverse link: clear on activity when it points to this program,
+        // regardless of whether the forward list had an entry. This cleans
+        // up legacy records that set only one direction.
+        if let Some(mut a) = self
+            .activity_store
+            .get(activity_id)
+            .map_err(|e| anyhow::anyhow!("Failed to look up activity: {e}"))?
+        {
+            if a.parent_program_id.as_ref() == Some(program_id) {
+                a.parent_program_id = None;
+                self.activity_store
+                    .save(&a)
+                    .map_err(|e| anyhow::anyhow!("Failed to clear activity parent: {e}"))?;
+                changed = true;
+            }
+        }
+
+        Ok(changed)
     }
 
     /// Get an activity by ID.
@@ -5343,5 +5486,503 @@ mod tests {
             1,
             "new assignee must appear in index"
         );
+    }
+
+    // =========================================================================
+    // Program ↔ Activity consistency tests
+    // =========================================================================
+
+    /// `create_activity` with a valid `parent_program_id` must add the new
+    /// activity's ID into `Program.activities` immediately.
+    #[tokio::test]
+    async fn create_activity_with_parent_program_id_updates_forward_list() {
+        let (mgr, domain_id, _member) = make_manager_with_domain().await;
+
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "Prog".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        assert!(
+            prog.activities.is_empty(),
+            "fresh program has no activities"
+        );
+
+        let act = mgr
+            .create_activity(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "Act A".to_string(),
+                None,
+                None,
+                None,
+                Some(prog.id.clone()),
+            )
+            .unwrap();
+
+        let reloaded = mgr.get_program(&prog.id).unwrap().unwrap();
+        assert!(
+            reloaded.activities.contains(&act.id),
+            "program.activities must contain the new activity id"
+        );
+    }
+
+    /// If the referenced program does not exist, `create_activity` must still
+    /// succeed (soft-reference semantics, consistent with milestone behavior).
+    #[tokio::test]
+    async fn create_activity_program_not_found_still_succeeds() {
+        let (mgr, _domain_id, _member) = make_manager_with_domain().await;
+
+        let ghost_program_id = ProgramId::generate();
+
+        let act = mgr
+            .create_activity(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "Orphan Act".to_string(),
+                None,
+                None,
+                None,
+                Some(ghost_program_id.clone()),
+            )
+            .unwrap();
+
+        // Activity was created and carries the reverse link.
+        assert_eq!(act.parent_program_id.as_ref(), Some(&ghost_program_id));
+    }
+
+    /// `link_activity_to_program` must write both directions: program gains the
+    /// activity ID and the activity gains the program ID.
+    #[tokio::test]
+    async fn link_activity_to_program_both_sides_updated() {
+        let (mgr, domain_id, _member) = make_manager_with_domain().await;
+
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "P".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Activity created WITHOUT a parent — no forward/reverse link yet.
+        let act = mgr
+            .create_activity(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "A".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        assert!(act.parent_program_id.is_none());
+
+        mgr.link_activity_to_program(&prog.id, &act.id).unwrap();
+
+        let p2 = mgr.get_program(&prog.id).unwrap().unwrap();
+        let a2 = mgr.get_activity(&act.id).unwrap().unwrap();
+        assert!(p2.activities.contains(&act.id), "forward link must exist");
+        assert_eq!(
+            a2.parent_program_id.as_ref(),
+            Some(&prog.id),
+            "reverse link must exist"
+        );
+    }
+
+    /// `link_activity_to_program` must be a no-op (not an error) when the
+    /// relationship already exists.
+    #[tokio::test]
+    async fn link_activity_to_program_idempotent() {
+        let (mgr, domain_id, _member) = make_manager_with_domain().await;
+
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "P".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let act = mgr
+            .create_activity(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "A".to_string(),
+                None,
+                None,
+                None,
+                Some(prog.id.clone()),
+            )
+            .unwrap();
+
+        // Link again — must not error or duplicate the ID in the list.
+        mgr.link_activity_to_program(&prog.id, &act.id).unwrap();
+        mgr.link_activity_to_program(&prog.id, &act.id).unwrap();
+
+        let p2 = mgr.get_program(&prog.id).unwrap().unwrap();
+        let occurrences = p2.activities.iter().filter(|id| *id == &act.id).count();
+        assert_eq!(occurrences, 1, "activity id must appear exactly once");
+    }
+
+    /// `link_activity_to_program` must return an error when the activity does
+    /// not exist.
+    #[tokio::test]
+    async fn link_activity_to_program_activity_not_found_errors() {
+        let (mgr, domain_id, _member) = make_manager_with_domain().await;
+
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "P".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let ghost = ActivityId::generate();
+        let result = mgr.link_activity_to_program(&prog.id, &ghost);
+        assert!(result.is_err(), "linking non-existent activity must error");
+    }
+
+    /// `unlink_activity_from_program` must remove both directions.
+    #[tokio::test]
+    async fn unlink_activity_from_program_both_sides_cleared() {
+        let (mgr, domain_id, _member) = make_manager_with_domain().await;
+
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "P".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let act = mgr
+            .create_activity(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "A".to_string(),
+                None,
+                None,
+                None,
+                Some(prog.id.clone()),
+            )
+            .unwrap();
+
+        // Verify both sides are set before unlinking.
+        let p1 = mgr.get_program(&prog.id).unwrap().unwrap();
+        assert!(p1.activities.contains(&act.id));
+
+        let was_linked = mgr.unlink_activity_from_program(&prog.id, &act.id).unwrap();
+        assert!(was_linked, "must return true when actually unlinked");
+
+        let p2 = mgr.get_program(&prog.id).unwrap().unwrap();
+        let a2 = mgr.get_activity(&act.id).unwrap().unwrap();
+        assert!(
+            !p2.activities.contains(&act.id),
+            "forward link must be removed"
+        );
+        assert!(
+            a2.parent_program_id.is_none(),
+            "reverse link must be cleared"
+        );
+    }
+
+    /// `unlink_activity_from_program` must return `false` (not an error) when
+    /// the activity is not linked to that program.
+    #[tokio::test]
+    async fn unlink_activity_not_linked_returns_false() {
+        let (mgr, domain_id, _member) = make_manager_with_domain().await;
+
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "P".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let act = mgr
+            .create_activity(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "A".to_string(),
+                None,
+                None,
+                None,
+                None, // not linked to prog
+            )
+            .unwrap();
+
+        let was_linked = mgr.unlink_activity_from_program(&prog.id, &act.id).unwrap();
+        assert!(!was_linked, "must return false when not linked");
+    }
+
+    /// Relinking an activity to a different program must move both directions
+    /// atomically: old program loses the ID, new program gains it, and the
+    /// activity's reverse link points to the new program.
+    #[tokio::test]
+    async fn relink_to_different_program_updates_both() {
+        let (mgr, domain_id, _member) = make_manager_with_domain().await;
+
+        let prog_a = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "Prog A".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let prog_b = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "Prog B".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let act = mgr
+            .create_activity(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "Migrating Act".to_string(),
+                None,
+                None,
+                None,
+                Some(prog_a.id.clone()),
+            )
+            .unwrap();
+
+        // Unlink from A, link to B.
+        mgr.unlink_activity_from_program(&prog_a.id, &act.id)
+            .unwrap();
+        mgr.link_activity_to_program(&prog_b.id, &act.id).unwrap();
+
+        let pa = mgr.get_program(&prog_a.id).unwrap().unwrap();
+        let pb = mgr.get_program(&prog_b.id).unwrap().unwrap();
+        let a2 = mgr.get_activity(&act.id).unwrap().unwrap();
+
+        assert!(
+            !pa.activities.contains(&act.id),
+            "prog_a must no longer contain the activity"
+        );
+        assert!(
+            pb.activities.contains(&act.id),
+            "prog_b must contain the activity"
+        );
+        assert_eq!(
+            a2.parent_program_id.as_ref(),
+            Some(&prog_b.id),
+            "activity reverse link must point to prog_b"
+        );
+    }
+
+    /// After `create_activity` with a `parent_program_id`, the dashboard for
+    /// that program must include the activity via the forward list alone — no
+    /// reverse-scan-only rescue needed for newly created activities.
+    #[tokio::test]
+    async fn dashboard_sees_activity_via_forward_link_immediately() {
+        let (mgr, domain_id, _member) = make_manager_with_domain().await;
+
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "FwdProg".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let act = mgr
+            .create_activity(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "FwdAct".to_string(),
+                None,
+                None,
+                None,
+                Some(prog.id.clone()),
+            )
+            .unwrap();
+
+        // Verify forward link is set — the dashboard does not rely on the
+        // reverse scan to discover this activity.
+        let p = mgr.get_program(&prog.id).unwrap().unwrap();
+        assert!(
+            p.activities.contains(&act.id),
+            "forward link must be set immediately after create_activity"
+        );
+
+        // Dashboard must include the activity.
+        let dash = mgr
+            .get_program_dashboard(&prog.id)
+            .unwrap()
+            .expect("program must exist");
+        assert!(
+            dash.activities.iter().any(|a| a.id == act.id),
+            "dashboard must expose the activity"
+        );
+    }
+
+    /// Legacy / pre-consistency-fix data: the activity's reverse link points at
+    /// `program_id`, but the program's forward list does NOT contain the
+    /// activity. `unlink_activity_from_program` must still clear the reverse
+    /// link and report that a change occurred.
+    #[tokio::test]
+    async fn unlink_clears_reverse_only_legacy_link() {
+        let (mgr, domain_id, _member) = make_manager_with_domain().await;
+
+        let prog = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "P".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let mut act = mgr
+            .create_activity(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "Legacy".to_string(),
+                None,
+                None,
+                None,
+                None, // not initially linked
+            )
+            .unwrap();
+
+        // Simulate legacy inconsistent state: reverse set but forward missing.
+        act.parent_program_id = Some(prog.id.clone());
+        mgr.activity_store.save(&act).unwrap();
+        let p_before = mgr.get_program(&prog.id).unwrap().unwrap();
+        assert!(
+            !p_before.activities.contains(&act.id),
+            "precondition: forward list must be empty"
+        );
+
+        let changed = mgr.unlink_activity_from_program(&prog.id, &act.id).unwrap();
+        assert!(
+            changed,
+            "unlink must report change even when only reverse link existed"
+        );
+
+        let a_after = mgr.get_activity(&act.id).unwrap().unwrap();
+        assert!(
+            a_after.parent_program_id.is_none(),
+            "reverse link must be cleared for legacy records"
+        );
+    }
+
+    /// Directly relinking an activity (without calling unlink first) must
+    /// remove the activity ID from the previous program's forward list so
+    /// no program holds a stale entry.
+    #[tokio::test]
+    async fn link_moves_activity_between_programs() {
+        let (mgr, domain_id, _member) = make_manager_with_domain().await;
+
+        let prog_a = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "A".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        let prog_b = mgr
+            .create_program(
+                domain_id.clone(),
+                "ent-1".to_string(),
+                ProgramKind::Cycle,
+                "B".to_string(),
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let act = mgr
+            .create_activity(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "Mover".to_string(),
+                None,
+                None,
+                None,
+                Some(prog_a.id.clone()),
+            )
+            .unwrap();
+
+        // Link directly to B without calling unlink first.
+        mgr.link_activity_to_program(&prog_b.id, &act.id).unwrap();
+
+        let pa = mgr.get_program(&prog_a.id).unwrap().unwrap();
+        let pb = mgr.get_program(&prog_b.id).unwrap().unwrap();
+        let a2 = mgr.get_activity(&act.id).unwrap().unwrap();
+        assert!(
+            !pa.activities.contains(&act.id),
+            "prog_a must lose the stale forward entry"
+        );
+        assert!(pb.activities.contains(&act.id));
+        assert_eq!(a2.parent_program_id.as_ref(), Some(&prog_b.id));
     }
 }
