@@ -1332,28 +1332,41 @@ impl MilestoneEventLogBackend for InMemoryMilestoneEventLog {
 /// Sled-backed append-only log for milestone status transitions.
 ///
 /// Key scheme:
-///   `milestone_event:{milestone_id}:{changed_at:020}:{uuid}`
+///   `milestone_event:{milestone_id}:{changed_at:020}:{seq:020}:{uuid}`
 ///
 /// The timestamp is zero-padded to 20 digits so lexicographic scan order
-/// matches chronological order. The UUID suffix ensures uniqueness within
-/// the same second (rare in practice, but correct).
+/// matches chronological order. A monotonically increasing per-process
+/// sequence number (`seq`) is appended so two appends in the same second
+/// retain insertion order regardless of UUID byte layout. The UUID suffix
+/// ensures uniqueness across process restarts (where `seq` resets to 0).
 ///
 /// Scan prefix: `milestone_event:{milestone_id}:` — yields all events for
 /// a milestone, in chronological order.
+///
+/// **ID-boundary note**: `MilestoneId::from_raw` allows `:` inside the id,
+/// so `scan_prefix` alone could return keys for `m1:child` when asked for
+/// `m1`. `list_by_milestone` therefore also checks the decoded
+/// `event.milestone_id` equals the requested id before returning.
 pub struct SledMilestoneEventLog {
     db: Arc<sled::Db>,
+    seq: std::sync::atomic::AtomicU64,
 }
 
 impl SledMilestoneEventLog {
     pub fn new(db: Arc<sled::Db>) -> Self {
-        Self { db }
+        Self {
+            db,
+            seq: std::sync::atomic::AtomicU64::new(0),
+        }
     }
 
-    fn event_key(milestone_id: &MilestoneId, changed_at: u64) -> String {
+    fn event_key(&self, milestone_id: &MilestoneId, changed_at: u64) -> String {
+        let seq = self.seq.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         format!(
-            "milestone_event:{}:{:020}:{}",
+            "milestone_event:{}:{:020}:{:020}:{}",
             milestone_id.0,
             changed_at,
+            seq,
             uuid::Uuid::new_v4()
         )
     }
@@ -1365,7 +1378,7 @@ impl SledMilestoneEventLog {
 
 impl MilestoneEventLogBackend for SledMilestoneEventLog {
     fn append(&self, event: &MilestoneEvent) -> std::result::Result<(), GovernanceError> {
-        let key = Self::event_key(&event.milestone_id, event.changed_at);
+        let key = self.event_key(&event.milestone_id, event.changed_at);
         let value = icn_encoding::encode_versioned(event).map_err(|e| {
             GovernanceError::Internal(format!("Failed to encode milestone event: {e}"))
         })?;
@@ -1380,20 +1393,25 @@ impl MilestoneEventLogBackend for SledMilestoneEventLog {
         milestone_id: &MilestoneId,
     ) -> std::result::Result<Vec<MilestoneEvent>, GovernanceError> {
         let prefix = Self::events_prefix(milestone_id);
-        let mut events = Vec::new();
+        // (changed_at, key_bytes) tuple preserves same-second insertion order
+        // via the `seq` component encoded in the key.
+        let mut rows: Vec<(u64, Vec<u8>, MilestoneEvent)> = Vec::new();
         for result in self.db.scan_prefix(prefix.as_bytes()) {
-            let (_key, value) = result.map_err(|e| {
+            let (key, value) = result.map_err(|e| {
                 GovernanceError::Internal(format!("Sled scan (event log) failed: {e}"))
             })?;
             let event: MilestoneEvent = icn_encoding::decode_versioned(&value).map_err(|e| {
                 GovernanceError::Internal(format!("Failed to decode milestone event: {e}"))
             })?;
-            events.push(event);
+            // Guard against `:` inside milestone_id producing prefix collisions
+            // (e.g. `m1:child` matching a scan for `m1`).
+            if &event.milestone_id != milestone_id {
+                continue;
+            }
+            rows.push((event.changed_at, key.to_vec(), event));
         }
-        // Sled scans in key order; since keys are zero-padded-timestamp-first,
-        // this is already chronological. Sort defensively for correctness.
-        events.sort_by_key(|e| e.changed_at);
-        Ok(events)
+        rows.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        Ok(rows.into_iter().map(|(_, _, e)| e).collect())
     }
 }
 
@@ -1480,28 +1498,41 @@ impl ProgramEventLogBackend for InMemoryProgramEventLog {
 /// Sled-backed append-only log for program status transitions.
 ///
 /// Key scheme:
-///   `program_event:{program_id}:{changed_at:020}:{uuid}`
+///   `program_event:{program_id}:{changed_at:020}:{seq:020}:{uuid}`
 ///
 /// The timestamp is zero-padded to 20 digits so lexicographic scan order
-/// matches chronological order. The UUID suffix ensures uniqueness within
-/// the same second.
+/// matches chronological order. A monotonically increasing per-process
+/// sequence number (`seq`) is appended so two appends in the same second
+/// retain insertion order. The UUID suffix ensures uniqueness across
+/// process restarts (where `seq` resets to 0).
 ///
 /// Scan prefix: `program_event:{program_id}:` — yields all events for a
 /// program in chronological order.
+///
+/// **ID-boundary note**: `ProgramId::from_raw` allows `:` inside the id,
+/// so `scan_prefix` alone could return keys for `p1:child` when asked for
+/// `p1`. `list_by_program` therefore also checks the decoded
+/// `event.program_id` equals the requested id before returning.
 pub struct SledProgramEventLog {
     db: Arc<sled::Db>,
+    seq: std::sync::atomic::AtomicU64,
 }
 
 impl SledProgramEventLog {
     pub fn new(db: Arc<sled::Db>) -> Self {
-        Self { db }
+        Self {
+            db,
+            seq: std::sync::atomic::AtomicU64::new(0),
+        }
     }
 
-    fn event_key(program_id: &ProgramId, changed_at: u64) -> String {
+    fn event_key(&self, program_id: &ProgramId, changed_at: u64) -> String {
+        let seq = self.seq.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         format!(
-            "program_event:{}:{:020}:{}",
+            "program_event:{}:{:020}:{:020}:{}",
             program_id.0,
             changed_at,
+            seq,
             uuid::Uuid::new_v4()
         )
     }
@@ -1513,7 +1544,7 @@ impl SledProgramEventLog {
 
 impl ProgramEventLogBackend for SledProgramEventLog {
     fn append(&self, event: &ProgramEvent) -> std::result::Result<(), GovernanceError> {
-        let key = Self::event_key(&event.program_id, event.changed_at);
+        let key = self.event_key(&event.program_id, event.changed_at);
         let value = icn_encoding::encode_versioned(event).map_err(|e| {
             GovernanceError::Internal(format!("Failed to encode program event: {e}"))
         })?;
@@ -1528,18 +1559,21 @@ impl ProgramEventLogBackend for SledProgramEventLog {
         program_id: &ProgramId,
     ) -> std::result::Result<Vec<ProgramEvent>, GovernanceError> {
         let prefix = Self::events_prefix(program_id);
-        let mut events = Vec::new();
+        let mut rows: Vec<(u64, Vec<u8>, ProgramEvent)> = Vec::new();
         for result in self.db.scan_prefix(prefix.as_bytes()) {
-            let (_key, value) = result.map_err(|e| {
+            let (key, value) = result.map_err(|e| {
                 GovernanceError::Internal(format!("Sled scan (program event log) failed: {e}"))
             })?;
             let event: ProgramEvent = icn_encoding::decode_versioned(&value).map_err(|e| {
                 GovernanceError::Internal(format!("Failed to decode program event: {e}"))
             })?;
-            events.push(event);
+            if &event.program_id != program_id {
+                continue;
+            }
+            rows.push((event.changed_at, key.to_vec(), event));
         }
-        events.sort_by_key(|e| e.changed_at);
-        Ok(events)
+        rows.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        Ok(rows.into_iter().map(|(_, _, e)| e).collect())
     }
 }
 
