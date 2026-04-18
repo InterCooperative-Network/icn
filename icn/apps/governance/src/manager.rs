@@ -1245,6 +1245,158 @@ impl icn_governance::MilestoneStoreBackend for SledMilestoneStore {
 }
 
 // ============================================================================
+// Milestone Event Log
+// ============================================================================
+
+/// A single status-transition event recorded when `update_milestone_status` runs.
+///
+/// This is an app-layer (not core-crate) record. It lives in `manager.rs`
+/// because it is produced and consumed entirely within the governance app's
+/// persistence layer.
+///
+/// Fields are limited to what is truthfully known at the write site:
+/// `milestone_id`, `changed_at`, `changed_by`, `from_status`, `to_status` are
+/// always present because `update_milestone_status` has all of them. No
+/// "reason" or "comment" field is added here; those require a Layer-2
+/// call-site decision that the substrate does not currently model.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MilestoneEvent {
+    pub milestone_id: MilestoneId,
+    /// Unix seconds when the transition was recorded.
+    pub changed_at: u64,
+    /// DID of the actor who triggered the transition.
+    pub changed_by: Did,
+    /// Status before the transition.
+    pub from_status: MilestoneStatus,
+    /// Status after the transition.
+    pub to_status: MilestoneStatus,
+}
+
+/// Append-only log of milestone status transitions.
+///
+/// `append` is called by `update_milestone_status` after a successful save.
+/// `list_by_milestone` is called by the history endpoint to populate the
+/// ordered entry list.
+///
+/// Ordering contract: entries returned by `list_by_milestone` must be
+/// oldest-to-newest by `changed_at`.
+pub trait MilestoneEventLogBackend: Send + Sync {
+    fn append(&self, event: &MilestoneEvent) -> std::result::Result<(), GovernanceError>;
+    fn list_by_milestone(
+        &self,
+        milestone_id: &MilestoneId,
+    ) -> std::result::Result<Vec<MilestoneEvent>, GovernanceError>;
+}
+
+// ── In-memory implementation (for tests and standalone mode) ─────────────────
+
+#[derive(Default)]
+pub struct InMemoryMilestoneEventLog {
+    events: RwLock<HashMap<MilestoneId, Vec<MilestoneEvent>>>,
+}
+
+impl InMemoryMilestoneEventLog {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl MilestoneEventLogBackend for InMemoryMilestoneEventLog {
+    fn append(&self, event: &MilestoneEvent) -> std::result::Result<(), GovernanceError> {
+        let mut guard = self
+            .events
+            .write()
+            .map_err(|e| GovernanceError::Internal(format!("event log lock poisoned: {e}")))?;
+        guard
+            .entry(event.milestone_id.clone())
+            .or_default()
+            .push(event.clone());
+        Ok(())
+    }
+
+    fn list_by_milestone(
+        &self,
+        milestone_id: &MilestoneId,
+    ) -> std::result::Result<Vec<MilestoneEvent>, GovernanceError> {
+        let guard = self
+            .events
+            .read()
+            .map_err(|e| GovernanceError::Internal(format!("event log lock poisoned: {e}")))?;
+        Ok(guard.get(milestone_id).cloned().unwrap_or_default())
+    }
+}
+
+// ── Sled-backed implementation (for production) ───────────────────────────────
+
+/// Sled-backed append-only log for milestone status transitions.
+///
+/// Key scheme:
+///   `milestone_event:{milestone_id}:{changed_at:020}:{uuid}`
+///
+/// The timestamp is zero-padded to 20 digits so lexicographic scan order
+/// matches chronological order. The UUID suffix ensures uniqueness within
+/// the same second (rare in practice, but correct).
+///
+/// Scan prefix: `milestone_event:{milestone_id}:` — yields all events for
+/// a milestone, in chronological order.
+pub struct SledMilestoneEventLog {
+    db: Arc<sled::Db>,
+}
+
+impl SledMilestoneEventLog {
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    fn event_key(milestone_id: &MilestoneId, changed_at: u64) -> String {
+        format!(
+            "milestone_event:{}:{:020}:{}",
+            milestone_id.0,
+            changed_at,
+            uuid::Uuid::new_v4()
+        )
+    }
+
+    fn events_prefix(milestone_id: &MilestoneId) -> String {
+        format!("milestone_event:{}:", milestone_id.0)
+    }
+}
+
+impl MilestoneEventLogBackend for SledMilestoneEventLog {
+    fn append(&self, event: &MilestoneEvent) -> std::result::Result<(), GovernanceError> {
+        let key = Self::event_key(&event.milestone_id, event.changed_at);
+        let value = icn_encoding::encode_versioned(event).map_err(|e| {
+            GovernanceError::Internal(format!("Failed to encode milestone event: {e}"))
+        })?;
+        self.db.insert(key.as_bytes(), value).map_err(|e| {
+            GovernanceError::Internal(format!("Sled insert (event log) failed: {e}"))
+        })?;
+        Ok(())
+    }
+
+    fn list_by_milestone(
+        &self,
+        milestone_id: &MilestoneId,
+    ) -> std::result::Result<Vec<MilestoneEvent>, GovernanceError> {
+        let prefix = Self::events_prefix(milestone_id);
+        let mut events = Vec::new();
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_key, value) = result.map_err(|e| {
+                GovernanceError::Internal(format!("Sled scan (event log) failed: {e}"))
+            })?;
+            let event: MilestoneEvent = icn_encoding::decode_versioned(&value).map_err(|e| {
+                GovernanceError::Internal(format!("Failed to decode milestone event: {e}"))
+            })?;
+            events.push(event);
+        }
+        // Sled scans in key order; since keys are zero-padded-timestamp-first,
+        // this is already chronological. Sort defensively for correctness.
+        events.sort_by_key(|e| e.changed_at);
+        Ok(events)
+    }
+}
+
+// ============================================================================
 // Sled-Backed Meeting Store
 // ============================================================================
 
@@ -2263,6 +2415,12 @@ pub struct GovernanceManager {
     governance_handle: Option<GovernanceHandle>,
     /// Optional receipt store for persisting GovernanceDecisionReceipts
     receipt_store: Option<Arc<dyn GovernanceReceiptBackend>>,
+    /// Optional append-only log of milestone status transitions.
+    ///
+    /// `None` in tests and standalone mode (no log written, history falls back
+    /// to lifecycle bookmarks). Set by sled-backed constructors so production
+    /// deployments record every status change.
+    milestone_event_log: Option<Arc<dyn MilestoneEventLogBackend>>,
 }
 
 impl GovernanceManager {
@@ -2286,6 +2444,7 @@ impl GovernanceManager {
             milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: None,
             receipt_store: None,
+            milestone_event_log: None,
         }
     }
 
@@ -2322,6 +2481,7 @@ impl GovernanceManager {
             milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: Some(handle),
             receipt_store: None,
+            milestone_event_log: None,
         }
     }
 
@@ -2382,6 +2542,16 @@ impl GovernanceManager {
         self
     }
 
+    /// Attach an append-only milestone event log.
+    ///
+    /// When set, `update_milestone_status` appends a [`MilestoneEvent`] on
+    /// every successful status transition. The history endpoint uses this log
+    /// when available, falling back to lifecycle bookmarks otherwise.
+    pub fn with_milestone_event_log(mut self, log: Arc<dyn MilestoneEventLogBackend>) -> Self {
+        self.milestone_event_log = Some(log);
+        self
+    }
+
     /// Create a governance manager with Sled-backed action item storage
     ///
     /// This is the recommended mode for production with persistent action items.
@@ -2403,9 +2573,10 @@ impl GovernanceManager {
             // program/milestone use the same db here to avoid needing further
             // builder calls for the happy path.
             program_store: Arc::new(SledProgramStore::new(db.clone())),
-            milestone_store: Arc::new(SledMilestoneStore::new(db)),
+            milestone_store: Arc::new(SledMilestoneStore::new(db.clone())),
             governance_handle: Some(handle),
             receipt_store: None,
+            milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db))),
         }
     }
 
@@ -2427,9 +2598,10 @@ impl GovernanceManager {
             // Programs and milestones use Sled-backed stores so they persist
             // across restarts (same db instance, separate key namespaces).
             program_store: Arc::new(SledProgramStore::new(db.clone())),
-            milestone_store: Arc::new(SledMilestoneStore::new(db)),
+            milestone_store: Arc::new(SledMilestoneStore::new(db.clone())),
             governance_handle: None,
             receipt_store: None,
+            milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db))),
         }
     }
 
@@ -4587,6 +4759,11 @@ impl GovernanceManager {
     /// milestone moves into `Completed`, the actor is recorded as
     /// `completed_by` for audit. When the milestone is reopened, both
     /// `completed_at` and `completed_by` are cleared.
+    ///
+    /// If a `milestone_event_log` is configured, a [`MilestoneEvent`] is
+    /// appended after the successful save. Event-log failures are logged but
+    /// do not cause the status update to fail — the milestone state is the
+    /// source of truth; the log is a supplementary observability record.
     pub fn update_milestone_status(
         &self,
         id: &MilestoneId,
@@ -4598,6 +4775,8 @@ impl GovernanceManager {
             .get(id)
             .map_err(|e| anyhow::anyhow!("Failed to get milestone: {e}"))?
             .ok_or_else(|| anyhow::anyhow!("Milestone not found: {id}"))?;
+
+        let from_status = m.status;
 
         if status == MilestoneStatus::Completed {
             if m.status != MilestoneStatus::Completed {
@@ -4613,7 +4792,44 @@ impl GovernanceManager {
         self.milestone_store
             .save(&m)
             .map_err(|e| anyhow::anyhow!("Failed to save milestone: {e}"))?;
+
+        // Append event-log entry when a log is configured.
+        // Only append if the status actually changed to avoid spurious entries
+        // (e.g. marking Completed again when already Completed).
+        if from_status != status {
+            if let Some(ref log) = self.milestone_event_log {
+                let event = MilestoneEvent {
+                    milestone_id: id.clone(),
+                    changed_at: icn_time::current_timestamp_secs(),
+                    changed_by: actor.clone(),
+                    from_status,
+                    to_status: status,
+                };
+                if let Err(e) = log.append(&event) {
+                    tracing::warn!(
+                        milestone_id = %id,
+                        error = %e,
+                        "Failed to append milestone event log entry (non-fatal)"
+                    );
+                }
+            }
+        }
+
         Ok(m)
+    }
+
+    /// List all recorded status-transition events for a milestone, oldest first.
+    ///
+    /// Returns an empty `Vec` when no event log is configured (in-memory /
+    /// standalone mode without an explicit event log). Callers should treat an
+    /// empty result as "no log available" and fall back to lifecycle bookmarks.
+    pub fn list_milestone_events(&self, id: &MilestoneId) -> Result<Vec<MilestoneEvent>> {
+        match &self.milestone_event_log {
+            None => Ok(Vec::new()),
+            Some(log) => log
+                .list_by_milestone(id)
+                .map_err(|e| anyhow::anyhow!("Failed to list milestone events: {e}")),
+        }
     }
 
     // ========================================================================

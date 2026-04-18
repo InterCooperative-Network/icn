@@ -3872,44 +3872,93 @@ pub async fn get_milestone_history<E: GovernanceEventEmitter + Clone + 'static>(
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Milestone not found"))?;
 
-    Ok(HttpResponse::Ok().json(build_milestone_history(&milestone)))
+    // Load event log entries (empty Vec when no log is configured).
+    let events = ctx
+        .manager
+        .list_milestone_events(&id)
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(build_milestone_history(&milestone, &events)))
 }
 
 /// Pure function assembling a [`MilestoneHistoryResponse`] from a milestone
-/// record. Split out for unit-testability without an HTTP stack.
+/// record and an optional list of recorded transition events.
 ///
-/// Entries are ordered oldest-to-newest:
-/// 1. Creation bookmark (`created_at`, status `pending`, source `creation`).
-/// 2. Completion bookmark (`completed_at` + `completed_by`), only present when
-///    the milestone has `completed_at` set.
+/// **Two paths:**
 ///
-/// No intermediate entries are emitted because intermediate transitions are
-/// not persisted in the current store.
-fn build_milestone_history(milestone: &icn_governance::Milestone) -> MilestoneHistoryResponse {
-    let mut entries = Vec::new();
+/// 1. **Transition log** (`events` is non-empty): entries are built directly
+///    from the event log. Coverage is `"transition_log"`. Each entry has
+///    `from_status`, `to_status`, `changed_by`, and `changed_at` from the
+///    recorded event. A synthetic creation entry is prepended (from
+///    `milestone.created_at`) because the event log records status *changes*
+///    only, not the initial creation.
+///
+/// 2. **Lifecycle bookmarks** (`events` is empty — no log configured or no
+///    transitions recorded yet): same fallback as the previous implementation.
+///    Coverage is `"lifecycle_bookmarks"`. Returns creation bookmark + optional
+///    completion bookmark from milestone struct fields.
+///
+/// Entries are always ordered oldest-to-newest.
+fn build_milestone_history(
+    milestone: &icn_governance::Milestone,
+    events: &[crate::manager::MilestoneEvent],
+) -> MilestoneHistoryResponse {
+    if events.is_empty() {
+        // ── Fallback: lifecycle bookmarks (no event log available) ──────────
+        let mut entries = Vec::new();
 
-    // Entry 1: creation (always present).
-    entries.push(MilestoneHistoryEntry {
-        changed_at: milestone.created_at,
-        changed_by: None, // creator is not recorded on the milestone record
-        to_status: "pending".to_string(),
-        source: "creation".to_string(),
-    });
-
-    // Entry 2: completion (only when the milestone has been completed).
-    if let Some(completed_at) = milestone.completed_at {
+        // Creation (always present; initial status is always pending).
         entries.push(MilestoneHistoryEntry {
-            changed_at: completed_at,
-            changed_by: milestone.completed_by.as_ref().map(|d| d.to_string()),
-            to_status: "completed".to_string(),
-            source: "completion_record".to_string(),
+            changed_at: milestone.created_at,
+            changed_by: None, // creator not recorded on milestone struct
+            to_status: "pending".to_string(),
+            source: "creation".to_string(),
         });
-    }
 
-    MilestoneHistoryResponse {
-        milestone_id: milestone.id.0.clone(),
-        coverage: "lifecycle_bookmarks".to_string(),
-        entries,
+        // Completion (only when the milestone has completed).
+        if let Some(completed_at) = milestone.completed_at {
+            entries.push(MilestoneHistoryEntry {
+                changed_at: completed_at,
+                changed_by: milestone.completed_by.as_ref().map(|d| d.to_string()),
+                to_status: "completed".to_string(),
+                source: "completion_record".to_string(),
+            });
+        }
+
+        MilestoneHistoryResponse {
+            milestone_id: milestone.id.0.clone(),
+            coverage: "lifecycle_bookmarks".to_string(),
+            entries,
+        }
+    } else {
+        // ── Full path: event log entries ────────────────────────────────────
+        //
+        // Prepend a synthetic creation entry. The event log records transitions
+        // only; the creation itself is not emitted as a log entry. The creation
+        // bookmark is always accurate (from milestone.created_at, initial status
+        // is always pending) and provides the anchor for the entry sequence.
+        let mut entries = Vec::with_capacity(events.len() + 1);
+        entries.push(MilestoneHistoryEntry {
+            changed_at: milestone.created_at,
+            changed_by: None,
+            to_status: "pending".to_string(),
+            source: "creation".to_string(),
+        });
+
+        for event in events {
+            entries.push(MilestoneHistoryEntry {
+                changed_at: event.changed_at,
+                changed_by: Some(event.changed_by.to_string()),
+                to_status: milestone_status_str(&event.to_status).to_string(),
+                source: "transition_log".to_string(),
+            });
+        }
+
+        MilestoneHistoryResponse {
+            milestone_id: milestone.id.0.clone(),
+            coverage: "transition_log".to_string(),
+            entries,
+        }
     }
 }
 
@@ -4137,7 +4186,7 @@ mod tests {
     use crate::http::configure::{
         GovernanceContext, GovernanceEffect, ProposalAcceptedHook, SuspensionChecker,
     };
-    use crate::manager::GovernanceManager;
+    use crate::manager::{GovernanceManager, InMemoryMilestoneEventLog};
 
     fn test_did(seed: u8) -> Did {
         Did::from_anchor_id(&[seed; 32])
@@ -5992,5 +6041,209 @@ mod tests {
         let t0 = entries[0]["changed_at"].as_u64().unwrap();
         let t1 = entries[1]["changed_at"].as_u64().unwrap();
         assert!(t1 >= t0, "completion must not precede creation");
+    }
+
+    // ── Event log path tests ───────────────────────────────────────────────
+    //
+    // These tests use a GovernanceManager configured with an InMemoryMilestoneEventLog
+    // so that status transitions are recorded. The history endpoint should return
+    // coverage: "transition_log" and the actual recorded events.
+
+    fn make_event_log_ctx(mgr: Arc<GovernanceManager>) -> GovernanceContext<NoopEventEmitter> {
+        GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_proposal_accepted: None,
+            on_charter_accepted: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        }
+    }
+
+    macro_rules! event_log_history_app {
+        ($ctx:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: "did:icn:reader".to_string(),
+                            scope: Some("governance:read".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/milestones/{milestone_id}/history",
+                        web::get().to(get_milestone_history::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// Helper: build a GovernanceManager with an InMemoryMilestoneEventLog wired in.
+    fn new_mgr_with_event_log() -> Arc<GovernanceManager> {
+        let log = Arc::new(InMemoryMilestoneEventLog::new());
+        Arc::new(GovernanceManager::new().with_milestone_event_log(log))
+    }
+
+    /// Status transitions are recorded; history returns transition_log coverage
+    /// with one creation entry + one log entry per unique status change.
+    #[actix_web::test]
+    async fn event_log_single_transition_appears_in_history() {
+        let mgr = new_mgr_with_event_log();
+        let pid = setup_preview_program(&mgr, "dom-el1", "ent-el1").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        let actor = Did::from_anchor_id(&[10u8; 32]);
+        mgr.update_milestone_status(&m.id, MilestoneStatus::InProgress, &actor)
+            .unwrap();
+
+        let app = event_log_history_app!(make_event_log_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["coverage"], "transition_log");
+
+        let entries = body["entries"].as_array().unwrap();
+        // 1 creation + 1 logged transition
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0]["source"], "creation");
+        assert_eq!(entries[0]["to_status"], "pending");
+        assert!(entries[0]["changed_by"].is_null());
+
+        assert_eq!(entries[1]["source"], "transition_log");
+        assert_eq!(entries[1]["to_status"], "in_progress");
+        assert_eq!(entries[1]["changed_by"], actor.to_string());
+    }
+
+    /// Multiple transitions appear in chronological order.
+    #[actix_web::test]
+    async fn event_log_multiple_transitions_ordered_oldest_first() {
+        let mgr = new_mgr_with_event_log();
+        let pid = setup_preview_program(&mgr, "dom-el2", "ent-el2").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        let actor = Did::from_anchor_id(&[11u8; 32]);
+        mgr.update_milestone_status(&m.id, MilestoneStatus::InProgress, &actor)
+            .unwrap();
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Blocked, &actor)
+            .unwrap();
+        mgr.update_milestone_status(&m.id, MilestoneStatus::InProgress, &actor)
+            .unwrap();
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &actor)
+            .unwrap();
+
+        let app = event_log_history_app!(make_event_log_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["coverage"], "transition_log");
+
+        let entries = body["entries"].as_array().unwrap();
+        // 1 creation + 4 transitions
+        assert_eq!(entries.len(), 5);
+        assert_eq!(entries[0]["source"], "creation");
+        assert_eq!(entries[1]["to_status"], "in_progress");
+        assert_eq!(entries[2]["to_status"], "blocked");
+        assert_eq!(entries[3]["to_status"], "in_progress");
+        assert_eq!(entries[4]["to_status"], "completed");
+
+        // Chronological order: each changed_at >= previous
+        let times: Vec<u64> = entries
+            .iter()
+            .map(|e| e["changed_at"].as_u64().unwrap())
+            .collect();
+        for pair in times.windows(2) {
+            assert!(pair[1] >= pair[0], "entries not in chronological order");
+        }
+    }
+
+    /// Re-marking an already-Completed milestone does not add a duplicate log entry.
+    #[actix_web::test]
+    async fn event_log_no_duplicate_on_same_status() {
+        let mgr = new_mgr_with_event_log();
+        let pid = setup_preview_program(&mgr, "dom-el3", "ent-el3").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        let actor = Did::from_anchor_id(&[12u8; 32]);
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &actor)
+            .unwrap();
+        // Call again with same status — should not produce a second log entry.
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &actor)
+            .unwrap();
+
+        let app = event_log_history_app!(make_event_log_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let entries = body["entries"].as_array().unwrap();
+        // 1 creation + 1 completion — no duplicate
+        assert_eq!(entries.len(), 2, "duplicate entry on same-status update");
+    }
+
+    /// A milestone without any transitions still has one entry (creation bookmark)
+    /// and coverage "transition_log" (log is configured but empty for this milestone).
+    /// Actually: no events → falls back to lifecycle_bookmarks.
+    #[actix_web::test]
+    async fn event_log_no_transitions_falls_back_to_lifecycle_bookmarks() {
+        let mgr = new_mgr_with_event_log();
+        let pid = setup_preview_program(&mgr, "dom-el4", "ent-el4").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+        // No status updates — event log for this milestone is empty.
+
+        let app = event_log_history_app!(make_event_log_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        // Empty event list → fallback path
+        assert_eq!(body["coverage"], "lifecycle_bookmarks");
+        let entries = body["entries"].as_array().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["source"], "creation");
     }
 }
