@@ -96,6 +96,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/gov/programs/{program_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** PATCH /gov/programs/{program_id}/status — advance or revert program lifecycle status. */
+        patch: operations["update_program_status"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -605,6 +622,27 @@ export interface components {
          * @enum {string}
          */
         Platform: "ios" | "android" | "web";
+        /** @description Program response */
+        ProgramResponse: {
+            activities: string[];
+            /** Format: int64 */
+            closedAt?: number | null;
+            /** Format: int64 */
+            createdAt: number;
+            createdByDecision?: string | null;
+            description?: string | null;
+            domainId: string;
+            /** Format: int64 */
+            endAt?: number | null;
+            id: string;
+            kind: string;
+            milestones: string[];
+            name: string;
+            parentEntityId: string;
+            /** Format: int64 */
+            startAt?: number | null;
+            status: string;
+        };
         /** @description Proposal payload types (gateway-local variant of the governance proposal payload) */
         ProposalPayloadRequest: {
             body: string;
@@ -876,6 +914,18 @@ export interface components {
         /** @description Request to update a milestone's status */
         UpdateMilestoneStatusRequest: {
             /** @description Status: "pending", "in_progress", "completed", "blocked", "skipped" */
+            status: string;
+        };
+        /**
+         * @description Request to advance (or revert) the lifecycle status of a program.
+         *
+         *     `PATCH /gov/programs/{program_id}/status`
+         *
+         *     Accepted values: `"draft"`, `"active_planning"`, `"public_launch"`,
+         *     `"in_execution"`, `"closed"`, `"archived"`.
+         */
+        UpdateProgramStatusRequest: {
+            /** @description Target program lifecycle status (snake_case). */
             status: string;
         };
         /** @description Update member role */
@@ -1177,6 +1227,61 @@ export interface operations {
                 };
             };
             /** @description Bad request — invalid gate expression or empty name */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Caller is not a member of the program's domain */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Program not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_program_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Program ID */
+                program_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProgramStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Program with updated status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramResponse"];
+                };
+            };
+            /** @description Unknown status string */
             400: {
                 headers: {
                     [name: string]: unknown;

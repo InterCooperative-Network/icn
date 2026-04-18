@@ -246,6 +246,42 @@ paths:
           description: Program not found
       security:
       - bearer_auth: []
+  /gov/programs/{program_id}/status:
+    patch:
+      tags:
+      - milestones
+      summary: PATCH /gov/programs/{program_id}/status — advance or revert program lifecycle status.
+      operationId: update_program_status
+      parameters:
+      - name: program_id
+        in: path
+        description: Program ID
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProgramStatusRequest'
+        required: true
+      responses:
+        '200':
+          description: Program with updated status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramResponse'
+        '400':
+          description: Unknown status string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Caller is not a member of the program's domain
+        '404':
+          description: Program not found
+      security:
+      - bearer_auth: []
 components:
   schemas:
     AccountDeltaResponse:
@@ -1406,6 +1442,70 @@ components:
       - ios
       - android
       - web
+    ProgramResponse:
+      type: object
+      description: Program response
+      required:
+      - id
+      - domainId
+      - parentEntityId
+      - kind
+      - name
+      - status
+      - milestones
+      - activities
+      - createdAt
+      properties:
+        activities:
+          type: array
+          items:
+            type: string
+        closedAt:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        createdAt:
+          type: integer
+          format: int64
+          minimum: 0
+        createdByDecision:
+          type:
+          - string
+          - 'null'
+        description:
+          type:
+          - string
+          - 'null'
+        domainId:
+          type: string
+        endAt:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        id:
+          type: string
+        kind:
+          type: string
+        milestones:
+          type: array
+          items:
+            type: string
+        name:
+          type: string
+        parentEntityId:
+          type: string
+        startAt:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        status:
+          type: string
     ProposalPayloadRequest:
       oneOf:
       - type: object
@@ -2009,6 +2109,22 @@ components:
         status:
           type: string
           description: 'Status: "pending", "in_progress", "completed", "blocked", "skipped"'
+      additionalProperties: false
+    UpdateProgramStatusRequest:
+      type: object
+      description: |-
+        Request to advance (or revert) the lifecycle status of a program.
+
+        `PATCH /gov/programs/{program_id}/status`
+
+        Accepted values: `"draft"`, `"active_planning"`, `"public_launch"`,
+        `"in_execution"`, `"closed"`, `"archived"`.
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          description: Target program lifecycle status (snake_case).
       additionalProperties: false
     UpdateRoleRequest:
       type: object
