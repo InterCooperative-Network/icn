@@ -466,6 +466,14 @@ impl ReceiptStore {
                 .get(&primary_key)
                 .map_err(|e| format!("sled get primary: {e}"))?
             else {
+                // Index points to a missing primary record — index/primary skew.
+                // Skip rather than hard-fail the read, but warn so operators can
+                // detect on-disk corruption or partial writes.
+                tracing::warn!(
+                    effect_record_id = %effect_record_id,
+                    evidence_id = %evidence_id,
+                    "dispatch evidence index skew: primary record missing"
+                );
                 continue;
             };
             let e: EffectDispatchEvidence = serde_json::from_slice(&bytes)
@@ -497,7 +505,14 @@ impl ReceiptStore {
                 .get(&primary_key)
                 .map_err(|e| format!("sled get primary: {e}"))?
             else {
-                // Index-primary skew — log and skip rather than hard-fail.
+                // Index points to a missing primary record — log and skip
+                // rather than hard-fail the read. A warning here is how
+                // operators notice on-disk corruption or partial writes.
+                tracing::warn!(
+                    proposal_id = %proposal_id,
+                    record_id = %record_id,
+                    "institutional effect index skew: primary record missing"
+                );
                 continue;
             };
             let record: InstitutionalEffectRecord = serde_json::from_slice(&bytes)

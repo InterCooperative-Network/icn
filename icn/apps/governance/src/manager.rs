@@ -3819,8 +3819,11 @@ impl GovernanceManager {
         }
 
         // Order deliberations chronologically by when the meeting actually
-        // occurred (started_at preferred, falling back to scheduled_at, then
-        // meeting creation). Meetings that never ran sort last.
+        // occurred: started_at preferred, falling back to scheduled_at.
+        // Meetings with neither timestamp sort last (u64::MAX). We deliberately
+        // do not tie-break on meeting creation time — meetings without either
+        // timestamp are rare enough that a stable-but-underspecified order is
+        // acceptable here.
         entries.sort_by_key(|e| {
             (
                 e.started_at.unwrap_or(u64::MAX),

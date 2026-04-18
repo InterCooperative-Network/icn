@@ -1746,15 +1746,19 @@ pub async fn get_proposal_deliberation<E: GovernanceEventEmitter + Clone + 'stat
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found(format!("Proposal not found: {}", id.0)))?;
 
-    let governance_decision =
+    // Only surface a governance decision when we have *both* a receipt and a
+    // terminal `decided_at`. A receipt without a decided_at would otherwise
+    // serialize as `decided_at: 0` (Unix epoch), which is a misleading
+    // timestamp for consumers in the rare receipt-store/state-skew case.
+    let governance_decision = trail.governance_receipt.as_ref().and_then(|r| {
         trail
-            .governance_receipt
-            .as_ref()
-            .map(|r| DeliberationDecisionResponse {
+            .decided_at
+            .map(|decided_at| DeliberationDecisionResponse {
                 outcome: r.outcome.to_string(),
-                decided_at: trail.decided_at.unwrap_or(0),
+                decided_at,
                 decision_hash: hex::encode(r.decision_hash),
-            });
+            })
+    });
 
     let deliberations = trail
         .deliberations
