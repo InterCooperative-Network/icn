@@ -1203,6 +1203,43 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         _ => "unknown",
     };
 
+    // On accepted: persist an institutional effect record (non-economic
+    // effects only — economic effects are recorded as AllocationReceipts in
+    // the manager). This runs regardless of dispatch path (standalone vs
+    // actor-backed) so the durable artifact is available via
+    // GET /gov/proposals/{id}/effects and GET /gov/proposals/{id}/deliberation.
+    if outcome == "accepted" {
+        // Best-effort decision_hash lookup to bind the record into the
+        // INV-5 provenance chain. If the governance receipt is not yet
+        // available (e.g. actor-path timing), record with decision_hash=None
+        // — the proposal_id still locates the record.
+        let decision_hash = ctx
+            .manager
+            .get_chain(&proposal_id)
+            .await
+            .ok()
+            .and_then(|chain| chain.governance_receipt.map(|r| r.decision_hash));
+
+        if let Some(record) = crate::institutional_effect::record_from_accepted_payload(
+            &proposal.id.0,
+            &proposal.domain_id.0,
+            decision_hash,
+            &proposal.payload,
+            current_time_secs(),
+        ) {
+            if let Err(e) = ctx.manager.record_institutional_effect(&record) {
+                // Non-fatal — the dispatch hook still fires below. Log so
+                // operators can detect a partial-audit state.
+                tracing::error!(
+                    proposal_id = %proposal.id.0,
+                    effect_kind = %record.effect_kind,
+                    error = %e,
+                    "Failed to persist institutional effect record",
+                );
+            }
+        }
+    }
+
     // On charter acceptance: deploy the document to the charter policy oracle.
     if outcome == "accepted" {
         if let icn_governance::ProposalPayload::Charter {
@@ -1583,6 +1620,12 @@ pub async fn get_proposal_deliberation<E: GovernanceEventEmitter + Clone + 'stat
         })
         .collect();
 
+    let emitted_effects = trail
+        .emitted_effects
+        .iter()
+        .map(effect_record_to_response)
+        .collect();
+
     Ok(HttpResponse::Ok().json(ProposalDeliberationResponse {
         proposal_id: trail.proposal_id.0,
         domain_id: trail.domain_id.0,
@@ -1591,6 +1634,66 @@ pub async fn get_proposal_deliberation<E: GovernanceEventEmitter + Clone + 'stat
         effect_kind: trail.effect_kind.to_string(),
         deliberations,
         governance_decision,
+        emitted_effects,
+    }))
+}
+
+/// Translate a persisted effect record into its HTTP response shape.
+fn effect_record_to_response(
+    r: &crate::institutional_effect::InstitutionalEffectRecord,
+) -> InstitutionalEffectResponse {
+    InstitutionalEffectResponse {
+        record_id: r.record_id.clone(),
+        proposal_id: r.proposal_id.clone(),
+        domain_id: r.domain_id.clone(),
+        decision_hash: r.decision_hash.map(hex::encode),
+        effect_kind: r.effect_kind.clone(),
+        target_did: r.target_did.clone(),
+        target_ref: r.target_ref.clone(),
+        reason: r.reason.clone(),
+        recorded_at: r.recorded_at,
+        payload: r.payload.clone(),
+    }
+}
+
+/// GET /gov/proposals/{proposal_id}/effects — List persisted institutional
+/// effect records emitted at acceptance.
+///
+/// Returns an empty list when the proposal was not accepted, when the
+/// payload translated to `Unhandled`, or when no receipt store is wired.
+/// Records are oldest-first.
+///
+/// Durable counterpart to the `effect_kind` shape label on `/deliberation`:
+/// this endpoint answers "what governance artifact was actually created?"
+/// rather than "what shape would this imply?"
+pub async fn list_proposal_effects<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    proposal_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+
+    let id = ProposalId(proposal_id.into_inner());
+
+    // 404 when the proposal itself is unknown — distinguishes a missing
+    // proposal from an accepted-but-no-effect proposal (which returns []).
+    let _ = ctx
+        .manager
+        .get_proposal(&id)
+        .await
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found(format!("Proposal not found: {}", id.0)))?;
+
+    let records = ctx
+        .manager
+        .list_institutional_effects(&id)
+        .map_err(anyhow_to_api)?;
+
+    let effects = records.iter().map(effect_record_to_response).collect();
+
+    Ok(HttpResponse::Ok().json(ProposalEffectsResponse {
+        proposal_id: id.0,
+        effects,
     }))
 }
 

@@ -280,6 +280,10 @@ where
             web::resource("/proposals/{proposal_id}/deliberation")
                 .route(web::get().to(handlers::get_proposal_deliberation::<E>)),
         )
+        .service(
+            web::resource("/proposals/{proposal_id}/effects")
+                .route(web::get().to(handlers::list_proposal_effects::<E>)),
+        )
         // ── Discussion endpoints ─────────────────────────────────────────
         .service(
             web::resource("/proposals/{proposal_id}/discussion")
