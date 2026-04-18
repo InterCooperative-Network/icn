@@ -1371,21 +1371,22 @@ impl GatewayServer {
                                 }
                             }
                             Ok(None) => {
-                                // No steward record exists — treat as failed
-                                // dispatch with a durable explanation rather
-                                // than silent no-op. Reconciliation should
-                                // surface this truthfully.
-                                tracing::warn!(
+                                // No active steward record exists — the desired
+                                // revoked state is already satisfied. Align with
+                                // the SdisService kernel path (services/sdis_service.rs)
+                                // which treats this as an idempotent no-op success.
+                                // Because reconciliation failures are sticky, recording
+                                // a false failure here would permanently misclassify
+                                // an already-revoked steward as ExecutionFailed.
+                                tracing::info!(
                                     did = %steward,
-                                    "RevokeSteward: no steward record found"
+                                    "RevokeSteward: no active steward record; treating as already revoked"
                                 );
                                 Some(DispatchEvidenceSpec {
                                     subsystem: "commons".to_string(),
                                     receipt_ref: None,
-                                    success: false,
-                                    error_message: Some(
-                                        "no active steward record for DID".to_string(),
-                                    ),
+                                    success: true,
+                                    error_message: None,
                                 })
                             }
                             Err(e) => {

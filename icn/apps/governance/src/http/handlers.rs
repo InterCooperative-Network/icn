@@ -1360,6 +1360,16 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         // `EffectDispatchEvidence` tied to the institutional effect record
         // persisted earlier in this handler. Other dispatch paths (charter/
         // freeze hooks) are fire-and-forget and remain `emitted_only`.
+        //
+        // Double-dispatch guard: for steward authority proposals, the
+        // evidence-returning hook (`on_proposal_accepted_with_evidence`, wired
+        // by the gateway to commons.register_steward / revoke_steward) is now
+        // canonical. If both are configured, running the sdis_service block
+        // below would re-enter register/revoke and produce conflicting
+        // evidence. When the evidence hook is wired, skip sdis_service for
+        // AppointSteward/RemoveSteward variants — other SDIS variants still
+        // flow through sdis_service unchanged.
+        let evidence_hook_handles_steward = ctx.on_proposal_accepted_with_evidence.is_some();
         if let Some(ref svc) = ctx.sdis_service {
             use icn_kernel_api::{AppointStewardRequest, RevokeStewardRequest};
             if let icn_governance::ProposalPayload::Sdis {
@@ -1394,6 +1404,13 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                 };
 
                 match sdis_proposal {
+                    icn_governance::sdis::SdisProposal::AppointSteward { .. }
+                    | icn_governance::sdis::SdisProposal::RemoveSteward { .. }
+                        if evidence_hook_handles_steward =>
+                    {
+                        // Evidence hook is canonical for steward variants — skip
+                        // sdis_service to avoid double-dispatch.
+                    }
                     icn_governance::sdis::SdisProposal::AppointSteward {
                         candidate,
                         bond_amount,
