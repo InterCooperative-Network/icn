@@ -1296,14 +1296,25 @@ impl MeetingStoreBackend for SledMeetingStore {
         let index_key = Self::index_key(&m.domain_id, &m.id);
 
         // Load the existing record (if any) to diff linked_activities for
-        // index maintenance. On first save this returns empty.
-        let old_activities: Vec<ActivityId> = self
-            .db
-            .get(primary_key.as_bytes())
-            .map_err(|e| GovernanceError::Internal(format!("Sled get (pre-save) failed: {e}")))?
-            .and_then(|v| icn_encoding::decode_versioned::<Meeting>(&v).ok())
-            .map(|old| old.linked_activities)
-            .unwrap_or_default();
+        // index maintenance. On first save this returns empty. If an existing
+        // record cannot be decoded, surface the decode failure rather than
+        // silently treating it as "no prior activities" — that would leave
+        // stale activity-index rows pointing at a now-absent meeting.
+        let old_activities: Vec<ActivityId> =
+            match self.db.get(primary_key.as_bytes()).map_err(|e| {
+                GovernanceError::Internal(format!("Sled get (pre-save) failed: {e}"))
+            })? {
+                Some(v) => {
+                    icn_encoding::decode_versioned::<Meeting>(&v)
+                        .map_err(|e| {
+                            GovernanceError::Internal(format!(
+                                "Failed to decode existing meeting for index diff: {e}"
+                            ))
+                        })?
+                        .linked_activities
+                }
+                None => Vec::new(),
+            };
 
         let value = icn_encoding::encode_versioned(m)
             .map_err(|e| GovernanceError::Internal(format!("Failed to encode meeting: {e}")))?;
@@ -1318,23 +1329,26 @@ impl MeetingStoreBackend for SledMeetingStore {
             .insert(index_key.as_bytes(), &[] as &[u8])
             .map_err(|e| GovernanceError::Internal(format!("Sled insert (index) failed: {e}")))?;
 
-        // Remove stale activity index entries (activities that were linked
-        // before but are no longer present in the new record).
-        for act_id in &old_activities {
-            if !m.linked_activities.contains(act_id) {
-                let k = Self::activity_index_key(act_id, &m.id);
-                self.db.remove(k.as_bytes()).map_err(|e| {
-                    GovernanceError::Internal(format!("Sled remove (activity index) failed: {e}"))
-                })?;
-            }
-        }
-        // Write new activity index entries (activities now linked that weren't
-        // linked before — or all of them on first save).
-        for act_id in &m.linked_activities {
-            if !old_activities.contains(act_id) {
-                let k = Self::activity_index_key(act_id, &m.id);
+        // Reconcile the activity secondary index against the *desired* set
+        // (`m.linked_activities`). We take the union of the old record's
+        // activities and the new record's activities as the set to touch —
+        // this means a retry after a partial-failure previous save still
+        // rebuilds any missing index rows for activities that are listed in
+        // the new primary record.
+        let desired: std::collections::HashSet<&ActivityId> = m.linked_activities.iter().collect();
+        let union: std::collections::HashSet<&ActivityId> = old_activities
+            .iter()
+            .chain(m.linked_activities.iter())
+            .collect();
+        for act_id in union {
+            let k = Self::activity_index_key(act_id, &m.id);
+            if desired.contains(act_id) {
                 self.db.insert(k.as_bytes(), &[] as &[u8]).map_err(|e| {
                     GovernanceError::Internal(format!("Sled insert (activity index) failed: {e}"))
+                })?;
+            } else {
+                self.db.remove(k.as_bytes()).map_err(|e| {
+                    GovernanceError::Internal(format!("Sled remove (activity index) failed: {e}"))
                 })?;
             }
         }
@@ -4595,7 +4609,16 @@ impl GovernanceManager {
                 }
             }
         }
-        meetings.sort_by_key(|m| m.scheduled_at.unwrap_or(u64::MAX));
+        // Deterministic ordering: primary key is `scheduled_at` (earliest
+        // first, `None` sorts last), secondary key is `MeetingId` so meetings
+        // with identical timestamps (common for `None`) have a stable order
+        // independent of `HashSet` iteration order.
+        meetings.sort_by(|a, b| {
+            a.scheduled_at
+                .unwrap_or(u64::MAX)
+                .cmp(&b.scheduled_at.unwrap_or(u64::MAX))
+                .then_with(|| a.id.0.cmp(&b.id.0))
+        });
 
         Ok(Some(ProgramDashboard {
             program,

@@ -3660,13 +3660,24 @@ fn meeting_status_str(s: &MeetingStatus) -> &'static str {
     }
 }
 
-fn dashboard_meeting_summary(m: &icn_governance::Meeting) -> DashboardMeetingSummary {
+fn dashboard_meeting_summary(
+    m: &icn_governance::Meeting,
+    program_activity_ids: &std::collections::HashSet<&str>,
+) -> DashboardMeetingSummary {
     DashboardMeetingSummary {
         id: m.id.0.clone(),
         title: m.title.clone(),
         status: meeting_status_str(&m.status).to_string(),
         scheduled_at: m.scheduled_at,
-        linked_activity_ids: m.linked_activities.iter().map(|a| a.0.clone()).collect(),
+        // Only expose activity IDs that belong to THIS program. A meeting
+        // may legitimately be linked to unrelated activities; those IDs are
+        // intentionally omitted from the program-scoped dashboard summary.
+        linked_activity_ids: m
+            .linked_activities
+            .iter()
+            .filter(|a| program_activity_ids.contains(a.0.as_str()))
+            .map(|a| a.0.clone())
+            .collect(),
     }
 }
 
@@ -3759,7 +3770,14 @@ pub async fn get_program_dashboard<E: GovernanceEventEmitter + Clone + 'static>(
             cancelled: ai.cancelled,
             total: ai.total(),
         },
-        meetings: d.meetings.iter().map(dashboard_meeting_summary).collect(),
+        meetings: {
+            let program_activity_ids: std::collections::HashSet<&str> =
+                d.activities.iter().map(|a| a.id.0.as_str()).collect();
+            d.meetings
+                .iter()
+                .map(|m| dashboard_meeting_summary(m, &program_activity_ids))
+                .collect()
+        },
     };
 
     Ok(HttpResponse::Ok().json(resp))

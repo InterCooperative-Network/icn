@@ -387,15 +387,12 @@ pub trait MeetingStoreBackend: Send + Sync {
     /// given a program's activities, collect meetings attached to those
     /// activities without a full domain scan.
     ///
-    /// The default implementation is an in-memory linear scan over all
-    /// meetings in the store, provided by delegating to the store's own
-    /// iteration. Stores with an explicit activity index (e.g.
-    /// `SledMeetingStore`) MUST override this method for O(log N) reads.
-    ///
-    /// **Note**: this default is deliberately left unimplemented rather than
-    /// returning an empty vec, so stores that don't override it fail loudly at
-    /// compile time via the missing-method error. Providing a correct default
-    /// requires access to the store's internal state, which varies per
+    /// This method has no default implementation: every backend must provide
+    /// one explicitly. Stores with an activity index (e.g. `SledMeetingStore`)
+    /// should serve this in O(log N) via the secondary index; stores without
+    /// one (e.g. `InMemoryMeetingStore`) fall back to a linear scan over their
+    /// own state. A correct default cannot be provided here because it would
+    /// require access to each backend's internal iteration, which varies per
     /// implementation.
     fn list_by_activity(
         &self,
