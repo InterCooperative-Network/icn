@@ -19,6 +19,10 @@ pub struct GatewayActorHandles {
     pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     pub ledger_service: Option<Arc<dyn icn_kernel_api::services::LedgerService>>,
     pub governance: Option<icn_gateway::governance_mgr::GovernanceHandle>,
+    /// Concrete actor-backed governance handle. Parallel to `governance`
+    /// (which is the trait-object alias). Needed for installing the
+    /// gateway's receipt_store on the actor's inner state.
+    pub governance_actor_handle: Option<icn_governance_actor::GovernanceHandle>,
     pub treasury: Option<icn_gateway::TreasuryHandle>,
     pub ledger: Option<icn_gateway::LedgerHandle>,
     pub entity: Option<icn_entity::EntityHandle>,

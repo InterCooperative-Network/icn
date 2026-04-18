@@ -99,6 +99,12 @@ pub struct GatewayServer {
     federation_service_handle: Option<Arc<dyn icn_kernel_api::services::FederationService>>,
     /// Optional handle to daemon's GovernanceActor (for actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
+    /// Optional concrete actor handle, parallel to `governance_handle`.
+    /// Used solely to install `receipt_store` onto the actor at startup so
+    /// actor-path `CloseProposal::Accept` and `ForceCloseProposal::Accept`
+    /// emit `InstitutionalEffectRecord` durably (closes parity gap with
+    /// the gateway-path close).
+    governance_actor_handle: Option<icn_governance_actor::GovernanceHandle>,
     /// Optional handle to daemon's ContractRegistryActor (for contract management)
     contract_registry_handle: Option<icn_ccl::ContractRegistryHandle>,
     /// Optional handle to daemon's TreasuryManager (for treasury operations)
@@ -151,6 +157,7 @@ impl GatewayServer {
             ledger_service_handle: None,
             federation_service_handle: None,
             governance_handle: None,
+            governance_actor_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
             ledger_handle: None,
@@ -197,6 +204,7 @@ impl GatewayServer {
             ledger_service_handle: None,
             federation_service_handle: None,
             governance_handle: None,
+            governance_actor_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
             ledger_handle: None,
@@ -244,6 +252,7 @@ impl GatewayServer {
             ledger_service_handle: None,
             federation_service_handle: None,
             governance_handle: None,
+            governance_actor_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
             ledger_handle: None,
@@ -366,6 +375,21 @@ impl GatewayServer {
     /// GovernanceActor, ensuring persistence and gossip synchronization.
     pub fn with_governance_handle(mut self, handle: GovernanceHandle) -> Self {
         self.governance_handle = Some(handle);
+        self
+    }
+
+    /// Set the concrete actor-backed governance handle.
+    ///
+    /// This is parallel to `with_governance_handle`, which accepts the
+    /// trait-object alias (`Arc<dyn GovernanceOps>`). The concrete handle is
+    /// required so the gateway can install its `receipt_store` on the actor
+    /// via `install_receipt_store` — without it, actor-path force-close
+    /// accept and deadline auto-close do not emit `InstitutionalEffectRecord`.
+    pub fn with_governance_actor_handle(
+        mut self,
+        handle: icn_governance_actor::GovernanceHandle,
+    ) -> Self {
+        self.governance_actor_handle = Some(handle);
         self
     }
 
@@ -565,6 +589,15 @@ impl GatewayServer {
         // Create receipt store early so governance manager can reference it
         let receipt_store = Arc::new(crate::receipt_store::ReceiptStore::new(db.clone()));
         info!("Receipt store initialized");
+
+        // Install receipt_store on the actor so actor-path `CloseProposal::Accept`
+        // and `ForceCloseProposal::Accept` emit `InstitutionalEffectRecord`
+        // durably. Without this, the HTTP-close path was the sole writer and
+        // force-close / deadline auto-close produced no institutional artifact.
+        if let Some(ref actor_handle) = self.governance_actor_handle {
+            actor_handle.install_receipt_store(receipt_store.clone());
+            info!("Receipt store installed on governance actor (actor-path parity)");
+        }
 
         // Execution record query store (read-only API surface).
         // Uses the daemon core store path when available: <data_dir>/store/execution
