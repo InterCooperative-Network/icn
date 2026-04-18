@@ -106,6 +106,95 @@ pub struct ProvenanceChain {
     pub chain_complete: bool,
 }
 
+/// A single meeting/agenda-item pair in a proposal's deliberation trail.
+///
+/// Produced by [`GovernanceManager::get_deliberation`] and rendered into
+/// [`crate::http::models::DeliberationMeetingResponse`] at the HTTP boundary.
+#[derive(Debug, Clone)]
+pub struct DeliberationMeetingEntry {
+    pub meeting_id: icn_governance::MeetingId,
+    pub meeting_title: String,
+    pub meeting_status: icn_governance::MeetingStatus,
+    pub scheduled_at: Option<u64>,
+    pub started_at: Option<u64>,
+    pub ended_at: Option<u64>,
+    pub agenda_item_id: icn_governance::AgendaItemId,
+    pub agenda_item_title: String,
+    pub presenter: Option<String>,
+    pub discussion_notes: Option<String>,
+    pub outcome: Option<String>,
+    pub generated_action_items: Vec<icn_governance::ActionItemId>,
+}
+
+/// Reverse read-model: a proposal's institutional trail.
+///
+/// Returned by [`GovernanceManager::get_deliberation`]. The `effect_kind`
+/// field labels which `http::configure::GovernanceEffect` variant this
+/// proposal would translate into on acceptance — shape only, not a claim
+/// that the effect was dispatched.
+#[derive(Debug, Clone)]
+pub struct ProposalDeliberation {
+    pub proposal_id: ProposalId,
+    pub domain_id: GovernanceDomainId,
+    pub payload_type: &'static str,
+    pub state_label: &'static str,
+    /// Unix seconds the proposal reached a terminal state, if any.
+    /// Sourced from `ProposalState`, not the receipt (receipts do not carry timestamps).
+    pub decided_at: Option<u64>,
+    pub effect_kind: &'static str,
+    pub deliberations: Vec<DeliberationMeetingEntry>,
+    pub governance_receipt: Option<icn_governance::GovernanceDecisionReceipt>,
+}
+
+/// Label the translated [`crate::http::configure::GovernanceEffect`] shape
+/// for a proposal payload. Pure projection — must stay in sync with the
+/// match in `http::handlers::close_proposal`.
+fn payload_effect_kind(payload: &ProposalPayload) -> &'static str {
+    match payload {
+        ProposalPayload::FreezeMember { .. } => "freeze_member",
+        ProposalPayload::UnfreezeMember { .. } => "unfreeze_member",
+        ProposalPayload::Charter { .. } => "deploy_charter",
+        ProposalPayload::Sdis { proposal: sdis } => match sdis {
+            icn_governance::sdis::SdisProposal::AppointSteward { .. } => "appoint_steward",
+            icn_governance::sdis::SdisProposal::RemoveSteward { .. } => "revoke_steward",
+            _ => "unhandled",
+        },
+        _ => "unhandled",
+    }
+}
+
+/// Unix-seconds timestamp the proposal reached a terminal lifecycle state,
+/// or `None` if still in-flight. Used by the deliberation endpoint to tag
+/// when a decision was recorded without depending on receipt fields.
+fn proposal_decided_at(state: &icn_governance::ProposalState) -> Option<u64> {
+    match state {
+        icn_governance::ProposalState::Accepted { closed_at }
+        | icn_governance::ProposalState::Rejected { closed_at }
+        | icn_governance::ProposalState::NoQuorum { closed_at } => Some(*closed_at),
+        icn_governance::ProposalState::Cancelled { cancelled_at } => Some(*cancelled_at),
+        icn_governance::ProposalState::Vetoed { vetoed_at, .. } => Some(*vetoed_at),
+        icn_governance::ProposalState::ForceClosed { closed_at, .. } => Some(*closed_at),
+        icn_governance::ProposalState::Draft
+        | icn_governance::ProposalState::Deliberation { .. }
+        | icn_governance::ProposalState::Open { .. } => None,
+    }
+}
+
+/// Short lowercase label for a proposal lifecycle state.
+fn proposal_state_label(state: &icn_governance::ProposalState) -> &'static str {
+    match state {
+        icn_governance::ProposalState::Draft => "draft",
+        icn_governance::ProposalState::Deliberation { .. } => "deliberation",
+        icn_governance::ProposalState::Open { .. } => "open",
+        icn_governance::ProposalState::Accepted { .. } => "accepted",
+        icn_governance::ProposalState::Rejected { .. } => "rejected",
+        icn_governance::ProposalState::NoQuorum { .. } => "no_quorum",
+        icn_governance::ProposalState::Cancelled { .. } => "cancelled",
+        icn_governance::ProposalState::Vetoed { .. } => "vetoed",
+        icn_governance::ProposalState::ForceClosed { .. } => "force_closed",
+    }
+}
+
 // ============================================================================
 // Program dashboard aggregate types
 // ============================================================================
@@ -3556,6 +3645,102 @@ impl GovernanceManager {
         })
     }
 
+    /// Assemble a proposal's deliberation trail.
+    ///
+    /// Returns the proposal's header fields together with every meeting in
+    /// the proposal's domain whose agenda references this proposal — each
+    /// meeting entry carries the per-agenda-item discussion notes, outcome,
+    /// and generated action items. When the proposal has been closed, the
+    /// governance decision receipt is included.
+    ///
+    /// `effect_kind` is a pure label derived from `proposal.payload` describing
+    /// which `GovernanceEffect` variant this proposal would translate into on
+    /// acceptance (matching the mapping in `http::handlers::close_proposal`).
+    /// It reports shape only — not whether the effect was actually dispatched.
+    ///
+    /// This is a reverse read-model (proposal → meetings); no new state is
+    /// written. Implementation scans `list_meetings(domain_id)` and filters
+    /// matching agenda items — acceptable at per-domain meeting scale.
+    pub async fn get_deliberation(
+        &self,
+        proposal_id: &ProposalId,
+    ) -> Result<Option<ProposalDeliberation>> {
+        let Some(proposal) = self.get_proposal(proposal_id).await? else {
+            return Ok(None);
+        };
+
+        let meetings = self
+            .meeting_store
+            .list_by_domain(&proposal.domain_id.0)
+            .map_err(|e| anyhow::anyhow!("Failed to list meetings: {e}"))?;
+
+        let mut entries: Vec<DeliberationMeetingEntry> = Vec::new();
+        for m in &meetings {
+            for item in &m.agenda {
+                if item
+                    .linked_proposal
+                    .as_ref()
+                    .is_some_and(|pid| pid == proposal_id)
+                {
+                    entries.push(DeliberationMeetingEntry {
+                        meeting_id: m.id.clone(),
+                        meeting_title: m.title.clone(),
+                        meeting_status: m.status,
+                        scheduled_at: m.scheduled_at,
+                        started_at: m.started_at,
+                        ended_at: m.ended_at,
+                        agenda_item_id: item.id.clone(),
+                        agenda_item_title: item.title.clone(),
+                        presenter: item.presenter.clone(),
+                        discussion_notes: item.discussion_notes.clone(),
+                        outcome: item.outcome.clone(),
+                        generated_action_items: item.generated_action_items.clone(),
+                    });
+                }
+            }
+        }
+
+        // Order deliberations chronologically by when the meeting actually
+        // occurred (started_at preferred, falling back to scheduled_at, then
+        // meeting creation). Meetings that never ran sort last.
+        entries.sort_by_key(|e| {
+            (
+                e.started_at.unwrap_or(u64::MAX),
+                e.scheduled_at.unwrap_or(u64::MAX),
+            )
+        });
+
+        let governance_receipt = if let Some(ref store) = self.receipt_store {
+            match store.get_governance_by_proposal(&proposal_id.0) {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::warn!(
+                        proposal_id = %proposal_id.0,
+                        error = %e,
+                        "Receipt store error in get_deliberation",
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        let effect_kind = payload_effect_kind(&proposal.payload);
+        let decided_at = proposal_decided_at(&proposal.state);
+
+        Ok(Some(ProposalDeliberation {
+            proposal_id: proposal.id.clone(),
+            domain_id: proposal.domain_id.clone(),
+            payload_type: proposal.payload.type_name(),
+            state_label: proposal_state_label(&proposal.state),
+            decided_at,
+            effect_kind,
+            deliberations: entries,
+            governance_receipt,
+        }))
+    }
+
     /// Create an AllocationReceipt from an accepted proposal's payload.
     ///
     /// Returns `None` for proposal types that don't produce economic effects
@@ -3670,7 +3855,7 @@ impl GovernanceManager {
                         SettlementIntent::new(
                             &proposal_id.0,
                             decision_hash,
-                            &domain_id.0,
+                            domain_id.0.clone(),
                             opt.recipient.to_string(),
                             opt.requested_amount as u64,
                             unit,
@@ -5910,6 +6095,259 @@ mod tests {
             chain.chain_complete,
             "INV-5: chain_complete must be true for accepted Text proposal (no allocations needed)"
         );
+    }
+
+    // ========================================================================
+    // Deliberation trail tests (proposal → meetings reverse read-model)
+    // ========================================================================
+
+    /// Helper: add an agenda item linked to `proposal_id` onto `meeting_id`,
+    /// with an optional outcome string. Goes through `update_meeting` so it
+    /// exercises the same store path the HTTP handler uses.
+    async fn push_linked_agenda_item(
+        mgr: &GovernanceManager,
+        meeting_id: &icn_governance::MeetingId,
+        proposal_id: &ProposalId,
+        title: &str,
+        outcome: Option<&str>,
+        notes: Option<&str>,
+    ) {
+        let mut m = mgr.get_meeting(meeting_id).unwrap().unwrap();
+        let mut item = icn_governance::AgendaItem::new(title);
+        item.linked_proposal = Some(proposal_id.clone());
+        item.outcome = outcome.map(|s| s.to_string());
+        item.discussion_notes = notes.map(|s| s.to_string());
+        m.agenda.push(item);
+        mgr.update_meeting(&m).unwrap();
+    }
+
+    #[tokio::test]
+    async fn deliberation_none_when_proposal_missing() {
+        let (mgr, _domain, _member) = make_manager_with_domain().await;
+        let missing = ProposalId("prop-does-not-exist".to_string());
+        let result = mgr.get_deliberation(&missing).await.unwrap();
+        assert!(
+            result.is_none(),
+            "get_deliberation must return None for an unknown proposal_id"
+        );
+    }
+
+    #[tokio::test]
+    async fn deliberation_empty_when_no_meeting_references_proposal() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-no-meetings".to_string()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Standalone".to_string(),
+                "No meeting ever touched this".to_string(),
+                ProposalPayload::Text {
+                    body: "body".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        // Create a meeting in the same domain whose agenda does NOT link this proposal.
+        let m = mgr
+            .create_meeting(
+                domain_id.0.clone(),
+                "Unrelated meeting".to_string(),
+                None,
+                None,
+                member_did.to_string(),
+            )
+            .unwrap();
+        // Add an agenda item linked to a different proposal id — should NOT match.
+        let other = ProposalId("prop-other".to_string());
+        push_linked_agenda_item(&mgr, &m.id, &other, "Unrelated item", None, None).await;
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        assert_eq!(trail.proposal_id, prop_id);
+        assert_eq!(trail.domain_id, domain_id);
+        assert!(trail.deliberations.is_empty());
+        assert!(trail.governance_receipt.is_none());
+        assert_eq!(trail.state_label, "draft");
+        assert_eq!(trail.effect_kind, "unhandled"); // Text payload has no structured effect.
+        assert!(trail.decided_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn deliberation_collects_linked_agenda_items_across_meetings() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-deliberated".to_string()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Multi-meeting".to_string(),
+                "Discussed twice, decided once".to_string(),
+                ProposalPayload::Text {
+                    body: "body".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        // Meeting A scheduled earlier, tabled discussion.
+        let mut m_a = mgr
+            .create_meeting(
+                domain_id.0.clone(),
+                "March review".to_string(),
+                None,
+                Some(1_700_000_000),
+                member_did.to_string(),
+            )
+            .unwrap();
+        m_a.started_at = Some(1_700_000_100);
+        mgr.update_meeting(&m_a).unwrap();
+        push_linked_agenda_item(
+            &mgr,
+            &m_a.id,
+            &prop_id,
+            "Initial discussion",
+            Some("tabled"),
+            Some("Needs more research"),
+        )
+        .await;
+
+        // Meeting B scheduled later, resolved.
+        let mut m_b = mgr
+            .create_meeting(
+                domain_id.0.clone(),
+                "April decision".to_string(),
+                None,
+                Some(1_700_500_000),
+                member_did.to_string(),
+            )
+            .unwrap();
+        m_b.started_at = Some(1_700_500_100);
+        mgr.update_meeting(&m_b).unwrap();
+        push_linked_agenda_item(&mgr, &m_b.id, &prop_id, "Vote", Some("resolved"), None).await;
+
+        // A meeting in a different domain must not leak in.
+        let other_domain = GovernanceDomainId::new("other-coop");
+        mgr.create_domain(
+            other_domain.clone(),
+            "Other Coop".to_string(),
+            "default".to_string(),
+            GovernanceParams {
+                quorum_percentage: 1,
+                approval_threshold_percentage: 51,
+                voting_period_seconds: 86400,
+                require_deliberation: false,
+                ..GovernanceParams::default()
+            },
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+        let m_other = mgr
+            .create_meeting(
+                other_domain.0.clone(),
+                "Other domain".to_string(),
+                None,
+                Some(1_700_250_000),
+                member_did.to_string(),
+            )
+            .unwrap();
+        push_linked_agenda_item(&mgr, &m_other.id, &prop_id, "Cross-domain", None, None).await;
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+
+        assert_eq!(
+            trail.deliberations.len(),
+            2,
+            "only same-domain meetings linking the proposal should appear",
+        );
+        // Chronological order by started_at (earliest first).
+        assert_eq!(trail.deliberations[0].meeting_title, "March review");
+        assert_eq!(trail.deliberations[0].outcome.as_deref(), Some("tabled"));
+        assert_eq!(
+            trail.deliberations[0].discussion_notes.as_deref(),
+            Some("Needs more research"),
+        );
+        assert_eq!(trail.deliberations[1].meeting_title, "April decision");
+        assert_eq!(trail.deliberations[1].outcome.as_deref(), Some("resolved"));
+    }
+
+    #[tokio::test]
+    async fn deliberation_includes_decision_receipt_after_close() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-closed".to_string()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Decided text".to_string(),
+                "Will be accepted".to_string(),
+                ProposalPayload::Text {
+                    body: "body".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        let m = mgr
+            .create_meeting(
+                domain_id.0.clone(),
+                "Decision meeting".to_string(),
+                None,
+                Some(1_700_000_000),
+                member_did.to_string(),
+            )
+            .unwrap();
+        push_linked_agenda_item(&mgr, &m.id, &prop_id, "Vote", Some("resolved"), None).await;
+
+        mgr.open_proposal(prop_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(prop_id.clone(), member_did.clone(), VoteChoice::For, None)
+            .await
+            .unwrap();
+        mgr.close_proposal(prop_id.clone()).await.unwrap();
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        assert_eq!(trail.state_label, "accepted");
+        assert!(trail.decided_at.is_some());
+        assert!(
+            trail.governance_receipt.is_some(),
+            "closed proposal must carry its decision receipt in the deliberation trail",
+        );
+        assert_eq!(trail.deliberations.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn deliberation_effect_kind_labels_freeze_member() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let target = test_did(42);
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-freeze".to_string()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Freeze".to_string(),
+                "Reason".to_string(),
+                ProposalPayload::FreezeMember {
+                    member: target,
+                    reason: "cause".to_string(),
+                    duration_seconds: None,
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        assert_eq!(trail.effect_kind, "freeze_member");
+        assert_eq!(trail.payload_type, "freeze_member");
     }
 
     // ========================================================================

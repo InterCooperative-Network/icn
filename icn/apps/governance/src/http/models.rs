@@ -1173,3 +1173,92 @@ pub struct ProgramSummaryResponse {
     /// `"phase_index_ordering"`.
     pub progress_basis: String,
 }
+
+// ============================================================================
+// Proposal deliberation trail (reverse read-model)
+// ============================================================================
+
+/// Decision receipt summary for a deliberation trail.
+///
+/// Flattens a `GovernanceDecisionReceipt` into the minimal set of fields
+/// required to answer "what was decided, and when". Callers that need full
+/// cryptographic proof should hit `GET /gov/proposals/{id}/proof`; callers
+/// that need the economic-effect chain should hit `.../chain`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DeliberationDecisionResponse {
+    /// Lowercase outcome label: `"accepted"`, `"rejected"`, `"no_quorum"`.
+    pub outcome: String,
+    /// Unix seconds when the decision was recorded.
+    pub decided_at: u64,
+    /// Hex-encoded decision hash (stable identifier of the receipt).
+    pub decision_hash: String,
+}
+
+/// A single meeting in a proposal's deliberation trail.
+///
+/// Each entry captures one agenda item that referenced the proposal. The same
+/// meeting may appear multiple times if its agenda includes the proposal in
+/// more than one item.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DeliberationMeetingResponse {
+    pub meeting_id: String,
+    pub meeting_title: String,
+    /// Lowercase meeting status: `"scheduled"`, `"in_progress"`, `"completed"`, `"cancelled"`.
+    pub meeting_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scheduled_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ended_at: Option<u64>,
+    pub agenda_item_id: String,
+    pub agenda_item_title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presenter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discussion_notes: Option<String>,
+    /// Free-form agenda outcome string recorded by the facilitator,
+    /// e.g. `"resolved"`, `"tabled"`, `"referred"`, `"no_action"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<String>,
+    /// Action items this agenda item generated on meeting close.
+    pub generated_action_items: Vec<String>,
+}
+
+/// Reverse read-model: a proposal's deliberation trail.
+///
+/// Returned by `GET /gov/proposals/{proposal_id}/deliberation`. Links a
+/// proposal backwards to every meeting where it appeared on the agenda,
+/// together with the decision receipt (when closed) and the translated
+/// institutional-effect shape.
+///
+/// `effect_kind` labels the `GovernanceEffect` variant the proposal would
+/// translate into on acceptance (e.g. `"freeze_member"`, `"deploy_charter"`,
+/// `"appoint_steward"`, `"unhandled"`). It is a shape claim only — the
+/// presence of a label does NOT imply the effect was dispatched. Consult
+/// `governance_decision` and, for economic effects, `GET .../chain` for
+/// dispatch evidence.
+///
+/// This endpoint is NOT a progress or activity tracker: it answers
+/// "what deliberation and decision produced this institutional action?"
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ProposalDeliberationResponse {
+    pub proposal_id: String,
+    pub domain_id: String,
+    /// Proposal payload type name (`"text"`, `"budget"`, `"freeze_member"`, …).
+    pub payload_type: String,
+    /// Lowercase proposal lifecycle state
+    /// (`"draft"`, `"deliberation"`, `"open"`, `"accepted"`, `"rejected"`,
+    /// `"no_quorum"`, `"cancelled"`, `"vetoed"`, `"force_closed"`).
+    pub state: String,
+    /// Translated [`crate::http::configure::GovernanceEffect`] shape for this
+    /// proposal payload. `"unhandled"` indicates no structured institutional
+    /// effect is wired for this payload type — the acceptance would still be
+    /// recorded but no gateway dispatch would occur beyond action items.
+    pub effect_kind: String,
+    /// Meetings, in chronological order, where this proposal was on the agenda.
+    pub deliberations: Vec<DeliberationMeetingResponse>,
+    /// Decision receipt summary if the proposal has been closed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub governance_decision: Option<DeliberationDecisionResponse>,
+}
