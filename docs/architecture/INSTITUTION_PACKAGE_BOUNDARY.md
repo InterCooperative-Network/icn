@@ -10,8 +10,8 @@ Supersedes on routing conflicts: `docs/strategy/NYCN-Repo-Architecture-Spec.md`,
 
 > Defines what belongs in ICN platform versus what belongs in an institution-specific package (e.g., NYCN). Anchors all future layered implementation decisions. **Where this doc and any NYCN strategy doc disagree about where a type goes, this doc wins.**
 
-**Grounded against:** `main` at `fde1466a` (Program + Milestone primitives landed, PR #1548) and subsequent Tranche 1a/1b work (milestone CCL gates, `PATCH /gov/programs/{id}/status`).
-**Companion docs:** `KERNEL_APP_SEPARATION.md`, `ADR-001-What-ICN-Is.md`.
+**Grounded against:** `main` at `fde1466a` (Program + Milestone primitives landed, PR #1548). Subsequent Tranche 1a/1b work — milestone CCL gates and `PATCH /gov/programs/{id}/status` — is in progress on open PRs and is *not* yet landed on main at the time of this doc's last review.
+**Companion docs:** `KERNEL_APP_SEPARATION.md`, `../strategy/ADR-001-What-ICN-Is.md`.
 **Docs governed by this one (must not contradict):** `docs/strategy/NYCN-Repo-Architecture-Spec.md`, `docs/strategy/NYCN-Implementation-Matrix.md`, `docs/strategy/NYCN-Execution-Tranches.md`.
 
 ---
@@ -141,7 +141,7 @@ These belong in ICN because every cooperative institution needs them — verifie
 | **Contact / OrgRelationship / CRM** | CRM shape and field semantics vary too much across institutions. | Institution package data model. |
 | **VolunteerAssignment** | A `RoleAssignment` with `authority_scope: ["volunteer"]` already covers this. | Use the existing `RoleAssignment`. |
 | **ReviewQueue** | An `ActionItem` filter view, not a new primitive. | `/gov/me/work?status=pending&tag=review`. |
-| **Institution-specific ProgramKind variants** (`AnnualSummit`, `PolicyDay`, etc.) | Tenant vocabulary leaking into a core enum. | `ProgramKind::Custom("annual_summit")`. The landed `icn-governance::program::ProgramKind` deliberately rejects named tenant variants (see the module doc). |
+| **Institution-specific ProgramKind variants** (`AnnualSummit`, `PolicyDay`, etc.) | Tenant vocabulary leaking into a core enum. | `ProgramKind::Custom("annual-summit")`. The landed `icn-governance::program::ProgramKind` includes generic variants (`Campaign`, `Initiative`, `Series`, `Cycle`) that cross-institution workloads use directly; only institution-specific kinds map to `Custom(String)`. See the module doc for the rationale. |
 | **Institution-specific MilestoneType variants** (`VenueLocked`, `BudgetLocked`, `PublicLaunchReady`, etc.) | Tenant vocabulary leaking into a core enum. | Free-form `completion_criteria: Vec<String>` on `Milestone`, optionally gated by a CCL `completion_gate` expression. The landed code uses strings, not enum variants. |
 
 ### Forbidden module paths (hard rule)

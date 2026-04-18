@@ -13,13 +13,13 @@
 >
 > On any disagreement between this spec and `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md`, **the boundary doc wins.**
 >
-> This document, written before the boundary was pinned down, routes several institution-specific nouns into `icn-governance::*`. That is drift. ICN core — `icn-governance` crate and `apps/governance` — must remain institution-agnostic. Anything shaped specifically by NYCN or the NY Cooperative Summit (sponsor packets, session catalogs, conference registrations, venue-accessibility scoring, summit-year milestone names) belongs in the **institution package** (future `apps/nycn/` or external `nycn-icn` repo), not in governance core.
+> This document, written before the boundary was pinned down, routes several institution-specific nouns into `icn-governance::*`. That is drift. ICN core — `icn-governance` crate and `apps/governance` — must remain institution-agnostic. Anything shaped specifically by NYCN or the NY Cooperative Summit (sponsor packets, session catalogs, conference registrations, venue-accessibility scoring, summit-year milestone names) belongs in the **institution package** (future `icn/apps/nycn/` or external `nycn-icn` repo), not in governance core. Per the App topology rule (`AGENTS.md`), runtime-integrated apps live under `icn/apps/`; no new top-level `apps/*` crates.
 >
 > **Corrected routing (authoritative):**
 >
 > | Section | As written | Corrected |
 > |---------|-----------|-----------|
-> | §2, §3, §5.1 `ProgramKind::AnnualSummit / Campaign / Initiative / Series / PolicyDay` | Named variants in core | `ProgramKind::Custom(String)` — see `icn-governance/src/program.rs`. Institution names live in contract bodies or the institution package. |
+> | §2, §3, §5.1 `ProgramKind::AnnualSummit / Campaign / Initiative / Series / PolicyDay` | Named variants in core | Generic kinds use existing core variants — `ProgramKind::{Campaign, Initiative, Series}` — while institution-specific kinds (`AnnualSummit`, `PolicyDay`) map to `ProgramKind::Custom("annual-summit")` / `ProgramKind::Custom("policy-day")`. See `icn-governance/src/program.rs`. Institution names live in contract bodies or the institution package. |
 > | §5.1 `MilestoneType::{StrategyLocked, VenueLocked, BudgetLocked, PublicLaunchReady, EventReady, ClosureComplete}` | Named variants in core | Landed code uses free-form `completion_criteria: Vec<String>` + generic `MilestoneStatus`. Named summit-shaped checks live in CCL contract bodies, not a core enum. |
 > | §2 / §6 / §10 / §13 sponsor pipeline, §3 `Sponsor` | `icn-governance::sponsor` | Institution package |
 > | §2 / §3 / §7 `BudgetItem` | `icn-governance::budget_item` | Institution package (or generic `icn-ledger` integration if it can be made institution-neutral) |
