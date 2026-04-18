@@ -149,11 +149,23 @@ pub struct DispatchEvidenceSpec {
 /// Returning `None` is valid and means "this dispatcher does not report
 /// evidence" — reconciliation stays `emitted_only` for that effect.
 ///
+/// Async-returning: dispatchers that await real downstream work (e.g.
+/// `register_steward` / `revoke_steward` in commons) can capture the
+/// success/failure result before returning a `DispatchEvidenceSpec`.
+/// Dispatchers that produce evidence synchronously still fit — wrap the
+/// sync computation in `Box::pin(async move { ... })`.
+///
 /// This is additive to `ProposalAcceptedHook`. Gateways that do not
 /// provide evidence-returning dispatchers can leave this `None` and keep
 /// using the fire-and-forget hook.
-pub type ProposalDispatchEvidenceHook =
-    Arc<dyn Fn(&GovernanceEffect) -> Option<DispatchEvidenceSpec> + Send + Sync>;
+pub type ProposalDispatchEvidenceHook = Arc<
+    dyn Fn(
+            &GovernanceEffect,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Option<DispatchEvidenceSpec>> + Send>,
+        > + Send
+        + Sync,
+>;
 
 /// Async predicate: is `did` an active steward in the commons layer?
 ///

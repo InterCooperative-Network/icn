@@ -1280,13 +1280,38 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                         charter_id: charter_id.clone(),
                     }
                 }
-                // SDIS steward proposals are handled via ctx.sdis_service when set (test
-                // path). In daemon mode sdis_service is None — the actor event system
-                // handles execution (KernelGovernanceExecutor → SdisServiceImpl). Emit
-                // Unhandled so the hook is a no-op for SDIS in both paths.
-                icn_governance::ProposalPayload::Sdis { .. } => GovernanceEffect::Unhandled {
-                    proposal_id: proposal.id.0.clone(),
-                    payload_type: proposal.payload.type_name().to_owned(),
+                // SDIS steward proposals: translate to concrete authority effects so the
+                // evidence-returning hook (wired by the gateway to commons.register_steward
+                // / commons.revoke_steward) can produce real dispatch evidence. Other SDIS
+                // variants fall through to Unhandled — they are carried by the actor event
+                // system (KernelGovernanceExecutor → SdisServiceImpl) and produce no
+                // in-process evidence from this handler.
+                icn_governance::ProposalPayload::Sdis { proposal: sdis } => match sdis {
+                    icn_governance::sdis::SdisProposal::AppointSteward {
+                        candidate,
+                        region,
+                        bond_amount,
+                        term_length,
+                        ..
+                    } => GovernanceEffect::AppointSteward {
+                        proposal_id: proposal.id.0.clone(),
+                        domain_id: proposal.domain_id.0.clone(),
+                        candidate: candidate.clone(),
+                        region: region.clone(),
+                        bond_amount: *bond_amount,
+                        term_length_seconds: *term_length,
+                    },
+                    icn_governance::sdis::SdisProposal::RemoveSteward {
+                        steward, reason, ..
+                    } => GovernanceEffect::RevokeSteward {
+                        proposal_id: proposal.id.0.clone(),
+                        steward: steward.clone(),
+                        reason: reason.clone(),
+                    },
+                    _ => GovernanceEffect::Unhandled {
+                        proposal_id: proposal.id.0.clone(),
+                        payload_type: proposal.payload.type_name().to_owned(),
+                    },
                 },
                 _ => GovernanceEffect::Unhandled {
                     proposal_id: proposal.id.0.clone(),
@@ -1301,7 +1326,7 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
             // effect record. Effect kind must match one of our translated
             // labels — for Unhandled we skip (no record was emitted).
             if let Some(ev_hook) = &ctx.on_proposal_accepted_with_evidence {
-                if let Some(spec) = ev_hook(&effect) {
+                if let Some(spec) = ev_hook(&effect).await {
                     let effect_kind = match &effect {
                         GovernanceEffect::FreezeMember { .. } => Some("freeze_member"),
                         GovernanceEffect::UnfreezeMember { .. } => Some("unfreeze_member"),
@@ -1335,6 +1360,16 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         // `EffectDispatchEvidence` tied to the institutional effect record
         // persisted earlier in this handler. Other dispatch paths (charter/
         // freeze hooks) are fire-and-forget and remain `emitted_only`.
+        //
+        // Double-dispatch guard: for steward authority proposals, the
+        // evidence-returning hook (`on_proposal_accepted_with_evidence`, wired
+        // by the gateway to commons.register_steward / revoke_steward) is now
+        // canonical. If both are configured, running the sdis_service block
+        // below would re-enter register/revoke and produce conflicting
+        // evidence. When the evidence hook is wired, skip sdis_service for
+        // AppointSteward/RemoveSteward variants — other SDIS variants still
+        // flow through sdis_service unchanged.
+        let evidence_hook_handles_steward = ctx.on_proposal_accepted_with_evidence.is_some();
         if let Some(ref svc) = ctx.sdis_service {
             use icn_kernel_api::{AppointStewardRequest, RevokeStewardRequest};
             if let icn_governance::ProposalPayload::Sdis {
@@ -1369,6 +1404,13 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                 };
 
                 match sdis_proposal {
+                    icn_governance::sdis::SdisProposal::AppointSteward { .. }
+                    | icn_governance::sdis::SdisProposal::RemoveSteward { .. }
+                        if evidence_hook_handles_steward =>
+                    {
+                        // Evidence hook is canonical for steward variants — skip
+                        // sdis_service to avoid double-dispatch.
+                    }
                     icn_governance::sdis::SdisProposal::AppointSteward {
                         candidate,
                         bond_amount,
@@ -5047,14 +5089,17 @@ mod tests {
 
         // The evidence hook simulates a downstream dispatcher reporting back
         // with a state_change_hash after successful side-effects.
-        let ev_hook: ProposalDispatchEvidenceHook = Arc::new(move |effect| match effect {
-            GovernanceEffect::FreezeMember { .. } => Some(DispatchEvidenceSpec {
-                subsystem: "commons".to_string(),
-                receipt_ref: Some("state-hash-abc".to_string()),
-                success: true,
-                error_message: None,
-            }),
-            _ => None,
+        let ev_hook: ProposalDispatchEvidenceHook = Arc::new(move |effect| {
+            let spec = match effect {
+                GovernanceEffect::FreezeMember { .. } => Some(DispatchEvidenceSpec {
+                    subsystem: "commons".to_string(),
+                    receipt_ref: Some("state-hash-abc".to_string()),
+                    success: true,
+                    error_message: None,
+                }),
+                _ => None,
+            };
+            Box::pin(async move { spec })
         });
 
         let ctx = GovernanceContext {
@@ -5090,6 +5135,368 @@ mod tests {
         assert!(evidence[0].success);
 
         // Reconciliation derives to ExecutionEvidenced on success.
+        let status = crate::dispatch_evidence::derive_reconciliation_status(&records[0], &evidence);
+        assert_eq!(status, ReconciliationStatus::ExecutionEvidenced);
+    }
+
+    /// Proves the `appoint_steward` dispatch lane produces real execution
+    /// evidence on success:
+    ///   SDIS AppointSteward proposal accepted
+    ///   → `InstitutionalEffectRecord(effect_kind = "appoint_steward")`
+    ///   → evidence hook awaits a simulated downstream steward registration,
+    ///     returns `DispatchEvidenceSpec { success: true, receipt_ref: Some(id) }`
+    ///   → dispatch evidence is persisted against the record
+    ///   → derived `ReconciliationStatus` is `ExecutionEvidenced`.
+    ///
+    /// The simulated downstream is the async commons `register_steward` call
+    /// in gateway/server.rs — same contract, substituted for a sync return
+    /// here to avoid pulling in commons.
+    #[tokio::test]
+    async fn evidence_hook_persists_dispatch_evidence_on_appoint_steward_success() {
+        use crate::dispatch_evidence::ReconciliationStatus;
+        use crate::http::configure::{DispatchEvidenceSpec, ProposalDispatchEvidenceHook};
+        use icn_governance::sdis::SdisProposal;
+
+        let steward_did = test_did(11);
+        let candidate_did = test_did(22);
+
+        let mgr = Arc::new(
+            GovernanceManager::new().with_receipt_store(Arc::new(HandlerTestReceiptBackend::new())),
+        );
+        let domain_id = GovernanceDomainId("steward-coop".to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            "steward coop".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 0, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![steward_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = ProposalId("appoint-1".to_string());
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id.clone(),
+            steward_did.clone(),
+            "Appoint candidate as steward".to_string(),
+            "appoint_steward".to_string(),
+            ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: candidate_did.clone(),
+                    sponsors: vec![steward_did.clone()],
+                    region: domain_id.0.clone(),
+                    bond_amount: 1000,
+                    term_length: 31_536_000, // 1 year
+                },
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .unwrap();
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            steward_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let simulated_steward_id = "abcd1234".to_string();
+        let sid_clone = simulated_steward_id.clone();
+        let ev_hook: ProposalDispatchEvidenceHook = Arc::new(move |effect| {
+            let sid = sid_clone.clone();
+            let matched = matches!(effect, GovernanceEffect::AppointSteward { .. });
+            Box::pin(async move {
+                if matched {
+                    Some(DispatchEvidenceSpec {
+                        subsystem: "commons".to_string(),
+                        receipt_ref: Some(sid),
+                        success: true,
+                        error_message: None,
+                    })
+                } else {
+                    None
+                }
+            })
+        });
+
+        let ctx = GovernanceContext {
+            manager: mgr.clone(),
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: Some(Arc::new(|_| {})),
+            on_proposal_accepted_with_evidence: Some(ev_hook),
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        };
+
+        let app = test_app!(ctx, steward_did);
+        let req = test::TestRequest::post()
+            .uri(&format!("/proposals/{}/close", proposal_id.0))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let records = mgr.list_institutional_effects(&proposal_id).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].effect_kind, "appoint_steward");
+
+        let evidence = mgr.list_dispatch_evidence(&records[0].record_id).unwrap();
+        assert_eq!(evidence.len(), 1);
+        assert_eq!(evidence[0].subsystem, "commons");
+        assert_eq!(
+            evidence[0].receipt_ref.as_deref(),
+            Some(simulated_steward_id.as_str())
+        );
+        assert!(evidence[0].success);
+        assert!(evidence[0].error_message.is_none());
+
+        let status = crate::dispatch_evidence::derive_reconciliation_status(&records[0], &evidence);
+        assert_eq!(status, ReconciliationStatus::ExecutionEvidenced);
+    }
+
+    /// Proves the `appoint_steward` dispatch lane records failures durably:
+    ///   downstream register_steward fails (e.g. no holder record, unratified charter)
+    ///   → `InstitutionalEffectRecord(effect_kind = "appoint_steward")`
+    ///   → evidence hook returns `DispatchEvidenceSpec { success: false, error_message }`
+    ///   → dispatch evidence is persisted
+    ///   → derived `ReconciliationStatus` is `ExecutionFailed`.
+    ///
+    /// Failure must be durable, not silently swallowed — this is what makes
+    /// reconciliation truthful. A later retry succeeding elsewhere must not
+    /// overwrite this failure; that stickiness is enforced by the status
+    /// derivation itself.
+    #[tokio::test]
+    async fn evidence_hook_persists_failure_on_appoint_steward_error() {
+        use crate::dispatch_evidence::ReconciliationStatus;
+        use crate::http::configure::{DispatchEvidenceSpec, ProposalDispatchEvidenceHook};
+        use icn_governance::sdis::SdisProposal;
+
+        let steward_did = test_did(11);
+        let candidate_did = test_did(24);
+
+        let mgr = Arc::new(
+            GovernanceManager::new().with_receipt_store(Arc::new(HandlerTestReceiptBackend::new())),
+        );
+        let domain_id = GovernanceDomainId("steward-fail-coop".to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            "steward fail coop".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 0, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![steward_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = ProposalId("appoint-fail-1".to_string());
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id.clone(),
+            steward_did.clone(),
+            "Appoint — will fail downstream".to_string(),
+            "appoint_steward".to_string(),
+            ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: candidate_did.clone(),
+                    sponsors: vec![steward_did.clone()],
+                    region: domain_id.0.clone(),
+                    bond_amount: 0,
+                    term_length: 31_536_000,
+                },
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .unwrap();
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            steward_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let ev_hook: ProposalDispatchEvidenceHook = Arc::new(move |effect| {
+            let matched = matches!(effect, GovernanceEffect::AppointSteward { .. });
+            Box::pin(async move {
+                if matched {
+                    Some(DispatchEvidenceSpec {
+                        subsystem: "commons".to_string(),
+                        receipt_ref: None,
+                        success: false,
+                        error_message: Some("candidate has no holder record".to_string()),
+                    })
+                } else {
+                    None
+                }
+            })
+        });
+
+        let ctx = GovernanceContext {
+            manager: mgr.clone(),
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: Some(Arc::new(|_| {})),
+            on_proposal_accepted_with_evidence: Some(ev_hook),
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        };
+
+        let app = test_app!(ctx, steward_did);
+        let req = test::TestRequest::post()
+            .uri(&format!("/proposals/{}/close", proposal_id.0))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let records = mgr.list_institutional_effects(&proposal_id).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].effect_kind, "appoint_steward");
+
+        let evidence = mgr.list_dispatch_evidence(&records[0].record_id).unwrap();
+        assert_eq!(evidence.len(), 1);
+        assert!(!evidence[0].success);
+        assert_eq!(
+            evidence[0].error_message.as_deref(),
+            Some("candidate has no holder record"),
+        );
+
+        let status = crate::dispatch_evidence::derive_reconciliation_status(&records[0], &evidence);
+        match status {
+            ReconciliationStatus::ExecutionFailed { error } => {
+                assert_eq!(error.as_deref(), Some("candidate has no holder record"));
+            }
+            other => panic!("expected ExecutionFailed, got {other:?}"),
+        }
+    }
+
+    /// Proves the `revoke_steward` dispatch lane mirrors the appoint lane:
+    /// on successful commons revocation, evidence is persisted with the
+    /// commons steward-id as receipt_ref and reconciliation derives to
+    /// `ExecutionEvidenced`.
+    #[tokio::test]
+    async fn evidence_hook_persists_dispatch_evidence_on_revoke_steward_success() {
+        use crate::dispatch_evidence::ReconciliationStatus;
+        use crate::http::configure::{DispatchEvidenceSpec, ProposalDispatchEvidenceHook};
+        use icn_governance::sdis::SdisProposal;
+
+        let steward_did = test_did(11);
+        let target_steward = test_did(26);
+
+        let mgr = Arc::new(
+            GovernanceManager::new().with_receipt_store(Arc::new(HandlerTestReceiptBackend::new())),
+        );
+        let domain_id = GovernanceDomainId("revoke-coop".to_string());
+        mgr.create_domain(
+            domain_id.clone(),
+            "revoke coop".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 0, 86_400),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![steward_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = ProposalId("revoke-1".to_string());
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id.clone(),
+            steward_did.clone(),
+            "Revoke target steward".to_string(),
+            "revoke_steward".to_string(),
+            ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: target_steward.clone(),
+                    reason: "performance".to_string(),
+                    return_bond: true,
+                },
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .unwrap();
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            steward_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let sid = "revoked-id-xyz".to_string();
+        let sid_clone = sid.clone();
+        let ev_hook: ProposalDispatchEvidenceHook = Arc::new(move |effect| {
+            let sid = sid_clone.clone();
+            let matched = matches!(effect, GovernanceEffect::RevokeSteward { .. });
+            Box::pin(async move {
+                if matched {
+                    Some(DispatchEvidenceSpec {
+                        subsystem: "commons".to_string(),
+                        receipt_ref: Some(sid),
+                        success: true,
+                        error_message: None,
+                    })
+                } else {
+                    None
+                }
+            })
+        });
+
+        let ctx = GovernanceContext {
+            manager: mgr.clone(),
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: Some(Arc::new(|_| {})),
+            on_proposal_accepted_with_evidence: Some(ev_hook),
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+        };
+
+        let app = test_app!(ctx, steward_did);
+        let req = test::TestRequest::post()
+            .uri(&format!("/proposals/{}/close", proposal_id.0))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let records = mgr.list_institutional_effects(&proposal_id).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].effect_kind, "revoke_steward");
+
+        let evidence = mgr.list_dispatch_evidence(&records[0].record_id).unwrap();
+        assert_eq!(evidence.len(), 1);
+        assert_eq!(evidence[0].receipt_ref.as_deref(), Some(sid.as_str()));
+        assert!(evidence[0].success);
+
         let status = crate::dispatch_evidence::derive_reconciliation_status(&records[0], &evidence);
         assert_eq!(status, ReconciliationStatus::ExecutionEvidenced);
     }
