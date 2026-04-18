@@ -384,6 +384,10 @@ where
             web::resource("/milestones/{milestone_id}/preview")
                 .route(web::get().to(handlers::preview_milestone::<E>)),
         )
+        .service(
+            web::resource("/milestones/{milestone_id}/history")
+                .route(web::get().to(handlers::get_milestone_history::<E>)),
+        )
         // ── Meeting endpoints ────────────────────────────────────────────
         .service(
             web::resource("/domains/{domain_id}/meetings")

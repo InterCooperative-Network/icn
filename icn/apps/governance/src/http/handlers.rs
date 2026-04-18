@@ -3836,6 +3836,83 @@ fn build_milestone_preview(
     }
 }
 
+// ── Milestone history ──────────────────────────────────────────────────────────
+
+/// GET /gov/milestones/{milestone_id}/history — Read-only lifecycle bookmark view.
+///
+/// Returns the observable status-transition history for a milestone.
+///
+/// **Coverage limitation**: the governance store records only two temporal
+/// facts about a milestone:
+/// - `created_at` — when the milestone was first persisted (initial status is
+///   always `pending`).
+/// - `completed_at` + `completed_by` — set only when the milestone moves into
+///   `Completed`.
+///
+/// Intermediate transitions (`pending → in_progress`, `→ blocked`, etc.) are
+/// **not** persisted. They will not appear in this response. The `coverage`
+/// field in the response is always `"lifecycle_bookmarks"` in the current
+/// implementation; callers must treat the entry list as a partial view, not a
+/// complete audit log.
+///
+/// Requires `governance:read`.
+///
+/// Returns 404 if the milestone does not exist.
+pub async fn get_milestone_history<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    milestone_id: web::Path<String>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let id = MilestoneId(milestone_id.into_inner());
+
+    let milestone = ctx
+        .manager
+        .get_milestone(&id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| err_not_found("Milestone not found"))?;
+
+    Ok(HttpResponse::Ok().json(build_milestone_history(&milestone)))
+}
+
+/// Pure function assembling a [`MilestoneHistoryResponse`] from a milestone
+/// record. Split out for unit-testability without an HTTP stack.
+///
+/// Entries are ordered oldest-to-newest:
+/// 1. Creation bookmark (`created_at`, status `pending`, source `creation`).
+/// 2. Completion bookmark (`completed_at` + `completed_by`), only present when
+///    the milestone has `completed_at` set.
+///
+/// No intermediate entries are emitted because intermediate transitions are
+/// not persisted in the current store.
+fn build_milestone_history(milestone: &icn_governance::Milestone) -> MilestoneHistoryResponse {
+    let mut entries = Vec::new();
+
+    // Entry 1: creation (always present).
+    entries.push(MilestoneHistoryEntry {
+        changed_at: milestone.created_at,
+        changed_by: None, // creator is not recorded on the milestone record
+        to_status: "pending".to_string(),
+        source: "creation".to_string(),
+    });
+
+    // Entry 2: completion (only when the milestone has been completed).
+    if let Some(completed_at) = milestone.completed_at {
+        entries.push(MilestoneHistoryEntry {
+            changed_at: completed_at,
+            changed_by: milestone.completed_by.as_ref().map(|d| d.to_string()),
+            to_status: "completed".to_string(),
+            source: "completion_record".to_string(),
+        });
+    }
+
+    MilestoneHistoryResponse {
+        milestone_id: milestone.id.0.clone(),
+        coverage: "lifecycle_bookmarks".to_string(),
+        entries,
+    }
+}
+
 // ── Program dashboard ─────────────────────────────────────────────────────────
 
 fn dashboard_milestone_summary(m: &icn_governance::Milestone) -> DashboardMilestoneSummary {
@@ -5793,5 +5870,127 @@ mod tests {
             reason.contains("blocked"),
             "reason should mention block: {reason}"
         );
+    }
+
+    // ── Milestone history tests ────────────────────────────────────────────
+
+    macro_rules! history_app {
+        ($ctx:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: "did:icn:reader".to_string(),
+                            scope: Some("governance:read".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .route(
+                        "/milestones/{milestone_id}/history",
+                        web::get().to(get_milestone_history::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// 404 when the milestone does not exist.
+    #[actix_web::test]
+    async fn history_404_for_missing_milestone() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let app = history_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri("/milestones/ghost/history")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 404);
+    }
+
+    /// Open (pending) milestone has exactly one entry: the creation bookmark.
+    /// `completed_at` and `completed_by` are absent → completion entry omitted.
+    #[actix_web::test]
+    async fn history_pending_milestone_has_one_entry() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-h1", "ent-h1").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        let app = history_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["coverage"], "lifecycle_bookmarks");
+        let entries = body["entries"].as_array().unwrap();
+        assert_eq!(
+            entries.len(),
+            1,
+            "only creation entry for pending milestone"
+        );
+        assert_eq!(entries[0]["to_status"], "pending");
+        assert_eq!(entries[0]["source"], "creation");
+        // changed_by is omitted (no creator recorded on milestone record)
+        assert!(entries[0]["changed_by"].is_null());
+    }
+
+    /// Completed milestone has two entries: creation + completion.
+    /// `completed_by` is present on the completion entry.
+    #[actix_web::test]
+    async fn history_completed_milestone_has_two_entries() {
+        let mgr = Arc::new(GovernanceManager::new());
+        let pid = setup_preview_program(&mgr, "dom-h2", "ent-h2").await;
+
+        let m = mgr
+            .create_milestone(pid, "Phase 0".to_string(), None, 0, None, vec![])
+            .unwrap();
+
+        let actor = Did::from_anchor_id(&[42u8; 32]);
+        let actor_str = actor.to_string();
+        mgr.update_milestone_status(&m.id, MilestoneStatus::Completed, &actor)
+            .unwrap();
+
+        let app = history_app!(make_dashboard_ctx(mgr));
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::get()
+                .uri(&format!("/milestones/{}/history", m.id.0))
+                .to_request(),
+        )
+        .await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["coverage"], "lifecycle_bookmarks");
+        let entries = body["entries"].as_array().unwrap();
+        assert_eq!(
+            entries.len(),
+            2,
+            "creation + completion for completed milestone"
+        );
+
+        assert_eq!(entries[0]["to_status"], "pending");
+        assert_eq!(entries[0]["source"], "creation");
+        assert!(entries[0]["changed_by"].is_null());
+
+        assert_eq!(entries[1]["to_status"], "completed");
+        assert_eq!(entries[1]["source"], "completion_record");
+        assert_eq!(entries[1]["changed_by"], actor_str);
+        // completion entry must be at or after creation
+        let t0 = entries[0]["changed_at"].as_u64().unwrap();
+        let t1 = entries[1]["changed_at"].as_u64().unwrap();
+        assert!(t1 >= t0, "completion must not precede creation");
     }
 }

@@ -1052,3 +1052,61 @@ pub struct ProgramDashboardResponse {
     /// earliest `scheduled_at` first; unscheduled meetings sort last.
     pub meetings: Vec<DashboardMeetingSummary>,
 }
+
+// ============================================================================
+// Milestone history (read-only lifecycle bookmark view)
+// ============================================================================
+
+/// A single lifecycle bookmark extracted from the milestone record.
+///
+/// **Coverage limitation**: the governance store records only two temporal
+/// facts about a milestone — when it was created (`created_at`) and when it
+/// reached `Completed` (`completed_at` + `completed_by`). Intermediate
+/// transitions (e.g. `pending → in_progress → blocked`) are not currently
+/// persisted; they will not appear in this list. `source` names which field
+/// on the record the entry was derived from, so callers know exactly what
+/// persisted data backs each entry.
+///
+/// Fields that are genuinely unknown are `null` (`changed_by` on the
+/// creation entry; `to_status` would always be the entry's status).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MilestoneHistoryEntry {
+    /// Unix seconds when this lifecycle event occurred (always present).
+    pub changed_at: u64,
+    /// DID of the actor who caused the transition, if recorded.
+    /// `null` for the creation entry (the creator is not currently stored on
+    /// the milestone record itself).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub changed_by: Option<String>,
+    /// The status the milestone moved INTO at this event.
+    pub to_status: String,
+    /// Persisted-data source backing this entry.
+    /// `"creation"` → derived from `created_at` (initial status is always
+    /// `pending`). `"completion_record"` → derived from `completed_at` +
+    /// `completed_by`.
+    pub source: String,
+}
+
+/// Ordered collection of lifecycle bookmarks for a milestone.
+///
+/// Returned by `GET /gov/milestones/{milestone_id}/history`. Entries are
+/// ordered oldest-to-newest (creation first).
+///
+/// `coverage` describes the fidelity of the history: `"lifecycle_bookmarks"`
+/// means only creation and completion events are available because the
+/// governance store does not persist intermediate status transitions.
+/// Callers MUST treat this list as a partial view, not a complete audit log.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MilestoneHistoryResponse {
+    /// Milestone identifier.
+    pub milestone_id: String,
+    /// Fidelity annotation.
+    ///
+    /// Always `"lifecycle_bookmarks"` in the current implementation: only
+    /// `created_at` and `completed_at` are persisted on the milestone record.
+    /// Future store migrations (e.g. an append-only transition log) would
+    /// change this to `"full_transition_log"`.
+    pub coverage: String,
+    /// Lifecycle bookmarks, oldest first.
+    pub entries: Vec<MilestoneHistoryEntry>,
+}
