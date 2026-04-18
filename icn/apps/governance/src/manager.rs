@@ -6,6 +6,9 @@
 //! [`GovernanceReceiptBackend`] trait so this crate does not depend on
 //! `icn-gateway`.
 
+use crate::dispatch_evidence::{
+    derive_reconciliation_status, EffectDispatchEvidence, ReconciliationStatus,
+};
 use crate::institutional_effect::InstitutionalEffectRecord;
 use crate::receipt_backend::GovernanceReceiptBackend;
 use anyhow::Result;
@@ -145,10 +148,20 @@ pub struct ProposalDeliberation {
     pub effect_kind: &'static str,
     pub deliberations: Vec<DeliberationMeetingEntry>,
     pub governance_receipt: Option<icn_governance::GovernanceDecisionReceipt>,
-    /// Institutional effect records emitted at acceptance, oldest-first.
-    /// Empty when the proposal was not accepted, when the payload translated
-    /// to `Unhandled`, or when no receipt store is wired.
-    pub emitted_effects: Vec<InstitutionalEffectRecord>,
+    /// Institutional effect records emitted at acceptance plus their
+    /// downstream reconciliation state, oldest-first.  Empty when the
+    /// proposal was not accepted, when the payload translated to
+    /// `Unhandled`, or when no receipt store is wired.
+    pub emitted_effects: Vec<ReconciledEffectEntry>,
+}
+
+/// An emitted institutional effect record paired with its dispatch evidence
+/// and derived reconciliation status.
+#[derive(Debug, Clone)]
+pub struct ReconciledEffectEntry {
+    pub record: InstitutionalEffectRecord,
+    pub dispatch_evidence: Vec<EffectDispatchEvidence>,
+    pub reconciliation_status: ReconciliationStatus,
 }
 
 /// Label the translated [`crate::http::configure::GovernanceEffect`] shape
@@ -3683,6 +3696,39 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Failed to list institutional effect records: {e}"))
     }
 
+    /// Persist downstream dispatch evidence attached to a previously
+    /// emitted institutional effect record.
+    ///
+    /// No-op when no receipt store is wired. Called by the HTTP close
+    /// handler after a downstream subsystem returns synchronously with
+    /// structured success/error data — currently only the SDIS test-path
+    /// `appoint_steward` / `revoke_steward` calls.
+    pub fn record_dispatch_evidence(
+        &self,
+        evidence: &EffectDispatchEvidence,
+    ) -> Result<(), anyhow::Error> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(());
+        };
+        store
+            .put_effect_dispatch_evidence(evidence)
+            .map_err(|e| anyhow::anyhow!("Failed to persist dispatch evidence: {e}"))
+    }
+
+    /// List dispatch evidence for an effect record, oldest-first. Empty
+    /// list when no evidence or no store wired.
+    pub fn list_dispatch_evidence(
+        &self,
+        effect_record_id: &str,
+    ) -> Result<Vec<EffectDispatchEvidence>, anyhow::Error> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_effect_dispatch_evidence_by_record(effect_record_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list dispatch evidence: {e}"))
+    }
+
     /// Assemble a proposal's deliberation trail.
     ///
     /// Returns the proposal's header fields together with every meeting in
@@ -3770,7 +3816,7 @@ impl GovernanceManager {
         // Include any emitted institutional effect records. Store errors are
         // downgraded to empty rather than failing the read — the deliberation
         // trail remains useful even if the effect index is unavailable.
-        let emitted_effects = self
+        let records = self
             .list_institutional_effects(proposal_id)
             .unwrap_or_else(|e| {
                 tracing::warn!(
@@ -3780,6 +3826,29 @@ impl GovernanceManager {
                 );
                 vec![]
             });
+
+        let emitted_effects: Vec<ReconciledEffectEntry> = records
+            .into_iter()
+            .map(|record| {
+                let dispatch_evidence = self
+                    .list_dispatch_evidence(&record.record_id)
+                    .unwrap_or_else(|e| {
+                        tracing::warn!(
+                            record_id = %record.record_id,
+                            error = %e,
+                            "get_deliberation: evidence read failed; treating as empty",
+                        );
+                        vec![]
+                    });
+                let reconciliation_status =
+                    derive_reconciliation_status(&record, &dispatch_evidence);
+                ReconciledEffectEntry {
+                    record,
+                    dispatch_evidence,
+                    reconciliation_status,
+                }
+            })
+            .collect();
 
         Ok(Some(ProposalDeliberation {
             proposal_id: proposal.id.clone(),
@@ -5783,6 +5852,7 @@ mod tests {
         governance: std::sync::Mutex<Vec<icn_governance::GovernanceDecisionReceipt>>,
         allocations: std::sync::Mutex<Vec<AllocationReceipt>>,
         institutional_effects: std::sync::Mutex<Vec<InstitutionalEffectRecord>>,
+        dispatch_evidence: std::sync::Mutex<Vec<EffectDispatchEvidence>>,
     }
 
     impl InMemoryReceiptBackend {
@@ -5791,6 +5861,7 @@ mod tests {
                 governance: std::sync::Mutex::new(vec![]),
                 allocations: std::sync::Mutex::new(vec![]),
                 institutional_effects: std::sync::Mutex::new(vec![]),
+                dispatch_evidence: std::sync::Mutex::new(vec![]),
             }
         }
     }
@@ -5871,6 +5942,31 @@ mod tests {
                 .cloned()
                 .collect();
             items.sort_by_key(|r| r.recorded_at);
+            Ok(items)
+        }
+        fn put_effect_dispatch_evidence(
+            &self,
+            evidence: &EffectDispatchEvidence,
+        ) -> Result<(), String> {
+            self.dispatch_evidence
+                .lock()
+                .unwrap()
+                .push(evidence.clone());
+            Ok(())
+        }
+        fn list_effect_dispatch_evidence_by_record(
+            &self,
+            effect_record_id: &str,
+        ) -> Result<Vec<EffectDispatchEvidence>, String> {
+            let mut items: Vec<EffectDispatchEvidence> = self
+                .dispatch_evidence
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|e| e.effect_record_id == effect_record_id)
+                .cloned()
+                .collect();
+            items.sort_by_key(|e| e.recorded_at);
             Ok(items)
         }
     }
@@ -6525,12 +6621,195 @@ mod tests {
         let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
         assert_eq!(trail.emitted_effects.len(), 1);
         let surfaced = &trail.emitted_effects[0];
-        assert_eq!(surfaced.effect_kind, "freeze_member");
+        assert_eq!(surfaced.record.effect_kind, "freeze_member");
         assert_eq!(
-            surfaced.target_did.as_deref(),
+            surfaced.record.target_did.as_deref(),
             Some(target.to_string().as_str())
         );
-        assert_eq!(surfaced.reason.as_deref(), Some("audit"));
+        assert_eq!(surfaced.record.reason.as_deref(), Some("audit"));
+        // No dispatch evidence wired for freeze_member → emitted_only.
+        assert!(surfaced.dispatch_evidence.is_empty());
+        assert_eq!(
+            surfaced.reconciliation_status,
+            ReconciliationStatus::EmittedOnly
+        );
+    }
+
+    // ========================================================================
+    // Dispatch evidence + reconciliation status (governance → execution bridge)
+    // ========================================================================
+
+    #[tokio::test]
+    async fn dispatch_evidence_roundtrip_and_ordering_per_record() {
+        let (mgr, _domain, _member) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let older = EffectDispatchEvidence::new(
+            "rec-a",
+            "prop-1",
+            "sdis",
+            Some("state-hash-1".into()),
+            true,
+            None,
+            100,
+        );
+        let newer = EffectDispatchEvidence::new(
+            "rec-a",
+            "prop-1",
+            "sdis",
+            Some("state-hash-2".into()),
+            true,
+            None,
+            200,
+        );
+        // Unrelated record — must not leak into rec-a's list.
+        let other_record =
+            EffectDispatchEvidence::new("rec-b", "prop-2", "sdis", None, true, None, 150);
+
+        mgr.record_dispatch_evidence(&newer).unwrap();
+        mgr.record_dispatch_evidence(&older).unwrap();
+        mgr.record_dispatch_evidence(&other_record).unwrap();
+
+        let list = mgr.list_dispatch_evidence("rec-a").unwrap();
+        assert_eq!(list.len(), 2, "must scope by effect_record_id");
+        assert_eq!(list[0].recorded_at, 100, "oldest first");
+        assert_eq!(list[1].recorded_at, 200);
+        assert_eq!(list[0].receipt_ref.as_deref(), Some("state-hash-1"));
+    }
+
+    #[tokio::test]
+    async fn deliberation_surfaces_execution_evidenced_when_success_recorded() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let target = test_did(8);
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-evid".into()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Freeze".into(),
+                "r".into(),
+                ProposalPayload::FreezeMember {
+                    member: target.clone(),
+                    reason: "audit".into(),
+                    duration_seconds: None,
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        let rec = crate::institutional_effect::record_from_accepted_payload(
+            &prop_id.0,
+            &domain_id.0,
+            None,
+            &ProposalPayload::FreezeMember {
+                member: target.clone(),
+                reason: "audit".into(),
+                duration_seconds: None,
+            },
+            10,
+        )
+        .expect("must produce record");
+        let rec_id = rec.record_id.clone();
+        mgr.record_institutional_effect(&rec).unwrap();
+
+        mgr.record_dispatch_evidence(&EffectDispatchEvidence::new(
+            rec_id.clone(),
+            prop_id.0.clone(),
+            "commons",
+            Some("commons-receipt-abc".into()),
+            true,
+            None,
+            20,
+        ))
+        .unwrap();
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        assert_eq!(trail.emitted_effects.len(), 1);
+        let e = &trail.emitted_effects[0];
+        assert_eq!(e.dispatch_evidence.len(), 1);
+        assert_eq!(e.dispatch_evidence[0].subsystem, "commons");
+        assert_eq!(
+            e.reconciliation_status,
+            ReconciliationStatus::ExecutionEvidenced
+        );
+    }
+
+    #[tokio::test]
+    async fn deliberation_surfaces_execution_failed_with_subsystem_error() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend);
+
+        let target = test_did(11);
+        let prop_id = mgr
+            .create_proposal(
+                ProposalId("prop-evid-fail".into()),
+                domain_id.clone(),
+                member_did.clone(),
+                "Freeze".into(),
+                "r".into(),
+                ProposalPayload::FreezeMember {
+                    member: target.clone(),
+                    reason: "audit".into(),
+                    duration_seconds: None,
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        let rec = crate::institutional_effect::record_from_accepted_payload(
+            &prop_id.0,
+            &domain_id.0,
+            None,
+            &ProposalPayload::FreezeMember {
+                member: target.clone(),
+                reason: "audit".into(),
+                duration_seconds: None,
+            },
+            10,
+        )
+        .unwrap();
+        let rec_id = rec.record_id.clone();
+        mgr.record_institutional_effect(&rec).unwrap();
+
+        // Subsystem reports failure, then a later success. Audit-discipline:
+        // failure should stick and the most recent failure message surfaces.
+        mgr.record_dispatch_evidence(&EffectDispatchEvidence::new(
+            rec_id.clone(),
+            prop_id.0.clone(),
+            "commons",
+            None,
+            false,
+            Some("member not found".into()),
+            20,
+        ))
+        .unwrap();
+        mgr.record_dispatch_evidence(&EffectDispatchEvidence::new(
+            rec_id.clone(),
+            prop_id.0.clone(),
+            "commons",
+            Some("later-hash".into()),
+            true,
+            None,
+            30,
+        ))
+        .unwrap();
+
+        let trail = mgr.get_deliberation(&prop_id).await.unwrap().unwrap();
+        let e = &trail.emitted_effects[0];
+        assert_eq!(e.dispatch_evidence.len(), 2);
+        match &e.reconciliation_status {
+            ReconciliationStatus::ExecutionFailed { error } => {
+                assert_eq!(error.as_deref(), Some("member not found"));
+            }
+            other => panic!("expected ExecutionFailed, got {other:?}"),
+        }
     }
 
     #[tokio::test]
