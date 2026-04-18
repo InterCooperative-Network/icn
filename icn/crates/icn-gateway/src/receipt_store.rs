@@ -9,6 +9,7 @@
 
 #[cfg_attr(not(test), allow(unused_imports))]
 use icn_governance::{GovernanceDecisionReceipt, ProofOutcome, VoteTally};
+use icn_governance_actor::dispatch_evidence::EffectDispatchEvidence;
 use icn_governance_actor::institutional_effect::InstitutionalEffectRecord;
 use icn_governance_actor::receipt_backend::GovernanceReceiptBackend;
 use icn_kernel_api::economics::SettlementIntent;
@@ -29,6 +30,10 @@ const PROPOSAL_INDEX_PREFIX: &[u8] = b"receipt:by_proposal:";
 const INSTITUTIONAL_EFFECT_PREFIX: &[u8] = b"effect:institutional:";
 /// Secondary index: effect records by proposal_id (sortable by recorded_at)
 const INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX: &[u8] = b"effect:institutional:by_proposal:";
+/// Key prefix for dispatch evidence (primary by evidence_id)
+const DISPATCH_EVIDENCE_PREFIX: &[u8] = b"effect:dispatch_evidence:";
+/// Secondary index: dispatch evidence by effect_record_id (sortable by recorded_at)
+const DISPATCH_EVIDENCE_BY_RECORD_PREFIX: &[u8] = b"effect:dispatch_evidence:by_record:";
 
 /// Receipt storage service for governance and economic chain artifacts.
 ///
@@ -408,6 +413,68 @@ impl ReceiptStore {
         Ok(())
     }
 
+    /// Persist a downstream dispatch evidence entry attached to a
+    /// previously emitted `InstitutionalEffectRecord`. Keyed by
+    /// `evidence_id` with a secondary index on
+    /// `(effect_record_id, recorded_at_be, evidence_id)` so scans over a
+    /// record's evidence return chronological order without sorting.
+    ///
+    /// Same-`evidence_id` writes overwrite with identical bytes — idempotent.
+    pub fn put_effect_dispatch_evidence(
+        &self,
+        evidence: &EffectDispatchEvidence,
+    ) -> Result<(), String> {
+        let mut primary_key = DISPATCH_EVIDENCE_PREFIX.to_vec();
+        primary_key.extend_from_slice(evidence.evidence_id.as_bytes());
+        let value = serde_json::to_vec(evidence)
+            .map_err(|e| format!("Failed to serialize EffectDispatchEvidence: {e}"))?;
+        self.db
+            .insert(&primary_key, value)
+            .map_err(|e| format!("sled insert primary: {e}"))?;
+
+        let mut idx_key = DISPATCH_EVIDENCE_BY_RECORD_PREFIX.to_vec();
+        idx_key.extend_from_slice(evidence.effect_record_id.as_bytes());
+        idx_key.push(b':');
+        idx_key.extend_from_slice(&evidence.recorded_at.to_be_bytes());
+        idx_key.push(b':');
+        idx_key.extend_from_slice(evidence.evidence_id.as_bytes());
+        self.db
+            .insert(&idx_key, evidence.evidence_id.as_bytes())
+            .map_err(|e| format!("sled insert index: {e}"))?;
+        Ok(())
+    }
+
+    /// Scan the secondary index for an effect record and hydrate evidence
+    /// entries in chronological order (oldest-first).
+    pub fn list_effect_dispatch_evidence_by_record(
+        &self,
+        effect_record_id: &str,
+    ) -> Result<Vec<EffectDispatchEvidence>, String> {
+        let mut prefix = DISPATCH_EVIDENCE_BY_RECORD_PREFIX.to_vec();
+        prefix.extend_from_slice(effect_record_id.as_bytes());
+        prefix.push(b':');
+
+        let mut out = Vec::new();
+        for entry in self.db.scan_prefix(&prefix) {
+            let (_k, v) = entry.map_err(|e| format!("sled scan: {e}"))?;
+            let evidence_id =
+                std::str::from_utf8(&v).map_err(|e| format!("index value not UTF-8: {e}"))?;
+            let mut primary_key = DISPATCH_EVIDENCE_PREFIX.to_vec();
+            primary_key.extend_from_slice(evidence_id.as_bytes());
+            let Some(bytes) = self
+                .db
+                .get(&primary_key)
+                .map_err(|e| format!("sled get primary: {e}"))?
+            else {
+                continue;
+            };
+            let e: EffectDispatchEvidence = serde_json::from_slice(&bytes)
+                .map_err(|err| format!("deserialize EffectDispatchEvidence: {err}"))?;
+            out.push(e);
+        }
+        Ok(out)
+    }
+
     /// Scan the secondary index for a proposal and hydrate records in
     /// chronological order (oldest-first).
     pub fn list_institutional_effects_by_proposal(
@@ -481,6 +548,20 @@ impl GovernanceReceiptBackend for ReceiptStore {
         proposal_id: &str,
     ) -> Result<Vec<InstitutionalEffectRecord>, String> {
         self.list_institutional_effects_by_proposal(proposal_id)
+    }
+
+    fn put_effect_dispatch_evidence(
+        &self,
+        evidence: &EffectDispatchEvidence,
+    ) -> Result<(), String> {
+        self.put_effect_dispatch_evidence(evidence)
+    }
+
+    fn list_effect_dispatch_evidence_by_record(
+        &self,
+        effect_record_id: &str,
+    ) -> Result<Vec<EffectDispatchEvidence>, String> {
+        self.list_effect_dispatch_evidence_by_record(effect_record_id)
     }
 }
 
@@ -764,6 +845,86 @@ mod tests {
         assert!(none_list.is_empty());
         assert_eq!(a_list[0].target_did.as_deref(), Some("did:icn:1"));
         assert_eq!(b_list[0].target_did.as_deref(), Some("did:icn:2"));
+    }
+
+    #[test]
+    fn dispatch_evidence_roundtrip_and_ordering() {
+        let store = ReceiptStore::new(temp_db());
+        let older = EffectDispatchEvidence::new(
+            "rec-a",
+            "prop-1",
+            "sdis",
+            Some("state-hash-1".into()),
+            true,
+            None,
+            100,
+        );
+        let newer = EffectDispatchEvidence::new(
+            "rec-a",
+            "prop-1",
+            "sdis",
+            Some("state-hash-2".into()),
+            false,
+            Some("boom".into()),
+            200,
+        );
+
+        store.put_effect_dispatch_evidence(&newer).unwrap();
+        store.put_effect_dispatch_evidence(&older).unwrap();
+
+        let list = store
+            .list_effect_dispatch_evidence_by_record("rec-a")
+            .unwrap();
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].recorded_at, 100);
+        assert_eq!(list[1].recorded_at, 200);
+        assert!(list[0].success);
+        assert!(!list[1].success);
+        assert_eq!(list[1].error_message.as_deref(), Some("boom"));
+    }
+
+    #[test]
+    fn dispatch_evidence_is_scoped_by_record() {
+        let store = ReceiptStore::new(temp_db());
+        store
+            .put_effect_dispatch_evidence(&EffectDispatchEvidence::new(
+                "rec-a", "prop-1", "sdis", None, true, None, 10,
+            ))
+            .unwrap();
+        store
+            .put_effect_dispatch_evidence(&EffectDispatchEvidence::new(
+                "rec-b", "prop-2", "sdis", None, true, None, 20,
+            ))
+            .unwrap();
+
+        let a = store
+            .list_effect_dispatch_evidence_by_record("rec-a")
+            .unwrap();
+        let b = store
+            .list_effect_dispatch_evidence_by_record("rec-b")
+            .unwrap();
+        let none = store
+            .list_effect_dispatch_evidence_by_record("missing")
+            .unwrap();
+
+        assert_eq!(a.len(), 1);
+        assert_eq!(b.len(), 1);
+        assert!(none.is_empty());
+        assert_eq!(a[0].effect_record_id, "rec-a");
+        assert_eq!(b[0].effect_record_id, "rec-b");
+    }
+
+    #[test]
+    fn dispatch_evidence_duplicate_evidence_id_is_idempotent() {
+        let store = ReceiptStore::new(temp_db());
+        let ev = EffectDispatchEvidence::new("rec-dup", "prop-dup", "sdis", None, true, None, 10);
+        store.put_effect_dispatch_evidence(&ev).unwrap();
+        store.put_effect_dispatch_evidence(&ev).unwrap();
+
+        let list = store
+            .list_effect_dispatch_evidence_by_record("rec-dup")
+            .unwrap();
+        assert_eq!(list.len(), 1);
     }
 
     #[test]

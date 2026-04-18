@@ -1252,11 +1252,52 @@ pub struct InstitutionalEffectResponse {
     pub payload: serde_json::Value,
 }
 
+/// Downstream dispatch evidence entry as rendered on the wire.
+///
+/// Carries the subsystem name, optional receipt_ref, success flag, and
+/// timestamp. `receipt_ref` is opaque — resolving it to a downstream
+/// record is the subsystem's responsibility, not governance's.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DispatchEvidenceResponse {
+    pub evidence_id: String,
+    pub effect_record_id: String,
+    pub proposal_id: String,
+    pub subsystem: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt_ref: Option<String>,
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    pub recorded_at: u64,
+}
+
+/// An emitted effect record paired with its dispatch evidence and a
+/// derived reconciliation status.
+///
+/// `reconciliation_status` is one of:
+/// - `"emitted_only"` — no downstream evidence yet (either not dispatched,
+///   fire-and-forget dispatch, or subsystem never reported back);
+/// - `"execution_evidenced"` — at least one successful evidence entry and
+///   no recorded failures;
+/// - `"execution_failed"` — at least one evidence entry reported failure.
+///   `reconciliation_error` surfaces the most recent failure message.
+///
+/// A later success does NOT erase an earlier failure — audit discipline.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ReconciledEffectResponse {
+    #[serde(flatten)]
+    pub record: InstitutionalEffectResponse,
+    pub reconciliation_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reconciliation_error: Option<String>,
+    pub dispatch_evidence: Vec<DispatchEvidenceResponse>,
+}
+
 /// Response body for `GET /gov/proposals/{proposal_id}/effects`.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ProposalEffectsResponse {
     pub proposal_id: String,
-    pub effects: Vec<InstitutionalEffectResponse>,
+    pub effects: Vec<ReconciledEffectResponse>,
 }
 
 /// Reverse read-model: a proposal's deliberation trail.
@@ -1295,9 +1336,10 @@ pub struct ProposalDeliberationResponse {
     /// Decision receipt summary if the proposal has been closed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub governance_decision: Option<DeliberationDecisionResponse>,
-    /// Durable institutional effect records emitted at acceptance, oldest
+    /// Durable institutional effect records emitted at acceptance, paired
+    /// with dispatch evidence and derived reconciliation status. Oldest
     /// first. Empty when the proposal was not accepted or when the payload
     /// translated to `Unhandled`.
     #[serde(default)]
-    pub emitted_effects: Vec<InstitutionalEffectResponse>,
+    pub emitted_effects: Vec<ReconciledEffectResponse>,
 }

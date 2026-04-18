@@ -1304,12 +1304,46 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         // When sdis_service is wired and the accepted payload is an SDIS proposal,
         // call the service directly so tests can prove steward creation without an
         // actor runtime.
+        //
+        // The SDIS service returns structured {success, state_change_hash, error},
+        // so this is the one dispatch path in close_proposal that yields real
+        // in-process evidence. After each call we record an
+        // `EffectDispatchEvidence` tied to the institutional effect record
+        // persisted earlier in this handler. Other dispatch paths (charter/
+        // freeze hooks) are fire-and-forget and remain `emitted_only`.
         if let Some(ref svc) = ctx.sdis_service {
             use icn_kernel_api::{AppointStewardRequest, RevokeStewardRequest};
             if let icn_governance::ProposalPayload::Sdis {
                 proposal: ref sdis_proposal,
             } = proposal.payload
             {
+                // Look up the institutional effect record persisted earlier
+                // in this handler. We match by effect_kind to disambiguate if
+                // historical records exist — for accept/revoke that is a
+                // singleton per proposal in normal flow.
+                let effect_kind_needed = match sdis_proposal {
+                    icn_governance::sdis::SdisProposal::AppointSteward { .. } => {
+                        Some("appoint_steward")
+                    }
+                    icn_governance::sdis::SdisProposal::RemoveSteward { .. } => {
+                        Some("revoke_steward")
+                    }
+                    _ => None,
+                };
+                let target_record_id: Option<String> = match effect_kind_needed {
+                    Some(kind) => ctx
+                        .manager
+                        .list_institutional_effects(&proposal_id)
+                        .ok()
+                        .and_then(|records| {
+                            records
+                                .into_iter()
+                                .find(|r| r.effect_kind == kind)
+                                .map(|r| r.record_id)
+                        }),
+                    None => None,
+                };
+
                 match sdis_proposal {
                     icn_governance::sdis::SdisProposal::AppointSteward {
                         candidate,
@@ -1325,13 +1359,16 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                             region: None,
                             proposal_id: proposal.id.0.clone(),
                         };
-                        match svc.appoint_steward(req) {
-                            Ok(result) if !result.success => {
-                                tracing::warn!(
-                                    proposal_id = %proposal.id.0,
-                                    error = ?result.error,
-                                    "SDIS test-path: appoint_steward returned success=false"
-                                );
+                        let (success, receipt_ref, error) = match svc.appoint_steward(req) {
+                            Ok(result) => {
+                                if !result.success {
+                                    tracing::warn!(
+                                        proposal_id = %proposal.id.0,
+                                        error = ?result.error,
+                                        "SDIS test-path: appoint_steward returned success=false"
+                                    );
+                                }
+                                (result.success, Some(result.state_change_hash), result.error)
                             }
                             Err(e) => {
                                 tracing::warn!(
@@ -1339,8 +1376,27 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                                     error = %e,
                                     "SDIS test-path: appoint_steward call failed"
                                 );
+                                (false, None, Some(e.to_string()))
                             }
-                            Ok(_) => {}
+                        };
+                        if let Some(record_id) = target_record_id.as_ref() {
+                            let evidence = crate::dispatch_evidence::EffectDispatchEvidence::new(
+                                record_id.clone(),
+                                proposal.id.0.clone(),
+                                "sdis",
+                                receipt_ref,
+                                success,
+                                error,
+                                current_time_secs(),
+                            );
+                            if let Err(e) = ctx.manager.record_dispatch_evidence(&evidence) {
+                                tracing::error!(
+                                    proposal_id = %proposal.id.0,
+                                    effect_record_id = %record_id,
+                                    error = %e,
+                                    "Failed to persist SDIS appoint_steward dispatch evidence",
+                                );
+                            }
                         }
                     }
                     icn_governance::sdis::SdisProposal::RemoveSteward {
@@ -1350,13 +1406,16 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                             steward_did: steward.to_string(),
                             reason: reason.clone(),
                         };
-                        match svc.revoke_steward(req) {
-                            Ok(result) if !result.success => {
-                                tracing::warn!(
-                                    proposal_id = %proposal.id.0,
-                                    error = ?result.error,
-                                    "SDIS test-path: revoke_steward returned success=false"
-                                );
+                        let (success, receipt_ref, error) = match svc.revoke_steward(req) {
+                            Ok(result) => {
+                                if !result.success {
+                                    tracing::warn!(
+                                        proposal_id = %proposal.id.0,
+                                        error = ?result.error,
+                                        "SDIS test-path: revoke_steward returned success=false"
+                                    );
+                                }
+                                (result.success, Some(result.state_change_hash), result.error)
                             }
                             Err(e) => {
                                 tracing::warn!(
@@ -1364,8 +1423,27 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                                     error = %e,
                                     "SDIS test-path: revoke_steward call failed"
                                 );
+                                (false, None, Some(e.to_string()))
                             }
-                            Ok(_) => {}
+                        };
+                        if let Some(record_id) = target_record_id.as_ref() {
+                            let evidence = crate::dispatch_evidence::EffectDispatchEvidence::new(
+                                record_id.clone(),
+                                proposal.id.0.clone(),
+                                "sdis",
+                                receipt_ref,
+                                success,
+                                error,
+                                current_time_secs(),
+                            );
+                            if let Err(e) = ctx.manager.record_dispatch_evidence(&evidence) {
+                                tracing::error!(
+                                    proposal_id = %proposal.id.0,
+                                    effect_record_id = %record_id,
+                                    error = %e,
+                                    "Failed to persist SDIS revoke_steward dispatch evidence",
+                                );
+                            }
                         }
                     }
                     _ => {}
@@ -1623,7 +1701,7 @@ pub async fn get_proposal_deliberation<E: GovernanceEventEmitter + Clone + 'stat
     let emitted_effects = trail
         .emitted_effects
         .iter()
-        .map(effect_record_to_response)
+        .map(reconciled_effect_to_response)
         .collect();
 
     Ok(HttpResponse::Ok().json(ProposalDeliberationResponse {
@@ -1653,6 +1731,43 @@ fn effect_record_to_response(
         reason: r.reason.clone(),
         recorded_at: r.recorded_at,
         payload: r.payload.clone(),
+    }
+}
+
+/// Translate a dispatch evidence record into its HTTP response shape.
+fn dispatch_evidence_to_response(
+    e: &crate::dispatch_evidence::EffectDispatchEvidence,
+) -> DispatchEvidenceResponse {
+    DispatchEvidenceResponse {
+        evidence_id: e.evidence_id.clone(),
+        effect_record_id: e.effect_record_id.clone(),
+        proposal_id: e.proposal_id.clone(),
+        subsystem: e.subsystem.clone(),
+        receipt_ref: e.receipt_ref.clone(),
+        success: e.success,
+        error_message: e.error_message.clone(),
+        recorded_at: e.recorded_at,
+    }
+}
+
+/// Render a reconciled effect entry (record + evidence + derived status).
+fn reconciled_effect_to_response(
+    entry: &crate::manager::ReconciledEffectEntry,
+) -> ReconciledEffectResponse {
+    use crate::dispatch_evidence::{reconciliation_label, ReconciliationStatus};
+    let reconciliation_error = match &entry.reconciliation_status {
+        ReconciliationStatus::ExecutionFailed { error } => error.clone(),
+        _ => None,
+    };
+    ReconciledEffectResponse {
+        record: effect_record_to_response(&entry.record),
+        reconciliation_status: reconciliation_label(&entry.reconciliation_status).to_string(),
+        reconciliation_error,
+        dispatch_evidence: entry
+            .dispatch_evidence
+            .iter()
+            .map(dispatch_evidence_to_response)
+            .collect(),
     }
 }
 
@@ -1689,7 +1804,30 @@ pub async fn list_proposal_effects<E: GovernanceEventEmitter + Clone + 'static>(
         .list_institutional_effects(&id)
         .map_err(anyhow_to_api)?;
 
-    let effects = records.iter().map(effect_record_to_response).collect();
+    let effects = records
+        .iter()
+        .map(|record| {
+            let evidence = ctx
+                .manager
+                .list_dispatch_evidence(&record.record_id)
+                .unwrap_or_else(|e| {
+                    tracing::warn!(
+                        record_id = %record.record_id,
+                        error = %e,
+                        "list_proposal_effects: evidence read failed; treating as empty",
+                    );
+                    vec![]
+                });
+            let reconciliation_status =
+                crate::dispatch_evidence::derive_reconciliation_status(record, &evidence);
+            crate::manager::ReconciledEffectEntry {
+                record: record.clone(),
+                dispatch_evidence: evidence,
+                reconciliation_status,
+            }
+        })
+        .map(|entry| reconciled_effect_to_response(&entry))
+        .collect();
 
     Ok(HttpResponse::Ok().json(ProposalEffectsResponse {
         proposal_id: id.0,

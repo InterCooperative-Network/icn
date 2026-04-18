@@ -4,6 +4,7 @@
 use icn_governance::GovernanceDecisionReceipt;
 use icn_kernel_api::{AllocationReceipt, Hash};
 
+use crate::dispatch_evidence::EffectDispatchEvidence;
 use crate::institutional_effect::InstitutionalEffectRecord;
 
 /// Minimal receipt-storage interface required by [`GovernanceManager`].
@@ -69,6 +70,30 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         &self,
         _proposal_id: &str,
     ) -> Result<Vec<InstitutionalEffectRecord>, String> {
+        Ok(vec![])
+    }
+
+    /// Persist downstream dispatch evidence for a previously emitted
+    /// institutional effect record. Append-only; implementations treat a
+    /// same-`evidence_id` re-write as idempotent.
+    ///
+    /// Default impl is a no-op so downstream backends can opt in without
+    /// breaking. The in-memory test backend and the sled-backed
+    /// `ReceiptStore` both override.
+    fn put_effect_dispatch_evidence(
+        &self,
+        _evidence: &EffectDispatchEvidence,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    /// Retrieve all dispatch evidence for an effect record, oldest-first.
+    /// Returns an empty list when no evidence exists or when the backend
+    /// does not implement evidence storage.
+    fn list_effect_dispatch_evidence_by_record(
+        &self,
+        _effect_record_id: &str,
+    ) -> Result<Vec<EffectDispatchEvidence>, String> {
         Ok(vec![])
     }
 }
