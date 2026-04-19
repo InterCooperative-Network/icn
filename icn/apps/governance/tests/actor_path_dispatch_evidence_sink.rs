@@ -598,6 +598,256 @@ async fn revoke_steward_noop_evidence_has_no_receipt_ref_but_is_success() {
     );
 }
 
+/// Successful SuspendSteward: the service publishes the commons
+/// `StewardId::to_hex()` and the sink persists it verbatim on the
+/// evidence row. Same seam as appoint/revoke/reconfirm.
+#[tokio::test(flavor = "current_thread")]
+async fn suspend_steward_evidence_carries_service_receipt_ref() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-suspend-rref",
+        "coop",
+        None,
+        "suspend_steward",
+        Some("did:icn:steward-s".into()),
+        None,
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![KernelEffect::Sdis(
+        icn_kernel_api::effects::SdisEffect::SuspendSteward {
+            steward_did: candidate.to_string(),
+            reason: "under investigation".into(),
+            duration_seconds: 86_400,
+            proposal_id: "prop-suspend-rref".into(),
+        },
+    )];
+    let steward_id_hex =
+        "c2a7bd1c4ee5fa0318d7c88a3b44f66b1e9d5e72c3a74b6cf88a1e0c2d3e4f50".to_string();
+    let results = vec![ok_result_with_receipt_ref("eff-suspend", &steward_id_hex)];
+
+    sink.record_effects(
+        "gov:domain-s:prop-suspend-rref:receipt",
+        &effects,
+        &results,
+        1_700_020_001,
+    );
+
+    let ev = backend.evidence_for("prop-suspend-rref");
+    assert_eq!(ev.len(), 1);
+    assert_eq!(
+        ev[0].receipt_ref,
+        Some(steward_id_hex),
+        "SuspendSteward must forward the steward_id the suspend was routed through"
+    );
+    assert_eq!(ev[0].subsystem, "sdis");
+    assert!(ev[0].success);
+    assert!(ev[0].error_message.is_none());
+}
+
+/// Successful ReinstateSteward (active-reinstate path): receipt_ref
+/// carries the real steward_id. The sink does not look at
+/// `was_suspended` — that flag lives only in the service-level result.
+#[tokio::test(flavor = "current_thread")]
+async fn reinstate_steward_evidence_carries_service_receipt_ref() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-reinstate-rref",
+        "coop",
+        None,
+        "reinstate_steward",
+        Some("did:icn:steward-r".into()),
+        None,
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![KernelEffect::Sdis(
+        icn_kernel_api::effects::SdisEffect::ReinstateSteward {
+            steward_did: candidate.to_string(),
+            proposal_id: "prop-reinstate-rref".into(),
+        },
+    )];
+    let steward_id_hex =
+        "d38e0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab".to_string();
+    let results = vec![ok_result_with_receipt_ref("eff-reinstate", &steward_id_hex)];
+
+    sink.record_effects(
+        "gov:domain-r:prop-reinstate-rref:receipt",
+        &effects,
+        &results,
+        1_700_020_002,
+    );
+
+    let ev = backend.evidence_for("prop-reinstate-rref");
+    assert_eq!(ev.len(), 1);
+    assert_eq!(
+        ev[0].receipt_ref,
+        Some(steward_id_hex),
+        "ReinstateSteward must forward the steward_id the reinstate was routed through"
+    );
+    assert_eq!(ev[0].subsystem, "sdis");
+    assert!(ev[0].success);
+}
+
+/// Successful SanctionSteward: the service minted a real receipt_ref
+/// (the steward_id the slash and optional suspend were routed through).
+/// Sink must persist it verbatim on the evidence row.
+#[tokio::test(flavor = "current_thread")]
+async fn sanction_steward_evidence_carries_service_receipt_ref() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-sanction-rref",
+        "coop",
+        None,
+        "sanction_steward",
+        Some("did:icn:steward-x".into()),
+        None,
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![KernelEffect::Sdis(
+        icn_kernel_api::effects::SdisEffect::SanctionSteward {
+            steward_did: candidate.to_string(),
+            bond_slash_amount: 250,
+            suspend_reason: "serious breach".into(),
+            reason: "serious breach".into(),
+            proposal_id: "prop-sanction-rref".into(),
+        },
+    )];
+    let steward_id_hex =
+        "e4f501234567899876543210fedcba987654321089abcdef0123456789abcd01".to_string();
+    let results = vec![ok_result_with_receipt_ref("eff-sanction", &steward_id_hex)];
+
+    sink.record_effects(
+        "gov:domain-x:prop-sanction-rref:receipt",
+        &effects,
+        &results,
+        1_700_020_003,
+    );
+
+    let ev = backend.evidence_for("prop-sanction-rref");
+    assert_eq!(ev.len(), 1);
+    assert_eq!(
+        ev[0].receipt_ref,
+        Some(steward_id_hex),
+        "SanctionSteward must forward the steward_id the slash was routed through"
+    );
+    assert_eq!(ev[0].subsystem, "sdis");
+    assert!(ev[0].success);
+}
+
+/// Suspend/Reinstate/Sanction hard-failure paths (no record, commons
+/// error): the kernel executor emits `success = false, receipt_ref =
+/// None`, and the sink must persist that faithfully. Pinned as one
+/// test because the sink logic is identical across all three effect
+/// kinds — only the effect enum variant differs.
+#[tokio::test(flavor = "current_thread")]
+async fn lifecycle_failure_evidence_has_no_receipt_ref() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    for (idx, (effect_kind, prop)) in [
+        ("suspend_steward", "prop-suspend-fail"),
+        ("reinstate_steward", "prop-reinstate-fail"),
+        ("sanction_steward", "prop-sanction-fail"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let ier = InstitutionalEffectRecord::new(
+            *prop,
+            "coop",
+            None,
+            *effect_kind,
+            Some(format!("did:icn:ghost-{idx}")),
+            None,
+            None,
+            1,
+            serde_json::json!({}),
+        );
+        backend.put_institutional_effect(&ier).unwrap();
+    }
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+
+    let cases: [(KernelEffect, &str, &str); 3] = [
+        (
+            KernelEffect::Sdis(icn_kernel_api::effects::SdisEffect::SuspendSteward {
+                steward_did: candidate.to_string(),
+                reason: "x".into(),
+                duration_seconds: 3_600,
+                proposal_id: "prop-suspend-fail".into(),
+            }),
+            "prop-suspend-fail",
+            "commons lookup failed: no record",
+        ),
+        (
+            KernelEffect::Sdis(icn_kernel_api::effects::SdisEffect::ReinstateSteward {
+                steward_did: candidate.to_string(),
+                proposal_id: "prop-reinstate-fail".into(),
+            }),
+            "prop-reinstate-fail",
+            "commons lookup failed: no record",
+        ),
+        (
+            KernelEffect::Sdis(icn_kernel_api::effects::SdisEffect::SanctionSteward {
+                steward_did: candidate.to_string(),
+                bond_slash_amount: 10,
+                suspend_reason: String::new(),
+                reason: "x".into(),
+                proposal_id: "prop-sanction-fail".into(),
+            }),
+            "prop-sanction-fail",
+            "commons lookup failed: no record",
+        ),
+    ];
+
+    for (i, (effect, proposal_id, err_msg)) in cases.iter().enumerate() {
+        let effects = vec![effect.clone()];
+        let results = vec![failure_result(&format!("eff-fail-{i}"), err_msg)];
+        sink.record_effects(
+            &format!("gov:domain-f:{proposal_id}:receipt"),
+            &effects,
+            &results,
+            1_700_030_000 + i as u64,
+        );
+
+        let ev = backend.evidence_for(proposal_id);
+        assert_eq!(ev.len(), 1, "each effect kind produces one evidence row");
+        assert!(!ev[0].success, "failure must not be persisted as success");
+        assert_eq!(
+            ev[0].receipt_ref, None,
+            "failure paths must truthfully leave receipt_ref unset across all lifecycle operations"
+        );
+        assert_eq!(
+            ev[0].error_message.as_deref(),
+            Some(*err_msg),
+            "error_message must carry the service-layer diagnostic verbatim"
+        );
+    }
+}
+
 /// Failure path: when the service produced no downstream handle
 /// (e.g. commons.register_steward failed, revoke hit an idempotent
 /// no-op with no active record), `receipt_ref` must remain `None` on
