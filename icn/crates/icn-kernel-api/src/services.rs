@@ -2264,6 +2264,12 @@ pub struct SuspendStewardResult {
     /// Stable hash of the state change (for audit); empty on failure.
     pub state_change_hash: String,
     pub error: Option<String>,
+    /// Downstream identifier for the suspended steward record (the commons
+    /// `StewardId::to_hex()` the suspend was routed through). See
+    /// [`AppointStewardResult::receipt_ref`] for semantics. `None` on
+    /// failure paths (e.g. no active record, commons error).
+    #[serde(default)]
+    pub receipt_ref: Option<String>,
 }
 
 /// Request to reinstate a previously suspended steward.
@@ -2285,6 +2291,14 @@ pub struct ReinstateStewardResult {
     /// Stable hash of the state change (for audit); empty on no-op path.
     pub state_change_hash: String,
     pub error: Option<String>,
+    /// Downstream identifier for the steward record the reinstate was
+    /// routed through (commons `StewardId::to_hex()`). Populated on both
+    /// the active-reinstate path and the no-op (was-not-suspended) path,
+    /// because in both cases the commons call succeeded against a real
+    /// record. `state_change_hash` still distinguishes the two. `None` on
+    /// failure (no record, commons error).
+    #[serde(default)]
+    pub receipt_ref: Option<String>,
 }
 
 /// Request to sanction a steward with a bond slash via governance dispatch.
@@ -2313,4 +2327,10 @@ pub struct SanctionStewardResult {
     /// Stable hash of the state change (for audit); empty on failure.
     pub state_change_hash: String,
     pub error: Option<String>,
+    /// Downstream identifier for the sanctioned steward record (commons
+    /// `StewardId::to_hex()` the slash — and optional suspend — were
+    /// routed through). See [`AppointStewardResult::receipt_ref`] for
+    /// semantics. `None` on failure (no record, commons error).
+    #[serde(default)]
+    pub receipt_ref: Option<String>,
 }

@@ -2332,11 +2332,13 @@ impl KernelSdisExecutor {
                         info!(
                             steward_did = %steward_did,
                             state_change_hash = %result.state_change_hash,
+                            receipt_ref = ?result.receipt_ref,
                             "Suspended steward reinstated with durable state"
                         );
                     } else {
                         info!(
                             steward_did = %steward_did,
+                            receipt_ref = ?result.receipt_ref,
                             "ReinstateSteward: steward was not suspended — no-op"
                         );
                     }
@@ -2361,7 +2363,7 @@ impl KernelSdisExecutor {
                         },
                         ledger_entry_id: None,
                         not_executed: false,
-                        receipt_ref: None,
+                        receipt_ref: result.receipt_ref,
                     })
                 } else {
                     Ok(EffectResult {
@@ -2395,6 +2397,7 @@ impl KernelSdisExecutor {
                         steward_did = %steward_did,
                         state_change_hash = %result.state_change_hash,
                         duration_seconds = %duration_seconds,
+                        receipt_ref = ?result.receipt_ref,
                         "Steward suspended via governance dispatch \
                          (duration advisory — timed reinstatement not enforced)"
                     );
@@ -2408,7 +2411,7 @@ impl KernelSdisExecutor {
                         state_change_hash: Some(result.state_change_hash),
                         ledger_entry_id: None,
                         not_executed: false,
-                        receipt_ref: None,
+                        receipt_ref: result.receipt_ref,
                     })
                 } else {
                     Ok(EffectResult {
@@ -2445,6 +2448,7 @@ impl KernelSdisExecutor {
                         remaining_bond = %result.remaining_bond,
                         suspended = %result.suspended,
                         state_change_hash = %result.state_change_hash,
+                        receipt_ref = ?result.receipt_ref,
                         "Steward sanctioned (bond slashed) via governance dispatch"
                     );
                     Ok(EffectResult {
@@ -2457,7 +2461,7 @@ impl KernelSdisExecutor {
                         state_change_hash: Some(result.state_change_hash),
                         ledger_entry_id: None,
                         not_executed: false,
-                        receipt_ref: None,
+                        receipt_ref: result.receipt_ref,
                     })
                 } else {
                     Ok(EffectResult {
