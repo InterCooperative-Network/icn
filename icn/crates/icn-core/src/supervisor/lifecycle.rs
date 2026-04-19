@@ -370,6 +370,7 @@ async fn spawn_actors_with_identity(
     let compute_payment_callback = handles.payment_callback;
     let compute_commons_settlement_callback = handles.commons_settlement_callback;
     let compute_settlement_query_engine = handles.settlement_query_engine;
+    let dispatch_evidence_sink = handles.dispatch_evidence_sink;
 
     // Wire runtime handles into the pre-initialized Ledger.
     // These depend on gossip/trust which are only available after gossip init.
@@ -921,9 +922,14 @@ async fn spawn_actors_with_identity(
             }
         }
 
-        // Create callback that routes effects through DecisionExecutor
-        let effect_callback =
-            super::decision_executor::create_decision_executor_callback(decision_executor);
+        // Create callback that routes effects through DecisionExecutor.
+        // When a dispatch-evidence sink is wired, route through it so that
+        // actor-originated acceptances produce the same durable dispatch
+        // evidence as the gateway-close path.
+        let effect_callback = super::decision_executor::create_decision_executor_callback_with_sink(
+            decision_executor,
+            dispatch_evidence_sink.clone(),
+        );
 
         // Create effect-based subscription via factory from BootstrapHandles
         // (avoids direct icn_governance_actor reference from lifecycle.rs)

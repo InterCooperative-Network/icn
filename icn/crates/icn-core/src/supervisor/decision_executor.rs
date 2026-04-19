@@ -50,7 +50,7 @@ use anyhow::Result;
 use tokio::sync::Semaphore;
 use tracing::{debug, error, info, warn};
 
-use icn_kernel_api::effects::{EffectResult, KernelEffect};
+use icn_kernel_api::effects::{DispatchEvidenceSink, EffectResult, KernelEffect};
 use icn_kernel_api::escrow::{EscrowStatus, EscrowStore};
 use icn_kernel_api::execution::{
     ExecutionRecord, ExecutionStatus, ExecutionStore, ExecutionTruthSummary,
@@ -662,6 +662,25 @@ pub struct CleanupReport {
 pub fn create_decision_executor_callback(
     executor: Arc<DecisionExecutor>,
 ) -> Arc<dyn Fn(Vec<KernelEffect>, String) + Send + Sync> {
+    create_decision_executor_callback_with_sink(executor, None)
+}
+
+/// Variant of [`create_decision_executor_callback`] that also invokes an
+/// app-layer [`DispatchEvidenceSink`] after execution completes.
+///
+/// When `sink` is `Some`, the sink is called with the original effects
+/// and their corresponding per-effect results once the executor has
+/// finished. The sink call is best-effort and runs on the same spawned
+/// task; failures in the sink do not affect execution recording.
+///
+/// This is the seam that closes the actor-path dispatch-evidence gap:
+/// any acceptance (actor- or gateway-originated) that flows through the
+/// effect subscription now passes through the sink, so durable evidence
+/// is observable by the same code path regardless of entry point.
+pub fn create_decision_executor_callback_with_sink(
+    executor: Arc<DecisionExecutor>,
+    sink: Option<Arc<dyn DispatchEvidenceSink>>,
+) -> Arc<dyn Fn(Vec<KernelEffect>, String) + Send + Sync> {
     Arc::new(move |effects, decision_receipt_id| {
         if effects.is_empty() {
             debug!(
@@ -672,6 +691,7 @@ pub fn create_decision_executor_callback(
         }
 
         let executor = executor.clone();
+        let sink = sink.clone();
         let semaphore = executor.concurrency_limit.clone();
         let effect_count = effects.len();
 
@@ -709,6 +729,10 @@ pub fn create_decision_executor_callback(
                 }
             };
 
+            // Keep a copy of the inputs so we can hand effects to the sink
+            // alongside their per-effect results after execute() consumes them.
+            let effects_for_sink = effects.clone();
+
             match executor
                 .execute(effects, &decision_receipt_id, &decision_hash, &proposal_id)
                 .await
@@ -722,6 +746,20 @@ pub fn create_decision_executor_callback(
                         success = success_count,
                         "Decision execution complete"
                     );
+                    if let Some(sink) = sink.as_ref() {
+                        if !results.is_empty() {
+                            let recorded_at = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_secs())
+                                .unwrap_or(0);
+                            sink.record_effects(
+                                &decision_receipt_id,
+                                &effects_for_sink,
+                                &results,
+                                recorded_at,
+                            );
+                        }
+                    }
                 }
                 Err(e) => {
                     error!(

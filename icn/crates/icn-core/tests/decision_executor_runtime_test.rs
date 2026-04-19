@@ -1305,3 +1305,85 @@ async fn test_distribute_surplus_executes_single_entry_with_n_deltas() {
         "member_b must appear in credits"
     );
 }
+
+/// The dispatch-evidence sink — when wired via the
+///  callback factory — is invoked once per completed
+/// execution with the original effects, the per-effect results, and a
+/// non-zero  timestamp. This pins the kernel-neutral seam
+/// that closes the actor-path dispatch-evidence gap.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_callback_invokes_dispatch_evidence_sink() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback_with_sink;
+    use icn_kernel_api::effects::{DispatchEvidenceSink, EffectResult, KernelEffect};
+    use std::sync::Mutex;
+
+    type SinkCall = (String, Vec<KernelEffect>, Vec<EffectResult>, u64);
+    #[derive(Default)]
+    struct CapturingSink {
+        calls: Mutex<Vec<SinkCall>>,
+    }
+    impl DispatchEvidenceSink for CapturingSink {
+        fn record_effects(
+            &self,
+            decision_receipt_id: &str,
+            effects: &[KernelEffect],
+            results: &[EffectResult],
+            recorded_at: u64,
+        ) {
+            self.calls.lock().unwrap().push((
+                decision_receipt_id.to_string(),
+                effects.to_vec(),
+                results.to_vec(),
+                recorded_at,
+            ));
+        }
+    }
+
+    let tmp = TempDir::new().unwrap();
+    let (executor, _exec_store) = make_executor_with_ledger(tmp.path());
+    let sink = Arc::new(CapturingSink::default());
+    let callback = create_decision_executor_callback_with_sink(
+        executor,
+        Some(sink.clone() as Arc<dyn DispatchEvidenceSink>),
+    );
+
+    let effects = spend_effect("hash-sink-1");
+    callback(effects.clone(), "receipt-sink-1".to_string());
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    let calls = sink.calls.lock().unwrap();
+    assert_eq!(
+        calls.len(),
+        1,
+        "sink must be invoked exactly once after execute"
+    );
+    let (receipt_id, seen_effects, seen_results, recorded_at) = &calls[0];
+    assert_eq!(receipt_id, "receipt-sink-1");
+    assert_eq!(seen_effects.len(), 1);
+    assert_eq!(seen_effects[0], effects[0]);
+    assert_eq!(seen_results.len(), 1);
+    assert!(
+        *recorded_at > 0,
+        "recorded_at must be set from wall clock at dispatch completion"
+    );
+}
+
+/// When no sink is wired, the legacy
+/// path must still function — no panics, decisions still execute.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_callback_without_sink_still_executes() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback_with_sink;
+
+    let tmp = TempDir::new().unwrap();
+    let (executor, exec_store) = make_executor_with_ledger(tmp.path());
+    let callback = create_decision_executor_callback_with_sink(executor, None);
+
+    let effects = spend_effect("hash-no-sink");
+    callback(effects, "receipt-no-sink".to_string());
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    let record = exec_store.get("hash-no-sink").unwrap().unwrap();
+    assert_eq!(record.status, ExecutionStatus::Confirmed);
+}

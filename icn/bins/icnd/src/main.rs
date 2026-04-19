@@ -318,6 +318,9 @@ async fn build_services(
         payment_callback: Some(payment_callback),
         commons_settlement_callback: Some(commons_settlement_callback),
         settlement_query_engine: Some(settlement_query_engine),
+        // Dispatch-evidence sink is wired later by the gateway bootstrap,
+        // where the governance receipt backend becomes available.
+        dispatch_evidence_sink: None,
     };
 
     Ok((registry, Some(bootstrap_handles)))

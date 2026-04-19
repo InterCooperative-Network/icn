@@ -138,4 +138,11 @@ pub struct BootstrapHandles {
     /// The concrete `SettlementEngine` (from `icn-ledger`) is built in the daemon and
     /// injected here as a trait object so `icn-core` never imports `icn-ledger`.
     pub settlement_query_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
+    /// Sink for durable per-effect dispatch evidence after decision execution.
+    ///
+    /// When provided, the supervisor wires this into the decision-executor
+    /// callback so that every accepted proposal (gateway- or actor-originated)
+    /// produces observable dispatch evidence via the same code path.
+    /// Kernel-neutral trait — the app-side implementer persists evidence.
+    pub dispatch_evidence_sink: Option<Arc<dyn icn_kernel_api::effects::DispatchEvidenceSink>>,
 }
