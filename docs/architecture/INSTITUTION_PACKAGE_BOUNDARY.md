@@ -64,7 +64,7 @@ A type, object, or capability belongs in ICN if:
 | Activity (Event/Program/Project/Initiative) | `icn-governance::activity` | Time-bounded, entity-owned |
 | Program + Milestone | `icn-governance::program` | Cycle container with stage gates |
 | ActionItem + decision bridge | `icn-governance::action_item` | Provenance-linked to proposals |
-| RoleAssignment | `icn-governance::structure` | Authority as `Vec<String>` capability strings |
+| RoleAssignment | `icn-governance::structure` | Authority as `Vec<String>` capability strings (shipped surface). Typed replacement path — `AuthorityClass` / `AuthorityGrant` / `TypedScope` / `Mandate` — is frozen in [ADR-0014](../adr/ADR-0014-constitutional-object-model.md); migration is additive and not yet landed. |
 | Meeting | `icn-governance::meeting` | Landed; HTTP routes wired |
 | InstitutionalParent attachment | `icn-governance::parent` | Polymorphic object attachment |
 | `/gov/me/scopes` + `/gov/me/work` | `apps/governance` handlers | PR #1552; assignee-indexed work spine |

@@ -310,6 +310,23 @@ A governance position with specific powers:
 - **Facilitator**: Meeting and process management
 - **Delegate**: Represents org in federation
 
+### AuthorityClass
+Closed enumeration of constitutional authority kinds, frozen in [ADR-0014](adr/ADR-0014-constitutional-object-model.md). Exactly three variants:
+- **Representation** — speaking/voting in place of another within a bounded scope
+- **Execution** — carrying out an action that mutates institutional state
+- **Attestation** — issuing signed statements of fact downstream consumers may rely on
+
+These three are distinct and must not be silently conflated. Representation does not confer Execution authority; Execution does not confer Attestation authority.
+
+### AuthorityGrant
+A bounded, auditable grant of authority issued by a sovereign entity to a grantee, in exactly one `AuthorityClass`. Carries: grantor entity, grantee DID or entity identifier (for example, a federation or cooperative, or a shared-service entity acting as an institutional actor), `TypedScope`, optional `proposal_id` + `decision_hash` provenance, validity window, optional revocation timestamp. App-layer constitutional meaning, not a kernel primitive. The ICN runtime, daemon, or gateway are never valid grantors. Frozen in [ADR-0014](adr/ADR-0014-constitutional-object-model.md); not yet implemented.
+
+### TypedScope
+Typed replacement path for today's `RoleAssignment.authority_scope: Vec<String>` capability strings. Conjunction of present scope categories: domain, proposal-class, action-kind, amount/ceiling, time-window. Absent categories are "unbounded along that axis"; at least one category must be populated for a grant to be meaningful. Frozen in [ADR-0014](adr/ADR-0014-constitutional-object-model.md).
+
+### Mandate
+The constitutional mediation layer between a governance decision and the execution of its effects. Binds a `GovernanceDecisionReceipt` (the decision) to one or more `AuthorityGrant`s, optionally an executor and a deadline, with lifecycle `Pending → InProgress → Discharged | Expired | Revoked`. **Not** a delegation, not a role assignment, not an office, not an `InstitutionalEffectRecord`, not a raw receipt, not a federation agreement, not a charter. It is the missing object between proposal/decision and execution/effect/evidence. Frozen in [ADR-0014](adr/ADR-0014-constitutional-object-model.md); not yet implemented.
+
 ---
 
 ## Technical Terms
