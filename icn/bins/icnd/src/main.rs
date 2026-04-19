@@ -299,6 +299,16 @@ async fn build_services(
     let settlement_query_engine: Arc<dyn icn_kernel_api::services::SettlementQueryService> =
         settlement_engine;
 
+    // Build the deferred dispatch-evidence sink. One Arc is threaded two ways:
+    //   - as a trait object into the kernel via `dispatch_evidence_sink` so the
+    //     decision executor records per-effect evidence on every accepted proposal.
+    //   - as a concrete installer into the gateway via
+    //     `dispatch_evidence_sink_installer`; the gateway calls `install_backend`
+    //     once its `ReceiptStore` is open, flipping the sink from pre-install
+    //     drop-and-log mode into a durable writer.
+    let deferred_dispatch_evidence_sink =
+        Arc::new(icn_governance_actor::DeferredDispatchEvidenceSink::new());
+
     let bootstrap_handles = icn_core::supervisor::BootstrapHandles {
         ledger: ledger_handle,
         ledger_store,
@@ -318,6 +328,12 @@ async fn build_services(
         payment_callback: Some(payment_callback),
         commons_settlement_callback: Some(commons_settlement_callback),
         settlement_query_engine: Some(settlement_query_engine),
+        // Trait-object view used by the kernel's decision executor.
+        dispatch_evidence_sink: Some(deferred_dispatch_evidence_sink.clone()
+            as Arc<dyn icn_kernel_api::effects::DispatchEvidenceSink>),
+        // Concrete installer view forwarded to the gateway so it can swap in the
+        // receipt store as the backend once it opens.
+        dispatch_evidence_sink_installer: Some(deferred_dispatch_evidence_sink),
     };
 
     Ok((registry, Some(bootstrap_handles)))

@@ -50,7 +50,7 @@ use anyhow::Result;
 use tokio::sync::Semaphore;
 use tracing::{debug, error, info, warn};
 
-use icn_kernel_api::effects::{EffectResult, KernelEffect};
+use icn_kernel_api::effects::{DispatchEvidenceSink, EffectResult, KernelEffect};
 use icn_kernel_api::escrow::{EscrowStatus, EscrowStore};
 use icn_kernel_api::execution::{
     ExecutionRecord, ExecutionStatus, ExecutionStore, ExecutionTruthSummary,
@@ -662,6 +662,25 @@ pub struct CleanupReport {
 pub fn create_decision_executor_callback(
     executor: Arc<DecisionExecutor>,
 ) -> Arc<dyn Fn(Vec<KernelEffect>, String) + Send + Sync> {
+    create_decision_executor_callback_with_sink(executor, None)
+}
+
+/// Variant of [`create_decision_executor_callback`] that also invokes an
+/// app-layer [`DispatchEvidenceSink`] after execution completes.
+///
+/// When `sink` is `Some`, the sink is called with the original effects
+/// and their corresponding per-effect results once the executor has
+/// finished. The sink call is best-effort and runs on the same spawned
+/// task; failures in the sink do not affect execution recording.
+///
+/// This is the seam that closes the actor-path dispatch-evidence gap:
+/// any acceptance (actor- or gateway-originated) that flows through the
+/// effect subscription now passes through the sink, so durable evidence
+/// is observable by the same code path regardless of entry point.
+pub fn create_decision_executor_callback_with_sink(
+    executor: Arc<DecisionExecutor>,
+    sink: Option<Arc<dyn DispatchEvidenceSink>>,
+) -> Arc<dyn Fn(Vec<KernelEffect>, String) + Send + Sync> {
     Arc::new(move |effects, decision_receipt_id| {
         if effects.is_empty() {
             debug!(
@@ -672,6 +691,7 @@ pub fn create_decision_executor_callback(
         }
 
         let executor = executor.clone();
+        let sink = sink.clone();
         let semaphore = executor.concurrency_limit.clone();
         let effect_count = effects.len();
 
@@ -709,10 +729,22 @@ pub fn create_decision_executor_callback(
                 }
             };
 
-            match executor
+            // Only clone the effects vector when a sink is actually
+            // wired — otherwise the clone is dead weight on the hot
+            // execution path.
+            let effects_for_sink = sink.as_ref().map(|_| effects.clone());
+
+            let exec_result = executor
                 .execute(effects, &decision_receipt_id, &decision_hash, &proposal_id)
-                .await
-            {
+                .await;
+
+            // Drop the permit before invoking the sink so any
+            // storage/network work the sink performs does not cap
+            // decision-execution concurrency. The sink is best-effort
+            // and must never block new decisions.
+            drop(_permit);
+
+            match exec_result {
                 Ok(results) => {
                     let success_count = results.iter().filter(|r| r.success).count();
                     info!(
@@ -722,6 +754,21 @@ pub fn create_decision_executor_callback(
                         success = success_count,
                         "Decision execution complete"
                     );
+                    if let (Some(sink), Some(effects_for_sink)) = (sink.as_ref(), effects_for_sink)
+                    {
+                        if !results.is_empty() {
+                            let recorded_at = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_secs())
+                                .unwrap_or(0);
+                            sink.record_effects(
+                                &decision_receipt_id,
+                                &effects_for_sink,
+                                &results,
+                                recorded_at,
+                            );
+                        }
+                    }
                 }
                 Err(e) => {
                     error!(
@@ -733,7 +780,6 @@ pub fn create_decision_executor_callback(
                     );
                 }
             }
-            // _permit drops here, releasing the semaphore slot
         });
     })
 }

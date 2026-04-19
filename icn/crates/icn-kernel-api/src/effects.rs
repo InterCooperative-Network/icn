@@ -569,12 +569,97 @@ impl EffectResult {
 }
 
 // =============================================================================
+// Dispatch Evidence Sink
+// =============================================================================
+
+/// Map a kernel effect variant to a stable lowercase subsystem label.
+///
+/// This is a **purely lexical** mapping over the kernel-neutral enum shape —
+/// it does not interpret domain semantics, does not read storage, and does
+/// not depend on any app crate. The label is the same one app-side
+/// evidence writers already key on (e.g. `"sdis"`, `"treasury"`).
+///
+/// Used by [`DispatchEvidenceSink`] implementers that need a subsystem
+/// tag without matching on every variant themselves.
+pub fn kernel_effect_subsystem(effect: &KernelEffect) -> &'static str {
+    match effect {
+        KernelEffect::Treasury(_) => "treasury",
+        KernelEffect::Membership(_) => "membership",
+        KernelEffect::Protocol(_) => "protocol",
+        KernelEffect::Control(_) => "control",
+        KernelEffect::Federation(_) => "federation",
+        KernelEffect::Dispute(_) => "dispute",
+        KernelEffect::Resource(_) => "resource",
+        KernelEffect::Sdis(_) => "sdis",
+        KernelEffect::NoOp { .. } => "noop",
+    }
+}
+
+/// Kernel-neutral sink for durable dispatch evidence.
+///
+/// After a `DecisionExecutor` finishes executing the effects for an
+/// accepted proposal, it invokes this sink with the original effects and
+/// their corresponding [`EffectResult`]s. An app-layer implementer can
+/// then persist evidence linking each effect's outcome back to the
+/// emitted institutional record.
+///
+/// The kernel does not know:
+/// - how the sink persists evidence
+/// - which app-layer record an effect maps to
+/// - what "success" means beyond the boolean on [`EffectResult`]
+///
+/// The sink is invoked **best-effort** — any panic or error is the sink's
+/// own responsibility to contain; the kernel does not retry.
+///
+/// # Ordering contract
+///
+/// `effects[i]` corresponds to `results[i]` by index. Implementers
+/// relying on this pairing must tolerate `effects.len() != results.len()`
+/// defensively (e.g. when the executor short-circuits), in which case
+/// only the shorter prefix is guaranteed aligned.
+pub trait DispatchEvidenceSink: Send + Sync {
+    /// Record dispatch evidence for a completed batch of effects.
+    ///
+    /// `decision_receipt_id` is the opaque app-layer identifier for the
+    /// governance decision whose acceptance produced these effects. The
+    /// kernel treats it as an opaque string — the app that owns its
+    /// format is also the one that parses it (e.g. to recover a proposal
+    /// id for its own storage keys).
+    ///
+    /// `recorded_at` is the Unix-seconds timestamp the kernel observed
+    /// at dispatch completion; the app layer uses it directly rather
+    /// than re-reading the clock so that tests can be deterministic.
+    fn record_effects(
+        &self,
+        decision_receipt_id: &str,
+        effects: &[KernelEffect],
+        results: &[EffectResult],
+        recorded_at: u64,
+    );
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kernel_effect_subsystem_labels_are_stable_lowercase() {
+        assert_eq!(
+            kernel_effect_subsystem(&KernelEffect::NoOp { reason: "x".into() }),
+            "noop"
+        );
+        assert_eq!(
+            kernel_effect_subsystem(&KernelEffect::Sdis(SdisEffect::RevokeSteward {
+                steward_did: "did:icn:z".into(),
+                reason: "r".into(),
+            })),
+            "sdis"
+        );
+    }
 
     #[test]
     fn contract_effect_result_classifier_matches_decision_executor_aggregation() {

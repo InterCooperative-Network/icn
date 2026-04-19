@@ -44,6 +44,13 @@ pub struct GatewayActorHandles {
     pub federation_service: Option<Arc<dyn icn_kernel_api::services::FederationService>>,
     /// Settlement engine for compute audit queries (task_id → settled status).
     pub settlement_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
+    /// Deferred dispatch-evidence sink installer. The daemon constructs one
+    /// `Arc<DeferredDispatchEvidenceSink>` at bootstrap; a clone is handed
+    /// to the kernel via `BootstrapHandles.dispatch_evidence_sink`, and
+    /// this field carries the *same* Arc through to the gateway so it can
+    /// install the receipt store as the concrete backend once it is open.
+    pub dispatch_evidence_sink_installer:
+        Option<Arc<icn_governance_actor::DeferredDispatchEvidenceSink>>,
 }
 
 /// Core actor handles returned from initialization
@@ -138,4 +145,23 @@ pub struct BootstrapHandles {
     /// The concrete `SettlementEngine` (from `icn-ledger`) is built in the daemon and
     /// injected here as a trait object so `icn-core` never imports `icn-ledger`.
     pub settlement_query_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
+    /// Sink for durable per-effect dispatch evidence after decision execution.
+    ///
+    /// When provided, the supervisor wires this into the decision-executor
+    /// callback so that every accepted proposal (gateway- or actor-originated)
+    /// produces observable dispatch evidence via the same code path.
+    /// Kernel-neutral trait — the app-side implementer persists evidence.
+    pub dispatch_evidence_sink: Option<Arc<dyn icn_kernel_api::effects::DispatchEvidenceSink>>,
+    /// Concrete installer companion to `dispatch_evidence_sink`. Carries the
+    /// same underlying `Arc<DeferredDispatchEvidenceSink>` so the supervisor
+    /// can forward it to the gateway; the gateway calls `install_backend`
+    /// once the receipt store is open, flipping the deferred sink from
+    /// forwarder-to-nowhere into a live writer.
+    ///
+    /// Optional — leaving this `None` keeps the deferred sink in its
+    /// pre-install "log and drop" state, which is the correct behavior for
+    /// configurations where no gateway / no receipt store exists (e.g.
+    /// standalone supervisor-only tests).
+    pub dispatch_evidence_sink_installer:
+        Option<Arc<icn_governance_actor::DeferredDispatchEvidenceSink>>,
 }

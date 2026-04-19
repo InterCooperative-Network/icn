@@ -66,6 +66,11 @@ pub struct GatewayHandles {
     pub federation_service: Option<Arc<dyn icn_kernel_api::FederationService>>,
     /// Settlement engine for compute audit queries (task_id → settled status).
     pub settlement_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
+    /// Deferred dispatch-evidence sink: the gateway calls
+    /// `install_backend(receipt_store)` on this once it opens its
+    /// `ReceiptStore`, activating durable actor-path dispatch evidence.
+    pub dispatch_evidence_sink_installer:
+        Option<Arc<icn_governance_actor::DeferredDispatchEvidenceSink>>,
 }
 
 /// Spawn the Gateway API server if enabled
@@ -133,6 +138,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let charter_accepted_hook = handles.charter_accepted_hook;
     let federation_service_handle = handles.federation_service;
     let settlement_engine_handle = handles.settlement_engine;
+    let dispatch_evidence_sink_installer = handles.dispatch_evidence_sink_installer;
     let default_trust_score = config.default_trust_score;
 
     // Spawn gateway in a dedicated thread (actix-web has its own runtime)
@@ -227,6 +233,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(engine) = settlement_engine_handle {
                 gateway_server = gateway_server.with_settlement_engine(engine);
+            }
+
+            if let Some(installer) = dispatch_evidence_sink_installer {
+                gateway_server = gateway_server.with_dispatch_evidence_sink_installer(installer);
             }
 
             if let Err(e) = gateway_server.run().await {
