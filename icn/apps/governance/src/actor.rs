@@ -548,14 +548,43 @@ impl GovernanceHandle {
     /// to the HTTP close handler's post-actor emission (which does not run
     /// for actor-only force-close). Wire this for any deployment where
     /// force-accept must produce the same audit trail as normal accept.
-    pub fn with_receipt_store(
+    pub async fn with_receipt_store(
         self,
         store: Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>,
     ) -> Self {
-        if let Ok(mut actor) = self.inner.try_write() {
-            actor.receipt_store = Some(store);
-        }
+        self.install_receipt_store(store).await;
         self
+    }
+
+    /// Shared-ref variant of `with_receipt_store`: install the receipt backend
+    /// on an already-cloned handle.
+    ///
+    /// The builder-style `with_receipt_store` consumes `self`, which is
+    /// incompatible with production wiring where the concrete
+    /// `GovernanceHandle` has already been cloned into `Arc<dyn GovernanceOps>`
+    /// before the receipt_store is created (receipt_store's backing DB is only
+    /// opened when the gateway server starts, after the actor is spawned).
+    ///
+    /// This setter mutates the shared actor state via the same
+    /// `Arc<RwLock<GovernanceActor>>`, so every clone of the handle sees the
+    /// newly-installed store. Closes the actor-path parity gap: without this,
+    /// force-close accept and deadline auto-close emit no
+    /// `InstitutionalEffectRecord` in daemon deployments (the HTTP-close path
+    /// remained the sole writer).
+    ///
+    /// Awaits the inner write lock rather than using `try_write`: a transient
+    /// lock contention window (e.g. an in-flight `submit`) during gateway
+    /// startup must NOT silently drop the install and re-open the parity gap
+    /// the setter exists to close. `submit` only holds the lock for the
+    /// duration of a single command, so this await completes quickly.
+    ///
+    /// Idempotent: repeat calls replace the previously-installed store.
+    pub async fn install_receipt_store(
+        &self,
+        store: Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>,
+    ) {
+        let mut actor = self.inner.write().await;
+        actor.receipt_store = Some(store);
     }
 
     /// List all protocol parameters
