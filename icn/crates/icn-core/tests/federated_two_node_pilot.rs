@@ -730,6 +730,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                             state_change_hash: extract_state_hash_from_effects(&effects),
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         }
                     }
                     _ => panic!("Batch effect failed on Node A"),
@@ -745,6 +746,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                 state_change_hash: None,
                 ledger_entry_id: None,
                 not_executed: true,
+                receipt_ref: None,
             },
             _ => panic!("Unexpected effect type in batch"),
         };
@@ -782,6 +784,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                             state_change_hash: extract_state_hash_from_effects(&effects),
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         }
                     }
                     _ => panic!("Batch effect failed on Node B"),
@@ -797,6 +800,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                 state_change_hash: None,
                 ledger_entry_id: None,
                 not_executed: true,
+                receipt_ref: None,
             },
             _ => panic!("Unexpected effect type in batch"),
         };

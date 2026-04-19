@@ -43,7 +43,16 @@ pub struct EffectDispatchEvidence {
     /// `"commons"`, `"ledger"`, …
     pub subsystem: String,
     /// Opaque receipt reference minted by the downstream subsystem.
-    /// For SDIS, this is the steward-store `state_change_hash`.
+    ///
+    /// For SDIS `AppointSteward` / `RevokeSteward` / `ReconfirmSteward`,
+    /// this is the content-addressed `StewardId::to_hex()` published by
+    /// the commons layer — *not* a steward-store `state_change_hash`.
+    ///
+    /// `None` means the executing service had no downstream handle to
+    /// attribute: a failure, a no-op (e.g. revoke against a DID with no
+    /// active record), or an effect family that does not yet produce a
+    /// downstream receipt. Consumers that need the full downstream
+    /// receipt must look it up in the subsystem's own store.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receipt_ref: Option<String>,
     /// Whether the subsystem reported success.

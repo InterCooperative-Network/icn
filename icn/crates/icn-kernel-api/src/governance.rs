@@ -264,6 +264,7 @@ impl EffectExecutor for DefaultEffectExecutor {
                 state_change_hash: None,
                 ledger_entry_id: None,
                 not_executed: false,
+                receipt_ref: None,
             }),
             KernelEffect::Treasury(treasury_effect) => {
                 // Convert TreasuryEffect to TreasuryOperation
@@ -296,6 +297,7 @@ impl EffectExecutor for DefaultEffectExecutor {
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     })
                 }
             }
@@ -309,6 +311,7 @@ impl EffectExecutor for DefaultEffectExecutor {
                 state_change_hash: None,
                 ledger_entry_id: None,
                 not_executed: true,
+                receipt_ref: None,
             }),
             // For other effect types, return success placeholder
             _ => Ok(EffectResult {
@@ -318,6 +321,7 @@ impl EffectExecutor for DefaultEffectExecutor {
                 state_change_hash: None,
                 ledger_entry_id: None,
                 not_executed: false,
+                receipt_ref: None,
             }),
         }
     }
@@ -545,6 +549,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             state_change_hash: None,
             ledger_entry_id: None,
             not_executed: false,
+            receipt_ref: None,
         },
         ExecutionOutcome::Failed { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
@@ -553,6 +558,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             state_change_hash: None,
             ledger_entry_id: None,
             not_executed: false,
+            receipt_ref: None,
         },
         ExecutionOutcome::Deferred { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
@@ -561,6 +567,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             state_change_hash: None,
             ledger_entry_id: None,
             not_executed: true,
+            receipt_ref: None,
         },
     }
 }

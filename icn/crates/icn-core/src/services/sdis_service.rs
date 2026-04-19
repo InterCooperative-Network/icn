@@ -113,17 +113,20 @@ impl SdisService for SdisServiceImpl {
         });
 
         match result {
-            Ok(_record) => {
+            Ok(record) => {
                 let state_change_hash = Self::compute_appoint_hash(&request);
+                let steward_id = record.id().to_hex();
                 info!(
                     steward_did = %request.steward_did,
                     state_change_hash = %state_change_hash,
+                    steward_id = %steward_id,
                     "Steward appointed and registered in commons"
                 );
                 Ok(AppointStewardResult {
                     success: true,
                     state_change_hash,
                     error: None,
+                    receipt_ref: Some(steward_id),
                 })
             }
             Err(e) => {
@@ -136,6 +139,7 @@ impl SdisService for SdisServiceImpl {
                     success: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
+                    receipt_ref: None,
                 })
             }
         }
@@ -151,24 +155,28 @@ impl SdisService for SdisServiceImpl {
         let steward_did = icn_identity::Did::from_str(&request.steward_did)
             .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
 
-        let result = tokio::task::block_in_place(|| {
+        // Returns `Some(steward_id)` when the revoke was routed through a
+        // real commons handle; `None` when no active record existed and this
+        // is an idempotent no-op. The inner `Result` disambiguates success
+        // from commons failure — we do not need a separate bool.
+        let result: Result<Option<String>> = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                // Look up by DID first, then revoke by record ID
                 match self.commons.get_steward_by_did(&steward_did).await {
                     Ok(Some(record)) => {
                         let steward_id = record.id().to_hex();
                         self.commons
                             .revoke_steward(&steward_id, request.reason.clone(), vec![])
                             .await
-                            .map(|_| true)
+                            .map(|_| Some(steward_id))
                     }
                     Ok(None) => {
-                        // No record found — idempotent no-op
+                        // No record found — idempotent no-op. No steward_id
+                        // to attribute to this revoke.
                         tracing::debug!(
                             steward_did = %request.steward_did,
                             "RevokeSteward: no active steward record found, treating as no-op"
                         );
-                        Ok(true)
+                        Ok(None)
                     }
                     Err(e) => Err(e),
                 }
@@ -176,18 +184,37 @@ impl SdisService for SdisServiceImpl {
         });
 
         match result {
-            Ok(_) => {
-                let state_change_hash = Self::compute_revoke_hash(&request);
-                info!(
-                    steward_did = %request.steward_did,
-                    state_change_hash = %state_change_hash,
-                    "Steward revoked in commons"
-                );
-                Ok(RevokeStewardResult {
-                    success: true,
-                    state_change_hash,
-                    error: None,
-                })
+            Ok(receipt_ref) => {
+                // Only count a real revoke as state-changing. The no-op
+                // (no active record) branch keeps `state_change_hash`
+                // empty so downstream audit surfaces can distinguish a
+                // genuine revocation from an idempotent repeat.
+                if receipt_ref.is_some() {
+                    let state_change_hash = Self::compute_revoke_hash(&request);
+                    info!(
+                        steward_did = %request.steward_did,
+                        state_change_hash = %state_change_hash,
+                        receipt_ref = ?receipt_ref,
+                        "Steward revoked in commons"
+                    );
+                    Ok(RevokeStewardResult {
+                        success: true,
+                        state_change_hash,
+                        error: None,
+                        receipt_ref,
+                    })
+                } else {
+                    info!(
+                        steward_did = %request.steward_did,
+                        "Steward revoke was a no-op in commons (no active record)"
+                    );
+                    Ok(RevokeStewardResult {
+                        success: true,
+                        state_change_hash: String::new(),
+                        error: None,
+                        receipt_ref: None,
+                    })
+                }
             }
             Err(e) => {
                 tracing::warn!(
@@ -199,6 +226,7 @@ impl SdisService for SdisServiceImpl {
                     success: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
+                    receipt_ref: None,
                 })
             }
         }
@@ -218,7 +246,7 @@ impl SdisService for SdisServiceImpl {
         let steward_did = icn_identity::Did::from_str(&request.steward_did)
             .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
 
-        let result = tokio::task::block_in_place(|| {
+        let result: Result<Option<String>> = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 match self.commons.get_steward_by_did(&steward_did).await {
                     Ok(Some(record)) => {
@@ -226,7 +254,7 @@ impl SdisService for SdisServiceImpl {
                         self.commons
                             .extend_steward_term(&steward_id, request.new_term_end)
                             .await
-                            .map(|_| true)
+                            .map(|_| Some(steward_id))
                     }
                     Ok(None) => {
                         tracing::warn!(
@@ -244,18 +272,20 @@ impl SdisService for SdisServiceImpl {
         });
 
         match result {
-            Ok(_) => {
+            Ok(receipt_ref) => {
                 let state_change_hash = Self::compute_reconfirm_hash(&request);
                 info!(
                     steward_did = %request.steward_did,
                     new_term_end = %request.new_term_end,
                     state_change_hash = %state_change_hash,
+                    receipt_ref = ?receipt_ref,
                     "Steward term extended in commons"
                 );
                 Ok(ReconfirmStewardResult {
                     success: true,
                     state_change_hash,
                     error: None,
+                    receipt_ref,
                 })
             }
             Err(e) => {
@@ -268,6 +298,7 @@ impl SdisService for SdisServiceImpl {
                     success: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
+                    receipt_ref: None,
                 })
             }
         }
@@ -554,14 +585,22 @@ mod tests {
         assert!(result.error.is_none());
 
         // Verify the steward record is now present in commons
-        let found = commons
+        let record = commons
             .get_steward_by_did(&holder)
             .await
             .expect("get_steward_by_did must not error")
-            .is_some();
-        assert!(
-            found,
-            "steward must be present in commons after appointment"
+            .expect("steward must be present in commons after appointment");
+
+        // Evidence-fidelity seam: the service must publish the commons
+        // StewardId::to_hex() as receipt_ref so the dispatch-evidence sink
+        // can persist it verbatim (see
+        // `apps/governance/tests/actor_path_dispatch_evidence_sink.rs`).
+        let expected_receipt_ref = record.id().to_hex();
+        assert_eq!(
+            result.receipt_ref,
+            Some(expected_receipt_ref),
+            "AppointStewardResult.receipt_ref must equal the commons StewardId::to_hex() \
+             so kernel-path dispatch evidence carries the real downstream handle"
         );
     }
 
@@ -586,11 +625,21 @@ mod tests {
         };
         let appoint = svc.appoint_steward(appoint_req).unwrap();
         assert!(appoint.success, "appoint must succeed");
+        let appoint_receipt_ref = appoint
+            .receipt_ref
+            .clone()
+            .expect("AppointStewardResult must publish receipt_ref on success");
 
         // Confirm presence before revoke
-        assert!(
-            commons.get_steward_by_did(&holder).await.unwrap().is_some(),
-            "steward must exist before revocation"
+        let record_before = commons
+            .get_steward_by_did(&holder)
+            .await
+            .unwrap()
+            .expect("steward must exist before revocation");
+        assert_eq!(
+            record_before.id().to_hex(),
+            appoint_receipt_ref,
+            "appoint receipt_ref must match the commons StewardId of the record the service created"
         );
 
         let revoke_req = RevokeStewardRequest {
@@ -600,8 +649,21 @@ mod tests {
         let revoke = svc.revoke_steward(revoke_req).unwrap();
         assert!(revoke.success, "revoke_steward should succeed");
         assert!(!revoke.state_change_hash.is_empty());
+        // Evidence-fidelity seam: revoke publishes the same steward_id it
+        // routed through — the handle the revoke operation actually used.
+        assert_eq!(
+            revoke.receipt_ref,
+            Some(appoint_receipt_ref),
+            "RevokeStewardResult.receipt_ref must be the steward_id the revoke was routed through"
+        );
 
-        // Idempotent second revoke must succeed (no-op on missing record)
+        // Idempotent second revoke must succeed. Because commons retains
+        // revoked records (get_steward_by_did does not filter by active
+        // status), the service still has a real handle to attribute the
+        // repeat revoke to — so receipt_ref remains Some(steward_id).
+        // The honestly-None path is exercised by
+        // `test_revoke_missing_steward_is_noop_with_no_receipt_ref` below,
+        // where no record ever existed.
         let idempotent = svc
             .revoke_steward(RevokeStewardRequest {
                 steward_did: steward_did_str,
@@ -611,6 +673,46 @@ mod tests {
         assert!(
             idempotent.success,
             "second revoke is a no-op and must succeed"
+        );
+        assert!(
+            idempotent.receipt_ref.is_some(),
+            "idempotent repeat revoke still routes through the retained record; \
+             receipt_ref must still point at that steward_id"
+        );
+    }
+
+    /// RevokeSteward against a DID that was never registered → no active
+    /// record → service returns success (idempotent no-op) but must truthfully
+    /// leave `receipt_ref` as `None` because there is no downstream handle
+    /// to attribute.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_revoke_missing_steward_is_noop_with_no_receipt_ref() {
+        let (svc, _commons) = make_service_with_commons();
+        let unknown = test_did(77);
+
+        let revoke = svc
+            .revoke_steward(RevokeStewardRequest {
+                steward_did: unknown.to_string(),
+                reason: "never appointed".to_string(),
+            })
+            .unwrap();
+
+        assert!(
+            revoke.success,
+            "revoke of a non-existent steward must succeed as an idempotent no-op"
+        );
+        assert_eq!(
+            revoke.receipt_ref, None,
+            "no active record → no handle to attribute → receipt_ref must remain None"
+        );
+        assert!(
+            revoke.state_change_hash.is_empty(),
+            "no-op revoke must not claim a state_change_hash — audit must be able \
+             to distinguish a real revocation from an idempotent no-op"
+        );
+        assert!(
+            revoke.error.is_none(),
+            "no-op revoke is a success, not a failure; error must be None"
         );
     }
 

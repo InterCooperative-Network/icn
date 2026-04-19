@@ -2138,6 +2138,12 @@ pub struct AppointStewardResult {
     /// Stable hash of the steward record (for audit)
     pub state_change_hash: String,
     pub error: Option<String>,
+    /// Downstream identifier for the registered steward (e.g. content-addressed
+    /// `StewardId::to_hex()` minted by the commons layer). Carried through to
+    /// `EffectResult.receipt_ref` and into durable dispatch evidence. `None`
+    /// on failure paths or when the service layer cannot honestly produce one.
+    #[serde(default)]
+    pub receipt_ref: Option<String>,
 }
 
 /// Request to revoke a steward appointment.
@@ -2155,6 +2161,13 @@ pub struct RevokeStewardResult {
     pub success: bool,
     pub state_change_hash: String,
     pub error: Option<String>,
+    /// Downstream identifier for the revoked steward record (the commons
+    /// `StewardId::to_hex()` the revoke was routed through). See
+    /// [`AppointStewardResult::receipt_ref`] for semantics. `None` when the
+    /// revoke was an idempotent no-op (no active record existed) or on
+    /// failure.
+    #[serde(default)]
+    pub receipt_ref: Option<String>,
 }
 
 /// Request to reconfirm (extend the term of) an existing steward.
@@ -2175,6 +2188,10 @@ pub struct ReconfirmStewardResult {
     /// Stable hash of the state change (for audit)
     pub state_change_hash: String,
     pub error: Option<String>,
+    /// Downstream identifier for the reconfirmed steward record. See
+    /// [`AppointStewardResult::receipt_ref`] for semantics.
+    #[serde(default)]
+    pub receipt_ref: Option<String>,
 }
 
 /// Trait for SDIS steward appointment, revocation, and lifecycle management.

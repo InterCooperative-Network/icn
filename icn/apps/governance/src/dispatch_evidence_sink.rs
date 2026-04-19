@@ -130,10 +130,15 @@ impl GovernanceDispatchEvidenceSink {
             effect_record_id.to_string(),
             proposal_id.to_string(),
             subsystem,
-            // The kernel path does not mint a downstream receipt_ref;
-            // leave None and let evidence-returning hooks (gateway path)
-            // fill it in when they exist.
-            None,
+            // Honest forwarding of whatever downstream handle the executing
+            // service published on `EffectResult.receipt_ref`. For SDIS
+            // AppointSteward / RevokeSteward / ReconfirmSteward this is the
+            // content-addressed `StewardId::to_hex()` minted by the commons
+            // layer. `None` when the service layer had no downstream handle
+            // to attribute (failure, no-op revoke, non-evidence-producing
+            // effects). No synthesis — what you see here is what the
+            // executor actually produced.
+            result.receipt_ref.clone(),
             result.success,
             error_message,
             recorded_at,
