@@ -2464,16 +2464,34 @@ impl KernelSdisExecutor {
                         receipt_ref: result.receipt_ref,
                     })
                 } else {
+                    // success=false is either a hard pre-slash failure (no
+                    // mutation) or a partial mutation (slash committed, suspend
+                    // failed). The service layer populates state_change_hash
+                    // and receipt_ref only when commons state really changed,
+                    // so forward them truthfully instead of wiping them.
+                    let state_change_hash = if result.state_change_hash.is_empty() {
+                        None
+                    } else {
+                        Some(result.state_change_hash)
+                    };
+                    if state_change_hash.is_some() {
+                        warn!(
+                            steward_did = %steward_did,
+                            remaining_bond = %result.remaining_bond,
+                            receipt_ref = ?result.receipt_ref,
+                            "Sanction partially applied (bond slashed, later step failed); preserving attribution"
+                        );
+                    }
                     Ok(EffectResult {
                         effect_id: decision_receipt_id.to_string(),
                         success: false,
                         message: result
                             .error
                             .unwrap_or_else(|| "Sanction failed".to_string()),
-                        state_change_hash: None,
+                        state_change_hash,
                         ledger_entry_id: None,
                         not_executed: false,
-                        receipt_ref: None,
+                        receipt_ref: result.receipt_ref,
                     })
                 }
             }
