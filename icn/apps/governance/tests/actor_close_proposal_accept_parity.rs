@@ -327,7 +327,9 @@ async fn actor_close_proposal_accept_without_receipt_store_is_noop() {
         .await
         .expect("cast_vote");
 
-    // NOTE: no install_receipt_store call.
+    // NOTE: no install_receipt_store call before close — at emission time
+    // the actor's receipt_store is None, so the CloseProposal::Accept
+    // emission branch is a documented no-op.
     actor_handle
         .submit(GovernanceCommand::CloseProposal {
             proposal_id: proposal_id.clone(),
@@ -336,6 +338,23 @@ async fn actor_close_proposal_accept_without_receipt_store_is_noop() {
         })
         .await
         .expect("CloseProposal submit must not panic without a receipt_store");
+
+    // Make the no-op contract observable: install a spy backend AFTER the
+    // close has already processed and confirm no IER exists for this
+    // proposal. The spy sees all writes routed through it — if the close
+    // had silently emitted anywhere it would show up, because the spy now
+    // owns the only readable institutional-effect surface.
+    let spy = Arc::new(MemoryReceiptBackend::new());
+    actor_handle.install_receipt_store(spy.clone()).await;
+
+    let post_close_effects = spy
+        .list_institutional_effects_by_proposal(&proposal_id.0)
+        .expect("list_institutional_effects_by_proposal");
+    assert!(
+        post_close_effects.is_empty(),
+        "CloseProposal::Accept with no receipt_store at emission time must leave no \
+         InstitutionalEffectRecord behind; got {post_close_effects:?}"
+    );
 
     actor_handle.shutdown().await;
 }
