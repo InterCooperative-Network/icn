@@ -42,7 +42,9 @@ use icn_governance_actor::{
     receipt_backend::GovernanceReceiptBackend, DeferredDispatchEvidenceSink, GovernanceCommand,
 };
 use icn_identity::IdentityBundle;
-use icn_kernel_api::effects::{DispatchEvidenceSink, EffectResult, KernelEffect, SdisEffect};
+use icn_kernel_api::effects::{
+    DispatchEvidenceSink, EffectOutcome, EffectResult, KernelEffect, SdisEffect,
+};
 use icn_store::SledStore;
 use std::sync::{Arc, Mutex};
 
@@ -174,6 +176,7 @@ fn ok_result(effect_id: &str) -> EffectResult {
         ledger_entry_id: None,
         not_executed: false,
         receipt_ref: None,
+        outcome: None,
     }
 }
 
@@ -189,6 +192,7 @@ fn ok_result_with_receipt_ref(effect_id: &str, receipt_ref: &str) -> EffectResul
         ledger_entry_id: None,
         not_executed: false,
         receipt_ref: Some(receipt_ref.into()),
+        outcome: None,
     }
 }
 
@@ -202,6 +206,7 @@ fn failure_result(effect_id: &str, message: &str) -> EffectResult {
         ledger_entry_id: None,
         not_executed: false,
         receipt_ref: None,
+        outcome: None,
     }
 }
 
@@ -382,6 +387,7 @@ async fn sink_skips_noop_effects() {
         ledger_entry_id: None,
         not_executed: true,
         receipt_ref: None,
+        outcome: None,
     }];
     sink.record_effects(
         "gov:domain-x:prop-noop:receipt",
@@ -572,6 +578,7 @@ async fn revoke_steward_noop_evidence_has_no_receipt_ref_but_is_success() {
         ledger_entry_id: None,
         not_executed: false,
         receipt_ref: None,
+        outcome: None,
     }];
 
     sink.record_effects(
@@ -1080,5 +1087,260 @@ async fn deferred_sink_second_install_is_idempotent_no_op() {
     assert!(
         backend_b.evidence_for("prop-idem").is_empty(),
         "second install must not rebind the backend"
+    );
+}
+
+// =============================================================================
+// Phase 2: EffectResult.outcome → EffectDispatchEvidence.outcome forwarding
+// =============================================================================
+//
+// Pins that the sink copies `result.outcome` through to the durable evidence
+// row verbatim — no reclassification, no reconstruction from (success,
+// state_change_hash, receipt_ref). Audit can distinguish applied / no_op /
+// partial / failed without guessing.
+
+/// Successful appoint: outcome=Applied is persisted.
+#[tokio::test(flavor = "current_thread")]
+async fn sink_forwards_applied_outcome() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-outcome-applied",
+        "coop",
+        None,
+        "appoint_steward",
+        Some("did:icn:s".into()),
+        Some("r".into()),
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![sdis_approve_effect(&candidate, "prop-outcome-applied")];
+    let results = vec![EffectResult {
+        effect_id: "eff-app".into(),
+        success: true,
+        message: "ok".into(),
+        state_change_hash: Some("hash".into()),
+        ledger_entry_id: None,
+        not_executed: false,
+        receipt_ref: Some("handle".into()),
+        outcome: Some(EffectOutcome::Applied),
+    }];
+
+    sink.record_effects(
+        "gov:d:prop-outcome-applied:receipt",
+        &effects,
+        &results,
+        1_700_040_000,
+    );
+
+    let ev = backend.evidence_for("prop-outcome-applied");
+    assert_eq!(ev.len(), 1);
+    assert_eq!(ev[0].outcome, Some(EffectOutcome::Applied));
+}
+
+/// No-op revoke: outcome=NoOp is persisted — distinct from Applied even
+/// though success=true in both.
+#[tokio::test(flavor = "current_thread")]
+async fn sink_forwards_noop_outcome() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-outcome-noop",
+        "coop",
+        None,
+        "revoke_steward",
+        Some("did:icn:s".into()),
+        None,
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![KernelEffect::Sdis(
+        icn_kernel_api::effects::SdisEffect::RevokeSteward {
+            steward_did: candidate.to_string(),
+            reason: "x".into(),
+        },
+    )];
+    let results = vec![EffectResult {
+        effect_id: "eff-noop".into(),
+        success: true,
+        message: "no active record".into(),
+        state_change_hash: None,
+        ledger_entry_id: None,
+        not_executed: false,
+        receipt_ref: None,
+        outcome: Some(EffectOutcome::NoOp),
+    }];
+
+    sink.record_effects(
+        "gov:d:prop-outcome-noop:receipt",
+        &effects,
+        &results,
+        1_700_040_001,
+    );
+
+    let ev = backend.evidence_for("prop-outcome-noop");
+    assert_eq!(ev.len(), 1);
+    assert_eq!(ev[0].outcome, Some(EffectOutcome::NoOp));
+    assert!(ev[0].success);
+}
+
+/// Partial sanction: outcome=Partial is persisted, with receipt_ref and
+/// state_change_hash preserved. This is the Codex P1 invariant.
+#[tokio::test(flavor = "current_thread")]
+async fn sink_forwards_partial_outcome_preserving_attribution() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-outcome-partial",
+        "coop",
+        None,
+        "sanction_steward",
+        Some("did:icn:s".into()),
+        None,
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![KernelEffect::Sdis(
+        icn_kernel_api::effects::SdisEffect::SanctionSteward {
+            steward_did: candidate.to_string(),
+            bond_slash_amount: 50,
+            suspend_reason: "breach".into(),
+            reason: "breach".into(),
+            proposal_id: "prop-outcome-partial".into(),
+        },
+    )];
+    let results = vec![EffectResult {
+        effect_id: "eff-partial".into(),
+        success: false,
+        message: "bond slashed but suspend failed: io".into(),
+        state_change_hash: Some("hash".into()),
+        ledger_entry_id: None,
+        not_executed: false,
+        receipt_ref: Some("handle".into()),
+        outcome: Some(EffectOutcome::Partial),
+    }];
+
+    sink.record_effects(
+        "gov:d:prop-outcome-partial:receipt",
+        &effects,
+        &results,
+        1_700_040_002,
+    );
+
+    let ev = backend.evidence_for("prop-outcome-partial");
+    assert_eq!(ev.len(), 1);
+    assert_eq!(
+        ev[0].outcome,
+        Some(EffectOutcome::Partial),
+        "partial mutation must be classified Partial on the durable row, \
+         not conflated with Failed"
+    );
+    assert!(!ev[0].success);
+    assert_eq!(
+        ev[0].receipt_ref.as_deref(),
+        Some("handle"),
+        "partial row must still carry the downstream handle"
+    );
+}
+
+/// Hard failure with no downstream handle: outcome=Failed is persisted and
+/// no attribution leaks onto the row.
+#[tokio::test(flavor = "current_thread")]
+async fn sink_forwards_failed_outcome() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-outcome-failed",
+        "coop",
+        None,
+        "appoint_steward",
+        Some("did:icn:s".into()),
+        Some("r".into()),
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![sdis_approve_effect(&candidate, "prop-outcome-failed")];
+    let results = vec![EffectResult {
+        effect_id: "eff-fail".into(),
+        success: false,
+        message: "commons error".into(),
+        state_change_hash: None,
+        ledger_entry_id: None,
+        not_executed: false,
+        receipt_ref: None,
+        outcome: Some(EffectOutcome::Failed),
+    }];
+
+    sink.record_effects(
+        "gov:d:prop-outcome-failed:receipt",
+        &effects,
+        &results,
+        1_700_040_003,
+    );
+
+    let ev = backend.evidence_for("prop-outcome-failed");
+    assert_eq!(ev.len(), 1);
+    assert_eq!(ev[0].outcome, Some(EffectOutcome::Failed));
+    assert!(!ev[0].success);
+    assert!(ev[0].receipt_ref.is_none());
+}
+
+/// Legacy result with `outcome: None` must persist as `None` (unclassified),
+/// not silently upgraded. This preserves the "None = unknown" convention so
+/// audit can distinguish pre-Phase-2 evidence from post-Phase-2 rows.
+#[tokio::test(flavor = "current_thread")]
+async fn sink_forwards_legacy_none_outcome_as_unclassified() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-outcome-legacy",
+        "coop",
+        None,
+        "appoint_steward",
+        Some("did:icn:s".into()),
+        Some("r".into()),
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![sdis_approve_effect(&candidate, "prop-outcome-legacy")];
+    let results = vec![ok_result("eff-legacy")]; // helper produces outcome=None
+
+    sink.record_effects(
+        "gov:d:prop-outcome-legacy:receipt",
+        &effects,
+        &results,
+        1_700_040_004,
+    );
+
+    let ev = backend.evidence_for("prop-outcome-legacy");
+    assert_eq!(ev.len(), 1);
+    assert_eq!(
+        ev[0].outcome, None,
+        "sink must not synthesize an outcome when the result left it unset"
     );
 }

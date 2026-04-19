@@ -872,6 +872,7 @@ mod tests {
             Some("state-hash-1".into()),
             true,
             None,
+            None,
             100,
         );
         let newer = EffectDispatchEvidence::new(
@@ -881,6 +882,7 @@ mod tests {
             Some("state-hash-2".into()),
             false,
             Some("boom".into()),
+            None,
             200,
         );
 
@@ -903,12 +905,12 @@ mod tests {
         let store = ReceiptStore::new(temp_db());
         store
             .put_effect_dispatch_evidence(&EffectDispatchEvidence::new(
-                "rec-a", "prop-1", "sdis", None, true, None, 10,
+                "rec-a", "prop-1", "sdis", None, true, None, None, 10,
             ))
             .unwrap();
         store
             .put_effect_dispatch_evidence(&EffectDispatchEvidence::new(
-                "rec-b", "prop-2", "sdis", None, true, None, 20,
+                "rec-b", "prop-2", "sdis", None, true, None, None, 20,
             ))
             .unwrap();
 
@@ -932,7 +934,8 @@ mod tests {
     #[test]
     fn dispatch_evidence_duplicate_evidence_id_is_idempotent() {
         let store = ReceiptStore::new(temp_db());
-        let ev = EffectDispatchEvidence::new("rec-dup", "prop-dup", "sdis", None, true, None, 10);
+        let ev =
+            EffectDispatchEvidence::new("rec-dup", "prop-dup", "sdis", None, true, None, None, 10);
         store.put_effect_dispatch_evidence(&ev).unwrap();
         store.put_effect_dispatch_evidence(&ev).unwrap();
 

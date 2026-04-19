@@ -448,6 +448,7 @@ mod tests {
                 ledger_entry_id: None,
                 not_executed: false,
                 receipt_ref: None,
+                outcome: None,
             },
             EffectResult {
                 effect_id: "membership_0".into(),
@@ -457,6 +458,7 @@ mod tests {
                 ledger_entry_id: None,
                 not_executed: false,
                 receipt_ref: None,
+                outcome: None,
             },
             EffectResult {
                 effect_id: "no_hash".into(),
@@ -466,6 +468,7 @@ mod tests {
                 ledger_entry_id: None,
                 not_executed: false,
                 receipt_ref: None,
+                outcome: None,
             },
         ];
 
@@ -485,6 +488,7 @@ mod tests {
             ledger_entry_id: None,
             not_executed: false,
             receipt_ref: None,
+            outcome: None,
         }];
 
         let results_b = vec![EffectResult {
@@ -495,6 +499,7 @@ mod tests {
             ledger_entry_id: None,
             not_executed: false,
             receipt_ref: None,
+            outcome: None,
         }];
 
         assert!(verify_effect_results_match(&results_a, &results_b));
@@ -510,6 +515,7 @@ mod tests {
             ledger_entry_id: None,
             not_executed: false,
             receipt_ref: None,
+            outcome: None,
         }];
 
         let results_b = vec![EffectResult {
@@ -520,6 +526,7 @@ mod tests {
             ledger_entry_id: None,
             not_executed: false,
             receipt_ref: None,
+            outcome: None,
         }];
 
         let comparison = compare_effect_results(&results_a, &results_b);

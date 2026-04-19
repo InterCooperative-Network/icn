@@ -506,6 +506,47 @@ pub enum SdisEffect {
 // Execution Result
 // =============================================================================
 
+/// Explicit outcome semantics for a kernel-dispatched effect.
+///
+/// Kernel-neutral: describes the **structural** result of an effect
+/// (whether durable state changed, fully or partially) without referring to
+/// any domain concept. Orthogonal to the boolean `success` / `not_executed`
+/// flags, which were insufficient to distinguish four real-world cases:
+///
+/// - [`Applied`](Self::Applied): execution committed the intended durable
+///   change.
+/// - [`NoOp`](Self::NoOp): the target was already in the desired state and
+///   the executing service intentionally made no change. `state_change_hash`
+///   should be `None`.
+/// - [`Partial`](Self::Partial): a multi-step effect committed some durable
+///   changes but a later step failed. Attribution (`receipt_ref`,
+///   `state_change_hash`) must remain populated — the change really happened.
+/// - [`Failed`](Self::Failed): hard failure with no durable mutation.
+///
+/// Additive on the wire: legacy readers that don't know this field receive
+/// `None` (see [`EffectResult::outcome`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectOutcome {
+    Applied,
+    NoOp,
+    Partial,
+    Failed,
+}
+
+impl EffectOutcome {
+    /// Short lowercase label for logs / audit rows. Matches serde repr.
+    #[inline]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            EffectOutcome::Applied => "applied",
+            EffectOutcome::NoOp => "no_op",
+            EffectOutcome::Partial => "partial",
+            EffectOutcome::Failed => "failed",
+        }
+    }
+}
+
 /// Result of executing a kernel effect
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EffectResult {
@@ -543,6 +584,15 @@ pub struct EffectResult {
     /// kernel boundary.
     #[serde(default)]
     pub receipt_ref: Option<String>,
+    /// Explicit structural outcome class — see [`EffectOutcome`].
+    ///
+    /// Populated by service layers that know which class applies. `None` is
+    /// intentionally distinct from [`EffectOutcome::Applied`] so legacy or
+    /// unclassified rows are visibly unclassified rather than silently
+    /// misclassified. Complements — does not replace — `success`,
+    /// `not_executed`, `state_change_hash`, and `receipt_ref`.
+    #[serde(default)]
+    pub outcome: Option<EffectOutcome>,
 }
 
 impl EffectResult {
@@ -691,6 +741,7 @@ mod tests {
             ledger_entry_id: None,
             not_executed: false,
             receipt_ref: None,
+            outcome: None,
         };
         assert!(hard.is_hard_failure());
         assert!(!hard.is_structurally_not_executed());
@@ -703,6 +754,7 @@ mod tests {
             ledger_entry_id: None,
             not_executed: true,
             receipt_ref: None,
+            outcome: None,
         };
         assert!(!nx.is_hard_failure());
         assert!(nx.is_structurally_not_executed());
@@ -715,6 +767,7 @@ mod tests {
             ledger_entry_id: Some("L1".into()),
             not_executed: false,
             receipt_ref: None,
+            outcome: None,
         };
         assert!(!ok.is_hard_failure());
         assert!(!ok.is_structurally_not_executed());
@@ -731,6 +784,7 @@ mod tests {
                 ledger_entry_id: None,
                 not_executed: true,
                 receipt_ref: None,
+                outcome: None,
             },
             EffectResult {
                 effect_id: "b".into(),
@@ -740,6 +794,7 @@ mod tests {
                 ledger_entry_id: None,
                 not_executed: false,
                 receipt_ref: None,
+                outcome: None,
             },
         ];
         for r in &rows {
@@ -960,6 +1015,7 @@ mod tests {
                 ledger_entry_id: Some("entry-123".into()),
                 not_executed: false,
                 receipt_ref: None,
+                outcome: None,
             },
             EffectResult {
                 effect_id: "eff-2".into(),
@@ -969,6 +1025,7 @@ mod tests {
                 ledger_entry_id: None,
                 not_executed: false,
                 receipt_ref: None,
+                outcome: None,
             },
         ];
 

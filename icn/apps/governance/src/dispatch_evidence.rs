@@ -18,6 +18,7 @@
 //! effects will remain `emitted_only` until their surfaces are upgraded.
 //! This module does not pretend otherwise.
 
+use icn_kernel_api::EffectOutcome;
 use serde::{Deserialize, Serialize};
 
 use crate::institutional_effect::InstitutionalEffectRecord;
@@ -60,11 +61,45 @@ pub struct EffectDispatchEvidence {
     /// Error message surfaced by the subsystem on failure.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+    /// Explicit structural outcome class — see [`EffectOutcome`].
+    ///
+    /// Complements `success` + `receipt_ref` + `state_change_hash`-derived
+    /// signals that previously forced auditors to infer semantics from
+    /// field combinations. A value of `None` means the evidence pre-dates
+    /// the outcome seam or the service-layer didn't classify — this is
+    /// intentionally distinct from `Some(Applied)` so stale data is
+    /// visibly unclassified rather than silently misclassified.
+    ///
+    /// When `Some`, the mapping to the other fields is contractually:
+    /// - [`EffectOutcome::Applied`]: `success = true`, real mutation;
+    ///   `receipt_ref` populated when a downstream handle exists.
+    /// - [`EffectOutcome::NoOp`]: `success = true`, no mutation.
+    ///   `receipt_ref` may be `None` or `Some` depending on whether the
+    ///   service reached a durable record at all.
+    /// - [`EffectOutcome::Partial`]: `success = false`, but a real
+    ///   mutation did commit before a later step failed; `receipt_ref`
+    ///   MUST be preserved.
+    /// - [`EffectOutcome::Failed`]: `success = false`, no mutation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<EffectOutcome>,
     /// Unix seconds when this evidence was persisted.
     pub recorded_at: u64,
 }
 
 impl EffectDispatchEvidence {
+    /// Construct evidence with explicit outcome classification.
+    ///
+    /// `outcome` is `Option<EffectOutcome>` rather than a default-to-`None`
+    /// so that every call site must make an explicit choice about whether
+    /// the writing layer can classify the result. Pass `None` only when
+    /// the writer genuinely has no structured outcome to offer (e.g. a
+    /// fire-and-forget hook, pre-outcome-seam legacy path, or test
+    /// fixture that is not exercising the classification field itself).
+    /// Callers that do know the classification — the kernel executor, the
+    /// SDIS service-path writers — MUST pass the concrete variant; an
+    /// unclassified row from a classifiable caller is a correctness bug,
+    /// not a wire-compat feature.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         effect_record_id: impl Into<String>,
         proposal_id: impl Into<String>,
@@ -72,6 +107,7 @@ impl EffectDispatchEvidence {
         receipt_ref: Option<String>,
         success: bool,
         error_message: Option<String>,
+        outcome: Option<EffectOutcome>,
         recorded_at: u64,
     ) -> Self {
         Self {
@@ -82,6 +118,7 @@ impl EffectDispatchEvidence {
             receipt_ref,
             success,
             error_message,
+            outcome,
             recorded_at,
         }
     }
@@ -169,6 +206,7 @@ mod tests {
             Some("state-hash-x".into()),
             success,
             err.map(String::from),
+            None,
             at,
         )
     }

@@ -119,6 +119,7 @@ impl EffectDispatcher {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: None,
+                        outcome: None,
                     };
                     row.debug_assert_semantic_invariants();
                     results.push(row);

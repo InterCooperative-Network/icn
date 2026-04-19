@@ -17,7 +17,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use icn_kernel_api::budget::{BeginSpendOutcome, BudgetRecord, BudgetSpendError, BudgetStore};
 use icn_kernel_api::effects::{
-    ControlEffect, EffectResult, KernelEffect, MembershipEffect, ResourceEffect, TreasuryEffect,
+    ControlEffect, EffectOutcome, EffectResult, KernelEffect, MembershipEffect, ResourceEffect,
+    TreasuryEffect,
 };
 use icn_kernel_api::escrow::{BeginReleaseOutcome, EscrowReleaseError, EscrowStore};
 use icn_kernel_api::governance::{
@@ -170,6 +171,7 @@ impl KernelGovernanceExecutor {
                                 ledger_entry_id: None,
                                 not_executed: false,
                                 receipt_ref: None,
+                                outcome: None,
                             });
                         }
                     }
@@ -231,6 +233,7 @@ impl KernelGovernanceExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: None,
+                            outcome: None,
                         });
                     }
                 };
@@ -246,6 +249,7 @@ impl KernelGovernanceExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: None,
+                            outcome: None,
                         });
                     }
                 };
@@ -270,6 +274,7 @@ impl KernelGovernanceExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: None,
+                            outcome: None,
                         });
                     }
                     Err(e) => {
@@ -286,6 +291,7 @@ impl KernelGovernanceExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: None,
+                            outcome: None,
                         });
                     }
                 }
@@ -405,6 +411,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: None,
+                            outcome: None,
                         });
                     }
                 };
@@ -425,6 +432,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: None,
+                            outcome: None,
                         });
                     }
                 };
@@ -468,6 +476,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: None,
+                            outcome: None,
                         });
                     }
                     Err(EscrowReleaseError::AlreadyReleasedByOther {
@@ -490,6 +499,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: None,
+                            outcome: None,
                         });
                     }
                     Err(EscrowReleaseError::Cancelled) => {
@@ -505,6 +515,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: None,
+                            outcome: None,
                         });
                     }
                     Err(EscrowReleaseError::Failed {
@@ -529,6 +540,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: None,
+                            outcome: None,
                         });
                     }
                 }
@@ -623,6 +635,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: None,
+                        outcome: None,
                     })
                 }
             }
@@ -654,6 +667,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                     ledger_entry_id: None,
                     not_executed: true,
                     receipt_ref: None,
+                    outcome: None,
                 })
             }
             KernelEffect::Control(control_effect) => {
@@ -694,6 +708,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                     ledger_entry_id: None,
                     not_executed: false,
                     receipt_ref: None,
+                    outcome: None,
                 })
             }
             KernelEffect::Resource(resource_effect) => {
@@ -729,6 +744,7 @@ impl KernelGovernanceExecutor {
                     ledger_entry_id: None,
                     not_executed: false,
                     receipt_ref: None,
+                    outcome: None,
                 });
             }
         };
@@ -773,6 +789,7 @@ impl KernelGovernanceExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: None,
+                        outcome: None,
                     }),
                     Err(e) => Ok(EffectResult {
                         effect_id: decision_receipt_id.to_string(),
@@ -782,6 +799,7 @@ impl KernelGovernanceExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: None,
+                        outcome: None,
                     }),
                 }
             }
@@ -806,6 +824,7 @@ impl KernelGovernanceExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: None,
+                        outcome: None,
                     }),
                     Err(e) => Ok(EffectResult {
                         effect_id: decision_receipt_id.to_string(),
@@ -815,6 +834,7 @@ impl KernelGovernanceExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: None,
+                        outcome: None,
                     }),
                 }
             }
@@ -1664,6 +1684,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
                 ledger_entry_id,
                 not_executed: false,
                 receipt_ref: None,
+                outcome: None,
             }
         }
         ExecutionOutcome::Failed { reason, .. } => EffectResult {
@@ -1674,6 +1695,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             ledger_entry_id: None,
             not_executed: false,
             receipt_ref: None,
+            outcome: None,
         },
         ExecutionOutcome::Deferred { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
@@ -1683,6 +1705,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             ledger_entry_id: None,
             not_executed: true,
             receipt_ref: None,
+            outcome: None,
         },
     }
 }
@@ -2157,6 +2180,7 @@ impl KernelSdisExecutor {
                 ledger_entry_id: None,
                 not_executed: false,
                 receipt_ref: None,
+                outcome: Some(EffectOutcome::Failed),
             });
         };
 
@@ -2196,6 +2220,7 @@ impl KernelSdisExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: result.receipt_ref,
+                        outcome: Some(EffectOutcome::Applied),
                     })
                 } else {
                     Ok(EffectResult {
@@ -2208,6 +2233,7 @@ impl KernelSdisExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: None,
+                        outcome: Some(EffectOutcome::Failed),
                     })
                 }
             }
@@ -2242,6 +2268,7 @@ impl KernelSdisExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: result.receipt_ref,
+                            outcome: Some(EffectOutcome::Applied),
                         })
                     } else {
                         info!(
@@ -2259,6 +2286,7 @@ impl KernelSdisExecutor {
                             ledger_entry_id: None,
                             not_executed: false,
                             receipt_ref: None,
+                            outcome: Some(EffectOutcome::NoOp),
                         })
                     }
                 } else {
@@ -2272,6 +2300,7 @@ impl KernelSdisExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: None,
+                        outcome: Some(EffectOutcome::Failed),
                     })
                 }
             }
@@ -2303,6 +2332,7 @@ impl KernelSdisExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: result.receipt_ref,
+                        outcome: Some(EffectOutcome::Applied),
                     })
                 } else {
                     Ok(EffectResult {
@@ -2315,6 +2345,7 @@ impl KernelSdisExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: None,
+                        outcome: Some(EffectOutcome::Failed),
                     })
                 }
             }
@@ -2364,6 +2395,11 @@ impl KernelSdisExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: result.receipt_ref,
+                        outcome: if result.was_suspended {
+                            Some(EffectOutcome::Applied)
+                        } else {
+                            Some(EffectOutcome::NoOp)
+                        },
                     })
                 } else {
                     Ok(EffectResult {
@@ -2376,6 +2412,7 @@ impl KernelSdisExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: None,
+                        outcome: Some(EffectOutcome::Failed),
                     })
                 }
             }
@@ -2412,6 +2449,7 @@ impl KernelSdisExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: result.receipt_ref,
+                        outcome: Some(EffectOutcome::Applied),
                     })
                 } else {
                     Ok(EffectResult {
@@ -2424,6 +2462,7 @@ impl KernelSdisExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: None,
+                        outcome: Some(EffectOutcome::Failed),
                     })
                 }
             }
@@ -2462,6 +2501,7 @@ impl KernelSdisExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: result.receipt_ref,
+                        outcome: Some(EffectOutcome::Applied),
                     })
                 } else {
                     // success=false is either a hard pre-slash failure (no
@@ -2482,6 +2522,14 @@ impl KernelSdisExecutor {
                             "Sanction partially applied (bond slashed, later step failed); preserving attribution"
                         );
                     }
+                    let outcome = if state_change_hash.is_some() {
+                        // Bond slashed but a later step failed — partial
+                        // mutation with durable attribution preserved.
+                        Some(EffectOutcome::Partial)
+                    } else {
+                        // Pre-slash failure: no commons state change.
+                        Some(EffectOutcome::Failed)
+                    };
                     Ok(EffectResult {
                         effect_id: decision_receipt_id.to_string(),
                         success: false,
@@ -2492,6 +2540,7 @@ impl KernelSdisExecutor {
                         ledger_entry_id: None,
                         not_executed: false,
                         receipt_ref: result.receipt_ref,
+                        outcome,
                     })
                 }
             }
@@ -3251,5 +3300,415 @@ mod tests {
             "NoOp message should state not executed: {}",
             effect_result.message
         );
+    }
+
+    // =========================================================================
+    // SDIS EffectOutcome classification — Phase 2 seam
+    // =========================================================================
+    //
+    // These tests pin the mapping from SdisService results to
+    // `EffectResult.outcome`. They intentionally bypass the real
+    // `SdisServiceImpl`/`CommonsHandle` path and inject a canned result per
+    // SDIS arm, so the assertions cover only the executor's classification
+    // rule (what counts as Applied / NoOp / Partial / Failed), not the
+    // commons layer.
+    //
+    // Coverage matrix:
+    //   ApproveSteward     → Applied / Failed
+    //   RevokeSteward      → Applied (with receipt_ref) / NoOp / Failed
+    //   ReconfirmSteward   → Applied / Failed
+    //   ReinstateSteward   → Applied (was_suspended=true) / NoOp (was_suspended=false) / Failed
+    //   SuspendSteward     → Applied / Failed
+    //   SanctionSteward    → Applied / Partial (slash committed, later step failed) / Failed
+    //   service missing    → Failed
+
+    mod sdis_outcome_classification {
+        use super::*;
+        use icn_kernel_api::effects::{EffectOutcome, SdisEffect};
+        use icn_kernel_api::{
+            AppointStewardRequest, AppointStewardResult, ReconfirmStewardRequest,
+            ReconfirmStewardResult, ReinstateStewardRequest, ReinstateStewardResult,
+            RevokeStewardRequest, RevokeStewardResult, SanctionStewardRequest,
+            SanctionStewardResult, SdisService, SuspendStewardRequest, SuspendStewardResult,
+        };
+        use std::sync::Arc;
+
+        /// Canned-response SdisService: each method returns a pre-seeded
+        /// result. Unused arms panic so tests stay loud about accidental
+        /// coverage gaps.
+        struct StubSdisService {
+            appoint: Option<AppointStewardResult>,
+            revoke: Option<RevokeStewardResult>,
+            reconfirm: Option<ReconfirmStewardResult>,
+            reinstate: Option<ReinstateStewardResult>,
+            suspend: Option<SuspendStewardResult>,
+            sanction: Option<SanctionStewardResult>,
+        }
+
+        impl StubSdisService {
+            fn empty() -> Self {
+                Self {
+                    appoint: None,
+                    revoke: None,
+                    reconfirm: None,
+                    reinstate: None,
+                    suspend: None,
+                    sanction: None,
+                }
+            }
+        }
+
+        impl SdisService for StubSdisService {
+            fn appoint_steward(
+                &self,
+                _: AppointStewardRequest,
+            ) -> std::result::Result<AppointStewardResult, anyhow::Error> {
+                Ok(self
+                    .appoint
+                    .clone()
+                    .expect("appoint result not seeded in stub"))
+            }
+            fn revoke_steward(
+                &self,
+                _: RevokeStewardRequest,
+            ) -> std::result::Result<RevokeStewardResult, anyhow::Error> {
+                Ok(self
+                    .revoke
+                    .clone()
+                    .expect("revoke result not seeded in stub"))
+            }
+            fn reconfirm_steward(
+                &self,
+                _: ReconfirmStewardRequest,
+            ) -> std::result::Result<ReconfirmStewardResult, anyhow::Error> {
+                Ok(self
+                    .reconfirm
+                    .clone()
+                    .expect("reconfirm result not seeded in stub"))
+            }
+            fn reinstate_steward(
+                &self,
+                _: ReinstateStewardRequest,
+            ) -> std::result::Result<ReinstateStewardResult, anyhow::Error> {
+                Ok(self
+                    .reinstate
+                    .clone()
+                    .expect("reinstate result not seeded in stub"))
+            }
+            fn suspend_steward(
+                &self,
+                _: SuspendStewardRequest,
+            ) -> std::result::Result<SuspendStewardResult, anyhow::Error> {
+                Ok(self
+                    .suspend
+                    .clone()
+                    .expect("suspend result not seeded in stub"))
+            }
+            fn sanction_steward(
+                &self,
+                _: SanctionStewardRequest,
+            ) -> std::result::Result<SanctionStewardResult, anyhow::Error> {
+                Ok(self
+                    .sanction
+                    .clone()
+                    .expect("sanction result not seeded in stub"))
+            }
+        }
+
+        fn exec_with(stub: StubSdisService, effect: SdisEffect) -> EffectResult {
+            let svc: Arc<dyn SdisService> = Arc::new(stub);
+            KernelSdisExecutor::with_service(svc)
+                .execute_sdis_effect(&effect, "gov:t:p:receipt")
+                .expect("executor must not error in classification tests")
+        }
+
+        fn approve_effect() -> SdisEffect {
+            SdisEffect::ApproveSteward {
+                steward_did: "did:icn:s".into(),
+                jurisdiction_id: "jur".into(),
+                term_length_seconds: 3600,
+                bond_amount: 100,
+                region: None,
+                proposal_id: "p".into(),
+                capabilities_hash: String::new(),
+            }
+        }
+
+        #[test]
+        fn approve_success_classifies_as_applied() {
+            let mut stub = StubSdisService::empty();
+            stub.appoint = Some(AppointStewardResult {
+                success: true,
+                state_change_hash: "hash".into(),
+                error: None,
+                receipt_ref: Some("handle".into()),
+            });
+            let r = exec_with(stub, approve_effect());
+            assert!(r.success);
+            assert_eq!(r.outcome, Some(EffectOutcome::Applied));
+            assert_eq!(r.receipt_ref.as_deref(), Some("handle"));
+        }
+
+        #[test]
+        fn approve_failure_classifies_as_failed() {
+            let mut stub = StubSdisService::empty();
+            stub.appoint = Some(AppointStewardResult {
+                success: false,
+                state_change_hash: String::new(),
+                error: Some("commons error".into()),
+                receipt_ref: None,
+            });
+            let r = exec_with(stub, approve_effect());
+            assert!(!r.success);
+            assert_eq!(r.outcome, Some(EffectOutcome::Failed));
+            assert!(r.receipt_ref.is_none());
+            assert!(r.state_change_hash.is_none());
+        }
+
+        #[test]
+        fn revoke_with_receipt_ref_classifies_as_applied() {
+            let mut stub = StubSdisService::empty();
+            stub.revoke = Some(RevokeStewardResult {
+                success: true,
+                state_change_hash: "hash".into(),
+                error: None,
+                receipt_ref: Some("handle".into()),
+            });
+            let r = exec_with(
+                stub,
+                SdisEffect::RevokeSteward {
+                    steward_did: "did:icn:s".into(),
+                    reason: "ended".into(),
+                },
+            );
+            assert!(r.success);
+            assert_eq!(r.outcome, Some(EffectOutcome::Applied));
+        }
+
+        #[test]
+        fn revoke_no_active_record_classifies_as_noop() {
+            let mut stub = StubSdisService::empty();
+            stub.revoke = Some(RevokeStewardResult {
+                success: true,
+                state_change_hash: String::new(),
+                error: None,
+                receipt_ref: None,
+            });
+            let r = exec_with(
+                stub,
+                SdisEffect::RevokeSteward {
+                    steward_did: "did:icn:s".into(),
+                    reason: "ended".into(),
+                },
+            );
+            assert!(r.success);
+            assert_eq!(r.outcome, Some(EffectOutcome::NoOp));
+            assert!(r.receipt_ref.is_none());
+            assert!(r.state_change_hash.is_none());
+        }
+
+        #[test]
+        fn revoke_failure_classifies_as_failed() {
+            let mut stub = StubSdisService::empty();
+            stub.revoke = Some(RevokeStewardResult {
+                success: false,
+                state_change_hash: String::new(),
+                error: Some("boom".into()),
+                receipt_ref: None,
+            });
+            let r = exec_with(
+                stub,
+                SdisEffect::RevokeSteward {
+                    steward_did: "did:icn:s".into(),
+                    reason: "ended".into(),
+                },
+            );
+            assert!(!r.success);
+            assert_eq!(r.outcome, Some(EffectOutcome::Failed));
+        }
+
+        #[test]
+        fn reconfirm_success_classifies_as_applied() {
+            let mut stub = StubSdisService::empty();
+            stub.reconfirm = Some(ReconfirmStewardResult {
+                success: true,
+                state_change_hash: "hash".into(),
+                error: None,
+                receipt_ref: Some("handle".into()),
+            });
+            let r = exec_with(
+                stub,
+                SdisEffect::ReconfirmSteward {
+                    steward_did: "did:icn:s".into(),
+                    new_term_end: 9_999_999_999,
+                    proposal_id: "p".into(),
+                },
+            );
+            assert_eq!(r.outcome, Some(EffectOutcome::Applied));
+        }
+
+        #[test]
+        fn reinstate_was_suspended_classifies_as_applied() {
+            let mut stub = StubSdisService::empty();
+            stub.reinstate = Some(ReinstateStewardResult {
+                success: true,
+                was_suspended: true,
+                state_change_hash: "hash".into(),
+                error: None,
+                receipt_ref: Some("handle".into()),
+            });
+            let r = exec_with(
+                stub,
+                SdisEffect::ReinstateSteward {
+                    steward_did: "did:icn:s".into(),
+                    proposal_id: "p".into(),
+                },
+            );
+            assert!(r.success);
+            assert_eq!(r.outcome, Some(EffectOutcome::Applied));
+        }
+
+        #[test]
+        fn reinstate_not_suspended_classifies_as_noop() {
+            let mut stub = StubSdisService::empty();
+            stub.reinstate = Some(ReinstateStewardResult {
+                success: true,
+                was_suspended: false,
+                state_change_hash: String::new(),
+                error: None,
+                receipt_ref: Some("handle".into()),
+            });
+            let r = exec_with(
+                stub,
+                SdisEffect::ReinstateSteward {
+                    steward_did: "did:icn:s".into(),
+                    proposal_id: "p".into(),
+                },
+            );
+            assert!(r.success);
+            assert_eq!(r.outcome, Some(EffectOutcome::NoOp));
+            // receipt_ref still forwarded — a real commons record existed.
+            assert_eq!(r.receipt_ref.as_deref(), Some("handle"));
+            // state_change_hash stays None — no mutation actually occurred.
+            assert!(r.state_change_hash.is_none());
+        }
+
+        #[test]
+        fn suspend_success_classifies_as_applied() {
+            let mut stub = StubSdisService::empty();
+            stub.suspend = Some(SuspendStewardResult {
+                success: true,
+                state_change_hash: "hash".into(),
+                error: None,
+                receipt_ref: Some("handle".into()),
+            });
+            let r = exec_with(
+                stub,
+                SdisEffect::SuspendSteward {
+                    steward_did: "did:icn:s".into(),
+                    reason: "x".into(),
+                    duration_seconds: 3600,
+                    proposal_id: "p".into(),
+                },
+            );
+            assert_eq!(r.outcome, Some(EffectOutcome::Applied));
+        }
+
+        #[test]
+        fn sanction_full_success_classifies_as_applied() {
+            let mut stub = StubSdisService::empty();
+            stub.sanction = Some(SanctionStewardResult {
+                success: true,
+                remaining_bond: 250,
+                suspended: true,
+                state_change_hash: "hash".into(),
+                error: None,
+                receipt_ref: Some("handle".into()),
+            });
+            let r = exec_with(
+                stub,
+                SdisEffect::SanctionSteward {
+                    steward_did: "did:icn:s".into(),
+                    bond_slash_amount: 50,
+                    suspend_reason: "serious".into(),
+                    reason: "serious".into(),
+                    proposal_id: "p".into(),
+                },
+            );
+            assert!(r.success);
+            assert_eq!(r.outcome, Some(EffectOutcome::Applied));
+        }
+
+        #[test]
+        fn sanction_partial_mutation_classifies_as_partial() {
+            // Slash committed, suspend failed: success=false but
+            // state_change_hash + receipt_ref are populated. This is the
+            // Codex P1 path — the executor must mark it Partial and
+            // preserve the durable attribution.
+            let mut stub = StubSdisService::empty();
+            stub.sanction = Some(SanctionStewardResult {
+                success: false,
+                remaining_bond: 250,
+                suspended: false,
+                state_change_hash: "hash".into(),
+                error: Some("bond slashed but suspend failed: io".into()),
+                receipt_ref: Some("handle".into()),
+            });
+            let r = exec_with(
+                stub,
+                SdisEffect::SanctionSteward {
+                    steward_did: "did:icn:s".into(),
+                    bond_slash_amount: 50,
+                    suspend_reason: "serious".into(),
+                    reason: "serious".into(),
+                    proposal_id: "p".into(),
+                },
+            );
+            assert!(!r.success);
+            assert_eq!(
+                r.outcome,
+                Some(EffectOutcome::Partial),
+                "slash-committed + later-step-failed must be Partial, not Failed"
+            );
+            assert_eq!(r.receipt_ref.as_deref(), Some("handle"));
+            assert_eq!(r.state_change_hash.as_deref(), Some("hash"));
+        }
+
+        #[test]
+        fn sanction_pre_slash_failure_classifies_as_failed() {
+            let mut stub = StubSdisService::empty();
+            stub.sanction = Some(SanctionStewardResult {
+                success: false,
+                remaining_bond: 0,
+                suspended: false,
+                state_change_hash: String::new(),
+                error: Some("steward not found".into()),
+                receipt_ref: None,
+            });
+            let r = exec_with(
+                stub,
+                SdisEffect::SanctionSteward {
+                    steward_did: "did:icn:s".into(),
+                    bond_slash_amount: 50,
+                    suspend_reason: "serious".into(),
+                    reason: "serious".into(),
+                    proposal_id: "p".into(),
+                },
+            );
+            assert!(!r.success);
+            assert_eq!(r.outcome, Some(EffectOutcome::Failed));
+            assert!(r.receipt_ref.is_none());
+            assert!(r.state_change_hash.is_none());
+        }
+
+        #[test]
+        fn missing_service_classifies_as_failed() {
+            // No service wired → executor returns a synthetic failure.
+            let r = KernelSdisExecutor::new()
+                .execute_sdis_effect(&approve_effect(), "gov:t:p:receipt")
+                .expect("no-service path is a success-result with failure classification");
+            assert!(!r.success);
+            assert_eq!(r.outcome, Some(EffectOutcome::Failed));
+        }
     }
 }
