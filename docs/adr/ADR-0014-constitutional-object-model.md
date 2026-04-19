@@ -52,12 +52,12 @@ none of which names authority as a first-class object:
 
 | Where authority partially lives today | File / type | What's missing |
 |---|---|---|
-| `RoleAssignment.authority_scope: Vec<String>` | [icn/crates/icn-governance/src/structure.rs:189](icn/crates/icn-governance/src/structure.rs:189) | Untyped strings; no scope grammar; no validator; no consumer gate. |
-| `Delegation` + `DelegationScope::{Blanket, Domain, Proposal}` | [icn/crates/icn-governance/src/delegation.rs](icn/crates/icn-governance/src/delegation.rs) | Strictly vote delegation. Module doc is explicit: "Vote delegation for liquid democracy." |
-| `StewardRecord { governance_approval, attestations_issued, … }` | [icn/crates/icn-governance/src/steward.rs](icn/crates/icn-governance/src/steward.rs) | Appointment record + attestation counters exist, but no governance-aware gate ("is this DID currently appointed to issue this class of attestation?"). |
-| `AgreementType::FederationMembership { terms }` | [icn/crates/icn-federation/src/agreement/types.rs:78](icn/crates/icn-federation/src/agreement/types.rs:78) | Typed compact-*shape* exists; federation-level *authority* is still admission policy (`Open | Vouched | Closed`), not a narrow enumerated grant. |
-| `InstitutionalEffectRecord` | [icn/apps/governance/src/institutional_effect.rs](icn/apps/governance/src/institutional_effect.rs) | Self-describes as "what artifact did this decision actually create?" — it is the evidence-side translation record, not a constitutional authorization. |
-| `GovernanceDecisionReceipt` | [icn/crates/icn-governance/src/proof.rs](icn/crates/icn-governance/src/proof.rs) | Canonical receipt anchored on `decision_hash`; authoritative for "the decision happened," but it does not itself bind authority-to-execute. |
+| `RoleAssignment.authority_scope: Vec<String>` | `icn/crates/icn-governance/src/structure.rs` (line 189) | Untyped strings; no scope grammar; no validator; no consumer gate. |
+| `Delegation` + `DelegationScope::{Blanket, Domain, Proposal}` | `icn/crates/icn-governance/src/delegation.rs` | Strictly vote delegation. Module doc is explicit: "Vote delegation for liquid democracy." |
+| `StewardRecord { governance_approval, attestations_issued, … }` | `icn/crates/icn-governance/src/steward.rs` | Appointment record + attestation counters exist, but no governance-aware gate ("is this DID currently appointed to issue this class of attestation?"). |
+| `AgreementType::FederationMembership { terms }` | `icn/crates/icn-federation/src/agreement/types.rs` (line 78) | Typed compact-*shape* exists; federation-level *authority* is still admission policy (`Open | Vouched | Closed`), not a narrow enumerated grant. |
+| `InstitutionalEffectRecord` | `icn/apps/governance/src/institutional_effect.rs` | Self-describes as "what artifact did this decision actually create?" — it is the evidence-side translation record, not a constitutional authorization. |
+| `GovernanceDecisionReceipt` | `icn/crates/icn-governance/src/proof.rs` | Canonical receipt anchored on `decision_hash`; authoritative for "the decision happened," but it does not itself bind authority-to-execute. |
 
 Every day these partial structures ship without a unifying model, implicit meaning
 hardens around the untyped surface (`Vec<String>` scopes, advisory steward records,
@@ -152,10 +152,11 @@ in one and only one `AuthorityClass`. Conceptual fields:
   not invisible platform conveniences.
 - `scope: TypedScope` — see §3. A grant with empty scope is meaningless; scope is
   mandatory.
-- `granted_by: Option<DecisionRef>` — optional provenance back to a governance
-  decision (`proposal_id` + `decision_hash`). Optional because some grants are
-  charter-direct (e.g. a steward appointment ratified at charter adoption), but
-  when a decision is the source, it must be named.
+- `granted_by: Option<{ proposal_id, decision_hash }>` — optional provenance back
+  to a governance decision, recorded as the originating proposal identifier plus
+  the hash of the decision record. Optional because some grants are charter-direct
+  (e.g. a steward appointment ratified at charter adoption), but when a decision
+  is the source, it must be named.
 - `valid_from: Timestamp` — grant takes effect at or after this time.
 - `valid_until: Option<Timestamp>` — grant expires at this time. `None` means
   charter-bounded or entity-lifetime-bounded; no grant is eternal without a named
@@ -352,10 +353,10 @@ of `AuthorityClass::Attestation` gives that future gate a concept to consult.
 
 ### InstitutionalEffectRecord (`apps/governance::institutional_effect`)
 
-**Evidence-side only.** [icn/apps/governance/src/institutional_effect.rs:1-19](icn/apps/governance/src/institutional_effect.rs:1) is explicit:
-`InstitutionalEffectRecord` is "the governance-app answer to the question 'what
-artifact did this decision actually create?'" — it is the translation evidence, not
-the authorization.
+**Evidence-side only.** `icn/apps/governance/src/institutional_effect.rs` (lines 1-19)
+is explicit: `InstitutionalEffectRecord` is "the governance-app answer to the question
+'what artifact did this decision actually create?'" — it is the translation evidence,
+not the authorization.
 
 `Mandate` is the missing object upstream of `InstitutionalEffectRecord`. The intended
 future wiring: `GovernanceDecisionReceipt` (decision happened) → `Mandate` (authorized
@@ -684,15 +685,15 @@ semantic decisions:
 - `ADR-0010` — App topology and canonical app roots
 - `ADR-0012` — Federation state origin model
 - `ADR-0013` — Federation clearing adoption contract
-- [docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md](docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md)
-- [docs/architecture/KERNEL_APP_SEPARATION.md](docs/architecture/KERNEL_APP_SEPARATION.md)
-- [icn/crates/icn-governance/src/structure.rs](icn/crates/icn-governance/src/structure.rs) — RoleAssignment
-- [icn/crates/icn-governance/src/delegation.rs](icn/crates/icn-governance/src/delegation.rs) — Delegation + DelegationScope
-- [icn/crates/icn-governance/src/steward.rs](icn/crates/icn-governance/src/steward.rs) — StewardRecord
-- [icn/crates/icn-governance/src/proof.rs](icn/crates/icn-governance/src/proof.rs) — GovernanceDecisionReceipt
-- [icn/crates/icn-federation/src/agreement/types.rs](icn/crates/icn-federation/src/agreement/types.rs) — AgreementType
-- [icn/apps/governance/src/institutional_effect.rs](icn/apps/governance/src/institutional_effect.rs) — InstitutionalEffectRecord
-- [icn/apps/charter/src/oracle.rs](icn/apps/charter/src/oracle.rs) — CharterPolicyOracle
-- [icn/crates/icn-ccl/src/schema/bridge.rs](icn/crates/icn-ccl/src/schema/bridge.rs) — charter_to_constraints
-- [icn/crates/icn-kernel-api/src/authz.rs](icn/crates/icn-kernel-api/src/authz.rs) — kernel Capability / PolicyOracle
-- [icn/bins/icnd/src/main.rs](icn/bins/icnd/src/main.rs) — CharterPolicyOracle wiring at startup
+- `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md`
+- `docs/architecture/KERNEL_APP_SEPARATION.md`
+- `icn/crates/icn-governance/src/structure.rs` — RoleAssignment
+- `icn/crates/icn-governance/src/delegation.rs` — Delegation + DelegationScope
+- `icn/crates/icn-governance/src/steward.rs` — StewardRecord
+- `icn/crates/icn-governance/src/proof.rs` — GovernanceDecisionReceipt
+- `icn/crates/icn-federation/src/agreement/types.rs` — AgreementType
+- `icn/apps/governance/src/institutional_effect.rs` — InstitutionalEffectRecord
+- `icn/apps/charter/src/oracle.rs` — CharterPolicyOracle
+- `icn/crates/icn-ccl/src/schema/bridge.rs` — charter_to_constraints
+- `icn/crates/icn-kernel-api/src/authz.rs` — kernel Capability / PolicyOracle
+- `icn/bins/icnd/src/main.rs` — CharterPolicyOracle wiring at startup

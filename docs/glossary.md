@@ -319,7 +319,7 @@ Closed enumeration of constitutional authority kinds, frozen in [ADR-0014](adr/A
 These three are distinct and must not be silently conflated. Representation does not confer Execution authority; Execution does not confer Attestation authority.
 
 ### AuthorityGrant
-A bounded, auditable grant of authority issued by a sovereign entity to a grantee, in exactly one `AuthorityClass`. Carries: grantor entity, grantee DID, `TypedScope`, optional `DecisionRef` provenance, validity window, optional revocation timestamp. App-layer constitutional meaning, not a kernel primitive. Frozen in [ADR-0014](adr/ADR-0014-constitutional-object-model.md); not yet implemented.
+A bounded, auditable grant of authority issued by a sovereign entity to a grantee, in exactly one `AuthorityClass`. Carries: grantor entity, grantee DID or entity identifier (for example, a federation or cooperative, or a shared-service entity acting as an institutional actor), `TypedScope`, optional `proposal_id` + `decision_hash` provenance, validity window, optional revocation timestamp. App-layer constitutional meaning, not a kernel primitive. The ICN runtime, daemon, or gateway are never valid grantors. Frozen in [ADR-0014](adr/ADR-0014-constitutional-object-model.md); not yet implemented.
 
 ### TypedScope
 Typed replacement path for today's `RoleAssignment.authority_scope: Vec<String>` capability strings. Conjunction of present scope categories: domain, proposal-class, action-kind, amount/ceiling, time-window. Absent categories are "unbounded along that axis"; at least one category must be populated for a grant to be meaningful. Frozen in [ADR-0014](adr/ADR-0014-constitutional-object-model.md).
