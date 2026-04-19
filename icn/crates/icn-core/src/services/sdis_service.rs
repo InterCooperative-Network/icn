@@ -317,12 +317,18 @@ impl SdisService for SdisServiceImpl {
         let steward_did = icn_identity::Did::from_str(&request.steward_did)
             .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
 
-        let result = tokio::task::block_in_place(|| {
+        // Returns (steward_id, was_suspended): capture the commons handle
+        // the reinstate was routed through so we can forward it into
+        // durable dispatch evidence. Populated on both active and no-op
+        // paths since the commons call succeeded against a real record;
+        // `state_change_hash` still distinguishes the two.
+        let result: Result<(String, bool)> = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 match self.commons.get_steward_by_did(&steward_did).await {
                     Ok(Some(record)) => {
                         let steward_id = record.id().to_hex();
-                        self.commons.reinstate_steward(&steward_id).await
+                        let was_suspended = self.commons.reinstate_steward(&steward_id).await?;
+                        Ok((steward_id, was_suspended))
                     }
                     Ok(None) => {
                         tracing::warn!(
@@ -340,18 +346,20 @@ impl SdisService for SdisServiceImpl {
         });
 
         match result {
-            Ok(was_suspended) => {
+            Ok((steward_id, was_suspended)) => {
                 let state_change_hash = if was_suspended {
                     let hash = Self::compute_reinstate_hash(&request);
                     info!(
                         steward_did = %request.steward_did,
                         state_change_hash = %hash,
+                        receipt_ref = %steward_id,
                         "Suspended steward reinstated in commons"
                     );
                     hash
                 } else {
                     info!(
                         steward_did = %request.steward_did,
+                        receipt_ref = %steward_id,
                         "ReinstateSteward no-op: steward was not suspended"
                     );
                     String::new()
@@ -361,6 +369,7 @@ impl SdisService for SdisServiceImpl {
                     was_suspended,
                     state_change_hash,
                     error: None,
+                    receipt_ref: Some(steward_id),
                 })
             }
             Err(e) => {
@@ -374,6 +383,7 @@ impl SdisService for SdisServiceImpl {
                     was_suspended: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
+                    receipt_ref: None,
                 })
             }
         }
@@ -389,14 +399,17 @@ impl SdisService for SdisServiceImpl {
         );
         let steward_did = icn_identity::Did::from_str(&request.steward_did)
             .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
-        let result = tokio::task::block_in_place(|| {
+        // Returns the steward_id the suspend was routed through, so it
+        // can be forwarded into durable dispatch evidence.
+        let result: Result<String> = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 match self.commons.get_steward_by_did(&steward_did).await {
                     Ok(Some(record)) => {
                         let steward_id = record.id().to_hex();
                         self.commons
                             .suspend_steward(&steward_id, request.reason.clone())
-                            .await
+                            .await?;
+                        Ok(steward_id)
                     }
                     Ok(None) => Err(anyhow::anyhow!(
                         "Steward '{}' not found — cannot suspend",
@@ -407,17 +420,19 @@ impl SdisService for SdisServiceImpl {
             })
         });
         match result {
-            Ok(()) => {
+            Ok(steward_id) => {
                 let hash = Self::compute_suspend_hash(&request);
                 info!(
                     steward_did = %request.steward_did,
                     state_change_hash = %hash,
+                    receipt_ref = %steward_id,
                     "Steward suspended in commons"
                 );
                 Ok(SuspendStewardResult {
                     success: true,
                     state_change_hash: hash,
                     error: None,
+                    receipt_ref: Some(steward_id),
                 })
             }
             Err(e) => {
@@ -430,6 +445,7 @@ impl SdisService for SdisServiceImpl {
                     success: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
+                    receipt_ref: None,
                 })
             }
         }
@@ -445,80 +461,132 @@ impl SdisService for SdisServiceImpl {
         let steward_did = icn_identity::Did::from_str(&request.steward_did)
             .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
 
-        let result = tokio::task::block_in_place(|| {
+        // Sanction is a two-step mutation: (1) slash_steward_bond, then optionally
+        // (2) suspend_steward. Step 1 is irreversible once committed. If step 2
+        // fails after step 1 has persisted, we MUST preserve the downstream handle
+        // (receipt_ref) and state_change_hash — otherwise dispatch evidence would
+        // hide a real commons mutation behind `success=false, receipt_ref=None`.
+        //
+        // We therefore split the async sequence so the pre-slash failure path and
+        // the post-slash partial-failure path are distinguishable to the caller.
+        let pre_slash = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                let record = match self.commons.get_steward_by_did(&steward_did).await {
-                    Ok(Some(r)) => r,
-                    Ok(None) => {
-                        return Err(anyhow::anyhow!(
+                let record = self
+                    .commons
+                    .get_steward_by_did(&steward_did)
+                    .await?
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
                             "Steward '{}' not found — cannot sanction",
                             request.steward_did
-                        ))
-                    }
-                    Err(e) => return Err(e),
-                };
+                        )
+                    })?;
                 let steward_id = record.id().to_hex();
-
-                // Slash bond
                 let remaining = self
                     .commons
                     .slash_steward_bond(&steward_id, request.bond_slash_amount)
                     .await?;
-
-                // Optionally suspend
-                let suspended = if !request.suspend_reason.is_empty() {
-                    self.commons
-                        .suspend_steward(&steward_id, request.suspend_reason.clone())
-                        .await?;
-                    true
-                } else {
-                    false
-                };
-
-                Ok((remaining, suspended))
+                Ok::<_, anyhow::Error>((steward_id, remaining))
             })
         });
 
-        match result {
-            Ok((remaining_bond, suspended)) => {
-                let mut hasher = Sha256::new();
-                hasher.update(b"sdis:sanction:");
-                hasher.update(request.steward_did.as_bytes());
-                hasher.update(b":");
-                hasher.update(request.proposal_id.as_bytes());
-                hasher.update(b":");
-                hasher.update(request.bond_slash_amount.to_le_bytes());
-                let state_change_hash = format!("{:x}", hasher.finalize());
-
-                info!(
-                    steward_did = %request.steward_did,
-                    remaining_bond = %remaining_bond,
-                    suspended = %suspended,
-                    state_change_hash = %state_change_hash,
-                    "Steward sanctioned (bond slashed) in commons"
-                );
-                Ok(SanctionStewardResult {
-                    success: true,
-                    remaining_bond,
-                    suspended,
-                    state_change_hash,
-                    error: None,
-                })
-            }
+        let (steward_id, remaining_bond) = match pre_slash {
+            Ok(pair) => pair,
             Err(e) => {
                 warn!(
                     steward_did = %request.steward_did,
                     error = %e,
-                    "Failed to sanction steward in commons"
+                    "Failed to sanction steward (pre-slash); no durable mutation"
                 );
-                Ok(SanctionStewardResult {
+                return Ok(SanctionStewardResult {
                     success: false,
                     remaining_bond: 0,
                     suspended: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
-                })
+                    receipt_ref: None,
+                });
             }
+        };
+
+        // Bond slash committed; compute state_change_hash once. From here on,
+        // receipt_ref and state_change_hash MUST be preserved in every return
+        // path because commons state has already changed durably.
+        let mut hasher = Sha256::new();
+        hasher.update(b"sdis:sanction:");
+        hasher.update(request.steward_did.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.proposal_id.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.bond_slash_amount.to_le_bytes());
+        let state_change_hash = format!("{:x}", hasher.finalize());
+
+        // Step 2: optional suspend. Any failure here is a partial mutation.
+        if !request.suspend_reason.is_empty() {
+            let suspend_res = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    self.commons
+                        .suspend_steward(&steward_id, request.suspend_reason.clone())
+                        .await
+                })
+            });
+            match suspend_res {
+                Ok(()) => {
+                    info!(
+                        steward_did = %request.steward_did,
+                        remaining_bond = %remaining_bond,
+                        suspended = true,
+                        state_change_hash = %state_change_hash,
+                        receipt_ref = %steward_id,
+                        "Steward sanctioned (bond slashed + suspended) in commons"
+                    );
+                    Ok(SanctionStewardResult {
+                        success: true,
+                        remaining_bond,
+                        suspended: true,
+                        state_change_hash,
+                        error: None,
+                        receipt_ref: Some(steward_id),
+                    })
+                }
+                Err(e) => {
+                    // Partial mutation: slash persisted, suspend failed.
+                    // Preserve receipt_ref + state_change_hash for honest audit.
+                    warn!(
+                        steward_did = %request.steward_did,
+                        remaining_bond = %remaining_bond,
+                        error = %e,
+                        state_change_hash = %state_change_hash,
+                        receipt_ref = %steward_id,
+                        "Sanction partially applied: bond slashed, suspend failed; preserving receipt_ref"
+                    );
+                    Ok(SanctionStewardResult {
+                        success: false,
+                        remaining_bond,
+                        suspended: false,
+                        state_change_hash,
+                        error: Some(format!("bond slashed but suspend failed: {e}")),
+                        receipt_ref: Some(steward_id),
+                    })
+                }
+            }
+        } else {
+            info!(
+                steward_did = %request.steward_did,
+                remaining_bond = %remaining_bond,
+                suspended = false,
+                state_change_hash = %state_change_hash,
+                receipt_ref = %steward_id,
+                "Steward sanctioned (bond slashed) in commons"
+            );
+            Ok(SanctionStewardResult {
+                success: true,
+                remaining_bond,
+                suspended: false,
+                state_change_hash,
+                error: None,
+                receipt_ref: Some(steward_id),
+            })
         }
     }
 }
@@ -862,6 +930,13 @@ mod tests {
             "state_change_hash must be non-empty when suspended was true"
         );
         assert!(result.error.is_none());
+        // Evidence-fidelity seam: reinstate publishes the same steward_id
+        // it routed the commons call through — the real downstream handle.
+        assert_eq!(
+            result.receipt_ref.as_deref(),
+            Some(record.id().to_hex().as_str()),
+            "ReinstateStewardResult.receipt_ref must be the steward_id the reinstate was routed through"
+        );
 
         // Verify the steward is now active again.
         assert!(
@@ -913,6 +988,20 @@ mod tests {
             "state_change_hash must be empty on no-op path"
         );
         assert!(result.error.is_none());
+        // No-op but record existed and commons call succeeded: the
+        // downstream handle is real, so receipt_ref is truthful.
+        // state_change_hash (empty) already distinguishes no-op from
+        // active reinstatement.
+        let record = commons
+            .get_steward_by_did(&holder)
+            .await
+            .expect("lookup must not error")
+            .expect("record must exist");
+        assert_eq!(
+            result.receipt_ref.as_deref(),
+            Some(record.id().to_hex().as_str()),
+            "reinstate no-op still routed through a real steward_id; receipt_ref must reflect it"
+        );
 
         // Steward still active.
         assert!(
@@ -941,6 +1030,10 @@ mod tests {
         assert!(
             result.error.is_some(),
             "error field must be populated on failure"
+        );
+        assert_eq!(
+            result.receipt_ref, None,
+            "no commons record → no downstream handle → receipt_ref must remain None"
         );
     }
 
@@ -998,6 +1091,18 @@ mod tests {
             "state_change_hash must be populated on success"
         );
         assert!(result.error.is_none());
+        // Evidence-fidelity seam: suspend publishes the steward_id it
+        // routed the commons call through.
+        let record = commons
+            .get_steward_by_did(&holder)
+            .await
+            .expect("lookup must not error")
+            .expect("record must exist");
+        assert_eq!(
+            result.receipt_ref.as_deref(),
+            Some(record.id().to_hex().as_str()),
+            "SuspendStewardResult.receipt_ref must be the steward_id the suspend was routed through"
+        );
 
         // Read back durable state — steward must now be inactive (suspended).
         assert!(
@@ -1102,5 +1207,188 @@ mod tests {
             result.state_change_hash.is_empty(),
             "state_change_hash must be empty on failure"
         );
+        assert_eq!(
+            result.receipt_ref, None,
+            "no commons record → no downstream handle → receipt_ref must remain None"
+        );
+    }
+
+    // ─── SanctionSteward proof tests ───────────────────────────────────────────
+
+    /// SanctionSteward → bond slashed in the durable commons record, and
+    /// the service-level receipt_ref carries the real commons
+    /// `StewardId::to_hex()` the slash was routed through.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_sanction_steward_slashes_bond_and_publishes_receipt_ref() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(30);
+        let sponsor = test_did(31);
+
+        create_strong_holder(&commons, &holder, &sponsor).await;
+        let appoint_req = AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86_400 * 30,
+            bond_amount: 1_000,
+            region: None,
+            proposal_id: "gov:coop:prop-040:receipt".to_string(),
+        };
+        svc.appoint_steward(appoint_req).unwrap();
+
+        let record = commons
+            .get_steward_by_did(&holder)
+            .await
+            .expect("lookup must not error")
+            .expect("record must exist");
+        let steward_id_hex = record.id().to_hex();
+
+        // Pure slash (no suspend).
+        let req = SanctionStewardRequest {
+            steward_did: holder.to_string(),
+            bond_slash_amount: 250,
+            suspend_reason: String::new(),
+            reason: "minor infraction".to_string(),
+            proposal_id: "gov:coop:prop-041:receipt".to_string(),
+        };
+        let result = svc.sanction_steward(req).unwrap();
+        assert!(result.success, "sanction must succeed");
+        // Commons slash_steward_bond returns the post-slash bond value
+        // from the commons layer; we don't pin an exact number here
+        // because the commons bond accounting semantics (starting bond,
+        // fees) live in icn-commons, not this service. What this test
+        // pins is that (a) the sanction succeeded, (b) a real receipt_ref
+        // was published, and (c) the suspended flag reflects the request.
+        assert!(
+            !result.suspended,
+            "empty suspend_reason → steward must not be suspended"
+        );
+        assert!(
+            !result.state_change_hash.is_empty(),
+            "state_change_hash must be populated on success"
+        );
+        assert_eq!(
+            result.receipt_ref.as_deref(),
+            Some(steward_id_hex.as_str()),
+            "SanctionStewardResult.receipt_ref must be the steward_id the slash was routed through"
+        );
+    }
+
+    /// SanctionSteward with `suspend_reason` also suspends the steward,
+    /// and still publishes the same `receipt_ref`.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_sanction_steward_with_suspend_publishes_receipt_ref() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(32);
+        let sponsor = test_did(33);
+
+        create_strong_holder(&commons, &holder, &sponsor).await;
+        svc.appoint_steward(AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86_400 * 30,
+            bond_amount: 500,
+            region: None,
+            proposal_id: "gov:coop:prop-050:receipt".to_string(),
+        })
+        .unwrap();
+
+        let record = commons
+            .get_steward_by_did(&holder)
+            .await
+            .unwrap()
+            .expect("record must exist");
+        let steward_id_hex = record.id().to_hex();
+
+        let req = SanctionStewardRequest {
+            steward_did: holder.to_string(),
+            bond_slash_amount: 100,
+            suspend_reason: "serious breach".to_string(),
+            reason: "serious breach".to_string(),
+            proposal_id: "gov:coop:prop-051:receipt".to_string(),
+        };
+        let result = svc.sanction_steward(req).unwrap();
+        assert!(result.success);
+        assert!(
+            result.suspended,
+            "non-empty suspend_reason → steward must be suspended"
+        );
+        assert_eq!(
+            result.receipt_ref.as_deref(),
+            Some(steward_id_hex.as_str()),
+            "receipt_ref must carry the same steward_id the slash+suspend were routed through"
+        );
+
+        // Durable state: suspension visible.
+        assert!(
+            !commons
+                .is_active_steward(&holder)
+                .await
+                .expect("is_active must not error"),
+            "steward must be inactive after sanction-with-suspend"
+        );
+    }
+
+    /// SanctionSteward fails for an unknown DID: no record → no handle →
+    /// receipt_ref must remain None.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_sanction_steward_fails_for_unknown_did() {
+        // Pre-slash failure path: lookup fails, so no commons mutation occurs.
+        // receipt_ref and state_change_hash must both be empty/None — this is
+        // the ONLY sanction failure path where dropping attribution is honest.
+        let (svc, _commons) = make_service_with_commons();
+        let unknown = test_did(96);
+        let req = SanctionStewardRequest {
+            steward_did: unknown.to_string(),
+            bond_slash_amount: 100,
+            suspend_reason: String::new(),
+            reason: "no record".to_string(),
+            proposal_id: "gov:unknown:prop-000:receipt".to_string(),
+        };
+        let result = svc.sanction_steward(req).unwrap();
+        assert!(!result.success, "sanction for unknown DID must fail");
+        assert!(result.error.is_some());
+        assert_eq!(
+            result.remaining_bond, 0,
+            "pre-slash failure must not leak a nonzero remaining_bond"
+        );
+        assert!(
+            result.state_change_hash.is_empty(),
+            "pre-slash failure must leave state_change_hash empty"
+        );
+        assert_eq!(
+            result.receipt_ref, None,
+            "no commons mutation occurred → receipt_ref must remain None"
+        );
+    }
+
+    /// Pins the partial-mutation DTO contract for `sanction_steward`.
+    ///
+    /// A real slash-then-suspend partial failure requires injecting a commons
+    /// storage fault between step 1 (slash, irreversible) and step 2 (suspend).
+    /// `icn-commons` does not currently expose a fault-injection seam, so we
+    /// pin the contract at the DTO level: a partial-mutation result MUST carry
+    /// both `receipt_ref = Some(_)` and a non-empty `state_change_hash` even
+    /// when `success == false`. Dropping attribution would hide a real durable
+    /// commons mutation behind a "nothing happened" evidence row.
+    #[test]
+    fn sanction_partial_mutation_dto_contract() {
+        let partial = SanctionStewardResult {
+            success: false,
+            remaining_bond: 250,
+            suspended: false,
+            state_change_hash: "abc123".to_string(),
+            error: Some("bond slashed but suspend failed: storage i/o".to_string()),
+            receipt_ref: Some("deadbeef".to_string()),
+        };
+        assert!(!partial.success);
+        assert!(
+            partial.receipt_ref.is_some(),
+            "partial mutation must preserve receipt_ref"
+        );
+        assert!(
+            !partial.state_change_hash.is_empty(),
+            "partial mutation must preserve state_change_hash (slash really happened)"
+        );
+        assert!(partial.error.is_some());
     }
 }

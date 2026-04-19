@@ -2332,11 +2332,13 @@ impl KernelSdisExecutor {
                         info!(
                             steward_did = %steward_did,
                             state_change_hash = %result.state_change_hash,
+                            receipt_ref = ?result.receipt_ref,
                             "Suspended steward reinstated with durable state"
                         );
                     } else {
                         info!(
                             steward_did = %steward_did,
+                            receipt_ref = ?result.receipt_ref,
                             "ReinstateSteward: steward was not suspended — no-op"
                         );
                     }
@@ -2361,7 +2363,7 @@ impl KernelSdisExecutor {
                         },
                         ledger_entry_id: None,
                         not_executed: false,
-                        receipt_ref: None,
+                        receipt_ref: result.receipt_ref,
                     })
                 } else {
                     Ok(EffectResult {
@@ -2395,6 +2397,7 @@ impl KernelSdisExecutor {
                         steward_did = %steward_did,
                         state_change_hash = %result.state_change_hash,
                         duration_seconds = %duration_seconds,
+                        receipt_ref = ?result.receipt_ref,
                         "Steward suspended via governance dispatch \
                          (duration advisory — timed reinstatement not enforced)"
                     );
@@ -2408,7 +2411,7 @@ impl KernelSdisExecutor {
                         state_change_hash: Some(result.state_change_hash),
                         ledger_entry_id: None,
                         not_executed: false,
-                        receipt_ref: None,
+                        receipt_ref: result.receipt_ref,
                     })
                 } else {
                     Ok(EffectResult {
@@ -2445,6 +2448,7 @@ impl KernelSdisExecutor {
                         remaining_bond = %result.remaining_bond,
                         suspended = %result.suspended,
                         state_change_hash = %result.state_change_hash,
+                        receipt_ref = ?result.receipt_ref,
                         "Steward sanctioned (bond slashed) via governance dispatch"
                     );
                     Ok(EffectResult {
@@ -2457,19 +2461,37 @@ impl KernelSdisExecutor {
                         state_change_hash: Some(result.state_change_hash),
                         ledger_entry_id: None,
                         not_executed: false,
-                        receipt_ref: None,
+                        receipt_ref: result.receipt_ref,
                     })
                 } else {
+                    // success=false is either a hard pre-slash failure (no
+                    // mutation) or a partial mutation (slash committed, suspend
+                    // failed). The service layer populates state_change_hash
+                    // and receipt_ref only when commons state really changed,
+                    // so forward them truthfully instead of wiping them.
+                    let state_change_hash = if result.state_change_hash.is_empty() {
+                        None
+                    } else {
+                        Some(result.state_change_hash)
+                    };
+                    if state_change_hash.is_some() {
+                        warn!(
+                            steward_did = %steward_did,
+                            remaining_bond = %result.remaining_bond,
+                            receipt_ref = ?result.receipt_ref,
+                            "Sanction partially applied (bond slashed, later step failed); preserving attribution"
+                        );
+                    }
                     Ok(EffectResult {
                         effect_id: decision_receipt_id.to_string(),
                         success: false,
                         message: result
                             .error
                             .unwrap_or_else(|| "Sanction failed".to_string()),
-                        state_change_hash: None,
+                        state_change_hash,
                         ledger_entry_id: None,
                         not_executed: false,
-                        receipt_ref: None,
+                        receipt_ref: result.receipt_ref,
                     })
                 }
             }

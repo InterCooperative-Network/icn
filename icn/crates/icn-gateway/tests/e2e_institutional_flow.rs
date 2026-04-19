@@ -761,6 +761,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
                 was_suspended: false,
                 state_change_hash: String::new(),
                 error: None,
+                receipt_ref: None,
             })
         }
 
@@ -774,6 +775,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
                 success: true,
                 state_change_hash: String::new(),
                 error: None,
+                receipt_ref: None,
             })
         }
 
@@ -789,6 +791,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
                 suspended: false,
                 state_change_hash: String::new(),
                 error: None,
+                receipt_ref: None,
             })
         }
     }
