@@ -185,7 +185,7 @@ Active execution: NYCN institutional integration work (meetings, structures, act
 <ul>
 <li><strong>Layered ontology (locked 2026-04-14):</strong> Entities (sovereign) / Structures (non-sovereign, entity-owned) / Activities (time-bounded, entity-owned). Committees are Structures. Summit is Activity.</li>
 <li><strong>Program is a separate primitive</strong> (not Activity extension): Milestones with machine-readable checks, parent_program_id for cycle-handoff. Spec in NYCN-Repo-Architecture-Spec.md §5.</li>
-<li><strong>Authority is capability-string based:</strong> <code>RoleAssignment.authority_scope: Vec&lt;String&gt;</code>.</li>
+<li><strong>Authority is capability-string based today, typed model frozen for migration:</strong> <code>RoleAssignment.authority_scope: Vec&lt;String&gt;</code> remains the shipped surface; the constitutional object model (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>) is frozen in <a href="/docs/adr/ADR-0014-constitutional-object-model">ADR-0014</a> and is the target of a subsequent additive migration. No behavior change has shipped yet.</li>
 <li><strong>Sled key convention:</strong> primary <code>&lt;thing&gt;:{id}</code>; secondary <code>&lt;thing&gt;_by_&lt;scope&gt;:{scope_id}:{id}</code>.</li>
 <li><strong>Gateway event naming:</strong> <code>Governance&lt;Thing&gt;&lt;Verb&gt;</code>.</li>
 <li><strong>Meaning Firewall:</strong> CI ratchet enforces no new kernel/domain import regressions. Pre-existing domain imports in icn-core and icn-gateway remain; full extraction is ongoing work.</li>

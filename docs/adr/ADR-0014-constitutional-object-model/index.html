@@ -1,0 +1,760 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0014: Constitutional Object Model | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yTnaBP6O.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0014 constitutional object model</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0014-constitutional-object-model.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<p>id: &quot;0014&quot;
+title: &quot;Constitutional Object Model — AuthorityClass, AuthorityGrant, TypedScope, Mandate&quot;
+status: &quot;proposed&quot;
+date: &quot;2026-04-19&quot;
+context: &quot;post-SDIS-evidence arc (#1571); post-institution-package-boundary (#1560); pre-executor-gating; pre-federation-authority-narrowing&quot;
+deciders: [&quot;Matt Faherty&quot;]
+tags: [&quot;governance&quot;, &quot;architecture&quot;, &quot;authority&quot;, &quot;charter&quot;, &quot;federation&quot;, &quot;mandate&quot;, &quot;meaning-firewall&quot;, &quot;semantic-freeze&quot;]
+supersedes: []
+superseded_by: []
+references:</p>
+<ul>
+<li>&quot;ADR-0010 (App topology)&quot;</li>
+<li>&quot;ADR-0012 (Federation state origin model)&quot;</li>
+<li>&quot;ADR-0013 (Federation clearing adoption contract)&quot;</li>
+<li>&quot;docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md&quot;</li>
+<li>&quot;docs/architecture/KERNEL_APP_SEPARATION.md&quot;</li>
+</ul>
+<hr>
+<h1>ADR 0014: Constitutional Object Model</h1>
+<h2>Status</h2>
+<p><strong>Proposed (docs-only semantic freeze).</strong> This ADR introduces no behavior changes, no
+new code paths, no new crate public surface. It freezes the meaning of four constitutional
+objects — <code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code> — so that a later
+implementation tranche can land them without reopening what they are.</p>
+<p>Implementation follows this ADR in a separate PR. Nothing in this ADR promotes any phase
+status or claims completion.</p>
+<hr>
+<h2>Context</h2>
+<p>The repository now has a working governance-to-evidence pipeline post-#1562/#1567/#1571:</p>
+<ul>
+<li>Proposals are deliberated and accepted.</li>
+<li>Acceptance translates a typed proposal payload into a sequence of <code>KernelEffect</code>s.</li>
+<li>Effects are dispatched; each returns an <code>EffectResult</code> carrying <code>EffectOutcome</code>
+(Applied / NoOp / Partial / Failed) and an opaque <code>receipt_ref</code>.</li>
+<li><code>InstitutionalEffectRecord</code> and <code>EffectDispatchEvidence</code> are durably persisted in the
+gateway <code>ReceiptStore</code>, indexed by <code>proposal_id</code> and <code>effect_record_id</code>.</li>
+<li>Charter enforcement already exists at evaluation time: <code>apps/charter::CharterPolicyOracle</code>
+(wired at <code>icn/bins/icnd/src/main.rs:260</code>) calls <code>icn_ccl::schema::bridge::charter_to_constraints</code>
+to translate ratified charters into <code>ConstraintSet</code>s the kernel enforces without
+semantic awareness.</li>
+</ul>
+<p>This pipeline is real. What is <strong>not</strong> real, and what is now the bottleneck, is a clean
+typed institutional language for <em>authority itself</em>. Authority is currently smeared
+across adjacent structures, each of which is correct for its immediate purpose but
+none of which names authority as a first-class object:</p>
+<table>
+<thead>
+<tr>
+<th>Where authority partially lives today</th>
+<th>File / type</th>
+<th>What&#39;s missing</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>RoleAssignment.authority_scope: Vec&lt;String&gt;</code></td>
+<td><code>icn/crates/icn-governance/src/structure.rs</code> (line 189)</td>
+<td>Untyped strings; no scope grammar; no validator; no consumer gate.</td>
+</tr>
+<tr>
+<td><code>Delegation</code> + <code>DelegationScope::{Blanket, Domain, Proposal}</code></td>
+<td><code>icn/crates/icn-governance/src/delegation.rs</code></td>
+<td>Strictly vote delegation. Module doc is explicit: &quot;Vote delegation for liquid democracy.&quot;</td>
+</tr>
+<tr>
+<td><code>StewardRecord { governance_approval, attestations_issued, … }</code></td>
+<td><code>icn/crates/icn-governance/src/steward.rs</code></td>
+<td>Appointment record + attestation counters exist, but no governance-aware gate (&quot;is this DID currently appointed to issue this class of attestation?&quot;).</td>
+</tr>
+<tr>
+<td><code>AgreementType::FederationMembership { terms }</code></td>
+<td><code>icn/crates/icn-federation/src/agreement/types.rs</code> (line 78)</td>
+<td>Typed compact-<em>shape</em> exists; federation-level <em>authority</em> is still admission policy (`Open</td>
+</tr>
+<tr>
+<td><code>InstitutionalEffectRecord</code></td>
+<td><code>icn/apps/governance/src/institutional_effect.rs</code></td>
+<td>Self-describes as &quot;what artifact did this decision actually create?&quot; — it is the evidence-side translation record, not a constitutional authorization.</td>
+</tr>
+<tr>
+<td><code>GovernanceDecisionReceipt</code></td>
+<td><code>icn/crates/icn-governance/src/proof.rs</code></td>
+<td>Canonical receipt anchored on <code>decision_hash</code>; authoritative for &quot;the decision happened,&quot; but it does not itself bind authority-to-execute.</td>
+</tr>
+</tbody></table>
+<p>Every day these partial structures ship without a unifying model, implicit meaning
+hardens around the untyped surface (<code>Vec&lt;String&gt;</code> scopes, advisory steward records,
+implicit federation admission authority). Migration cost grows roughly linearly with
+new consumers. The natural downstream work — narrow federation authority, executor
+gating, governance-validated attestation, member-visible &quot;what am I authorized to do&quot;,
+and proposal-to-execution closure — all depend on a frozen object model underneath.</p>
+<hr>
+<h2>Animating principles</h2>
+<p>The object model below is shaped by six non-negotiable commitments. If a future
+refinement of these types violates any of them, the refinement is wrong, not the
+principle.</p>
+<ol>
+<li><strong>Entity sovereignty.</strong> Authority descends from sovereign entities (cooperatives,
+communities, federations) acting under their charters. It does not descend from
+the platform, the runtime, the gateway, a daemon instance, or a shared service.
+A grant without a sovereign grantor is not a grant.</li>
+<li><strong>Typed separation as anti-capture.</strong> Representation, execution, and attestation
+authority remain distinct at the type level so that aggregation across classes
+requires explicit, auditable action. Silent conflation of classes is the usual
+mechanism of capture; typing prevents it.</li>
+<li><strong>Provenance as institutional memory.</strong> <code>Mandate</code> is not a log line and not an
+index row. It is an institutional-memory record answering &quot;under whose authority,
+grounded in which decision, was this action permitted?&quot; That question must remain
+answerable long after the action lands.</li>
+<li><strong>Constitutional legibility for ordinary members.</strong> Typed grants and mandates
+are the substrate on which the member shell can answer, in plain terms: &quot;what am
+I currently authorized to do, by whom, for how long, and how was that decided?&quot;
+Mobile/member accessibility is downstream of having a typed surface to render.
+This ADR freezes that surface even though it does not implement the shell.</li>
+<li><strong>Meaning Firewall integrity.</strong> All four objects live at the governance app
+layer. The kernel enforces <code>ConstraintSet</code>s and dispatches <code>KernelEffect</code>s
+without learning what <code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, or
+<code>Mandate</code> mean.</li>
+<li><strong>Institutional, not financial, vocabulary.</strong> Scope ceilings are institutional
+units (credit units, labor hours, resource allocations) carried by policy-
+governed positions — never hosted balances, operator-routed value, or
+platform-issued currency. The typed model must not smuggle a balance worldview
+into the constitutional layer.</li>
+</ol>
+<hr>
+<h2>Decision (what this ADR freezes)</h2>
+<p>Introduce four constitutional objects at the <strong>governance app layer</strong>, with the meanings
+below. Exact Rust representations may refine at implementation time (field names, enum
+encoding, serialization tags). The <em>semantic categories</em> are frozen now.</p>
+<h3>1. <code>AuthorityClass</code></h3>
+<p>A closed, enumerated kind of authority. Three variants, and only three, at the
+constitutional level:</p>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Permits</th>
+<th>Does NOT permit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Representation</code></td>
+<td>Speaking or voting in place of another identity within a bounded scope — e.g. casting a vote for a delegator, representing a coop in a federation council seat, answering on behalf of a committee.</td>
+<td>Executing effects. Issuing receipts/attestations.</td>
+</tr>
+<tr>
+<td><code>Execution</code></td>
+<td>Carrying out an action that mutates institutional state under a scope — e.g. spending from a budget, deploying a charter, freezing/unfreezing a member, settling a clearing agreement, appointing/revoking a steward.</td>
+<td>Voting in place of others. Issuing primary attestations.</td>
+</tr>
+<tr>
+<td><code>Attestation</code></td>
+<td>Issuing signed statements of fact or status that downstream consumers may rely on — e.g. steward proof-of-personhood, uniqueness attestations, audit sign-offs.</td>
+<td>Deciding policy. Executing effects.</td>
+</tr>
+</tbody></table>
+<p><strong>These three are distinct and must not be silently conflated.</strong> A representation grant
+does not carry execution authority. An execution grant does not carry attestation
+authority. An attestation grant does not decide policy. Conflating them is exactly the
+anti-capture failure the typed model exists to prevent.</p>
+<p>What <code>AuthorityClass</code> explicitly does <strong>not</strong> cover: general-purpose ACL/RBAC roles,
+kernel-level capability bearer semantics (those remain in <code>icn-kernel-api::authz</code>),
+trust score computations, or ordinary membership status. A member <em>being</em> a member is
+not an authority grant; a member <em>appointed to execute</em> under a bounded scope is.</p>
+<h3>2. <code>AuthorityGrant</code></h3>
+<p>A bounded, auditable grant of authority issued by a sovereign entity to a grantee,
+in one and only one <code>AuthorityClass</code>. Conceptual fields:</p>
+<ul>
+<li><code>id</code> — stable identifier for the grant (UUID or content-addressed).</li>
+<li><code>class: AuthorityClass</code> — exactly one of Representation / Execution / Attestation.</li>
+<li><code>grantor_entity</code> — the sovereign entity that issues the grant. This field makes
+the charter-first sovereignty explicit: grants descend from entities, never from
+platform conveniences or anonymous &quot;roles.&quot; A valid grantor is a cooperative,
+community, or federation acting under its own charter&#39;s process; the ICN runtime,
+gateway, daemon, or a bare &quot;system&quot; identity is <strong>not</strong> a valid grantor. A grant
+lacking a sovereign grantor is malformed and must be rejected.</li>
+<li><code>grantee</code> — the DID or entity identifier receiving the authority. The grantee is
+typically a person, but may be another entity (e.g. a federation grants a coop
+authority to clear on its behalf) or a shared-service entity acting as an
+institutional actor (e.g. a cooperative grants a commons service authority to
+issue personhood attestations bounded by scope). Shared-service entities are
+legitimate grantees precisely because they must be legible institutional actors,
+not invisible platform conveniences.</li>
+<li><code>scope: TypedScope</code> — see §3. A grant with empty scope is meaningless; scope is
+mandatory.</li>
+<li><code>granted_by: Option&lt;{ proposal_id, decision_hash }&gt;</code> — optional provenance back
+to a governance decision, recorded as the originating proposal identifier plus
+the hash of the decision record. Optional because some grants are charter-direct
+(e.g. a steward appointment ratified at charter adoption), but when a decision
+is the source, it must be named.</li>
+<li><code>valid_from: Timestamp</code> — grant takes effect at or after this time.</li>
+<li><code>valid_until: Option&lt;Timestamp&gt;</code> — grant expires at this time. <code>None</code> means
+charter-bounded or entity-lifetime-bounded; no grant is eternal without a named
+charter clause.</li>
+<li><code>revoked_at: Option&lt;Timestamp&gt;</code> — explicit revocation record. Revocation is
+<strong>always</strong> possible by the grantor entity.</li>
+</ul>
+<p><strong><code>AuthorityGrant</code> is app-layer constitutional meaning, not a kernel primitive.</strong>
+Kernel-side <code>icn_kernel_api::authz::Capability</code> (bearer token with holder/issuer/
+expiration/signature) remains the mechanical transport. <code>AuthorityGrant</code> is the
+institutional source the app layer can point a future enforcement path at; it is
+not imported into kernel crates.</p>
+<h3>3. <code>TypedScope</code></h3>
+<p>The typed replacement path for today&#39;s <code>authority_scope: Vec&lt;String&gt;</code>. Minimal and
+tranche-sized — designed to cover what existing consumers already express, not to
+anticipate every future dimension.</p>
+<p>Frozen scope categories (the <em>shape</em> — exact enum encoding may evolve slightly at
+implementation):</p>
+<ul>
+<li><strong>Domain scope</strong> — a <code>GovernanceDomainId</code> the grant is bounded to.</li>
+<li><strong>Proposal-class scope</strong> — a class of proposal payloads the grant applies to
+(e.g. treasury spends, membership changes, charter deployments). Existing code
+already has proposal-payload tags to key off; scope is the set of those tags.</li>
+<li><strong>Action-kind scope</strong> — a set of kernel-layer <code>ActionKind</code>s / <code>KernelEffect</code>
+variants the grant authorizes. For Execution-class grants only.</li>
+<li><strong>Amount / ceiling scope</strong> — a numeric ceiling expressed as an institutional unit
+(credit units, labor hours, resource allocation units). These are policy-governed
+positions inside a treasury or obligation ledger, not hosted balances or
+operator-routed value. Applies to Execution grants bounded by magnitude (common
+for treasury grants).</li>
+<li><strong>Time-window scope</strong> — a finer-grained time bound within the outer
+<code>valid_from</code>/<code>valid_until</code> (e.g. a budget grant that only applies during a
+specific fiscal window, or a meeting-quorum representation grant that only
+applies during the meeting).</li>
+</ul>
+<p>A <code>TypedScope</code> is a <strong>conjunction</strong> of the categories that are present. A grant with
+a domain scope <em>and</em> an amount scope authorizes only acts that satisfy both. Absent
+categories are &quot;unbounded along that axis&quot; — but because grants require at least
+one populated scope category to be meaningful, &quot;unbounded on everything&quot; is not
+expressible.</p>
+<p><code>TypedScope</code> is not a subset of <code>DelegationScope</code>, and does not supersede it.
+<code>DelegationScope</code> remains vote-delegation-specific (see §Mapping).</p>
+<h3>4. <code>Mandate</code></h3>
+<p><code>Mandate</code> is the constitutional mediation layer between a governance decision and
+the execution of its effects. This is the object the repo is currently missing and
+the one that this ADR most carefully defines, because its absence is what keeps
+&quot;proposal → decision → mandate → action → receipt → evidence&quot; incomplete.</p>
+<p><code>Mandate</code> is also, in its own right, a <strong>first-class institutional-memory record</strong>.
+It is the durable answer to the question &quot;under whose authority, grounded in which
+decision, was this action permitted?&quot; That answer must survive personnel turnover,
+platform upgrades, and the passage of time. A <code>Mandate</code> is therefore not reducible
+to a log line, an index row, or a join between two other records; it is the record
+that makes authority auditable as such.</p>
+<p>A <code>Mandate</code> means:</p>
+<blockquote>
+<p>An accepted decision has produced a bounded institutional authorization to carry
+out one or more classes of action, optionally assigning an executor, a deadline,
+and one or more authority grants. Executing the mandated action under the mandate
+is what makes the effect legitimate — not merely the fact that the decision was
+recorded.</p>
+</blockquote>
+<p>Conceptual fields:</p>
+<ul>
+<li><code>id</code> — stable identifier for the mandate.</li>
+<li><code>decision_receipt_id</code> — reference to the <code>GovernanceDecisionReceipt</code>.</li>
+<li><code>decision_hash</code> — the anchoring hash from that receipt (redundant-by-design for
+fork detection and independent auditability).</li>
+<li><code>payload_hash</code> — hash of the accepted proposal payload; binds the mandate to the
+concrete content of the decision, not just its identity.</li>
+<li><code>grants: Vec&lt;AuthorityGrantRef&gt;</code> — references to one or more <code>AuthorityGrant</code>s
+that together confer the authority this mandate relies on. Typically Execution-
+class, but a mandate may bundle Representation or Attestation grants if the
+decision names them.</li>
+<li><code>executor: Option&lt;Did&gt;</code> — the party (person or entity) named to carry out the
+action. Optional because some mandates are self-dispatching (the decision body
+itself executes) or addressed to a role rather than a DID.</li>
+<li><code>deadline: Option&lt;Timestamp&gt;</code> — the point after which the mandate expires without
+further execution. Expiration is institutional memory, not an error: an expired
+mandate records that the action was not taken.</li>
+<li><code>status</code> — lifecycle: <code>Pending → InProgress → Discharged → Expired → Revoked</code>.
+A revoked mandate blocks further execution even if prior effects have already
+landed (those remain recorded in the evidence layer).</li>
+</ul>
+<p><strong>What <code>Mandate</code> is not:</strong></p>
+<ul>
+<li>Not a <code>Delegation</code>. Delegation is vote-delegation (Representation, proposal-bounded);
+Mandate is broader and typically binds Execution.</li>
+<li>Not a <code>RoleAssignment</code>. A role assignment places a DID in an ongoing structural
+position (e.g. Treasurer). A mandate is issued per-decision (or per-charter-clause)
+and is bounded.</li>
+<li>Not a <code>Structure::Office</code>. An office is an institutional seat; a mandate is an
+authorization to act, often by a seat-holder, but distinct from the seat itself.</li>
+<li>Not an <code>InstitutionalEffectRecord</code>. That record is <em>evidence</em> that a translation
+from accepted payload to effect occurred. Mandate is <em>authority</em> to perform that
+translation in the first place.</li>
+<li>Not a raw <code>GovernanceDecisionReceipt</code>. The receipt records that a decision was
+reached. The mandate binds that decision to a bounded authorization.</li>
+<li>Not a federation <code>Agreement</code>. An agreement is a bilateral/multilateral compact
+between entities. A mandate is an internal authorization within an entity (or
+from an entity to a named executor) to carry out a decision.</li>
+<li>Not a <code>Charter</code>. The charter is the sovereign constitutional source. A mandate
+is an authorization grounded in the charter&#39;s process.</li>
+</ul>
+<p><strong>Mandate is the missing object between proposal/decision and execution/effect/evidence.</strong>
+With it present, the full chain becomes expressible: charter ratified → decision
+taken under charter process → mandate issued binding that decision to one or more
+authority grants → executor (acting under those grants) applies kernel effect →
+<code>InstitutionalEffectRecord</code> and <code>EffectDispatchEvidence</code> record that the mandate was
+discharged. Without it, authority-to-execute is implicit and managerial, and the
+evidence layer records <em>what happened</em> without being able to answer <em>who was
+authorized to do it and under which grant</em>.</p>
+<hr>
+<h2>Mapping against existing repo structures</h2>
+<p>This section is the authoritative &quot;what stays, what becomes adjacent, what is merely
+proto-form&quot; reference for the implementation PR.</p>
+<h3>Charter (<code>icn-governance::charter</code>, <code>apps/charter::CharterPolicyOracle</code>, <code>icn-ccl::schema::bridge</code>)</h3>
+<p><strong>Stays.</strong> The charter remains the sovereign constitutional source of the entity. This
+ADR does not touch charter representation, ratification, or the <code>charter_to_constraints</code>
+bridge. <code>CharterPolicyOracle</code> continues to translate ratified charter documents into
+<code>ConstraintSet</code>s at evaluation time.</p>
+<p>Relationship to the new objects: <code>AuthorityGrant</code>s descend from the charter&#39;s process.
+The charter defines who may issue which grants under what governance process.
+<code>Mandate</code>s are issued when decisions made under the charter direct an action.</p>
+<h3>Delegation (<code>icn-governance::delegation</code>)</h3>
+<p><strong>Stays as representation-specific.</strong> <code>DelegationScope::{Blanket, Domain, Proposal}</code>
+remains the typed surface for vote delegation. A vote delegation is conceptually a
+time-bounded <code>AuthorityGrant</code> of class <code>Representation</code> with a scope matching
+<code>DelegationScope</code>, but we do not rewrite <code>Delegation</code> in terms of <code>AuthorityGrant</code> in
+this tranche — doing so would be effect-family widening.</p>
+<p><strong>What&#39;s explicitly excluded:</strong> general &quot;act-on-behalf-of&quot; authority. Delegation is
+not Execution authority and must not be conflated with it. An entity that needs to
+authorize an executor does so via a <code>Mandate</code> (and its referenced <code>AuthorityGrant</code>s),
+not by delegating votes.</p>
+<h3>RoleAssignment (<code>icn-governance::structure</code>)</h3>
+<p><strong>Proto-authority surface.</strong> <code>RoleAssignment.authority_scope: Vec&lt;String&gt;</code> is the
+closest current analogue of <code>AuthorityGrant.scope</code> and is the primary migration target
+(see §Migration). <code>RoleAssignment.assigned_by_decision: Option&lt;ProposalId&gt;</code> is the
+closest current analogue of <code>AuthorityGrant.granted_by</code>.</p>
+<p><code>RoleAssignment</code> is not deprecated by this ADR. Its role as a structural placement
+(this DID holds this role in this structure) remains. Its authority-scoping surface
+becomes a typed projection into <code>AuthorityGrant</code>.</p>
+<h3>Structure::Office (<code>icn-governance::structure</code>)</h3>
+<p><strong>Adjacent.</strong> <code>Structure { kind: Office }</code> names an institutional seat. An office is
+not itself an <code>AuthorityGrant</code>; office-holders may be grantees of grants, and offices
+may be the addressee of mandates (as a named role rather than a DID). This ADR does
+not redefine offices.</p>
+<h3>Agreement::FederationMembership (<code>icn-federation::agreement::types</code>)</h3>
+<p><strong>Adjacent, proto-compact.</strong> <code>AgreementType::FederationMembership { terms }</code> has the
+shape of a typed inter-entity compact. It is not yet the narrow, typed, revocable
+federation authority system this ADR ultimately prepares. Federation-level
+<code>AuthorityGrant</code>s (cooperative A grants federation B the authority to clear on
+A&#39;s behalf, bounded and revocable) are downstream of this ADR and are explicitly
+out of scope here.</p>
+<p>This ADR does not alter <code>Agreement</code> types. Later work to narrow federation authority
+will emit <code>AuthorityGrant</code>s alongside (or attached to) <code>Agreement</code>s; that narrowing
+belongs in a subsequent ADR and PR.</p>
+<h3>StewardRecord + StewardAttestation (<code>icn-governance::steward</code>)</h3>
+<p><strong>Adjacent, proto-attestation-authority.</strong> <code>StewardRecord { governance_approval, status, term_start, term_end, attestations_issued, … }</code> already carries most of the
+shape of an <code>AuthorityGrant</code> of class <code>Attestation</code>: a grantor&#39;s decision reference,
+a bounded term, a grantee DID, and an attestation-counter surface.</p>
+<p>What is missing and that this ADR prepares (but does not implement): a governance-aware
+gate that validates &quot;is this steward currently authorized, under a non-revoked grant,
+to issue <em>this specific class</em> of attestation?&quot; That gate is future work. The freeze
+of <code>AuthorityClass::Attestation</code> gives that future gate a concept to consult.</p>
+<h3>InstitutionalEffectRecord (<code>apps/governance::institutional_effect</code>)</h3>
+<p><strong>Evidence-side only.</strong> <code>icn/apps/governance/src/institutional_effect.rs</code> (lines 1-19)
+is explicit: <code>InstitutionalEffectRecord</code> is &quot;the governance-app answer to the question
+&#39;what artifact did this decision actually create?&#39;&quot; — it is the translation evidence,
+not the authorization.</p>
+<p><code>Mandate</code> is the missing object upstream of <code>InstitutionalEffectRecord</code>. The intended
+future wiring: <code>GovernanceDecisionReceipt</code> (decision happened) → <code>Mandate</code> (authorized
+to execute) → <code>InstitutionalEffectRecord</code> (translation occurred) → <code>EffectDispatchEvidence</code>
+(execution reported). This ADR does not implement that wiring; it freezes the
+meaning of the missing link.</p>
+<h3>GovernanceDecisionReceipt (<code>icn-governance::proof</code>)</h3>
+<p><strong>Stays.</strong> The receipt is the cryptographic anchor for &quot;the decision was reached
+under canonical process.&quot; <code>Mandate.decision_receipt_id</code> and <code>Mandate.decision_hash</code>
+reference it. The receipt is not subsumed into <code>Mandate</code>; they are distinct records
+with distinct purposes (receipt = decision identity; mandate = authorization to act
+on the decision).</p>
+<h3>CCL / charter bridge (<code>icn-ccl::schema::bridge::charter_to_constraints</code>)</h3>
+<p><strong>Stays unchanged.</strong> The charter bridge operates at <code>PolicyOracle::evaluate()</code> time to
+translate ratified charters into <code>ConstraintSet</code>s. It is not replaced by this ADR,
+and it does not import any of the new objects.</p>
+<p>Relationship: a mandate derived from a decision made under a charter is constrained
+by whatever <code>ConstraintSet</code> that charter translates to. Nothing more. The kernel still
+enforces constraints without understanding that the constraints came from a charter
+and without understanding that a mandate mediates between decision and effect.</p>
+<h3>Kernel authz (<code>icn-kernel-api::authz::Capability</code>, <code>PolicyOracle</code>, <code>ConstraintSet</code>)</h3>
+<p><strong>Stays unchanged and remains unimported.</strong> The kernel capability is a mechanical
+bearer token used for transport-level authorization. <code>AuthorityGrant</code> is the
+constitutional source that a future implementation might <em>mint</em> kernel capabilities
+from — but the two remain in distinct layers and the kernel does not learn the
+meaning of <code>AuthorityClass</code>, <code>TypedScope</code>, or <code>Mandate</code>.</p>
+<h3>Shared-service entities (<code>icn-commons</code>, <code>icn-compute</code>, future shared services)</h3>
+<p><strong>Become legible institutional actors under the same grammar.</strong> Shared services
+currently function as real actors (commons identity registry, commons-pool compute)
+but are not yet modeled as grantees/grantors in a first-class way. The typed model
+does not require any refactor of these crates in this tranche; it names the shape
+they will be legible under:</p>
+<ul>
+<li>A shared service is a <strong>grantee</strong> of specific <code>AuthorityGrant</code>s issued by the
+sovereign entities that rely on it. Example (future): a federation grants its
+commons steward network an <code>Attestation</code>-class grant to issue personhood
+attestations, bounded by scope, revocable by the federation.</li>
+<li>A shared service may also be a <strong>grantor</strong> if — and only if — it is itself a
+sovereign entity under its own charter (e.g. a commons federation with its own
+ratified charter). Absent that, it is a grantee only. No shared service may be
+the grantor of its own authority.</li>
+<li>This framing is what makes shared services legible rather than invisible. An
+invisible platform-level permission that &quot;just works&quot; is exactly the drift this
+ADR exists to prevent.</li>
+</ul>
+<p>No shared-service refactor is part of this ADR. Their future legibility through
+this grammar is part of what the freeze prepares.</p>
+<h3>Mobile/member constitutional surface (<code>sdk/react-native</code>, <code>examples/mobile-app</code>, <code>web/pilot-ui</code>)</h3>
+<p><strong>Not implemented by this ADR; directly enabled by it.</strong> The strategic frame names
+mobile/member interaction as mission-level, and the member shell as a constitutional
+interface rather than cosmetic polish. This ADR does not add a single hook or
+screen. What it does is freeze the typed substrate the shell needs in order to
+render, in plain-language and accessible form:</p>
+<ul>
+<li>&quot;Here are the grants you currently hold&quot; (class, scope, grantor, expiration).</li>
+<li>&quot;Here is the mandate behind the action you are about to take&quot; (decision → grant → action).</li>
+<li>&quot;Here is the provenance of the receipt you are reading&quot; (receipt ← evidence ← mandate ← decision ← charter).</li>
+</ul>
+<p>None of these surfaces is possible against <code>Vec&lt;String&gt;</code> capability smears,
+advisory steward records, or implicit federation admission authority. A typed
+surface is a prerequisite for accessibility; screen readers, plain-language
+summaries, and member-facing explainers all need typed content to render
+faithfully. This ADR protects that future surface by freezing its substrate now.</p>
+<hr>
+<h2>Layer placement</h2>
+<p>All four objects (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>) live at
+the <strong>governance app / domain layer</strong>:</p>
+<ul>
+<li>Introduced in <code>icn-governance</code> (types) and consumed by <code>apps/governance</code> (persistence,
+HTTP surfaces, wiring).</li>
+<li><strong>Never imported by kernel crates.</strong> <code>icn-kernel-api</code>, <code>icn-core</code>, <code>icn-net</code>,
+<code>icn-gossip</code>, <code>icn-store</code>, <code>icn-gateway</code>, <code>icn-rpc</code> must not depend on these types.</li>
+<li>The <code>check-meaning-firewall.sh</code> ratchet and <code>forbidden-deps-allowlist.txt</code> continue
+to apply. These objects are domain semantics; the kernel enforces constraints, not
+constitutional meaning.</li>
+</ul>
+<p>Kernel effects, constraints, receipts, and <code>EffectDispatchEvidence</code> remain the shared
+boundary types. Apps translate <code>Mandate</code>-authorized actions into <code>KernelEffect</code>s at
+the existing translation seam; the kernel stays generic.</p>
+<hr>
+<h2>Boundary rules between authority types</h2>
+<p>The ADR explicitly separates the three authority classes and names, for each, the
+concrete repo locations of partial current implementation and the distinct
+conflations to reject.</p>
+<h3>Representation authority</h3>
+<ul>
+<li>Permits: voting in place of another; speaking/answering in place of another within
+a bounded scope; occupying a federation council seat on behalf of a coop.</li>
+<li>Currently partially implemented by: <code>Delegation</code> + <code>DelegationScope</code> (vote-only);
+meeting attendance/proxy conventions (informal).</li>
+<li>Must not be silently conflated with: Execution. A member who delegates their vote
+is not authorizing the delegate to execute mandates on their behalf.</li>
+<li>Why typed separation matters: prevents delegation-to-dictatorship — a broad vote
+delegation cannot be upgraded to administrative authority without a distinct grant.</li>
+</ul>
+<h3>Execution authority</h3>
+<ul>
+<li>Permits: carrying out actions that mutate institutional state — budget spends,
+charter deployments, member freezes/unfreezes, steward appointments, clearing
+settlements, etc.</li>
+<li>Currently partially implemented by: <code>RoleAssignment.authority_scope: Vec&lt;String&gt;</code>
+(untyped); <code>StewardRecord.status</code> (advisory; not consulted by effect dispatcher);
+implicit &quot;whoever the gateway accepted&quot; at API boundaries.</li>
+<li>Must not be silently conflated with: Representation (voting power) or Attestation
+(signing power). An officer with Execution authority is not thereby authorized to
+issue personhood attestations.</li>
+<li>Why typed separation matters: prevents execution creep — the most likely source of
+platform capture is silent aggregation of execution authority under roles that
+were not explicitly granted it.</li>
+</ul>
+<h3>Attestation authority</h3>
+<ul>
+<li>Permits: issuing signed statements of fact or status that downstream consumers
+rely on — steward personhood attestations, uniqueness proofs, audit sign-offs,
+dispute findings.</li>
+<li>Currently partially implemented by: <code>StewardRecord</code> + <code>StewardAttestation</code>
+(cryptographically signed; not governance-validated); various ad-hoc <code>sign()</code>
+helpers at app boundaries.</li>
+<li>Must not be silently conflated with: policy decisions (Representation) or
+resource mutations (Execution). An attester&#39;s signature is a witness, not a
+decision, and not an action.</li>
+<li>Why typed separation matters: attestations are the trust-root for downstream
+automation (SDIS, trust graphs, clearing). Without typed separation, any
+sufficiently-privileged DID can produce attestations that downstream consumers
+treat as authoritative, with no constitutional trail back to an explicit grant.</li>
+</ul>
+<p>These three must remain distinct at the type level. A <code>Mandate</code> that references a
+<code>Representation</code> grant cannot be discharged by issuing an attestation; a grant of
+<code>Attestation</code> cannot authorize an execution effect. The type system expresses the
+institutional anti-capture rule.</p>
+<hr>
+<h2>Scope and non-goals</h2>
+<p>This ADR is a semantic freeze. It does <strong>not</strong> do, and a future implementation PR
+must not do under the banner of &quot;the ADR said so,&quot; any of the following:</p>
+<ol>
+<li>No executor or dispatcher gating. <code>icn-core</code> and <code>apps/governance::executor</code> do
+not learn to consult <code>Mandate</code> or <code>AuthorityGrant</code> in this tranche. Effect
+dispatch continues exactly as it does today.</li>
+<li>No effect-family widening. No new <code>KernelEffect</code> variants, no new receipt/evidence
+families. The dispatch-evidence seam is left alone.</li>
+<li>No changes to <code>receipt_ref</code> semantics. <code>EffectOutcome</code> / <code>receipt_ref</code> behavior
+is fixed by #1571 and is not re-opened here.</li>
+<li>No federation-authority narrowing. <code>AgreementType::FederationMembership</code> keeps
+its current shape; <code>FederationPolicy::{Open, Vouched, Closed}</code> is not replaced
+by narrow typed grants in this tranche.</li>
+<li>No shared-service / entity-kind refactor. <code>icn-commons</code>, <code>icn-compute</code>, and the
+shared-service-legibility question are explicitly out of scope.</li>
+<li>No <code>icn-commons</code> centralization cleanup. L2 record hosting (charters / amendments
+/ appeals) stays where it is for now.</li>
+<li>No mobile SDK or mobile-shell implementation. No React Native hooks, no example
+app screens are added under this ADR.</li>
+<li>No kernel meaning changes. <code>icn-kernel-api::authz::Capability</code>, <code>ConstraintSet</code>,
+<code>PolicyOracle</code> remain unchanged. The kernel does not learn about <code>AuthorityClass</code>.</li>
+<li>No phase-status promotion. This ADR does not claim Phase 2, Phase 3, or any
+phase-level completion. <code>docs/PHASE_PROGRESS.md</code> is not touched.</li>
+<li>No deprecation of existing surfaces in this ADR. <code>RoleAssignment.authority_scope: Vec&lt;String&gt;</code> remains present; migration is additive (see §Migration).</li>
+<li>No platform-as-grantor. Under no refinement of the types may the ICN runtime,
+daemon, gateway, or any non-entity platform component appear as the
+<code>grantor_entity</code> of an <code>AuthorityGrant</code>. Authority originates from sovereign
+entities under their charters, full stop. Violating this collapses the model
+into precisely the managerial recentering the type system exists to prevent.</li>
+<li>No generic balance worldview. <code>TypedScope.amount_ceiling</code> and adjacent fields
+describe policy-governed institutional positions (commitments, obligations,
+allocations, settlement records) — not hosted balances, operator-routed
+value, or platform-issued currency. The typed model does not provide a seam
+through which a balance abstraction can re-enter the constitutional layer.</li>
+</ol>
+<hr>
+<h2>Migration guidance</h2>
+<h3>From <code>authority_scope: Vec&lt;String&gt;</code> toward <code>TypedScope</code></h3>
+<p>The implementation PR will add <code>TypedScope</code> as a new, typed projection without
+removing the string surface. Concretely:</p>
+<ol>
+<li><code>RoleAssignment</code> continues to carry <code>authority_scope: Vec&lt;String&gt;</code> unchanged.
+No wire-format break.</li>
+<li>A new method (e.g. <code>RoleAssignment::typed_scope(&amp;self) -&gt; Option&lt;TypedScope&gt;</code>)
+parses known string patterns into the typed structure. Unrecognized strings
+yield <code>None</code> and are reported via metric, not error.</li>
+<li>New consumers (future <code>AuthorityGrant</code> issuance, future execution gate) read
+the typed projection. Existing consumers that read the string vector continue
+to work.</li>
+<li>Over subsequent tranches, call sites that mint <code>RoleAssignment</code>s begin minting
+<code>AuthorityGrant</code>s alongside, with <code>TypedScope</code> populated directly. The string
+vector becomes a legacy parallel representation and eventually a derived view.</li>
+<li>No hard break is scheduled in this ADR. A later ADR will declare the string
+surface deprecated when the typed surface is the single source of truth.</li>
+</ol>
+<h3>Intended future chain (not yet implemented)</h3>
+<pre><code>Charter (ratified, active)
+    │
+    │  process produces →
+    ▼
+GovernanceDecisionReceipt         [exists today]
+    │
+    │  authorizes →
+    ▼
+Mandate                            [introduced by this ADR&#39;s implementation PR]
+    │  (references AuthorityGrant(s) bounded by TypedScope)
+    │
+    │  discharged by executor →
+    ▼
+KernelEffect dispatch              [exists today]
+    │
+    ▼
+InstitutionalEffectRecord          [exists today]
+    │
+    ▼
+EffectDispatchEvidence             [exists today, post-#1571]
+</code></pre>
+<p>This chain is the <em>intended clarified model</em>. This ADR does not claim it exists end-
+to-end. The missing step is <code>Mandate</code>; the other steps are live. Implementation
+tranches will land the <code>Mandate</code> object and, subsequently, an execution gate that
+consults it.</p>
+<hr>
+<h2>Consequences</h2>
+<h3>What this freeze prepares (but does not itself implement)</h3>
+<ul>
+<li><strong>Narrow federation authority.</strong> Once <code>AuthorityGrant</code> exists, federation-level
+authority (e.g. &quot;federation F may clear settlement receipts for coop C up to X
+credit units per week, revocable by C&quot;) becomes expressible as
+<code>AuthorityGrant { class: Execution, grantor_entity: C, grantee: F, scope: TypedScope { action_kind: clear_receipts, amount_ceiling: X credit units, time_window: weekly }, … }</code>. Note the directionality: C is the sovereign grantor,
+F is the grantee acting on C&#39;s behalf. The federation does not authorize itself.</li>
+<li><strong>Execution gating.</strong> Once <code>Mandate</code> exists, the effect dispatcher can (in a
+later tranche) consult it before applying certain kernel effects. Effects that
+require a mandate will be rejected when executed without one.</li>
+<li><strong>Governance-validated attestation authority.</strong> Once <code>AuthorityGrant { class: Attestation }</code> exists, steward attestations can be checked not only cryptographically
+(signature valid) but also governance-fully (&quot;is this DID under a non-revoked
+Attestation grant for this class of attestation, at this time?&quot;).</li>
+<li><strong>Typed federation compacts built from grants.</strong> A later ADR can declare that
+federation <code>Agreement</code>s are <strong>composed from</strong> <code>AuthorityGrant</code>s (not merely
+accompanied by them). A federation compact becomes legible as a bundle of
+narrow, typed, revocable grants exchanged between sovereign entities — which
+is exactly the &quot;narrow, explicit, auditable, revocable&quot; federation-authority
+shape the strategic frame requires.</li>
+<li><strong>Constitutional legibility in the member shell.</strong> Once grants are typed, the
+member shell (CoopWallet React Native app, web/pilot-ui, and peer surfaces)
+becomes capable of presenting, in plain-language and accessible form, three
+questions every ordinary participant should be able to answer: <em>what am I
+currently authorized to do; under whose authority did a given action happen;
+how was that authority decided.</em> This ADR does not implement those surfaces;
+it freezes the substrate that makes them renderable.</li>
+<li><strong>Provenance strengthened as institutional memory.</strong> <code>Mandate</code> adds a durable,
+first-class memory record between decision and effect. Audit bundles, review
+chains, and precedent queries all gain a principled join key. The evidence
+layer stops being merely &quot;what happened&quot; and becomes &quot;what was authorized,
+by whom, and how it was discharged.&quot;</li>
+<li><strong>Cleaner proposal-to-execution closure.</strong> With <code>Mandate</code> persisted between
+<code>GovernanceDecisionReceipt</code> and <code>InstitutionalEffectRecord</code>, a proposal&#39;s lifecycle
+becomes auditable end-to-end: which decision, which authorization, which execution,
+which evidence, which discharge.</li>
+</ul>
+<h3>What this freeze costs</h3>
+<ul>
+<li>Review attention on definitional precision. Freezing meaning before code is cheap
+<em>here</em> and expensive <em>later</em>, but the act of freezing has a cost now: it narrows
+some informal expressive space (e.g. a &quot;role&quot; cannot implicitly mean both
+representation and execution without a typed grant).</li>
+<li>One additional small surface area in <code>icn-governance</code> when implementation lands.
+That surface is purposely minimal.</li>
+</ul>
+<h3>What this freeze explicitly does not do</h3>
+<p>Already enumerated in §Scope and non-goals. Reiterated here as a consequence: no
+behavior changes land on the back of this ADR. If a PR claims to &quot;implement this ADR,&quot;
+reviewers should expect type additions, an <code>authority_scope: Vec&lt;String&gt;</code> bridge, and
+tests — not a new enforcement gate.</p>
+<hr>
+<h2>Open questions left for implementation</h2>
+<p>These are intentionally unresolved here; they are implementation details, not
+semantic decisions:</p>
+<ol>
+<li>Exact Rust representation of <code>TypedScope</code> — whether each category is a separate
+optional field, a <code>Vec&lt;ScopeClause&gt;</code>, or a flat struct. Semantic categories are
+frozen; encoding is not.</li>
+<li>Whether <code>Mandate.payload_hash</code> reuses the existing proposal payload hashing or
+introduces a new canonicalization. Likely reuse.</li>
+<li>Whether <code>AuthorityGrant</code> is a separate store or an index projected from existing
+records (e.g. from <code>RoleAssignment</code> + proposal records). Either is acceptable;
+implementation should pick the simpler path first.</li>
+<li>Whether <code>Mandate.status</code> is stored as a single field or reconstructed from
+events. Event sourcing is not mandated.</li>
+<li>HTTP surface — whether <code>/gov/mandates/*</code> is introduced in this tranche or a
+later one. Not required for the types to be usable internally.</li>
+</ol>
+<hr>
+<h2>References</h2>
+<ul>
+<li><code>ADR-0010</code> — App topology and canonical app roots</li>
+<li><code>ADR-0012</code> — Federation state origin model</li>
+<li><code>ADR-0013</code> — Federation clearing adoption contract</li>
+<li><code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code></li>
+<li><code>docs/architecture/KERNEL_APP_SEPARATION.md</code></li>
+<li><code>icn/crates/icn-governance/src/structure.rs</code> — RoleAssignment</li>
+<li><code>icn/crates/icn-governance/src/delegation.rs</code> — Delegation + DelegationScope</li>
+<li><code>icn/crates/icn-governance/src/steward.rs</code> — StewardRecord</li>
+<li><code>icn/crates/icn-governance/src/proof.rs</code> — GovernanceDecisionReceipt</li>
+<li><code>icn/crates/icn-federation/src/agreement/types.rs</code> — AgreementType</li>
+<li><code>icn/apps/governance/src/institutional_effect.rs</code> — InstitutionalEffectRecord</li>
+<li><code>icn/apps/charter/src/oracle.rs</code> — CharterPolicyOracle</li>
+<li><code>icn/crates/icn-ccl/src/schema/bridge.rs</code> — charter_to_constraints</li>
+<li><code>icn/crates/icn-kernel-api/src/authz.rs</code> — kernel Capability / PolicyOracle</li>
+<li><code>icn/bins/icnd/src/main.rs</code> — CharterPolicyOracle wiring at startup</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

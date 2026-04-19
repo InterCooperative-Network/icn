@@ -326,6 +326,20 @@ View source on GitHub →
 <li><strong>Facilitator</strong>: Meeting and process management</li>
 <li><strong>Delegate</strong>: Represents org in federation</li>
 </ul>
+<h3>AuthorityClass</h3>
+<p>Closed enumeration of constitutional authority kinds, frozen in <a href="/docs/adr/ADR-0014-constitutional-object-model">ADR-0014</a>. Exactly three variants:</p>
+<ul>
+<li><strong>Representation</strong> — speaking/voting in place of another within a bounded scope</li>
+<li><strong>Execution</strong> — carrying out an action that mutates institutional state</li>
+<li><strong>Attestation</strong> — issuing signed statements of fact downstream consumers may rely on</li>
+</ul>
+<p>These three are distinct and must not be silently conflated. Representation does not confer Execution authority; Execution does not confer Attestation authority.</p>
+<h3>AuthorityGrant</h3>
+<p>A bounded, auditable grant of authority issued by a sovereign entity to a grantee, in exactly one <code>AuthorityClass</code>. Carries: grantor entity, grantee DID or entity identifier (for example, a federation or cooperative, or a shared-service entity acting as an institutional actor), <code>TypedScope</code>, optional <code>proposal_id</code> + <code>decision_hash</code> provenance, validity window, optional revocation timestamp. App-layer constitutional meaning, not a kernel primitive. The ICN runtime, daemon, or gateway are never valid grantors. Frozen in <a href="/docs/adr/ADR-0014-constitutional-object-model">ADR-0014</a>; not yet implemented.</p>
+<h3>TypedScope</h3>
+<p>Typed replacement path for today&#39;s <code>RoleAssignment.authority_scope: Vec&lt;String&gt;</code> capability strings. Conjunction of present scope categories: domain, proposal-class, action-kind, amount/ceiling, time-window. Absent categories are &quot;unbounded along that axis&quot;; at least one category must be populated for a grant to be meaningful. Frozen in <a href="/docs/adr/ADR-0014-constitutional-object-model">ADR-0014</a>.</p>
+<h3>Mandate</h3>
+<p>The constitutional mediation layer between a governance decision and the execution of its effects. Binds a <code>GovernanceDecisionReceipt</code> (the decision) to one or more <code>AuthorityGrant</code>s, optionally an executor and a deadline, with lifecycle <code>Pending → InProgress → Discharged | Expired | Revoked</code>. <strong>Not</strong> a delegation, not a role assignment, not an office, not an <code>InstitutionalEffectRecord</code>, not a raw receipt, not a federation agreement, not a charter. It is the missing object between proposal/decision and execution/effect/evidence. Frozen in <a href="/docs/adr/ADR-0014-constitutional-object-model">ADR-0014</a>; not yet implemented.</p>
 <hr>
 <h2>Technical Terms</h2>
 <h3>CCL (Cooperative Contract Language)</h3>
