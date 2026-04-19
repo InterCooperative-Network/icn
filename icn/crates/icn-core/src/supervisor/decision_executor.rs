@@ -729,14 +729,22 @@ pub fn create_decision_executor_callback_with_sink(
                 }
             };
 
-            // Keep a copy of the inputs so we can hand effects to the sink
-            // alongside their per-effect results after execute() consumes them.
-            let effects_for_sink = effects.clone();
+            // Only clone the effects vector when a sink is actually
+            // wired — otherwise the clone is dead weight on the hot
+            // execution path.
+            let effects_for_sink = sink.as_ref().map(|_| effects.clone());
 
-            match executor
+            let exec_result = executor
                 .execute(effects, &decision_receipt_id, &decision_hash, &proposal_id)
-                .await
-            {
+                .await;
+
+            // Drop the permit before invoking the sink so any
+            // storage/network work the sink performs does not cap
+            // decision-execution concurrency. The sink is best-effort
+            // and must never block new decisions.
+            drop(_permit);
+
+            match exec_result {
                 Ok(results) => {
                     let success_count = results.iter().filter(|r| r.success).count();
                     info!(
@@ -746,7 +754,8 @@ pub fn create_decision_executor_callback_with_sink(
                         success = success_count,
                         "Decision execution complete"
                     );
-                    if let Some(sink) = sink.as_ref() {
+                    if let (Some(sink), Some(effects_for_sink)) = (sink.as_ref(), effects_for_sink)
+                    {
                         if !results.is_empty() {
                             let recorded_at = std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
@@ -771,7 +780,6 @@ pub fn create_decision_executor_callback_with_sink(
                     );
                 }
             }
-            // _permit drops here, releasing the semaphore slot
         });
     })
 }

@@ -138,6 +138,14 @@ pub struct GatewayServer {
     commons_handle: Option<icn_commons::CommonsHandle>,
     /// Settlement engine for compute audit queries (task_id → settled status).
     settlement_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
+    /// Deferred dispatch-evidence sink: the daemon constructs this before
+    /// the gateway opens the receipt store and passes it through here so
+    /// the gateway can install the backend as soon as `ReceiptStore` is
+    /// ready. With this installer wired, actor/internal proposal
+    /// acceptances produce the same durable per-effect
+    /// `EffectDispatchEvidence` as the gateway-close HTTP path.
+    dispatch_evidence_sink_installer:
+        Option<Arc<icn_governance_actor::DeferredDispatchEvidenceSink>>,
 }
 
 impl GatewayServer {
@@ -173,6 +181,7 @@ impl GatewayServer {
             charter_accepted_hook: None,
             commons_handle: None,
             settlement_engine: None,
+            dispatch_evidence_sink_installer: None,
         }
     }
 
@@ -220,6 +229,7 @@ impl GatewayServer {
             charter_accepted_hook: None,
             commons_handle: None,
             settlement_engine: None,
+            dispatch_evidence_sink_installer: None,
         }
     }
 
@@ -268,6 +278,7 @@ impl GatewayServer {
             charter_accepted_hook: None,
             commons_handle: None,
             settlement_engine: None,
+            dispatch_evidence_sink_installer: None,
         }
     }
 
@@ -498,6 +509,23 @@ impl GatewayServer {
         self
     }
 
+    /// Install the deferred dispatch-evidence sink installer.
+    ///
+    /// The daemon constructs `DeferredDispatchEvidenceSink` at bootstrap,
+    /// passes a clone into the kernel as `BootstrapHandles.dispatch_evidence_sink`,
+    /// and passes this clone here so the gateway — once it opens its
+    /// `ReceiptStore` — can install the backend into the deferred sink.
+    /// Without this wiring, actor-path acceptances that complete while
+    /// the daemon is running log per-effect results but never persist
+    /// `EffectDispatchEvidence` (the parity gap this closes).
+    pub fn with_dispatch_evidence_sink_installer(
+        mut self,
+        installer: Arc<icn_governance_actor::DeferredDispatchEvidenceSink>,
+    ) -> Self {
+        self.dispatch_evidence_sink_installer = Some(installer);
+        self
+    }
+
     /// Run the gateway server
     pub async fn run(self) -> Result<()> {
         info!("Starting ICN Gateway on {}", self.bind_addr);
@@ -599,6 +627,18 @@ impl GatewayServer {
                 .install_receipt_store(receipt_store.clone())
                 .await;
             info!("Receipt store installed on governance actor (actor-path parity)");
+        }
+
+        // Install the same receipt store into the deferred dispatch-evidence
+        // sink handed to us by the daemon. From this point onward, actor/
+        // internal acceptance paths flowing through the decision-executor
+        // callback produce durable per-effect `EffectDispatchEvidence` —
+        // the same artifact the gateway-close HTTP hook writes, just via
+        // the kernel seam. Without this call the deferred sink stays a
+        // no-op forwarder and the actor-path evidence gap remains open.
+        if let Some(ref installer) = self.dispatch_evidence_sink_installer {
+            installer.install_backend(receipt_store.clone());
+            info!("Dispatch-evidence sink backend installed (actor-path evidence parity active)");
         }
 
         // Execution record query store (read-only API surface).

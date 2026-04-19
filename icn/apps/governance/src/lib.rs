@@ -43,7 +43,7 @@ pub use dispatch_evidence::{
     derive_reconciliation_status, reconciliation_label, EffectDispatchEvidence,
     ReconciliationStatus,
 };
-pub use dispatch_evidence_sink::GovernanceDispatchEvidenceSink;
+pub use dispatch_evidence_sink::{DeferredDispatchEvidenceSink, GovernanceDispatchEvidenceSink};
 pub use events::{GovernanceEventEmitter, NoopEventEmitter};
 pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
 pub use handlers::translate_payload_to_effects;

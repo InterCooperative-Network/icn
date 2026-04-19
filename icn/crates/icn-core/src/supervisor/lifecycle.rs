@@ -147,6 +147,7 @@ pub async fn run_supervisor(
             charter_accepted_hook: gateway_handles.charter_accepted_hook,
             federation_service: gateway_handles.federation_service,
             settlement_engine: gateway_handles.settlement_engine,
+            dispatch_evidence_sink_installer: gateway_handles.dispatch_evidence_sink_installer,
         },
     );
 
@@ -371,6 +372,9 @@ async fn spawn_actors_with_identity(
     let compute_commons_settlement_callback = handles.commons_settlement_callback;
     let compute_settlement_query_engine = handles.settlement_query_engine;
     let dispatch_evidence_sink = handles.dispatch_evidence_sink;
+    // Carry the concrete installer through to the gateway so it can bind
+    // the receipt store into the deferred sink once the store is open.
+    gateway_handles.dispatch_evidence_sink_installer = handles.dispatch_evidence_sink_installer;
 
     // Wire runtime handles into the pre-initialized Ledger.
     // These depend on gossip/trust which are only available after gossip init.

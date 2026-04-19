@@ -39,7 +39,7 @@ use icn_governance_actor::{
     actor::GovernanceActor, dispatch_evidence::EffectDispatchEvidence,
     dispatch_evidence_sink::GovernanceDispatchEvidenceSink,
     institutional_effect::InstitutionalEffectRecord, manager::GovernanceManager,
-    receipt_backend::GovernanceReceiptBackend, GovernanceCommand,
+    receipt_backend::GovernanceReceiptBackend, DeferredDispatchEvidenceSink, GovernanceCommand,
 };
 use icn_identity::IdentityBundle;
 use icn_kernel_api::effects::{DispatchEvidenceSink, EffectResult, KernelEffect, SdisEffect};
@@ -246,13 +246,6 @@ async fn sink_records_dispatch_evidence_after_actor_accept() {
     // Install backend, close via actor — produces the IER.
     let backend = Arc::new(MemoryReceiptBackend::new());
     actor_handle.install_receipt_store(backend.clone()).await;
-    // Install backend into the manager too so the sink can look it up.
-    let manager_with_store = Arc::new(
-        GovernanceManager::with_handle(
-            Arc::new(actor_handle.clone()) as Arc<dyn GovernanceOps + Send + Sync>
-        )
-        .with_receipt_store(backend.clone() as Arc<dyn GovernanceReceiptBackend>),
-    );
 
     actor_handle
         .submit(GovernanceCommand::CloseProposal {
@@ -268,8 +261,11 @@ async fn sink_records_dispatch_evidence_after_actor_accept() {
     let ier = &iers[0];
     assert_eq!(ier.effect_kind, "appoint_steward");
 
-    // Build the sink over the manager that has the receipt store wired.
-    let sink = GovernanceDispatchEvidenceSink::new(manager_with_store);
+    // Build the sink directly over the backend — no GovernanceManager
+    // coupling is required. The backend is the same Arc the gateway
+    // would install in production.
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
     let effects = vec![sdis_approve_effect(&candidate_did, &proposal_id.0)];
     let results = vec![ok_result("eff-1")];
     let decision_receipt_id = format!("gov:{}:{}:receipt", domain_id.0, proposal_id.0);
@@ -296,11 +292,8 @@ async fn sink_records_dispatch_evidence_after_actor_accept() {
 #[tokio::test(flavor = "current_thread")]
 async fn sink_no_op_when_no_institutional_record_exists() {
     let backend = Arc::new(MemoryReceiptBackend::new());
-    let manager = Arc::new(
-        GovernanceManager::new()
-            .with_receipt_store(backend.clone() as Arc<dyn GovernanceReceiptBackend>),
-    );
-    let sink = GovernanceDispatchEvidenceSink::new(manager);
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
 
     let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
     let effects = vec![sdis_approve_effect(&candidate, "prop-no-ier")];
@@ -337,11 +330,8 @@ async fn sink_skips_noop_effects() {
     );
     backend.put_institutional_effect(&ier).unwrap();
 
-    let manager = Arc::new(
-        GovernanceManager::new()
-            .with_receipt_store(backend.clone() as Arc<dyn GovernanceReceiptBackend>),
-    );
-    let sink = GovernanceDispatchEvidenceSink::new(manager);
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
 
     let effects = vec![KernelEffect::NoOp {
         reason: "non-executable".into(),
@@ -371,11 +361,8 @@ async fn sink_skips_noop_effects() {
 #[tokio::test(flavor = "current_thread")]
 async fn sink_rejects_malformed_receipt_id() {
     let backend = Arc::new(MemoryReceiptBackend::new());
-    let manager = Arc::new(
-        GovernanceManager::new()
-            .with_receipt_store(backend.clone() as Arc<dyn GovernanceReceiptBackend>),
-    );
-    let sink = GovernanceDispatchEvidenceSink::new(manager);
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
     let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
 
     let effects = vec![sdis_approve_effect(&candidate, "anything")];
@@ -384,4 +371,132 @@ async fn sink_rejects_malformed_receipt_id() {
     sink.record_effects("not-a-governance-id", &effects, &results, 1_700_000_000);
 
     assert!(backend.evidence_for("anything").is_empty());
+}
+
+/// Daemon-bootstrap wiring parity:
+///
+/// The daemon constructs a [`DeferredDispatchEvidenceSink`] *before* the
+/// gateway opens the backing `ReceiptStore`. Writes routed to the
+/// deferred sink before `install_backend` must silently drop (honest
+/// best-effort); writes after install must reach the backend exactly
+/// as the concrete `GovernanceDispatchEvidenceSink` would.
+///
+/// This test pins the deferred seam end-to-end at the app layer:
+/// build the deferred sink as `Arc<dyn DispatchEvidenceSink>` (the
+/// shape the kernel receives from `BootstrapHandles`), prove pre-install
+/// drops are no-ops, then call `install_backend` (the same call the
+/// gateway server makes after opening the receipt store) and prove
+/// the next record_effects actually persists.
+#[tokio::test(flavor = "current_thread")]
+async fn deferred_sink_drops_before_install_then_persists_after() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+
+    // Seed an IER so the post-install write has something to link.
+    let ier = InstitutionalEffectRecord::new(
+        "prop-deferred",
+        "coop",
+        None,
+        "appoint_steward",
+        Some("did:icn:steward".into()),
+        Some("region-z".into()),
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let deferred = Arc::new(DeferredDispatchEvidenceSink::new());
+    assert!(!deferred.is_installed());
+
+    // Hand to the kernel as the trait object BootstrapHandles carries.
+    let as_trait: Arc<dyn DispatchEvidenceSink> = deferred.clone();
+
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![sdis_approve_effect(&candidate, "prop-deferred")];
+    let results = vec![ok_result("eff-pre")];
+
+    // PRE-INSTALL: must drop silently. No writes, no panic.
+    as_trait.record_effects(
+        "gov:domain-z:prop-deferred:receipt",
+        &effects,
+        &results,
+        1_700_000_001,
+    );
+    assert!(
+        backend.evidence_for("prop-deferred").is_empty(),
+        "pre-install record_effects must not touch the backend"
+    );
+
+    // Daemon/gateway seam: install the real backend once receipt_store is ready.
+    deferred.install_backend(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+    assert!(deferred.is_installed());
+
+    // POST-INSTALL: the same trait-object handle now persists.
+    let results2 = vec![ok_result("eff-post")];
+    as_trait.record_effects(
+        "gov:domain-z:prop-deferred:receipt",
+        &effects,
+        &results2,
+        1_700_000_002,
+    );
+
+    let ev = backend.evidence_for("prop-deferred");
+    assert_eq!(
+        ev.len(),
+        1,
+        "post-install record_effects must persist exactly one evidence row; got {ev:?}"
+    );
+    assert_eq!(ev[0].effect_record_id, ier.record_id);
+    assert_eq!(ev[0].subsystem, "sdis");
+    assert!(ev[0].success);
+    assert_eq!(ev[0].recorded_at, 1_700_000_002);
+}
+
+/// Second install is a warning-logged no-op, not a panic. The daemon
+/// contract is "install exactly once"; this asserts the sink stays
+/// stable if that contract is violated (e.g. a restart path accidentally
+/// re-invokes the gateway startup sequence).
+#[tokio::test(flavor = "current_thread")]
+async fn deferred_sink_second_install_is_idempotent_no_op() {
+    let backend_a = Arc::new(MemoryReceiptBackend::new());
+    let backend_b = Arc::new(MemoryReceiptBackend::new());
+
+    let ier = InstitutionalEffectRecord::new(
+        "prop-idem",
+        "coop",
+        None,
+        "appoint_steward",
+        Some("did:icn:steward".into()),
+        Some("region-z".into()),
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend_a.put_institutional_effect(&ier).unwrap();
+    backend_b.put_institutional_effect(&ier).unwrap();
+
+    let deferred = DeferredDispatchEvidenceSink::new();
+    deferred.install_backend(backend_a.clone() as Arc<dyn GovernanceReceiptBackend>);
+    deferred.install_backend(backend_b.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![sdis_approve_effect(&candidate, "prop-idem")];
+    let results = vec![ok_result("eff-idem")];
+    deferred.record_effects(
+        "gov:domain-z:prop-idem:receipt",
+        &effects,
+        &results,
+        1_700_000_003,
+    );
+
+    // First backend wins; second is silently ignored.
+    assert_eq!(
+        backend_a.evidence_for("prop-idem").len(),
+        1,
+        "first-installed backend must be the one that receives writes"
+    );
+    assert!(
+        backend_b.evidence_for("prop-idem").is_empty(),
+        "second install must not rebind the backend"
+    );
 }
