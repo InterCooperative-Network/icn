@@ -126,7 +126,7 @@ impl GovernanceDispatchEvidenceSink {
         } else {
             Some(result.message.clone())
         };
-        let evidence = EffectDispatchEvidence::new_with_outcome(
+        let evidence = EffectDispatchEvidence::new(
             effect_record_id.to_string(),
             proposal_id.to_string(),
             subsystem,

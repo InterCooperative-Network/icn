@@ -89,10 +89,18 @@ pub struct EffectDispatchEvidence {
 impl EffectDispatchEvidence {
     /// Construct evidence with explicit outcome classification.
     ///
-    /// Prefer this over [`Self::new`] so the outcome field carries truthful
-    /// semantics rather than defaulting to `None`.
+    /// `outcome` is `Option<EffectOutcome>` rather than a default-to-`None`
+    /// so that every call site must make an explicit choice about whether
+    /// the writing layer can classify the result. Pass `None` only when
+    /// the writer genuinely has no structured outcome to offer (e.g. a
+    /// fire-and-forget hook, pre-outcome-seam legacy path, or test
+    /// fixture that is not exercising the classification field itself).
+    /// Callers that do know the classification — the kernel executor, the
+    /// SDIS service-path writers — MUST pass the concrete variant; an
+    /// unclassified row from a classifiable caller is a correctness bug,
+    /// not a wire-compat feature.
     #[allow(clippy::too_many_arguments)]
-    pub fn new_with_outcome(
+    pub fn new(
         effect_record_id: impl Into<String>,
         proposal_id: impl Into<String>,
         subsystem: impl Into<String>,
@@ -113,29 +121,6 @@ impl EffectDispatchEvidence {
             outcome,
             recorded_at,
         }
-    }
-
-    /// Legacy constructor — leaves `outcome` unclassified (`None`). Prefer
-    /// [`Self::new_with_outcome`] in new code so audit rows are self-describing.
-    pub fn new(
-        effect_record_id: impl Into<String>,
-        proposal_id: impl Into<String>,
-        subsystem: impl Into<String>,
-        receipt_ref: Option<String>,
-        success: bool,
-        error_message: Option<String>,
-        recorded_at: u64,
-    ) -> Self {
-        Self::new_with_outcome(
-            effect_record_id,
-            proposal_id,
-            subsystem,
-            receipt_ref,
-            success,
-            error_message,
-            None,
-            recorded_at,
-        )
     }
 }
 
@@ -221,6 +206,7 @@ mod tests {
             Some("state-hash-x".into()),
             success,
             err.map(String::from),
+            None,
             at,
         )
     }

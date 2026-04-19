@@ -132,12 +132,17 @@ pub type ProposalAcceptedHook = Arc<dyn Fn(GovernanceEffect) + Send + Sync>;
 ///
 /// `subsystem` is lowercase stable (`"commons"`, `"ledger"`, `"sdis"`).
 /// `receipt_ref` is opaque — governance does not interpret or validate it.
+/// `outcome` is the structural classification the dispatcher is willing to
+/// stand behind for this result. `None` means the dispatcher has no truthful
+/// outcome to report (pre-outcome-seam hook, fire-and-forget surface). See
+/// [`icn_kernel_api::EffectOutcome`] for the full semantics of each variant.
 #[derive(Debug, Clone)]
 pub struct DispatchEvidenceSpec {
     pub subsystem: String,
     pub receipt_ref: Option<String>,
     pub success: bool,
     pub error_message: Option<String>,
+    pub outcome: Option<icn_kernel_api::EffectOutcome>,
 }
 
 /// Optional parallel hook that, when wired, returns downstream dispatch

@@ -1446,6 +1446,15 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                             }
                         };
                         if let Some(record_id) = target_record_id.as_ref() {
+                            // AppointSteward has no NoOp / Partial semantics at
+                            // the service layer: success ⇒ Applied, failure ⇒
+                            // Failed (classification mirrors the kernel
+                            // executor, see supervisor::governance_executor).
+                            let outcome = if success {
+                                Some(icn_kernel_api::EffectOutcome::Applied)
+                            } else {
+                                Some(icn_kernel_api::EffectOutcome::Failed)
+                            };
                             let evidence = crate::dispatch_evidence::EffectDispatchEvidence::new(
                                 record_id.clone(),
                                 proposal.id.0.clone(),
@@ -1453,6 +1462,7 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                                 receipt_ref,
                                 success,
                                 error,
+                                outcome,
                                 current_time_secs(),
                             );
                             if let Err(e) = ctx.manager.record_dispatch_evidence(&evidence) {
@@ -1493,6 +1503,21 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                             }
                         };
                         if let Some(record_id) = target_record_id.as_ref() {
+                            // RevokeSteward can be a NoOp when no active record
+                            // exists for the target — but the HTTP test-path
+                            // collapses that into `success = true` without
+                            // surfacing the receipt_ref signal used by the
+                            // kernel executor. Classify conservatively: mark
+                            // `Applied` on success (may over-count NoOp in this
+                            // legacy test-path; the kernel-owned executor is
+                            // canonical for the NoOp distinction) and `Failed`
+                            // on failure. The service here does not expose
+                            // Partial mutations.
+                            let outcome = if success {
+                                Some(icn_kernel_api::EffectOutcome::Applied)
+                            } else {
+                                Some(icn_kernel_api::EffectOutcome::Failed)
+                            };
                             let evidence = crate::dispatch_evidence::EffectDispatchEvidence::new(
                                 record_id.clone(),
                                 proposal.id.0.clone(),
@@ -1500,6 +1525,7 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                                 receipt_ref,
                                 success,
                                 error,
+                                outcome,
                                 current_time_secs(),
                             );
                             if let Err(e) = ctx.manager.record_dispatch_evidence(&evidence) {
@@ -1748,6 +1774,7 @@ async fn record_hook_dispatch_evidence<E: GovernanceEventEmitter + Clone + 'stat
         spec.receipt_ref,
         spec.success,
         spec.error_message,
+        spec.outcome,
         now,
     );
     if let Err(e) = ctx.manager.record_dispatch_evidence(&evidence) {
@@ -5096,6 +5123,7 @@ mod tests {
                     receipt_ref: Some("state-hash-abc".to_string()),
                     success: true,
                     error_message: None,
+                    outcome: Some(icn_kernel_api::EffectOutcome::Applied),
                 }),
                 _ => None,
             };
@@ -5220,6 +5248,7 @@ mod tests {
                         receipt_ref: Some(sid),
                         success: true,
                         error_message: None,
+                        outcome: Some(icn_kernel_api::EffectOutcome::Applied),
                     })
                 } else {
                     None
@@ -5342,6 +5371,7 @@ mod tests {
                         receipt_ref: None,
                         success: false,
                         error_message: Some("candidate has no holder record".to_string()),
+                        outcome: Some(icn_kernel_api::EffectOutcome::Failed),
                     })
                 } else {
                     None
@@ -5461,6 +5491,7 @@ mod tests {
                         receipt_ref: Some(sid),
                         success: true,
                         error_message: None,
+                        outcome: Some(icn_kernel_api::EffectOutcome::Applied),
                     })
                 } else {
                     None

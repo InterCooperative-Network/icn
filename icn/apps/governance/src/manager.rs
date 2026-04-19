@@ -6694,6 +6694,7 @@ mod tests {
             Some("state-hash-1".into()),
             true,
             None,
+            None,
             100,
         );
         let newer = EffectDispatchEvidence::new(
@@ -6703,11 +6704,12 @@ mod tests {
             Some("state-hash-2".into()),
             true,
             None,
+            None,
             200,
         );
         // Unrelated record — must not leak into rec-a's list.
         let other_record =
-            EffectDispatchEvidence::new("rec-b", "prop-2", "sdis", None, true, None, 150);
+            EffectDispatchEvidence::new("rec-b", "prop-2", "sdis", None, true, None, None, 150);
 
         mgr.record_dispatch_evidence(&newer).unwrap();
         mgr.record_dispatch_evidence(&older).unwrap();
@@ -6765,6 +6767,7 @@ mod tests {
             "commons",
             Some("commons-receipt-abc".into()),
             true,
+            None,
             None,
             20,
         ))
@@ -6829,6 +6832,7 @@ mod tests {
             None,
             false,
             Some("member not found".into()),
+            None,
             20,
         ))
         .unwrap();
@@ -6838,6 +6842,7 @@ mod tests {
             "commons",
             Some("later-hash".into()),
             true,
+            None,
             None,
             30,
         ))
