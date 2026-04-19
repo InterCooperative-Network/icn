@@ -528,6 +528,76 @@ async fn revoke_steward_evidence_carries_service_receipt_ref() {
     assert!(ev[0].success);
 }
 
+/// No-op revoke (success + no downstream handle) must be persisted as a
+/// distinct durable row from a real revocation: `success = true` with
+/// `receipt_ref = None` and no `error_message`. This is what the
+/// kernel executor's no-op branch now emits when the service reports
+/// `receipt_ref = None` on the success path.
+#[tokio::test(flavor = "current_thread")]
+async fn revoke_steward_noop_evidence_has_no_receipt_ref_but_is_success() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-revoke-noop",
+        "coop",
+        None,
+        "revoke_steward",
+        Some("did:icn:steward-ghost".into()),
+        None,
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![KernelEffect::Sdis(
+        icn_kernel_api::effects::SdisEffect::RevokeSteward {
+            steward_did: candidate.to_string(),
+            reason: "never was steward".into(),
+        },
+    )];
+    // Emulates what the kernel executor now produces for the no-op
+    // branch: success=true, state_change_hash=None, receipt_ref=None.
+    let results = vec![EffectResult {
+        effect_id: "eff-revoke-noop".into(),
+        success: true,
+        message: format!(
+            "Steward {} revoke was a no-op (no active record)",
+            candidate
+        ),
+        state_change_hash: None,
+        ledger_entry_id: None,
+        not_executed: false,
+        receipt_ref: None,
+    }];
+
+    sink.record_effects(
+        "gov:domain-b:prop-revoke-noop:receipt",
+        &effects,
+        &results,
+        1_700_010_003,
+    );
+
+    let ev = backend.evidence_for("prop-revoke-noop");
+    assert_eq!(ev.len(), 1);
+    assert!(
+        ev[0].success,
+        "no-op revoke is a success at the governance layer — it satisfies the decision idempotently"
+    );
+    assert_eq!(
+        ev[0].receipt_ref, None,
+        "no active record → no handle to attribute → receipt_ref must stay None"
+    );
+    assert!(
+        ev[0].error_message.is_none(),
+        "no-op is not a failure; error_message must be None so audit can \
+         distinguish it from a hard commons failure"
+    );
+}
+
 /// Failure path: when the service produced no downstream handle
 /// (e.g. commons.register_steward failed, revoke hit an idempotent
 /// no-op with no active record), `receipt_ref` must remain `None` on

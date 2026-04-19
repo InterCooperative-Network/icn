@@ -2221,23 +2221,46 @@ impl KernelSdisExecutor {
                 };
                 let result = service.revoke_steward(request)?;
                 if result.success {
-                    info!(
-                        state_change_hash = %result.state_change_hash,
-                        receipt_ref = ?result.receipt_ref,
-                        "Steward revoked with durable state"
-                    );
-                    Ok(EffectResult {
-                        effect_id: decision_receipt_id.to_string(),
-                        success: true,
-                        message: format!(
-                            "Steward {} revoked -> state_hash={}",
-                            steward_did, result.state_change_hash
-                        ),
-                        state_change_hash: Some(result.state_change_hash),
-                        ledger_entry_id: None,
-                        not_executed: false,
-                        receipt_ref: result.receipt_ref,
-                    })
+                    // Distinguish a genuine revocation from an idempotent
+                    // no-op. `receipt_ref = Some(steward_id)` means the
+                    // service actually routed through a commons record;
+                    // `None` means there was no active record to revoke.
+                    if result.receipt_ref.is_some() {
+                        info!(
+                            state_change_hash = %result.state_change_hash,
+                            receipt_ref = ?result.receipt_ref,
+                            "Steward revoked with durable state"
+                        );
+                        Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: true,
+                            message: format!(
+                                "Steward {} revoked -> state_hash={}",
+                                steward_did, result.state_change_hash
+                            ),
+                            state_change_hash: Some(result.state_change_hash),
+                            ledger_entry_id: None,
+                            not_executed: false,
+                            receipt_ref: result.receipt_ref,
+                        })
+                    } else {
+                        info!(
+                            steward_did = %steward_did,
+                            "Steward revoke dispatched as no-op (no active record)"
+                        );
+                        Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: true,
+                            message: format!(
+                                "Steward {} revoke was a no-op (no active record)",
+                                steward_did
+                            ),
+                            state_change_hash: None,
+                            ledger_entry_id: None,
+                            not_executed: false,
+                            receipt_ref: None,
+                        })
+                    }
                 } else {
                     Ok(EffectResult {
                         effect_id: decision_receipt_id.to_string(),

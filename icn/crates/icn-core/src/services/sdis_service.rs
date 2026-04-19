@@ -155,11 +155,11 @@ impl SdisService for SdisServiceImpl {
         let steward_did = icn_identity::Did::from_str(&request.steward_did)
             .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
 
-        // Returns (success, Option<steward_id>): the steward_id is the
-        // commons handle we routed the revoke through. `None` means the
-        // idempotent no-op case (no active record existed) — honestly
-        // reflected in receipt_ref below.
-        let result: Result<(bool, Option<String>)> = tokio::task::block_in_place(|| {
+        // Returns `Some(steward_id)` when the revoke was routed through a
+        // real commons handle; `None` when no active record existed and this
+        // is an idempotent no-op. The inner `Result` disambiguates success
+        // from commons failure — we do not need a separate bool.
+        let result: Result<Option<String>> = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 match self.commons.get_steward_by_did(&steward_did).await {
                     Ok(Some(record)) => {
@@ -167,7 +167,7 @@ impl SdisService for SdisServiceImpl {
                         self.commons
                             .revoke_steward(&steward_id, request.reason.clone(), vec![])
                             .await
-                            .map(|_| (true, Some(steward_id)))
+                            .map(|_| Some(steward_id))
                     }
                     Ok(None) => {
                         // No record found — idempotent no-op. No steward_id
@@ -176,7 +176,7 @@ impl SdisService for SdisServiceImpl {
                             steward_did = %request.steward_did,
                             "RevokeSteward: no active steward record found, treating as no-op"
                         );
-                        Ok((true, None))
+                        Ok(None)
                     }
                     Err(e) => Err(e),
                 }
@@ -184,20 +184,37 @@ impl SdisService for SdisServiceImpl {
         });
 
         match result {
-            Ok((_, receipt_ref)) => {
-                let state_change_hash = Self::compute_revoke_hash(&request);
-                info!(
-                    steward_did = %request.steward_did,
-                    state_change_hash = %state_change_hash,
-                    receipt_ref = ?receipt_ref,
-                    "Steward revoked in commons"
-                );
-                Ok(RevokeStewardResult {
-                    success: true,
-                    state_change_hash,
-                    error: None,
-                    receipt_ref,
-                })
+            Ok(receipt_ref) => {
+                // Only count a real revoke as state-changing. The no-op
+                // (no active record) branch keeps `state_change_hash`
+                // empty so downstream audit surfaces can distinguish a
+                // genuine revocation from an idempotent repeat.
+                if receipt_ref.is_some() {
+                    let state_change_hash = Self::compute_revoke_hash(&request);
+                    info!(
+                        steward_did = %request.steward_did,
+                        state_change_hash = %state_change_hash,
+                        receipt_ref = ?receipt_ref,
+                        "Steward revoked in commons"
+                    );
+                    Ok(RevokeStewardResult {
+                        success: true,
+                        state_change_hash,
+                        error: None,
+                        receipt_ref,
+                    })
+                } else {
+                    info!(
+                        steward_did = %request.steward_did,
+                        "Steward revoke was a no-op in commons (no active record)"
+                    );
+                    Ok(RevokeStewardResult {
+                        success: true,
+                        state_change_hash: String::new(),
+                        error: None,
+                        receipt_ref: None,
+                    })
+                }
             }
             Err(e) => {
                 tracing::warn!(
@@ -687,6 +704,15 @@ mod tests {
         assert_eq!(
             revoke.receipt_ref, None,
             "no active record → no handle to attribute → receipt_ref must remain None"
+        );
+        assert!(
+            revoke.state_change_hash.is_empty(),
+            "no-op revoke must not claim a state_change_hash — audit must be able \
+             to distinguish a real revocation from an idempotent no-op"
+        );
+        assert!(
+            revoke.error.is_none(),
+            "no-op revoke is a success, not a failure; error must be None"
         );
     }
 
