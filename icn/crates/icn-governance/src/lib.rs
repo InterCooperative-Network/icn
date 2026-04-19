@@ -95,6 +95,12 @@ pub mod orphan_cleanup;
 // Proposal cleanup and archival
 pub mod proposal_cleanup;
 
+// Constitutional object model (ADR-0014): types-first, behavior-neutral.
+// Authority: AuthorityClass, AuthorityGrant, TypedScope + compatibility bridge.
+// Mandate: the constitutional mediation layer between decision and execution.
+pub mod authority;
+pub mod mandate;
+
 pub use amendment::{
     Amendment, AmendmentChange, AmendmentId, AmendmentScope, AmendmentStatus, AmendmentType,
     ChangeTarget, ChangeType, Ratification, RatificationRequirements, RatificationResult,
@@ -199,6 +205,13 @@ pub use structure::{
     InMemoryStructureStore, RoleAssignment, RoleAssignmentId, Structure, StructureId,
     StructureKind, StructureStatus, StructureStoreBackend,
 };
+
+// Constitutional object model (ADR-0014) re-exports
+pub use authority::{
+    parse_authority_scope_strings, AmountCeiling, AmountUnit, AuthorityClass, AuthorityGrant,
+    AuthorityGrantId, DecisionProvenance, Grantee, GrantorEntityId, TimeWindow, TypedScope,
+};
+pub use mandate::{Mandate, MandateId, MandateStatus};
 
 /// Unix timestamp in seconds
 pub type Timestamp = u64;

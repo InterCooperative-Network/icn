@@ -225,6 +225,25 @@ impl RoleAssignment {
             None => true,
         }
     }
+
+    /// Compatibility bridge from the stringly-typed `authority_scope` to
+    /// the typed [`crate::authority::TypedScope`] frozen by ADR-0014.
+    ///
+    /// This is a read-only projection: the underlying `Vec<String>`
+    /// field is unchanged. Unrecognized labels are silently ignored. A
+    /// return value of `None` means no label in the current scope matched
+    /// any recognized form — i.e. the typed projection would be empty.
+    ///
+    /// See [`crate::authority::parse_authority_scope_strings`] for the
+    /// grammar and the extensibility story.
+    ///
+    /// This helper adds no behavioral enforcement: existing consumers
+    /// that read `authority_scope` directly continue to work unchanged.
+    /// Future consumers that want a typed view can call this method
+    /// without forcing a migration of any call site today.
+    pub fn typed_scope(&self) -> Option<crate::authority::TypedScope> {
+        crate::authority::parse_authority_scope_strings(&self.authority_scope)
+    }
 }
 
 // ========== Store Backend ==========
@@ -528,6 +547,43 @@ mod tests {
         assert!(role.is_active_at(1500));
         assert!(!role.is_active_at(2000)); // at end (exclusive)
         assert!(!role.is_active_at(3000));
+    }
+
+    #[test]
+    fn test_role_typed_scope_bridge_none_when_empty_or_unrecognized() {
+        // ADR-0014 compatibility bridge: empty authority_scope and
+        // unrecognized labels both yield None.
+        let sid = StructureId::from_raw("s");
+        let role = RoleAssignment::new(sid.clone(), test_did(), "coordinator".into(), 1000);
+        assert!(role.typed_scope().is_none());
+
+        let mut with_unknown = role.clone();
+        with_unknown.authority_scope = vec!["not-a-known-label".into()];
+        assert!(with_unknown.typed_scope().is_none());
+    }
+
+    #[test]
+    fn test_role_typed_scope_bridge_projects_known_labels() {
+        // ADR-0014 compatibility bridge: recognized labels project into
+        // a typed scope without mutating the underlying string vector.
+        let sid = StructureId::from_raw("s");
+        let mut role = RoleAssignment::new(sid, test_did(), "treasurer".into(), 1000);
+        role.authority_scope = vec![
+            "domain:treasury".into(),
+            "action_kind:Treasury::Spend".into(),
+            "amount_ceiling:500:credit_units".into(),
+        ];
+
+        let scope = role.typed_scope().expect("bridge should yield Some");
+        assert_eq!(
+            scope.domain.as_ref().map(|d| d.0.as_str()),
+            Some("treasury")
+        );
+        assert_eq!(scope.action_kind, vec!["Treasury::Spend".to_string()]);
+        assert!(scope.amount_ceiling.is_some());
+
+        // The underlying string vector remains as-is — no migration side-effect.
+        assert_eq!(role.authority_scope.len(), 3);
     }
 
     #[test]
