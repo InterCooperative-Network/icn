@@ -176,7 +176,16 @@ fn ok_result(effect_id: &str) -> EffectResult {
     }
 }
 
-/// Positive parity: actor Accept → IER emitted → sink fired → evidence persisted.
+/// Positive parity / single-owner invariant: actor Accept → IER emitted → sink
+/// fired *once* → evidence persisted *once*.
+///
+/// This pins the Phase-2 single-ownership decision for SDIS dispatch:
+/// the production gateway wires
+/// `GovernanceContext.on_proposal_accepted_with_evidence = None`, so the
+/// only path that records evidence is the actor → event_bus →
+/// DecisionExecutor → `GovernanceDispatchEvidenceSink` chain exercised
+/// here. See `crates/icn-gateway/src/server.rs` (`GovernanceContext`
+/// construction) for the wiring.
 #[tokio::test(flavor = "current_thread")]
 async fn sink_records_dispatch_evidence_after_actor_accept() {
     let tmp = tempfile::tempdir().expect("tempdir");
@@ -371,6 +380,62 @@ async fn sink_rejects_malformed_receipt_id() {
     sink.record_effects("not-a-governance-id", &effects, &results, 1_700_000_000);
 
     assert!(backend.evidence_for("anything").is_empty());
+}
+
+/// Regression pin for the Phase-2 single-ownership decision.
+///
+/// The sink itself does NOT deduplicate: if two independent acceptance
+/// paths both call `record_effects` for the same `(proposal_id,
+/// effect_record_id)`, the backend receives two evidence rows. This was
+/// the duplicate-dispatch pathology in the previous gateway wiring —
+/// the HTTP close path's `on_proposal_accepted_with_evidence` hook and
+/// the actor/kernel-executor path each fired the sink for the same IER.
+///
+/// This test documents the invariant by showing the failure mode in
+/// isolation: two sink invocations = two rows. The fix lives at the
+/// wiring layer (gateway `GovernanceContext` sets the HTTP hook to
+/// `None`), not inside the sink. Any future attempt to restore a
+/// second dispatch owner must also introduce sink-level de-duplication,
+/// or this invariant breaks.
+#[tokio::test(flavor = "current_thread")]
+async fn two_sink_invocations_produce_duplicate_evidence_rows() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+
+    // Seed the IER the sink will link against.
+    let ier = InstitutionalEffectRecord::new(
+        "prop-dup",
+        "coop",
+        None,
+        "appoint_steward",
+        Some("did:icn:steward".into()),
+        Some("region-d".into()),
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![sdis_approve_effect(&candidate, "prop-dup")];
+    let results = vec![ok_result("eff-dup")];
+    let receipt_id = "gov:domain-d:prop-dup:receipt";
+
+    // Simulate: kernel-executor path fires the sink.
+    sink.record_effects(receipt_id, &effects, &results, 1_700_000_100);
+    // Simulate: HTTP hook *also* fires (the bug the Phase-2 change removes).
+    sink.record_effects(receipt_id, &effects, &results, 1_700_000_101);
+
+    let ev = backend.evidence_for("prop-dup");
+    assert_eq!(
+        ev.len(),
+        2,
+        "sink is intentionally non-deduplicating; two invocations must yield \
+         two rows. Production wiring must ensure exactly one owner calls it \
+         per dispatch."
+    );
 }
 
 /// Daemon-bootstrap wiring parity:
