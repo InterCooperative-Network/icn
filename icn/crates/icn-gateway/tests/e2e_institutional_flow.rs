@@ -722,6 +722,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
                 success: true,
                 state_change_hash: String::new(),
                 error: None,
+                receipt_ref: None,
             })
         }
         fn revoke_steward(
@@ -732,6 +733,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
                 success: true,
                 state_change_hash: String::new(),
                 error: None,
+                receipt_ref: None,
             })
         }
         fn reconfirm_steward(
@@ -744,6 +746,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
                 success: true,
                 state_change_hash: String::new(),
                 error: None,
+                receipt_ref: None,
             })
         }
 

@@ -173,6 +173,35 @@ fn ok_result(effect_id: &str) -> EffectResult {
         state_change_hash: Some("state-hash-abc".into()),
         ledger_entry_id: None,
         not_executed: false,
+        receipt_ref: None,
+    }
+}
+
+/// Successful result carrying a downstream receipt_ref, emulating what
+/// `SdisServiceImpl::appoint_steward` now publishes (the commons
+/// `StewardId::to_hex()`).
+fn ok_result_with_receipt_ref(effect_id: &str, receipt_ref: &str) -> EffectResult {
+    EffectResult {
+        effect_id: effect_id.into(),
+        success: true,
+        message: "approved".into(),
+        state_change_hash: Some("state-hash-abc".into()),
+        ledger_entry_id: None,
+        not_executed: false,
+        receipt_ref: Some(receipt_ref.into()),
+    }
+}
+
+/// Hard-failure result: no success, no downstream handle minted.
+fn failure_result(effect_id: &str, message: &str) -> EffectResult {
+    EffectResult {
+        effect_id: effect_id.into(),
+        success: false,
+        message: message.into(),
+        state_change_hash: None,
+        ledger_entry_id: None,
+        not_executed: false,
+        receipt_ref: None,
     }
 }
 
@@ -352,6 +381,7 @@ async fn sink_skips_noop_effects() {
         state_change_hash: None,
         ledger_entry_id: None,
         not_executed: true,
+        receipt_ref: None,
     }];
     sink.record_effects(
         "gov:domain-x:prop-noop:receipt",
@@ -380,6 +410,173 @@ async fn sink_rejects_malformed_receipt_id() {
     sink.record_effects("not-a-governance-id", &effects, &results, 1_700_000_000);
 
     assert!(backend.evidence_for("anything").is_empty());
+}
+
+// =============================================================================
+// Evidence-fidelity: receipt_ref carries the downstream service handle
+// =============================================================================
+//
+// These three tests pin the Phase-2b seam: `EffectResult.receipt_ref`, set
+// by the executing service (`SdisServiceImpl` publishes the commons
+// `StewardId::to_hex()`), is forwarded verbatim into
+// `EffectDispatchEvidence.receipt_ref`. This is what restores the durable
+// steward-handle trail we lost when the gateway HTTP hook was removed,
+// without reintroducing a second dispatch owner.
+
+/// Successful AppointSteward: receipt_ref from the service result must
+/// appear on the persisted evidence row exactly as produced.
+#[tokio::test(flavor = "current_thread")]
+async fn appoint_steward_evidence_carries_service_receipt_ref() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-appoint-rref",
+        "coop",
+        None,
+        "appoint_steward",
+        Some("did:icn:steward-a".into()),
+        Some("region-a".into()),
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![sdis_approve_effect(&candidate, "prop-appoint-rref")];
+    // The real commons handle minted by register_steward — content-addressed,
+    // 64-hex-chars. We pass a representative literal; the sink must forward
+    // it verbatim without interpreting or rewriting.
+    let steward_id_hex =
+        "b1946ac92492d2347c6235b4d2611184dc2e8d6b6fbe7d42a3a0b4e9ef6e2a11".to_string();
+    let results = vec![ok_result_with_receipt_ref("eff-appoint", &steward_id_hex)];
+
+    sink.record_effects(
+        "gov:domain-a:prop-appoint-rref:receipt",
+        &effects,
+        &results,
+        1_700_010_000,
+    );
+
+    let ev = backend.evidence_for("prop-appoint-rref");
+    assert_eq!(
+        ev.len(),
+        1,
+        "single-owner invariant: exactly one evidence row for one dispatch"
+    );
+    assert_eq!(
+        ev[0].receipt_ref,
+        Some(steward_id_hex),
+        "sink must forward EffectResult.receipt_ref verbatim; no synthesis"
+    );
+    assert_eq!(ev[0].effect_record_id, ier.record_id);
+    assert_eq!(ev[0].subsystem, "sdis");
+    assert!(ev[0].success);
+    assert!(ev[0].error_message.is_none());
+}
+
+/// Successful RevokeSteward: same seam. Distinct data shape from appoint
+/// because the service looks up the steward record and publishes its id.
+#[tokio::test(flavor = "current_thread")]
+async fn revoke_steward_evidence_carries_service_receipt_ref() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-revoke-rref",
+        "coop",
+        None,
+        "revoke_steward",
+        Some("did:icn:steward-b".into()),
+        None,
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    // RevokeSteward is a distinct effect shape — build it directly.
+    let effects = vec![KernelEffect::Sdis(
+        icn_kernel_api::effects::SdisEffect::RevokeSteward {
+            steward_did: candidate.to_string(),
+            reason: "term ended".into(),
+        },
+    )];
+    let steward_id_hex =
+        "a0b4e9ef6e2a11b1946ac92492d2347c6235b4d2611184dc2e8d6b6fbe7d42a3".to_string();
+    let results = vec![ok_result_with_receipt_ref("eff-revoke", &steward_id_hex)];
+
+    sink.record_effects(
+        "gov:domain-b:prop-revoke-rref:receipt",
+        &effects,
+        &results,
+        1_700_010_001,
+    );
+
+    let ev = backend.evidence_for("prop-revoke-rref");
+    assert_eq!(ev.len(), 1);
+    assert_eq!(
+        ev[0].receipt_ref,
+        Some(steward_id_hex),
+        "RevokeSteward must forward the service-layer steward_id the revoke was routed through"
+    );
+    assert_eq!(ev[0].subsystem, "sdis");
+    assert!(ev[0].success);
+}
+
+/// Failure path: when the service produced no downstream handle
+/// (e.g. commons.register_steward failed, revoke hit an idempotent
+/// no-op with no active record), `receipt_ref` must remain `None` on
+/// the durable evidence row. No synthesis, no placeholders.
+#[tokio::test(flavor = "current_thread")]
+async fn failure_evidence_has_no_receipt_ref() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-fail-rref",
+        "coop",
+        None,
+        "appoint_steward",
+        Some("did:icn:steward-c".into()),
+        Some("region-c".into()),
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![sdis_approve_effect(&candidate, "prop-fail-rref")];
+    let results = vec![failure_result(
+        "eff-fail",
+        "commons.register_steward failed",
+    )];
+
+    sink.record_effects(
+        "gov:domain-c:prop-fail-rref:receipt",
+        &effects,
+        &results,
+        1_700_010_002,
+    );
+
+    let ev = backend.evidence_for("prop-fail-rref");
+    assert_eq!(ev.len(), 1);
+    assert_eq!(
+        ev[0].receipt_ref, None,
+        "failure paths must truthfully leave receipt_ref unset"
+    );
+    assert!(!ev[0].success);
+    assert_eq!(
+        ev[0].error_message.as_deref(),
+        Some("commons.register_steward failed"),
+        "error_message still carries the service-layer diagnostic"
+    );
 }
 
 /// Regression pin for the Phase-2 single-ownership decision.

@@ -169,6 +169,7 @@ impl KernelGovernanceExecutor {
                                 state_change_hash: None,
                                 ledger_entry_id: None,
                                 not_executed: false,
+                                receipt_ref: None,
                             });
                         }
                     }
@@ -229,6 +230,7 @@ impl KernelGovernanceExecutor {
                             state_change_hash: None,
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         });
                     }
                 };
@@ -243,6 +245,7 @@ impl KernelGovernanceExecutor {
                             state_change_hash: None,
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         });
                     }
                 };
@@ -266,6 +269,7 @@ impl KernelGovernanceExecutor {
                             state_change_hash: None,
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         });
                     }
                     Err(e) => {
@@ -281,6 +285,7 @@ impl KernelGovernanceExecutor {
                             state_change_hash: None,
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         });
                     }
                 }
@@ -399,6 +404,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             state_change_hash: None,
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         });
                     }
                 };
@@ -418,6 +424,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             state_change_hash: None,
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         });
                     }
                 };
@@ -460,6 +467,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             state_change_hash: None,
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         });
                     }
                     Err(EscrowReleaseError::AlreadyReleasedByOther {
@@ -481,6 +489,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             state_change_hash: None,
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         });
                     }
                     Err(EscrowReleaseError::Cancelled) => {
@@ -495,6 +504,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             state_change_hash: None,
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         });
                     }
                     Err(EscrowReleaseError::Failed {
@@ -518,6 +528,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             state_change_hash: None,
                             ledger_entry_id: None,
                             not_executed: false,
+                            receipt_ref: None,
                         });
                     }
                 }
@@ -611,6 +622,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     })
                 }
             }
@@ -641,6 +653,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                     state_change_hash: None,
                     ledger_entry_id: None,
                     not_executed: true,
+                    receipt_ref: None,
                 })
             }
             KernelEffect::Control(control_effect) => {
@@ -680,6 +693,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                     state_change_hash: None,
                     ledger_entry_id: None,
                     not_executed: false,
+                    receipt_ref: None,
                 })
             }
             KernelEffect::Resource(resource_effect) => {
@@ -714,6 +728,7 @@ impl KernelGovernanceExecutor {
                     state_change_hash: None,
                     ledger_entry_id: None,
                     not_executed: false,
+                    receipt_ref: None,
                 });
             }
         };
@@ -757,6 +772,7 @@ impl KernelGovernanceExecutor {
                         state_change_hash: Some(access_model_hash.clone()),
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     }),
                     Err(e) => Ok(EffectResult {
                         effect_id: decision_receipt_id.to_string(),
@@ -765,6 +781,7 @@ impl KernelGovernanceExecutor {
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     }),
                 }
             }
@@ -788,6 +805,7 @@ impl KernelGovernanceExecutor {
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     }),
                     Err(e) => Ok(EffectResult {
                         effect_id: decision_receipt_id.to_string(),
@@ -796,6 +814,7 @@ impl KernelGovernanceExecutor {
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     }),
                 }
             }
@@ -1644,6 +1663,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
                 state_change_hash,
                 ledger_entry_id,
                 not_executed: false,
+                receipt_ref: None,
             }
         }
         ExecutionOutcome::Failed { reason, .. } => EffectResult {
@@ -1653,6 +1673,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             state_change_hash: None,
             ledger_entry_id: None,
             not_executed: false,
+            receipt_ref: None,
         },
         ExecutionOutcome::Deferred { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
@@ -1661,6 +1682,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             state_change_hash: None,
             ledger_entry_id: None,
             not_executed: true,
+            receipt_ref: None,
         },
     }
 }
@@ -2134,6 +2156,7 @@ impl KernelSdisExecutor {
                 state_change_hash: None,
                 ledger_entry_id: None,
                 not_executed: false,
+                receipt_ref: None,
             });
         };
 
@@ -2159,6 +2182,7 @@ impl KernelSdisExecutor {
                 if result.success {
                     info!(
                         state_change_hash = %result.state_change_hash,
+                        receipt_ref = ?result.receipt_ref,
                         "Steward appointed with durable state"
                     );
                     Ok(EffectResult {
@@ -2171,6 +2195,7 @@ impl KernelSdisExecutor {
                         state_change_hash: Some(result.state_change_hash),
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: result.receipt_ref,
                     })
                 } else {
                     Ok(EffectResult {
@@ -2182,6 +2207,7 @@ impl KernelSdisExecutor {
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     })
                 }
             }
@@ -2197,6 +2223,7 @@ impl KernelSdisExecutor {
                 if result.success {
                     info!(
                         state_change_hash = %result.state_change_hash,
+                        receipt_ref = ?result.receipt_ref,
                         "Steward revoked with durable state"
                     );
                     Ok(EffectResult {
@@ -2209,6 +2236,7 @@ impl KernelSdisExecutor {
                         state_change_hash: Some(result.state_change_hash),
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: result.receipt_ref,
                     })
                 } else {
                     Ok(EffectResult {
@@ -2220,6 +2248,7 @@ impl KernelSdisExecutor {
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     })
                 }
             }
@@ -2237,6 +2266,7 @@ impl KernelSdisExecutor {
                 if result.success {
                     info!(
                         state_change_hash = %result.state_change_hash,
+                        receipt_ref = ?result.receipt_ref,
                         "Steward term extended with durable state"
                     );
                     Ok(EffectResult {
@@ -2249,6 +2279,7 @@ impl KernelSdisExecutor {
                         state_change_hash: Some(result.state_change_hash),
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: result.receipt_ref,
                     })
                 } else {
                     Ok(EffectResult {
@@ -2260,6 +2291,7 @@ impl KernelSdisExecutor {
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     })
                 }
             }
@@ -2306,6 +2338,7 @@ impl KernelSdisExecutor {
                         },
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     })
                 } else {
                     Ok(EffectResult {
@@ -2317,6 +2350,7 @@ impl KernelSdisExecutor {
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     })
                 }
             }
@@ -2351,6 +2385,7 @@ impl KernelSdisExecutor {
                         state_change_hash: Some(result.state_change_hash),
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     })
                 } else {
                     Ok(EffectResult {
@@ -2362,6 +2397,7 @@ impl KernelSdisExecutor {
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     })
                 }
             }
@@ -2398,6 +2434,7 @@ impl KernelSdisExecutor {
                         state_change_hash: Some(result.state_change_hash),
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     })
                 } else {
                     Ok(EffectResult {
@@ -2409,6 +2446,7 @@ impl KernelSdisExecutor {
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
+                        receipt_ref: None,
                     })
                 }
             }

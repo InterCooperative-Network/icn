@@ -528,6 +528,21 @@ pub struct EffectResult {
     /// execution failure at the decision level.
     #[serde(default)]
     pub not_executed: bool,
+    /// Opaque downstream identifier produced by the executing service, if any.
+    ///
+    /// Kernel-neutral: the kernel treats this as an opaque string — a content-addressed
+    /// record id, a ledger row handle, or whatever the executing service layer returned.
+    /// Populated by service implementations that have a real downstream handle to
+    /// expose (e.g. `SdisServiceImpl::appoint_steward` publishes the commons
+    /// `StewardId::to_hex()`). Left `None` when no such identifier exists
+    /// (failure paths, NoOp, effects whose services don't mint a handle).
+    ///
+    /// This field is what `GovernanceDispatchEvidenceSink` writes into
+    /// `EffectDispatchEvidence.receipt_ref`, so a richer service layer produces
+    /// a richer durable audit trail without any app-layer types crossing the
+    /// kernel boundary.
+    #[serde(default)]
+    pub receipt_ref: Option<String>,
 }
 
 impl EffectResult {
@@ -562,6 +577,11 @@ impl EffectResult {
             debug_assert!(
                 self.state_change_hash.is_none(),
                 "EffectResult: not_executed rows must not set state_change_hash (effect_id={})",
+                self.effect_id
+            );
+            debug_assert!(
+                self.receipt_ref.is_none(),
+                "EffectResult: not_executed rows must not set receipt_ref (effect_id={})",
                 self.effect_id
             );
         }
@@ -670,6 +690,7 @@ mod tests {
             state_change_hash: None,
             ledger_entry_id: None,
             not_executed: false,
+            receipt_ref: None,
         };
         assert!(hard.is_hard_failure());
         assert!(!hard.is_structurally_not_executed());
@@ -681,6 +702,7 @@ mod tests {
             state_change_hash: None,
             ledger_entry_id: None,
             not_executed: true,
+            receipt_ref: None,
         };
         assert!(!nx.is_hard_failure());
         assert!(nx.is_structurally_not_executed());
@@ -692,6 +714,7 @@ mod tests {
             state_change_hash: Some("h".into()),
             ledger_entry_id: Some("L1".into()),
             not_executed: false,
+            receipt_ref: None,
         };
         assert!(!ok.is_hard_failure());
         assert!(!ok.is_structurally_not_executed());
@@ -707,6 +730,7 @@ mod tests {
                 state_change_hash: None,
                 ledger_entry_id: None,
                 not_executed: true,
+                receipt_ref: None,
             },
             EffectResult {
                 effect_id: "b".into(),
@@ -715,6 +739,7 @@ mod tests {
                 state_change_hash: Some("x".into()),
                 ledger_entry_id: None,
                 not_executed: false,
+                receipt_ref: None,
             },
         ];
         for r in &rows {
@@ -934,6 +959,7 @@ mod tests {
                 state_change_hash: Some("statehash123".into()),
                 ledger_entry_id: Some("entry-123".into()),
                 not_executed: false,
+                receipt_ref: None,
             },
             EffectResult {
                 effect_id: "eff-2".into(),
@@ -942,6 +968,7 @@ mod tests {
                 state_change_hash: None,
                 ledger_entry_id: None,
                 not_executed: false,
+                receipt_ref: None,
             },
         ];
 
