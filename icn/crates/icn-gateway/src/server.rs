@@ -595,7 +595,9 @@ impl GatewayServer {
         // durably. Without this, the HTTP-close path was the sole writer and
         // force-close / deadline auto-close produced no institutional artifact.
         if let Some(ref actor_handle) = self.governance_actor_handle {
-            actor_handle.install_receipt_store(receipt_store.clone());
+            actor_handle
+                .install_receipt_store(receipt_store.clone())
+                .await;
             info!("Receipt store installed on governance actor (actor-path parity)");
         }
 

@@ -194,7 +194,7 @@ async fn actor_force_close_accept_emits_appoint_steward_effect() {
     // where the gateway opens its sled DB (and builds ReceiptStore) only
     // after the supervisor has already spawned the actor.
     let backend = Arc::new(MemoryReceiptBackend::new());
-    actor_handle.install_receipt_store(backend.clone());
+    actor_handle.install_receipt_store(backend.clone()).await;
 
     // Force-close accept. The normal close path would also emit, but the
     // specific regression this test pins is the actor-path force-close.
@@ -286,7 +286,7 @@ async fn actor_force_close_accept_emits_revoke_steward_effect() {
         .expect("open_proposal");
 
     let backend = Arc::new(MemoryReceiptBackend::new());
-    actor_handle.install_receipt_store(backend.clone());
+    actor_handle.install_receipt_store(backend.clone()).await;
 
     actor_handle
         .submit(GovernanceCommand::ForceCloseProposal {

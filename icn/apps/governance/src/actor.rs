@@ -548,11 +548,11 @@ impl GovernanceHandle {
     /// to the HTTP close handler's post-actor emission (which does not run
     /// for actor-only force-close). Wire this for any deployment where
     /// force-accept must produce the same audit trail as normal accept.
-    pub fn with_receipt_store(
+    pub async fn with_receipt_store(
         self,
         store: Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>,
     ) -> Self {
-        self.install_receipt_store(store);
+        self.install_receipt_store(store).await;
         self
     }
 
@@ -572,20 +572,19 @@ impl GovernanceHandle {
     /// `InstitutionalEffectRecord` in daemon deployments (the HTTP-close path
     /// remained the sole writer).
     ///
+    /// Awaits the inner write lock rather than using `try_write`: a transient
+    /// lock contention window (e.g. an in-flight `submit`) during gateway
+    /// startup must NOT silently drop the install and re-open the parity gap
+    /// the setter exists to close. `submit` only holds the lock for the
+    /// duration of a single command, so this await completes quickly.
+    ///
     /// Idempotent: repeat calls replace the previously-installed store.
-    pub fn install_receipt_store(
+    pub async fn install_receipt_store(
         &self,
         store: Arc<dyn crate::receipt_backend::GovernanceReceiptBackend>,
     ) {
-        if let Ok(mut actor) = self.inner.try_write() {
-            actor.receipt_store = Some(store);
-        } else {
-            tracing::error!(
-                "install_receipt_store: actor inner lock contended; receipt_store \
-                 not installed. Actor-backed force-close will not emit \
-                 InstitutionalEffectRecord until this is retried."
-            );
-        }
+        let mut actor = self.inner.write().await;
+        actor.receipt_store = Some(store);
     }
 
     /// List all protocol parameters
