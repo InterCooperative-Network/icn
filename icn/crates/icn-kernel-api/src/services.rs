@@ -2319,18 +2319,30 @@ pub struct SanctionStewardRequest {
 /// Result of a sanction-steward operation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SanctionStewardResult {
+    /// `true` only when every requested mutation committed. On partial
+    /// mutation (bond slashed, suspend failed) this is `false` but
+    /// `state_change_hash` and `receipt_ref` are still populated because
+    /// commons state really did change.
     pub success: bool,
-    /// Remaining bond after slash; 0 on failure.
+    /// Remaining bond after slash. Populated whenever the slash committed,
+    /// even if a subsequent suspend failed; `0` only when the slash never
+    /// ran (pre-slash failure path).
     pub remaining_bond: u64,
-    /// Whether the steward was also suspended.
+    /// Whether the steward was also suspended. `false` on partial mutation
+    /// where slash committed but suspend failed.
     pub suspended: bool,
-    /// Stable hash of the state change (for audit); empty on failure.
+    /// Stable hash of the durable state change (for audit). Empty only on
+    /// pre-slash failure where no mutation occurred; populated on full
+    /// success AND on partial mutation (the slash is itself a durable
+    /// change).
     pub state_change_hash: String,
     pub error: Option<String>,
     /// Downstream identifier for the sanctioned steward record (commons
     /// `StewardId::to_hex()` the slash — and optional suspend — were
     /// routed through). See [`AppointStewardResult::receipt_ref`] for
-    /// semantics. `None` on failure (no record, commons error).
+    /// semantics. `Some` whenever any commons mutation committed
+    /// (full success OR partial mutation); `None` only on pre-slash
+    /// failure (lookup/DID error) where no mutation occurred.
     #[serde(default)]
     pub receipt_ref: Option<String>,
 }

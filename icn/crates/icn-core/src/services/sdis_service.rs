@@ -461,83 +461,132 @@ impl SdisService for SdisServiceImpl {
         let steward_did = icn_identity::Did::from_str(&request.steward_did)
             .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
 
-        let result = tokio::task::block_in_place(|| {
+        // Sanction is a two-step mutation: (1) slash_steward_bond, then optionally
+        // (2) suspend_steward. Step 1 is irreversible once committed. If step 2
+        // fails after step 1 has persisted, we MUST preserve the downstream handle
+        // (receipt_ref) and state_change_hash — otherwise dispatch evidence would
+        // hide a real commons mutation behind `success=false, receipt_ref=None`.
+        //
+        // We therefore split the async sequence so the pre-slash failure path and
+        // the post-slash partial-failure path are distinguishable to the caller.
+        let pre_slash = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                let record = match self.commons.get_steward_by_did(&steward_did).await {
-                    Ok(Some(r)) => r,
-                    Ok(None) => {
-                        return Err(anyhow::anyhow!(
+                let record = self
+                    .commons
+                    .get_steward_by_did(&steward_did)
+                    .await?
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
                             "Steward '{}' not found — cannot sanction",
                             request.steward_did
-                        ))
-                    }
-                    Err(e) => return Err(e),
-                };
+                        )
+                    })?;
                 let steward_id = record.id().to_hex();
-
-                // Slash bond
                 let remaining = self
                     .commons
                     .slash_steward_bond(&steward_id, request.bond_slash_amount)
                     .await?;
-
-                // Optionally suspend
-                let suspended = if !request.suspend_reason.is_empty() {
-                    self.commons
-                        .suspend_steward(&steward_id, request.suspend_reason.clone())
-                        .await?;
-                    true
-                } else {
-                    false
-                };
-
-                Ok((steward_id, remaining, suspended))
+                Ok::<_, anyhow::Error>((steward_id, remaining))
             })
         });
 
-        match result {
-            Ok((steward_id, remaining_bond, suspended)) => {
-                let mut hasher = Sha256::new();
-                hasher.update(b"sdis:sanction:");
-                hasher.update(request.steward_did.as_bytes());
-                hasher.update(b":");
-                hasher.update(request.proposal_id.as_bytes());
-                hasher.update(b":");
-                hasher.update(request.bond_slash_amount.to_le_bytes());
-                let state_change_hash = format!("{:x}", hasher.finalize());
-
-                info!(
-                    steward_did = %request.steward_did,
-                    remaining_bond = %remaining_bond,
-                    suspended = %suspended,
-                    state_change_hash = %state_change_hash,
-                    receipt_ref = %steward_id,
-                    "Steward sanctioned (bond slashed) in commons"
-                );
-                Ok(SanctionStewardResult {
-                    success: true,
-                    remaining_bond,
-                    suspended,
-                    state_change_hash,
-                    error: None,
-                    receipt_ref: Some(steward_id),
-                })
-            }
+        let (steward_id, remaining_bond) = match pre_slash {
+            Ok(pair) => pair,
             Err(e) => {
                 warn!(
                     steward_did = %request.steward_did,
                     error = %e,
-                    "Failed to sanction steward in commons"
+                    "Failed to sanction steward (pre-slash); no durable mutation"
                 );
-                Ok(SanctionStewardResult {
+                return Ok(SanctionStewardResult {
                     success: false,
                     remaining_bond: 0,
                     suspended: false,
                     state_change_hash: String::new(),
                     error: Some(e.to_string()),
                     receipt_ref: None,
-                })
+                });
             }
+        };
+
+        // Bond slash committed; compute state_change_hash once. From here on,
+        // receipt_ref and state_change_hash MUST be preserved in every return
+        // path because commons state has already changed durably.
+        let mut hasher = Sha256::new();
+        hasher.update(b"sdis:sanction:");
+        hasher.update(request.steward_did.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.proposal_id.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.bond_slash_amount.to_le_bytes());
+        let state_change_hash = format!("{:x}", hasher.finalize());
+
+        // Step 2: optional suspend. Any failure here is a partial mutation.
+        if !request.suspend_reason.is_empty() {
+            let suspend_res = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    self.commons
+                        .suspend_steward(&steward_id, request.suspend_reason.clone())
+                        .await
+                })
+            });
+            match suspend_res {
+                Ok(()) => {
+                    info!(
+                        steward_did = %request.steward_did,
+                        remaining_bond = %remaining_bond,
+                        suspended = true,
+                        state_change_hash = %state_change_hash,
+                        receipt_ref = %steward_id,
+                        "Steward sanctioned (bond slashed + suspended) in commons"
+                    );
+                    Ok(SanctionStewardResult {
+                        success: true,
+                        remaining_bond,
+                        suspended: true,
+                        state_change_hash,
+                        error: None,
+                        receipt_ref: Some(steward_id),
+                    })
+                }
+                Err(e) => {
+                    // Partial mutation: slash persisted, suspend failed.
+                    // Preserve receipt_ref + state_change_hash for honest audit.
+                    warn!(
+                        steward_did = %request.steward_did,
+                        remaining_bond = %remaining_bond,
+                        error = %e,
+                        state_change_hash = %state_change_hash,
+                        receipt_ref = %steward_id,
+                        "Sanction partially applied: bond slashed, suspend failed; preserving receipt_ref"
+                    );
+                    Ok(SanctionStewardResult {
+                        success: false,
+                        remaining_bond,
+                        suspended: false,
+                        state_change_hash,
+                        error: Some(format!("bond slashed but suspend failed: {e}")),
+                        receipt_ref: Some(steward_id),
+                    })
+                }
+            }
+        } else {
+            info!(
+                steward_did = %request.steward_did,
+                remaining_bond = %remaining_bond,
+                suspended = false,
+                state_change_hash = %state_change_hash,
+                receipt_ref = %steward_id,
+                "Steward sanctioned (bond slashed) in commons"
+            );
+            Ok(SanctionStewardResult {
+                success: true,
+                remaining_bond,
+                suspended: false,
+                state_change_hash,
+                error: None,
+                receipt_ref: Some(steward_id),
+            })
         }
     }
 }
@@ -1283,6 +1332,9 @@ mod tests {
     /// receipt_ref must remain None.
     #[tokio::test(flavor = "multi_thread")]
     async fn test_sanction_steward_fails_for_unknown_did() {
+        // Pre-slash failure path: lookup fails, so no commons mutation occurs.
+        // receipt_ref and state_change_hash must both be empty/None — this is
+        // the ONLY sanction failure path where dropping attribution is honest.
         let (svc, _commons) = make_service_with_commons();
         let unknown = test_did(96);
         let req = SanctionStewardRequest {
@@ -1297,15 +1349,46 @@ mod tests {
         assert!(result.error.is_some());
         assert_eq!(
             result.remaining_bond, 0,
-            "failure must not leak a nonzero remaining_bond"
+            "pre-slash failure must not leak a nonzero remaining_bond"
         );
         assert!(
             result.state_change_hash.is_empty(),
-            "failure must leave state_change_hash empty"
+            "pre-slash failure must leave state_change_hash empty"
         );
         assert_eq!(
             result.receipt_ref, None,
-            "no commons record → receipt_ref must remain None on failure"
+            "no commons mutation occurred → receipt_ref must remain None"
         );
+    }
+
+    /// Pins the partial-mutation DTO contract for `sanction_steward`.
+    ///
+    /// A real slash-then-suspend partial failure requires injecting a commons
+    /// storage fault between step 1 (slash, irreversible) and step 2 (suspend).
+    /// `icn-commons` does not currently expose a fault-injection seam, so we
+    /// pin the contract at the DTO level: a partial-mutation result MUST carry
+    /// both `receipt_ref = Some(_)` and a non-empty `state_change_hash` even
+    /// when `success == false`. Dropping attribution would hide a real durable
+    /// commons mutation behind a "nothing happened" evidence row.
+    #[test]
+    fn sanction_partial_mutation_dto_contract() {
+        let partial = SanctionStewardResult {
+            success: false,
+            remaining_bond: 250,
+            suspended: false,
+            state_change_hash: "abc123".to_string(),
+            error: Some("bond slashed but suspend failed: storage i/o".to_string()),
+            receipt_ref: Some("deadbeef".to_string()),
+        };
+        assert!(!partial.success);
+        assert!(
+            partial.receipt_ref.is_some(),
+            "partial mutation must preserve receipt_ref"
+        );
+        assert!(
+            !partial.state_change_hash.is_empty(),
+            "partial mutation must preserve state_change_hash (slash really happened)"
+        );
+        assert!(partial.error.is_some());
     }
 }
