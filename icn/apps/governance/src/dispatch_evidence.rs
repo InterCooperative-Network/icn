@@ -18,6 +18,7 @@
 //! effects will remain `emitted_only` until their surfaces are upgraded.
 //! This module does not pretend otherwise.
 
+use icn_kernel_api::EffectOutcome;
 use serde::{Deserialize, Serialize};
 
 use crate::institutional_effect::InstitutionalEffectRecord;
@@ -60,18 +61,45 @@ pub struct EffectDispatchEvidence {
     /// Error message surfaced by the subsystem on failure.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+    /// Explicit structural outcome class — see [`EffectOutcome`].
+    ///
+    /// Complements `success` + `receipt_ref` + `state_change_hash`-derived
+    /// signals that previously forced auditors to infer semantics from
+    /// field combinations. A value of `None` means the evidence pre-dates
+    /// the outcome seam or the service-layer didn't classify — this is
+    /// intentionally distinct from `Some(Applied)` so stale data is
+    /// visibly unclassified rather than silently misclassified.
+    ///
+    /// When `Some`, the mapping to the other fields is contractually:
+    /// - [`EffectOutcome::Applied`]: `success = true`, real mutation;
+    ///   `receipt_ref` populated when a downstream handle exists.
+    /// - [`EffectOutcome::NoOp`]: `success = true`, no mutation.
+    ///   `receipt_ref` may be `None` or `Some` depending on whether the
+    ///   service reached a durable record at all.
+    /// - [`EffectOutcome::Partial`]: `success = false`, but a real
+    ///   mutation did commit before a later step failed; `receipt_ref`
+    ///   MUST be preserved.
+    /// - [`EffectOutcome::Failed`]: `success = false`, no mutation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<EffectOutcome>,
     /// Unix seconds when this evidence was persisted.
     pub recorded_at: u64,
 }
 
 impl EffectDispatchEvidence {
-    pub fn new(
+    /// Construct evidence with explicit outcome classification.
+    ///
+    /// Prefer this over [`Self::new`] so the outcome field carries truthful
+    /// semantics rather than defaulting to `None`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_outcome(
         effect_record_id: impl Into<String>,
         proposal_id: impl Into<String>,
         subsystem: impl Into<String>,
         receipt_ref: Option<String>,
         success: bool,
         error_message: Option<String>,
+        outcome: Option<EffectOutcome>,
         recorded_at: u64,
     ) -> Self {
         Self {
@@ -82,8 +110,32 @@ impl EffectDispatchEvidence {
             receipt_ref,
             success,
             error_message,
+            outcome,
             recorded_at,
         }
+    }
+
+    /// Legacy constructor — leaves `outcome` unclassified (`None`). Prefer
+    /// [`Self::new_with_outcome`] in new code so audit rows are self-describing.
+    pub fn new(
+        effect_record_id: impl Into<String>,
+        proposal_id: impl Into<String>,
+        subsystem: impl Into<String>,
+        receipt_ref: Option<String>,
+        success: bool,
+        error_message: Option<String>,
+        recorded_at: u64,
+    ) -> Self {
+        Self::new_with_outcome(
+            effect_record_id,
+            proposal_id,
+            subsystem,
+            receipt_ref,
+            success,
+            error_message,
+            None,
+            recorded_at,
+        )
     }
 }
 

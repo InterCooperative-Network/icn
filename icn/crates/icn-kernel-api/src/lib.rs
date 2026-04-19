@@ -82,9 +82,9 @@ pub use container::{
 pub use coord::Coordination;
 pub use economics::{AssetType, DepreciationSchedule, SettlementIntent};
 pub use effects::{
-    kernel_effect_subsystem, ControlEffect, DispatchEvidenceSink, DisputeEffect, EffectResult,
-    FederationEffect, KernelEffect, MembershipEffect, ProtocolEffect, ResourceEffect, SdisEffect,
-    TreasuryEffect,
+    kernel_effect_subsystem, ControlEffect, DispatchEvidenceSink, DisputeEffect, EffectOutcome,
+    EffectResult, FederationEffect, KernelEffect, MembershipEffect, ProtocolEffect, ResourceEffect,
+    SdisEffect, TreasuryEffect,
 };
 pub use error::{ErrCode, IcnError};
 pub use escrow::{

@@ -126,7 +126,7 @@ impl GovernanceDispatchEvidenceSink {
         } else {
             Some(result.message.clone())
         };
-        let evidence = EffectDispatchEvidence::new(
+        let evidence = EffectDispatchEvidence::new_with_outcome(
             effect_record_id.to_string(),
             proposal_id.to_string(),
             subsystem,
@@ -141,6 +141,12 @@ impl GovernanceDispatchEvidenceSink {
             result.receipt_ref.clone(),
             result.success,
             error_message,
+            // Explicit outcome class — forwarded verbatim from the service
+            // layer. `None` when the service didn't classify (non-SDIS
+            // effects today); classified rows let auditors distinguish
+            // applied / no_op / partial / failed without inferring from
+            // success + receipt_ref + state_change_hash combinations.
+            result.outcome,
             recorded_at,
         );
 
