@@ -157,6 +157,17 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// re-write as idempotent. Default impl is a no-op so downstream
     /// backends can opt in without breaking.
     ///
+    /// **Seam contract:** because the defaulted no-op returns `Ok(())`
+    /// without actually storing anything, the ADR-0014 mandate seam in
+    /// [`crate::grant_minting::mint_and_persist_for_accepted`] verifies
+    /// each write with a follow-up [`Self::get_authority_grant`] call.
+    /// Backends that opt into grant storage **must override both**
+    /// `put_authority_grant` and `get_authority_grant` so the
+    /// read-after-write check round-trips; otherwise the seam treats
+    /// the grant as unpersisted and the mandate falls back to
+    /// pending-grants semantics rather than referencing a grant ID that
+    /// cannot be retrieved.
+    ///
     /// **Override status (ADR-0014 bootstrap):** The in-memory test
     /// backend overrides. The production sled-backed
     /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore) does

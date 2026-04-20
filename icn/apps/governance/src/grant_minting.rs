@@ -135,14 +135,37 @@ pub fn mint_and_persist_for_accepted(
     let grants = derive_grants_for_accepted_proposal(payload, domain_id, &decision_prov, now);
     let grant_ids: Vec<_> = grants.iter().map(|g| g.id.clone()).collect();
 
-    // Persist grants **before** the mandate. If a grant write fails we
-    // log and continue — the mandate is still recorded, but with
-    // `has_no_grants()` semantics because the authorization binding did
-    // not land durably.
+    // Persist grants **before** the mandate, then verify each write via
+    // read-after-write. The defaulted-no-op `put_authority_grant`
+    // returns `Ok(())` without storing anything; a backend that opts
+    // into grant persistence must also override `get_authority_grant`.
+    // If the read does not round-trip the grant, the backend does not
+    // actually durably store grants — we must treat that grant as
+    // unpersisted so the mandate falls back to `new_pending_grants`
+    // rather than constructing a strict mandate referencing IDs that
+    // cannot be retrieved. This is the smallest honest way to keep the
+    // seam truthful without widening the trait surface.
     let mut persisted_grants: Vec<AuthorityGrant> = Vec::new();
     for grant in &grants {
         match backend.put_authority_grant(grant) {
-            Ok(()) => persisted_grants.push(grant.clone()),
+            Ok(()) => match backend.get_authority_grant(&grant.id) {
+                Ok(Some(_)) => persisted_grants.push(grant.clone()),
+                Ok(None) => {
+                    tracing::warn!(
+                        proposal_id = %proposal_id,
+                        grant_id = %grant.id,
+                        "Backend does not durably persist authority grants (read-after-write returned None); mandate will fall back to pending-grants"
+                    );
+                }
+                Err(e) => {
+                    tracing::error!(
+                        proposal_id = %proposal_id,
+                        grant_id = %grant.id,
+                        error = %e,
+                        "Read-after-write verification failed for authority grant; treating as unpersisted"
+                    );
+                }
+            },
             Err(e) => {
                 tracing::error!(
                     proposal_id = %proposal_id,
@@ -232,7 +255,21 @@ fn derive_sdis_grants(
             term_length,
             ..
         } => {
-            let valid_until = now.checked_add(*term_length);
+            // Overflow must fail closed: an overflowed `now + term_length`
+            // previously fell through to `valid_until: None`, which the
+            // grant model interprets as unbounded authority. A steward
+            // term cannot silently become permanent because of arithmetic
+            // overflow. Decline to mint; the caller records a
+            // pending-grants mandate instead.
+            let Some(valid_until) = now.checked_add(*term_length) else {
+                tracing::error!(
+                    grantee = ?candidate,
+                    now,
+                    term_length,
+                    "AppointSteward term_length overflow; declining to mint grant (would be unbounded)"
+                );
+                return Vec::new();
+            };
             let scope = TypedScope {
                 domain: Some(domain_id.clone()),
                 proposal_class: vec!["Sdis".into()],
@@ -246,7 +283,7 @@ fn derive_sdis_grants(
                 scope,
                 granted_by: Some(decision.clone()),
                 valid_from: now,
-                valid_until,
+                valid_until: Some(valid_until),
                 revoked_at: None,
             }]
         }
@@ -416,6 +453,185 @@ mod tests {
         };
         let grants = derive_grants_for_accepted_proposal(&payload, &domain(), &decision(), 100);
         assert!(grants.is_empty());
+    }
+
+    #[test]
+    fn appoint_steward_term_length_overflow_declines_to_mint() {
+        // u64::MAX term_length with a nonzero `now` overflows
+        // `now.checked_add(term_length)`. Before this hardening, that
+        // silently produced `valid_until: None` — an effectively
+        // unbounded grant. The seam must decline instead.
+        let payload = ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate: did(9),
+                sponsors: vec![did(1)],
+                region: "nyc".into(),
+                bond_amount: 100,
+                term_length: u64::MAX,
+            },
+        };
+        let grants = derive_grants_for_accepted_proposal(
+            &payload,
+            &domain(),
+            &decision(),
+            1_000, // now is nonzero → now + u64::MAX overflows
+        );
+        assert!(
+            grants.is_empty(),
+            "overflowed term_length must not mint a grant (would be unbounded); got {grants:?}"
+        );
+    }
+
+    /// Backend that tracks mandates but leaves grant storage at its
+    /// defaulted no-op — i.e. `put_authority_grant` returns `Ok(())`
+    /// without storing, and `get_authority_grant` returns `Ok(None)`.
+    /// Mirrors the real sled backend's current bootstrap posture.
+    struct MandateOnlyBackend {
+        mandates: std::sync::Mutex<Vec<Mandate>>,
+    }
+
+    impl MandateOnlyBackend {
+        fn new() -> Self {
+            Self {
+                mandates: std::sync::Mutex::new(vec![]),
+            }
+        }
+    }
+
+    impl GovernanceReceiptBackend for MandateOnlyBackend {
+        fn put_governance(
+            &self,
+            _: &icn_governance::GovernanceDecisionReceipt,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+        fn get_governance_by_proposal(
+            &self,
+            _: &str,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn put_allocation(
+            &self,
+            _: &icn_kernel_api::AllocationReceipt,
+        ) -> Result<icn_kernel_api::Hash, String> {
+            Ok([0u8; 32])
+        }
+        fn get_governance_by_decision(
+            &self,
+            _: &icn_kernel_api::Hash,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn list_allocations_by_decision(
+            &self,
+            _: &icn_kernel_api::Hash,
+        ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
+            Ok(vec![])
+        }
+        fn put_mandate(&self, mandate: &Mandate) -> Result<(), String> {
+            self.mandates.lock().unwrap().push(mandate.clone());
+            Ok(())
+        }
+        fn get_mandate_by_proposal(&self, proposal_id: &str) -> Result<Option<Mandate>, String> {
+            Ok(self
+                .mandates
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|m| m.decision.proposal_id == proposal_id)
+                .cloned())
+        }
+        // `put_authority_grant` and `get_authority_grant` intentionally
+        // left at their defaulted no-ops to simulate an unsupported
+        // grant-storage backend.
+    }
+
+    #[test]
+    fn no_op_grant_backend_falls_back_to_pending_grants_mandate() {
+        // AppointSteward would normally mint a grant. But if the
+        // backend's `put_authority_grant` is the defaulted no-op and
+        // `get_authority_grant` returns None, the read-after-write
+        // check must fail the grant, and the mandate must fall back to
+        // `new_pending_grants` rather than referencing a non-durable
+        // grant ID.
+        let backend = MandateOnlyBackend::new();
+        let payload = ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate: did(9),
+                sponsors: vec![did(1)],
+                region: "nyc".into(),
+                bond_amount: 100,
+                term_length: 3_600,
+            },
+        };
+
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-no-op-grant",
+            &domain(),
+            [9u8; 32],
+            &payload,
+            1_000,
+        )
+        .expect("mint");
+
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => {
+                assert_eq!(
+                    grants_persisted, 0,
+                    "no-op grant backend must report zero grants persisted"
+                );
+            }
+            other => panic!("expected Minted; got {other:?}"),
+        }
+
+        let mandates = backend.mandates.lock().unwrap().clone();
+        assert_eq!(mandates.len(), 1, "mandate must still be recorded");
+        assert!(
+            mandates[0].has_no_grants(),
+            "mandate must fall back to pending-grants when grant durability unsupported"
+        );
+    }
+
+    #[test]
+    fn overflow_and_no_op_backend_compose_to_pending_grants() {
+        // Defensive: both failure modes at once (overflowed term_length
+        // on a backend that doesn't store grants) must still produce a
+        // pending-grants mandate, not a strict mandate with fake IDs.
+        let backend = MandateOnlyBackend::new();
+        let payload = ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate: did(9),
+                sponsors: vec![did(1)],
+                region: "nyc".into(),
+                bond_amount: 100,
+                term_length: u64::MAX,
+            },
+        };
+
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-overflow",
+            &domain(),
+            [3u8; 32],
+            &payload,
+            1_000,
+        )
+        .expect("mint");
+
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(grants_persisted, 0),
+            other => panic!("expected Minted; got {other:?}"),
+        }
+
+        let mandates = backend.mandates.lock().unwrap().clone();
+        assert_eq!(mandates.len(), 1);
+        assert!(mandates[0].has_no_grants());
     }
 
     #[test]
