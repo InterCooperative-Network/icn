@@ -2096,19 +2096,25 @@ impl GovernanceActor {
                 // AlreadyEmitted rather than duplicate. When no receipt store
                 // is wired, emission is a no-op and the HTTP handler remains
                 // the sole writer.
+                //
+                // ADR-0014 constitutional-memory seam: mandate + narrow
+                // authority grants are minted through the shared helper
+                // so this actor path produces the same constitutional
+                // artifacts as the standalone `close_proposal_inner`.
+                // Idempotent on `proposal_id` via `get_mandate_by_proposal`.
                 if matches!(outcome_result, DecisionOutcome::Accepted) {
                     if let Some(ref store) = self.receipt_store {
-                        let decision_hash_bytes: Option<icn_kernel_api::receipts::Hash> = {
-                            use icn_governance::proof::ProofOutcome;
-                            let receipt = GovernanceDecisionReceipt::new(
-                                proposal_id.0.clone(),
-                                proposal.domain_id.0.clone(),
-                                ProofOutcome::Accepted,
-                                tally.clone(),
-                                &votes,
-                            );
-                            Some(receipt.decision_hash)
-                        };
+                        use icn_governance::proof::ProofOutcome;
+                        let gate_receipt = GovernanceDecisionReceipt::new(
+                            proposal_id.0.clone(),
+                            proposal.domain_id.0.clone(),
+                            ProofOutcome::Accepted,
+                            tally.clone(),
+                            &votes,
+                        );
+                        let decision_hash = gate_receipt.decision_hash;
+                        let decision_hash_bytes: Option<icn_kernel_api::receipts::Hash> =
+                            Some(decision_hash);
                         match crate::institutional_effect::emit_accepted_effect(
                             store.as_ref(),
                             &proposal_id.0,
@@ -2133,6 +2139,49 @@ impl GovernanceActor {
                                     proposal_id = %proposal_id.0,
                                     error = %e,
                                     "Actor failed to emit InstitutionalEffectRecord (non-fatal)"
+                                );
+                            }
+                        }
+
+                        match crate::grant_minting::mint_and_persist_for_accepted(
+                            store.as_ref(),
+                            &proposal_id.0,
+                            &proposal.domain_id,
+                            decision_hash,
+                            &proposal.payload,
+                            now,
+                        ) {
+                            Ok(crate::grant_minting::MandateMintOutcome::Minted {
+                                mandate_id,
+                                grants_persisted,
+                            }) => {
+                                debug!(
+                                    proposal_id = %proposal_id.0,
+                                    %mandate_id,
+                                    grants_persisted,
+                                    "Actor minted ADR-0014 mandate"
+                                );
+                            }
+                            Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted {
+                                mandate_id,
+                            }) => {
+                                debug!(
+                                    proposal_id = %proposal_id.0,
+                                    %mandate_id,
+                                    "Actor: ADR-0014 mandate already present; idempotent no-op"
+                                );
+                            }
+                            Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
+                                error!(
+                                    proposal_id = %proposal_id.0,
+                                    "Actor failed to hash payload for mandate — declining to mint"
+                                );
+                            }
+                            Err(e) => {
+                                error!(
+                                    proposal_id = %proposal_id.0,
+                                    error = %e,
+                                    "Actor failed to persist ADR-0014 mandate (non-fatal)"
                                 );
                             }
                         }

@@ -261,13 +261,18 @@ mod tests {
     /// - server.rs: +1 scoped `use icn_governance::{MembershipResolver, TrustServiceMembershipResolver}`
     ///   for TrustThreshold membership resolver wiring at proposal close time (#1500)
     /// - icn-gateway: 12
+    ///
+    /// Current state (2026-04-20, ADR-0014 durable Mandate+AuthorityGrant storage):
+    /// - receipt_store.rs: +5 `use icn_governance::{Mandate, MandateId, AuthorityGrant,
+    ///   AuthorityGrantId, ...}` for sled-backed ADR-0014 authorization-side storage (#1575)
+    /// - icn-gateway: 17
     #[test]
     fn strict_governance_import_violations() {
         let expected: &[(&str, usize)] = &[
             ("icn-net", 0),      // CLEAN ✅
             ("icn-gossip", 0),   // CLEAN ✅
             ("icn-ledger", 0),   // CLEAN ✅
-            ("icn-gateway", 12), // +1 TrustServiceMembershipResolver wiring in server.rs (#1500)
+            ("icn-gateway", 17), // +5 ADR-0014 Mandate/AuthorityGrant storage in receipt_store.rs (#1575)
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -324,9 +329,16 @@ mod tests {
     ///   for TrustThreshold membership resolver wiring at proposal close time (#1500)
     ///   TrustManagerMembershipResolver removed from trust_mgr.rs (moved to tests/ only)
     /// - Hard residue: 16
+    ///
+    /// Current state (2026-04-20, ADR-0014 durable Mandate+AuthorityGrant storage):
+    /// - receipt_store.rs: +6 references for sled-backed ADR-0014 authorization-side storage —
+    ///   Mandate, MandateId, AuthorityGrant, AuthorityGrantId primary + secondary index writes
+    ///   plus atomic put_mandate_with_grants_atomic transaction (#1575). These are durable
+    ///   governance artifacts; extraction to gateway DTOs would duplicate the canonical types.
+    /// - Hard residue: 22
     #[test]
     fn strict_gateway_governance_total_refs() {
-        let expected: usize = 16; // +1 TrustServiceMembershipResolver wiring in server.rs (#1500)
+        let expected: usize = 22; // +6 ADR-0014 Mandate/AuthorityGrant storage in receipt_store.rs (#1575)
         let actual = count_imports_in_crate("icn-gateway", "icn_governance::");
 
         assert!(
