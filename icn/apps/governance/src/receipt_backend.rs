@@ -1,7 +1,7 @@
 //! Abstraction over gateway's ReceiptStore so GovernanceManager can live
 //! in this crate without a circular dependency on icn-gateway.
 
-use icn_governance::{GovernanceDecisionReceipt, Mandate};
+use icn_governance::{AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt, Mandate};
 use icn_kernel_api::{AllocationReceipt, Hash};
 
 use crate::dispatch_evidence::EffectDispatchEvidence;
@@ -140,6 +140,51 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// [`Self::list_allocations_by_decision`] and to permit future
     /// multi-mandate decisions without a migration.
     fn list_mandates_by_decision(&self, _decision_hash: &Hash) -> Result<Vec<Mandate>, String> {
+        Ok(vec![])
+    }
+
+    /// Persist an [`AuthorityGrant`] minted at proposal acceptance time.
+    ///
+    /// Grants are derived by [`crate::grant_minting`] from a narrow,
+    /// truthful subset of accepted proposal classes (today:
+    /// steward-appointment and steward-reconfirmation). The grant sits
+    /// on the **authorization** side of the chain, composed into the
+    /// [`Mandate`] that records the underlying decision's bounded
+    /// authority. It is **distinct from** downstream evidence records
+    /// ([`InstitutionalEffectRecord`], [`EffectDispatchEvidence`]).
+    ///
+    /// Append-only; implementations treat a same-[`AuthorityGrantId`]
+    /// re-write as idempotent. Default impl is a no-op so downstream
+    /// backends can opt in without breaking.
+    ///
+    /// **Override status (ADR-0014 bootstrap):** The in-memory test
+    /// backend overrides. The production sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore) does
+    /// **not** yet override — a follow-up tranche is required to add
+    /// sled column families for grant storage, in the same way mandate
+    /// storage is deferred. Operators that need durable grant records
+    /// today must provide their own overriding backend.
+    fn put_authority_grant(&self, _grant: &AuthorityGrant) -> Result<(), String> {
+        Ok(())
+    }
+
+    /// Retrieve an [`AuthorityGrant`] by its stable identifier, if any.
+    fn get_authority_grant(
+        &self,
+        _grant_id: &AuthorityGrantId,
+    ) -> Result<Option<AuthorityGrant>, String> {
+        Ok(None)
+    }
+
+    /// Retrieve all [`AuthorityGrant`]s whose `granted_by` provenance
+    /// matches the given decision hash, oldest-first by `valid_from`.
+    ///
+    /// Returns `Ok(vec![])` when no grants exist or when the backend
+    /// does not implement grant storage (default).
+    fn list_authority_grants_by_decision(
+        &self,
+        _decision_hash: &Hash,
+    ) -> Result<Vec<AuthorityGrant>, String> {
         Ok(vec![])
     }
 }

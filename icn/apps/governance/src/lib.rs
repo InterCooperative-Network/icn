@@ -29,6 +29,7 @@ pub mod dispatch_evidence;
 pub mod dispatch_evidence_sink;
 pub mod events;
 pub mod executor;
+pub mod grant_minting;
 pub mod handlers;
 pub mod http;
 pub mod init;

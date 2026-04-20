@@ -1,0 +1,298 @@
+//! ADR-0014 AuthorityGrant minting at the accepted-decision seam.
+//!
+//! This module derives zero or more [`AuthorityGrant`]s from an accepted
+//! proposal. It is deliberately **narrow and truthful**:
+//!
+//! - It mints a grant **only** for proposal classes whose payload
+//!   already names the grantee, the class of authority, and a truthful
+//!   time bound. If a payload does not carry that information, we
+//!   return an empty `Vec` — no grant is better than a fabricated one.
+//! - The grantor is always the sovereign entity behind the accepted
+//!   decision (the governance domain the proposal was decided in). The
+//!   platform, the runtime, the gateway, and any shared service are
+//!   never grantors here.
+//! - Scope is populated **only** with categories that can be honestly
+//!   derived from the payload. No invented action kinds, no invented
+//!   ceilings, no invented durations.
+//! - This module does not gate dispatch, authorize executors, or
+//!   change effect semantics. It only produces records.
+//!
+//! # Bootstrap posture
+//!
+//! Today the only classes that mint grants are steward-appointment and
+//! steward-reconfirmation proposals: those are the narrowest cases
+//! where the accepted payload unambiguously names a grantee, a term
+//! length, and a class (Attestation — stewards issue attestations).
+//! Every other accepted proposal currently produces zero grants, and
+//! its mandate is recorded via [`crate::manager`] using the
+//! bootstrap-phase `new_pending_grants` constructor. Expanding this
+//! set is explicit future work; silently broadening it would be the
+//! kind of "mint default grants" move the ADR specifically forbids.
+//!
+//! # Distinctness
+//!
+//! `AuthorityGrant` lives on the *authorization* side of the chain:
+//!
+//! ```text
+//!     Charter → Decision → Mandate [ + Grants ] → Action → Receipt → Evidence
+//! ```
+//!
+//! It is **not** a replacement for `InstitutionalEffectRecord` or
+//! `EffectDispatchEvidence`; those record downstream execution and
+//! evidence, which is a separate layer.
+
+use icn_governance::{
+    AuthorityClass, AuthorityGrant, AuthorityGrantId, DecisionProvenance, GovernanceDomainId,
+    Grantee, GrantorEntityId, ProposalPayload, Timestamp, TypedScope,
+};
+
+/// Derive zero or more [`AuthorityGrant`]s from an accepted proposal.
+///
+/// Returns an empty vector for payloads that cannot truthfully be
+/// translated into bounded grants today. Callers **must not** treat
+/// the empty case as an error — it is the correct behavior for the
+/// vast majority of proposal classes in this bootstrap tranche.
+pub(crate) fn derive_grants_for_accepted_proposal(
+    payload: &ProposalPayload,
+    domain_id: &GovernanceDomainId,
+    decision: &DecisionProvenance,
+    now: Timestamp,
+) -> Vec<AuthorityGrant> {
+    match payload {
+        ProposalPayload::Sdis { proposal } => {
+            derive_sdis_grants(proposal, domain_id, decision, now)
+        }
+        // Every other payload class currently mints no grants. This is
+        // the truthful default: we do not yet have enough structure in
+        // the payload to derive a narrow, bounded grant without
+        // guessing. Expanding this is intentional future work.
+        _ => Vec::new(),
+    }
+}
+
+fn derive_sdis_grants(
+    sdis: &icn_governance::sdis::SdisProposal,
+    domain_id: &GovernanceDomainId,
+    decision: &DecisionProvenance,
+    now: Timestamp,
+) -> Vec<AuthorityGrant> {
+    use icn_governance::sdis::SdisProposal;
+
+    match sdis {
+        // Steward appointment: the payload names the candidate
+        // (grantee), a term length (time bound), and implies
+        // Attestation class (stewards issue signed identity
+        // attestations under SDIS).
+        SdisProposal::AppointSteward {
+            candidate,
+            term_length,
+            ..
+        } => {
+            let valid_until = now.checked_add(*term_length);
+            let scope = TypedScope {
+                domain: Some(domain_id.clone()),
+                proposal_class: vec!["Sdis".into()],
+                ..TypedScope::default()
+            };
+            vec![AuthorityGrant {
+                id: AuthorityGrantId::new(),
+                class: AuthorityClass::Attestation,
+                grantor: GrantorEntityId(domain_id.0.clone()),
+                grantee: Grantee::Person(candidate.clone()),
+                scope,
+                granted_by: Some(decision.clone()),
+                valid_from: now,
+                valid_until,
+                revoked_at: None,
+            }]
+        }
+
+        // Steward reconfirmation: the payload names the steward
+        // (grantee) and a new absolute term end (time bound). Same
+        // class / scope shape as appointment; the grant represents
+        // the refreshed term.
+        SdisProposal::ReconfirmSteward {
+            steward,
+            new_term_end,
+            ..
+        } => {
+            let scope = TypedScope {
+                domain: Some(domain_id.clone()),
+                proposal_class: vec!["Sdis".into()],
+                ..TypedScope::default()
+            };
+            vec![AuthorityGrant {
+                id: AuthorityGrantId::new(),
+                class: AuthorityClass::Attestation,
+                grantor: GrantorEntityId(domain_id.0.clone()),
+                grantee: Grantee::Person(steward.clone()),
+                scope,
+                granted_by: Some(decision.clone()),
+                valid_from: now,
+                valid_until: Some(*new_term_end),
+                revoked_at: None,
+            }]
+        }
+
+        // Removals, sanctions, suspensions, and authority revocations
+        // do not mint new grants — they *revoke* existing authority.
+        // Modeling that requires querying the mandate/grant store and
+        // updating `revoked_at` on prior grants, which is explicit
+        // future work. Returning an empty vec here is the truthful
+        // answer: this decision does not create new authority.
+        SdisProposal::RemoveSteward { .. }
+        | SdisProposal::SanctionSteward { .. }
+        | SdisProposal::SuspendSteward { .. }
+        | SdisProposal::ReinstateSteward { .. }
+        | SdisProposal::RevokeAuthority { .. }
+        | SdisProposal::RevocationAppeal { .. }
+        | SdisProposal::ModifyThreshold { .. }
+        | SdisProposal::ApproveAuthority { .. }
+        | SdisProposal::UpdateJurisdictionTier { .. }
+        | SdisProposal::ForceKeyRotation { .. } => Vec::new(),
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use icn_governance::sdis::SdisProposal;
+    use icn_identity::Did;
+
+    fn did(seed: u8) -> Did {
+        Did::from_anchor_id(&[seed; 32])
+    }
+
+    fn domain() -> GovernanceDomainId {
+        GovernanceDomainId("coop:tech".into())
+    }
+
+    fn decision() -> DecisionProvenance {
+        DecisionProvenance {
+            proposal_id: "prop-steward-1".into(),
+            decision_hash: [7u8; 32],
+        }
+    }
+
+    #[test]
+    fn appoint_steward_mints_one_attestation_grant_bounded_by_term() {
+        let payload = ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate: did(9),
+                sponsors: vec![did(1), did(2)],
+                region: "nyc".into(),
+                bond_amount: 100,
+                term_length: 365 * 24 * 60 * 60,
+            },
+        };
+        let d = decision();
+        let dom = domain();
+        let now: Timestamp = 1_000;
+
+        let grants = derive_grants_for_accepted_proposal(&payload, &dom, &d, now);
+        assert_eq!(grants.len(), 1, "expected exactly one grant");
+        let g = &grants[0];
+
+        assert_eq!(g.class, AuthorityClass::Attestation);
+        assert_eq!(g.grantor, GrantorEntityId("coop:tech".into()));
+        assert_eq!(g.grantee, Grantee::Person(did(9)));
+        assert_eq!(g.granted_by.as_ref().unwrap(), &d);
+        assert_eq!(g.valid_from, now);
+        assert_eq!(g.valid_until, Some(now + 365 * 24 * 60 * 60));
+        assert!(g.revoked_at.is_none());
+
+        assert_eq!(g.scope.domain.as_ref(), Some(&dom));
+        assert_eq!(g.scope.proposal_class, vec!["Sdis".to_string()]);
+        assert!(g.scope.action_kind.is_empty());
+        assert!(g.scope.amount_ceiling.is_none());
+        assert!(
+            !g.scope.is_empty(),
+            "scope must not be empty (unbounded-on-everything malformation)"
+        );
+    }
+
+    #[test]
+    fn reconfirm_steward_mints_one_attestation_grant_bounded_by_new_term_end() {
+        let new_term_end: Timestamp = 5_000_000;
+        let payload = ProposalPayload::Sdis {
+            proposal: SdisProposal::ReconfirmSteward {
+                steward: did(3),
+                new_term_end,
+                performance_notes: None,
+            },
+        };
+        let d = decision();
+        let dom = domain();
+
+        let grants = derive_grants_for_accepted_proposal(&payload, &dom, &d, 1_000);
+        assert_eq!(grants.len(), 1);
+        let g = &grants[0];
+        assert_eq!(g.class, AuthorityClass::Attestation);
+        assert_eq!(g.grantee, Grantee::Person(did(3)));
+        assert_eq!(g.valid_until, Some(new_term_end));
+    }
+
+    #[test]
+    fn remove_steward_mints_zero_grants() {
+        let payload = ProposalPayload::Sdis {
+            proposal: SdisProposal::RemoveSteward {
+                steward: did(3),
+                reason: "breach".into(),
+                return_bond: false,
+            },
+        };
+        let grants = derive_grants_for_accepted_proposal(&payload, &domain(), &decision(), 100);
+        assert!(
+            grants.is_empty(),
+            "revocation-shaped proposals must not mint new grants"
+        );
+    }
+
+    #[test]
+    fn text_payload_mints_zero_grants() {
+        let payload = ProposalPayload::Text {
+            body: "hello".into(),
+        };
+        let grants = derive_grants_for_accepted_proposal(&payload, &domain(), &decision(), 100);
+        assert!(grants.is_empty());
+    }
+
+    #[test]
+    fn budget_payload_mints_zero_grants_until_truthful_mapping_exists() {
+        // We intentionally do not mint grants for `Budget` in this
+        // tranche: the payload carries amount + currency as strings,
+        // which do not map cleanly to the closed `AmountUnit` enum
+        // without guessing. Adding a truthful mapping is future work.
+        let payload = ProposalPayload::Budget {
+            amount: 500,
+            currency: "COOP".into(),
+            recipient: did(4),
+            purpose: "lab equipment".into(),
+        };
+        let grants = derive_grants_for_accepted_proposal(&payload, &domain(), &decision(), 100);
+        assert!(grants.is_empty());
+    }
+
+    #[test]
+    fn appoint_steward_grant_provenance_matches_decision() {
+        let payload = ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate: did(9),
+                sponsors: vec![did(1)],
+                region: "nyc".into(),
+                bond_amount: 100,
+                term_length: 1_000,
+            },
+        };
+        let d = DecisionProvenance {
+            proposal_id: "prop-xyz".into(),
+            decision_hash: [42u8; 32],
+        };
+        let grants = derive_grants_for_accepted_proposal(&payload, &domain(), &d, 100);
+        let g = &grants[0];
+        let p = g.granted_by.as_ref().unwrap();
+        assert_eq!(p.proposal_id, "prop-xyz");
+        assert_eq!(p.decision_hash, [42u8; 32]);
+    }
+}

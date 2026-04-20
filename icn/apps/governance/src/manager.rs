@@ -16,17 +16,17 @@ use icn_federation::BilateralClearingAgreement;
 use icn_governance::{
     scopes_overlap, ActionItem, ActionItemFilter, ActionItemId, ActionItemPriority,
     ActionItemStatus, ActionItemStoreBackend, Activity, ActivityId, ActivityKind,
-    ActivityStoreBackend, Comment, CommentId, DecisionProvenance, Delegation, DelegationId,
-    DelegationScope, Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt,
-    GovernanceDomain, GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams,
-    GovernanceProfileId, InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore,
-    InMemoryMeetingStore, InMemoryMilestoneStore, InMemoryProgramStore, InMemoryStructureStore,
-    Mandate, Meeting, MeetingId, MeetingStoreBackend, MembershipConfig, MembershipSource,
-    Milestone, MilestoneId, MilestoneStatus, MilestoneStoreBackend, PaginatedResult, Program,
-    ProgramId, ProgramKind, ProgramStatus, ProgramStoreBackend, ProofOutcome, Proposal,
-    ProposalDomainLookup, ProposalId, ProposalPayload, ProposalScope, ProposalState,
-    RoleAssignment, Structure, StructureId, StructureKind, StructureStoreBackend, Timestamp, Vote,
-    VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
+    ActivityStoreBackend, AuthorityGrant, Comment, CommentId, DecisionProvenance, Delegation,
+    DelegationId, DelegationScope, Discussion, DiscussionStore, GovernanceConfig,
+    GovernanceDecisionReceipt, GovernanceDomain, GovernanceDomainId, GovernanceError,
+    GovernanceOps, GovernanceParams, GovernanceProfileId, InMemoryActionItemStore,
+    InMemoryActivityStore, InMemoryDiscussionStore, InMemoryMeetingStore, InMemoryMilestoneStore,
+    InMemoryProgramStore, InMemoryStructureStore, Mandate, Meeting, MeetingId, MeetingStoreBackend,
+    MembershipConfig, MembershipSource, Milestone, MilestoneId, MilestoneStatus,
+    MilestoneStoreBackend, PaginatedResult, Program, ProgramId, ProgramKind, ProgramStatus,
+    ProgramStoreBackend, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload,
+    ProposalScope, ProposalState, RoleAssignment, Structure, StructureId, StructureKind,
+    StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -3515,16 +3515,105 @@ impl GovernanceManager {
                 if matches!(outcome, ProofOutcome::Accepted) {
                     match hash_proposal_payload(&proposal.payload) {
                         Ok(payload_hash) => {
-                            let mandate = Mandate::new_pending_grants(
-                                DecisionProvenance {
-                                    proposal_id: proposal_id.0.clone(),
-                                    decision_hash: receipt.decision_hash,
-                                },
-                                payload_hash,
-                                None,
-                                None,
+                            let decision_prov = DecisionProvenance {
+                                proposal_id: proposal_id.0.clone(),
+                                decision_hash: receipt.decision_hash,
+                            };
+
+                            // ADR-0014 bounded-authority seam.
+                            //
+                            // Derive zero or more `AuthorityGrant`s from the
+                            // accepted payload. Today only steward-appointment
+                            // and steward-reconfirmation proposals mint grants;
+                            // every other class returns an empty `Vec` and the
+                            // mandate is recorded with no grants attached
+                            // (still institutional-memory, still bound to the
+                            // decision, but explicitly unbound on authority
+                            // until a later tranche widens the mapping).
+                            let grants = crate::grant_minting::derive_grants_for_accepted_proposal(
+                                &proposal.payload,
+                                &proposal.domain_id,
+                                &decision_prov,
                                 now,
                             );
+
+                            let grant_ids: Vec<_> = grants.iter().map(|g| g.id.clone()).collect();
+
+                            // Persist grants **before** the mandate. If a
+                            // grant write fails we log and continue — the
+                            // mandate is still recorded, but with
+                            // `has_no_grants()` semantics because the
+                            // authorization binding did not land durably.
+                            let mut persisted_grants: Vec<AuthorityGrant> = Vec::new();
+                            for grant in &grants {
+                                match store.put_authority_grant(grant) {
+                                    Ok(()) => persisted_grants.push(grant.clone()),
+                                    Err(e) => {
+                                        tracing::error!(
+                                            proposal_id = %proposal_id.0,
+                                            grant_id = %grant.id,
+                                            error = %e,
+                                            "Failed to store authority grant — \
+                                             grant binding lost for this decision"
+                                        );
+                                    }
+                                }
+                            }
+
+                            let mandate = if persisted_grants.len() == grants.len()
+                                && !grant_ids.is_empty()
+                            {
+                                // All derived grants persisted. Construct the
+                                // mandate through the strict `::new` path so
+                                // the constructor enforces the non-empty
+                                // invariant.
+                                match Mandate::new(
+                                    decision_prov,
+                                    payload_hash,
+                                    grant_ids,
+                                    None,
+                                    None,
+                                    now,
+                                ) {
+                                    Ok(m) => m,
+                                    Err(e) => {
+                                        // Only reachable if grant_ids became
+                                        // empty between the check and here,
+                                        // which it cannot; log defensively.
+                                        tracing::error!(
+                                            proposal_id = %proposal_id.0,
+                                            error = %e,
+                                            "Mandate::new rejected derived grant set; falling back to pending-grants"
+                                        );
+                                        Mandate::new_pending_grants(
+                                            DecisionProvenance {
+                                                proposal_id: proposal_id.0.clone(),
+                                                decision_hash: receipt.decision_hash,
+                                            },
+                                            payload_hash,
+                                            None,
+                                            None,
+                                            now,
+                                        )
+                                    }
+                                }
+                            } else {
+                                // Either the payload class mints no grants, or
+                                // some grant writes failed. Record the mandate
+                                // as institutional memory, explicitly unbound
+                                // on authority.
+                                Mandate::new_pending_grants(
+                                    DecisionProvenance {
+                                        proposal_id: proposal_id.0.clone(),
+                                        decision_hash: receipt.decision_hash,
+                                    },
+                                    payload_hash,
+                                    None,
+                                    None,
+                                    now,
+                                )
+                            };
+
                             if let Err(e) = store.put_mandate(&mandate) {
                                 tracing::error!(
                                     proposal_id = %proposal_id.0,
@@ -5971,6 +6060,7 @@ mod tests {
         institutional_effects: std::sync::Mutex<Vec<InstitutionalEffectRecord>>,
         dispatch_evidence: std::sync::Mutex<Vec<EffectDispatchEvidence>>,
         mandates: std::sync::Mutex<Vec<icn_governance::Mandate>>,
+        authority_grants: std::sync::Mutex<Vec<icn_governance::AuthorityGrant>>,
     }
 
     impl InMemoryReceiptBackend {
@@ -5981,6 +6071,7 @@ mod tests {
                 institutional_effects: std::sync::Mutex::new(vec![]),
                 dispatch_evidence: std::sync::Mutex::new(vec![]),
                 mandates: std::sync::Mutex::new(vec![]),
+                authority_grants: std::sync::Mutex::new(vec![]),
             }
         }
     }
@@ -6117,6 +6208,44 @@ mod tests {
                 .cloned()
                 .collect();
             items.sort_by_key(|m| m.issued_at);
+            Ok(items)
+        }
+        fn put_authority_grant(
+            &self,
+            grant: &icn_governance::AuthorityGrant,
+        ) -> Result<(), String> {
+            self.authority_grants.lock().unwrap().push(grant.clone());
+            Ok(())
+        }
+        fn get_authority_grant(
+            &self,
+            grant_id: &icn_governance::AuthorityGrantId,
+        ) -> Result<Option<icn_governance::AuthorityGrant>, String> {
+            Ok(self
+                .authority_grants
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|g| g.id == *grant_id)
+                .cloned())
+        }
+        fn list_authority_grants_by_decision(
+            &self,
+            decision_hash: &icn_kernel_api::Hash,
+        ) -> Result<Vec<icn_governance::AuthorityGrant>, String> {
+            let mut items: Vec<icn_governance::AuthorityGrant> = self
+                .authority_grants
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|g| {
+                    g.granted_by
+                        .as_ref()
+                        .is_some_and(|p| &p.decision_hash == decision_hash)
+                })
+                .cloned()
+                .collect();
+            items.sort_by_key(|g| g.valid_from);
             Ok(items)
         }
     }
@@ -8233,5 +8362,290 @@ mod tests {
             effects.is_empty(),
             "Text payload translates to no effect record; mandate remains upstream"
         );
+    }
+
+    /// Steward-appointment proposals mint one bounded `AuthorityGrant`
+    /// and a mandate whose `grants` field references it. This is the
+    /// first truthful binding of typed authority to a real decision.
+    #[tokio::test]
+    async fn adr0014_appoint_steward_mints_bounded_authority_grant() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend.clone());
+
+        let candidate_kp = icn_identity::KeyPair::generate().unwrap();
+        let candidate_did = candidate_kp.did().clone();
+        let term_length_seconds: u64 = 365 * 24 * 60 * 60;
+
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Appoint steward".to_string(),
+                "Appoint a new regional steward for identity attestations".to_string(),
+                ProposalPayload::Sdis {
+                    proposal: icn_governance::sdis::SdisProposal::AppointSteward {
+                        candidate: candidate_did.clone(),
+                        sponsors: vec![member_did.clone()],
+                        region: "nyc".into(),
+                        bond_amount: 100,
+                        term_length: term_length_seconds,
+                    },
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        let gov_receipt = backend
+            .get_governance_by_proposal(&proposal_id.0)
+            .unwrap()
+            .expect("governance receipt must exist");
+        assert_eq!(gov_receipt.outcome, ProofOutcome::Accepted);
+
+        // Grant is persisted and bound to the decision provenance.
+        let grants = backend
+            .list_authority_grants_by_decision(&gov_receipt.decision_hash)
+            .unwrap();
+        assert_eq!(
+            grants.len(),
+            1,
+            "AppointSteward must mint exactly one grant"
+        );
+        let grant = &grants[0];
+        assert_eq!(grant.class, icn_governance::AuthorityClass::Attestation);
+        assert_eq!(
+            grant.grantor,
+            icn_governance::GrantorEntityId(domain_id.0.clone())
+        );
+        assert_eq!(
+            grant.grantee,
+            icn_governance::Grantee::Person(candidate_did.clone())
+        );
+        assert_eq!(grant.scope.domain.as_ref(), Some(&domain_id));
+        assert_eq!(grant.scope.proposal_class, vec!["Sdis".to_string()]);
+        assert!(
+            !grant.scope.is_empty(),
+            "scope must be bounded (not unbounded-on-everything)"
+        );
+        let prov = grant.granted_by.as_ref().expect("granted_by set");
+        assert_eq!(prov.proposal_id, proposal_id.0);
+        assert_eq!(prov.decision_hash, gov_receipt.decision_hash);
+        assert_eq!(
+            grant.valid_until,
+            Some(grant.valid_from + term_length_seconds),
+            "valid_until must match grant.valid_from + term_length"
+        );
+        assert!(grant.revoked_at.is_none());
+
+        // Mandate references the grant and is constructed via the strict
+        // `::new` path (no longer bootstrap-phase for this proposal class).
+        let mandate = backend
+            .get_mandate_by_proposal(&proposal_id.0)
+            .unwrap()
+            .expect("mandate must exist");
+        assert!(
+            !mandate.has_no_grants(),
+            "AppointSteward mandate must reference attached grants"
+        );
+        assert_eq!(mandate.grants, vec![grant.id.clone()]);
+        assert_eq!(mandate.decision.decision_hash, gov_receipt.decision_hash);
+    }
+
+    /// Accepted proposals whose payload class does not truthfully imply
+    /// bounded authority (here: a `Text` proposal) must not mint grants,
+    /// and the mandate must remain in the bootstrap-phase "no grants"
+    /// state — this is the truthful default, not a failure.
+    #[tokio::test]
+    async fn adr0014_text_proposal_mints_zero_grants_and_unbound_mandate() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend.clone());
+
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Text".to_string(),
+                "No derivable authority".to_string(),
+                ProposalPayload::Text {
+                    body: "House rules update.".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        let gov_receipt = backend
+            .get_governance_by_proposal(&proposal_id.0)
+            .unwrap()
+            .unwrap();
+        let grants = backend
+            .list_authority_grants_by_decision(&gov_receipt.decision_hash)
+            .unwrap();
+        assert!(
+            grants.is_empty(),
+            "Text payload must not mint grants; default is truthful restraint"
+        );
+
+        let mandate = backend
+            .get_mandate_by_proposal(&proposal_id.0)
+            .unwrap()
+            .expect("mandate still recorded as authorization-provenance");
+        assert!(
+            mandate.has_no_grants(),
+            "bootstrap-phase mandate stays unbound on authority when no grants derive"
+        );
+    }
+
+    /// A rejected AppointSteward proposal must not mint a grant — grants
+    /// descend from *accepted* decisions only.
+    #[tokio::test]
+    async fn adr0014_rejected_appoint_steward_mints_no_grant() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend.clone());
+
+        let candidate_kp = icn_identity::KeyPair::generate().unwrap();
+
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Appoint".to_string(),
+                "Expected rejection".to_string(),
+                ProposalPayload::Sdis {
+                    proposal: icn_governance::sdis::SdisProposal::AppointSteward {
+                        candidate: candidate_kp.did().clone(),
+                        sponsors: vec![member_did.clone()],
+                        region: "nyc".into(),
+                        bond_amount: 100,
+                        term_length: 1_000,
+                    },
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::Against,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        let gov_receipt = backend
+            .get_governance_by_proposal(&proposal_id.0)
+            .unwrap()
+            .unwrap();
+        assert_eq!(gov_receipt.outcome, ProofOutcome::Rejected);
+
+        let grants = backend
+            .list_authority_grants_by_decision(&gov_receipt.decision_hash)
+            .unwrap();
+        assert!(
+            grants.is_empty(),
+            "rejected proposal must not mint authority grants"
+        );
+        assert!(backend
+            .get_mandate_by_proposal(&proposal_id.0)
+            .unwrap()
+            .is_none());
+    }
+
+    /// AuthorityGrant lives on the authorization side of the chain;
+    /// `InstitutionalEffectRecord` lives on the evidence side. Accepting
+    /// an AppointSteward proposal mints a grant but (given the current
+    /// translator) no effect record — proving grant and evidence records
+    /// are not collapsed at the seam.
+    #[tokio::test]
+    async fn adr0014_authority_grant_distinct_from_institutional_effect() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend.clone());
+
+        let candidate_kp = icn_identity::KeyPair::generate().unwrap();
+
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Appoint steward".to_string(),
+                "Distinctness test".to_string(),
+                ProposalPayload::Sdis {
+                    proposal: icn_governance::sdis::SdisProposal::AppointSteward {
+                        candidate: candidate_kp.did().clone(),
+                        sponsors: vec![member_did.clone()],
+                        region: "nyc".into(),
+                        bond_amount: 100,
+                        term_length: 1_000,
+                    },
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        let gov_receipt = backend
+            .get_governance_by_proposal(&proposal_id.0)
+            .unwrap()
+            .unwrap();
+        let grants = backend
+            .list_authority_grants_by_decision(&gov_receipt.decision_hash)
+            .unwrap();
+        assert_eq!(grants.len(), 1, "grant recorded on authorization side");
+
+        // Evidence side is governed by a separate translator; whether or
+        // not it emits a record for this SDIS variant, the point of this
+        // test is that grant recording does not imply effect recording
+        // and vice versa. We assert the grant exists and is indexable by
+        // decision_hash separately from any effect record.
+        let grant_ids_via_decision: Vec<_> = grants.iter().map(|g| g.id.clone()).collect();
+        let mandate = backend
+            .get_mandate_by_proposal(&proposal_id.0)
+            .unwrap()
+            .unwrap();
+        assert_eq!(mandate.grants, grant_ids_via_decision);
     }
 }
