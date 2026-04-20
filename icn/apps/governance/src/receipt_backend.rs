@@ -108,8 +108,18 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     ///
     /// Append-only; implementations treat a same-`MandateId` re-write as
     /// idempotent. Default impl is a no-op so downstream backends can
-    /// opt in without breaking. The in-memory test backend and the
-    /// sled-backed `ReceiptStore` both override.
+    /// opt in without breaking.
+    ///
+    /// **Override status (ADR-0014 bootstrap):** The in-memory test
+    /// backend overrides. The production sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore) does
+    /// **not** yet override — a follow-up tranche is required to add
+    /// sled column families for mandate storage. Until then, the
+    /// gateway's acceptance path records the mandate in tracing logs
+    /// (via the `GovernanceManager` error path when a backend returns
+    /// an error) but the sled backend simply no-ops. Operators that
+    /// need durable mandate records today must provide their own
+    /// overriding backend.
     fn put_mandate(&self, _mandate: &Mandate) -> Result<(), String> {
         Ok(())
     }

@@ -154,9 +154,23 @@ pub enum MandateStatus {
 /// provenance, payload hash, and at least one [`AuthorityGrantId`]. A
 /// mandate with an empty `grants` vector is not a valid constitutional
 /// authorization — the ADR-0014 rule is that authority must be bounded.
-/// The constructor enforces this invariant and returns
-/// [`MandateError::EmptyGrants`] if violated, so no caller can mint an
-/// unbounded mandate.
+/// The standard constructor enforces this invariant and returns
+/// [`MandateError::EmptyGrants`] if violated.
+///
+/// [`Mandate::new_pending_grants`] is the **only sanctioned** path that
+/// produces a mandate with an empty `grants` vector; it exists for the
+/// bootstrap-phase acceptance seam where typed
+/// [`crate::authority::AuthorityGrant`] minting is not yet wired, and
+/// the downstream obligation (no execution under an empty-grants
+/// mandate) is stated on that constructor.
+///
+/// Note that `Mandate`'s fields are currently `pub`, so a struct
+/// literal or a future custom `Deserialize` path could technically
+/// construct a `Mandate` with `grants.is_empty()` outside either
+/// constructor. Consumers that enforce execution gating must therefore
+/// call [`Mandate::has_no_grants`] rather than assume construction
+/// site alone guarantees non-emptiness. Tightening field visibility to
+/// close this gap is deliberate follow-up work.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Mandate {
     /// Stable identifier for the mandate.

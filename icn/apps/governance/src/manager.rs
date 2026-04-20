@@ -168,24 +168,26 @@ pub struct ReconciledEffectEntry {
 /// payload, for binding a [`Mandate`] to the concrete content of the
 /// decision (ADR-0014 `payload_hash` field).
 ///
-/// The hash is taken over `serde_json::to_vec(payload)`. JSON is
-/// canonical here because `ProposalPayload` already derives `Serialize`
-/// for cross-node use; if serialization fails (which shouldn't happen
-/// for a well-formed payload that was accepted by the governance
-/// pipeline), we fall back to a zeroed hash so the mandate still records
-/// the decision provenance rather than being silently dropped.
-fn hash_proposal_payload(payload: &ProposalPayload) -> icn_kernel_api::Hash {
-    match serde_json::to_vec(payload) {
-        Ok(bytes) => *blake3::hash(&bytes).as_bytes(),
-        Err(e) => {
-            tracing::warn!(
-                error = %e,
-                "Failed to serialize proposal payload for mandate payload_hash; \
-                 falling back to zeroed hash"
-            );
-            [0u8; 32]
-        }
-    }
+/// The hash is taken over the current `serde_json::to_vec(payload)`
+/// byte representation. This is treated as deterministic for the
+/// `ProposalPayload` shape and `serde_json` configuration used at
+/// acceptance time, but it is **not** a formally canonical JSON
+/// encoding — if `ProposalPayload` changes shape or `serde_json`
+/// semantics drift, payload hashes from older decisions will not be
+/// reproducible and must be read from the mandate record rather than
+/// recomputed.
+///
+/// Returns `Err` on serialization failure. The caller must decline to
+/// mint a mandate in that case; substituting a sentinel hash would
+/// collapse distinct payloads to the same content-binding and silently
+/// break the mandate↔payload invariant. Serialization failure on a
+/// payload that was accepted by the governance pipeline is not
+/// expected in practice.
+fn hash_proposal_payload(
+    payload: &ProposalPayload,
+) -> Result<icn_kernel_api::Hash, serde_json::Error> {
+    let bytes = serde_json::to_vec(payload)?;
+    Ok(*blake3::hash(&bytes).as_bytes())
 }
 
 /// Label the translated [`crate::http::configure::GovernanceEffect`] shape
@@ -3511,24 +3513,35 @@ impl GovernanceManager {
                 // **behavior-neutral**: no executor gating, no dispatcher
                 // wiring changes.
                 if matches!(outcome, ProofOutcome::Accepted) {
-                    let payload_hash = hash_proposal_payload(&proposal.payload);
-                    let mandate = Mandate::new_pending_grants(
-                        DecisionProvenance {
-                            proposal_id: proposal_id.0.clone(),
-                            decision_hash: receipt.decision_hash,
-                        },
-                        payload_hash,
-                        None,
-                        None,
-                        now,
-                    );
-                    if let Err(e) = store.put_mandate(&mandate) {
-                        tracing::error!(
-                            proposal_id = %proposal_id.0,
-                            mandate_id = %mandate.id,
-                            error = %e,
-                            "Failed to store mandate — constitutional-memory record lost"
-                        );
+                    match hash_proposal_payload(&proposal.payload) {
+                        Ok(payload_hash) => {
+                            let mandate = Mandate::new_pending_grants(
+                                DecisionProvenance {
+                                    proposal_id: proposal_id.0.clone(),
+                                    decision_hash: receipt.decision_hash,
+                                },
+                                payload_hash,
+                                None,
+                                None,
+                                now,
+                            );
+                            if let Err(e) = store.put_mandate(&mandate) {
+                                tracing::error!(
+                                    proposal_id = %proposal_id.0,
+                                    mandate_id = %mandate.id,
+                                    error = %e,
+                                    "Failed to store mandate — constitutional-memory record lost"
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                proposal_id = %proposal_id.0,
+                                error = %e,
+                                "Failed to hash proposal payload for mandate payload_hash — \
+                                 declining to mint mandate to avoid breaking content-binding invariant"
+                            );
+                        }
                     }
                 }
 
