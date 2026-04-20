@@ -1,7 +1,7 @@
 //! Abstraction over gateway's ReceiptStore so GovernanceManager can live
 //! in this crate without a circular dependency on icn-gateway.
 
-use icn_governance::GovernanceDecisionReceipt;
+use icn_governance::{GovernanceDecisionReceipt, Mandate};
 use icn_kernel_api::{AllocationReceipt, Hash};
 
 use crate::dispatch_evidence::EffectDispatchEvidence;
@@ -94,6 +94,52 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         &self,
         _effect_record_id: &str,
     ) -> Result<Vec<EffectDispatchEvidence>, String> {
+        Ok(vec![])
+    }
+
+    /// Persist a [`Mandate`] minted at proposal acceptance time.
+    ///
+    /// A mandate is the constitutional mediation layer between an
+    /// accepted decision and its execution (ADR-0014). It is
+    /// **upstream** of evidence-side records (`InstitutionalEffectRecord`,
+    /// `EffectDispatchEvidence`) and **distinct** from them: a mandate
+    /// records *authority to act*, evidence records document *what was
+    /// done*.
+    ///
+    /// Append-only; implementations treat a same-`MandateId` re-write as
+    /// idempotent. Default impl is a no-op so downstream backends can
+    /// opt in without breaking.
+    ///
+    /// **Override status (ADR-0014 bootstrap):** The in-memory test
+    /// backend overrides. The production sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore) does
+    /// **not** yet override — a follow-up tranche is required to add
+    /// sled column families for mandate storage. Until then, the
+    /// gateway's acceptance path records the mandate in tracing logs
+    /// (via the `GovernanceManager` error path when a backend returns
+    /// an error) but the sled backend simply no-ops. Operators that
+    /// need durable mandate records today must provide their own
+    /// overriding backend.
+    fn put_mandate(&self, _mandate: &Mandate) -> Result<(), String> {
+        Ok(())
+    }
+
+    /// Retrieve the mandate minted for a proposal, if any.
+    ///
+    /// Returns `Ok(None)` when no mandate exists or when the backend
+    /// does not implement mandate storage (default).
+    fn get_mandate_by_proposal(&self, _proposal_id: &str) -> Result<Option<Mandate>, String> {
+        Ok(None)
+    }
+
+    /// Retrieve all mandates anchored to a governance decision hash,
+    /// oldest-first by `issued_at`.
+    ///
+    /// A single decision usually yields one mandate, but this returns a
+    /// `Vec` to keep the API symmetric with
+    /// [`Self::list_allocations_by_decision`] and to permit future
+    /// multi-mandate decisions without a migration.
+    fn list_mandates_by_decision(&self, _decision_hash: &Hash) -> Result<Vec<Mandate>, String> {
         Ok(vec![])
     }
 }

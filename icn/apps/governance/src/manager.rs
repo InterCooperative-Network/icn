@@ -16,17 +16,17 @@ use icn_federation::BilateralClearingAgreement;
 use icn_governance::{
     scopes_overlap, ActionItem, ActionItemFilter, ActionItemId, ActionItemPriority,
     ActionItemStatus, ActionItemStoreBackend, Activity, ActivityId, ActivityKind,
-    ActivityStoreBackend, Comment, CommentId, Delegation, DelegationId, DelegationScope,
-    Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt, GovernanceDomain,
-    GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
-    InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore, InMemoryMeetingStore,
-    InMemoryMilestoneStore, InMemoryProgramStore, InMemoryStructureStore, Meeting, MeetingId,
-    MeetingStoreBackend, MembershipConfig, MembershipSource, Milestone, MilestoneId,
-    MilestoneStatus, MilestoneStoreBackend, PaginatedResult, Program, ProgramId, ProgramKind,
-    ProgramStatus, ProgramStoreBackend, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
-    ProposalPayload, ProposalScope, ProposalState, RoleAssignment, Structure, StructureId,
-    StructureKind, StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally,
-    DEFAULT_MAX_DELEGATION_DEPTH,
+    ActivityStoreBackend, Comment, CommentId, DecisionProvenance, Delegation, DelegationId,
+    DelegationScope, Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt,
+    GovernanceDomain, GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams,
+    GovernanceProfileId, InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore,
+    InMemoryMeetingStore, InMemoryMilestoneStore, InMemoryProgramStore, InMemoryStructureStore,
+    Mandate, Meeting, MeetingId, MeetingStoreBackend, MembershipConfig, MembershipSource,
+    Milestone, MilestoneId, MilestoneStatus, MilestoneStoreBackend, PaginatedResult, Program,
+    ProgramId, ProgramKind, ProgramStatus, ProgramStoreBackend, ProofOutcome, Proposal,
+    ProposalDomainLookup, ProposalId, ProposalPayload, ProposalScope, ProposalState,
+    RoleAssignment, Structure, StructureId, StructureKind, StructureStoreBackend, Timestamp, Vote,
+    VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -162,6 +162,32 @@ pub struct ReconciledEffectEntry {
     pub record: InstitutionalEffectRecord,
     pub dispatch_evidence: Vec<EffectDispatchEvidence>,
     pub reconciliation_status: ReconciliationStatus,
+}
+
+/// Compute a deterministic blake3 hash over the serialized proposal
+/// payload, for binding a [`Mandate`] to the concrete content of the
+/// decision (ADR-0014 `payload_hash` field).
+///
+/// The hash is taken over the current `serde_json::to_vec(payload)`
+/// byte representation. This is treated as deterministic for the
+/// `ProposalPayload` shape and `serde_json` configuration used at
+/// acceptance time, but it is **not** a formally canonical JSON
+/// encoding — if `ProposalPayload` changes shape or `serde_json`
+/// semantics drift, payload hashes from older decisions will not be
+/// reproducible and must be read from the mandate record rather than
+/// recomputed.
+///
+/// Returns `Err` on serialization failure. The caller must decline to
+/// mint a mandate in that case; substituting a sentinel hash would
+/// collapse distinct payloads to the same content-binding and silently
+/// break the mandate↔payload invariant. Serialization failure on a
+/// payload that was accepted by the governance pipeline is not
+/// expected in practice.
+fn hash_proposal_payload(
+    payload: &ProposalPayload,
+) -> Result<icn_kernel_api::Hash, serde_json::Error> {
+    let bytes = serde_json::to_vec(payload)?;
+    Ok(*blake3::hash(&bytes).as_bytes())
 }
 
 /// Label the translated [`crate::http::configure::GovernanceEffect`] shape
@@ -3470,6 +3496,55 @@ impl GovernanceManager {
                     // the governance→economics provenance chain is broken (PS-3).
                 }
 
+                // ADR-0014 constitutional-memory seam.
+                //
+                // An Accepted decision produces a bounded institutional
+                // authorization to carry out its effects — a `Mandate`. We
+                // record that mandate here, upstream of any
+                // `InstitutionalEffectRecord` or `EffectDispatchEvidence`
+                // (which are evidence-side, see `institutional_effect.rs`).
+                //
+                // Bootstrap-phase posture: typed `AuthorityGrant` minting is
+                // not yet implemented, so we use
+                // `Mandate::new_pending_grants`. The mandate is
+                // institutional memory that authorization arose from this
+                // decision; it carries no executable authority until a
+                // later tranche attaches grants. This is intentionally
+                // **behavior-neutral**: no executor gating, no dispatcher
+                // wiring changes.
+                if matches!(outcome, ProofOutcome::Accepted) {
+                    match hash_proposal_payload(&proposal.payload) {
+                        Ok(payload_hash) => {
+                            let mandate = Mandate::new_pending_grants(
+                                DecisionProvenance {
+                                    proposal_id: proposal_id.0.clone(),
+                                    decision_hash: receipt.decision_hash,
+                                },
+                                payload_hash,
+                                None,
+                                None,
+                                now,
+                            );
+                            if let Err(e) = store.put_mandate(&mandate) {
+                                tracing::error!(
+                                    proposal_id = %proposal_id.0,
+                                    mandate_id = %mandate.id,
+                                    error = %e,
+                                    "Failed to store mandate — constitutional-memory record lost"
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                proposal_id = %proposal_id.0,
+                                error = %e,
+                                "Failed to hash proposal payload for mandate payload_hash — \
+                                 declining to mint mandate to avoid breaking content-binding invariant"
+                            );
+                        }
+                    }
+                }
+
                 // Wire governance→economics binding (INV-2: Allocation Completeness)
                 // When a budget/treasury/allocation proposal is accepted, create an
                 // AllocationReceipt linking the decision to economic intents.
@@ -5895,6 +5970,7 @@ mod tests {
         allocations: std::sync::Mutex<Vec<AllocationReceipt>>,
         institutional_effects: std::sync::Mutex<Vec<InstitutionalEffectRecord>>,
         dispatch_evidence: std::sync::Mutex<Vec<EffectDispatchEvidence>>,
+        mandates: std::sync::Mutex<Vec<icn_governance::Mandate>>,
     }
 
     impl InMemoryReceiptBackend {
@@ -5904,6 +5980,7 @@ mod tests {
                 allocations: std::sync::Mutex::new(vec![]),
                 institutional_effects: std::sync::Mutex::new(vec![]),
                 dispatch_evidence: std::sync::Mutex::new(vec![]),
+                mandates: std::sync::Mutex::new(vec![]),
             }
         }
     }
@@ -6009,6 +6086,37 @@ mod tests {
                 .cloned()
                 .collect();
             items.sort_by_key(|e| e.recorded_at);
+            Ok(items)
+        }
+        fn put_mandate(&self, mandate: &icn_governance::Mandate) -> Result<(), String> {
+            self.mandates.lock().unwrap().push(mandate.clone());
+            Ok(())
+        }
+        fn get_mandate_by_proposal(
+            &self,
+            proposal_id: &str,
+        ) -> Result<Option<icn_governance::Mandate>, String> {
+            Ok(self
+                .mandates
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|m| m.decision.proposal_id == proposal_id)
+                .cloned())
+        }
+        fn list_mandates_by_decision(
+            &self,
+            decision_hash: &icn_kernel_api::Hash,
+        ) -> Result<Vec<icn_governance::Mandate>, String> {
+            let mut items: Vec<icn_governance::Mandate> = self
+                .mandates
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| m.decision.decision_hash == *decision_hash)
+                .cloned()
+                .collect();
+            items.sort_by_key(|m| m.issued_at);
             Ok(items)
         }
     }
@@ -7951,5 +8059,179 @@ mod tests {
         );
         assert!(pb.activities.contains(&act.id));
         assert_eq!(a2.parent_program_id.as_ref(), Some(&prog_b.id));
+    }
+
+    // ============================================================================
+    // ADR-0014: Mandate recording at the decision-acceptance seam
+    // ============================================================================
+
+    /// Accepted proposal mints a pending-grants `Mandate` bound to the
+    /// decision provenance and payload content, recorded distinctly from
+    /// the governance receipt.
+    #[tokio::test]
+    async fn adr0014_mandate_minted_on_accepted_proposal() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend.clone());
+
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Adopt policy".to_string(),
+                "A non-economic policy decision".to_string(),
+                ProposalPayload::Text {
+                    body: "Adopt the house rules.".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        // Governance receipt exists.
+        let gov_receipt = backend
+            .get_governance_by_proposal(&proposal_id.0)
+            .unwrap()
+            .expect("governance receipt must exist");
+        assert_eq!(gov_receipt.outcome, ProofOutcome::Accepted);
+
+        // Mandate exists and binds the same decision provenance.
+        let mandate = backend
+            .get_mandate_by_proposal(&proposal_id.0)
+            .unwrap()
+            .expect("mandate must be recorded on Accepted path");
+        assert_eq!(mandate.decision.proposal_id, proposal_id.0);
+        assert_eq!(mandate.decision.decision_hash, gov_receipt.decision_hash);
+        // Bootstrap phase: no typed grants attached yet.
+        assert!(
+            mandate.has_no_grants(),
+            "bootstrap-phase mandate carries no attached grants"
+        );
+        assert_eq!(mandate.status, icn_governance::MandateStatus::Pending);
+        // payload_hash is bound to the payload content (non-zero).
+        assert_ne!(
+            mandate.payload_hash, [0u8; 32],
+            "payload_hash must be bound to actual payload serialization"
+        );
+
+        // Indexing by decision_hash returns the same mandate.
+        let by_decision = backend
+            .list_mandates_by_decision(&gov_receipt.decision_hash)
+            .unwrap();
+        assert_eq!(by_decision.len(), 1);
+        assert_eq!(by_decision[0].id, mandate.id);
+    }
+
+    /// Rejected proposal must not mint a mandate — a mandate is
+    /// *authorization*, which only arises from acceptance.
+    #[tokio::test]
+    async fn adr0014_no_mandate_on_rejected_proposal() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend.clone());
+
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Reject this".to_string(),
+                "Expected rejection".to_string(),
+                ProposalPayload::Text {
+                    body: "A thing that will be voted down.".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::Against,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        let gov_receipt = backend
+            .get_governance_by_proposal(&proposal_id.0)
+            .unwrap()
+            .expect("governance receipt must exist");
+        assert_eq!(gov_receipt.outcome, ProofOutcome::Rejected);
+
+        let mandate = backend.get_mandate_by_proposal(&proposal_id.0).unwrap();
+        assert!(
+            mandate.is_none(),
+            "Rejected proposal must not mint a mandate — authorization requires acceptance"
+        );
+    }
+
+    /// The Mandate record must remain upstream of evidence-side records.
+    /// Acceptance of a non-effect-translating proposal (`Text`) still mints
+    /// a Mandate (authorization provenance) but no `InstitutionalEffectRecord`
+    /// (evidence of translation). This pins the Mandate/Evidence distinction.
+    #[tokio::test]
+    async fn adr0014_mandate_distinct_from_institutional_effect_record() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let backend = Arc::new(InMemoryReceiptBackend::new());
+        let mgr = mgr.with_receipt_store(backend.clone());
+
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Text only".to_string(),
+                "No effect translation".to_string(),
+                ProposalPayload::Text {
+                    body: "Declarative text; no kernel effect.".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        // Mandate: recorded (authorization arose from the decision).
+        let mandate = backend.get_mandate_by_proposal(&proposal_id.0).unwrap();
+        assert!(
+            mandate.is_some(),
+            "Mandate must be recorded for any accepted decision"
+        );
+
+        // InstitutionalEffectRecord: NOT recorded for Text payloads, since
+        // they do not translate to a structured GovernanceEffect. This is
+        // the explicit distinctness: authorization is upstream of translation.
+        let effects = backend
+            .list_institutional_effects_by_proposal(&proposal_id.0)
+            .unwrap();
+        assert!(
+            effects.is_empty(),
+            "Text payload translates to no effect record; mandate remains upstream"
+        );
     }
 }

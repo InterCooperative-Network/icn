@@ -154,9 +154,23 @@ pub enum MandateStatus {
 /// provenance, payload hash, and at least one [`AuthorityGrantId`]. A
 /// mandate with an empty `grants` vector is not a valid constitutional
 /// authorization — the ADR-0014 rule is that authority must be bounded.
-/// The constructor enforces this invariant and returns
-/// [`MandateError::EmptyGrants`] if violated, so no caller can mint an
-/// unbounded mandate.
+/// The standard constructor enforces this invariant and returns
+/// [`MandateError::EmptyGrants`] if violated.
+///
+/// [`Mandate::new_pending_grants`] is the **only sanctioned** path that
+/// produces a mandate with an empty `grants` vector; it exists for the
+/// bootstrap-phase acceptance seam where typed
+/// [`crate::authority::AuthorityGrant`] minting is not yet wired, and
+/// the downstream obligation (no execution under an empty-grants
+/// mandate) is stated on that constructor.
+///
+/// Note that `Mandate`'s fields are currently `pub`, so a struct
+/// literal or a future custom `Deserialize` path could technically
+/// construct a `Mandate` with `grants.is_empty()` outside either
+/// constructor. Consumers that enforce execution gating must therefore
+/// call [`Mandate::has_no_grants`] rather than assume construction
+/// site alone guarantees non-emptiness. Tightening field visibility to
+/// close this gap is deliberate follow-up work.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Mandate {
     /// Stable identifier for the mandate.
@@ -218,6 +232,54 @@ impl Mandate {
         })
     }
 
+    /// Construct a mandate for the **bootstrap-phase decision-acceptance
+    /// seam**, where typed [`AuthorityGrant`] minting is not yet
+    /// implemented.
+    ///
+    /// Unlike [`Mandate::new`], this constructor **accepts an empty
+    /// `grants` vector** and does not return a `Result`. It exists
+    /// precisely because the current live governance path can identify
+    /// the decision but cannot yet identify the specific
+    /// [`AuthorityGrant`]s that bound the decision's authority — that
+    /// layer is future work.
+    ///
+    /// Status is initialized to [`MandateStatus::Pending`]. The mandate
+    /// is recorded as institutional memory that the decision conferred
+    /// bounded authorization under its domain's charter; the specific
+    /// grant binding is deferred.
+    ///
+    /// # Downstream obligations
+    ///
+    /// Callers that later wire execution gating **must** treat a mandate
+    /// constructed here (i.e. with `grants.is_empty()`) as **ineligible
+    /// for execution authorization checks** until a future tranche
+    /// attaches real grants. This constructor is the explicit
+    /// acknowledgement that we have authorization-provenance without
+    /// authority-binding, and it is behavior-neutral by design.
+    ///
+    /// This constructor is expected to be removed (or replaced by
+    /// stricter construction) once typed grant minting is landed.
+    ///
+    /// [`AuthorityGrant`]: crate::authority::AuthorityGrant
+    pub fn new_pending_grants(
+        decision: DecisionProvenance,
+        payload_hash: Hash,
+        executor: Option<Did>,
+        deadline: Option<Timestamp>,
+        issued_at: Timestamp,
+    ) -> Self {
+        Self {
+            id: MandateId::new(),
+            decision,
+            payload_hash,
+            grants: Vec::new(),
+            executor,
+            deadline,
+            status: MandateStatus::Pending,
+            issued_at,
+        }
+    }
+
     /// Return `true` if `now >= deadline` (when a deadline is set).
     ///
     /// This is a time-check helper, **not** an enforcement gate. Callers
@@ -226,6 +288,18 @@ impl Mandate {
     /// already discharged, which overrides deadline expiry).
     pub fn is_past_deadline(&self, now: Timestamp) -> bool {
         matches!(self.deadline, Some(d) if now >= d)
+    }
+
+    /// Return `true` if this mandate was minted before any typed
+    /// [`AuthorityGrant`]s could be attached.
+    ///
+    /// Downstream execution-gating code must refuse mandates where this
+    /// returns `true`; they are institutional-memory records, not
+    /// execution authorizations.
+    ///
+    /// [`AuthorityGrant`]: crate::authority::AuthorityGrant
+    pub fn has_no_grants(&self) -> bool {
+        self.grants.is_empty()
     }
 }
 
@@ -263,6 +337,14 @@ mod tests {
     fn mandate_new_rejects_empty_grants() {
         let err = Mandate::new(sample_decision(), [0u8; 32], vec![], None, None, 0).unwrap_err();
         assert_eq!(err, MandateError::EmptyGrants);
+    }
+
+    #[test]
+    fn mandate_new_pending_grants_allows_empty_and_marks_unbound() {
+        let m = Mandate::new_pending_grants(sample_decision(), [1u8; 32], None, Some(500), 100);
+        assert!(m.has_no_grants());
+        assert_eq!(m.status, MandateStatus::Pending);
+        assert_eq!(m.payload_hash, [1u8; 32]);
     }
 
     #[test]
