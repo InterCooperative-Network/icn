@@ -23,7 +23,7 @@
   "author": "ICN Project",
   "license": "MIT",
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.1",
+    "@axe-core/playwright": "^4.11.2",
     "@playwright/test": "^1.59.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.1.5",
