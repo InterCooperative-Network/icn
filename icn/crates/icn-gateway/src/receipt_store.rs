@@ -559,20 +559,32 @@ impl ReceiptStore {
         key
     }
 
+    /// Encode `proposal_id` as `{len_be_u32}{bytes}` so two IDs where
+    /// one is a `:`-delimited prefix of the other (e.g. `foo` and
+    /// `foo:bar`) cannot alias under `scan_prefix`. A bare `:` delimiter
+    /// was vulnerable because proposal IDs are unconstrained strings
+    /// and may legitimately contain `:`; a length prefix makes the
+    /// boundary unambiguous. `.len() as u32` is wrapping on overflow;
+    /// proposal IDs exceeding 4 GiB are not a realistic scenario and
+    /// would produce harmless aliasing confined to absurd-sized IDs.
+    fn len_prefixed(bytes: &[u8]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(4 + bytes.len());
+        out.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
+        out.extend_from_slice(bytes);
+        out
+    }
+
     fn mandate_by_proposal_key(proposal_id: &str, issued_at: u64, id: &MandateId) -> Vec<u8> {
         let mut key = MANDATE_BY_PROPOSAL_PREFIX.to_vec();
-        key.extend_from_slice(proposal_id.as_bytes());
-        key.push(b':');
+        key.extend_from_slice(&Self::len_prefixed(proposal_id.as_bytes()));
         key.extend_from_slice(&issued_at.to_be_bytes());
-        key.push(b':');
         key.extend_from_slice(id.0.hyphenated().to_string().as_bytes());
         key
     }
 
     fn mandate_by_proposal_scan_prefix(proposal_id: &str) -> Vec<u8> {
         let mut prefix = MANDATE_BY_PROPOSAL_PREFIX.to_vec();
-        prefix.extend_from_slice(proposal_id.as_bytes());
-        prefix.push(b':');
+        prefix.extend_from_slice(&Self::len_prefixed(proposal_id.as_bytes()));
         prefix
     }
 
@@ -1613,6 +1625,121 @@ mod tests {
             .list_mandates_by_decision(&decision_hash)
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn mandate_by_proposal_index_does_not_alias_colon_prefixes() {
+        // Regression: the by_proposal index used a raw `proposal_id +
+        // ':'` boundary, which aliased `foo` against `foo:bar` under
+        // scan_prefix (Codex P2 on #1575). In the seam's idempotency
+        // check, that could make a fresh "foo" proposal return
+        // AlreadyMinted with "foo:bar"'s mandate. Length-prefix
+        // encoding makes the boundary unambiguous.
+        let store = ReceiptStore::new(temp_db());
+        let decision_a = [0xaau8; 32];
+        let decision_b = [0xbbu8; 32];
+
+        let mandate_foo = Mandate::new_pending_grants(
+            DecisionProvenance {
+                proposal_id: "foo".into(),
+                decision_hash: decision_a,
+            },
+            [1u8; 32],
+            None,
+            None,
+            100,
+        );
+        let mandate_foo_bar = Mandate::new_pending_grants(
+            DecisionProvenance {
+                proposal_id: "foo:bar".into(),
+                decision_hash: decision_b,
+            },
+            [2u8; 32],
+            None,
+            None,
+            200,
+        );
+
+        // Write the deeper-prefixed proposal first — this maximises the
+        // chance of aliasing if the index is buggy, because `foo:bar:...`
+        // would sort under `foo:` scan.
+        store.put_mandate(&mandate_foo_bar).unwrap();
+        store.put_mandate(&mandate_foo).unwrap();
+
+        // Exact match only
+        let foo = store.get_mandate_by_proposal("foo").unwrap().unwrap();
+        assert_eq!(
+            foo.id, mandate_foo.id,
+            "get('foo') must not alias to 'foo:bar'"
+        );
+        assert_eq!(foo.decision.proposal_id, "foo");
+
+        let foo_bar = store.get_mandate_by_proposal("foo:bar").unwrap().unwrap();
+        assert_eq!(foo_bar.id, mandate_foo_bar.id);
+        assert_eq!(foo_bar.decision.proposal_id, "foo:bar");
+
+        // Negative case: "fo" must not match either
+        assert!(store.get_mandate_by_proposal("fo").unwrap().is_none());
+        // And "foo:" (with trailing colon) must not match the bare "foo"
+        assert!(store.get_mandate_by_proposal("foo:").unwrap().is_none());
+    }
+
+    #[test]
+    fn seam_idempotency_is_not_fooled_by_colon_aliased_proposal_id() {
+        // Seam-level proof: minting for "foo:bar" then minting for "foo"
+        // must produce two distinct Minted outcomes, not AlreadyMinted
+        // for the second call. This is the concrete correctness bug
+        // the prefix-alias fix closes.
+        use icn_governance::sdis::SdisProposal;
+        use icn_governance::{GovernanceDomainId, ProposalPayload};
+        use icn_governance_actor::grant_minting::{
+            mint_and_persist_for_accepted, MandateMintOutcome,
+        };
+        use icn_identity::Did;
+
+        let store = ReceiptStore::new(temp_db());
+        let domain = GovernanceDomainId("coop:tech".into());
+        let candidate = Did::from_anchor_id(&[9u8; 32]);
+        let payload = ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate,
+                sponsors: vec![],
+                region: "nyc".into(),
+                bond_amount: 1_000,
+                term_length: 3_600,
+            },
+        };
+
+        let outcome_foo_bar = mint_and_persist_for_accepted(
+            &store,
+            "foo:bar",
+            &domain,
+            [0xbbu8; 32],
+            &payload,
+            1_000,
+        )
+        .unwrap();
+        let outcome_foo =
+            mint_and_persist_for_accepted(&store, "foo", &domain, [0xaau8; 32], &payload, 1_000)
+                .unwrap();
+
+        match outcome_foo_bar {
+            MandateMintOutcome::Minted { .. } => {}
+            other => panic!("expected Minted for 'foo:bar'; got {other:?}"),
+        }
+        match outcome_foo {
+            MandateMintOutcome::Minted { .. } => {}
+            other => {
+                panic!("expected Minted for 'foo'; got {other:?} — prefix aliasing regression")
+            }
+        }
+
+        // Two distinct mandates exist
+        let m_foo = store.get_mandate_by_proposal("foo").unwrap().unwrap();
+        let m_foo_bar = store.get_mandate_by_proposal("foo:bar").unwrap().unwrap();
+        assert_ne!(m_foo.id, m_foo_bar.id);
+        assert_eq!(m_foo.decision.proposal_id, "foo");
+        assert_eq!(m_foo_bar.decision.proposal_id, "foo:bar");
     }
 
     #[test]

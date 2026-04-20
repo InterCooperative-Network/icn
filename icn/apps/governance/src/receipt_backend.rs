@@ -110,16 +110,16 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// idempotent. Default impl is a no-op so downstream backends can
     /// opt in without breaking.
     ///
-    /// **Override status (ADR-0014 bootstrap):** The in-memory test
-    /// backend overrides. The production sled-backed
-    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore) does
-    /// **not** yet override — a follow-up tranche is required to add
-    /// sled column families for mandate storage. Until then, the
-    /// gateway's acceptance path records the mandate in tracing logs
-    /// (via the `GovernanceManager` error path when a backend returns
-    /// an error) but the sled backend simply no-ops. Operators that
-    /// need durable mandate records today must provide their own
-    /// overriding backend.
+    /// **Override status:** The in-memory test backend and the
+    /// production sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore) both
+    /// override. The sled override uses a single transaction covering
+    /// the mandate primary record and both the proposal and decision
+    /// secondary indexes, so on-disk index skew from a partial write
+    /// cannot happen. The default no-op here is only reached by
+    /// backends that have not opted in to mandate storage; the
+    /// acceptance seam treats such backends as having no durable
+    /// mandate store and records the mandate in tracing logs only.
     fn put_mandate(&self, _mandate: &Mandate) -> Result<(), String> {
         Ok(())
     }
@@ -211,13 +211,17 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// pending-grants semantics rather than referencing a grant ID that
     /// cannot be retrieved.
     ///
-    /// **Override status (ADR-0014 bootstrap):** The in-memory test
-    /// backend overrides. The production sled-backed
-    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore) does
-    /// **not** yet override — a follow-up tranche is required to add
-    /// sled column families for grant storage, in the same way mandate
-    /// storage is deferred. Operators that need durable grant records
-    /// today must provide their own overriding backend.
+    /// **Override status:** The in-memory test backend and the
+    /// production sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore) both
+    /// override. The sled override uses a single transaction covering
+    /// the grant primary record and (when `granted_by` is set) the
+    /// decision-hash secondary index, so on-disk index skew cannot
+    /// happen. The default no-op here is only reached by backends that
+    /// have not opted in to grant storage; the acceptance seam's
+    /// read-after-write check and the
+    /// [`Self::put_mandate_with_grants`] sentinel ensure a non-durable
+    /// grant never ends up referenced by a strict mandate.
     fn put_authority_grant(&self, _grant: &AuthorityGrant) -> Result<(), String> {
         Ok(())
     }
