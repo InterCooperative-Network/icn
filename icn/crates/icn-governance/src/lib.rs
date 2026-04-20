@@ -211,7 +211,7 @@ pub use authority::{
     parse_authority_scope_strings, AmountCeiling, AmountUnit, AuthorityClass, AuthorityGrant,
     AuthorityGrantId, DecisionProvenance, Grantee, GrantorEntityId, TimeWindow, TypedScope,
 };
-pub use mandate::{Mandate, MandateId, MandateStatus};
+pub use mandate::{Mandate, MandateError, MandateId, MandateStatus};
 
 /// Unix timestamp in seconds
 pub type Timestamp = u64;

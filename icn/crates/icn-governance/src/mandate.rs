@@ -70,12 +70,23 @@
 //! semantics.
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use uuid::Uuid;
 
 use crate::authority::{AuthorityGrantId, DecisionProvenance};
 use crate::proof::Hash;
 use crate::Timestamp;
 use icn_identity::Did;
+
+/// Errors returned when constructing a [`Mandate`] that violates an
+/// ADR-0014 invariant.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum MandateError {
+    /// Grants vector was empty. A mandate must compose at least one
+    /// [`AuthorityGrantId`] — unbounded authorization is forbidden.
+    #[error("mandate must carry at least one authority grant")]
+    EmptyGrants,
+}
 
 /// Unique identifier for a [`Mandate`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -142,8 +153,10 @@ pub enum MandateStatus {
 /// [`MandateStatus::Pending`]. Callers must supply the decision
 /// provenance, payload hash, and at least one [`AuthorityGrantId`]. A
 /// mandate with an empty `grants` vector is not a valid constitutional
-/// authorization; downstream code minting mandates should refuse that
-/// case (the ADR-0014 rule that authority must be bounded).
+/// authorization — the ADR-0014 rule is that authority must be bounded.
+/// The constructor enforces this invariant and returns
+/// [`MandateError::EmptyGrants`] if violated, so no caller can mint an
+/// unbounded mandate.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Mandate {
     /// Stable identifier for the mandate.
@@ -178,6 +191,10 @@ pub struct Mandate {
 impl Mandate {
     /// Construct a new mandate with a fresh identifier and
     /// [`MandateStatus::Pending`].
+    ///
+    /// Returns [`MandateError::EmptyGrants`] if `grants` is empty. This
+    /// enforces the ADR-0014 invariant that a mandate must carry bounded
+    /// authority; no caller may mint an unbounded mandate.
     pub fn new(
         decision: DecisionProvenance,
         payload_hash: Hash,
@@ -185,8 +202,11 @@ impl Mandate {
         executor: Option<Did>,
         deadline: Option<Timestamp>,
         issued_at: Timestamp,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, MandateError> {
+        if grants.is_empty() {
+            return Err(MandateError::EmptyGrants);
+        }
+        Ok(Self {
             id: MandateId::new(),
             decision,
             payload_hash,
@@ -195,7 +215,7 @@ impl Mandate {
             deadline,
             status: MandateStatus::Pending,
             issued_at,
-        }
+        })
     }
 
     /// Return `true` if `now >= deadline` (when a deadline is set).
@@ -234,8 +254,15 @@ mod tests {
             Some(did(1)),
             Some(1000),
             100,
-        );
+        )
+        .unwrap();
         assert_eq!(m.status, MandateStatus::Pending);
+    }
+
+    #[test]
+    fn mandate_new_rejects_empty_grants() {
+        let err = Mandate::new(sample_decision(), [0u8; 32], vec![], None, None, 0).unwrap_err();
+        assert_eq!(err, MandateError::EmptyGrants);
     }
 
     #[test]
@@ -243,8 +270,8 @@ mod tests {
         let d = sample_decision();
         let p = [0u8; 32];
         let g = AuthorityGrantId::new();
-        let m1 = Mandate::new(d.clone(), p, vec![g.clone()], None, None, 0);
-        let m2 = Mandate::new(d.clone(), p, vec![g.clone()], None, None, 0);
+        let m1 = Mandate::new(d.clone(), p, vec![g.clone()], None, None, 0).unwrap();
+        let m2 = Mandate::new(d.clone(), p, vec![g.clone()], None, None, 0).unwrap();
         assert_ne!(m1.id, m2.id);
         assert_eq!(m1.decision, m2.decision);
     }
@@ -258,7 +285,8 @@ mod tests {
             None,
             Some(500),
             100,
-        );
+        )
+        .unwrap();
         assert!(!m.is_past_deadline(499));
         assert!(m.is_past_deadline(500));
         assert!(m.is_past_deadline(1000));
@@ -270,7 +298,8 @@ mod tests {
             None,
             None,
             100,
-        );
+        )
+        .unwrap();
         assert!(!m_no_deadline.is_past_deadline(u64::MAX));
     }
 
@@ -300,7 +329,8 @@ mod tests {
             Some(did(1)),
             Some(2000),
             1500,
-        );
+        )
+        .unwrap();
         let json = serde_json::to_string(&m).unwrap();
         let back: Mandate = serde_json::from_str(&json).unwrap();
         assert_eq!(m, back);

@@ -93,10 +93,15 @@ pub enum AmountUnit {
 }
 
 /// A non-negative magnitude bound expressed in an institutional unit.
+///
+/// The typed bound is deliberately unsigned: a ceiling expresses "at most
+/// this much" and a negative bound has no institutional meaning. Parsers
+/// that receive signed input reject negatives rather than silently
+/// coercing them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AmountCeiling {
-    /// Ceiling value. Interpretation depends on `unit`.
-    pub value: i64,
+    /// Non-negative ceiling value. Interpretation depends on `unit`.
+    pub value: u64,
     /// The institutional unit the value is expressed in.
     pub unit: AmountUnit,
 }
@@ -367,8 +372,10 @@ pub fn parse_authority_scope_strings(labels: &[String]) -> Option<TypedScope> {
         };
         match prefix {
             "domain" => {
-                scope.domain = Some(GovernanceDomainId(rest.to_string()));
-                any_recognized = true;
+                if !rest.is_empty() {
+                    scope.domain = Some(GovernanceDomainId(rest.to_string()));
+                    any_recognized = true;
+                }
             }
             "proposal_class" => {
                 if !rest.is_empty() {
@@ -383,11 +390,13 @@ pub fn parse_authority_scope_strings(labels: &[String]) -> Option<TypedScope> {
                 }
             }
             "amount_ceiling" => {
-                // Expect `<int>:<unit>` in `rest`.
+                // Expect `<non-negative int>:<unit>` in `rest`.
                 let Some((value_str, unit_str)) = rest.split_once(':') else {
                     continue;
                 };
-                let Ok(value) = value_str.parse::<i64>() else {
+                // u64 parse rejects negatives by construction; `AmountCeiling`
+                // carries a non-negative bound.
+                let Ok(value) = value_str.parse::<u64>() else {
                     continue;
                 };
                 let unit = match unit_str {
@@ -395,6 +404,9 @@ pub fn parse_authority_scope_strings(labels: &[String]) -> Option<TypedScope> {
                     "labor_hours" => AmountUnit::LaborHours,
                     other => {
                         if let Some(res) = other.strip_prefix("resource:") {
+                            if res.is_empty() {
+                                continue;
+                            }
                             AmountUnit::Resource(res.to_string())
                         } else {
                             continue;
@@ -615,6 +627,25 @@ mod tests {
         );
         // Unknown unit (no resource: prefix, no known bare unit)
         assert!(parse_authority_scope_strings(&["amount_ceiling:100:usd".to_string()]).is_none());
+        // Negative value (rejected: `AmountCeiling` is non-negative by type)
+        assert!(
+            parse_authority_scope_strings(&["amount_ceiling:-1:credit_units".to_string()])
+                .is_none()
+        );
+        // Empty resource name
+        assert!(
+            parse_authority_scope_strings(&["amount_ceiling:10:resource:".to_string()]).is_none()
+        );
+    }
+
+    #[test]
+    fn parse_scope_strings_ignores_empty_label_payloads() {
+        // Empty `domain:` must not produce `domain: Some("")`.
+        assert!(parse_authority_scope_strings(&["domain:".to_string()]).is_none());
+        // Empty `proposal_class:` must not populate the list.
+        assert!(parse_authority_scope_strings(&["proposal_class:".to_string()]).is_none());
+        // Empty `action_kind:` must not populate the list.
+        assert!(parse_authority_scope_strings(&["action_kind:".to_string()]).is_none());
     }
 
     #[test]
