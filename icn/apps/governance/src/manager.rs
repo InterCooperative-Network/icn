@@ -16,17 +16,17 @@ use icn_federation::BilateralClearingAgreement;
 use icn_governance::{
     scopes_overlap, ActionItem, ActionItemFilter, ActionItemId, ActionItemPriority,
     ActionItemStatus, ActionItemStoreBackend, Activity, ActivityId, ActivityKind,
-    ActivityStoreBackend, AuthorityGrant, Comment, CommentId, DecisionProvenance, Delegation,
-    DelegationId, DelegationScope, Discussion, DiscussionStore, GovernanceConfig,
-    GovernanceDecisionReceipt, GovernanceDomain, GovernanceDomainId, GovernanceError,
-    GovernanceOps, GovernanceParams, GovernanceProfileId, InMemoryActionItemStore,
-    InMemoryActivityStore, InMemoryDiscussionStore, InMemoryMeetingStore, InMemoryMilestoneStore,
-    InMemoryProgramStore, InMemoryStructureStore, Mandate, Meeting, MeetingId, MeetingStoreBackend,
-    MembershipConfig, MembershipSource, Milestone, MilestoneId, MilestoneStatus,
-    MilestoneStoreBackend, PaginatedResult, Program, ProgramId, ProgramKind, ProgramStatus,
-    ProgramStoreBackend, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload,
-    ProposalScope, ProposalState, RoleAssignment, Structure, StructureId, StructureKind,
-    StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
+    ActivityStoreBackend, Comment, CommentId, Delegation, DelegationId, DelegationScope,
+    Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt, GovernanceDomain,
+    GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
+    InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore, InMemoryMeetingStore,
+    InMemoryMilestoneStore, InMemoryProgramStore, InMemoryStructureStore, Meeting, MeetingId,
+    MeetingStoreBackend, MembershipConfig, MembershipSource, Milestone, MilestoneId,
+    MilestoneStatus, MilestoneStoreBackend, PaginatedResult, Program, ProgramId, ProgramKind,
+    ProgramStatus, ProgramStoreBackend, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
+    ProposalPayload, ProposalScope, ProposalState, RoleAssignment, Structure, StructureId,
+    StructureKind, StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally,
+    DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -162,32 +162,6 @@ pub struct ReconciledEffectEntry {
     pub record: InstitutionalEffectRecord,
     pub dispatch_evidence: Vec<EffectDispatchEvidence>,
     pub reconciliation_status: ReconciliationStatus,
-}
-
-/// Compute a deterministic blake3 hash over the serialized proposal
-/// payload, for binding a [`Mandate`] to the concrete content of the
-/// decision (ADR-0014 `payload_hash` field).
-///
-/// The hash is taken over the current `serde_json::to_vec(payload)`
-/// byte representation. This is treated as deterministic for the
-/// `ProposalPayload` shape and `serde_json` configuration used at
-/// acceptance time, but it is **not** a formally canonical JSON
-/// encoding — if `ProposalPayload` changes shape or `serde_json`
-/// semantics drift, payload hashes from older decisions will not be
-/// reproducible and must be read from the mandate record rather than
-/// recomputed.
-///
-/// Returns `Err` on serialization failure. The caller must decline to
-/// mint a mandate in that case; substituting a sentinel hash would
-/// collapse distinct payloads to the same content-binding and silently
-/// break the mandate↔payload invariant. Serialization failure on a
-/// payload that was accepted by the governance pipeline is not
-/// expected in practice.
-fn hash_proposal_payload(
-    payload: &ProposalPayload,
-) -> Result<icn_kernel_api::Hash, serde_json::Error> {
-    let bytes = serde_json::to_vec(payload)?;
-    Ok(*blake3::hash(&bytes).as_bytes())
 }
 
 /// Label the translated [`crate::http::configure::GovernanceEffect`] shape
@@ -3499,136 +3473,61 @@ impl GovernanceManager {
                 // ADR-0014 constitutional-memory seam.
                 //
                 // An Accepted decision produces a bounded institutional
-                // authorization to carry out its effects — a `Mandate`. We
-                // record that mandate here, upstream of any
-                // `InstitutionalEffectRecord` or `EffectDispatchEvidence`
-                // (which are evidence-side, see `institutional_effect.rs`).
+                // authorization to carry out its effects — a `Mandate`,
+                // optionally composed with narrow `AuthorityGrant`
+                // records. Both are persisted through the shared
+                // [`crate::grant_minting::mint_and_persist_for_accepted`]
+                // helper, which is the canonical seam called by this
+                // standalone path AND by the actor-backed close handler
+                // so both paths produce the same constitutional-memory
+                // artifact.
                 //
-                // Bootstrap-phase posture: typed `AuthorityGrant` minting is
-                // not yet implemented, so we use
-                // `Mandate::new_pending_grants`. The mandate is
-                // institutional memory that authorization arose from this
-                // decision; it carries no executable authority until a
-                // later tranche attaches grants. This is intentionally
-                // **behavior-neutral**: no executor gating, no dispatcher
-                // wiring changes.
+                // This sits upstream of any `InstitutionalEffectRecord`
+                // or `EffectDispatchEvidence` (which are evidence-side,
+                // see `institutional_effect.rs`) and is intentionally
+                // **behavior-neutral**: no executor gating, no
+                // dispatcher wiring changes.
                 if matches!(outcome, ProofOutcome::Accepted) {
-                    match hash_proposal_payload(&proposal.payload) {
-                        Ok(payload_hash) => {
-                            let decision_prov = DecisionProvenance {
-                                proposal_id: proposal_id.0.clone(),
-                                decision_hash: receipt.decision_hash,
-                            };
-
-                            // ADR-0014 bounded-authority seam.
-                            //
-                            // Derive zero or more `AuthorityGrant`s from the
-                            // accepted payload. Today only steward-appointment
-                            // and steward-reconfirmation proposals mint grants;
-                            // every other class returns an empty `Vec` and the
-                            // mandate is recorded with no grants attached
-                            // (still institutional-memory, still bound to the
-                            // decision, but explicitly unbound on authority
-                            // until a later tranche widens the mapping).
-                            let grants = crate::grant_minting::derive_grants_for_accepted_proposal(
-                                &proposal.payload,
-                                &proposal.domain_id,
-                                &decision_prov,
-                                now,
+                    match crate::grant_minting::mint_and_persist_for_accepted(
+                        store.as_ref(),
+                        &proposal_id.0,
+                        &proposal.domain_id,
+                        receipt.decision_hash,
+                        &proposal.payload,
+                        now,
+                    ) {
+                        Ok(crate::grant_minting::MandateMintOutcome::Minted {
+                            mandate_id,
+                            grants_persisted,
+                        }) => {
+                            tracing::debug!(
+                                proposal_id = %proposal_id.0,
+                                %mandate_id,
+                                grants_persisted,
+                                "Minted ADR-0014 mandate (standalone path)"
                             );
-
-                            let grant_ids: Vec<_> = grants.iter().map(|g| g.id.clone()).collect();
-
-                            // Persist grants **before** the mandate. If a
-                            // grant write fails we log and continue — the
-                            // mandate is still recorded, but with
-                            // `has_no_grants()` semantics because the
-                            // authorization binding did not land durably.
-                            let mut persisted_grants: Vec<AuthorityGrant> = Vec::new();
-                            for grant in &grants {
-                                match store.put_authority_grant(grant) {
-                                    Ok(()) => persisted_grants.push(grant.clone()),
-                                    Err(e) => {
-                                        tracing::error!(
-                                            proposal_id = %proposal_id.0,
-                                            grant_id = %grant.id,
-                                            error = %e,
-                                            "Failed to store authority grant — \
-                                             grant binding lost for this decision"
-                                        );
-                                    }
-                                }
-                            }
-
-                            let mandate = if persisted_grants.len() == grants.len()
-                                && !grant_ids.is_empty()
-                            {
-                                // All derived grants persisted. Construct the
-                                // mandate through the strict `::new` path so
-                                // the constructor enforces the non-empty
-                                // invariant.
-                                match Mandate::new(
-                                    decision_prov,
-                                    payload_hash,
-                                    grant_ids,
-                                    None,
-                                    None,
-                                    now,
-                                ) {
-                                    Ok(m) => m,
-                                    Err(e) => {
-                                        // Only reachable if grant_ids became
-                                        // empty between the check and here,
-                                        // which it cannot; log defensively.
-                                        tracing::error!(
-                                            proposal_id = %proposal_id.0,
-                                            error = %e,
-                                            "Mandate::new rejected derived grant set; falling back to pending-grants"
-                                        );
-                                        Mandate::new_pending_grants(
-                                            DecisionProvenance {
-                                                proposal_id: proposal_id.0.clone(),
-                                                decision_hash: receipt.decision_hash,
-                                            },
-                                            payload_hash,
-                                            None,
-                                            None,
-                                            now,
-                                        )
-                                    }
-                                }
-                            } else {
-                                // Either the payload class mints no grants, or
-                                // some grant writes failed. Record the mandate
-                                // as institutional memory, explicitly unbound
-                                // on authority.
-                                Mandate::new_pending_grants(
-                                    DecisionProvenance {
-                                        proposal_id: proposal_id.0.clone(),
-                                        decision_hash: receipt.decision_hash,
-                                    },
-                                    payload_hash,
-                                    None,
-                                    None,
-                                    now,
-                                )
-                            };
-
-                            if let Err(e) = store.put_mandate(&mandate) {
-                                tracing::error!(
-                                    proposal_id = %proposal_id.0,
-                                    mandate_id = %mandate.id,
-                                    error = %e,
-                                    "Failed to store mandate — constitutional-memory record lost"
-                                );
-                            }
+                        }
+                        Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted {
+                            mandate_id,
+                        }) => {
+                            tracing::debug!(
+                                proposal_id = %proposal_id.0,
+                                %mandate_id,
+                                "ADR-0014 mandate already present; idempotent no-op"
+                            );
+                        }
+                        Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
+                            tracing::error!(
+                                proposal_id = %proposal_id.0,
+                                "Failed to hash proposal payload for mandate payload_hash — \
+                                 declining to mint mandate to avoid breaking content-binding invariant"
+                            );
                         }
                         Err(e) => {
                             tracing::error!(
                                 proposal_id = %proposal_id.0,
                                 error = %e,
-                                "Failed to hash proposal payload for mandate payload_hash — \
-                                 declining to mint mandate to avoid breaking content-binding invariant"
+                                "Failed to persist ADR-0014 mandate — constitutional-memory record lost"
                             );
                         }
                     }

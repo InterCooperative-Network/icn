@@ -43,8 +43,152 @@
 
 use icn_governance::{
     AuthorityClass, AuthorityGrant, AuthorityGrantId, DecisionProvenance, GovernanceDomainId,
-    Grantee, GrantorEntityId, ProposalPayload, Timestamp, TypedScope,
+    Grantee, GrantorEntityId, Mandate, MandateId, ProposalPayload, Timestamp, TypedScope,
 };
+
+use crate::receipt_backend::GovernanceReceiptBackend;
+
+/// Canonical content hash of a `ProposalPayload`.
+///
+/// Used by the mandate seam to bind the accepted decision's content into
+/// the mandate. Returns `Err` on serialization failure — callers must
+/// decline to mint a mandate in that case; substituting a sentinel hash
+/// would collapse distinct payloads to the same content-binding and
+/// silently break the mandate↔payload invariant.
+pub(crate) fn hash_proposal_payload(
+    payload: &ProposalPayload,
+) -> Result<icn_kernel_api::Hash, serde_json::Error> {
+    let bytes = serde_json::to_vec(payload)?;
+    Ok(*blake3::hash(&bytes).as_bytes())
+}
+
+/// Outcome of running the ADR-0014 mandate seam at acceptance time.
+///
+/// Modeled after [`crate::institutional_effect::AcceptanceEmissionOutcome`]
+/// so both paths that call into the seam can pattern-match uniformly.
+#[derive(Debug, Clone)]
+pub enum MandateMintOutcome {
+    /// A new mandate was derived and persisted. `grants_persisted` is the
+    /// number of `AuthorityGrant`s that were successfully stored before
+    /// the mandate — it may be zero (e.g. a `Text` proposal), in which
+    /// case the mandate was recorded with `has_no_grants()` semantics.
+    Minted {
+        mandate_id: MandateId,
+        grants_persisted: usize,
+    },
+    /// A mandate for this proposal already exists in the backend.
+    /// Idempotent re-acceptance; no new writes happened.
+    AlreadyMinted { mandate_id: MandateId },
+    /// Payload hashing failed, so no mandate was minted. Substituting a
+    /// sentinel hash would silently break content-binding.
+    HashFailed,
+}
+
+/// Mint and persist the constitutional-memory artifacts for an accepted
+/// decision — zero or more [`AuthorityGrant`]s plus one [`Mandate`].
+///
+/// This is the **canonical shared seam** called by both the standalone
+/// close path in [`crate::manager::GovernanceManager::close_proposal_inner`]
+/// and the actor-backed close handler in [`crate::actor`]. Both paths
+/// invoke it with the same arguments so the constitutional-memory
+/// record lands regardless of which path produced the acceptance.
+///
+/// Idempotency: if a mandate already exists for `proposal_id` in the
+/// backend, returns [`MandateMintOutcome::AlreadyMinted`] without
+/// writing. This matches the actor/HTTP idempotency pattern used by
+/// the institutional-effect seam.
+///
+/// Caller contract: only invoke after the proposal has been recorded
+/// as `Accepted` and after the governance decision receipt has been
+/// stored (so `decision_hash` binds into the INV-5 chain).
+pub fn mint_and_persist_for_accepted(
+    backend: &dyn GovernanceReceiptBackend,
+    proposal_id: &str,
+    domain_id: &GovernanceDomainId,
+    decision_hash: icn_kernel_api::Hash,
+    payload: &ProposalPayload,
+    now: Timestamp,
+) -> Result<MandateMintOutcome, String> {
+    // Idempotency: if a mandate already exists for this proposal, don't
+    // re-derive or re-persist. Backends that don't implement the lookup
+    // (the default-no-op) return `Ok(None)`, which falls through to the
+    // mint path; in that case duplicate minting is acceptable because
+    // the default-no-op put is also a no-op.
+    if let Some(prior) = backend.get_mandate_by_proposal(proposal_id)? {
+        return Ok(MandateMintOutcome::AlreadyMinted {
+            mandate_id: prior.id,
+        });
+    }
+
+    let payload_hash = match hash_proposal_payload(payload) {
+        Ok(h) => h,
+        Err(_) => return Ok(MandateMintOutcome::HashFailed),
+    };
+
+    let decision_prov = DecisionProvenance {
+        proposal_id: proposal_id.to_string(),
+        decision_hash,
+    };
+
+    // Derive zero or more grants. Empty vec is the truthful default for
+    // most payload classes today.
+    let grants = derive_grants_for_accepted_proposal(payload, domain_id, &decision_prov, now);
+    let grant_ids: Vec<_> = grants.iter().map(|g| g.id.clone()).collect();
+
+    // Persist grants **before** the mandate. If a grant write fails we
+    // log and continue — the mandate is still recorded, but with
+    // `has_no_grants()` semantics because the authorization binding did
+    // not land durably.
+    let mut persisted_grants: Vec<AuthorityGrant> = Vec::new();
+    for grant in &grants {
+        match backend.put_authority_grant(grant) {
+            Ok(()) => persisted_grants.push(grant.clone()),
+            Err(e) => {
+                tracing::error!(
+                    proposal_id = %proposal_id,
+                    grant_id = %grant.id,
+                    error = %e,
+                    "Failed to store authority grant — grant binding lost for this decision"
+                );
+            }
+        }
+    }
+
+    let mandate = if persisted_grants.len() == grants.len() && !grant_ids.is_empty() {
+        match Mandate::new(
+            decision_prov.clone(),
+            payload_hash,
+            grant_ids,
+            None,
+            None,
+            now,
+        ) {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::error!(
+                    proposal_id = %proposal_id,
+                    error = %e,
+                    "Mandate::new rejected derived grant set; falling back to pending-grants"
+                );
+                Mandate::new_pending_grants(decision_prov, payload_hash, None, None, now)
+            }
+        }
+    } else {
+        // Either the payload class mints no grants, or some grant writes
+        // failed. Record the mandate as institutional memory, explicitly
+        // unbound on authority.
+        Mandate::new_pending_grants(decision_prov, payload_hash, None, None, now)
+    };
+
+    let mandate_id = mandate.id.clone();
+    let grants_persisted = persisted_grants.len();
+    backend.put_mandate(&mandate)?;
+
+    Ok(MandateMintOutcome::Minted {
+        mandate_id,
+        grants_persisted,
+    })
+}
 
 /// Derive zero or more [`AuthorityGrant`]s from an accepted proposal.
 ///
