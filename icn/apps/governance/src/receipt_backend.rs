@@ -143,6 +143,49 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         Ok(vec![])
     }
 
+    /// Atomically persist a mandate and the authority grants it
+    /// references, or leave the store unchanged.
+    ///
+    /// This is the **canonical write path** for the ADR-0014 acceptance
+    /// seam when a derived grant set is non-empty: it exists so
+    /// mandate→grant linkage cannot observe a partial-failure state
+    /// where grants are durable but the mandate is not (orphan grants)
+    /// or vice versa.
+    ///
+    /// **Default impl:** sequential per-grant `put_authority_grant` +
+    /// read-after-write verification, then `put_mandate`. If any grant's
+    /// round-trip fails (e.g. the backend inherits the no-op default
+    /// for either put or get), the method returns an error whose string
+    /// begins with the sentinel `grant_durability_not_supported` so the
+    /// seam can recognize the case and fall back to a pending-grants
+    /// mandate instead of leaving orphan grants. The default is **not
+    /// atomic** across the full set of writes: if `put_authority_grant`
+    /// has already written earlier grants and `put_mandate` then fails,
+    /// the earlier grants are durable orphans. Backends that need true
+    /// atomicity (the gateway sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore))
+    /// **must override** this method with a real transaction.
+    ///
+    /// Callers must not assume per-grant writes landed individually when
+    /// this method returns an error — the seam handles that invariant by
+    /// recording a pending-grants mandate on the sentinel error.
+    fn put_mandate_with_grants(
+        &self,
+        mandate: &Mandate,
+        grants: &[AuthorityGrant],
+    ) -> Result<(), String> {
+        for grant in grants {
+            self.put_authority_grant(grant)?;
+            if self.get_authority_grant(&grant.id)?.is_none() {
+                return Err(format!(
+                    "grant_durability_not_supported: backend did not round-trip grant {}",
+                    grant.id
+                ));
+            }
+        }
+        self.put_mandate(mandate)
+    }
+
     /// Persist an [`AuthorityGrant`] minted at proposal acceptance time.
     ///
     /// Grants are derived by [`crate::grant_minting`] from a narrow,

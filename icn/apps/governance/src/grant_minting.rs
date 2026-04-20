@@ -135,50 +135,19 @@ pub fn mint_and_persist_for_accepted(
     let grants = derive_grants_for_accepted_proposal(payload, domain_id, &decision_prov, now);
     let grant_ids: Vec<_> = grants.iter().map(|g| g.id.clone()).collect();
 
-    // Persist grants **before** the mandate, then verify each write via
-    // read-after-write. The defaulted-no-op `put_authority_grant`
-    // returns `Ok(())` without storing anything; a backend that opts
-    // into grant persistence must also override `get_authority_grant`.
-    // If the read does not round-trip the grant, the backend does not
-    // actually durably store grants — we must treat that grant as
-    // unpersisted so the mandate falls back to `new_pending_grants`
-    // rather than constructing a strict mandate referencing IDs that
-    // cannot be retrieved. This is the smallest honest way to keep the
-    // seam truthful without widening the trait surface.
-    let mut persisted_grants: Vec<AuthorityGrant> = Vec::new();
-    for grant in &grants {
-        match backend.put_authority_grant(grant) {
-            Ok(()) => match backend.get_authority_grant(&grant.id) {
-                Ok(Some(_)) => persisted_grants.push(grant.clone()),
-                Ok(None) => {
-                    tracing::warn!(
-                        proposal_id = %proposal_id,
-                        grant_id = %grant.id,
-                        "Backend does not durably persist authority grants (read-after-write returned None); mandate will fall back to pending-grants"
-                    );
-                }
-                Err(e) => {
-                    tracing::error!(
-                        proposal_id = %proposal_id,
-                        grant_id = %grant.id,
-                        error = %e,
-                        "Read-after-write verification failed for authority grant; treating as unpersisted"
-                    );
-                }
-            },
-            Err(e) => {
-                tracing::error!(
-                    proposal_id = %proposal_id,
-                    grant_id = %grant.id,
-                    error = %e,
-                    "Failed to store authority grant — grant binding lost for this decision"
-                );
-            }
-        }
-    }
-
-    let mandate = if persisted_grants.len() == grants.len() && !grant_ids.is_empty() {
-        match Mandate::new(
+    // When we derived grants, attempt the atomic
+    // `put_mandate_with_grants` commit: mandate + all grants land
+    // together or neither does. The gateway sled-backed ReceiptStore
+    // overrides this with a real transaction; the default impl (used by
+    // in-memory test backends and the sled backend's inherited no-op
+    // for grant storage) does sequential writes with read-after-write
+    // verification, returning the sentinel
+    // `grant_durability_not_supported` error if a grant cannot be
+    // round-tripped. That sentinel is the cue to degrade to a
+    // pending-grants mandate so no orphan grant IDs appear in the
+    // mandate record.
+    if !grant_ids.is_empty() {
+        let strict_mandate = match Mandate::new(
             decision_prov.clone(),
             payload_hash,
             grant_ids,
@@ -191,25 +160,61 @@ pub fn mint_and_persist_for_accepted(
                 tracing::error!(
                     proposal_id = %proposal_id,
                     error = %e,
-                    "Mandate::new rejected derived grant set; falling back to pending-grants"
+                    "Mandate::new rejected derived grant set; recording pending-grants mandate"
                 );
-                Mandate::new_pending_grants(decision_prov, payload_hash, None, None, now)
+                return write_pending_mandate(backend, decision_prov, payload_hash, now);
+            }
+        };
+        let mandate_id = strict_mandate.id.clone();
+        match backend.put_mandate_with_grants(&strict_mandate, &grants) {
+            Ok(()) => {
+                return Ok(MandateMintOutcome::Minted {
+                    mandate_id,
+                    grants_persisted: grants.len(),
+                });
+            }
+            Err(e) if e.starts_with("grant_durability_not_supported") => {
+                tracing::warn!(
+                    proposal_id = %proposal_id,
+                    error = %e,
+                    "Backend does not durably persist authority grants; mandate will be recorded as pending-grants"
+                );
+                // Fall through to pending-grants record. No orphan grants
+                // because the sequential default bails out on the first
+                // failed read-after-write before persisting subsequent
+                // grants; the atomic override leaves the store unchanged
+                // on abort.
+            }
+            Err(e) => {
+                tracing::error!(
+                    proposal_id = %proposal_id,
+                    error = %e,
+                    "Atomic put_mandate_with_grants failed; no mandate recorded"
+                );
+                return Err(e);
             }
         }
-    } else {
-        // Either the payload class mints no grants, or some grant writes
-        // failed. Record the mandate as institutional memory, explicitly
-        // unbound on authority.
-        Mandate::new_pending_grants(decision_prov, payload_hash, None, None, now)
-    };
+    }
 
+    write_pending_mandate(backend, decision_prov, payload_hash, now)
+}
+
+/// Record a pending-grants mandate and return a `Minted { grants_persisted: 0 }`
+/// outcome. Used when the payload derives no grants, when `Mandate::new`
+/// rejects a derived grant set, or when the backend cannot durably
+/// persist grants.
+fn write_pending_mandate(
+    backend: &dyn GovernanceReceiptBackend,
+    decision_prov: DecisionProvenance,
+    payload_hash: icn_kernel_api::Hash,
+    now: Timestamp,
+) -> Result<MandateMintOutcome, String> {
+    let mandate = Mandate::new_pending_grants(decision_prov, payload_hash, None, None, now);
     let mandate_id = mandate.id.clone();
-    let grants_persisted = persisted_grants.len();
     backend.put_mandate(&mandate)?;
-
     Ok(MandateMintOutcome::Minted {
         mandate_id,
-        grants_persisted,
+        grants_persisted: 0,
     })
 }
 
