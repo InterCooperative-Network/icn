@@ -172,20 +172,52 @@ impl ReceiptStore {
     }
 
     /// Get a governance decision receipt by proposal_id.
+    ///
+    /// Uses `scan_prefix` over a raw `{proposal_id}:{hex_hash}` secondary
+    /// index that predates the colon-safe length-prefix scheme used by
+    /// `MANDATE_BY_PROPOSAL_PREFIX`. Two proposal IDs where one is a
+    /// `:`-delimited prefix of the other (e.g. `foo` and `foo:bar`) would
+    /// otherwise alias under `scan_prefix`.
+    ///
+    /// **Repair strategy:** filter-on-read. The scan may return aliased
+    /// hits; we defuse them by loading the primary record (which already
+    /// happens in the O(1) lookup) and keeping only those whose canonical
+    /// `proposal_id` matches the requested one. This is zero extra I/O
+    /// versus the pre-repair behavior and needs no migration of
+    /// on-disk data — the index keys stay in their legacy raw-colon
+    /// shape, but reads converge to the canonical truth stored on the
+    /// primary record.
     pub fn get_governance_by_proposal(
         &self,
         proposal_id: &str,
     ) -> Result<Option<GovernanceDecisionReceipt>, String> {
         let prefix = Self::make_proposal_scan_prefix(proposal_id);
 
-        // Scan for all receipts with this proposal_id (should be exactly 1)
         for entry in self.db.scan_prefix(&prefix) {
             let (_, hash_bytes) =
                 entry.map_err(|e| format!("Failed to scan proposal index: {}", e))?;
-            if hash_bytes.len() == 32 {
-                let mut hash = [0u8; 32];
-                hash.copy_from_slice(&hash_bytes);
-                return self.get_governance(&hash);
+            if hash_bytes.len() != 32 {
+                continue;
+            }
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&hash_bytes);
+            match self.get_governance(&hash)? {
+                Some(receipt) if receipt.proposal_id == proposal_id => {
+                    return Ok(Some(receipt));
+                }
+                Some(other) => {
+                    tracing::debug!(
+                        requested = %proposal_id,
+                        found = %other.proposal_id,
+                        "governance proposal index: filtered colon-aliased hit"
+                    );
+                }
+                None => {
+                    tracing::warn!(
+                        proposal_id = %proposal_id,
+                        "governance proposal index skew: primary record missing"
+                    );
+                }
             }
         }
         Ok(None)
@@ -499,6 +531,23 @@ impl ReceiptStore {
 
     /// Scan the secondary index for a proposal and hydrate records in
     /// chronological order (oldest-first).
+    ///
+    /// The secondary index key is
+    /// `effect:institutional:by_proposal:{proposal_id}:{recorded_at_be}:{record_id}`
+    /// — raw bytes, not length-prefixed. A scan with prefix
+    /// `{…}:{proposal_id}:` would otherwise alias when two proposal IDs
+    /// share a `:`-delimited prefix (e.g. `foo` vs `foo:bar`). That
+    /// aliasing is load-bearing here because
+    /// [`emit_accepted_effect`](icn_governance_actor::institutional_effect::emit_accepted_effect)
+    /// uses this lookup for `(proposal_id, effect_kind)` dedup — a false
+    /// hit would silently drop a real new record.
+    ///
+    /// **Repair strategy:** filter-on-read. We already load each primary
+    /// record to hydrate it, so comparing its canonical `proposal_id`
+    /// against the requested one is free. Aliased entries are logged and
+    /// skipped, not returned. Zero extra I/O and no on-disk migration —
+    /// live K3s data keeps working, new writes stay in the same format,
+    /// and dedup now sees a truthful `(proposal_id, effect_kind)` set.
     pub fn list_institutional_effects_by_proposal(
         &self,
         proposal_id: &str,
@@ -531,6 +580,15 @@ impl ReceiptStore {
             };
             let record: InstitutionalEffectRecord = serde_json::from_slice(&bytes)
                 .map_err(|e| format!("deserialize InstitutionalEffectRecord: {e}"))?;
+            if record.proposal_id != proposal_id {
+                tracing::debug!(
+                    requested = %proposal_id,
+                    found = %record.proposal_id,
+                    record_id = %record_id,
+                    "institutional effect proposal index: filtered colon-aliased hit"
+                );
+                continue;
+            }
             out.push(record);
         }
         Ok(out)
@@ -1843,6 +1901,171 @@ mod tests {
                 .unwrap()
                 .len(),
             1
+        );
+    }
+
+    // ============================================================
+    // Legacy proposal-id index colon-alias repair regression tests
+    // ============================================================
+    //
+    // The `PROPOSAL_INDEX_PREFIX` and `INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX`
+    // secondary indexes use raw `{proposal_id}:{…}` key shapes. The
+    // colon-safe length-prefix scheme used by `MANDATE_BY_PROPOSAL_PREFIX`
+    // was not retrofitted onto them because they carry live on-disk
+    // K3s data. Instead, their `get_governance_by_proposal` and
+    // `list_institutional_effects_by_proposal` readers perform a
+    // canonical-proposal-id match against the loaded primary record,
+    // so aliased scan hits never become returned results.
+
+    #[test]
+    fn governance_proposal_index_does_not_alias_colon_prefixes() {
+        let store = ReceiptStore::new(temp_db());
+        // Write only the `foo:bar` receipt. A buggy scan on `foo:` would
+        // return this receipt; the filter must reject it.
+        store
+            .put_governance(&make_test_governance_receipt("foo:bar"))
+            .unwrap();
+
+        let aliased = store.get_governance_by_proposal("foo").unwrap();
+        assert!(
+            aliased.is_none(),
+            "get_governance_by_proposal(\"foo\") leaked a \"foo:bar\" hit under prefix aliasing"
+        );
+
+        let exact = store
+            .get_governance_by_proposal("foo:bar")
+            .unwrap()
+            .expect("exact proposal_id must still resolve");
+        assert_eq!(exact.proposal_id, "foo:bar");
+    }
+
+    #[test]
+    fn governance_proposal_index_returns_correct_receipt_when_both_exist() {
+        let store = ReceiptStore::new(temp_db());
+        // Both `foo` and `foo:bar` live in the index under overlapping
+        // scan-prefix space; each lookup must return its own receipt.
+        let foo_hash = store
+            .put_governance(&make_test_governance_receipt("foo"))
+            .unwrap();
+        let foo_bar_hash = store
+            .put_governance(&make_test_governance_receipt("foo:bar"))
+            .unwrap();
+        assert_ne!(foo_hash, foo_bar_hash);
+
+        let foo = store
+            .get_governance_by_proposal("foo")
+            .unwrap()
+            .expect("foo");
+        assert_eq!(foo.proposal_id, "foo");
+        assert_eq!(foo.decision_hash, foo_hash);
+
+        let foo_bar = store
+            .get_governance_by_proposal("foo:bar")
+            .unwrap()
+            .expect("foo:bar");
+        assert_eq!(foo_bar.proposal_id, "foo:bar");
+        assert_eq!(foo_bar.decision_hash, foo_bar_hash);
+    }
+
+    #[test]
+    fn institutional_effect_index_does_not_alias_colon_prefixes() {
+        let store = ReceiptStore::new(temp_db());
+        // Write only a `foo:bar` record. A buggy scan on `foo:` would
+        // include it; the canonical-id filter must drop it.
+        let rec = InstitutionalEffectRecord::new(
+            "foo:bar",
+            "coop-a",
+            Some([1u8; 32]),
+            "freeze_member",
+            Some("did:icn:x".into()),
+            None,
+            None,
+            100,
+            serde_json::json!({}),
+        );
+        store.put_institutional_effect(&rec).unwrap();
+
+        let aliased = store.list_institutional_effects_by_proposal("foo").unwrap();
+        assert!(
+            aliased.is_empty(),
+            "list_institutional_effects_by_proposal(\"foo\") leaked a \"foo:bar\" hit"
+        );
+
+        let exact = store
+            .list_institutional_effects_by_proposal("foo:bar")
+            .unwrap();
+        assert_eq!(exact.len(), 1);
+        assert_eq!(exact[0].proposal_id, "foo:bar");
+    }
+
+    #[test]
+    fn institutional_effect_index_is_scoped_when_both_proposal_ids_coexist() {
+        let store = ReceiptStore::new(temp_db());
+        let foo = InstitutionalEffectRecord::new(
+            "foo",
+            "coop-a",
+            None,
+            "freeze_member",
+            Some("did:icn:1".into()),
+            None,
+            None,
+            10,
+            serde_json::json!({"src": "foo"}),
+        );
+        let foo_bar = InstitutionalEffectRecord::new(
+            "foo:bar",
+            "coop-a",
+            None,
+            "freeze_member",
+            Some("did:icn:2".into()),
+            None,
+            None,
+            20,
+            serde_json::json!({"src": "foo:bar"}),
+        );
+        store.put_institutional_effect(&foo).unwrap();
+        store.put_institutional_effect(&foo_bar).unwrap();
+
+        let foo_list = store.list_institutional_effects_by_proposal("foo").unwrap();
+        assert_eq!(foo_list.len(), 1);
+        assert_eq!(foo_list[0].proposal_id, "foo");
+        assert_eq!(foo_list[0].target_did.as_deref(), Some("did:icn:1"));
+
+        let foo_bar_list = store
+            .list_institutional_effects_by_proposal("foo:bar")
+            .unwrap();
+        assert_eq!(foo_bar_list.len(), 1);
+        assert_eq!(foo_bar_list[0].proposal_id, "foo:bar");
+        assert_eq!(foo_bar_list[0].target_did.as_deref(), Some("did:icn:2"));
+    }
+
+    #[test]
+    fn institutional_effect_dedup_not_fooled_by_colon_aliased_proposal_id() {
+        // The dedup check inside `emit_accepted_effect` is
+        // `list_institutional_effects_by_proposal(proposal_id)` followed
+        // by a match on `effect_kind`. If aliasing were still leaking
+        // hits, recording `foo` with `freeze_member` after `foo:bar`
+        // with the same kind already exists would spuriously look like
+        // `AlreadyEmitted` and the `foo` record would be silently
+        // dropped. Pin that this cannot happen.
+        let store = ReceiptStore::new(temp_db());
+        let foo_bar = InstitutionalEffectRecord::new(
+            "foo:bar",
+            "coop-a",
+            None,
+            "freeze_member",
+            Some("did:icn:2".into()),
+            None,
+            None,
+            20,
+            serde_json::json!({}),
+        );
+        store.put_institutional_effect(&foo_bar).unwrap();
+
+        let before_foo = store.list_institutional_effects_by_proposal("foo").unwrap();
+        assert!(
+            before_foo.is_empty(),
+            "dedup scan for \"foo\" leaked \"foo:bar\" and would cause silent write loss"
         );
     }
 }
