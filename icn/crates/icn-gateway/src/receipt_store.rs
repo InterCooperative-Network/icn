@@ -180,13 +180,13 @@ impl ReceiptStore {
     /// otherwise alias under `scan_prefix`.
     ///
     /// **Repair strategy:** filter-on-read. The scan may return aliased
-    /// hits; we defuse them by loading the primary record (which already
-    /// happens in the O(1) lookup) and keeping only those whose canonical
-    /// `proposal_id` matches the requested one. This is zero extra I/O
-    /// versus the pre-repair behavior and needs no migration of
-    /// on-disk data — the index keys stay in their legacy raw-colon
-    /// shape, but reads converge to the canonical truth stored on the
-    /// primary record.
+    /// hits; we defuse them by loading candidate primary records and
+    /// keeping only those whose canonical `proposal_id` matches the
+    /// requested one. In aliasing cases this can require additional
+    /// reads and more than one candidate lookup, but it avoids any
+    /// migration of existing on-disk data — the index keys stay in
+    /// their legacy raw-colon shape, while reads converge to the
+    /// canonical truth stored on the primary record.
     pub fn get_governance_by_proposal(
         &self,
         proposal_id: &str,
@@ -215,6 +215,7 @@ impl ReceiptStore {
                 None => {
                     tracing::warn!(
                         proposal_id = %proposal_id,
+                        receipt_hash = %hex::encode(hash),
                         "governance proposal index skew: primary record missing"
                     );
                 }
