@@ -1034,29 +1034,42 @@ impl ReceiptStore {
         revoked_at: Timestamp,
     ) -> Result<(), String> {
         let primary_key = Self::grant_primary_key(grant_id);
-        let Some(bytes) = self
-            .db
-            .get(&primary_key)
-            .map_err(|e| format!("sled get grant primary: {e}"))?
-        else {
-            return Err(format!("grant_not_found: {grant_id}"));
-        };
-        let mut grant: AuthorityGrant = serde_json::from_slice(&bytes)
-            .map_err(|e| format!("deserialize AuthorityGrant: {e}"))?;
-        if grant.revoked_at.is_some() {
-            // First-write-wins: already revoked. No-op, no rewrite, no
-            // move of the existing revocation timestamp.
-            return Ok(());
-        }
-        grant.revoked_at = Some(revoked_at);
-        let new_bytes = serde_json::to_vec(&grant)
-            .map_err(|e| format!("Failed to serialize AuthorityGrant: {e}"))?;
+        // Read + check + write all happen inside one sled transaction so
+        // concurrent revocations cannot both observe `revoked_at: None`
+        // and race each other to the write. Sled serializes transactions
+        // against the same key; the first revocation wins and the second
+        // observes `revoked_at: Some(..)` and no-ops.
         self.db
             .transaction(|tx| {
+                let Some(bytes) = tx.get(primary_key.as_slice())? else {
+                    return Err(ConflictableTransactionError::Abort(format!(
+                        "grant_not_found: {grant_id}"
+                    )));
+                };
+                let mut grant: AuthorityGrant =
+                    serde_json::from_slice(bytes.as_ref()).map_err(|e| {
+                        ConflictableTransactionError::Abort(format!(
+                            "deserialize AuthorityGrant: {e}"
+                        ))
+                    })?;
+                if grant.revoked_at.is_some() {
+                    // First-write-wins: already revoked. No-op, no rewrite, no
+                    // move of the existing revocation timestamp.
+                    return Ok(());
+                }
+                grant.revoked_at = Some(revoked_at);
+                let new_bytes = serde_json::to_vec(&grant).map_err(|e| {
+                    ConflictableTransactionError::Abort(format!(
+                        "Failed to serialize AuthorityGrant: {e}"
+                    ))
+                })?;
                 tx.insert(primary_key.as_slice(), new_bytes.as_slice())?;
-                Ok::<(), ConflictableTransactionError<()>>(())
+                Ok(())
             })
-            .map_err(|e: TransactionError<()>| format!("sled revoke grant tx: {e:?}"))
+            .map_err(|e: TransactionError<String>| match e {
+                TransactionError::Abort(msg) => msg,
+                TransactionError::Storage(err) => format!("sled revoke grant tx: {err}"),
+            })
     }
 
     /// Atomically persist a mandate and all grants it references.

@@ -371,8 +371,9 @@ fn derive_sdis_grants(
 /// `revoked_at` on the target's active grants via
 /// [`GovernanceReceiptBackend::revoke_authority_grant`]. For
 /// [`SdisProposal::ReinstateSteward`] this mints a brand-new grant
-/// (fresh UUID) cloning class/scope/grantor from the most-recent prior
-/// grant — never mutating a revoked grant back to active.
+/// (fresh UUID) cloning class/scope from the most-recent prior grant
+/// and setting `grantor` from this reinstatement decision's
+/// `domain_id` — never mutating a revoked grant back to active.
 ///
 /// Revocations are best-effort: backend errors are logged and do not
 /// abort the decision. A `grant_not_found` error from an in-flight index
@@ -594,12 +595,12 @@ fn mint_reinstatement_grant(
         return None;
     }
 
-    // Ensure the cloned scope still names the current decision's domain.
-    // Prior grants issued under a different domain are kept in scope
-    // with their original domain — we don't rewrite a grant's domain
-    // context in reinstatement. The grantor remains the sovereign entity
-    // that decided *this* reinstatement, which matches the derive-path
-    // convention.
+    // Reinstatement preserves the prior grant scope as-is by cloning the
+    // template scope without validating or rewriting any embedded domain
+    // identifier. Prior grants issued under a different domain therefore
+    // keep their original domain context. The grantor remains the
+    // sovereign entity that decided *this* reinstatement, which matches
+    // the derive-path convention.
     let scope = template.scope.clone();
 
     Some(AuthorityGrant {
