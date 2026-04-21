@@ -9,8 +9,8 @@
 
 #[cfg_attr(not(test), allow(unused_imports))]
 use icn_governance::{
-    AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt, Mandate, MandateId, ProofOutcome,
-    VoteTally,
+    AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt, Grantee, Mandate, MandateId,
+    ProofOutcome, Timestamp, VoteTally,
 };
 use icn_governance_actor::dispatch_evidence::EffectDispatchEvidence;
 use icn_governance_actor::institutional_effect::InstitutionalEffectRecord;
@@ -48,6 +48,12 @@ const MANDATE_BY_DECISION_PREFIX: &[u8] = b"adr0014:mandate:by_decision:";
 const AUTHORITY_GRANT_PREFIX: &[u8] = b"adr0014:grant:";
 /// Secondary index: authority grant by decision_hash (sortable by valid_from)
 const AUTHORITY_GRANT_BY_DECISION_PREFIX: &[u8] = b"adr0014:grant:by_decision:";
+/// Secondary index: authority grant by grantee (ADR-0014 length-prefix key
+/// scheme). The grantee portion is length-prefixed so no two canonical
+/// grantee encodings can alias under `scan_prefix` — required because
+/// entity IDs are unconstrained strings that may contain `:`, and Person
+/// DIDs and Entity IDs share this index under distinct tag bytes.
+const AUTHORITY_GRANT_BY_GRANTEE_PREFIX: &[u8] = b"adr0014:grant:by_grantee:";
 
 /// Receipt storage service for governance and economic chain artifacts.
 ///
@@ -691,6 +697,53 @@ impl ReceiptStore {
         prefix
     }
 
+    /// Canonical byte encoding of a [`Grantee`] for secondary-index keying.
+    ///
+    /// - Person: tag byte `0x01` followed by the DID string bytes.
+    /// - Entity: tag byte `0x02` followed by the entity ID string bytes.
+    ///
+    /// The distinct tag bytes keep Person and Entity values in separate
+    /// key-spaces even when string bytes coincide, and the whole value is
+    /// further wrapped in [`Self::len_prefixed`] at the key-composition
+    /// site so two encodings where one is a prefix of the other cannot
+    /// alias under `scan_prefix`. This is the ADR-0014 length-prefix
+    /// scheme; raw colon-delimited composition would reintroduce the
+    /// exact aliasing bug that PR #1576 closed on the proposal-id side.
+    fn grantee_canonical_bytes(grantee: &Grantee) -> Vec<u8> {
+        match grantee {
+            Grantee::Person(did) => {
+                let s = did.as_str().as_bytes();
+                let mut out = Vec::with_capacity(1 + s.len());
+                out.push(0x01);
+                out.extend_from_slice(s);
+                out
+            }
+            Grantee::Entity(id) => {
+                let s = id.as_bytes();
+                let mut out = Vec::with_capacity(1 + s.len());
+                out.push(0x02);
+                out.extend_from_slice(s);
+                out
+            }
+        }
+    }
+
+    fn grant_by_grantee_key(grantee: &Grantee, valid_from: u64, id: &AuthorityGrantId) -> Vec<u8> {
+        let mut key = AUTHORITY_GRANT_BY_GRANTEE_PREFIX.to_vec();
+        let canon = Self::grantee_canonical_bytes(grantee);
+        key.extend_from_slice(&Self::len_prefixed(&canon));
+        key.extend_from_slice(&valid_from.to_be_bytes());
+        key.extend_from_slice(id.0.hyphenated().to_string().as_bytes());
+        key
+    }
+
+    fn grant_by_grantee_scan_prefix(grantee: &Grantee) -> Vec<u8> {
+        let mut prefix = AUTHORITY_GRANT_BY_GRANTEE_PREFIX.to_vec();
+        let canon = Self::grantee_canonical_bytes(grantee);
+        prefix.extend_from_slice(&Self::len_prefixed(&canon));
+        prefix
+    }
+
     /// Persist a mandate with its proposal and decision secondary indexes
     /// in a single sled transaction.
     ///
@@ -800,6 +853,7 @@ impl ReceiptStore {
             .granted_by
             .as_ref()
             .map(|p| Self::grant_by_decision_key(&p.decision_hash, grant.valid_from, &grant.id));
+        let grantee_idx = Self::grant_by_grantee_key(&grant.grantee, grant.valid_from, &grant.id);
 
         self.db
             .transaction(|tx| {
@@ -807,6 +861,7 @@ impl ReceiptStore {
                 if let Some(idx) = decision_idx.as_ref() {
                     tx.insert(idx.as_slice(), id_bytes.as_slice())?;
                 }
+                tx.insert(grantee_idx.as_slice(), id_bytes.as_slice())?;
                 Ok::<(), ConflictableTransactionError<()>>(())
             })
             .map_err(|e: TransactionError<()>| format!("sled grant tx: {e:?}"))
@@ -864,6 +919,146 @@ impl ReceiptStore {
         Ok(out)
     }
 
+    /// List all authority grants for a grantee that are active at `now`.
+    ///
+    /// "Active" is defined by [`AuthorityGrant::is_active_at`]: not
+    /// revoked at or before `now`, `now >= valid_from`, and (if
+    /// `valid_until` is set) `now < valid_until`. Ordering is oldest-first
+    /// by `valid_from` (the secondary-index sort order).
+    ///
+    /// Uses the by-grantee secondary index written at grant-creation
+    /// time. Iteration is `O(grants_for_grantee)` — bounded by the
+    /// number of grants ever issued to this grantee, not by the total
+    /// grant count.
+    pub fn list_active_authority_grants_by_grantee(
+        &self,
+        grantee: &Grantee,
+        now: Timestamp,
+    ) -> Result<Vec<AuthorityGrant>, String> {
+        let scan = Self::grant_by_grantee_scan_prefix(grantee);
+        let mut out = Vec::new();
+        for entry in self.db.scan_prefix(&scan) {
+            let (_k, v) = entry.map_err(|e| format!("sled scan grant by_grantee: {e}"))?;
+            let id_str =
+                std::str::from_utf8(&v).map_err(|e| format!("grant index value not UTF-8: {e}"))?;
+            let uuid = uuid::Uuid::parse_str(id_str)
+                .map_err(|e| format!("grant index value not a UUID: {e}"))?;
+            let primary = Self::grant_primary_key(&AuthorityGrantId(uuid));
+            let Some(bytes) = self
+                .db
+                .get(&primary)
+                .map_err(|e| format!("sled get grant primary: {e}"))?
+            else {
+                tracing::warn!(
+                    id = %id_str,
+                    "authority grant by-grantee index skew: primary missing"
+                );
+                continue;
+            };
+            let grant: AuthorityGrant = serde_json::from_slice(&bytes)
+                .map_err(|e| format!("deserialize AuthorityGrant: {e}"))?;
+            // Filter-on-read: the grantee index is authoritative for
+            // grantee-keyed lookup, but the canonical answer to "is this
+            // still active?" lives on the primary record (its
+            // `revoked_at` may have been updated since the index was
+            // written). `is_active_at` consults that canonical state.
+            if grant.is_active_at(now) {
+                out.push(grant);
+            }
+        }
+        Ok(out)
+    }
+
+    /// List **all** authority grants ever issued to a grantee, including
+    /// revoked and expired ones, ordered oldest-first by `valid_from`.
+    ///
+    /// Uses the same by-grantee secondary index as
+    /// [`Self::list_active_authority_grants_by_grantee`] but omits the
+    /// `is_active_at` filter. Used by the reinstatement seam to locate
+    /// the most-recent revoked grant as a template for the fresh grant
+    /// that reinstatement mints.
+    pub fn list_authority_grants_by_grantee(
+        &self,
+        grantee: &Grantee,
+    ) -> Result<Vec<AuthorityGrant>, String> {
+        let scan = Self::grant_by_grantee_scan_prefix(grantee);
+        let mut out = Vec::new();
+        for entry in self.db.scan_prefix(&scan) {
+            let (_k, v) = entry.map_err(|e| format!("sled scan grant by_grantee: {e}"))?;
+            let id_str =
+                std::str::from_utf8(&v).map_err(|e| format!("grant index value not UTF-8: {e}"))?;
+            let uuid = uuid::Uuid::parse_str(id_str)
+                .map_err(|e| format!("grant index value not a UUID: {e}"))?;
+            let primary = Self::grant_primary_key(&AuthorityGrantId(uuid));
+            let Some(bytes) = self
+                .db
+                .get(&primary)
+                .map_err(|e| format!("sled get grant primary: {e}"))?
+            else {
+                tracing::warn!(
+                    id = %id_str,
+                    "authority grant by-grantee index skew: primary missing"
+                );
+                continue;
+            };
+            let grant: AuthorityGrant = serde_json::from_slice(&bytes)
+                .map_err(|e| format!("deserialize AuthorityGrant: {e}"))?;
+            out.push(grant);
+        }
+        Ok(out)
+    }
+
+    /// Revoke an authority grant by stamping `revoked_at` on its primary
+    /// record.
+    ///
+    /// **Semantics:**
+    ///
+    /// - First-write-wins idempotency: if the grant is already revoked
+    ///   (i.e. `revoked_at` is `Some(_)`), this is a no-op. `revoked_at`
+    ///   never moves — not earlier, not later. This keeps double-revocation
+    ///   safe and prevents a later proposal from silently rewriting the
+    ///   original revocation time.
+    /// - Missing primary is an error: if no grant exists for `grant_id`,
+    ///   returns `Err("grant_not_found: …")`. Callers decide whether this
+    ///   is fatal or skippable (the acceptance seam logs and continues).
+    /// - Secondary indexes are intentionally untouched. The by-decision
+    ///   and by-grantee indexes are keyed by `valid_from` and grant id,
+    ///   neither of which changes on revocation. Consumers that need
+    ///   "active right now" semantics filter on read via
+    ///   [`AuthorityGrant::is_active_at`]. Rewriting index keys on
+    ///   revocation would only invalidate existing readers without
+    ///   adding correctness.
+    pub fn revoke_authority_grant(
+        &self,
+        grant_id: &AuthorityGrantId,
+        revoked_at: Timestamp,
+    ) -> Result<(), String> {
+        let primary_key = Self::grant_primary_key(grant_id);
+        let Some(bytes) = self
+            .db
+            .get(&primary_key)
+            .map_err(|e| format!("sled get grant primary: {e}"))?
+        else {
+            return Err(format!("grant_not_found: {grant_id}"));
+        };
+        let mut grant: AuthorityGrant = serde_json::from_slice(&bytes)
+            .map_err(|e| format!("deserialize AuthorityGrant: {e}"))?;
+        if grant.revoked_at.is_some() {
+            // First-write-wins: already revoked. No-op, no rewrite, no
+            // move of the existing revocation timestamp.
+            return Ok(());
+        }
+        grant.revoked_at = Some(revoked_at);
+        let new_bytes = serde_json::to_vec(&grant)
+            .map_err(|e| format!("Failed to serialize AuthorityGrant: {e}"))?;
+        self.db
+            .transaction(|tx| {
+                tx.insert(primary_key.as_slice(), new_bytes.as_slice())?;
+                Ok::<(), ConflictableTransactionError<()>>(())
+            })
+            .map_err(|e: TransactionError<()>| format!("sled revoke grant tx: {e:?}"))
+    }
+
     /// Atomically persist a mandate and all grants it references.
     ///
     /// All primary records and all secondary index entries land in a
@@ -900,6 +1095,7 @@ impl ReceiptStore {
             value: Vec<u8>,
             id_bytes: Vec<u8>,
             decision_idx: Option<Vec<u8>>,
+            grantee_idx: Vec<u8>,
         }
         let prepared: Vec<PreparedGrant> = grants
             .iter()
@@ -912,11 +1108,13 @@ impl ReceiptStore {
                     .granted_by
                     .as_ref()
                     .map(|p| Self::grant_by_decision_key(&p.decision_hash, g.valid_from, &g.id));
+                let grantee_idx = Self::grant_by_grantee_key(&g.grantee, g.valid_from, &g.id);
                 Ok(PreparedGrant {
                     primary_key,
                     value,
                     id_bytes,
                     decision_idx,
+                    grantee_idx,
                 })
             })
             .collect::<Result<_, String>>()?;
@@ -928,6 +1126,7 @@ impl ReceiptStore {
                     if let Some(idx) = pg.decision_idx.as_ref() {
                         tx.insert(idx.as_slice(), pg.id_bytes.as_slice())?;
                     }
+                    tx.insert(pg.grantee_idx.as_slice(), pg.id_bytes.as_slice())?;
                 }
                 tx.insert(mandate_primary_key.as_slice(), mandate_value.as_slice())?;
                 tx.insert(mandate_proposal_idx.as_slice(), mandate_id_bytes.as_slice())?;
@@ -1024,6 +1223,29 @@ impl GovernanceReceiptBackend for ReceiptStore {
         decision_hash: &Hash,
     ) -> Result<Vec<AuthorityGrant>, String> {
         self.list_authority_grants_by_decision(decision_hash)
+    }
+
+    fn list_active_authority_grants_by_grantee(
+        &self,
+        grantee: &Grantee,
+        now: Timestamp,
+    ) -> Result<Vec<AuthorityGrant>, String> {
+        self.list_active_authority_grants_by_grantee(grantee, now)
+    }
+
+    fn list_authority_grants_by_grantee(
+        &self,
+        grantee: &Grantee,
+    ) -> Result<Vec<AuthorityGrant>, String> {
+        self.list_authority_grants_by_grantee(grantee)
+    }
+
+    fn revoke_authority_grant(
+        &self,
+        grant_id: &AuthorityGrantId,
+        revoked_at: Timestamp,
+    ) -> Result<(), String> {
+        self.revoke_authority_grant(grant_id, revoked_at)
     }
 
     fn put_mandate_with_grants(
@@ -1616,6 +1838,165 @@ mod tests {
                 .is_empty(),
             "charter-direct grant must not be discoverable via decision scan"
         );
+    }
+
+    #[test]
+    fn authority_grant_revocation_roundtrip() {
+        // Put a fresh grant, revoke it, read it back, assert `revoked_at`
+        // is stamped and survives the primary-record roundtrip.
+        let store = ReceiptStore::new(temp_db());
+        let decision_hash = [0xa1u8; 32];
+        let grant = make_grant(decision_hash, 1_000);
+        let grant_id = grant.id.clone();
+
+        store.put_authority_grant(&grant).unwrap();
+        assert!(
+            store
+                .get_authority_grant(&grant_id)
+                .unwrap()
+                .unwrap()
+                .revoked_at
+                .is_none(),
+            "fresh grant must have revoked_at: None"
+        );
+
+        store.revoke_authority_grant(&grant_id, 2_000).unwrap();
+
+        let revoked = store.get_authority_grant(&grant_id).unwrap().unwrap();
+        assert_eq!(
+            revoked.revoked_at,
+            Some(2_000),
+            "revoke_authority_grant must stamp revoked_at on the primary record"
+        );
+    }
+
+    #[test]
+    fn authority_grant_is_active_at_flips_false_after_revocation() {
+        // After revocation, `is_active_at(now)` must return false for any
+        // `now >= revoked_at`. This is the canonical-state invariant the
+        // seam relies on to decide whether a grant still carries authority.
+        let store = ReceiptStore::new(temp_db());
+        let decision_hash = [0xa2u8; 32];
+        let grant = make_grant(decision_hash, 1_000); // valid_from 1_000, valid_until 4_600
+        let grant_id = grant.id.clone();
+        store.put_authority_grant(&grant).unwrap();
+
+        // Pre-revocation: active at a time inside the term.
+        let before = store.get_authority_grant(&grant_id).unwrap().unwrap();
+        assert!(before.is_active_at(2_000), "active before revocation");
+
+        store.revoke_authority_grant(&grant_id, 2_000).unwrap();
+
+        let after = store.get_authority_grant(&grant_id).unwrap().unwrap();
+        assert!(
+            !after.is_active_at(2_000),
+            "must not be active at t == revoked_at"
+        );
+        assert!(
+            !after.is_active_at(3_000),
+            "must not be active after revocation"
+        );
+        assert!(
+            after.is_active_at(1_500),
+            "must still be active at t < revoked_at (revocation is not retroactive)"
+        );
+    }
+
+    #[test]
+    fn authority_grant_revocation_is_idempotent_keeps_original_timestamp() {
+        // First-write-wins: a second revocation of the same grant must
+        // not move `revoked_at` — neither earlier nor later. This keeps
+        // retries safe and preserves the constitutional record of the
+        // original revocation event.
+        let store = ReceiptStore::new(temp_db());
+        let grant = make_grant([0xa3u8; 32], 1_000);
+        let grant_id = grant.id.clone();
+        store.put_authority_grant(&grant).unwrap();
+
+        store.revoke_authority_grant(&grant_id, 2_000).unwrap();
+        // Second revoke at a later time: must be a no-op.
+        store.revoke_authority_grant(&grant_id, 9_999).unwrap();
+        // And an earlier-time retry must also be a no-op.
+        store.revoke_authority_grant(&grant_id, 1_500).unwrap();
+
+        let g = store.get_authority_grant(&grant_id).unwrap().unwrap();
+        assert_eq!(
+            g.revoked_at,
+            Some(2_000),
+            "double revocation must preserve the first `revoked_at` timestamp"
+        );
+    }
+
+    #[test]
+    fn revoke_missing_grant_returns_grant_not_found() {
+        // Revoking a grant that was never persisted must surface as an
+        // error whose message begins with `grant_not_found:` so the
+        // acceptance seam can recognise it as skippable (vs a hard
+        // store failure).
+        let store = ReceiptStore::new(temp_db());
+        let stranger_id = AuthorityGrantId::new();
+        let err = store
+            .revoke_authority_grant(&stranger_id, 1_000)
+            .unwrap_err();
+        assert!(
+            err.starts_with("grant_not_found"),
+            "expected grant_not_found sentinel; got {err}"
+        );
+    }
+
+    #[test]
+    fn list_active_authority_grants_by_grantee_filters_revoked() {
+        // The active-filter variant must consult primary-record
+        // `revoked_at` and drop revoked grants even though the by-grantee
+        // index still points at them.
+        let store = ReceiptStore::new(temp_db());
+        // Uses an Entity grantee so this test stays focused on the
+        // revoke-vs-active filter and does not depend on Ed25519
+        // public-key validity for a synthetic DID.
+        let grantee = Grantee::Entity("svc:filter-test".into());
+        let active_grant = AuthorityGrant {
+            grantee: grantee.clone(),
+            ..make_grant([0xb1u8; 32], 1_000)
+        };
+        let to_revoke = AuthorityGrant {
+            grantee: grantee.clone(),
+            ..make_grant([0xb1u8; 32], 1_500)
+        };
+        store.put_authority_grant(&active_grant).unwrap();
+        store.put_authority_grant(&to_revoke).unwrap();
+        store.revoke_authority_grant(&to_revoke.id, 1_700).unwrap();
+
+        let listed = store
+            .list_active_authority_grants_by_grantee(&grantee, 2_000)
+            .unwrap();
+        assert_eq!(listed.len(), 1, "only the non-revoked grant must be listed");
+        assert_eq!(listed[0].id, active_grant.id);
+    }
+
+    #[test]
+    fn list_authority_grants_by_grantee_includes_revoked() {
+        // The unfiltered variant is what reinstatement uses to find a
+        // template; it must return the revoked grant as well.
+        let store = ReceiptStore::new(temp_db());
+        let grantee = Grantee::Entity("svc:unfiltered-test".into());
+        let g1 = AuthorityGrant {
+            grantee: grantee.clone(),
+            ..make_grant([0xb2u8; 32], 1_000)
+        };
+        let g2 = AuthorityGrant {
+            grantee: grantee.clone(),
+            ..make_grant([0xb2u8; 32], 1_500)
+        };
+        store.put_authority_grant(&g1).unwrap();
+        store.put_authority_grant(&g2).unwrap();
+        store.revoke_authority_grant(&g2.id, 1_700).unwrap();
+
+        let all = store.list_authority_grants_by_grantee(&grantee).unwrap();
+        assert_eq!(all.len(), 2, "unfiltered list must include revoked grants");
+        // Expect oldest-first by valid_from
+        assert_eq!(all[0].id, g1.id);
+        assert_eq!(all[1].id, g2.id);
+        assert!(all[1].revoked_at.is_some());
     }
 
     #[test]

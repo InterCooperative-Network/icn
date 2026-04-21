@@ -130,9 +130,29 @@ pub fn mint_and_persist_for_accepted(
         decision_hash,
     };
 
-    // Derive zero or more grants. Empty vec is the truthful default for
-    // most payload classes today.
-    let grants = derive_grants_for_accepted_proposal(payload, domain_id, &decision_prov, now);
+    // Apply lifecycle side effects (revocations / reinstatement) for
+    // SDIS proposal variants that mutate existing authority. Revocations
+    // are durably stamped on target primary records before we proceed to
+    // mandate composition. Reinstatement may mint a fresh grant that
+    // composes into the derive-path grant set below.
+    //
+    // Revocations happen outside the mandate transaction — they must, in
+    // this tranche, because `put_mandate_with_grants_atomic` is a write
+    // path (inserts + index updates) that does not know about primary-
+    // record mutations. This creates a recoverable race window: if a
+    // revocation lands but the mandate write subsequently fails, the
+    // caller retries this seam → the idempotency check at the top of
+    // this function misses (no mandate) → the lifecycle runs again →
+    // `revoke_authority_grant`'s first-write-wins semantics turn the
+    // repeat into a no-op → the mandate write is re-attempted. The
+    // original `revoked_at` timestamp is preserved across retries.
+    let lifecycle_grants =
+        apply_acceptance_lifecycle(backend, payload, domain_id, &decision_prov, now);
+
+    // Derive zero or more grants from the payload itself. Empty vec is
+    // the truthful default for most payload classes today.
+    let mut grants = derive_grants_for_accepted_proposal(payload, domain_id, &decision_prov, now);
+    grants.extend(lifecycle_grants);
     let grant_ids: Vec<_> = grants.iter().map(|g| g.id.clone()).collect();
 
     // When we derived grants, attempt the atomic
@@ -321,11 +341,15 @@ fn derive_sdis_grants(
         }
 
         // Removals, sanctions, suspensions, and authority revocations
-        // do not mint new grants — they *revoke* existing authority.
-        // Modeling that requires querying the mandate/grant store and
-        // updating `revoked_at` on prior grants, which is explicit
-        // future work. Returning an empty vec here is the truthful
-        // answer: this decision does not create new authority.
+        // do not mint **new** grants from the derive path — they
+        // *revoke* existing authority. The side-effecting lifecycle
+        // work (durably stamping `revoked_at` on the target's grants,
+        // and minting a fresh grant for reinstatement) happens in
+        // [`apply_acceptance_lifecycle`], which is a separate seam so
+        // revocation writes and the pending-grants fall-through stay
+        // untangled from pure derivation. Returning an empty vec here
+        // keeps the "derivation is pure; lifecycle is side-effecting"
+        // split clean.
         SdisProposal::RemoveSteward { .. }
         | SdisProposal::SanctionSteward { .. }
         | SdisProposal::SuspendSteward { .. }
@@ -337,6 +361,258 @@ fn derive_sdis_grants(
         | SdisProposal::UpdateJurisdictionTier { .. }
         | SdisProposal::ForceKeyRotation { .. } => Vec::new(),
     }
+}
+
+/// Apply lifecycle side effects (revocations, reinstatement) at proposal
+/// acceptance time and return any fresh grants minted by reinstatement.
+///
+/// Called from [`mint_and_persist_for_accepted`] after the idempotency
+/// check passes. For revocation-shaped SDIS payloads this durably stamps
+/// `revoked_at` on the target's active grants via
+/// [`GovernanceReceiptBackend::revoke_authority_grant`]. For
+/// [`SdisProposal::ReinstateSteward`] this mints a brand-new grant
+/// (fresh UUID) cloning class/scope/grantor from the most-recent prior
+/// grant — never mutating a revoked grant back to active.
+///
+/// Revocations are best-effort: backend errors are logged and do not
+/// abort the decision. A `grant_not_found` error from an in-flight index
+/// skew is treated as skippable.
+///
+/// All backend calls on the defaulted no-op trait methods return empty
+/// lists / `Ok(())`, so in-memory test backends that do not durably
+/// persist grants produce the truthful "no grants to revoke" answer
+/// without error.
+fn apply_acceptance_lifecycle(
+    backend: &dyn GovernanceReceiptBackend,
+    payload: &ProposalPayload,
+    domain_id: &GovernanceDomainId,
+    decision: &DecisionProvenance,
+    now: Timestamp,
+) -> Vec<AuthorityGrant> {
+    let ProposalPayload::Sdis { proposal } = payload else {
+        return Vec::new();
+    };
+    use icn_governance::sdis::{SdisProposal, StewardPenalty};
+
+    match proposal {
+        // Direct-removal / direct-suspension: the target loses active
+        // authority at `now`. No new grants are minted.
+        SdisProposal::RemoveSteward { steward, .. }
+        | SdisProposal::SuspendSteward { steward, .. } => {
+            revoke_active_grants_for_person(backend, steward, now);
+            Vec::new()
+        }
+
+        // Sanctions only revoke when the penalty is removal-shaped.
+        // Warnings, bond-slashes, tier-demotions, and probation do not
+        // terminate existing authority; they operate on other axes
+        // (reputation, bond, monitoring) that the grant record does
+        // not model. Suspension and Removal do terminate authority;
+        // those penalties revoke the target's active grants.
+        SdisProposal::SanctionSteward {
+            steward, penalty, ..
+        } => {
+            let revokes = matches!(
+                penalty,
+                StewardPenalty::Removal { .. } | StewardPenalty::Suspension { .. }
+            );
+            if revokes {
+                revoke_active_grants_for_person(backend, steward, now);
+            }
+            Vec::new()
+        }
+
+        // Institutional-authority revocation: honors the payload's
+        // `effective_at` when set (allows a governance-granted grace
+        // period); otherwise takes effect at `now`. Grants whose
+        // `revoked_at` is already set are left untouched by the
+        // first-write-wins semantics in the backend.
+        SdisProposal::RevokeAuthority {
+            authority_did,
+            effective_at,
+            ..
+        } => {
+            let revoke_at = effective_at.unwrap_or(now);
+            revoke_active_grants_for_person(backend, authority_did, revoke_at);
+            Vec::new()
+        }
+
+        // Reinstatement mints a **fresh** grant — new UUID, new
+        // `valid_from = now`, new provenance bound to *this* decision.
+        // It does not mutate the revoked grant back to active. If no
+        // prior grant is found, we decline (return empty) and log: the
+        // seam refuses to fabricate bounds a payload did not carry.
+        SdisProposal::ReinstateSteward { steward, .. } => {
+            match mint_reinstatement_grant(backend, steward, domain_id, decision, now) {
+                Some(g) => vec![g],
+                None => Vec::new(),
+            }
+        }
+
+        // Revocation appeals do not mutate the original revocation in
+        // place — that would violate the first-write-wins invariant on
+        // `revoked_at` and would lose the constitutional record of the
+        // original revocation event. If an appeal is upheld, the
+        // governance flow follows up with a targeted remint proposal
+        // (e.g. `ReinstateSteward` for a steward, or a fresh
+        // `AppointSteward`/authority-granting proposal). In this
+        // tranche the acceptance seam records the mandate (via the
+        // pending-grants path) without any grant-store mutation.
+        SdisProposal::RevocationAppeal { .. } => {
+            tracing::info!(
+                proposal_id = %decision.proposal_id,
+                "RevocationAppeal acceptance: no in-place grant mutation; any reinstatement routes through a separate reinstatement proposal"
+            );
+            Vec::new()
+        }
+
+        // Non-lifecycle SDIS variants (threshold, authority approval,
+        // jurisdiction-tier bumps, forced key rotation) do not revoke
+        // grants — they change other domain state. No lifecycle work.
+        SdisProposal::AppointSteward { .. }
+        | SdisProposal::ReconfirmSteward { .. }
+        | SdisProposal::ModifyThreshold { .. }
+        | SdisProposal::ApproveAuthority { .. }
+        | SdisProposal::UpdateJurisdictionTier { .. }
+        | SdisProposal::ForceKeyRotation { .. } => Vec::new(),
+    }
+}
+
+/// Revoke every active grant whose grantee is the given person DID,
+/// best-effort. Errors are logged and the decision continues; missing
+/// primaries (index skew) are warned and skipped.
+fn revoke_active_grants_for_person(
+    backend: &dyn GovernanceReceiptBackend,
+    person: &icn_identity::Did,
+    revoked_at: Timestamp,
+) {
+    let grantee = Grantee::Person(person.clone());
+    let grants = match backend.list_active_authority_grants_by_grantee(&grantee, revoked_at) {
+        Ok(g) => g,
+        Err(e) => {
+            tracing::error!(
+                grantee = ?grantee,
+                error = %e,
+                "list_active_authority_grants_by_grantee failed; skipping revocation"
+            );
+            return;
+        }
+    };
+    for g in grants {
+        match backend.revoke_authority_grant(&g.id, revoked_at) {
+            Ok(()) => {
+                tracing::info!(
+                    grant_id = %g.id,
+                    grantee = ?grantee,
+                    revoked_at,
+                    "revoked authority grant at acceptance seam"
+                );
+            }
+            Err(e) if e.starts_with("grant_not_found") => {
+                tracing::warn!(
+                    grant_id = %g.id,
+                    error = %e,
+                    "revoke_authority_grant skipped: grant_not_found (index skew)"
+                );
+            }
+            Err(e) => {
+                tracing::error!(
+                    grant_id = %g.id,
+                    error = %e,
+                    "revoke_authority_grant failed"
+                );
+            }
+        }
+    }
+}
+
+/// Mint a fresh reinstatement grant for a steward, cloning
+/// class/scope/grantor from the most-recent prior grant. Returns
+/// `None` when no prior grant can be located; reinstatement declines
+/// rather than fabricate bounds the payload does not carry.
+///
+/// Term length is taken from the prior grant's
+/// `valid_until - valid_from` (when `valid_until` was bounded); for
+/// prior grants that were unbounded (`valid_until: None`) the fresh
+/// grant is also unbounded, which mirrors the prior authority shape.
+fn mint_reinstatement_grant(
+    backend: &dyn GovernanceReceiptBackend,
+    steward: &icn_identity::Did,
+    domain_id: &GovernanceDomainId,
+    decision: &DecisionProvenance,
+    now: Timestamp,
+) -> Option<AuthorityGrant> {
+    let grantee = Grantee::Person(steward.clone());
+    let all = match backend.list_authority_grants_by_grantee(&grantee) {
+        Ok(g) => g,
+        Err(e) => {
+            tracing::error!(
+                grantee = ?grantee,
+                error = %e,
+                "list_authority_grants_by_grantee failed; declining to mint reinstatement grant"
+            );
+            return None;
+        }
+    };
+    // Prefer the most-recent revoked grant (typical reinstatement
+    // shape); fall back to the most-recent grant of any status so a
+    // reinstatement after a mere expiry also works. Backend returns
+    // oldest-first by `valid_from`, so we take the last entry.
+    let template = all
+        .iter()
+        .filter(|g| g.revoked_at.is_some())
+        .next_back()
+        .or_else(|| all.last());
+    let template = match template {
+        Some(t) => t.clone(),
+        None => {
+            tracing::warn!(
+                grantee = ?grantee,
+                proposal_id = %decision.proposal_id,
+                "ReinstateSteward: no prior grant found for steward; declining to mint (no term bounds to clone)"
+            );
+            return None;
+        }
+    };
+
+    let valid_until = match template.valid_until {
+        Some(old_until) => {
+            let term = old_until.saturating_sub(template.valid_from);
+            now.checked_add(term)
+        }
+        None => None,
+    };
+    // If we attempted to add a bounded term and it overflowed, decline
+    // rather than silently widen the grant to unbounded (same fail-
+    // closed rule as [`derive_sdis_grants`] applies to AppointSteward).
+    if template.valid_until.is_some() && valid_until.is_none() {
+        tracing::error!(
+            grantee = ?grantee,
+            now,
+            "ReinstateSteward term overflow cloning prior grant; declining to mint (would be unbounded)"
+        );
+        return None;
+    }
+
+    // Ensure the cloned scope still names the current decision's domain.
+    // Prior grants issued under a different domain are kept in scope
+    // with their original domain — we don't rewrite a grant's domain
+    // context in reinstatement. The grantor remains the sovereign entity
+    // that decided *this* reinstatement, which matches the derive-path
+    // convention.
+    let scope = template.scope.clone();
+
+    Some(AuthorityGrant {
+        id: AuthorityGrantId::new(),
+        class: template.class,
+        grantor: GrantorEntityId(domain_id.0.clone()),
+        grantee: Grantee::Person(steward.clone()),
+        scope,
+        granted_by: Some(decision.clone()),
+        valid_from: now,
+        valid_until,
+        revoked_at: None,
+    })
 }
 
 #[cfg(test)]
@@ -659,5 +935,530 @@ mod tests {
         let p = g.granted_by.as_ref().unwrap();
         assert_eq!(p.proposal_id, "prop-xyz");
         assert_eq!(p.decision_hash, [42u8; 32]);
+    }
+
+    // ========================================================================
+    // Acceptance-seam lifecycle tests (revocation + reinstatement)
+    // ========================================================================
+
+    /// In-memory backend that fully supports mandate + grant storage,
+    /// including the ADR-0014 revocation write-path. Used by
+    /// acceptance-seam lifecycle tests to exercise `apply_acceptance_lifecycle`
+    /// without depending on the sled-backed gateway store.
+    struct InMemoryGrantBackend {
+        mandates: std::sync::Mutex<Vec<Mandate>>,
+        grants: std::sync::Mutex<Vec<AuthorityGrant>>,
+    }
+
+    impl InMemoryGrantBackend {
+        fn new() -> Self {
+            Self {
+                mandates: std::sync::Mutex::new(vec![]),
+                grants: std::sync::Mutex::new(vec![]),
+            }
+        }
+    }
+
+    impl GovernanceReceiptBackend for InMemoryGrantBackend {
+        fn put_governance(
+            &self,
+            _: &icn_governance::GovernanceDecisionReceipt,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+        fn get_governance_by_proposal(
+            &self,
+            _: &str,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn put_allocation(
+            &self,
+            _: &icn_kernel_api::AllocationReceipt,
+        ) -> Result<icn_kernel_api::Hash, String> {
+            Ok([0u8; 32])
+        }
+        fn get_governance_by_decision(
+            &self,
+            _: &icn_kernel_api::Hash,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn list_allocations_by_decision(
+            &self,
+            _: &icn_kernel_api::Hash,
+        ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
+            Ok(vec![])
+        }
+        fn put_mandate(&self, mandate: &Mandate) -> Result<(), String> {
+            self.mandates.lock().unwrap().push(mandate.clone());
+            Ok(())
+        }
+        fn get_mandate_by_proposal(&self, proposal_id: &str) -> Result<Option<Mandate>, String> {
+            Ok(self
+                .mandates
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|m| m.decision.proposal_id == proposal_id)
+                .cloned())
+        }
+        fn put_authority_grant(&self, grant: &AuthorityGrant) -> Result<(), String> {
+            let mut guard = self.grants.lock().unwrap();
+            if let Some(existing) = guard.iter_mut().find(|g| g.id == grant.id) {
+                *existing = grant.clone();
+            } else {
+                guard.push(grant.clone());
+            }
+            Ok(())
+        }
+        fn get_authority_grant(
+            &self,
+            grant_id: &AuthorityGrantId,
+        ) -> Result<Option<AuthorityGrant>, String> {
+            Ok(self
+                .grants
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|g| &g.id == grant_id)
+                .cloned())
+        }
+        fn list_active_authority_grants_by_grantee(
+            &self,
+            grantee: &Grantee,
+            now: Timestamp,
+        ) -> Result<Vec<AuthorityGrant>, String> {
+            Ok(self
+                .grants
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|g| &g.grantee == grantee && g.is_active_at(now))
+                .cloned()
+                .collect())
+        }
+        fn list_authority_grants_by_grantee(
+            &self,
+            grantee: &Grantee,
+        ) -> Result<Vec<AuthorityGrant>, String> {
+            let mut out: Vec<_> = self
+                .grants
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|g| &g.grantee == grantee)
+                .cloned()
+                .collect();
+            out.sort_by_key(|g| g.valid_from);
+            Ok(out)
+        }
+        fn revoke_authority_grant(
+            &self,
+            grant_id: &AuthorityGrantId,
+            revoked_at: Timestamp,
+        ) -> Result<(), String> {
+            let mut guard = self.grants.lock().unwrap();
+            let Some(g) = guard.iter_mut().find(|g| &g.id == grant_id) else {
+                return Err(format!("grant_not_found: {grant_id}"));
+            };
+            // First-write-wins idempotency.
+            if g.revoked_at.is_none() {
+                g.revoked_at = Some(revoked_at);
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn remove_steward_revokes_only_target_grants_at_acceptance_seam() {
+        // Two stewards with active grants; a RemoveSteward proposal for
+        // steward A must revoke A's grant and leave B's untouched. This
+        // is the scoped-revocation invariant the by-grantee index is
+        // designed to serve.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward_a = did(10);
+        let steward_b = did(11);
+
+        // Mint via the normal AppointSteward path so both grants exist
+        // under the acceptance seam's own rules.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-a",
+            &dom,
+            [0xa1u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward_a.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-b",
+            &dom,
+            [0xa2u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward_b.clone(),
+                    sponsors: vec![did(2)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        // Sanity: both grants are active pre-revocation.
+        let a_active = backend
+            .list_active_authority_grants_by_grantee(&Grantee::Person(steward_a.clone()), 2_000)
+            .unwrap();
+        let b_active = backend
+            .list_active_authority_grants_by_grantee(&Grantee::Person(steward_b.clone()), 2_000)
+            .unwrap();
+        assert_eq!(a_active.len(), 1);
+        assert_eq!(b_active.len(), 1);
+
+        // Now accept a RemoveSteward for A only.
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-remove-a",
+            &dom,
+            [0xadu8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: steward_a.clone(),
+                    reason: "breach".into(),
+                    return_bond: false,
+                },
+            },
+            2_500,
+        )
+        .unwrap();
+
+        // RemoveSteward itself mints no grant, so the mandate lands in
+        // pending-grants shape.
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(grants_persisted, 0),
+            other => panic!("expected Minted (pending-grants); got {other:?}"),
+        }
+
+        // A's active list must now be empty; B's must still be present.
+        let a_after = backend
+            .list_active_authority_grants_by_grantee(&Grantee::Person(steward_a.clone()), 3_000)
+            .unwrap();
+        let b_after = backend
+            .list_active_authority_grants_by_grantee(&Grantee::Person(steward_b.clone()), 3_000)
+            .unwrap();
+        assert!(
+            a_after.is_empty(),
+            "target steward's active grants must be revoked; got {a_after:?}"
+        );
+        assert_eq!(
+            b_after.len(),
+            1,
+            "non-target steward's grants must not be touched"
+        );
+
+        // A's revoked grant's `revoked_at` equals the decision `now`.
+        let a_all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward_a.clone()))
+            .unwrap();
+        assert_eq!(a_all.len(), 1);
+        assert_eq!(a_all[0].revoked_at, Some(2_500));
+    }
+
+    #[test]
+    fn remove_steward_acceptance_is_idempotent_across_retries() {
+        // Retrying the RemoveSteward acceptance (e.g. after a mandate-
+        // write failure) must not move the original `revoked_at`. The
+        // seam-level idempotency check + first-write-wins at the backend
+        // together guarantee this.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(10);
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint",
+            &dom,
+            [0xc1u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        // First acceptance of the RemoveSteward: revocation lands at
+        // now=2_500.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-remove",
+            &dom,
+            [0xc2u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: steward.clone(),
+                    reason: "breach".into(),
+                    return_bond: false,
+                },
+            },
+            2_500,
+        )
+        .unwrap();
+
+        // Simulated retry at a later now=9_999: seam short-circuits on
+        // idempotency (mandate already exists). Even if it didn't, the
+        // backend's first-write-wins would keep revoked_at at 2_500.
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-remove",
+            &dom,
+            [0xc2u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: steward.clone(),
+                    reason: "breach".into(),
+                    return_bond: false,
+                },
+            },
+            9_999,
+        )
+        .unwrap();
+        assert!(matches!(outcome, MandateMintOutcome::AlreadyMinted { .. }));
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(
+            all[0].revoked_at,
+            Some(2_500),
+            "original revoked_at must be preserved across retries"
+        );
+    }
+
+    #[test]
+    fn reinstate_steward_mints_fresh_grant_not_mutating_revoked_one() {
+        // After a RemoveSteward + ReinstateSteward sequence, the original
+        // grant must remain revoked and a brand-new grant (distinct id)
+        // must exist for the steward. This is the fresh-grant invariant:
+        // reinstatement never resurrects a revoked record.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(20);
+
+        // Appoint.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint",
+            &dom,
+            [0xd1u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        let original_id = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward.clone()))
+            .unwrap()[0]
+            .id
+            .clone();
+
+        // Remove (revoke).
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-remove",
+            &dom,
+            [0xd2u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: steward.clone(),
+                    reason: "misconduct".into(),
+                    return_bond: false,
+                },
+            },
+            2_000,
+        )
+        .unwrap();
+
+        // Reinstate.
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reinstate",
+            &dom,
+            [0xd3u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReinstateSteward {
+                    steward: steward.clone(),
+                    reason: "appeal upheld".into(),
+                },
+            },
+            3_000,
+        )
+        .unwrap();
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(
+                grants_persisted, 1,
+                "reinstatement must mint exactly one fresh grant"
+            ),
+            other => panic!("expected Minted with fresh grant; got {other:?}"),
+        }
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward.clone()))
+            .unwrap();
+        assert_eq!(all.len(), 2, "original + fresh grant");
+
+        // Original still revoked; fresh grant has distinct id, is active
+        // at `now`, and carries the reinstatement decision's provenance.
+        let original = all.iter().find(|g| g.id == original_id).unwrap();
+        let fresh = all.iter().find(|g| g.id != original_id).unwrap();
+        assert_eq!(
+            original.revoked_at,
+            Some(2_000),
+            "revoked grant must not be mutated back to active"
+        );
+        assert!(
+            fresh.revoked_at.is_none(),
+            "fresh grant must not be born revoked"
+        );
+        assert_ne!(
+            fresh.id, original_id,
+            "reinstatement must allocate a fresh AuthorityGrantId"
+        );
+        assert!(fresh.is_active_at(3_500));
+        assert_eq!(
+            fresh.granted_by.as_ref().unwrap().proposal_id,
+            "prop-reinstate",
+            "fresh grant's provenance must bind to the reinstatement decision"
+        );
+        assert_eq!(fresh.class, AuthorityClass::Attestation);
+        assert_eq!(fresh.grantee, Grantee::Person(steward));
+        // Cloned term length: original was 3_600 (1_000..4_600); fresh
+        // starts at now=3_000 and must also span 3_600.
+        assert_eq!(fresh.valid_from, 3_000);
+        assert_eq!(fresh.valid_until, Some(3_000 + 3_600));
+    }
+
+    #[test]
+    fn reinstate_steward_without_prior_grant_declines_to_mint() {
+        // If no prior grant exists for the steward, reinstatement has
+        // no template to clone bounds from. It must decline rather than
+        // fabricate unbounded authority.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(30);
+
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reinstate-orphan",
+            &dom,
+            [0xe1u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReinstateSteward {
+                    steward: steward.clone(),
+                    reason: "mistaken identity".into(),
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(
+                grants_persisted, 0,
+                "reinstatement with no template must produce pending-grants mandate"
+            ),
+            other => panic!("expected Minted (pending-grants); got {other:?}"),
+        }
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert!(all.is_empty(), "no grant may be fabricated");
+    }
+
+    #[test]
+    fn revoke_authority_honors_effective_at() {
+        // RevokeAuthority may carry an `effective_at` grace-period
+        // timestamp; the revocation must stamp that value (not `now`)
+        // on the target's grants.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let authority = did(40);
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-authority",
+            &dom,
+            [0xf1u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: authority.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 10_000,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-revoke-authority",
+            &dom,
+            [0xf2u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RevokeAuthority {
+                    authority_did: authority.clone(),
+                    reason: "decertified".into(),
+                    effective_at: Some(5_555),
+                },
+            },
+            2_000,
+        )
+        .unwrap();
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(authority))
+            .unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(
+            all[0].revoked_at,
+            Some(5_555),
+            "effective_at must override the acceptance `now` for revocation timestamp"
+        );
     }
 }
