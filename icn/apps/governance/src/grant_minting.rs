@@ -401,7 +401,7 @@ fn apply_acceptance_lifecycle(
         // grants are never revoked by this domain's vote.
         SdisProposal::RemoveSteward { steward, .. }
         | SdisProposal::SuspendSteward { steward, .. } => {
-            revoke_active_grants_for_person(backend, steward, domain_id, now)?;
+            revoke_active_grants_for_person(backend, steward, domain_id, now, now)?;
             Ok(Vec::new())
         }
 
@@ -426,24 +426,27 @@ fn apply_acceptance_lifecycle(
                     | StewardPenalty::Probation { .. }
             );
             if revokes {
-                revoke_active_grants_for_person(backend, steward, domain_id, now)?;
+                revoke_active_grants_for_person(backend, steward, domain_id, now, now)?;
             }
             Ok(Vec::new())
         }
 
         // Institutional-authority revocation: honors the payload's
         // `effective_at` when set (allows a governance-granted grace
-        // period); otherwise takes effect at `now`. The backend
-        // enforces monotonic-minimum: a strictly-earlier revocation
-        // tightens, a later-or-equal one is a no-op. Scoped to grants
-        // this domain issued — cross-domain grants are not touched.
+        // period); otherwise takes effect at `now`. Candidate grants
+        // are still selected from the set active at acceptance time,
+        // so grants minted after `effective_at` but before acceptance
+        // are not silently missed. The backend enforces
+        // monotonic-minimum: a strictly-earlier revocation tightens,
+        // a later-or-equal one is a no-op. Scoped to grants this
+        // domain issued — cross-domain grants are not touched.
         SdisProposal::RevokeAuthority {
             authority_did,
             effective_at,
             ..
         } => {
             let revoke_at = effective_at.unwrap_or(now);
-            revoke_active_grants_for_person(backend, authority_did, domain_id, revoke_at)?;
+            revoke_active_grants_for_person(backend, authority_did, domain_id, now, revoke_at)?;
             Ok(Vec::new())
         }
 
@@ -543,8 +546,9 @@ fn apply_acceptance_lifecycle(
     }
 }
 
-/// Revoke every active grant whose grantee is the given person DID AND
-/// whose grantor is the deciding domain.
+/// Revoke every grant whose grantee is the given person DID, whose
+/// grantor is the deciding domain, and which is active at
+/// `selection_now`; stamp each revocation with `revoked_at`.
 ///
 /// Error propagation: any failure to *list* or *write* a revocation —
 /// other than the benign `grant_not_found` index-skew case — is
@@ -577,11 +581,12 @@ fn revoke_active_grants_for_person(
     backend: &dyn GovernanceReceiptBackend,
     person: &icn_identity::Did,
     domain_id: &GovernanceDomainId,
+    selection_now: Timestamp,
     revoked_at: Timestamp,
 ) -> Result<(), String> {
     let grantee = Grantee::Person(person.clone());
     let grants = backend
-        .list_active_authority_grants_by_grantee(&grantee, revoked_at)
+        .list_active_authority_grants_by_grantee(&grantee, selection_now)
         .map_err(|e| {
             tracing::error!(
                 grantee = ?grantee,
@@ -607,6 +612,7 @@ fn revoke_active_grants_for_person(
                 tracing::info!(
                     grant_id = %g.id,
                     grantee = ?grantee,
+                    selection_now,
                     revoked_at,
                     "revoked authority grant at acceptance seam"
                 );
@@ -1762,6 +1768,70 @@ mod tests {
             all[0].revoked_at,
             Some(5_555),
             "effective_at must override the acceptance `now` for revocation timestamp"
+        );
+    }
+
+    #[test]
+    fn revoke_authority_revokes_grants_minted_after_effective_at_but_before_acceptance() {
+        // Candidate selection must happen at acceptance time, not at
+        // `effective_at`. Otherwise a grant minted during the grace
+        // window would remain active forever after an accepted
+        // RevokeAuthority decision.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let authority = did(41);
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-authority-late",
+            &dom,
+            [0xf3u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: authority.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 10_000,
+                },
+            },
+            5_800,
+        )
+        .unwrap();
+
+        // Grace-period revocation accepted after the grant was minted.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-revoke-authority-late",
+            &dom,
+            [0xf4u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RevokeAuthority {
+                    authority_did: authority.clone(),
+                    reason: "decertified".into(),
+                    effective_at: Some(5_555),
+                },
+            },
+            6_000,
+        )
+        .unwrap();
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(authority.clone()))
+            .unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(
+            all[0].revoked_at,
+            Some(5_555),
+            "accepted revocation must stamp payload effective_at even for grants discovered at acceptance time"
+        );
+
+        let active_after_acceptance = backend
+            .list_active_authority_grants_by_grantee(&Grantee::Person(authority), 6_000)
+            .unwrap();
+        assert!(
+            active_after_acceptance.is_empty(),
+            "grant minted during the grace window must still be revoked once the decision is accepted"
         );
     }
 
