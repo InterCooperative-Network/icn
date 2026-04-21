@@ -325,32 +325,14 @@ fn derive_sdis_grants(
             }]
         }
 
-        // Steward reconfirmation: the payload names the steward
-        // (grantee) and a new absolute term end (time bound). Same
-        // class / scope shape as appointment; the grant represents
-        // the refreshed term.
-        SdisProposal::ReconfirmSteward {
-            steward,
-            new_term_end,
-            ..
-        } => {
-            let scope = TypedScope {
-                domain: Some(domain_id.clone()),
-                proposal_class: vec!["Sdis".into()],
-                ..TypedScope::default()
-            };
-            vec![AuthorityGrant {
-                id: AuthorityGrantId::new(),
-                class: AuthorityClass::Attestation,
-                grantor: GrantorEntityId(domain_id.0.clone()),
-                grantee: Grantee::Person(steward.clone()),
-                scope,
-                granted_by: Some(decision.clone()),
-                valid_from: now,
-                valid_until: Some(*new_term_end),
-                revoked_at: None,
-            }]
-        }
+        // Steward reconfirmation handled in the lifecycle seam, not
+        // here. A pure derive path cannot enforce the history-aware
+        // preconditions (active in-domain grant must exist; the most
+        // recent in-domain grant must not be revoked; new term must
+        // be strictly in the future). Without those guards, the
+        // derive path is a stealth-reinstatement and stealth-
+        // appointment vector — see [`apply_acceptance_lifecycle`].
+        SdisProposal::ReconfirmSteward { .. } => Vec::new(),
 
         // Removals, sanctions, suspensions, and authority revocations
         // do not mint **new** grants from the derive path — they
@@ -477,6 +459,59 @@ fn apply_acceptance_lifecycle(
             },
         ),
 
+        // Steward reconfirmation: refresh the term of an already-
+        // active steward. History-aware guards:
+        //   - Decline if `new_term_end <= now`. An absolute timestamp
+        //     at or before `now` produces an inactive grant — silent
+        //     no-op. Fail closed instead.
+        //   - Decline unless an active in-domain grant exists. This
+        //     closes two attack paths the pure derive path had open:
+        //       (a) Stealth reinstatement — ReconfirmSteward on a
+        //           steward whose most-recent in-domain grant is
+        //           revoked would mint fresh active authority,
+        //           bypassing `mint_reinstatement_grant`'s revoked-
+        //           template guard and the Reinstate proposal flow.
+        //       (b) Stealth appointment — ReconfirmSteward on a DID
+        //           that never had a grant in this domain would mint
+        //           authority without the AppointSteward sponsorship/
+        //           bond/term-length flow.
+        //
+        // Scope is cloned from the active template rather than
+        // fabricated, mirroring `mint_reinstatement_grant`'s pattern
+        // so a refresh preserves the prior grant's authority shape
+        // rather than quietly rewriting it.
+        //
+        // The prior active grant is intentionally NOT pre-revoked.
+        // Revoking outside `put_mandate_with_grants` would create a
+        // retry-livelock under partial-failure: a failed mandate
+        // commit after a successful prior-revoke would make the
+        // retry's active-grant lookup miss and decline the refresh,
+        // leaving the steward with no active authority. Letting the
+        // prior grant expire naturally on its original `valid_until`
+        // keeps the refresh retry-safe. Short coexistence overlap
+        // (prior's remaining term) is a benign consequence: both
+        // grants are governance-minted under the same scope/class/
+        // grantor, so accumulation is not a privilege-extension
+        // vector — it is append-only continuity-of-authority until
+        // the old term lapses.
+        SdisProposal::ReconfirmSteward {
+            steward,
+            new_term_end,
+            ..
+        } => Ok(
+            match mint_reconfirmation_grant(
+                backend,
+                steward,
+                domain_id,
+                decision,
+                now,
+                *new_term_end,
+            ) {
+                Some(g) => vec![g],
+                None => Vec::new(),
+            },
+        ),
+
         // Revocation appeals do not un-revoke in place — reviving a
         // revoked grant by clearing `revoked_at` would lose the
         // constitutional record of the original revocation event and
@@ -498,8 +533,9 @@ fn apply_acceptance_lifecycle(
         // Non-lifecycle SDIS variants (threshold, authority approval,
         // jurisdiction-tier bumps, forced key rotation) do not revoke
         // grants — they change other domain state. No lifecycle work.
+        // AppointSteward is handled in the pure derive path (no prior
+        // state to consult).
         SdisProposal::AppointSteward { .. }
-        | SdisProposal::ReconfirmSteward { .. }
         | SdisProposal::ModifyThreshold { .. }
         | SdisProposal::ApproveAuthority { .. }
         | SdisProposal::UpdateJurisdictionTier { .. }
@@ -724,6 +760,93 @@ fn mint_reinstatement_grant(
     })
 }
 
+/// Mint a fresh reconfirmation grant for a steward, cloning
+/// class/scope from the current **active** prior grant issued by
+/// **this deciding domain** and setting `grantor` from `domain_id`.
+///
+/// Returns `None` (declines to mint) when:
+/// - `new_term_end <= now` — the payload carries a degenerate absolute
+///   timestamp that would produce an inactive grant (silent no-op).
+///   Fail closed rather than record a grant that never activates.
+/// - no active in-domain grant exists for this grantee at `now` —
+///   reconfirmation presupposes active authority. Declining closes
+///   the stealth-reinstatement path (ReconfirmSteward on a revoked
+///   steward) and the stealth-appointment path (ReconfirmSteward on
+///   a never-granted DID). The callers for those cases are
+///   ReinstateSteward and AppointSteward respectively.
+///
+/// The cloned scope mirrors `mint_reinstatement_grant` so a refresh
+/// preserves the prior grant's authority shape rather than
+/// fabricating a narrower/broader scope from the payload alone.
+///
+/// The prior active grant is NOT revoked here — see the comment on
+/// the `ReconfirmSteward` lifecycle arm for the retry-safety rationale.
+fn mint_reconfirmation_grant(
+    backend: &dyn GovernanceReceiptBackend,
+    steward: &icn_identity::Did,
+    domain_id: &GovernanceDomainId,
+    decision: &DecisionProvenance,
+    now: Timestamp,
+    new_term_end: Timestamp,
+) -> Option<AuthorityGrant> {
+    if new_term_end <= now {
+        tracing::warn!(
+            grantee = %steward,
+            proposal_id = %decision.proposal_id,
+            now,
+            new_term_end,
+            "ReconfirmSteward: new_term_end is at or before now; declining to mint (would be inactive on creation)"
+        );
+        return None;
+    }
+
+    let grantee = Grantee::Person(steward.clone());
+    let actives = match backend.list_active_authority_grants_by_grantee(&grantee, now) {
+        Ok(g) => g,
+        Err(e) => {
+            tracing::error!(
+                grantee = ?grantee,
+                error = %e,
+                "list_active_authority_grants_by_grantee failed; declining to mint reconfirmation grant"
+            );
+            return None;
+        }
+    };
+    // Restrict candidates to grants issued by THIS deciding domain.
+    // A cross-domain active grant does not authorize this domain to
+    // refresh it — the grantor must match.
+    let template = actives
+        .iter()
+        .filter(|g| g.grantor.0 == domain_id.0)
+        .next_back();
+    let template = match template {
+        Some(t) => t.clone(),
+        None => {
+            tracing::warn!(
+                grantee = ?grantee,
+                proposal_id = %decision.proposal_id,
+                deciding_domain = %domain_id.0,
+                "ReconfirmSteward: no active in-domain grant found; declining to mint (reconfirmation requires an active grant issued by this domain — use AppointSteward for first-time authority, ReinstateSteward for a revoked template)"
+            );
+            return None;
+        }
+    };
+
+    let scope = template.scope.clone();
+
+    Some(AuthorityGrant {
+        id: AuthorityGrantId::new(),
+        class: template.class,
+        grantor: GrantorEntityId(domain_id.0.clone()),
+        grantee: Grantee::Person(steward.clone()),
+        scope,
+        granted_by: Some(decision.clone()),
+        valid_from: now,
+        valid_until: Some(new_term_end),
+        revoked_at: None,
+    })
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -784,24 +907,23 @@ mod tests {
     }
 
     #[test]
-    fn reconfirm_steward_mints_one_attestation_grant_bounded_by_new_term_end() {
-        let new_term_end: Timestamp = 5_000_000;
+    fn reconfirm_steward_is_not_a_pure_derive_path() {
+        // ReconfirmSteward now requires backend/history access (it is
+        // lifecycle, not pure derive). The pure derive path must
+        // return an empty vec; the real behavior is exercised via
+        // `mint_and_persist_for_accepted` against a backend.
         let payload = ProposalPayload::Sdis {
             proposal: SdisProposal::ReconfirmSteward {
                 steward: did(3),
-                new_term_end,
+                new_term_end: 5_000_000,
                 performance_notes: None,
             },
         };
-        let d = decision();
-        let dom = domain();
-
-        let grants = derive_grants_for_accepted_proposal(&payload, &dom, &d, 1_000);
-        assert_eq!(grants.len(), 1);
-        let g = &grants[0];
-        assert_eq!(g.class, AuthorityClass::Attestation);
-        assert_eq!(g.grantee, Grantee::Person(did(3)));
-        assert_eq!(g.valid_until, Some(new_term_end));
+        let grants = derive_grants_for_accepted_proposal(&payload, &domain(), &decision(), 1_000);
+        assert!(
+            grants.is_empty(),
+            "ReconfirmSteward must not mint from the pure derive path — needs history lookup"
+        );
     }
 
     #[test]
@@ -2123,5 +2245,372 @@ mod tests {
                 .is_some(),
             "mandate must be recorded on the successful retry"
         );
+    }
+
+    // ========================================================================
+    // ReconfirmSteward history-aware lifecycle tests
+    // ========================================================================
+
+    #[test]
+    fn reconfirm_steward_declines_when_steward_has_no_prior_grant() {
+        // ReconfirmSteward on a DID with no in-domain history must
+        // decline — this is the stealth-appointment path. First-time
+        // authority belongs to AppointSteward.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(90);
+
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reconfirm-ghost",
+            &dom,
+            [0xA0u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReconfirmSteward {
+                    steward: steward.clone(),
+                    new_term_end: 10_000,
+                    performance_notes: None,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(
+                grants_persisted, 0,
+                "reconfirmation without any prior in-domain grant must decline"
+            ),
+            other => panic!("expected Minted (pending-grants); got {other:?}"),
+        }
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert!(
+            all.is_empty(),
+            "no grant may be minted for a never-appointed steward"
+        );
+    }
+
+    #[test]
+    fn reconfirm_steward_declines_when_only_revoked_in_domain_grant_exists() {
+        // The critical bug: ReconfirmSteward on a revoked steward was
+        // a stealth-reinstatement path in the pure derive version.
+        // Must decline — reinstatement of a revoked steward routes
+        // through ReinstateSteward, which mints from a valid revoked
+        // template under its own flow.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(91);
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-for-revoke",
+            &dom,
+            [0xA1u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-remove-before-reconfirm",
+            &dom,
+            [0xA2u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: steward.clone(),
+                    reason: "breach".into(),
+                    return_bond: false,
+                },
+            },
+            2_000,
+        )
+        .unwrap();
+
+        // Attempt reconfirmation while the steward is revoked — must
+        // decline rather than silently re-activate.
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reconfirm-revoked",
+            &dom,
+            [0xA3u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReconfirmSteward {
+                    steward: steward.clone(),
+                    new_term_end: 10_000,
+                    performance_notes: None,
+                },
+            },
+            3_000,
+        )
+        .unwrap();
+
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(
+                grants_persisted, 0,
+                "reconfirmation of a revoked steward must decline (closes stealth-reinstatement path)"
+            ),
+            other => panic!("expected Minted (pending-grants); got {other:?}"),
+        }
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(
+            all[0].revoked_at,
+            Some(2_000),
+            "revoked grant must remain revoked; no fresh active grant was minted"
+        );
+    }
+
+    #[test]
+    fn reconfirm_steward_declines_when_new_term_end_is_at_or_before_now() {
+        // An absolute `new_term_end <= now` would record a grant that
+        // is inactive on creation. Fail closed rather than record a
+        // silent no-op grant.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(92);
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-92",
+            &dom,
+            [0xA4u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 10_000,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        // new_term_end equal to now: must decline.
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reconfirm-now-eq-term",
+            &dom,
+            [0xA5u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReconfirmSteward {
+                    steward: steward.clone(),
+                    new_term_end: 5_000,
+                    performance_notes: None,
+                },
+            },
+            5_000,
+        )
+        .unwrap();
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(grants_persisted, 0, "new_term_end == now must decline"),
+            other => panic!("expected Minted; got {other:?}"),
+        }
+
+        // new_term_end strictly before now: must decline.
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reconfirm-term-in-past",
+            &dom,
+            [0xA6u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReconfirmSteward {
+                    steward: steward.clone(),
+                    new_term_end: 4_000,
+                    performance_notes: None,
+                },
+            },
+            5_000,
+        )
+        .unwrap();
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(grants_persisted, 0, "new_term_end < now must decline"),
+            other => panic!("expected Minted; got {other:?}"),
+        }
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert_eq!(
+            all.len(),
+            1,
+            "only the original appointment grant exists; no degenerate reconfirmation grants were recorded"
+        );
+    }
+
+    #[test]
+    fn reconfirm_steward_mints_fresh_grant_when_active_in_domain_grant_exists() {
+        // Happy path: steward has an active in-domain grant,
+        // `new_term_end > now`. Mints one fresh grant with
+        // `valid_from = now`, `valid_until = new_term_end`. The prior
+        // grant is intentionally left to expire naturally — retry-
+        // safety rationale is in the lifecycle arm comment.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(93);
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-93",
+            &dom,
+            [0xA7u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 10_000,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reconfirm-happy",
+            &dom,
+            [0xA8u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReconfirmSteward {
+                    steward: steward.clone(),
+                    new_term_end: 50_000,
+                    performance_notes: Some("solid term".into()),
+                },
+            },
+            5_000,
+        )
+        .unwrap();
+
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(
+                grants_persisted, 1,
+                "happy-path reconfirm mints one fresh grant"
+            ),
+            other => panic!("expected Minted; got {other:?}"),
+        }
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert_eq!(
+            all.len(),
+            2,
+            "history holds the appointment + the reconfirmation"
+        );
+
+        let refreshed = all
+            .iter()
+            .find(|g| g.valid_from == 5_000)
+            .expect("refresh exists");
+        assert_eq!(refreshed.valid_until, Some(50_000));
+        assert_eq!(refreshed.class, AuthorityClass::Attestation);
+        assert_eq!(refreshed.grantor, GrantorEntityId("coop:tech".into()));
+        assert!(refreshed.revoked_at.is_none());
+
+        let original = all
+            .iter()
+            .find(|g| g.valid_from == 1_000)
+            .expect("original exists");
+        assert!(
+            original.revoked_at.is_none(),
+            "prior grant is intentionally left active — retry-safety over pre-revoke"
+        );
+        assert_eq!(
+            original.valid_until,
+            Some(11_000),
+            "original term unchanged"
+        );
+    }
+
+    #[test]
+    fn reconfirm_steward_declines_when_only_cross_domain_active_grant_exists() {
+        // A cross-domain active grant does not authorize this domain
+        // to refresh. Only an active grant whose grantor matches the
+        // deciding domain counts.
+        let backend = InMemoryGrantBackend::new();
+        let steward = did(94);
+        let domain_a = GovernanceDomainId("coop:alpha".into());
+        let domain_b = GovernanceDomainId("coop:beta".into());
+
+        // Domain B appoints the steward.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-b-94",
+            &domain_b,
+            [0xA9u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(2)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 10_000,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        // Domain A attempts to reconfirm — must decline (domain A has
+        // no grant to refresh).
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reconfirm-cross-domain",
+            &domain_a,
+            [0xAAu8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReconfirmSteward {
+                    steward: steward.clone(),
+                    new_term_end: 50_000,
+                    performance_notes: None,
+                },
+            },
+            2_000,
+        )
+        .unwrap();
+
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(
+                grants_persisted, 0,
+                "cross-domain reconfirmation must decline"
+            ),
+            other => panic!("expected Minted; got {other:?}"),
+        }
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert_eq!(all.len(), 1, "only domain_b's original grant exists");
+        assert_eq!(all[0].grantor, GrantorEntityId(domain_b.0));
     }
 }
