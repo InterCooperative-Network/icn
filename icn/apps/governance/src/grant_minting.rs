@@ -149,8 +149,17 @@ pub fn mint_and_persist_for_accepted(
     // preserved across same-or-later retries; a strictly-earlier
     // retry would correctly tighten (which is also safe — the grant
     // only terminates sooner, never later).
+    //
+    // The inverse window — lifecycle write fails and we still record
+    // the mandate — must NOT be allowed to close silently: the
+    // idempotency check at the top of this function would short-
+    // circuit retries to `AlreadyMinted`, skipping the lifecycle, and
+    // leave the target's grant active despite an accepted revocation
+    // decision. So lifecycle errors propagate; no mandate is recorded
+    // when any revocation write failed, and the retry re-runs the
+    // whole seam.
     let lifecycle_grants =
-        apply_acceptance_lifecycle(backend, payload, domain_id, &decision_prov, now);
+        apply_acceptance_lifecycle(backend, payload, domain_id, &decision_prov, now)?;
 
     // Derive zero or more grants from the payload itself. Empty vec is
     // the truthful default for most payload classes today.
@@ -378,9 +387,14 @@ fn derive_sdis_grants(
 /// and setting `grantor` from this reinstatement decision's
 /// `domain_id` — never mutating a revoked grant back to active.
 ///
-/// Revocations are best-effort: backend errors are logged and do not
-/// abort the decision. A `grant_not_found` error from an in-flight index
-/// skew is treated as skippable.
+/// Revocation write failures propagate: if a revocation cannot be
+/// durably stamped, the error is returned so the caller aborts before
+/// recording the mandate. Recording a mandate while a revocation is
+/// only logged-and-skipped would let the idempotency check at the top
+/// of `mint_and_persist_for_accepted` short-circuit retries and leave
+/// the target grant active indefinitely. Benign `grant_not_found`
+/// errors (index skew) are still skipped locally — the grant is
+/// already gone so the caller's intent is satisfied.
 ///
 /// All backend calls on the defaulted no-op trait methods return empty
 /// lists / `Ok(())`, so in-memory test backends that do not durably
@@ -392,9 +406,9 @@ fn apply_acceptance_lifecycle(
     domain_id: &GovernanceDomainId,
     decision: &DecisionProvenance,
     now: Timestamp,
-) -> Vec<AuthorityGrant> {
+) -> Result<Vec<AuthorityGrant>, String> {
     let ProposalPayload::Sdis { proposal } = payload else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     use icn_governance::sdis::{SdisProposal, StewardPenalty};
 
@@ -405,8 +419,8 @@ fn apply_acceptance_lifecycle(
         // grants are never revoked by this domain's vote.
         SdisProposal::RemoveSteward { steward, .. }
         | SdisProposal::SuspendSteward { steward, .. } => {
-            revoke_active_grants_for_person(backend, steward, domain_id, now);
-            Vec::new()
+            revoke_active_grants_for_person(backend, steward, domain_id, now)?;
+            Ok(Vec::new())
         }
 
         // Sanctions revoke when the penalty terminates authority
@@ -430,9 +444,9 @@ fn apply_acceptance_lifecycle(
                     | StewardPenalty::Probation { .. }
             );
             if revokes {
-                revoke_active_grants_for_person(backend, steward, domain_id, now);
+                revoke_active_grants_for_person(backend, steward, domain_id, now)?;
             }
-            Vec::new()
+            Ok(Vec::new())
         }
 
         // Institutional-authority revocation: honors the payload's
@@ -447,8 +461,8 @@ fn apply_acceptance_lifecycle(
             ..
         } => {
             let revoke_at = effective_at.unwrap_or(now);
-            revoke_active_grants_for_person(backend, authority_did, domain_id, revoke_at);
-            Vec::new()
+            revoke_active_grants_for_person(backend, authority_did, domain_id, revoke_at)?;
+            Ok(Vec::new())
         }
 
         // Reinstatement mints a **fresh** grant — new UUID, new
@@ -456,12 +470,12 @@ fn apply_acceptance_lifecycle(
         // It does not mutate the revoked grant back to active. If no
         // prior grant is found, we decline (return empty) and log: the
         // seam refuses to fabricate bounds a payload did not carry.
-        SdisProposal::ReinstateSteward { steward, .. } => {
+        SdisProposal::ReinstateSteward { steward, .. } => Ok(
             match mint_reinstatement_grant(backend, steward, domain_id, decision, now) {
                 Some(g) => vec![g],
                 None => Vec::new(),
-            }
-        }
+            },
+        ),
 
         // Revocation appeals do not un-revoke in place — reviving a
         // revoked grant by clearing `revoked_at` would lose the
@@ -478,7 +492,7 @@ fn apply_acceptance_lifecycle(
                 proposal_id = %decision.proposal_id,
                 "RevocationAppeal acceptance: no in-place grant mutation; any reinstatement routes through a separate reinstatement proposal"
             );
-            Vec::new()
+            Ok(Vec::new())
         }
 
         // Non-lifecycle SDIS variants (threshold, authority approval,
@@ -489,14 +503,33 @@ fn apply_acceptance_lifecycle(
         | SdisProposal::ModifyThreshold { .. }
         | SdisProposal::ApproveAuthority { .. }
         | SdisProposal::UpdateJurisdictionTier { .. }
-        | SdisProposal::ForceKeyRotation { .. } => Vec::new(),
+        | SdisProposal::ForceKeyRotation { .. } => Ok(Vec::new()),
     }
 }
 
 /// Revoke every active grant whose grantee is the given person DID AND
-/// whose grantor is the deciding domain, best-effort. Errors are logged
-/// and the decision continues; missing primaries (index skew) are
-/// warned and skipped.
+/// whose grantor is the deciding domain.
+///
+/// Error propagation: any failure to *list* or *write* a revocation —
+/// other than the benign `grant_not_found` index-skew case — is
+/// returned to the caller so the acceptance seam can abort before
+/// recording the mandate. The mandate write must not land when a
+/// revocation write failed: if it did, the idempotency check at the
+/// top of `mint_and_persist_for_accepted` would short-circuit retries
+/// to `AlreadyMinted`, skipping the lifecycle, and the target grant
+/// would remain active indefinitely despite an accepted revocation
+/// decision. Propagating the error lets the retry re-run the lifecycle
+/// under monotonic-minimum semantics.
+///
+/// `grant_not_found` errors (primary record absent despite an active
+/// by-grantee index entry — in-flight index skew) are logged and
+/// skipped, not propagated: the grant the caller meant to revoke is
+/// already gone, so the caller's intent is satisfied. All other
+/// backend errors short-circuit the remaining revocations to avoid
+/// partial revocation state (some grants revoked, others not, yet no
+/// mandate recorded — but under a successful retry the list call
+/// re-discovers the not-yet-revoked grants, so stopping early costs
+/// at most one extra retry pass).
 ///
 /// Cross-domain guard: an accepted SDIS revocation runs in exactly one
 /// governance domain. That domain's vote must not strip authority
@@ -509,19 +542,18 @@ fn revoke_active_grants_for_person(
     person: &icn_identity::Did,
     domain_id: &GovernanceDomainId,
     revoked_at: Timestamp,
-) {
+) -> Result<(), String> {
     let grantee = Grantee::Person(person.clone());
-    let grants = match backend.list_active_authority_grants_by_grantee(&grantee, revoked_at) {
-        Ok(g) => g,
-        Err(e) => {
+    let grants = backend
+        .list_active_authority_grants_by_grantee(&grantee, revoked_at)
+        .map_err(|e| {
             tracing::error!(
                 grantee = ?grantee,
                 error = %e,
-                "list_active_authority_grants_by_grantee failed; skipping revocation"
+                "list_active_authority_grants_by_grantee failed; aborting acceptance before mandate write"
             );
-            return;
-        }
-    };
+            e
+        })?;
     for g in grants {
         if g.grantor.0 != domain_id.0 {
             // Cross-domain grant: this decision's domain did not
@@ -554,11 +586,13 @@ fn revoke_active_grants_for_person(
                 tracing::error!(
                     grant_id = %g.id,
                     error = %e,
-                    "revoke_authority_grant failed"
+                    "revoke_authority_grant failed; aborting acceptance before mandate write"
                 );
+                return Err(e);
             }
         }
     }
+    Ok(())
 }
 
 /// Mint a fresh reinstatement grant for a steward, cloning
@@ -1023,6 +1057,11 @@ mod tests {
     struct InMemoryGrantBackend {
         mandates: std::sync::Mutex<Vec<Mandate>>,
         grants: std::sync::Mutex<Vec<AuthorityGrant>>,
+        /// One-shot fault-injection switch: when `true`, the next call
+        /// to `revoke_authority_grant` returns a transient backend
+        /// error and clears the flag. Used to simulate a revocation
+        /// write failure and verify the acceptance seam propagates it.
+        fail_next_revoke: std::sync::atomic::AtomicBool,
     }
 
     impl InMemoryGrantBackend {
@@ -1030,7 +1069,13 @@ mod tests {
             Self {
                 mandates: std::sync::Mutex::new(vec![]),
                 grants: std::sync::Mutex::new(vec![]),
+                fail_next_revoke: std::sync::atomic::AtomicBool::new(false),
             }
+        }
+
+        fn arm_next_revoke_failure(&self) {
+            self.fail_next_revoke
+                .store(true, std::sync::atomic::Ordering::SeqCst);
         }
     }
 
@@ -1133,6 +1178,12 @@ mod tests {
             grant_id: &AuthorityGrantId,
             revoked_at: Timestamp,
         ) -> Result<(), String> {
+            if self
+                .fail_next_revoke
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                return Err("transient_backend_error: simulated revoke failure".into());
+            }
             let mut guard = self.grants.lock().unwrap();
             let Some(g) = guard.iter_mut().find(|g| &g.id == grant_id) else {
                 return Err(format!("grant_not_found: {grant_id}"));
@@ -1959,6 +2010,118 @@ mod tests {
             after_second.len(),
             2,
             "still exactly 1 revoked + 1 active; no second active grant minted"
+        );
+    }
+
+    #[test]
+    fn remove_steward_revocation_write_failure_aborts_acceptance_and_retry_succeeds() {
+        // If a revocation write fails, the mandate MUST NOT be recorded:
+        // otherwise the idempotency check at the top of
+        // `mint_and_persist_for_accepted` short-circuits retries to
+        // `AlreadyMinted`, the lifecycle never re-runs, and the target
+        // grant stays active indefinitely despite an accepted
+        // revocation decision.
+        //
+        // Walk: appoint → arm one-shot revoke failure → RemoveSteward
+        // (must Err, no mandate recorded, grant still active) → retry
+        // (must succeed, mandate recorded, grant revoked).
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(80);
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-fail",
+            &dom,
+            [0x90u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        // Arm one-shot failure and attempt revocation — must Err.
+        backend.arm_next_revoke_failure();
+        let err = mint_and_persist_for_accepted(
+            &backend,
+            "prop-remove-fail",
+            &dom,
+            [0x91u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: steward.clone(),
+                    reason: "breach".into(),
+                    return_bond: false,
+                },
+            },
+            2_000,
+        )
+        .expect_err("revocation write failure must propagate, not record mandate");
+        assert!(
+            err.contains("transient_backend_error"),
+            "propagated error should surface the backend failure cause, got: {err}"
+        );
+
+        // Grant still active — revocation did not land.
+        let after_fail = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward.clone()))
+            .unwrap();
+        assert_eq!(after_fail.len(), 1);
+        assert!(
+            after_fail[0].revoked_at.is_none(),
+            "grant must remain active when revocation write failed"
+        );
+
+        // Mandate must NOT be recorded — otherwise retry would hit the
+        // idempotency short-circuit and skip the lifecycle forever.
+        assert!(
+            backend
+                .get_mandate_by_proposal("prop-remove-fail")
+                .unwrap()
+                .is_none(),
+            "no mandate may be recorded when a revocation write failed"
+        );
+
+        // Retry same proposal_id — flag is cleared, revocation lands,
+        // mandate records.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-remove-fail",
+            &dom,
+            [0x91u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: steward.clone(),
+                    reason: "breach".into(),
+                    return_bond: false,
+                },
+            },
+            2_500,
+        )
+        .expect("retry after transient failure must succeed");
+
+        let after_retry = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert_eq!(after_retry.len(), 1);
+        assert_eq!(
+            after_retry[0].revoked_at,
+            Some(2_500),
+            "retry must revoke at its own `now`"
+        );
+        assert!(
+            backend
+                .get_mandate_by_proposal("prop-remove-fail")
+                .unwrap()
+                .is_some(),
+            "mandate must be recorded on the successful retry"
         );
     }
 }
