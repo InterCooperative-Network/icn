@@ -15,9 +15,17 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         <span class="badge badge-amber">Maturity Anchor</span>
         <h1>What's Real Now</h1>
         <p class="lead">
-          ICN is a real, active infrastructure project with uneven maturity.
-          This page is where we say what is proven, what is advancing, and what is not yet finished.
+          ICN has uneven maturity across its subsystems.
+          This page states what is proven, what is advancing, and what is not yet complete.
           Every other page on this site should be readable against what is here without contradiction.
+        </p>
+      </div>
+
+      <div class="status-anchor">
+        <span class="status-anchor-label">Reviewed 2026-04-21</span>
+        <p>
+          As of April 21, 2026, governance structures, meetings, notifications, and decision-to-action work have landed.
+          Provenance is still the strongest part of the system. Broader execution coverage and stronger governance-to-economics links are still being built.
         </p>
       </div>
     </div>
@@ -34,7 +42,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 
       <MaturityGrid>
         <MaturityCard band="strong">
-          <p>Implemented, integrated, and load-bearing. The project is willing to stand behind these capabilities in public.</p>
+          <p>Implemented, integrated, and load-bearing. These are capabilities we are prepared to stand behind in public.</p>
         </MaturityCard>
         <MaturityCard band="advancing">
           <p>Actively under development with visible progress. Not yet something to rely on, but moving.</p>
@@ -43,20 +51,20 @@ import ReadingLadder from '../components/ReadingLadder.astro';
           <p>Serious implementation exists. Surfaces and integrations are still being finished. Implementation is often ahead of the public-facing story.</p>
         </MaturityCard>
         <MaturityCard band="notyet">
-          <p>Scoped and intended, but not where real work is concentrated right now. We would rather say that directly than imply a schedule.</p>
+          <p>Scoped, but not where work is concentrated right now. We would rather say that directly than imply a schedule.</p>
         </MaturityCard>
       </MaturityGrid>
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section-pre-ladder">
     <div class="container narrow prose">
       <h2>Strong today</h2>
       <p>
         <strong>Provenance and institutional memory.</strong>
         The deepest mature part of ICN is the chain that carries an outcome back through the rule that shaped it,
         the decision that authorized it, and the members who held standing. Proposals, votes, receipts,
-        and the decision-to-outcome chain are the strongest through-line in the current system.
+        and the decision-to-outcome chain are the most mature path in the current system.
       </p>
       <p>
         <strong>Auditable coordination.</strong>
@@ -126,7 +134,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         than paint pictures we cannot yet stand behind.
       </p>
       <p>
-        Other parts of the system are scoped and intended but not where active work is concentrated right now.
+        Other parts of the system are scoped but not where active work is concentrated right now.
         When outsiders ask "does ICN do X," the honest answer is sometimes <em>not yet, and we are not pretending otherwise</em>.
       </p>
 
@@ -159,7 +167,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
     </div>
   </section>
 
-  <section class="section-alt">
+  <section class="section-alt section-ladder">
     <div class="container narrow">
       <ReadingLadder current="whats-real-now" />
     </div>
@@ -172,6 +180,30 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 .page-hero .badge { align-self: flex-start; }
 .page-hero h1 { margin: 0; }
 .lead { font-size: 1.125rem; color: var(--text-body); line-height: 1.6; margin: 0; }
+.status-anchor {
+  margin-top: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--accent-amber);
+  border-radius: var(--radius-lg);
+}
+.status-anchor-label {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent-amber);
+  margin-bottom: var(--space-sm);
+}
+.status-anchor p {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
 
 .prose h2 { margin-top: var(--space-2xl); margin-bottom: var(--space-md); }
 .prose p { margin: 0 0 var(--space-md); line-height: 1.7; }
