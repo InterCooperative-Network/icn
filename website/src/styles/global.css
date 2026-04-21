@@ -283,6 +283,13 @@ pre code {
   border-top: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
 }
+.section-pre-ladder {
+  padding-bottom: var(--space-2xl);
+}
+.section-ladder {
+  padding-top: var(--space-2xl);
+  padding-bottom: var(--space-3xl);
+}
 .section-header {
   text-align: center;
   max-width: 680px;
@@ -1035,6 +1042,13 @@ pre code {
   .section,
   .section-alt {
     padding: var(--space-3xl) 0;
+  }
+  .section-pre-ladder {
+    padding-bottom: var(--space-xl);
+  }
+  .section-ladder {
+    padding-top: var(--space-xl);
+    padding-bottom: var(--space-2xl);
   }
   .section-header {
     margin-bottom: var(--space-2xl);
