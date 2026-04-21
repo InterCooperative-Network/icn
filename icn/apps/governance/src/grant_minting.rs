@@ -552,14 +552,24 @@ fn revoke_active_grants_for_person(
 }
 
 /// Mint a fresh reinstatement grant for a steward, cloning
-/// class/scope/grantor from the most-recent prior grant. Returns
-/// `None` when no prior grant can be located; reinstatement declines
-/// rather than fabricate bounds the payload does not carry.
+/// class/scope from the most-recent **revoked** prior grant issued by
+/// **this deciding domain** and setting `grantor` from `domain_id`.
 ///
-/// Term length is taken from the prior grant's
-/// `valid_until - valid_from` (when `valid_until` was bounded); for
-/// prior grants that were unbounded (`valid_until: None`) the fresh
-/// grant is also unbounded, which mirrors the prior authority shape.
+/// Returns `None` (declines to mint) when:
+/// - no prior grant exists for this grantee in this domain,
+/// - no prior grant in this domain has been revoked (which includes
+///   the common case where the steward is already active — a
+///   reinstatement of an already-active steward is a no-op, never a
+///   privilege extension), or
+/// - cloning the prior term would overflow `now`.
+///
+/// Reinstatement declines rather than fabricate bounds the payload
+/// does not carry, and declines rather than clone a template from
+/// another domain's history. Term length is taken from the prior
+/// grant's `valid_until - valid_from` (when `valid_until` was
+/// bounded); for prior grants that were unbounded (`valid_until:
+/// None`) the fresh grant is also unbounded, mirroring the prior
+/// authority shape.
 fn mint_reinstatement_grant(
     backend: &dyn GovernanceReceiptBackend,
     steward: &icn_identity::Did,
@@ -579,22 +589,25 @@ fn mint_reinstatement_grant(
             return None;
         }
     };
-    // Prefer the most-recent revoked grant (typical reinstatement
-    // shape); fall back to the most-recent grant of any status so a
-    // reinstatement after a mere expiry also works. Backend returns
-    // oldest-first by `valid_from`, so we take the last entry.
+    // Restrict candidates to:
+    //   (a) grants issued by THIS deciding domain — cross-domain
+    //       reinstatement would import another sovereign's shape, and
+    //   (b) grants that have been revoked — reinstating an already-
+    //       active steward must be a no-op, not a privilege-extension
+    //       mint. Backend returns oldest-first by `valid_from`, so we
+    //       take the last matching entry (most-recent revoked).
     let template = all
         .iter()
-        .filter(|g| g.revoked_at.is_some())
-        .next_back()
-        .or_else(|| all.last());
+        .filter(|g| g.grantor.0 == domain_id.0 && g.revoked_at.is_some())
+        .next_back();
     let template = match template {
         Some(t) => t.clone(),
         None => {
             tracing::warn!(
                 grantee = ?grantee,
                 proposal_id = %decision.proposal_id,
-                "ReinstateSteward: no prior grant found for steward; declining to mint (no term bounds to clone)"
+                deciding_domain = %domain_id.0,
+                "ReinstateSteward: no revoked in-domain grant found; declining to mint (reinstatement needs a revoked template issued by this domain)"
             );
             return None;
         }
@@ -1580,5 +1593,154 @@ mod tests {
             domain_b_grant.revoked_at, None,
             "domain_b's grant must NOT be revoked by domain_a's decision — cross-domain guard"
         );
+    }
+
+    #[test]
+    fn reinstate_steward_declines_when_target_is_active() {
+        // Reinstating an already-active steward must be a no-op, not a
+        // fresh-grant mint. The common-case bug: repeated or erroneous
+        // ReinstateSteward proposals must NOT silently duplicate or
+        // extend privileges.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(50);
+
+        // Appoint — steward is active; there are no revoked grants.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint",
+            &dom,
+            [0x51u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        // Reinstate while still active — must decline.
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reinstate-active",
+            &dom,
+            [0x52u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReinstateSteward {
+                    steward: steward.clone(),
+                    reason: "redundant appeal".into(),
+                },
+            },
+            2_000,
+        )
+        .unwrap();
+
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(
+                grants_persisted, 0,
+                "reinstatement of an active steward must NOT mint a new grant"
+            ),
+            other => panic!("expected Minted (pending-grants); got {other:?}"),
+        }
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert_eq!(all.len(), 1, "exactly the original appointment grant");
+        assert!(
+            all[0].revoked_at.is_none(),
+            "original grant remains active and untouched"
+        );
+    }
+
+    #[test]
+    fn reinstate_steward_declines_when_only_cross_domain_revoked_template_exists() {
+        // Reinstatement must NOT clone a template from another domain.
+        // Domain B revoked the steward. Domain A (which never issued a
+        // grant to this steward) accepts a ReinstateSteward — must
+        // decline rather than import domain B's shape/bounds.
+        let backend = InMemoryGrantBackend::new();
+        let steward = did(51);
+        let domain_a = GovernanceDomainId("coop:alpha".into());
+        let domain_b = GovernanceDomainId("coop:beta".into());
+
+        // Appoint + revoke under domain B only.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-b",
+            &domain_b,
+            [0x60u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(2)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-remove-b",
+            &domain_b,
+            [0x61u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: steward.clone(),
+                    reason: "breach".into(),
+                    return_bond: false,
+                },
+            },
+            2_000,
+        )
+        .unwrap();
+
+        // Domain A tries to reinstate — no in-domain template exists.
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reinstate-a",
+            &domain_a,
+            [0x62u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReinstateSteward {
+                    steward: steward.clone(),
+                    reason: "cross-domain import attempt".into(),
+                },
+            },
+            3_000,
+        )
+        .unwrap();
+
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(
+                grants_persisted, 0,
+                "cross-domain reinstatement without an in-domain template must decline"
+            ),
+            other => panic!("expected Minted (pending-grants); got {other:?}"),
+        }
+
+        // Still only the domain_b grant exists (revoked); no domain_a grant minted.
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert_eq!(
+            all.len(),
+            1,
+            "no fresh grant should be minted — domain_b's revoked grant remains as the only record"
+        );
+        assert_eq!(all[0].grantor, GrantorEntityId(domain_b.0));
+        assert_eq!(all[0].revoked_at, Some(2_000));
     }
 }
