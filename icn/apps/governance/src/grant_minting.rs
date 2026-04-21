@@ -453,7 +453,7 @@ fn apply_acceptance_lifecycle(
         // prior grant is found, we decline (return empty) and log: the
         // seam refuses to fabricate bounds a payload did not carry.
         SdisProposal::ReinstateSteward { steward, .. } => Ok(
-            match mint_reinstatement_grant(backend, steward, domain_id, decision, now) {
+            match mint_reinstatement_grant(backend, steward, domain_id, decision, now)? {
                 Some(g) => vec![g],
                 None => Vec::new(),
             },
@@ -506,7 +506,7 @@ fn apply_acceptance_lifecycle(
                 decision,
                 now,
                 *new_term_end,
-            ) {
+            )? {
                 Some(g) => vec![g],
                 None => Vec::new(),
             },
@@ -635,7 +635,7 @@ fn revoke_active_grants_for_person(
 /// class/scope from the most-recent **revoked** prior grant issued by
 /// **this deciding domain** and setting `grantor` from `domain_id`.
 ///
-/// Returns `None` (declines to mint) when:
+/// Returns `Ok(None)` (benign decline) when:
 /// - no prior grant exists for this grantee in this domain,
 /// - no prior grant in this domain has been revoked (which includes
 ///   the common case where the steward is already active — a
@@ -647,6 +647,13 @@ fn revoke_active_grants_for_person(
 ///   would otherwise find the old revoked grant as a template and
 ///   silently mint a second concurrent active grant, or
 /// - cloning the prior term would overflow `now`.
+///
+/// Returns `Err(e)` when the backend read fails transiently. The
+/// caller must propagate so the mandate is NOT recorded — otherwise
+/// the idempotency check at the top of `mint_and_persist_for_accepted`
+/// would short-circuit retries to `AlreadyMinted`, skipping the
+/// lifecycle, and the accepted reinstatement would never actually
+/// materialize authority.
 ///
 /// Reinstatement declines rather than fabricate bounds the payload
 /// does not carry, and declines rather than clone a template from
@@ -661,19 +668,18 @@ fn mint_reinstatement_grant(
     domain_id: &GovernanceDomainId,
     decision: &DecisionProvenance,
     now: Timestamp,
-) -> Option<AuthorityGrant> {
+) -> Result<Option<AuthorityGrant>, String> {
     let grantee = Grantee::Person(steward.clone());
-    let all = match backend.list_authority_grants_by_grantee(&grantee) {
-        Ok(g) => g,
-        Err(e) => {
+    let all = backend
+        .list_authority_grants_by_grantee(&grantee)
+        .map_err(|e| {
             tracing::error!(
                 grantee = ?grantee,
                 error = %e,
-                "list_authority_grants_by_grantee failed; declining to mint reinstatement grant"
+                "list_authority_grants_by_grantee failed; aborting acceptance before mandate write"
             );
-            return None;
-        }
-    };
+            e
+        })?;
     // Precheck: if any in-domain grant is already active at `now`,
     // decline. The per-candidate filter below selects the most-recent
     // revoked in-domain template, but after a normal
@@ -693,7 +699,7 @@ fn mint_reinstatement_grant(
             deciding_domain = %domain_id.0,
             "ReinstateSteward: an in-domain grant is already active; declining to mint (reinstatement of an active steward is a no-op)"
         );
-        return None;
+        return Ok(None);
     }
 
     // Restrict candidates to:
@@ -716,7 +722,7 @@ fn mint_reinstatement_grant(
                 deciding_domain = %domain_id.0,
                 "ReinstateSteward: no revoked in-domain grant found; declining to mint (reinstatement needs a revoked template issued by this domain)"
             );
-            return None;
+            return Ok(None);
         }
     };
 
@@ -736,7 +742,7 @@ fn mint_reinstatement_grant(
             now,
             "ReinstateSteward term overflow cloning prior grant; declining to mint (would be unbounded)"
         );
-        return None;
+        return Ok(None);
     }
 
     // Reinstatement preserves the prior grant scope as-is by cloning the
@@ -747,7 +753,7 @@ fn mint_reinstatement_grant(
     // the derive-path convention.
     let scope = template.scope.clone();
 
-    Some(AuthorityGrant {
+    Ok(Some(AuthorityGrant {
         id: AuthorityGrantId::new(),
         class: template.class,
         grantor: GrantorEntityId(domain_id.0.clone()),
@@ -757,14 +763,14 @@ fn mint_reinstatement_grant(
         valid_from: now,
         valid_until,
         revoked_at: None,
-    })
+    }))
 }
 
 /// Mint a fresh reconfirmation grant for a steward, cloning
 /// class/scope from the current **active** prior grant issued by
 /// **this deciding domain** and setting `grantor` from `domain_id`.
 ///
-/// Returns `None` (declines to mint) when:
+/// Returns `Ok(None)` (benign decline) when:
 /// - `new_term_end <= now` — the payload carries a degenerate absolute
 ///   timestamp that would produce an inactive grant (silent no-op).
 ///   Fail closed rather than record a grant that never activates.
@@ -774,6 +780,13 @@ fn mint_reinstatement_grant(
 ///   steward) and the stealth-appointment path (ReconfirmSteward on
 ///   a never-granted DID). The callers for those cases are
 ///   ReinstateSteward and AppointSteward respectively.
+///
+/// Returns `Err(e)` when the backend read fails transiently. The
+/// caller must propagate so the mandate is NOT recorded — otherwise
+/// the idempotency check at the top of `mint_and_persist_for_accepted`
+/// would short-circuit retries to `AlreadyMinted`, skipping the
+/// lifecycle, and the accepted reconfirmation would never actually
+/// refresh authority.
 ///
 /// The cloned scope mirrors `mint_reinstatement_grant` so a refresh
 /// preserves the prior grant's authority shape rather than
@@ -788,7 +801,7 @@ fn mint_reconfirmation_grant(
     decision: &DecisionProvenance,
     now: Timestamp,
     new_term_end: Timestamp,
-) -> Option<AuthorityGrant> {
+) -> Result<Option<AuthorityGrant>, String> {
     if new_term_end <= now {
         tracing::warn!(
             grantee = %steward,
@@ -797,21 +810,20 @@ fn mint_reconfirmation_grant(
             new_term_end,
             "ReconfirmSteward: new_term_end is at or before now; declining to mint (would be inactive on creation)"
         );
-        return None;
+        return Ok(None);
     }
 
     let grantee = Grantee::Person(steward.clone());
-    let actives = match backend.list_active_authority_grants_by_grantee(&grantee, now) {
-        Ok(g) => g,
-        Err(e) => {
+    let actives = backend
+        .list_active_authority_grants_by_grantee(&grantee, now)
+        .map_err(|e| {
             tracing::error!(
                 grantee = ?grantee,
                 error = %e,
-                "list_active_authority_grants_by_grantee failed; declining to mint reconfirmation grant"
+                "list_active_authority_grants_by_grantee failed; aborting acceptance before mandate write"
             );
-            return None;
-        }
-    };
+            e
+        })?;
     // Restrict candidates to grants issued by THIS deciding domain.
     // A cross-domain active grant does not authorize this domain to
     // refresh it — the grantor must match.
@@ -828,13 +840,13 @@ fn mint_reconfirmation_grant(
                 deciding_domain = %domain_id.0,
                 "ReconfirmSteward: no active in-domain grant found; declining to mint (reconfirmation requires an active grant issued by this domain — use AppointSteward for first-time authority, ReinstateSteward for a revoked template)"
             );
-            return None;
+            return Ok(None);
         }
     };
 
     let scope = template.scope.clone();
 
-    Some(AuthorityGrant {
+    Ok(Some(AuthorityGrant {
         id: AuthorityGrantId::new(),
         class: template.class,
         grantor: GrantorEntityId(domain_id.0.clone()),
@@ -844,7 +856,7 @@ fn mint_reconfirmation_grant(
         valid_from: now,
         valid_until: Some(new_term_end),
         revoked_at: None,
-    })
+    }))
 }
 
 #[cfg(test)]
@@ -1184,6 +1196,18 @@ mod tests {
         /// error and clears the flag. Used to simulate a revocation
         /// write failure and verify the acceptance seam propagates it.
         fail_next_revoke: std::sync::atomic::AtomicBool,
+        /// One-shot fault-injection switch: when `true`, the next call
+        /// to `list_authority_grants_by_grantee` returns a transient
+        /// backend error and clears the flag. Used to verify
+        /// reinstatement read-path errors propagate and abort the
+        /// acceptance seam before the mandate write.
+        fail_next_list_all: std::sync::atomic::AtomicBool,
+        /// One-shot fault-injection switch: when `true`, the next call
+        /// to `list_active_authority_grants_by_grantee` returns a
+        /// transient backend error and clears the flag. Used to verify
+        /// reconfirmation read-path errors propagate and abort the
+        /// acceptance seam before the mandate write.
+        fail_next_list_active: std::sync::atomic::AtomicBool,
     }
 
     impl InMemoryGrantBackend {
@@ -1192,11 +1216,23 @@ mod tests {
                 mandates: std::sync::Mutex::new(vec![]),
                 grants: std::sync::Mutex::new(vec![]),
                 fail_next_revoke: std::sync::atomic::AtomicBool::new(false),
+                fail_next_list_all: std::sync::atomic::AtomicBool::new(false),
+                fail_next_list_active: std::sync::atomic::AtomicBool::new(false),
             }
         }
 
         fn arm_next_revoke_failure(&self) {
             self.fail_next_revoke
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+
+        fn arm_next_list_all_failure(&self) {
+            self.fail_next_list_all
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+
+        fn arm_next_list_active_failure(&self) {
+            self.fail_next_list_active
                 .store(true, std::sync::atomic::Ordering::SeqCst);
         }
     }
@@ -1271,6 +1307,12 @@ mod tests {
             grantee: &Grantee,
             now: Timestamp,
         ) -> Result<Vec<AuthorityGrant>, String> {
+            if self
+                .fail_next_list_active
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                return Err("transient_backend_error: simulated list_active failure".into());
+            }
             Ok(self
                 .grants
                 .lock()
@@ -1284,6 +1326,12 @@ mod tests {
             &self,
             grantee: &Grantee,
         ) -> Result<Vec<AuthorityGrant>, String> {
+            if self
+                .fail_next_list_all
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                return Err("transient_backend_error: simulated list_all failure".into());
+            }
             let mut out: Vec<_> = self
                 .grants
                 .lock()
@@ -2241,6 +2289,222 @@ mod tests {
         assert!(
             backend
                 .get_mandate_by_proposal("prop-remove-fail")
+                .unwrap()
+                .is_some(),
+            "mandate must be recorded on the successful retry"
+        );
+    }
+
+    #[test]
+    fn reinstate_steward_list_read_failure_aborts_acceptance_and_retry_succeeds() {
+        // Regression for the mint-helper read-failure path: if
+        // `list_authority_grants_by_grantee` fails transiently during
+        // `mint_reinstatement_grant`, the helper previously returned
+        // `None` which the lifecycle arm mapped to `Ok(Vec::new())`.
+        // That caused the mandate to still be recorded (as pending-
+        // grants), and retries then short-circuited on the idempotency
+        // check, so the accepted ReinstateSteward never actually minted
+        // authority. The read failure must now propagate, abort the
+        // mandate write, and let the retry recover.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(82);
+
+        // Appoint and revoke to produce a revoked in-domain template.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-reinstate-read-fail",
+            &dom,
+            [0x93u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-remove-reinstate-read-fail",
+            &dom,
+            [0x94u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: steward.clone(),
+                    reason: "breach".into(),
+                    return_bond: false,
+                },
+            },
+            2_000,
+        )
+        .unwrap();
+
+        // Arm one-shot list-all failure and attempt reinstatement —
+        // must Err, no mandate recorded.
+        backend.arm_next_list_all_failure();
+        let err = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reinstate-read-fail",
+            &dom,
+            [0x95u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReinstateSteward {
+                    steward: steward.clone(),
+                    reason: "appeal upheld".into(),
+                },
+            },
+            3_000,
+        )
+        .expect_err("list read failure must propagate, not record mandate");
+        assert!(
+            err.contains("transient_backend_error"),
+            "propagated error should surface the backend failure cause, got: {err}"
+        );
+
+        assert!(
+            backend
+                .get_mandate_by_proposal("prop-reinstate-read-fail")
+                .unwrap()
+                .is_none(),
+            "no mandate may be recorded when the reinstatement read failed \
+             — otherwise the retry would short-circuit on AlreadyMinted"
+        );
+
+        // Retry — flag is cleared, reinstatement mints fresh grant.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-reinstate-read-fail",
+            &dom,
+            [0x95u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReinstateSteward {
+                    steward: steward.clone(),
+                    reason: "appeal upheld".into(),
+                },
+            },
+            3_500,
+        )
+        .expect("retry after transient read failure must succeed");
+
+        let after_retry = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        let active: Vec<_> = after_retry
+            .iter()
+            .filter(|g| g.is_active_at(3_500))
+            .collect();
+        assert_eq!(
+            active.len(),
+            1,
+            "retry must materialize exactly one active grant"
+        );
+        assert_eq!(active[0].valid_from, 3_500);
+        assert!(
+            backend
+                .get_mandate_by_proposal("prop-reinstate-read-fail")
+                .unwrap()
+                .is_some(),
+            "mandate must be recorded on the successful retry"
+        );
+    }
+
+    #[test]
+    fn reconfirm_steward_list_read_failure_aborts_acceptance_and_retry_succeeds() {
+        // Same regression class as the reinstatement read-failure test
+        // above, but for the reconfirmation arm:
+        // `list_active_authority_grants_by_grantee` failure during
+        // `mint_reconfirmation_grant` must propagate, abort the
+        // mandate write, and let the retry recover.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(83);
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-reconfirm-read-fail",
+            &dom,
+            [0x96u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 10_000,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        backend.arm_next_list_active_failure();
+        let err = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reconfirm-read-fail",
+            &dom,
+            [0x97u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReconfirmSteward {
+                    steward: steward.clone(),
+                    new_term_end: 20_000,
+                    performance_notes: None,
+                },
+            },
+            2_000,
+        )
+        .expect_err("list_active read failure must propagate, not record mandate");
+        assert!(
+            err.contains("transient_backend_error"),
+            "propagated error should surface the backend failure cause, got: {err}"
+        );
+
+        assert!(
+            backend
+                .get_mandate_by_proposal("prop-reconfirm-read-fail")
+                .unwrap()
+                .is_none(),
+            "no mandate may be recorded when the reconfirmation read failed"
+        );
+
+        // Retry — flag is cleared, reconfirmation mints fresh grant.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-reconfirm-read-fail",
+            &dom,
+            [0x97u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReconfirmSteward {
+                    steward: steward.clone(),
+                    new_term_end: 20_000,
+                    performance_notes: None,
+                },
+            },
+            2_500,
+        )
+        .expect("retry after transient read failure must succeed");
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert_eq!(
+            all.len(),
+            2,
+            "reconfirmation retry appends a fresh grant alongside the original (no pre-revoke)"
+        );
+        let fresh = all
+            .iter()
+            .find(|g| g.valid_from == 2_500)
+            .expect("fresh reconfirmation grant at retry `now` must exist");
+        assert_eq!(fresh.valid_until, Some(20_000));
+        assert!(fresh.revoked_at.is_none());
+        assert!(
+            backend
+                .get_mandate_by_proposal("prop-reconfirm-read-fail")
                 .unwrap()
                 .is_some(),
             "mandate must be recorded on the successful retry"
