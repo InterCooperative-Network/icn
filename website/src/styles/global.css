@@ -654,7 +654,7 @@ pre code {
   padding: var(--space-xs);
 }
 @media (max-width: 1180px) {
-  .nav-logo span {
+  .nav .nav-logo span {
     display: none;
   }
   .nav-inner {
