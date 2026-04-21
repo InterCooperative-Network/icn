@@ -409,19 +409,25 @@ fn apply_acceptance_lifecycle(
             Vec::new()
         }
 
-        // Sanctions only revoke when the penalty is removal-shaped.
-        // Warnings, bond-slashes, tier-demotions, and probation do not
-        // terminate existing authority; they operate on other axes
+        // Sanctions revoke when the penalty terminates authority
+        // operationally. Removal and Suspension terminate authority by
+        // definition. Probation is mapped by the execution layer
+        // (`handlers/execution.rs`) to `SdisEffect::SuspendSteward`, so
+        // for grant-lifecycle purposes it must behave as a suspension:
+        // leaving the grants active while the execution layer treats
+        // the steward as suspended would split "what the execution
+        // layer sees" from "what the grant store records". Warnings,
+        // bond-slashes, and tier-demotions operate on other axes
         // (reputation, bond, monitoring) that the grant record does
-        // not model. Suspension and Removal do terminate authority;
-        // those penalties revoke the target's active grants issued by
-        // the deciding domain.
+        // not model, so they do not revoke.
         SdisProposal::SanctionSteward {
             steward, penalty, ..
         } => {
             let revokes = matches!(
                 penalty,
-                StewardPenalty::Removal { .. } | StewardPenalty::Suspension { .. }
+                StewardPenalty::Removal { .. }
+                    | StewardPenalty::Suspension { .. }
+                    | StewardPenalty::Probation { .. }
             );
             if revokes {
                 revoke_active_grants_for_person(backend, steward, domain_id, now);
@@ -564,7 +570,12 @@ fn revoke_active_grants_for_person(
 /// - no prior grant in this domain has been revoked (which includes
 ///   the common case where the steward is already active — a
 ///   reinstatement of an already-active steward is a no-op, never a
-///   privilege extension), or
+///   privilege extension),
+/// - an active in-domain grant already exists for this grantee at
+///   `now` — the precheck blocks the "1 revoked + 1 active after a
+///   prior Remove→Reinstate cycle" case where a duplicate Reinstate
+///   would otherwise find the old revoked grant as a template and
+///   silently mint a second concurrent active grant, or
 /// - cloning the prior term would overflow `now`.
 ///
 /// Reinstatement declines rather than fabricate bounds the payload
@@ -593,6 +604,28 @@ fn mint_reinstatement_grant(
             return None;
         }
     };
+    // Precheck: if any in-domain grant is already active at `now`,
+    // decline. The per-candidate filter below selects the most-recent
+    // revoked in-domain template, but after a normal
+    // Remove→Reinstate cycle the history is [revoked_old, active_new].
+    // Without this precheck, a duplicate ReinstateSteward on the same
+    // steward would still find `revoked_old`, pass the filter, and
+    // silently mint a *second* concurrent active grant — re-opening
+    // the privilege-extension path the revoked-filter was supposed to
+    // close. Decline instead.
+    let has_active_in_domain = all
+        .iter()
+        .any(|g| g.grantor.0 == domain_id.0 && g.is_active_at(now));
+    if has_active_in_domain {
+        tracing::warn!(
+            grantee = ?grantee,
+            proposal_id = %decision.proposal_id,
+            deciding_domain = %domain_id.0,
+            "ReinstateSteward: an in-domain grant is already active; declining to mint (reinstatement of an active steward is a no-op)"
+        );
+        return None;
+    }
+
     // Restrict candidates to:
     //   (a) grants issued by THIS deciding domain — cross-domain
     //       reinstatement would import another sovereign's shape, and
@@ -1753,5 +1786,179 @@ mod tests {
         );
         assert_eq!(all[0].grantor, GrantorEntityId(domain_b.0));
         assert_eq!(all[0].revoked_at, Some(2_000));
+    }
+
+    #[test]
+    fn sanction_steward_probation_revokes_active_grants() {
+        // Probation maps to SdisEffect::SuspendSteward in
+        // handlers/execution.rs. Grant lifecycle must match: leaving
+        // grants active while the execution layer treats the steward
+        // as suspended would split operational state from the grant
+        // store. Probation therefore revokes the target's active
+        // in-domain grants, the same way an explicit Suspension does.
+        use icn_governance::sdis::StewardPenalty;
+
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(70);
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-probation",
+            &dom,
+            [0x70u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-probation",
+            &dom,
+            [0x71u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::SanctionSteward {
+                    steward: steward.clone(),
+                    penalty: StewardPenalty::Probation {
+                        duration: 86_400,
+                        conditions: vec!["weekly check-in".into()],
+                    },
+                    reason: "conduct review".into(),
+                    evidence: vec![],
+                },
+            },
+            2_000,
+        )
+        .unwrap();
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(
+            all[0].revoked_at,
+            Some(2_000),
+            "Probation must revoke active in-domain grants (execution layer treats it as SuspendSteward)"
+        );
+    }
+
+    #[test]
+    fn reinstate_steward_declines_when_active_in_domain_grant_exists_after_prior_cycle() {
+        // After a normal Remove→Reinstate cycle, grant history is
+        // [revoked_old, active_new]. A duplicate ReinstateSteward on
+        // the same steward must NOT mint a second active grant — the
+        // revoked-filter would otherwise still select `revoked_old`
+        // as a template. The active-in-domain precheck guards this.
+        let backend = InMemoryGrantBackend::new();
+        let dom = domain();
+        let steward = did(71);
+
+        // Appoint.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-cycle",
+            &dom,
+            [0x80u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        // Remove → first grant is revoked.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-remove-cycle",
+            &dom,
+            [0x81u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: steward.clone(),
+                    reason: "breach".into(),
+                    return_bond: false,
+                },
+            },
+            2_000,
+        )
+        .unwrap();
+
+        // First Reinstate → mints a fresh active grant (valid cycle).
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-reinstate-1",
+            &dom,
+            [0x82u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReinstateSteward {
+                    steward: steward.clone(),
+                    reason: "appeal upheld".into(),
+                },
+            },
+            3_000,
+        )
+        .unwrap();
+
+        let after_first = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward.clone()))
+            .unwrap();
+        assert_eq!(
+            after_first.len(),
+            2,
+            "history after first cycle: 1 revoked + 1 active"
+        );
+        assert!(after_first.iter().any(|g| g.revoked_at.is_some()));
+        assert!(after_first.iter().any(|g| g.revoked_at.is_none()));
+
+        // Second (duplicate/erroneous) Reinstate while an active
+        // in-domain grant already exists — must decline to mint.
+        let outcome = mint_and_persist_for_accepted(
+            &backend,
+            "prop-reinstate-2",
+            &dom,
+            [0x83u8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::ReinstateSteward {
+                    steward: steward.clone(),
+                    reason: "duplicate appeal".into(),
+                },
+            },
+            4_000,
+        )
+        .unwrap();
+
+        match outcome {
+            MandateMintOutcome::Minted {
+                grants_persisted, ..
+            } => assert_eq!(
+                grants_persisted, 0,
+                "duplicate reinstatement while an in-domain active grant exists must decline"
+            ),
+            other => panic!("expected Minted (pending-grants); got {other:?}"),
+        }
+
+        let after_second = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward))
+            .unwrap();
+        assert_eq!(
+            after_second.len(),
+            2,
+            "still exactly 1 revoked + 1 active; no second active grant minted"
+        );
     }
 }
