@@ -20,19 +20,19 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 
       <div class="truth-grid truth-grid-2">
         <div class="truth-note truth-note-teal">
-          <span class="truth-note-label">Reviewed 2026-04-21</span>
-          <h3>Best read path in the current repo</h3>
+          <span class="truth-note-label">Start here</span>
+          <h3>Best place to begin in the code</h3>
           <p>
-            If you want the most grounded first impression, start with governance, provenance, gateway surfaces,
-            and the kernel/app boundary. That is where the implementation is most integrated and easiest to evaluate honestly.
+            Start with governance, provenance, gateway surfaces, and the kernel/app boundary.
+            That is where the system is easiest to evaluate on its own terms.
           </p>
         </div>
         <div class="truth-note truth-note-amber">
-          <span class="truth-note-label">Reality check</span>
-          <h3>Where the code is ahead of the public surface</h3>
+          <span class="truth-note-label">Also true</span>
+          <h3>The repo is ahead of the website</h3>
           <p>
-            Federation, commons/compute, and adjacent economic semantics have serious implementation behind them, but the member-facing
-            and public-documentation surfaces still lag. The repo is stronger than the marketing surface, and the site should say so.
+            Federation, commons/compute, and adjacent economic semantics go deeper in the codebase
+            than they do on the public site. The member-facing and documentation surfaces still lag.
           </p>
         </div>
       </div>
@@ -75,7 +75,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <ul>
         <li><strong>The meaning firewall.</strong> Kernel crates enforce constraints; app crates supply meaning. The kernel is not allowed to understand what a "trust score" or a "cooperative" is. The boundary is enforced in the crate graph itself, not as a design aspiration.</li>
         <li><strong>Policy oracles.</strong> An app that implements the <code>PolicyOracle</code> interface is the bridge between domain semantics and kernel enforcement. The trust oracle is the canonical example.</li>
-        <li><strong>The governance executor.</strong> A kernel-dispatch bridge between accepted governance payloads and the subsystems that carry them into operational effect. Widening the set of payload types it dispatches is the active frontier of the project.</li>
+        <li><strong>The governance executor.</strong> A kernel-dispatch bridge between accepted governance payloads and the subsystems that carry them into operational effect. Expanding the set of payload types it dispatches is one of the main areas of active work.</li>
         <li><strong>Scopes as first-class institutions.</strong> A member, a cooperative, a community, a federation, and a commons are each modeled as a distinct scope. Each has its own crate in the workspace.</li>
         <li><strong>Actors and supervision.</strong> The runtime is built around long-lived actors managed by a supervisor, communicating through message passing.</li>
         <li><strong>Trust-gated rate limiting and placement.</strong> Trust class affects message rate limits, credit relationships, and task placement. Trust is native, not trustless.</li>
