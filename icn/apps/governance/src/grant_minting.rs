@@ -143,9 +143,12 @@ pub fn mint_and_persist_for_accepted(
     // revocation lands but the mandate write subsequently fails, the
     // caller retries this seam → the idempotency check at the top of
     // this function misses (no mandate) → the lifecycle runs again →
-    // `revoke_authority_grant`'s first-write-wins semantics turn the
-    // repeat into a no-op → the mandate write is re-attempted. The
-    // original `revoked_at` timestamp is preserved across retries.
+    // `revoke_authority_grant`'s monotonic-minimum semantics turn the
+    // repeat into a no-op at the same-or-later `now` → the mandate
+    // write is re-attempted. The original `revoked_at` timestamp is
+    // preserved across same-or-later retries; a strictly-earlier
+    // retry would correctly tighten (which is also safe — the grant
+    // only terminates sooner, never later).
     let lifecycle_grants =
         apply_acceptance_lifecycle(backend, payload, domain_id, &decision_prov, now);
 
@@ -428,9 +431,9 @@ fn apply_acceptance_lifecycle(
 
         // Institutional-authority revocation: honors the payload's
         // `effective_at` when set (allows a governance-granted grace
-        // period); otherwise takes effect at `now`. Grants whose
-        // `revoked_at` is already set are left untouched by the
-        // first-write-wins semantics in the backend. Scoped to grants
+        // period); otherwise takes effect at `now`. The backend
+        // enforces monotonic-minimum: a strictly-earlier revocation
+        // tightens, a later-or-equal one is a no-op. Scoped to grants
         // this domain issued — cross-domain grants are not touched.
         SdisProposal::RevokeAuthority {
             authority_did,
@@ -454,10 +457,11 @@ fn apply_acceptance_lifecycle(
             }
         }
 
-        // Revocation appeals do not mutate the original revocation in
-        // place — that would violate the first-write-wins invariant on
-        // `revoked_at` and would lose the constitutional record of the
-        // original revocation event. If an appeal is upheld, the
+        // Revocation appeals do not un-revoke in place — reviving a
+        // revoked grant by clearing `revoked_at` would lose the
+        // constitutional record of the original revocation event and
+        // violate the one-way property the backend's monotonic-minimum
+        // rule enforces. If an appeal is upheld, the
         // governance flow follows up with a targeted remint proposal
         // (e.g. `ReinstateSteward` for a steward, or a fresh
         // `AppointSteward`/authority-granting proposal). In this
@@ -1100,9 +1104,13 @@ mod tests {
             let Some(g) = guard.iter_mut().find(|g| &g.id == grant_id) else {
                 return Err(format!("grant_not_found: {grant_id}"));
             };
-            // First-write-wins idempotency.
-            if g.revoked_at.is_none() {
-                g.revoked_at = Some(revoked_at);
+            // Monotonic-minimum idempotency, matching the ReceiptStore
+            // sled-backed semantics: the earliest effective revocation
+            // wins. A retry at a later-or-equal timestamp is a no-op;
+            // a strictly-earlier timestamp tightens termination.
+            match g.revoked_at {
+                Some(existing) if revoked_at >= existing => {}
+                _ => g.revoked_at = Some(revoked_at),
             }
             Ok(())
         }
@@ -1220,9 +1228,11 @@ mod tests {
     #[test]
     fn remove_steward_acceptance_is_idempotent_across_retries() {
         // Retrying the RemoveSteward acceptance (e.g. after a mandate-
-        // write failure) must not move the original `revoked_at`. The
-        // seam-level idempotency check + first-write-wins at the backend
-        // together guarantee this.
+        // write failure) must not move the original `revoked_at`
+        // forward. The seam-level idempotency check short-circuits on
+        // the already-minted mandate, and even if it didn't, the
+        // backend's monotonic-minimum revocation rule would reject the
+        // later-timestamp retry.
         let backend = InMemoryGrantBackend::new();
         let dom = domain();
         let steward = did(10);
@@ -1265,7 +1275,8 @@ mod tests {
 
         // Simulated retry at a later now=9_999: seam short-circuits on
         // idempotency (mandate already exists). Even if it didn't, the
-        // backend's first-write-wins would keep revoked_at at 2_500.
+        // backend's monotonic-minimum would keep revoked_at at 2_500
+        // (the later retry at 9_999 cannot loosen termination).
         let outcome = mint_and_persist_for_accepted(
             &backend,
             "prop-remove",

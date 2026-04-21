@@ -1073,13 +1073,28 @@ impl ReceiptStore {
     /// Revoke an authority grant by stamping `revoked_at` on its primary
     /// record.
     ///
-    /// **Semantics:**
+    /// **Semantics (monotonic minimum):**
     ///
-    /// - First-write-wins idempotency: if the grant is already revoked
-    ///   (i.e. `revoked_at` is `Some(_)`), this is a no-op. `revoked_at`
-    ///   never moves — not earlier, not later. This keeps double-revocation
-    ///   safe and prevents a later proposal from silently rewriting the
-    ///   original revocation time.
+    /// - If `revoked_at` is currently `None`, stamp it with the new
+    ///   timestamp.
+    /// - If `revoked_at` is currently `Some(existing)` and
+    ///   `new < existing`, replace with the earlier value. This covers
+    ///   the real case where a `RevokeAuthority` with
+    ///   `effective_at: Some(future)` lands first, and a later
+    ///   `RemoveSteward` at `now < future` must tighten the termination
+    ///   time rather than be silently ignored.
+    /// - If `revoked_at` is currently `Some(existing)` and
+    ///   `new >= existing`, this is a no-op. Once a grant is terminated,
+    ///   a later decision cannot loosen that termination — revocation
+    ///   is one-way. This preserves the ADR-0014 constitutional-record
+    ///   property: a double-revocation retry at a later `now` never
+    ///   moves the timestamp forward.
+    /// - Concurrent revocations serialize inside a single sled
+    ///   transaction on the primary key, so two concurrent writers
+    ///   cannot both observe the same pre-state and race to overwrite
+    ///   each other. The transaction computes `min(existing, new)` and
+    ///   writes only when that is strictly less than the current
+    ///   `revoked_at`.
     /// - Missing primary is an error: if no grant exists for `grant_id`,
     ///   returns `Err("grant_not_found: …")`. Callers decide whether this
     ///   is fatal or skippable (the acceptance seam logs and continues).
@@ -1096,11 +1111,12 @@ impl ReceiptStore {
         revoked_at: Timestamp,
     ) -> Result<(), String> {
         let primary_key = Self::grant_primary_key(grant_id);
-        // Read + check + write all happen inside one sled transaction so
-        // concurrent revocations cannot both observe `revoked_at: None`
-        // and race each other to the write. Sled serializes transactions
-        // against the same key; the first revocation wins and the second
-        // observes `revoked_at: Some(..)` and no-ops.
+        // Read + check + conditional write all happen inside one sled
+        // transaction so concurrent revocations serialize on the
+        // primary key: two callers cannot both observe the same
+        // pre-state and race to overwrite each other. The transaction
+        // body computes `min(existing, new)` and writes only when that
+        // is strictly less than the current `revoked_at`.
         self.db
             .transaction(|tx| {
                 let Some(bytes) = tx.get(primary_key.as_slice())? else {
@@ -1114,12 +1130,19 @@ impl ReceiptStore {
                             "deserialize AuthorityGrant: {e}"
                         ))
                     })?;
-                if grant.revoked_at.is_some() {
-                    // First-write-wins: already revoked. No-op, no rewrite, no
-                    // move of the existing revocation timestamp.
-                    return Ok(());
+                // Monotonic-minimum: keep the earliest effective
+                // revocation. A later decision can tighten but never
+                // loosen the termination time.
+                match grant.revoked_at {
+                    Some(existing) if revoked_at >= existing => {
+                        // No tightening: existing termination already
+                        // occurs no later than this one. Leave as-is.
+                        return Ok(());
+                    }
+                    _ => {
+                        grant.revoked_at = Some(revoked_at);
+                    }
                 }
-                grant.revoked_at = Some(revoked_at);
                 let new_bytes = serde_json::to_vec(&grant).map_err(|e| {
                     ConflictableTransactionError::Abort(format!(
                         "Failed to serialize AuthorityGrant: {e}"
@@ -1978,27 +2001,77 @@ mod tests {
     }
 
     #[test]
-    fn authority_grant_revocation_is_idempotent_keeps_original_timestamp() {
-        // First-write-wins: a second revocation of the same grant must
-        // not move `revoked_at` — neither earlier nor later. This keeps
-        // retries safe and preserves the constitutional record of the
-        // original revocation event.
+    fn authority_grant_revocation_later_retry_is_no_op() {
+        // Monotonic minimum: once `revoked_at` is set, a retry at a
+        // LATER timestamp must not loosen the termination. This keeps
+        // double-revocation retries safe and preserves the
+        // constitutional record: a later decision can tighten but
+        // never extend active authority.
         let store = ReceiptStore::new(temp_db());
         let grant = make_grant([0xa3u8; 32], 1_000);
         let grant_id = grant.id.clone();
         store.put_authority_grant(&grant).unwrap();
 
         store.revoke_authority_grant(&grant_id, 2_000).unwrap();
-        // Second revoke at a later time: must be a no-op.
+        // Second revoke at a strictly later time: must be a no-op.
         store.revoke_authority_grant(&grant_id, 9_999).unwrap();
-        // And an earlier-time retry must also be a no-op.
-        store.revoke_authority_grant(&grant_id, 1_500).unwrap();
+        // Revoke at the same time: also a no-op (>= comparison).
+        store.revoke_authority_grant(&grant_id, 2_000).unwrap();
 
         let g = store.get_authority_grant(&grant_id).unwrap().unwrap();
         assert_eq!(
             g.revoked_at,
             Some(2_000),
-            "double revocation must preserve the first `revoked_at` timestamp"
+            "later-or-equal retry must preserve the earlier `revoked_at`"
+        );
+    }
+
+    #[test]
+    fn authority_grant_revocation_tightens_to_earlier_timestamp() {
+        // Monotonic minimum: if an existing `revoked_at` is in the
+        // future (e.g. from a `RevokeAuthority { effective_at }` grace
+        // period), a later decision whose effective time is strictly
+        // earlier must tighten the termination. Otherwise an
+        // immediate-removal decision would be silently ignored while
+        // a grace-period revocation kept the grant active.
+        let store = ReceiptStore::new(temp_db());
+        let grant = make_grant([0xa4u8; 32], 1_000);
+        let grant_id = grant.id.clone();
+        store.put_authority_grant(&grant).unwrap();
+
+        // First revocation with a FUTURE effective_at (grace period).
+        store.revoke_authority_grant(&grant_id, 5_000).unwrap();
+        assert_eq!(
+            store
+                .get_authority_grant(&grant_id)
+                .unwrap()
+                .unwrap()
+                .revoked_at,
+            Some(5_000)
+        );
+
+        // Immediate-removal decision at `now = 3_000` must tighten.
+        store.revoke_authority_grant(&grant_id, 3_000).unwrap();
+        let g = store.get_authority_grant(&grant_id).unwrap().unwrap();
+        assert_eq!(
+            g.revoked_at,
+            Some(3_000),
+            "strictly-earlier revocation must tighten the termination time"
+        );
+        assert!(
+            !g.is_active_at(3_000),
+            "grant must be inactive at the tightened revocation time"
+        );
+
+        // A subsequent retry even earlier also tightens.
+        store.revoke_authority_grant(&grant_id, 2_500).unwrap();
+        assert_eq!(
+            store
+                .get_authority_grant(&grant_id)
+                .unwrap()
+                .unwrap()
+                .revoked_at,
+            Some(2_500)
         );
     }
 
