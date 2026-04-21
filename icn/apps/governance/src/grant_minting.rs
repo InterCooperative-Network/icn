@@ -397,10 +397,12 @@ fn apply_acceptance_lifecycle(
 
     match proposal {
         // Direct-removal / direct-suspension: the target loses active
-        // authority at `now`. No new grants are minted.
+        // authority at `now`. No new grants are minted. Scoped to
+        // grants issued by the deciding domain only — another domain's
+        // grants are never revoked by this domain's vote.
         SdisProposal::RemoveSteward { steward, .. }
         | SdisProposal::SuspendSteward { steward, .. } => {
-            revoke_active_grants_for_person(backend, steward, now);
+            revoke_active_grants_for_person(backend, steward, domain_id, now);
             Vec::new()
         }
 
@@ -409,7 +411,8 @@ fn apply_acceptance_lifecycle(
         // terminate existing authority; they operate on other axes
         // (reputation, bond, monitoring) that the grant record does
         // not model. Suspension and Removal do terminate authority;
-        // those penalties revoke the target's active grants.
+        // those penalties revoke the target's active grants issued by
+        // the deciding domain.
         SdisProposal::SanctionSteward {
             steward, penalty, ..
         } => {
@@ -418,7 +421,7 @@ fn apply_acceptance_lifecycle(
                 StewardPenalty::Removal { .. } | StewardPenalty::Suspension { .. }
             );
             if revokes {
-                revoke_active_grants_for_person(backend, steward, now);
+                revoke_active_grants_for_person(backend, steward, domain_id, now);
             }
             Vec::new()
         }
@@ -427,14 +430,15 @@ fn apply_acceptance_lifecycle(
         // `effective_at` when set (allows a governance-granted grace
         // period); otherwise takes effect at `now`. Grants whose
         // `revoked_at` is already set are left untouched by the
-        // first-write-wins semantics in the backend.
+        // first-write-wins semantics in the backend. Scoped to grants
+        // this domain issued — cross-domain grants are not touched.
         SdisProposal::RevokeAuthority {
             authority_did,
             effective_at,
             ..
         } => {
             let revoke_at = effective_at.unwrap_or(now);
-            revoke_active_grants_for_person(backend, authority_did, revoke_at);
+            revoke_active_grants_for_person(backend, authority_did, domain_id, revoke_at);
             Vec::new()
         }
 
@@ -479,12 +483,21 @@ fn apply_acceptance_lifecycle(
     }
 }
 
-/// Revoke every active grant whose grantee is the given person DID,
-/// best-effort. Errors are logged and the decision continues; missing
-/// primaries (index skew) are warned and skipped.
+/// Revoke every active grant whose grantee is the given person DID AND
+/// whose grantor is the deciding domain, best-effort. Errors are logged
+/// and the decision continues; missing primaries (index skew) are
+/// warned and skipped.
+///
+/// Cross-domain guard: an accepted SDIS revocation runs in exactly one
+/// governance domain. That domain's vote must not strip authority
+/// granted by another sovereign entity — grants whose `grantor` does
+/// not match `domain_id` are skipped unconditionally. This preserves
+/// the ADR-0014 invariant that revocation is by-grantor: only the
+/// entity that issued a grant can end it.
 fn revoke_active_grants_for_person(
     backend: &dyn GovernanceReceiptBackend,
     person: &icn_identity::Did,
+    domain_id: &GovernanceDomainId,
     revoked_at: Timestamp,
 ) {
     let grantee = Grantee::Person(person.clone());
@@ -500,6 +513,17 @@ fn revoke_active_grants_for_person(
         }
     };
     for g in grants {
+        if g.grantor.0 != domain_id.0 {
+            // Cross-domain grant: this decision's domain did not
+            // issue it, so this decision does not terminate it.
+            tracing::debug!(
+                grant_id = %g.id,
+                grant_grantor = %g.grantor,
+                deciding_domain = %domain_id.0,
+                "skipping cross-domain grant during revocation"
+            );
+            continue;
+        }
         match backend.revoke_authority_grant(&g.id, revoked_at) {
             Ok(()) => {
                 tracing::info!(
@@ -1460,6 +1484,101 @@ mod tests {
             all[0].revoked_at,
             Some(5_555),
             "effective_at must override the acceptance `now` for revocation timestamp"
+        );
+    }
+
+    #[test]
+    fn remove_steward_does_not_revoke_cross_domain_grants() {
+        // Cross-domain guard: a RemoveSteward accepted in domain A must
+        // NOT revoke the same steward's active grant issued by domain B.
+        // Only the grantor entity that issued a grant can end it.
+        let backend = InMemoryGrantBackend::new();
+        let steward = did(12);
+        let domain_a = GovernanceDomainId("coop:alpha".into());
+        let domain_b = GovernanceDomainId("coop:beta".into());
+
+        // Mint a grant under domain A.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-a",
+            &domain_a,
+            [0xaau8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(1)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+        // Mint a grant under domain B for the same steward.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-appoint-b",
+            &domain_b,
+            [0xbbu8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::AppointSteward {
+                    candidate: steward.clone(),
+                    sponsors: vec![did(2)],
+                    region: "nyc".into(),
+                    bond_amount: 100,
+                    term_length: 3_600,
+                },
+            },
+            1_000,
+        )
+        .unwrap();
+
+        // Sanity: two active grants for the same grantee, different grantors.
+        let active = backend
+            .list_active_authority_grants_by_grantee(&Grantee::Person(steward.clone()), 1_500)
+            .unwrap();
+        assert_eq!(active.len(), 2);
+
+        // Domain A accepts RemoveSteward — must NOT touch domain B's grant.
+        mint_and_persist_for_accepted(
+            &backend,
+            "prop-remove-a",
+            &domain_a,
+            [0xccu8; 32],
+            &ProposalPayload::Sdis {
+                proposal: SdisProposal::RemoveSteward {
+                    steward: steward.clone(),
+                    reason: "breach".into(),
+                    return_bond: false,
+                },
+            },
+            2_000,
+        )
+        .unwrap();
+
+        let all = backend
+            .list_authority_grants_by_grantee(&Grantee::Person(steward.clone()))
+            .unwrap();
+        assert_eq!(all.len(), 2, "no grant should be deleted");
+
+        let domain_a_grant = all
+            .iter()
+            .find(|g| g.grantor == GrantorEntityId(domain_a.0.clone()))
+            .expect("domain_a grant must exist");
+        let domain_b_grant = all
+            .iter()
+            .find(|g| g.grantor == GrantorEntityId(domain_b.0.clone()))
+            .expect("domain_b grant must exist");
+
+        assert_eq!(
+            domain_a_grant.revoked_at,
+            Some(2_000),
+            "domain_a's own grant must be revoked by its own RemoveSteward decision"
+        );
+        assert_eq!(
+            domain_b_grant.revoked_at, None,
+            "domain_b's grant must NOT be revoked by domain_a's decision — cross-domain guard"
         );
     }
 }

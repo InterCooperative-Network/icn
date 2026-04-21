@@ -867,6 +867,68 @@ impl ReceiptStore {
             .map_err(|e: TransactionError<()>| format!("sled grant tx: {e:?}"))
     }
 
+    /// Backfill the by-grantee secondary index for grants persisted
+    /// before this index existed.
+    ///
+    /// PR #1575 wired `put_authority_grant` (primary + by-decision
+    /// index). PR #1579 added the by-grantee index wired into the
+    /// same write path. A sled database written between #1575 merging
+    /// and #1579 merging may hold primary grant records with no
+    /// corresponding by-grantee entry — `list_*_by_grantee` readers
+    /// would then miss those grants, and an accepted lifecycle
+    /// revocation in the acceptance seam would leave them active.
+    ///
+    /// This method scans every primary grant record and writes any
+    /// missing by-grantee entry with the deterministic
+    /// `(grantee, valid_from, id)` key. It is:
+    /// - **Idempotent**: keys are deterministic from the grant,
+    ///   so re-running against a fully backfilled db is a no-op.
+    /// - **Non-destructive**: primary records are never mutated; the
+    ///   by-decision index is never touched; no grant is revoked,
+    ///   deleted, or moved.
+    /// - **Per-entry atomic**: each missing index write uses a single
+    ///   `db.insert` (no cross-grant transaction). Partial failures
+    ///   leave the db in a consistent partial-backfill state that the
+    ///   next call resumes from.
+    ///
+    /// Callers typically invoke this once during gateway startup
+    /// immediately after opening the receipt store. Returns the number
+    /// of index entries written.
+    pub fn backfill_grant_by_grantee_index(&self) -> Result<usize, String> {
+        let mut written = 0usize;
+        for kv in self.db.scan_prefix(AUTHORITY_GRANT_PREFIX) {
+            let (key, value) = kv.map_err(|e| format!("sled scan grants: {e}"))?;
+            // `AUTHORITY_GRANT_PREFIX` ("adr0014:grant:") is a byte
+            // prefix of both secondary-index prefixes. Skip secondary
+            // entries explicitly — their values are bare grant-id
+            // bytes, not serialized grants, and attempting to
+            // deserialize them would be a category error.
+            if key.starts_with(AUTHORITY_GRANT_BY_DECISION_PREFIX)
+                || key.starts_with(AUTHORITY_GRANT_BY_GRANTEE_PREFIX)
+            {
+                continue;
+            }
+            let grant: AuthorityGrant = serde_json::from_slice(&value).map_err(|e| {
+                format!("deserialize AuthorityGrant during by-grantee backfill: {e}")
+            })?;
+            let grantee_key =
+                Self::grant_by_grantee_key(&grant.grantee, grant.valid_from, &grant.id);
+            if self
+                .db
+                .get(&grantee_key)
+                .map_err(|e| format!("sled get grantee idx during backfill: {e}"))?
+                .is_none()
+            {
+                let id_bytes = grant.id.0.hyphenated().to_string().into_bytes();
+                self.db
+                    .insert(&grantee_key, id_bytes.as_slice())
+                    .map_err(|e| format!("sled insert grantee idx during backfill: {e}"))?;
+                written += 1;
+            }
+        }
+        Ok(written)
+    }
+
     /// Retrieve an authority grant by its stable id.
     pub fn get_authority_grant(
         &self,
@@ -2010,6 +2072,50 @@ mod tests {
         assert_eq!(all[0].id, g1.id);
         assert_eq!(all[1].id, g2.id);
         assert!(all[1].revoked_at.is_some());
+    }
+
+    #[test]
+    fn backfill_by_grantee_index_recovers_legacy_grants() {
+        // Simulate a database written before the by-grantee index existed:
+        // write a primary grant record directly via the raw db, bypassing
+        // `put_authority_grant` which would populate the index. The
+        // listing-by-grantee reader must not see the grant, then after
+        // backfill runs it must see it. Running backfill again returns 0.
+        let store = ReceiptStore::new(temp_db());
+        let grantee = Grantee::Entity("svc:legacy".into());
+        let grant = AuthorityGrant {
+            grantee: grantee.clone(),
+            ..make_grant([0xd1u8; 32], 1_000)
+        };
+
+        // Write primary record ONLY — no by-grantee index entry.
+        let primary_key = ReceiptStore::grant_primary_key(&grant.id);
+        let bytes = serde_json::to_vec(&grant).unwrap();
+        store.db.insert(&primary_key, bytes).unwrap();
+
+        // Pre-backfill: primary reads fine, but by-grantee listing is empty.
+        assert_eq!(
+            store.get_authority_grant(&grant.id).unwrap().as_ref(),
+            Some(&grant)
+        );
+        assert!(store
+            .list_active_authority_grants_by_grantee(&grantee, 1_500)
+            .unwrap()
+            .is_empty());
+
+        // Run backfill.
+        let written = store.backfill_grant_by_grantee_index().unwrap();
+        assert_eq!(written, 1);
+
+        // Post-backfill: listing-by-grantee sees the grant.
+        let listed = store
+            .list_active_authority_grants_by_grantee(&grantee, 1_500)
+            .unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, grant.id);
+
+        // Idempotent: re-running does nothing.
+        assert_eq!(store.backfill_grant_by_grantee_index().unwrap(), 0);
     }
 
     #[test]
