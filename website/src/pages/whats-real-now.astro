@@ -20,6 +20,15 @@ import ReadingLadder from '../components/ReadingLadder.astro';
           Every other page on this site should be readable against what is here without contradiction.
         </p>
       </div>
+
+      <div class="status-anchor">
+        <span class="status-anchor-label">Reviewed 2026-04-21</span>
+        <p>
+          This page was checked against <code>docs/STATE.md</code>, current merged governance work, and the live repo tree.
+          Recent governance institutional primitives have landed, the provenance chain remains the most durable public surface,
+          and the active frontier is still broader decision-to-effect coverage plus stronger governance-to-economics proof.
+        </p>
+      </div>
     </div>
   </section>
 
@@ -172,6 +181,30 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 .page-hero .badge { align-self: flex-start; }
 .page-hero h1 { margin: 0; }
 .lead { font-size: 1.125rem; color: var(--text-body); line-height: 1.6; margin: 0; }
+.status-anchor {
+  margin-top: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--accent-amber);
+  border-radius: var(--radius-lg);
+}
+.status-anchor-label {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent-amber);
+  margin-bottom: var(--space-sm);
+}
+.status-anchor p {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
 
 .prose h2 { margin-top: var(--space-2xl); margin-bottom: var(--space-md); }
 .prose p { margin: 0 0 var(--space-md); line-height: 1.7; }

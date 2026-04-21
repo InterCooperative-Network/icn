@@ -10,33 +10,70 @@ import MaturityCard from '../components/MaturityCard.astro';
 
   <!-- ═══ HERO ═══════════════════════════════════════════════════ -->
   <section class="hero hero-home">
-    <div class="container narrow hero-container">
-      <div class="hero-content animate-in">
-        <div class="badge badge-teal mb-lg">
-          <span class="badge-dot"></span>
-          Active project · open infrastructure
+    <div class="container hero-container">
+      <div class="hero-shell">
+        <div class="hero-content animate-in">
+          <div class="badge badge-teal mb-lg">
+            <span class="badge-dot"></span>
+            Active project · open infrastructure
+          </div>
+
+          <h1>
+            Digital infrastructure for<br/>
+            <span class="gradient-text">cooperatives, communities, and federations.</span>
+          </h1>
+
+          <p>
+            ICN makes membership, governance, shared rules, economic coordination,
+            and institutional accountability native to the system itself —
+            so decisions, action, and proof do not have to live in separate worlds.
+          </p>
+
+          <div class="hero-actions">
+            <a href="/what-is-icn" class="btn btn-primary">
+              What is ICN
+              <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+            </a>
+            <a href="/how-it-works" class="btn btn-secondary">How It Works</a>
+            <a href="/whats-real-now" class="btn btn-ghost">What's Real Now</a>
+          </div>
+          <p class="hero-qualifier">Under active construction. This site is explicit about what is proven, what is advancing, and what is not yet built.</p>
         </div>
 
-        <h1>
-          Digital infrastructure for<br/>
-          <span class="gradient-text">cooperatives, communities, and federations.</span>
-        </h1>
+        <aside class="hero-panel animate-in animate-delay-2" aria-label="At a glance">
+          <div class="hero-panel-head">
+            <span class="eyebrow">At a glance</span>
+            <h2>Public infrastructure, explained without hype.</h2>
+            <p>
+              The site is designed to make three things legible right away:
+              what ICN is for, what is already real, and what still needs building.
+            </p>
+            <p class="hero-panel-meta">
+              Reviewed against repo state on April 21, 2026. The strongest public through-line is still provenance and auditable coordination; active work is concentrated on widening execution coverage and tightening governance-to-economics proof.
+            </p>
+          </div>
 
-        <p>
-          ICN makes membership, governance, shared rules, economic coordination,
-          and institutional accountability native to the system itself —
-          so decisions, action, and proof do not have to live in separate worlds.
-        </p>
+          <div class="hero-panel-list">
+            <article class="hero-panel-item">
+              <span class="hero-panel-kicker">Scope and standing</span>
+              <p>Who is acting, in what institution, with what recognized place in the system.</p>
+            </article>
+            <article class="hero-panel-item">
+              <span class="hero-panel-kicker">Decision to effect</span>
+              <p>Where governance already carries into operational consequences and where the coverage is still expanding.</p>
+            </article>
+            <article class="hero-panel-item">
+              <span class="hero-panel-kicker">Proof and memory</span>
+              <p>How receipts, provenance, and institutional history stay attached to the actions they authorize.</p>
+            </article>
+          </div>
 
-        <div class="hero-actions">
-          <a href="/what-is-icn" class="btn btn-primary">
-            What is ICN
-            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-          </a>
-          <a href="/how-it-works" class="btn btn-secondary">How It Works</a>
-          <a href="/whats-real-now" class="btn btn-ghost">What's Real Now</a>
-        </div>
-        <p class="hero-qualifier">Under active construction. This site is explicit about what is proven, what is advancing, and what is not yet built.</p>
+          <div class="hero-panel-links">
+            <a href="/architecture">Architecture</a>
+            <a href="/roadmap">Roadmap</a>
+            <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a>
+          </div>
+        </aside>
       </div>
     </div>
     <div class="hero-bg-grid" aria-hidden="true"></div>
@@ -217,7 +254,7 @@ import MaturityCard from '../components/MaturityCard.astro';
       </div>
 
       <div class="grid grid-2">
-        <div class="card">
+        <div class="card card-accent-teal">
           <h3>Cooperatives, communities, and federations</h3>
           <p>
             Organizations that already know how hard running a real institution is,
@@ -227,7 +264,7 @@ import MaturityCard from '../components/MaturityCard.astro';
           </p>
           <a href="/for-cooperatives" class="link-arrow">For Cooperatives →</a>
         </div>
-        <div class="card">
+        <div class="card card-accent-amber">
           <h3>Developers, architects, and researchers</h3>
           <p>
             Technical readers evaluating ICN as a system. Kernel/app separation with a strict meaning firewall,
@@ -292,8 +329,14 @@ import MaturityCard from '../components/MaturityCard.astro';
   position: relative;
   z-index: 2;
 }
+.hero-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
+  gap: var(--space-2xl);
+  align-items: start;
+}
 .hero-home .hero-content {
-  max-width: 760px;
+  max-width: 720px;
 }
 .hero-home .hero-content h1 {
   font-size: clamp(2.25rem, 5.5vw, 3.75rem);
@@ -309,6 +352,84 @@ import MaturityCard from '../components/MaturityCard.astro';
 .hero-qualifier {
   font-size: .8125rem; color: var(--text-muted);
   margin: var(--space-sm) 0 0; letter-spacing: .01em; max-width: 42em;
+}
+.hero-panel {
+  position: relative;
+  padding: var(--space-xl);
+  background:
+    linear-gradient(180deg, rgba(17, 24, 39, 0.9), rgba(11, 17, 27, 0.96));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.hero-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--accent-teal) 0%,
+    var(--accent-amber) 55%,
+    var(--accent-blue) 100%
+  );
+}
+.hero-panel-head h2 {
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  margin: var(--space-sm) 0;
+}
+.hero-panel-head p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.hero-panel-meta {
+  margin-top: var(--space-sm) !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.65 !important;
+  color: var(--text-muted) !important;
+}
+.hero-panel-list {
+  display: grid;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+.hero-panel-item {
+  padding: var(--space-md) var(--space-lg);
+  background: rgba(12, 17, 24, 0.78);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+.hero-panel-kicker {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-teal);
+  margin-bottom: var(--space-xs);
+}
+.hero-panel-item p {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+.hero-panel-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border-subtle);
+}
+.hero-panel-links a {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
 }
 .badge-dot {
   width: 6px; height: 6px; border-radius: 50%;
@@ -397,12 +518,20 @@ import MaturityCard from '../components/MaturityCard.astro';
     padding-top: calc(64px + var(--space-xl));
     padding-bottom: var(--space-xl);
   }
+  .hero-shell {
+    grid-template-columns: 1fr;
+    gap: var(--space-xl);
+  }
   .hero-home .hero-content h1 {
     font-size: clamp(1.75rem, 7vw, 2.5rem);
     line-height: 1.15;
   }
   .hero-home .hero-content > p {
     font-size: 0.9375rem;
+  }
+  .hero-panel {
+    padding: var(--space-lg);
+    border-radius: var(--radius-xl);
   }
   .hero-actions .btn {
     flex: 1 1 auto;

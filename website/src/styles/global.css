@@ -1,4 +1,4 @@
-﻿/* ICN Design System — intercooperative.network */
+/* ICN Design System — intercooperative.network */
 
 :root {
   --bg-primary: #06090f;
@@ -107,7 +107,7 @@
   --shadow-glow-amber: 0 0 20px rgba(194, 65, 12, 0.15);
   --shadow-glow-blue: 0 0 20px rgba(3, 105, 161, 0.15);
 }
-﻿*,
+*,
 *::before,
 *::after {
   box-sizing: border-box;
@@ -294,6 +294,54 @@ pre code {
 .section-header p {
   margin: 0 auto;
 }
+.truth-grid {
+  display: grid;
+  gap: var(--space-lg);
+  margin-top: var(--space-xl);
+}
+.truth-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.truth-note {
+  padding: var(--space-lg) var(--space-xl);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 100%),
+    var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.truth-note-label {
+  display: inline-block;
+  margin-bottom: var(--space-sm);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.truth-note h3 {
+  margin: 0 0 var(--space-sm);
+  font-size: 1.05rem;
+}
+.truth-note p {
+  margin: 0;
+  max-width: none;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+.truth-note-teal {
+  border-color: var(--border-teal);
+}
+.truth-note-teal .truth-note-label {
+  color: var(--accent-teal);
+}
+.truth-note-amber {
+  border-color: var(--border-accent);
+}
+.truth-note-amber .truth-note-label {
+  color: var(--accent-amber);
+}
 .grid {
   display: grid;
   gap: var(--space-xl);
@@ -308,11 +356,17 @@ pre code {
   .grid-3 {
     grid-template-columns: repeat(2, 1fr);
   }
+  .truth-grid-2 {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 600px) {
   .grid-2,
   .grid-3 {
     grid-template-columns: 1fr;
+  }
+  .truth-note {
+    padding: var(--space-lg);
   }
 }
 
@@ -397,13 +451,18 @@ pre code {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  min-height: 100%;
   transition:
     border-color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out);
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 .inst-card:hover {
   border-color: var(--accent-teal);
   background: var(--bg-card-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 .inst-card-eyebrow {
   font-family: var(--font-mono);
@@ -502,13 +561,13 @@ pre code {
   margin-bottom: var(--space-md);
 }
 
-﻿.nav {
+.nav {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 100;
-  background: rgba(6, 9, 15, 0.85);
+  background: rgba(6, 9, 15, 0.88);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-subtle);
   height: 64px;
@@ -520,7 +579,7 @@ pre code {
   height: 100%;
   display: flex;
   align-items: center;
-  gap: var(--space-xl);
+  gap: var(--space-lg);
 }
 .nav-logo {
   display: flex;
@@ -542,15 +601,16 @@ pre code {
 .nav-links {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 2px;
   list-style: none;
   flex: 1;
+  justify-content: center;
 }
 .nav-links a {
   color: var(--text-secondary);
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  padding: var(--space-xs) var(--space-sm);
+  padding: 0.38rem 0.62rem;
   border-radius: var(--radius-md);
   transition: all var(--duration-fast) var(--ease-out);
   text-decoration: none;
@@ -586,17 +646,26 @@ pre code {
   cursor: pointer;
   padding: var(--space-xs);
 }
+@media (max-width: 1180px) {
+  .nav-logo span {
+    display: none;
+  }
+  .nav-inner {
+    gap: var(--space-md);
+  }
+}
 @media (max-width: 768px) {
   .nav-links {
     display: none;
     position: absolute;
-    top: 64px;
-    left: 0;
-    right: 0;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-subtle);
+    top: calc(100% + 8px);
+    left: var(--space-md);
+    right: var(--space-md);
+    background: rgba(12, 17, 24, 0.98);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
     flex-direction: column;
-    padding: var(--space-md);
+    padding: var(--space-sm);
     gap: 0;
     z-index: 999;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -607,7 +676,7 @@ pre code {
   }
   .nav-links a {
     display: block;
-    padding: var(--space-md) var(--space-lg);
+    padding: 0.9rem 1rem;
     font-size: 1rem;
     width: 100%;
     border-radius: var(--radius-md);
@@ -731,11 +800,12 @@ pre code {
   color: var(--accent-purple);
   border: 1px solid var(--border-subtle);
 }
-﻿.card {
+.card {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
+  min-height: 100%;
   transition: all var(--duration-normal) var(--ease-out);
 }
 .card:hover {
@@ -958,8 +1028,24 @@ pre code {
   }
 }
 @media (max-width: 600px) {
+  .container,
+  .container-narrow {
+    padding: 0 var(--space-lg);
+  }
+  .section,
+  .section-alt {
+    padding: var(--space-3xl) 0;
+  }
+  .section-header {
+    margin-bottom: var(--space-2xl);
+  }
+  .card,
+  .inst-card {
+    padding: var(--space-lg);
+  }
   .footer-inner {
     grid-template-columns: 1fr;
+    gap: var(--space-xl);
   }
   .footer-bottom {
     flex-direction: column;
