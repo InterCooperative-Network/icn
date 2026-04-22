@@ -145,7 +145,7 @@ function isFork(
     --ladder-accent: var(--accent-teal);
     --ladder-rail: var(--border-default);
     margin: 0;
-    padding: var(--space-xl) 0 0;
+    padding: var(--space-sm) 0 0;
     display: flex;
     flex-direction: column;
     gap: var(--space-lg);
@@ -189,6 +189,7 @@ function isFork(
     transition:
       border-color var(--duration-fast) var(--ease-out),
       background var(--duration-fast) var(--ease-out);
+    min-width: 0;
   }
 
   .ladder-link:hover {
@@ -215,6 +216,8 @@ function isFork(
     letter-spacing: -0.01em;
     flex: 1;
     min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: normal;
   }
 
   /* Current step: teal-bordered, with a dot marker AND a "you are here"
@@ -303,6 +306,7 @@ function isFork(
     transition:
       border-color var(--duration-fast) var(--ease-out),
       background var(--duration-fast) var(--ease-out);
+    min-width: 0;
   }
 
   .ladder-fork-opt.ladder-link:hover {
@@ -349,9 +353,18 @@ function isFork(
       padding: var(--space-md);
       height: 100%;
     }
+    .ladder-fork-options {
+      min-width: 0;
+    }
     .ladder-fork-num {
       min-width: 0;
       align-self: flex-start;
+    }
+    .ladder-fork-opt {
+      align-items: flex-start;
+    }
+    .ladder-fork-opt .ladder-label {
+      width: 100%;
     }
   }
 
@@ -399,6 +412,7 @@ function isFork(
     font-size: 1rem;
     color: var(--text-heading);
     line-height: 1.3;
+    overflow-wrap: anywhere;
   }
 
   .ladder-nav-next-wrap {

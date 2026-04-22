@@ -3,13 +3,40 @@
 [![CI](https://github.com/InterCooperative-Network/icn/actions/workflows/ci.yml/badge.svg)](https://github.com/InterCooperative-Network/icn/actions/workflows/ci.yml)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
-A substrate daemon for the cooperative internet.
+A shared infrastructure effort for cooperatives, communities, and federations.
 
 **[intercooperative.network](https://intercooperative.network)**
 
-ICN is a P2P coordination layer for cooperatives, communities, and federations. It is not a blockchain or federation server — it's a constraint engine where apps translate cooperative governance into generic constraints, and the kernel enforces them without understanding their meaning.
+ICN is institutional infrastructure for democratic organizations. It is being built so cooperatives, communities, and federations can prove decisions, operate on infrastructure they control, and coordinate across organizational boundaries without handing those functions to a platform landlord.
+
+The Rust workspace lives in [`icn/`](icn/). The public site lives in [`website/`](website/). The project is large and uneven in maturity, so the fastest way to avoid getting lost is to start from the right entrypoint for your role.
+
+## Start Here by Role
+
+- **Understand the project first**: start with [intercooperative.network](https://intercooperative.network), especially [What is ICN](https://intercooperative.network/what-is-icn), [What's Real Now](https://intercooperative.network/whats-real-now), and [Get Involved](https://intercooperative.network/get-involved).
+- **Contribute technically**: read [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md), then [CONTRIBUTING.md](CONTRIBUTING.md), then [docs/onboarding/README.md](docs/onboarding/README.md).
+- **Contribute non-technically**: use the public [Get Involved](https://intercooperative.network/get-involved) page for docs, design, testing, research, policy, and ecosystem paths.
+- **Bring an institutional use case**: read [For Cooperatives](https://intercooperative.network/for-cooperatives) and open a [GitHub Discussion](https://github.com/InterCooperative-Network/icn/discussions).
+- **Support the work financially**: the live rail today is [GitHub Sponsors](https://github.com/sponsors/InterCooperative-Network).
 
 ---
+
+## Developer Quickstart
+
+If you want to build the codebase and orient quickly:
+
+```bash
+git clone https://github.com/InterCooperative-Network/icn.git
+cd icn/icn
+cargo build
+cargo test --workspace --lib
+```
+
+Before opening a PR, read:
+
+- [AGENTS.md](AGENTS.md) for repo operating rules, verification routing, and invariants
+- [CONTRIBUTING.md](CONTRIBUTING.md) for architectural guardrails
+- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) for a cleaner contributor-first startup path
 
 ## What ICN Provides
 
@@ -39,43 +66,17 @@ The kernel never sees "trust scores" or "governance rules" — only generic cons
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture documentation.
 
-## Quick Start
+## Repo Map
 
-```bash
-# Build
-cd icn && cargo build --release
+The repo is split across several surfaces:
 
-# Start node alpha (terminal 1)
-./target/release/icnd --config ../config/icn-alpha.toml
+- [`icn/`](icn/) — Rust workspace: crates in `icn/crates/`, runtime apps in `icn/apps/`, binaries in `icn/bins/`
+- [`website/`](website/) — public site for `intercooperative.network`
+- [`docs/`](docs/) — architecture, reference, contributor, and operator documentation
+- [`sdk/`](sdk/) — TypeScript and React Native SDK work
+- [`deploy/`](deploy/) — deployment manifests and cluster configuration
 
-# Start node beta (terminal 2)
-./target/release/icnd --config ../config/icn-beta.toml
-
-# Check status (terminal 3)
-./target/release/icnctl network status
-./target/release/icnctl network peers
-# Nodes discover each other via mDNS within seconds
-```
-
-### Identity Management
-
-```bash
-icnctl id init          # Create identity (DID + keystore)
-icnctl id show          # Show current DID
-icnctl id rotate        # Rotate keys
-icnctl id export b.age  # Export encrypted backup
-```
-
-### Trust & Networking
-
-```bash
-icnctl trust add did:icn:z6Mk... --score 0.8 --label partner
-icnctl trust list
-icnctl network peers
-icnctl network stats
-```
-
-### Ports
+### Common Ports
 
 | Service | Port | Protocol | Purpose |
 |---------|------|----------|---------|
@@ -84,82 +85,18 @@ icnctl network stats
 | Metrics | 9100 | HTTP | Prometheus exporter |
 | Health | 8080 | HTTP | Health checks |
 
-## Project Structure
-
-**35 crates** in `icn/crates/`, **4 app crates** in `apps/`, **3 binaries** in `icn/bins/`.
-
-### Kernel (domain-agnostic)
-
-| Crate | Purpose |
-|-------|---------|
-| `icn-kernel-api` | Trait definitions (PolicyOracle, State, Compute, Comms) |
-| `icn-core` | Tokio runtime, supervisor, actor lifecycle |
-| `icn-net` | QUIC/TLS sessions, mDNS discovery |
-| `icn-gossip` | Topic-based replication with causal ordering |
-| `icn-gateway` | REST + WebSocket API |
-| `icn-rpc` | gRPC API server |
-| `icn-store` | Persistent KV storage (sled) |
-| `icn-obs` | Prometheus metrics, tracing |
-| `icn-identity` | DIDs, Ed25519 keypairs, encrypted keystore |
-| `icn-encoding` | Serialization utilities |
-| `icn-time` | Clock synchronization |
-| `icn-snapshot` | State snapshots for graceful restarts |
-| `icn-api` | Shared validation and error handling |
-| `icn-testkit` | Test utilities |
-
-### Apps (domain-specific, Policy Oracles)
-
-| Crate | Purpose |
-|-------|---------|
-| `apps/trust` | Trust graph → PolicyOracle (rate limits, credit multipliers) |
-| `apps/governance` | GovernanceActor, proposal execution |
-| `apps/ledger` | Ledger reduction and settlement |
-| `apps/echo` | Example app for testing |
-
-### Domain Crates
-
-| Crate | Purpose |
-|-------|---------|
-| `icn-trust` | Trust graph storage and computation |
-| `icn-governance` | Governance primitives (proposals, voting, parameters) |
-| `icn-ledger` | Double-entry mutual credit with Merkle-DAG |
-| `icn-ccl` | Contract language AST, interpreter, fuel metering |
-| `icn-compute` | Distributed compute with trust-gated execution |
-| `icn-federation` | Inter-cooperative coordination |
-| `icn-entity` | Unified entity model |
-| `icn-coop` | Cooperative management |
-| `icn-community` | Community structures |
-| `icn-security` | Byzantine fault detection |
-| `icn-privacy` | Privacy primitives |
-| `icn-crypto-pq` | Post-quantum hybrid cryptography |
-| `icn-steward` | SDIS steward network |
-| `icn-zkp` | Zero-knowledge proofs |
-
-### Binaries
-
-| Binary | Purpose |
-|--------|---------|
-| `icnd` | The ICN daemon |
-| `icnctl` | CLI management tool |
-| `icn-console` | Interactive TUI |
-
 ## Development
 
 ```bash
 cd icn
 
-# Build
 cargo build
-
-# Test
-cargo test --all-features
-
-# Lint
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --lib
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for architectural guardrails and the git workflow.
+Run the checks that match what you touched. [AGENTS.md](AGENTS.md) is the routing table for Rust crates, website work, SDK work, and docs changes.
 
 ## Security
 
@@ -173,21 +110,17 @@ Trust-gated rate limiting enforces per-actor throughput bounds based on trust cl
 
 ## Documentation
 
-- **[Architecture](docs/ARCHITECTURE.md)** — Constraint engine model, kernel/app separation, Policy Oracle pattern
-- **[Getting Started](docs/GETTING_STARTED.md)** — Installation and first steps
-- **[FAQ](docs/FAQ.md)** — Common questions
-- **[Contributing](CONTRIBUTING.md)** — Development workflow and architectural guardrails
-- **[Architecture Index](docs/architecture/)** — Visual diagrams, kernel/app separation details
-- **[Onboarding Modules](docs/onboarding/)** — Deep-dive learning modules
-- **[Production Hardening](docs/production-hardening.md)** — Security and deployment
-- **[Roadmap](docs/strategy/ICN-Roadmap-Live.md)** — Current sprint and tranche progress
-- **[Phase History](docs/PHASE_HISTORY.md)** — Completed development phases
+- **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** — developer and evaluator startup path
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — contribution guardrails and PR expectations
+- **[docs/onboarding/README.md](docs/onboarding/README.md)** — deeper developer onboarding curriculum
+- **[docs/INDEX.md](docs/INDEX.md)** — master doc navigation
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — architecture deep dive
+- **[docs/STATE.md](docs/STATE.md)** — current project snapshot
+- **[Production Hardening](docs/production-hardening.md)** — security and deployment
 
 ## Status
 
-~198K lines of Rust across 35 crates, 4 app crates, and 3 binaries. Deployed on a K3s cluster since December 2025.
-
-Kernel/app separation (Phases 0-7) is complete. The Charter Engine is live — YAML charter documents produce kernel-enforced constraints. Active development follows [Governance Dispatch Tranches](docs/strategy/ICN-Roadmap-Live.md) (Tranches 9-18), wiring remaining governance decision types through the executor pipeline. Phase 2 (Pilot Launch) is blocked on cooperative partner identification.
+ICN is real, active, and uneven in maturity. The strongest parts today are provenance, cryptographic identity, and the decision-to-record path. Member-facing polish, broader execution coverage, and cleaner onboarding surfaces are still being built. For the current truth plane, read [docs/STATE.md](docs/STATE.md) and the public [What's Real Now](https://intercooperative.network/whats-real-now) page.
 
 ## License
 

@@ -35,12 +35,20 @@ Welcome to the ICN (Intercooperative Network) documentation! This index provides
 ## 📋 Quick Navigation
 
 - **New to ICN?** → Start with [Getting Started Guide](GETTING_STARTED.md)
+- **Looking for the public engagement map?** → Start with [intercooperative.network/get-involved](https://intercooperative.network/get-involved)
 - **Understanding the system?** → Read [Architecture Overview](ARCHITECTURE.md)
 - **Building the public site?** → Start with [Design Language Brief v0](design-language/brief-v0.md)
 - **Building features?** → Check [Developer Guides](#developer-guides)
 - **Deploying ICN?** → See [Operations Guides](#operations-guides)
 - **Looking for APIs?** → Browse [API Reference](#api-reference)
 - **Historical context?** → Explore [Archives](#archives)
+
+### Start here by role
+
+- **Developer or technical contributor**: [GETTING_STARTED.md](GETTING_STARTED.md) → [CONTRIBUTING.md](../CONTRIBUTING.md) → [onboarding/README.md](onboarding/README.md)
+- **Non-technical contributor**: [intercooperative.network/get-involved](https://intercooperative.network/get-involved)
+- **Institutional partner or cooperative evaluator**: [intercooperative.network/for-cooperatives](https://intercooperative.network/for-cooperatives) and [intercooperative.network/whats-real-now](https://intercooperative.network/whats-real-now)
+- **Financial supporter**: [GitHub Sponsors](https://github.com/sponsors/InterCooperative-Network)
 
 ### Design language (canonical)
 

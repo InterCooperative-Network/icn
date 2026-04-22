@@ -1,5 +1,30 @@
 # Contributing to ICN
 
+## Start Here
+
+ICN is a large repo with a strict architecture. Before opening a PR, start from the entrypoint that matches the kind of work you want to do:
+
+- **Code contributions**: read [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md), then [AGENTS.md](AGENTS.md), then this file
+- **Documentation contributions**: use the routing in [README.md](README.md), [docs/INDEX.md](docs/INDEX.md), and [intercooperative.network/get-involved](https://intercooperative.network/get-involved)
+- **Design, testing, research, institutional input**: use the public [Get Involved](https://intercooperative.network/get-involved) page and open a [GitHub Discussion](https://github.com/InterCooperative-Network/icn/discussions) when the work is not already scoped as an issue
+
+## Before You Open a PR
+
+Every contribution should be able to answer these plainly:
+
+1. What exactly changed?
+2. Why is this the right scope?
+3. What risk does it carry?
+4. What checks did you run?
+
+Additional expectations:
+
+- Keep diffs small and reviewable.
+- Work on a branch, not on `main`.
+- Run the verification commands that match the area you touched.
+- Do not weaken invariants, validation, signature requirements, or crate boundaries to make tests pass.
+- If the change affects public wording, docs, or user-facing behavior, make the routing and terminology more truthful, not less.
+
 ## Architectural Guardrails
 
 ### 1. Interfaces First

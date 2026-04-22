@@ -51,8 +51,8 @@ if (!icon) {
 
 const isDecorative = !label;
 const accessibilityAttrs = isDecorative
-  ? { 'aria-hidden': 'true' }
-  : { role: 'img', 'aria-label': label };
+  ? { 'aria-hidden': true }
+  : { role: 'img' as const, 'aria-label': label };
 ---
 
 <svg

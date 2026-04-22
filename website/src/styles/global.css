@@ -284,11 +284,11 @@ pre code {
   border-bottom: 1px solid var(--border-subtle);
 }
 .section-pre-ladder {
-  padding-bottom: var(--space-2xl);
+  padding-bottom: var(--space-lg);
 }
 .section-ladder {
-  padding-top: var(--space-2xl);
-  padding-bottom: var(--space-3xl);
+  padding-top: var(--space-lg);
+  padding-bottom: var(--space-2xl);
 }
 .section-header {
   text-align: center;
@@ -1044,11 +1044,11 @@ pre code {
     padding: var(--space-3xl) 0;
   }
   .section-pre-ladder {
-    padding-bottom: var(--space-xl);
+    padding-bottom: var(--space-md);
   }
   .section-ladder {
-    padding-top: var(--space-xl);
-    padding-bottom: var(--space-2xl);
+    padding-top: var(--space-md);
+    padding-bottom: var(--space-xl);
   }
   .section-header {
     margin-bottom: var(--space-2xl);

@@ -44,7 +44,7 @@ Maintainers make architectural decisions, review boundary-crossing PRs, and ment
 
 ### 4. Load Testing
 
-**File**: `icn/tests/load_tests.rs`
+**Reference docs**: `docs/performance/BENCHMARKS.md`, `docs/performance/PROFILING.md`
 
 Simulate 100+ nodes, 1000+ messages/sec, measure:
 - Gossip convergence time

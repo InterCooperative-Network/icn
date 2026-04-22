@@ -1,6 +1,12 @@
 ---
+interface SearchItem {
+  slug: string;
+  title: string;
+  description?: string;
+}
+
 interface Props {
-  searchList: any[];
+  searchList: SearchItem[];
 }
 
 const { searchList } = Astro.props;
@@ -37,7 +43,13 @@ const { searchList } = Astro.props;
   class SearchComponent extends HTMLElement {
     constructor() {
       super();
-      const listData = JSON.parse(this.dataset.list || '[]');
+      type SearchItem = {
+        slug: string;
+        title: string;
+        description?: string;
+      };
+
+      const listData = JSON.parse(this.dataset.list || '[]') as SearchItem[];
       const input = this.querySelector('input');
       const countEl = this.querySelector('#match-count');
       const countContainer = this.querySelector('#search-results-count');
@@ -46,25 +58,25 @@ const { searchList } = Astro.props;
       
       if (!input) return;
 
-      const fuse = new Fuse(listData, {
+      const fuse = new Fuse<SearchItem>(listData, {
         keys: ['title', 'slug', 'description'],
         threshold: 0.4,
         ignoreLocation: true,
       });
 
       // Local Storage Helpers
-      const getRecent = () => {
+      const getRecent = (): string[] => {
         try {
-          return JSON.parse(localStorage.getItem('icn-recent-searches') || '[]');
+          return JSON.parse(localStorage.getItem('icn-recent-searches') || '[]') as string[];
         } catch {
           return [];
         }
       };
 
-      const addRecent = (term) => {
+      const addRecent = (term: string) => {
         if (!term) return;
         let recent = getRecent();
-        recent = [term, ...recent.filter(t => t !== term)].slice(0, 5);
+        recent = [term, ...recent.filter((t: string) => t !== term)].slice(0, 5);
         localStorage.setItem('icn-recent-searches', JSON.stringify(recent));
       };
 
@@ -75,7 +87,7 @@ const { searchList } = Astro.props;
           recentContainer.classList.add('hidden');
           return;
         }
-        recentList.innerHTML = recent.map(term => `
+        recentList.innerHTML = recent.map((term: string) => `
           <li>
             <button type="button" class="recent-item">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>

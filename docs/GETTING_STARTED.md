@@ -1,411 +1,125 @@
 # Getting Started with ICN
 
-Welcome to ICN (Intercooperative Network)! This guide will help you get up and running with ICN in minutes.
+This guide is the contributor and evaluator entrypoint for the ICN repo. It is written for people who want to understand the project, build the codebase, run the main checks, and choose an initial way to help without guessing their way through the repository.
 
-## What is ICN?
+If you are looking for institutional engagement, non-technical contribution, or financial support, use the public [Get Involved](https://intercooperative.network/get-involved) page first.
 
-ICN is a **peer-to-peer coordination substrate** for cooperatives and community organizations. It provides:
+## Choose Your Starting Path
 
-- **Decentralized Identity** (DIDs) with Ed25519 cryptography
-- **Trust Graph** for reputation and access control
-- **Mutual Credit Ledger** for community currency
-- **Gossip Protocol** for P2P communication
-- **Cooperative Contracts** (CCL) for programmable agreements
-- **Governance Primitives** for democratic decision-making
+- **I want to understand the project before building anything**: start with [intercooperative.network/what-is-icn](https://intercooperative.network/what-is-icn), [intercooperative.network/for-developers](https://intercooperative.network/for-developers), and [intercooperative.network/whats-real-now](https://intercooperative.network/whats-real-now)
+- **I want to contribute code**: keep reading this guide, then read [CONTRIBUTING.md](../CONTRIBUTING.md)
+- **I want a deeper technical curriculum**: use [docs/onboarding/README.md](onboarding/README.md)
+- **I want to run a node locally and inspect the daemon**: follow the local-node section below after you build the workspace
 
-Think of it as infrastructure for the cooperative economy - like Git for collaboration, but for economic coordination.
+## Developer Quickstart
 
----
+### Prerequisites
 
-## Quick Start (5 minutes)
+- Rust toolchain from `icn/rust-toolchain.toml`
+- Git
+- Enough disk for a full workspace build and incremental cache
 
-### 1. Install ICN
+### Clone and build
 
-**One-line install** (Linux/macOS):
-```bash
-curl -fsSL https://raw.githubusercontent.com/InterCooperative-Network/icn/main/scripts/install.sh | bash
-```
-
-**Manual install** (build from source):
 ```bash
 git clone https://github.com/InterCooperative-Network/icn.git
 cd icn/icn
-cargo build --release
-sudo cp target/release/{icnd,icnctl} /usr/local/bin/
+cargo build
+cargo test --workspace --lib
 ```
 
-**Verify installation:**
-```bash
-icnctl --version
-icnd --version
-```
+Important: the Rust workspace is in the `icn/` subdirectory, not at the repo root.
 
-### 2. Create Your Identity
+### Read these next
 
-ICN uses decentralized identifiers (DIDs) instead of usernames. Let's create yours:
+1. [README.md](../README.md) — repo map and role-based routing
+2. [AGENTS.md](../AGENTS.md) — verification rules, invariants, and crate layout
+3. [CONTRIBUTING.md](../CONTRIBUTING.md) — PR expectations and architectural guardrails
+4. [docs/onboarding/README.md](onboarding/README.md) — structured contributor path
 
-```bash
-# Use an explicit data dir so icnctl and icnd read the same identity state
-icnctl --data-dir ~/.icn id init
-```
+### Repo orientation
 
-You'll be prompted to:
-1. **Choose a passphrase** (encrypts your private key)
-2. **Confirm the passphrase**
+- `icn/` — Rust workspace
+- `icn/crates/` — core crates and shared subsystems
+- `icn/apps/` — runtime-integrated application crates
+- `icn/bins/` — binaries such as `icnd` and `icnctl`
+- `website/` — public site for `intercooperative.network`
+- `docs/` — architecture, guides, reference material, and onboarding
 
-Your DID will look like: `did:icn:5Xk8Y2r...` (based on your public key)
+### Choose an initial area
 
-**View your identity:**
-```bash
-icnctl --data-dir ~/.icn id show
-```
+- Start with [good first issues](https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue) if you want a scoped first PR
+- Use [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions) if the work is exploratory, architectural, institutional, or not yet issue-shaped
+- If you want to read first and patch later, follow the reading order on [For Developers](https://intercooperative.network/for-developers)
 
-### 3. Start the Daemon
-
-ICN runs as a background daemon (`icnd`):
+### Verify before you push
 
 ```bash
-# Start manually (foreground, for testing)
-icnd --data-dir ~/.icn
-
-# Or install as a system service
-sudo systemctl enable --now icnd  # Linux
-sudo launchctl load /Library/LaunchDaemons/com.icn.icnd.plist  # macOS
+cd icn
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --lib
 ```
 
-**Check daemon status:**
-```bash
-icnctl --data-dir ~/.icn status
-```
+Run the checks that match the area you touched. `AGENTS.md` is the routing table for workspace crates, website work, SDK work, and docs.
 
-### 4. Join a Cooperative
+## Running a Local Node
 
-If you're joining an existing cooperative, you need:
-1. The **cooperative's invite link** or **bootstrap node address**
-2. **Trust attestation** from an existing member
+If you want to inspect the daemon and CLI directly after building:
+
+### Create an identity
 
 ```bash
-# Connect to a bootstrap node
-icnctl network add-peer 192.168.1.100:7777 did:icn:abc123...
-
-# Request trust from a member
-# (They run: icnctl trust add did:icn:YOUR_DID 0.5)
+cd icn
+./target/debug/icnctl --data-dir ~/.icn id init
+./target/debug/icnctl --data-dir ~/.icn id show
 ```
 
-### 5. Your First Transaction
-
-Once you're trusted by the cooperative, you can participate in the mutual credit ledger:
+### Start the daemon
 
 ```bash
-# Check your balance
-icnctl ledger balance
-
-# Record a transaction (e.g., "I gave Alice 2 hours of help")
-icnctl ledger pay did:icn:alice... 2 hours "Gardening help"
-
-# View transaction history
-icnctl ledger history
+cd icn
+./target/debug/icnd --data-dir ~/.icn
 ```
 
----
-
-## Core Concepts
-
-### Identity & Trust
-
-- **DID (Decentralized Identifier)**: Your cryptographic identity (e.g., `did:icn:5Xk8Y...`)
-- **Keystore**: Encrypted file storing your private key (`{data_dir}/identity.age`, for example `~/.icn/identity.age` when using `--data-dir ~/.icn`)
-- **Trust Score**: How much the network trusts you (0.0 to 1.0)
-- **Trust Graph**: Web of trust relationships between members
-
-Trust is **transitive**: If Alice trusts Bob (0.8) and Bob trusts Carol (0.6), Alice implicitly trusts Carol (~0.48).
-
-### Mutual Credit Ledger
-
-- **Mutual Credit**: Community currency where balances net to zero
-- **Double-Entry Accounting**: Every transaction has a debit and credit
-- **Credit Limits**: Maximum negative balance (based on trust + history)
-- **Currencies**: Hours, USD, credits, kWh, etc. (configurable per cooperative)
-
-**Example:**
-```
-Alice helps Bob for 2 hours
-  Alice: +2 hours
-  Bob: -2 hours
-  Network total: 0 hours
-```
-
-### Gossip Protocol
-
-ICN uses **gossip** (epidemic broadcast) for P2P communication:
-
-- **Topics**: Channels like `ledger:sync`, `governance:proposals`, `compute:tasks`
-- **Access Control**: Public, private, or trust-gated topics
-- **Anti-Entropy**: Automatic conflict resolution and missing data repair
-- **Vector Clocks**: Track causal ordering of events
-
-You don't need to understand gossip to use ICN - it's automatic!
-
-### Governance
-
-ICN provides **primitives** for democratic decision-making:
-
-- **Domains**: Governance contexts (e.g., "food-coop:membership")
-- **Proposals**: Motions to be voted on
-- **Voting**: For/Against/Abstain with configurable thresholds
-- **Profiles**: Decision rules (consensus, majority, consent, etc.)
+### Check status from another terminal
 
 ```bash
-# Create a governance domain
-icnctl gov domain create --domain-id my-coop --name "My Cooperative"
-
-# Create a proposal
-icnctl gov proposal create --domain-id my-coop --title "Approve new supplier" --kind text
-
-# Vote
-icnctl gov vote cast --proposal-id abc123 --choice for
+cd icn
+./target/debug/icnctl --data-dir ~/.icn status
+./target/debug/icnctl --data-dir ~/.icn network peers
 ```
 
----
+### Useful local endpoints
 
-## Common Workflows
+- Gateway health: `http://localhost:8080/v1/health`
+- Metrics: `http://localhost:9100/metrics`
 
-### Set Up a New Cooperative
+## Other Real Ways to Help
 
-1. **Choose a member** to initialize:
-   ```bash
-   icnctl init-coop --name "My Food Coop" --members "did:icn:alice,did:icn:bob,did:icn:carol"
-   ```
+If you are not contributing Rust code, there are still real paths:
 
-2. **Set initial trust**:
-   ```bash
-   # Members trust each other
-   icnctl trust add did:icn:alice 0.8
-   icnctl trust add did:icn:bob 0.8
-   ```
+- docs, design, testing, research, governance, and ecosystem work are routed through [intercooperative.network/get-involved](https://intercooperative.network/get-involved)
+- institutional use cases and partnership questions belong in [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions)
+- financial support goes through [GitHub Sponsors](https://github.com/sponsors/InterCooperative-Network)
 
-3. **Create governance domain**:
-   ```bash
-   icnctl gov domain create --domain-id food-coop --name "Food Coop Governance"
-   ```
+## What This Guide Does Not Promise
 
-4. **Set credit policies** (optional):
-   ```bash
-   # Via CCL contract or manual configuration
-   # See docs/economic-safety.md for details
-   ```
+- a polished non-technical onboarding flow for ordinary members
+- a hosted sign-up path or managed pilot program
+- a finished member-facing product surface
 
-### Backup Your Identity
+Those are still in progress. This guide is for building, reading, testing, and contributing against the repo as it exists today.
 
-**IMPORTANT**: Your keystore is your identity. Back it up!
+## Next Documents
 
-```bash
-# Backup entire data directory (keystore + ledger + trust graph)
-icnctl backup ~/icn-backup-$(date +%Y%m%d).tar.gz.age
+- [README.md](../README.md) for the repo map and public-routing layer
+- [CONTRIBUTING.md](../CONTRIBUTING.md) for PR expectations and architectural guardrails
+- [onboarding/README.md](onboarding/README.md) for the longer contributor curriculum
+- [ARCHITECTURE.md](ARCHITECTURE.md) and [STATE.md](STATE.md) if you need deeper technical and project-status context
 
-# Restore from backup
-icnctl restore ~/icn-backup-20251121.tar.gz.age --force
-```
+## Where To Ask Or Contribute Next
 
-Store backups:
-- **Off-site** (cloud storage, different physical location)
-- **Encrypted** (backups are Age-encrypted with your passphrase)
-- **Regularly** (weekly for active cooperatives)
-
-### Monitor Your Node
-
-1. **Gateway Health Endpoint**:
-   ```bash
-   curl http://localhost:8080/v1/health
-   ```
-
-2. **Prometheus Metrics**:
-   ```
-   curl http://localhost:9100/metrics
-   ```
-
-3. **Health Check**:
-   ```bash
-   curl http://localhost:8080/v1/health
-   icnctl network status
-   ```
-
-### Multi-Device Setup
-
-Use your identity on multiple devices (laptop + phone):
-
-```bash
-# On Device 1 (primary)
-icnctl device add --name "My Phone" --capabilities sign
-
-# On Device 2 (new device)
-# 1. Copy the device keypair from Device 1
-# 2. Import and approve the device
-icnctl device list
-```
-
-See [Multi-Device Identity Design](design/multi-device-identity-design.md) for details.
-
----
-
-## Authentication for Web/Mobile Apps
-
-ICN provides a **Gateway API** for building user-facing applications:
-
-1. **Get a JWT token**:
-   ```bash
-   icnctl auth token --gateway http://localhost:8080 --coop-id my-coop
-   ```
-
-2. **Use the token** in HTTP requests:
-   ```bash
-   curl -H "Authorization: Bearer eyJ0eXAi..." \
-        http://localhost:8080/v1/coops/my-coop
-   ```
-
-3. **WebSocket for real-time updates**:
-   ```javascript
-   const ws = new WebSocket('ws://localhost:8080/v1/ws/my-coop');
-   ws.send(JSON.stringify({type: 'Auth', token: 'eyJ0eXAi...'}));
-   ```
-
-See [Platform Layer Design](design/platform-layer-design.md) and the TypeScript SDK ([sdk/typescript/](../sdk/typescript/)).
-
----
-
-## Troubleshooting
-
-### "Identity already exists"
-You've already run `icnctl id init`. View your existing identity:
-```bash
-icnctl id show
-```
-
-### "Failed to unlock keystore"
-Wrong passphrase. Try again or restore from backup.
-
-### "No peers connected"
-Your node hasn't discovered peers yet. Either:
-1. Wait for mDNS discovery (~30 seconds on LAN)
-2. Manually add a peer: `icnctl network add-peer <addr> <did>`
-3. Check firewall settings (port 7777/UDP for QUIC)
-
-### "Transaction rejected: insufficient credit"
-You've hit your credit limit. Either:
-1. Receive payments from others (increase balance)
-2. Build more trust (increases limit)
-3. Wait for credit limit ramp (new members have throttled limits)
-
-### "Proposal not found"
-The proposal hasn't gossiped to your node yet. Wait 10-30 seconds and try again.
-
-### Logs and Debugging
-```bash
-# View logs (systemd)
-journalctl -u icnd -f
-
-# View logs (manual run)
-RUST_LOG=debug icnd
-
-# Check network connectivity
-icnctl network peers
-icnctl network status
-```
-
----
-
-## Next Steps
-
-### Learn More
-- [Architecture Overview](ARCHITECTURE.md) - How ICN works under the hood
-- [Operations Guide](guides/operations/operations-guide.md) - Day-to-day management
-- [Economic Safety](design/economics/economic-safety.md) - Credit limits, dispute resolution
-- [Governance Primitives](design/governance/governance-primitives.md) - Democratic decision-making
-- [Deployment Guide](operations/deployment/deployment-guide.md) - Production deployment
-
-### Build on ICN
-
-**Quick TypeScript Example**:
-```typescript
-import { ICNClient } from '@icn/client';
-
-const client = new ICNClient({ baseUrl: 'http://localhost:8080' });
-
-// Authenticate (you provide signing logic)
-await client.authenticate('did:icn:alice', signer, 'my-coop', ['ledger:read']);
-
-// Make a payment
-await client.pay('my-coop', {
-  from: 'did:icn:alice',
-  to: 'did:icn:bob',
-  amount: 5,
-  currency: 'hours',
-});
-
-// Submit a compute task
-const task = await client.submitTask({
-  code: JSON.stringify(cclContract),
-  fuel_limit: 10000,
-});
-const result = await client.waitForTask(task.task_hash);
-```
-
-**More Resources**:
-- [Gateway API Reference](reference/api/API_REFERENCE.md) - REST + WebSocket API
-- [TypeScript SDK](../sdk/typescript/) - `@icn/client` npm package
-- [Platform Layer Design](design/platform-layer-design.md) - App architecture
-
-### Get Help
-- **GitHub Issues**: https://github.com/InterCooperative-Network/icn/issues
-- **Documentation**: All docs in `docs/` directory
-- **Examples**: See `examples/` directory
-
-### Contribute
-- [Contributing Guide](../CONTRIBUTING.md) - How to contribute
-- [Code of Conduct](../CODE_OF_CONDUCT.md) - Community standards
-- [Phase History](PHASE_HISTORY.md) - Completed development phases
-- [Current TODO](TODO.md) - What's being built next
-
----
-
-## Quick Reference Card
-
-```bash
-# Identity
-icnctl id init              # Create new identity
-icnctl id show              # View your DID
-icnctl id rotate            # Rotate to new keypair
-
-# Trust
-icnctl trust add <did> <score>     # Add trust edge
-icnctl trust list                  # View trust graph
-icnctl trust score <did>           # Query trust score
-
-# Ledger
-icnctl ledger balance              # Check balance
-icnctl ledger pay <did> <amount> <currency> <memo>
-icnctl ledger history              # Transaction history
-
-# Governance
-icnctl gov domain create --domain-id <id> --name <name>
-icnctl gov proposal create --domain-id <id> --title <title>
-icnctl gov vote cast --proposal-id <id> --choice for|against|abstain
-
-# Network
-icnctl network status              # Show peers, gossip state
-icnctl network add-peer <addr> <did>  # Manual peering
-
-# Backup
-icnctl backup <path>               # Create encrypted backup
-icnctl restore <path>              # Restore from backup
-
-# Daemon
-icnd                               # Start daemon (foreground)
-icnctl status                      # Check daemon status
-```
-
----
-
-**Welcome to the cooperative internet!** 🎉
-
-If you have questions, check the [docs/](.) directory or open a [GitHub issue](https://github.com/InterCooperative-Network/icn/issues).
+- Use [GitHub Issues](https://github.com/InterCooperative-Network/icn/issues) for scoped implementation and documentation work
+- Use [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions) for design questions, institutional use cases, and broader project conversation
+- Use [intercooperative.network/get-involved](https://intercooperative.network/get-involved) if you are deciding how to help across technical, non-technical, institutional, or financial paths

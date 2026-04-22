@@ -22,7 +22,7 @@ enforces cooperative policy decisions.
 ## Related Materials
 - `icn/crates/icn-governance/`
 - `icn/crates/icn-ccl/`
-- `docs/governance-primitives.md`
+- `docs/design/governance/governance-primitives.md`
 
 ---
 
