@@ -62,13 +62,12 @@ Important: the Rust workspace is in the `icn/` subdirectory, not at the repo roo
 ### Verify before you push
 
 ```bash
-cd icn
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --lib
 ```
 
-Run the checks that match the area you touched. `AGENTS.md` is the routing table for workspace crates, website work, SDK work, and docs.
+Run the checks that match the area you touched from `icn/`, the workspace directory you entered in the build step. `AGENTS.md` is the routing table for workspace crates, website work, SDK work, and docs.
 
 ## Running a Local Node
 
@@ -77,7 +76,6 @@ If you want to inspect the daemon and CLI directly after building:
 ### Create an identity
 
 ```bash
-cd icn
 ./target/debug/icnctl --data-dir ~/.icn id init
 ./target/debug/icnctl --data-dir ~/.icn id show
 ```
@@ -85,14 +83,12 @@ cd icn
 ### Start the daemon
 
 ```bash
-cd icn
 ./target/debug/icnd --data-dir ~/.icn
 ```
 
 ### Check status from another terminal
 
 ```bash
-cd icn
 ./target/debug/icnctl --data-dir ~/.icn status
 ./target/debug/icnctl --data-dir ~/.icn network peers
 ```

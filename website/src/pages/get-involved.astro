@@ -20,7 +20,7 @@ import Layout from '../layouts/Layout.astro';
         </p>
       </div>
 
-      <div class="path-nav" aria-label="Jump to a path">
+      <nav class="path-nav" aria-label="Jump to a path">
         <a href="#build" class="path-nav-item">
           <span class="path-nav-num">01</span>
           <span class="path-nav-label">Build</span>
@@ -41,7 +41,7 @@ import Layout from '../layouts/Layout.astro';
           <span class="path-nav-label">Support</span>
           <span class="path-nav-hint">Sponsor the work financially</span>
         </a>
-      </div>
+      </nav>
     </div>
   </section>
 
@@ -123,12 +123,11 @@ cargo test --workspace --lib</code></pre>
         </li>
         <li>
           <h3>Verify before you push</h3>
-          <pre><code>cd icn
-cargo fmt --all --check
+          <pre><code>cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --lib</code></pre>
           <p class="path-step-note">
-            Run the checks that match what you touched. Full routing table is in <code>AGENTS.md</code>.
+            Run these from <code>icn/</code>, the Rust workspace you entered in the build step. Full routing table is in <code>AGENTS.md</code>.
           </p>
         </li>
         <li>
