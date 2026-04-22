@@ -1,7 +1,7 @@
 ---
 Status: draft
 Canonical: no
-Depends-On: docs/design/ICN_VISUAL_SYSTEM.md
+Depends On: docs/design/ICN_VISUAL_SYSTEM.md
 Last Reviewed: 2026-04-22
 Last Updated: 2026-04-22
 Purpose: Tactical prompt library for image generation and visual exploration aligned with ICN visual doctrine.
