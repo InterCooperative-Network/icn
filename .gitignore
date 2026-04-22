@@ -21,6 +21,7 @@ icn/apps/*/Cargo.lock
 # Claude Code
 .claude/settings.local.json
 .claude/.env
+.claude/scheduled_tasks.lock
 
 # Local cargo config overrides (machine-specific, not for CI)
 icn/.cargo/config.user.toml
@@ -108,3 +109,6 @@ icn-wt/
 
 # Playwright MCP debug artifacts (screenshots, console logs, snapshots)
 .playwright-mcp/
+
+# Session scratch artifacts
+.tmp/
