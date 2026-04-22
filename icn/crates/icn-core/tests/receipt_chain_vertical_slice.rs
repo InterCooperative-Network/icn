@@ -16,11 +16,85 @@ use icn_governance::{
     AllocationOption, GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId,
     ProposalPayload, ProposalScope, StaticMembershipResolver, VoteChoice,
 };
+use icn_governance_actor::receipt_backend::GovernanceReceiptBackend;
 use icn_governance_actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite};
 use icn_identity::KeyPair;
 use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
+use icn_kernel_api::{AllocationReceipt, CanonicalReceipt, Hash};
 use icn_store::SledStore;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+
+#[derive(Default)]
+struct TestReceiptBackend {
+    governance_by_proposal: Mutex<HashMap<String, icn_governance::GovernanceDecisionReceipt>>,
+    governance_by_decision: Mutex<HashMap<Hash, icn_governance::GovernanceDecisionReceipt>>,
+    allocations_by_decision: Mutex<HashMap<Hash, Vec<AllocationReceipt>>>,
+}
+
+impl GovernanceReceiptBackend for TestReceiptBackend {
+    fn put_governance(
+        &self,
+        receipt: &icn_governance::GovernanceDecisionReceipt,
+    ) -> Result<(), String> {
+        self.governance_by_proposal
+            .lock()
+            .map_err(|e| e.to_string())?
+            .insert(receipt.proposal_id.clone(), receipt.clone());
+        self.governance_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .insert(receipt.decision_hash, receipt.clone());
+        Ok(())
+    }
+
+    fn get_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+        Ok(self
+            .governance_by_proposal
+            .lock()
+            .map_err(|e| e.to_string())?
+            .get(proposal_id)
+            .cloned())
+    }
+
+    fn put_allocation(&self, receipt: &AllocationReceipt) -> Result<Hash, String> {
+        self.allocations_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .entry(receipt.decision_hash)
+            .or_default()
+            .push(receipt.clone());
+        Ok(receipt.canonical_hash())
+    }
+
+    fn get_governance_by_decision(
+        &self,
+        decision_hash: &Hash,
+    ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+        Ok(self
+            .governance_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .get(decision_hash)
+            .cloned())
+    }
+
+    fn list_allocations_by_decision(
+        &self,
+        decision_hash: &Hash,
+    ) -> Result<Vec<AllocationReceipt>, String> {
+        Ok(self
+            .allocations_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .get(decision_hash)
+            .cloned()
+            .unwrap_or_default())
+    }
+}
 
 /// Spawn a minimal single-member GovernanceActor wired to an EventBus.
 async fn make_actor() -> Result<(
@@ -64,6 +138,9 @@ async fn make_actor() -> Result<(
         None,
     )
     .await?;
+    actor
+        .install_receipt_store(Arc::new(TestReceiptBackend::default()))
+        .await;
 
     let domain_id = GovernanceDomainId::new("vertical-slice-domain");
     actor
