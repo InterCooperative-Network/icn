@@ -140,9 +140,9 @@ pub use proof::{
 };
 pub use proposal::{
     AllocationOption, DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome,
-    FederationProposal, FederationTerms, ForcedOutcome, MembershipAction, Proposal, ProposalId,
-    ProposalPayload, ProposalScope, ProposalState, ResourceAccessAction, TreasuryApprovalType,
-    TreasuryProposalOperation, Version,
+    ExecutionClosureClass, FederationProposal, FederationTerms, ForcedOutcome, MembershipAction,
+    Proposal, ProposalId, ProposalPayload, ProposalScope, ProposalState, ResourceAccessAction,
+    TreasuryApprovalType, TreasuryProposalOperation, Version,
 };
 pub use resolver::{MembershipResolver, StaticMembershipResolver, TrustServiceMembershipResolver};
 pub use sdis::{

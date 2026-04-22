@@ -1903,6 +1903,15 @@ impl GovernanceActor {
                     DecisionOutcome::NoQuorum => ProposalState::NoQuorum { closed_at: now },
                 };
 
+                let requires_execution_closure = matches!(outcome_result, DecisionOutcome::Accepted)
+                    && proposal.payload.requires_execution_closure();
+                if requires_execution_closure && self.receipt_store.is_none() {
+                    anyhow::bail!(
+                        "Proposal '{}' requires execution closure but no receipt_store is installed on actor.",
+                        proposal_id.0
+                    );
+                }
+
                 // Update proposal
                 proposal.close(new_state)?;
 
@@ -2176,6 +2185,12 @@ impl GovernanceActor {
                                     proposal_id = %proposal_id.0,
                                     "Actor failed to hash payload for mandate — declining to mint"
                                 );
+                                if requires_execution_closure {
+                                    anyhow::bail!(
+                                        "Proposal '{}' requires execution closure but actor mandate mint hash failed.",
+                                        proposal_id.0
+                                    );
+                                }
                             }
                             Err(e) => {
                                 error!(
@@ -2183,6 +2198,12 @@ impl GovernanceActor {
                                     error = %e,
                                     "Actor failed to persist ADR-0014 mandate (non-fatal)"
                                 );
+                                if requires_execution_closure {
+                                    anyhow::bail!(
+                                        "Proposal '{}' requires execution closure but actor mandate persistence failed: {e}",
+                                        proposal_id.0
+                                    );
+                                }
                             }
                         }
                     }
@@ -2260,6 +2281,15 @@ impl GovernanceActor {
                     ForcedOutcome::Cancel => ProposalOutcome::NoQuorum, // Treat Cancel as NoQuorum
                 };
 
+                let requires_execution_closure = matches!(&forced_outcome, ForcedOutcome::Accept)
+                    && proposal.payload.requires_execution_closure();
+                if requires_execution_closure && self.receipt_store.is_none() {
+                    anyhow::bail!(
+                        "Proposal '{}' requires execution closure but no receipt_store is installed on actor.",
+                        proposal_id.0
+                    );
+                }
+
                 // Force close the proposal
                 proposal.force_close(proposal_outcome.clone(), reason.clone())?;
 
@@ -2269,7 +2299,7 @@ impl GovernanceActor {
                 // Emit appropriate event
                 if let Some(ref event_bus) = self.event_bus {
                     let now = now_seconds();
-                    let event = match forced_outcome {
+                    let event = match &forced_outcome {
                         ForcedOutcome::Accept => match serde_json::to_value(&proposal.payload) {
                             Ok(payload) => {
                                 let canonical_payload_hash = serde_json::to_string(&payload)
@@ -2342,10 +2372,10 @@ impl GovernanceActor {
                 // normal accept did. Uses the same translation helper so
                 // audit semantics are path-agnostic. Idempotent on
                 // (proposal_id, effect_kind).
-                if matches!(forced_outcome, ForcedOutcome::Accept) {
+                if matches!(&forced_outcome, ForcedOutcome::Accept) {
                     if let Some(ref store) = self.receipt_store {
                         let now = now_seconds();
-                        let decision_hash_bytes: Option<icn_kernel_api::receipts::Hash> = {
+                        let forced_decision_hash: icn_kernel_api::receipts::Hash = {
                             use icn_governance::proof::ProofOutcome;
                             let receipt = GovernanceDecisionReceipt::new(
                                 proposal_id.0.clone(),
@@ -2354,8 +2384,10 @@ impl GovernanceActor {
                                 VoteTally::empty(),
                                 &[],
                             );
-                            Some(receipt.decision_hash)
+                            receipt.decision_hash
                         };
+                        let decision_hash_bytes: Option<icn_kernel_api::receipts::Hash> =
+                            Some(forced_decision_hash);
                         match crate::institutional_effect::emit_accepted_effect(
                             store.as_ref(),
                             &proposal_id.0,
@@ -2381,6 +2413,42 @@ impl GovernanceActor {
                                     error = %e,
                                     "Force-accept failed to emit InstitutionalEffectRecord (non-fatal)"
                                 );
+                                if requires_execution_closure {
+                                    anyhow::bail!(
+                                        "Proposal '{}' requires execution closure but force-accept effect emission failed: {e}",
+                                        proposal_id.0
+                                    );
+                                }
+                            }
+                        }
+
+                        match crate::grant_minting::mint_and_persist_for_accepted(
+                            store.as_ref(),
+                            &proposal_id.0,
+                            &proposal.domain_id,
+                            forced_decision_hash,
+                            &proposal.payload,
+                            now,
+                        ) {
+                            Ok(crate::grant_minting::MandateMintOutcome::Minted { .. })
+                            | Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted {
+                                ..
+                            }) => {}
+                            Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
+                                if requires_execution_closure {
+                                    anyhow::bail!(
+                                        "Proposal '{}' requires execution closure but force-accept mandate hash failed.",
+                                        proposal_id.0
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                if requires_execution_closure {
+                                    anyhow::bail!(
+                                        "Proposal '{}' requires execution closure but force-accept mandate persistence failed: {e}",
+                                        proposal_id.0
+                                    );
+                                }
                             }
                         }
                     }

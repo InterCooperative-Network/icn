@@ -710,6 +710,17 @@ pub enum ProposalPayload {
     },
 }
 
+/// Whether an accepted proposal must close into a downstream execution artifact.
+///
+/// - `Declarative`: acceptance itself is the terminal semantic outcome.
+/// - `ExecutionRequired`: acceptance is only a decision signal and must be paired
+///   with a traceable closure artifact (allocation receipt, mandate/provenance, etc).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExecutionClosureClass {
+    Declarative,
+    ExecutionRequired,
+}
+
 impl ProposalPayload {
     /// Get a string name for the proposal type (for metrics labeling)
     pub fn type_name(&self) -> &'static str {
@@ -758,6 +769,26 @@ impl ProposalPayload {
     /// Check if this is an emergency proposal (requires higher quorum)
     pub fn is_emergency(&self) -> bool {
         self.emergency_type().is_some()
+    }
+
+    /// Classify whether this payload requires downstream execution closure when accepted.
+    ///
+    /// `Text` resolutions are purely declarative in current ICN semantics.
+    /// All other payloads represent operational changes and must not end at
+    /// "accepted" without a durable closure artifact.
+    pub fn execution_closure_class(&self) -> ExecutionClosureClass {
+        match self {
+            ProposalPayload::Text { .. } => ExecutionClosureClass::Declarative,
+            _ => ExecutionClosureClass::ExecutionRequired,
+        }
+    }
+
+    /// Convenience helper for acceptance guards.
+    pub fn requires_execution_closure(&self) -> bool {
+        matches!(
+            self.execution_closure_class(),
+            ExecutionClosureClass::ExecutionRequired
+        )
     }
 }
 
@@ -1585,6 +1616,32 @@ mod tests {
         assert_eq!(proposal.title, "Test Proposal");
         assert_eq!(proposal.state, ProposalState::Draft);
         assert!(proposal.created_at > 0);
+    }
+
+    #[test]
+    fn test_execution_closure_classification_for_declarative_payload() {
+        let payload = ProposalPayload::Text {
+            body: "declarative statement".to_string(),
+        };
+        assert_eq!(
+            payload.execution_closure_class(),
+            ExecutionClosureClass::Declarative
+        );
+        assert!(!payload.requires_execution_closure());
+    }
+
+    #[test]
+    fn test_execution_closure_classification_for_operational_payload() {
+        let payload = ProposalPayload::FreezeMember {
+            member: icn_identity::Did::from_anchor_id(&[7u8; 32]),
+            reason: "policy breach".to_string(),
+            duration_seconds: Some(600),
+        };
+        assert_eq!(
+            payload.execution_closure_class(),
+            ExecutionClosureClass::ExecutionRequired
+        );
+        assert!(payload.requires_execution_closure());
     }
 
     #[test]

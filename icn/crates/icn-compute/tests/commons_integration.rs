@@ -234,6 +234,142 @@ async fn test_scheduling_enforces_credits() {
     );
 }
 
+/// Test 5b: Custom policy requirement callback drives commons admission threshold.
+#[tokio::test]
+async fn test_scheduling_uses_policy_required_credit_callback() {
+    use icn_compute::{
+        BalanceCallback, CommonsRequiredCreditsCallback, ComputeError, ComputeTask,
+        DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass, TaskCode, TaskPriority,
+    };
+
+    fn make_commons_task(submitter: &str, fuel_limit: u64) -> ComputeTask {
+        ComputeTask {
+            id: "test-policy-required".into(),
+            submitter: submitter.into(),
+            coop_id: None,
+            code: TaskCode::Ccl("(define x 1)".into()),
+            inputs: vec![],
+            fuel_limit: FuelLimit(fuel_limit),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            storage_class: None,
+            data_locality: None,
+            scope: icn_kernel_api::ScopeLevel::Commons,
+        }
+    }
+
+    // Fuel-limit formula would require only 1 here; callback forces 5.
+    let policy_required: CommonsRequiredCreditsCallback = Arc::new(|_task| Ok(5));
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let low_balance: BalanceCallback = Arc::new(|_| 4);
+    let mut actor = ComputeActor::new("did:icn:scheduler".into(), trust_cb.clone());
+    actor.set_balance_callback(low_balance);
+    actor.set_commons_required_credits_callback(policy_required.clone());
+    let handle = actor.spawn();
+
+    let denied = handle.submit(make_commons_task("did:icn:insufficient", 500)).await;
+    assert!(
+        matches!(
+            denied,
+            Err(ComputeError::InsufficientCommonsCredits {
+                balance: 4,
+                required: 5
+            })
+        ),
+        "policy-required threshold should be enforced; got {denied:?}"
+    );
+
+    let enough_balance: BalanceCallback = Arc::new(|_| 5);
+    let mut actor2 = ComputeActor::new("did:icn:scheduler".into(), trust_cb);
+    actor2.set_balance_callback(enough_balance);
+    actor2.set_commons_required_credits_callback(policy_required);
+    let handle2 = actor2.spawn();
+    let accepted = handle2.submit(make_commons_task("did:icn:sufficient", 500)).await;
+    assert!(
+        accepted.is_ok(),
+        "submitter with callback-required balance should pass; got {accepted:?}"
+    );
+}
+
+/// Test 5c: Requirement callback failure/malformed outputs are explicit.
+#[tokio::test]
+async fn test_scheduling_rejects_invalid_policy_requirement_path() {
+    use icn_compute::{
+        BalanceCallback, CommonsRequiredCreditsCallback, ComputeError, ComputeTask,
+        DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass, TaskCode, TaskPriority,
+    };
+
+    fn make_commons_task() -> ComputeTask {
+        ComputeTask {
+            id: "test-policy-invalid".into(),
+            submitter: "did:icn:submitter".into(),
+            coop_id: None,
+            code: TaskCode::Ccl("(define x 1)".into()),
+            inputs: vec![],
+            fuel_limit: FuelLimit(1_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            storage_class: None,
+            data_locality: None,
+            scope: icn_kernel_api::ScopeLevel::Commons,
+        }
+    }
+
+    let trust_cb: TrustCallback = Arc::new(|_| 1.0);
+    let plenty: BalanceCallback = Arc::new(|_| 100);
+
+    let erring_cb: CommonsRequiredCreditsCallback =
+        Arc::new(|_task| Err("policy unavailable".to_string()));
+    let mut actor = ComputeActor::new("did:icn:scheduler".into(), trust_cb.clone());
+    actor.set_balance_callback(plenty.clone());
+    actor.set_commons_required_credits_callback(erring_cb);
+    let handle = actor.spawn();
+    let result = handle.submit(make_commons_task()).await;
+    assert!(
+        matches!(result, Err(ComputeError::PolicyViolation(ref msg)) if msg.contains("policy unavailable")),
+        "policy callback errors should surface explicitly; got {result:?}"
+    );
+
+    let malformed_cb: CommonsRequiredCreditsCallback = Arc::new(|_task| Ok(0));
+    let mut actor2 = ComputeActor::new("did:icn:scheduler".into(), trust_cb);
+    actor2.set_balance_callback(plenty);
+    actor2.set_commons_required_credits_callback(malformed_cb);
+    let handle2 = actor2.spawn();
+    let result2 = handle2.submit(make_commons_task()).await;
+    assert!(
+        matches!(result2, Err(ComputeError::PolicyViolation(ref msg)) if msg.contains("must be >=")),
+        "malformed requirements should reject explicitly; got {result2:?}"
+    );
+}
+
 /// Test 6: Receipt-backed earn entries produce distinct hashes (replay protection).
 #[test]
 fn test_receipt_backed_earn_entries_are_distinct() {

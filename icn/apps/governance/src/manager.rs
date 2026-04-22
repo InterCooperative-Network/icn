@@ -181,6 +181,16 @@ fn payload_effect_kind(payload: &ProposalPayload) -> &'static str {
     }
 }
 
+fn payload_requires_allocation_receipt(payload: &ProposalPayload) -> bool {
+    matches!(
+        payload,
+        ProposalPayload::Budget { .. }
+            | ProposalPayload::Treasury { .. }
+            | ProposalPayload::Allocation { .. }
+            | ProposalPayload::SurplusAllocation { .. }
+    )
+}
+
 /// Unix-seconds timestamp the proposal reached a terminal lifecycle state,
 /// or `None` if still in-flight. Used by the deliberation endpoint to tag
 /// when a decision was recorded without depending on receipt fields.
@@ -3450,6 +3460,16 @@ impl GovernanceManager {
                 _ => unreachable!("final_state is always Accepted/Rejected/NoQuorum"),
             };
 
+            let requires_execution_closure =
+                matches!(outcome, ProofOutcome::Accepted) && proposal.payload.requires_execution_closure();
+            if requires_execution_closure && self.receipt_store.is_none() {
+                anyhow::bail!(
+                    "Proposal '{}' requires execution closure but no receipt store is wired. \
+                     Refusing to finalize Accepted without a traceable closure artifact.",
+                    proposal_id.0
+                );
+            }
+
             proposal.close(final_state)?;
 
             if let Some(ref store) = self.receipt_store {
@@ -3468,6 +3488,12 @@ impl GovernanceManager {
                     );
                     // Escalated from warn to error: receipt store failure means
                     // the governance→economics provenance chain is broken (PS-3).
+                    if requires_execution_closure {
+                        anyhow::bail!(
+                            "Proposal '{}' requires execution closure but governance receipt persistence failed: {e}",
+                            proposal_id.0
+                        );
+                    }
                 }
 
                 // ADR-0014 constitutional-memory seam.
@@ -3522,6 +3548,12 @@ impl GovernanceManager {
                                 "Failed to hash proposal payload for mandate payload_hash — \
                                  declining to mint mandate to avoid breaking content-binding invariant"
                             );
+                            if requires_execution_closure {
+                                anyhow::bail!(
+                                    "Proposal '{}' requires execution closure but mandate minting failed (hash).",
+                                    proposal_id.0
+                                );
+                            }
                         }
                         Err(e) => {
                             tracing::error!(
@@ -3529,6 +3561,12 @@ impl GovernanceManager {
                                 error = %e,
                                 "Failed to persist ADR-0014 mandate — constitutional-memory record lost"
                             );
+                            if requires_execution_closure {
+                                anyhow::bail!(
+                                    "Proposal '{}' requires execution closure but mandate persistence failed: {e}",
+                                    proposal_id.0
+                                );
+                            }
                         }
                     }
                 }
@@ -3550,6 +3588,12 @@ impl GovernanceManager {
                                 error = %e,
                                 "Failed to store allocation receipt — economics binding broken"
                             );
+                            if requires_execution_closure {
+                                anyhow::bail!(
+                                    "Proposal '{}' requires execution closure but allocation receipt persistence failed: {e}",
+                                    proposal_id.0
+                                );
+                            }
                         } else {
                             tracing::info!(
                                 proposal_id = %proposal_id.0,
@@ -3557,6 +3601,11 @@ impl GovernanceManager {
                                 "Allocation receipt created: governance→economics chain bound"
                             );
                         }
+                    } else if payload_requires_allocation_receipt(&proposal.payload) {
+                        anyhow::bail!(
+                            "Proposal '{}' requires an allocation receipt closure artifact, but no receipt was generated.",
+                            proposal_id.0
+                        );
                     }
                 }
             }
@@ -3696,13 +3745,7 @@ impl GovernanceManager {
                     // Look up the proposal to determine if it requires allocations.
                     match self.get_proposal(proposal_id).await.ok().flatten() {
                         Some(p) => {
-                            let is_economic_payload = matches!(
-                                p.payload,
-                                ProposalPayload::Budget { .. }
-                                    | ProposalPayload::Treasury { .. }
-                                    | ProposalPayload::Allocation { .. }
-                                    | ProposalPayload::SurplusAllocation { .. }
-                            );
+                            let is_economic_payload = payload_requires_allocation_receipt(&p.payload);
                             if is_economic_payload {
                                 has_allocations
                             } else {
@@ -6175,6 +6218,78 @@ mod tests {
         .unwrap();
 
         (mgr, domain_id, member_did)
+    }
+
+    #[tokio::test]
+    async fn declarative_text_proposal_can_close_without_receipt_store() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Adopt statement".to_string(),
+                "Declarative text".to_string(),
+                ProposalPayload::Text {
+                    body: "We endorse this statement.".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        let closed = mgr.get_proposal(&proposal_id).await.unwrap().unwrap();
+        assert!(
+            matches!(closed.state, ProposalState::Accepted { .. }),
+            "declarative payload should remain closable without execution linkage backend"
+        );
+    }
+
+    #[tokio::test]
+    async fn execution_required_payload_rejects_accept_without_receipt_store() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let target = test_did(77);
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Freeze member".to_string(),
+                "Execution-required".to_string(),
+                ProposalPayload::FreezeMember {
+                    member: target,
+                    reason: "policy breach".to_string(),
+                    duration_seconds: Some(3600),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(proposal_id.clone(), member_did, VoteChoice::For, None)
+            .await
+            .unwrap();
+
+        let result = mgr.close_proposal(proposal_id.clone()).await;
+        assert!(
+            result
+                .as_ref()
+                .err()
+                .is_some_and(|e| e.to_string().contains("requires execution closure")),
+            "execution-required payload must not close Accepted without closure backend; got {result:?}"
+        );
     }
 
     /// INV-2 TEST: Accepted Budget proposal creates AllocationReceipt.
