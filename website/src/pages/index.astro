@@ -19,13 +19,13 @@ import MaturityCard from '../components/MaturityCard.astro';
           </div>
 
           <h1>
-            Infrastructure for democratic institutions that need governance, records, and coordination to hold together.
+            <span>Infrastructure for</span>
+            <span class="hero-accent">democratic institutions.</span>
           </h1>
 
           <p>
-            The InterCooperative Network is being built as shared digital infrastructure for cooperatives, communities, and federations.
-            The aim is not another app stack. It is a substrate where institutions can prove decisions,
-            keep records and obligations coherent, and coordinate across organizational boundaries on infrastructure they can govern.
+            The InterCooperative Network is shared digital infrastructure for cooperatives, communities, and federations.
+            It helps institutions keep decisions, records, obligations, and coordination on infrastructure they can govern.
           </p>
 
           <div class="hero-actions">
@@ -36,44 +36,42 @@ import MaturityCard from '../components/MaturityCard.astro';
             <a href="/get-involved" class="btn btn-secondary">Get Involved</a>
             <a href="/whats-real-now" class="btn btn-ghost">What's Real Now</a>
           </div>
-          <p class="hero-qualifier">For institutions that need durable capacity, not another disconnected software tool.</p>
+          <p class="hero-qualifier">For institutions that need durable capacity, not another disconnected software stack.</p>
+          <aside class="hero-panel animate-in animate-delay-2" aria-label="Start here">
+            <div class="hero-panel-head">
+              <span class="eyebrow">Start Here</span>
+              <h2>Choose the right first page.</h2>
+              <p>
+                If you are evaluating the InterCooperative Network, start with the public framing. If you are trying to contribute,
+                partner, or support the work, use the engagement paths directly.
+              </p>
+            </div>
+
+            <div class="hero-panel-list">
+              <article class="hero-panel-item">
+                <span class="hero-panel-kicker">Understand the project</span>
+                <p>Read <a href="/what-is-icn">What is ICN</a> and <a href="/whats-real-now">What's Real Now</a> for the public framing and current maturity.</p>
+              </article>
+              <article class="hero-panel-item">
+                <span class="hero-panel-kicker">Build or contribute</span>
+                <p>Use <a href="/for-developers">For Developers</a> and <a href="/get-involved">Get Involved</a> to find the actual contribution paths.</p>
+              </article>
+              <article class="hero-panel-item">
+                <span class="hero-panel-kicker">Partner or support</span>
+                <p>Use <a href="/for-cooperatives">For Cooperatives</a> for institutional engagement and <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a> for financial support.</p>
+              </article>
+            </div>
+
+            <div class="hero-panel-links">
+              <a href="/what-is-icn">What is ICN</a>
+              <a href="/whats-real-now">What's Real Now</a>
+              <a href="/for-developers">For Developers</a>
+              <a href="/for-cooperatives">For Cooperatives</a>
+              <a href="/get-involved">Get Involved</a>
+              <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a>
+            </div>
+          </aside>
         </div>
-
-        <aside class="hero-panel animate-in animate-delay-2" aria-label="Start here">
-          <div class="hero-panel-head">
-            <span class="eyebrow">Start Here</span>
-            <h2>Choose the right first page.</h2>
-            <p>
-              If you are evaluating the InterCooperative Network, start with the public framing. If you are trying to contribute,
-              partner, or support the work, use the engagement paths directly.
-            </p>
-          </div>
-
-          <div class="hero-panel-list">
-            <article class="hero-panel-item">
-              <span class="hero-panel-kicker">Understand the project</span>
-              <p>Read <a href="/what-is-icn">What is ICN</a> and <a href="/whats-real-now">What's Real Now</a> for the public framing and current maturity.</p>
-            </article>
-            <article class="hero-panel-item">
-              <span class="hero-panel-kicker">Build or contribute</span>
-              <p>Use <a href="/for-developers">For Developers</a> and <a href="/get-involved">Get Involved</a> to find the actual contribution paths.</p>
-            </article>
-            <article class="hero-panel-item">
-              <span class="hero-panel-kicker">Partner or support</span>
-              <p>Use <a href="/for-cooperatives">For Cooperatives</a> for institutional engagement and <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a> for financial support.</p>
-            </article>
-          </div>
-
-          <div class="hero-panel-links">
-            <a href="/what-is-icn">What is ICN</a>
-            <a href="/get-involved">Get Involved</a>
-            <a href="/for-developers">For Developers</a>
-            <a href="/for-cooperatives">For Cooperatives</a>
-            <a href="/how-it-works">How It Works</a>
-            <a href="/architecture">Architecture</a>
-            <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a>
-          </div>
-        </aside>
       </div>
     </div>
     <div class="hero-bg-grid" aria-hidden="true"></div>
@@ -367,42 +365,58 @@ import MaturityCard from '../components/MaturityCard.astro';
   min-height: 0;
   height: auto;
   display: block;
-  padding-top: calc(64px + var(--space-2xl));
-  padding-bottom: var(--space-xl);
+  padding-top: calc(64px + var(--space-xl));
+  padding-bottom: var(--space-lg);
 }
 .hero-container {
   position: relative;
   z-index: 2;
 }
 .hero-shell {
-  display: grid;
-  grid-template-columns: minmax(0, 1.22fr) minmax(300px, 0.78fr);
-  gap: var(--space-xl);
-  align-items: start;
+  display: block;
 }
 .hero-home .hero-content {
-  max-width: 720px;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
 }
 .hero-home .hero-content h1 {
-  font-size: clamp(2rem, 4.4vw, 3.15rem);
-  line-height: 1.08;
-  max-width: 14ch;
-  margin-bottom: var(--space-md);
+  font-size: clamp(2.35rem, 4.7vw, 4.1rem);
+  line-height: 1.04;
+  max-width: 11.5ch;
+  margin-bottom: var(--space-sm);
+  margin-left: auto;
+  margin-right: auto;
+}
+.hero-home .hero-content h1 span {
+  display: block;
+}
+.hero-accent {
+  color: var(--text-heading);
 }
 .hero-home .hero-content > p {
-  max-width: 40em;
-  font-size: 0.98rem;
-  line-height: 1.55;
+  max-width: 38rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 
 .hero-qualifier {
   font-size: .8125rem; color: var(--text-muted);
-  margin: var(--space-sm) 0 0; letter-spacing: .01em; max-width: 42em;
+  margin: 0.75rem auto 0; letter-spacing: .01em; max-width: 42em;
+}
+.hero-home .hero-actions {
+  justify-content: center;
 }
 .hero-panel {
   position: relative;
-  padding: var(--space-md) var(--space-lg);
+  margin-top: var(--space-xl);
+  max-width: 980px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1rem 1rem 1.05rem;
   background:
     linear-gradient(180deg, rgba(17, 24, 39, 0.9), rgba(11, 17, 27, 0.96));
   border: 1px solid var(--border-default);
@@ -423,22 +437,23 @@ import MaturityCard from '../components/MaturityCard.astro';
   );
 }
 .hero-panel-head h2 {
-  font-size: clamp(1.05rem, 1.7vw, 1.3rem);
-  margin: var(--space-sm) 0;
+  font-size: clamp(1rem, 1.45vw, 1.18rem);
+  margin: 0.45rem 0 0.5rem;
 }
 .hero-panel-head p {
   margin: 0;
-  font-size: 0.875rem;
-  line-height: 1.6;
+  font-size: 0.84rem;
+  line-height: 1.55;
   color: var(--text-secondary);
 }
 .hero-panel-list {
   display: grid;
-  gap: var(--space-sm);
-  margin-top: var(--space-md);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.85rem;
 }
 .hero-panel-item {
-  padding: 0.85rem var(--space-md);
+  padding: 0.72rem 0.85rem;
   background: rgba(12, 17, 24, 0.78);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -455,33 +470,32 @@ import MaturityCard from '../components/MaturityCard.astro';
 }
 .hero-panel-item p {
   margin: 0;
-  font-size: 0.84rem;
-  line-height: 1.55;
+  font-size: 0.81rem;
+  line-height: 1.5;
   color: var(--text-secondary);
 }
 .hero-panel-item a {
   color: var(--text-heading);
 }
 .hero-panel-links {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.4rem 0.5rem;
-  margin-top: var(--space-sm);
-  padding-top: var(--space-sm);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.42rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
   border-top: 1px solid var(--border-subtle);
 }
 .hero-panel-links a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.75rem;
-  padding: 0.5rem 0.75rem;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.65rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: rgba(12, 17, 24, 0.56);
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   letter-spacing: 0.04em;
   line-height: 1.1;
   transition:
@@ -598,13 +612,10 @@ import MaturityCard from '../components/MaturityCard.astro';
     padding-top: calc(64px + var(--space-xl));
     padding-bottom: var(--space-xl);
   }
-  .hero-shell {
-    grid-template-columns: 1fr;
-    gap: var(--space-xl);
-  }
   .hero-home .hero-content h1 {
     font-size: clamp(1.75rem, 7vw, 2.5rem);
     line-height: 1.15;
+    max-width: 10.5ch;
   }
   .hero-home .hero-content > p {
     font-size: 0.9375rem;
@@ -612,6 +623,12 @@ import MaturityCard from '../components/MaturityCard.astro';
   .hero-panel {
     padding: var(--space-lg);
     border-radius: var(--radius-xl);
+  }
+  .hero-panel-list {
+    grid-template-columns: 1fr;
+  }
+  .hero-panel-links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .hero-actions .btn {
     flex: 1 1 auto;
