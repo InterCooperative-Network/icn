@@ -613,6 +613,9 @@ pre code {
   flex: 1;
   justify-content: center;
 }
+.nav-mobile-only {
+  display: none;
+}
 .nav-links a {
   color: var(--text-secondary);
   font-size: 0.875rem;
@@ -701,6 +704,12 @@ pre code {
   .nav-links li {
     list-style: none;
     width: 100%;
+  }
+  .nav-mobile-only {
+    display: block;
+    margin-top: var(--space-xs);
+    padding-top: var(--space-xs);
+    border-top: 1px solid var(--border-subtle);
   }
   .nav-links a {
     display: block;
