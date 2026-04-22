@@ -474,14 +474,16 @@ import MaturityCard from '../components/MaturityCard.astro';
 .hero-panel-links a {
   display: inline-flex;
   align-items: center;
-  padding: 0.34rem 0.54rem;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: rgba(12, 17, 24, 0.56);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   letter-spacing: 0.04em;
-  line-height: 1;
+  line-height: 1.1;
   transition:
     border-color var(--duration-fast) var(--ease-out),
     color var(--duration-fast) var(--ease-out),
@@ -516,7 +518,6 @@ import MaturityCard from '../components/MaturityCard.astro';
   padding-top: var(--space-md);
 }
 .homepage-paths {
-  padding-top: var(--space-lg);
   padding-bottom: var(--space-2xl);
 }
 .homepage-path-grid {
