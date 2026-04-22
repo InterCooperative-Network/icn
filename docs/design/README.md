@@ -17,6 +17,10 @@ Every claim has been verified against the codebase. If a document says "Not Supp
 
 ## Subsystem Design
 
+### Visual System
+- [ICN Visual System](ICN_VISUAL_SYSTEM.md) - Stable visual doctrine for website, docs, product surfaces, and demos
+- [ICN Prompt Library](ICN_PROMPT_LIBRARY.md) - Tactical prompt library for doctrine-aligned image generation
+
 ### Economics
 - [Economic Architecture](economics/ECONOMIC_ARCHITECTURE.md) - Core economic system design
 - [Economic Vision](economics/ECONOMIC_VISION.md) - Long-term economic vision

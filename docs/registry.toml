@@ -1146,6 +1146,38 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/ICN_VISUAL_SYSTEM.md"]
+category = "design"
+status = "draft"
+title = "ICN Visual System"
+description = "Stable visual doctrine for ICN across website, docs, product surfaces, onboarding, demo materials, and future institutional deployments"
+last_updated = "2026-04-22"
+owner = "matt"
+audiences = ["architects", "developers", "stakeholders"]
+truth_class = "draft"
+role = "design"
+canonical = "no"
+freshness = "current"
+domain_tags = ["design", "visual-system"]
+recommended_action = "keep"
+last_reviewed = "2026-04-22"
+
+[docs."docs/design/ICN_PROMPT_LIBRARY.md"]
+category = "design"
+status = "draft"
+title = "ICN Prompt Library"
+description = "Tactical prompt library for doctrine-aligned image generation and visual exploration"
+last_updated = "2026-04-22"
+owner = "matt"
+audiences = ["architects", "developers", "designers"]
+truth_class = "draft"
+role = "design"
+canonical = "no"
+freshness = "current"
+domain_tags = ["design", "prompt-library"]
+recommended_action = "keep"
+last_reviewed = "2026-04-22"
+
 # ============================================================================
 # STRATEGY DOCUMENTS
 # ============================================================================
