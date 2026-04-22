@@ -602,9 +602,6 @@ pre code {
 .nav-logo:hover {
   color: var(--text-heading);
 }
-.nav-logo-svg {
-  border-radius: 8px;
-}
 .nav-links {
   display: flex;
   align-items: center;
@@ -681,9 +678,6 @@ pre code {
   padding: var(--space-xs);
 }
 @media (max-width: 1180px) {
-  .nav .nav-logo span {
-    display: none;
-  }
   .nav-inner {
     gap: var(--space-md);
   }
