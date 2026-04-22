@@ -185,7 +185,10 @@ fn payload_requires_allocation_receipt(payload: &ProposalPayload) -> bool {
     matches!(
         payload,
         ProposalPayload::Budget { .. }
-            | ProposalPayload::Treasury { .. }
+            | ProposalPayload::Treasury {
+                operation: icn_governance::TreasuryProposalOperation::CreateBudget { .. }
+                    | icn_governance::TreasuryProposalOperation::Spend { .. },
+            }
             | ProposalPayload::Allocation { .. }
             | ProposalPayload::SurplusAllocation { .. }
     )
@@ -3460,8 +3463,8 @@ impl GovernanceManager {
                 _ => unreachable!("final_state is always Accepted/Rejected/NoQuorum"),
             };
 
-            let requires_execution_closure =
-                matches!(outcome, ProofOutcome::Accepted) && proposal.payload.requires_execution_closure();
+            let requires_execution_closure = matches!(outcome, ProofOutcome::Accepted)
+                && proposal.payload.requires_execution_closure();
             if requires_execution_closure && self.receipt_store.is_none() {
                 anyhow::bail!(
                     "Proposal '{}' requires execution closure but no receipt store is wired. \
@@ -3469,8 +3472,6 @@ impl GovernanceManager {
                     proposal_id.0
                 );
             }
-
-            proposal.close(final_state)?;
 
             if let Some(ref store) = self.receipt_store {
                 let receipt = GovernanceDecisionReceipt::new(
@@ -3548,12 +3549,6 @@ impl GovernanceManager {
                                 "Failed to hash proposal payload for mandate payload_hash — \
                                  declining to mint mandate to avoid breaking content-binding invariant"
                             );
-                            if requires_execution_closure {
-                                anyhow::bail!(
-                                    "Proposal '{}' requires execution closure but mandate minting failed (hash).",
-                                    proposal_id.0
-                                );
-                            }
                         }
                         Err(e) => {
                             tracing::error!(
@@ -3561,12 +3556,6 @@ impl GovernanceManager {
                                 error = %e,
                                 "Failed to persist ADR-0014 mandate — constitutional-memory record lost"
                             );
-                            if requires_execution_closure {
-                                anyhow::bail!(
-                                    "Proposal '{}' requires execution closure but mandate persistence failed: {e}",
-                                    proposal_id.0
-                                );
-                            }
                         }
                     }
                 }
@@ -3588,12 +3577,6 @@ impl GovernanceManager {
                                 error = %e,
                                 "Failed to store allocation receipt — economics binding broken"
                             );
-                            if requires_execution_closure {
-                                anyhow::bail!(
-                                    "Proposal '{}' requires execution closure but allocation receipt persistence failed: {e}",
-                                    proposal_id.0
-                                );
-                            }
                         } else {
                             tracing::info!(
                                 proposal_id = %proposal_id.0,
@@ -3609,6 +3592,8 @@ impl GovernanceManager {
                     }
                 }
             }
+
+            proposal.close(final_state)?;
 
             // Decision→action bridge (standalone path).
             //
@@ -3745,7 +3730,8 @@ impl GovernanceManager {
                     // Look up the proposal to determine if it requires allocations.
                     match self.get_proposal(proposal_id).await.ok().flatten() {
                         Some(p) => {
-                            let is_economic_payload = payload_requires_allocation_receipt(&p.payload);
+                            let is_economic_payload =
+                                payload_requires_allocation_receipt(&p.payload);
                             if is_economic_payload {
                                 has_allocations
                             } else {

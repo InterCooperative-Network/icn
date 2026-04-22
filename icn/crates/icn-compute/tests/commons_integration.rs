@@ -281,7 +281,9 @@ async fn test_scheduling_uses_policy_required_credit_callback() {
     actor.set_commons_required_credits_callback(policy_required.clone());
     let handle = actor.spawn();
 
-    let denied = handle.submit(make_commons_task("did:icn:insufficient", 500)).await;
+    let denied = handle
+        .submit(make_commons_task("did:icn:insufficient", 500))
+        .await;
     assert!(
         matches!(
             denied,
@@ -298,7 +300,9 @@ async fn test_scheduling_uses_policy_required_credit_callback() {
     actor2.set_balance_callback(enough_balance);
     actor2.set_commons_required_credits_callback(policy_required);
     let handle2 = actor2.spawn();
-    let accepted = handle2.submit(make_commons_task("did:icn:sufficient", 500)).await;
+    let accepted = handle2
+        .submit(make_commons_task("did:icn:sufficient", 500))
+        .await;
     assert!(
         accepted.is_ok(),
         "submitter with callback-required balance should pass; got {accepted:?}"
