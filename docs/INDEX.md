@@ -35,12 +35,20 @@ Welcome to the ICN (Intercooperative Network) documentation! This index provides
 ## 📋 Quick Navigation
 
 - **New to ICN?** → Start with [Getting Started Guide](GETTING_STARTED.md)
+- **Looking for the public engagement map?** → Start with [intercooperative.network/get-involved](https://intercooperative.network/get-involved)
 - **Understanding the system?** → Read [Architecture Overview](ARCHITECTURE.md)
 - **Building the public site?** → Start with [Design Language Brief v0](design-language/brief-v0.md)
 - **Building features?** → Check [Developer Guides](#developer-guides)
 - **Deploying ICN?** → See [Operations Guides](#operations-guides)
 - **Looking for APIs?** → Browse [API Reference](#api-reference)
 - **Historical context?** → Explore [Archives](#archives)
+
+### Start here by role
+
+- **Developer or technical contributor**: [GETTING_STARTED.md](GETTING_STARTED.md) → [CONTRIBUTING.md](../CONTRIBUTING.md) → [onboarding/README.md](onboarding/README.md) → [good first issues](https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue)
+- **Non-technical contributor**: [intercooperative.network/get-involved](https://intercooperative.network/get-involved) → [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions)
+- **Institutional partner or cooperative evaluator**: [intercooperative.network/for-cooperatives](https://intercooperative.network/for-cooperatives) → [intercooperative.network/whats-real-now](https://intercooperative.network/whats-real-now) → [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions)
+- **Financial supporter**: [GitHub Sponsors](https://github.com/sponsors/InterCooperative-Network)
 
 ### Design language (canonical)
 

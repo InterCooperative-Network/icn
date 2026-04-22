@@ -41,7 +41,7 @@ const jsonLd = {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content={description} />
   <meta name="theme-color" content="#06090f" />
-  <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -77,11 +77,14 @@ const jsonLd = {
         <li><a href="/whats-real-now" class:list={[{ active: activeNav === 'whats-real-now' || currentPath.startsWith('/whats-real-now') }]} aria-current={activeNav === 'whats-real-now' || currentPath.startsWith('/whats-real-now') ? 'page' : undefined}>What's Real Now</a></li>
         <li><a href="/for-cooperatives" class:list={[{ active: activeNav === 'for-cooperatives' || currentPath.startsWith('/for-cooperatives') }]} aria-current={activeNav === 'for-cooperatives' || currentPath.startsWith('/for-cooperatives') ? 'page' : undefined}>For Cooperatives</a></li>
         <li><a href="/for-developers" class:list={[{ active: activeNav === 'for-developers' || currentPath.startsWith('/for-developers') }]} aria-current={activeNav === 'for-developers' || currentPath.startsWith('/for-developers') ? 'page' : undefined}>For Developers</a></li>
+        <li><a href="/get-involved" class:list={[{ active: activeNav === 'get-involved' || currentPath.startsWith('/get-involved') }]} aria-current={activeNav === 'get-involved' || currentPath.startsWith('/get-involved') ? 'page' : undefined}>Get Involved</a></li>
         <li><a href="/docs" class:list={[{ active: activeNav === 'docs' || currentPath.startsWith('/docs') || currentPath.startsWith('/architecture') }]} aria-current={activeNav === 'docs' || currentPath.startsWith('/docs') || currentPath.startsWith('/architecture') ? 'page' : undefined}>Explore</a></li>
+        <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li>
       </ul>
 
       <div class="nav-cta">
         <ThemeToggle />
+        <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a>
         <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
         </a>
@@ -111,6 +114,7 @@ const jsonLd = {
             <span>InterCooperative Network</span>
           </a>
           <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p>
+          <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p>
         </div>
 
         <div class="footer-col">
@@ -122,6 +126,7 @@ const jsonLd = {
             <li><a href="/whats-real-now">What's Real Now</a></li>
             <li><a href="/for-cooperatives">For Cooperatives</a></li>
             <li><a href="/for-developers">For Developers</a></li>
+            <li><a href="/get-involved">Get Involved</a></li>
           </ul>
         </div>
 
@@ -144,6 +149,7 @@ const jsonLd = {
             <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li>
             <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li>
             <li><a href="/community">Community</a></li>
+            <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li>
             <li><a href="/blog">Blog</a></li>
           </ul>
         </div>

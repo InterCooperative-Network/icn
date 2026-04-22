@@ -284,11 +284,11 @@ pre code {
   border-bottom: 1px solid var(--border-subtle);
 }
 .section-pre-ladder {
-  padding-bottom: var(--space-2xl);
+  padding-bottom: var(--space-lg);
 }
 .section-ladder {
-  padding-top: var(--space-2xl);
-  padding-bottom: var(--space-3xl);
+  padding-top: var(--space-lg);
+  padding-bottom: var(--space-2xl);
 }
 .section-header {
   text-align: center;
@@ -613,6 +613,9 @@ pre code {
   flex: 1;
   justify-content: center;
 }
+.nav-mobile-only {
+  display: none;
+}
 .nav-links a {
   color: var(--text-secondary);
   font-size: 0.875rem;
@@ -635,6 +638,27 @@ pre code {
   align-items: center;
   gap: var(--space-sm);
   flex-shrink: 0;
+}
+.nav-support {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.38rem 0.7rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+.nav-support:hover {
+  color: var(--text-heading);
+  border-color: var(--border-accent);
+  background: var(--accent-amber-glow);
 }
 .nav-github {
   color: var(--text-muted);
@@ -681,6 +705,12 @@ pre code {
     list-style: none;
     width: 100%;
   }
+  .nav-mobile-only {
+    display: block;
+    margin-top: var(--space-xs);
+    padding-top: var(--space-xs);
+    border-top: 1px solid var(--border-subtle);
+  }
   .nav-links a {
     display: block;
     padding: 0.9rem 1rem;
@@ -702,6 +732,9 @@ pre code {
     padding: var(--space-sm);
   }
   .nav-cta .btn {
+    display: none;
+  }
+  .nav-cta .nav-support {
     display: none;
   }
   .nav-cta .nav-github {
@@ -995,6 +1028,9 @@ pre code {
   font-size: 0.9375rem;
   max-width: 36ch;
 }
+.footer-brand p + p {
+  margin-top: var(--space-sm);
+}
 .footer-col h4 {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -1044,11 +1080,11 @@ pre code {
     padding: var(--space-3xl) 0;
   }
   .section-pre-ladder {
-    padding-bottom: var(--space-xl);
+    padding-bottom: var(--space-md);
   }
   .section-ladder {
-    padding-top: var(--space-xl);
-    padding-bottom: var(--space-2xl);
+    padding-top: var(--space-md);
+    padding-bottom: var(--space-xl);
   }
   .section-header {
     margin-bottom: var(--space-2xl);

@@ -30,7 +30,7 @@ including topic subscriptions, vector clocks, and anti-entropy synchronization.
 ## Part 1: Network Actor Structure
 
 ### Steps
-1. Open `icn/crates/icn-net/src/actor.rs`
+1. Open `icn/crates/icn-net/src/actor/mod.rs`
 2. Find the `NetworkActor` struct definition
 3. Identify the key components: endpoint, sessions, router
 

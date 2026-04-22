@@ -78,5 +78,5 @@ You've completed this layer when you can:
 
 → `reference/module-11-federation.md` — Full federation protocol  
 → `reference/module-09-ops-deploy.md` — Deployment, monitoring, backups  
-→ `docs/HOMELAB_DEPLOYMENT.md` — Live deployment example  
+→ `docs/operations/deployment/HOMELAB_DEPLOYMENT.md` — Live deployment example
 → `deploy/k8s/README.md` — Kubernetes deployment guide

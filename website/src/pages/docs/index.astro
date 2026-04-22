@@ -148,6 +148,24 @@ const allDocs = sections.flatMap(s => s.docs);
         <p>Everything you need to understand, deploy, and contribute to the InterCooperative Network. These docs are synced directly from the main repository.</p>
       </div>
 
+      <div class="docs-quickstart">
+        <a href="/docs/GETTING_STARTED" class="docs-quickstart-card">
+          <span class="docs-quickstart-label">Developers</span>
+          <h2>Start with Getting Started</h2>
+          <p>Build the workspace, orient in the repo, and find the right contributor path without getting lost.</p>
+        </a>
+        <a href="/get-involved" class="docs-quickstart-card">
+          <span class="docs-quickstart-label">Contributors</span>
+          <h2>Use the engagement map</h2>
+          <p>Route yourself into docs, design, testing, research, institutional collaboration, or ecosystem work.</p>
+        </a>
+        <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="docs-quickstart-card">
+          <span class="docs-quickstart-label">Supporters</span>
+          <h2>Support the work</h2>
+          <p>GitHub Sponsors is the live public support rail today for sustaining the project’s engineering work.</p>
+        </a>
+      </div>
+
       <!-- Search -->
       <Search searchList={allDocs} />
 
@@ -200,6 +218,52 @@ const allDocs = sections.flatMap(s => s.docs);
 </Layout>
 
 <style>
+  .docs-quickstart {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-md);
+    margin: 0 0 var(--space-xl);
+  }
+
+  .docs-quickstart-card {
+    display: block;
+    padding: var(--space-lg);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    text-decoration: none;
+    transition: all var(--duration-normal) var(--ease-out);
+  }
+
+  .docs-quickstart-card:hover {
+    border-color: var(--border-accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow-teal);
+  }
+
+  .docs-quickstart-label {
+    display: inline-block;
+    margin-bottom: var(--space-sm);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-teal);
+  }
+
+  .docs-quickstart-card h2 {
+    font-size: 1.125rem;
+    margin: 0 0 var(--space-sm);
+  }
+
+  .docs-quickstart-card p {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    max-width: none;
+  }
+
   .docs-index-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
@@ -245,5 +309,11 @@ const allDocs = sections.flatMap(s => s.docs);
   .docs-section-card li a:hover {
     background: var(--accent-teal-glow);
     color: var(--accent-teal);
+  }
+
+  @media (max-width: 900px) {
+    .docs-quickstart {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

@@ -223,7 +223,7 @@ Governance is how communities change rules without breaking trust.
 
 - `docs/onboarding/reference/module-14-governance-ccl-deep-dive.md`
 - `icn/crates/icn-governance/`
-- `docs/governance-primitives.md`
+- `docs/design/governance/governance-primitives.md`
 
 ## Part 6: Gateway, SDK, and Web UI
 
