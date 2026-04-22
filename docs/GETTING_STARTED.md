@@ -52,6 +52,13 @@ Important: the Rust workspace is in the `icn/` subdirectory, not at the repo roo
 - Use [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions) if the work is exploratory, architectural, institutional, or not yet issue-shaped
 - If you want to read first and patch later, follow the reading order on [For Developers](https://intercooperative.network/for-developers)
 
+### If you are helping without writing Rust
+
+- Documentation work: use [docs/INDEX.md](INDEX.md) to find the right surface, then open a scoped docs issue or PR
+- Design, research, testing, and ecosystem work: use [intercooperative.network/get-involved](https://intercooperative.network/get-involved) for the current public routing, then move concrete proposals into [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions)
+- Institutional questions: start with [intercooperative.network/for-cooperatives](https://intercooperative.network/for-cooperatives) and [intercooperative.network/whats-real-now](https://intercooperative.network/whats-real-now), then open a Discussion with the real use case
+- Financial support: the live path today is [GitHub Sponsors](https://github.com/sponsors/InterCooperative-Network)
+
 ### Verify before you push
 
 ```bash

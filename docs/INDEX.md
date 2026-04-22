@@ -45,9 +45,9 @@ Welcome to the ICN (Intercooperative Network) documentation! This index provides
 
 ### Start here by role
 
-- **Developer or technical contributor**: [GETTING_STARTED.md](GETTING_STARTED.md) → [CONTRIBUTING.md](../CONTRIBUTING.md) → [onboarding/README.md](onboarding/README.md)
-- **Non-technical contributor**: [intercooperative.network/get-involved](https://intercooperative.network/get-involved)
-- **Institutional partner or cooperative evaluator**: [intercooperative.network/for-cooperatives](https://intercooperative.network/for-cooperatives) and [intercooperative.network/whats-real-now](https://intercooperative.network/whats-real-now)
+- **Developer or technical contributor**: [GETTING_STARTED.md](GETTING_STARTED.md) → [CONTRIBUTING.md](../CONTRIBUTING.md) → [onboarding/README.md](onboarding/README.md) → [good first issues](https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue)
+- **Non-technical contributor**: [intercooperative.network/get-involved](https://intercooperative.network/get-involved) → [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions)
+- **Institutional partner or cooperative evaluator**: [intercooperative.network/for-cooperatives](https://intercooperative.network/for-cooperatives) → [intercooperative.network/whats-real-now](https://intercooperative.network/whats-real-now) → [GitHub Discussions](https://github.com/InterCooperative-Network/icn/discussions)
 - **Financial supporter**: [GitHub Sponsors](https://github.com/sponsors/InterCooperative-Network)
 
 ### Design language (canonical)

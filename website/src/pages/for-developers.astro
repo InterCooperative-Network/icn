@@ -41,6 +41,30 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 
   <section class="section-alt section-pre-ladder">
     <div class="container narrow prose">
+      <h2>Your first hour in the repo</h2>
+      <div class="truth-grid truth-grid-2">
+        <div class="truth-note truth-note-teal">
+          <span class="truth-note-label">1. Build</span>
+          <h3>Confirm the workspace compiles from the real root</h3>
+          <p>Clone the repo, change into <code>icn/</code>, then run <code>cargo build</code> and <code>cargo test --workspace --lib</code>. The Rust workspace is not at the repo root.</p>
+        </div>
+        <div class="truth-note truth-note-amber">
+          <span class="truth-note-label">2. Verify</span>
+          <h3>Use the same checks the repo expects</h3>
+          <p>Read <a href="/docs/GETTING_STARTED">Getting Started</a>, then run <code>cargo fmt --all --check</code>, <code>cargo clippy --workspace --all-targets --all-features -- -D warnings</code>, and the test scope that matches your change.</p>
+        </div>
+        <div class="truth-note truth-note-teal">
+          <span class="truth-note-label">3. Read the guardrails</span>
+          <h3>Start from the repo’s operating documents</h3>
+          <p><a href="/docs/GETTING_STARTED">Getting Started</a> tells you how to build and orient. <a href="https://github.com/InterCooperative-Network/icn/blob/main/AGENTS.md" target="_blank" rel="noopener"><code>AGENTS.md</code></a> and <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener"><code>CONTRIBUTING.md</code></a> tell you how not to break the repo.</p>
+        </div>
+        <div class="truth-note truth-note-amber">
+          <span class="truth-note-label">4. Choose a first patch</span>
+          <h3>Pick something scoped before you wander</h3>
+          <p>Use <a href="https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue" target="_blank" rel="noopener">good first issues</a> for a first code change, or close a concrete docs gap if you want to contribute without starting in the deepest Rust paths.</p>
+        </div>
+      </div>
+
       <h2>Why ICN may be interesting to technical readers</h2>
       <ul>
         <li><strong>Kernel/app separation with a strict meaning firewall.</strong> The kernel enforces generic constraints without understanding their domain semantics. Apps translate domain meaning into those constraints. The boundary is enforced in the crate graph.</li>
@@ -151,6 +175,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         <li><strong>Start with the contributor entry docs.</strong> Read <a href="/docs/GETTING_STARTED">Getting Started</a>, then <a href="https://github.com/InterCooperative-Network/icn/blob/main/README.md" target="_blank" rel="noopener"><code>README.md</code></a>, then <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener"><code>CONTRIBUTING.md</code></a>.</li>
         <li><strong>Use the onboarding curriculum when you want a deeper path.</strong> The full developer ladder is in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/README.md" target="_blank" rel="noopener"><code>docs/onboarding/README.md</code></a>.</li>
         <li><strong>Choose a first area deliberately.</strong> Start with <a href="https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue" target="_blank" rel="noopener">good first issues</a> or with one documentation gap you can close cleanly.</li>
+        <li><strong>Run from the right directory.</strong> Cargo commands belong in <code>icn/</code>, not the repo root. That one detail prevents a surprising amount of confusion.</li>
         <li><strong>Use the public contribution map if you are deciding how to help.</strong> <a href="/get-involved">Get Involved</a> is the route map for code, docs, design, institutional input, and financial support.</li>
       </ul>
 
