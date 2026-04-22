@@ -1,0 +1,128 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="A blunt framing for the technically skeptical. ICN is coordination infrastructure, not a blockchain, not a payment rail, not a DAO."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>What ICN Is (And What It Isn&#39;t) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BI4mzcbW.css"></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <article class="section" style="padding-top: calc(64px + var(--space-3xl));"> <div class="container container-sm"> <div class="prose-header text-center mb-xl"> <div class="text-accent-teal text-sm font-bold uppercase tracking-wide mb-sm"> March 21, 2026 </div> <h1>What ICN Is (And What It Isn&#39;t)</h1>  </div> <div class="prose"> <p>Let’s get the disclaimers out of the way first.</p>
+<p>ICN is not a blockchain. It has no token. There is no “ICN coin.” If you are here because someone told you this was a crypto project, they were wrong and you should demand a refund of your time.</p>
+<p>What ICN actually is: a peer-to-peer coordination substrate for cooperatives, communities, and federations. Think less “decentralized finance” and more “group infrastructure that doesn’t require trusting a single company.” The distinction matters enormously and we will return to it.</p>
+<h2 id="the-problem-icn-solves">The Problem ICN Solves</h2>
+<p>Cooperatives are organizationally democratic but technically dependent. A worker-owned grocery collective uses Square for payments, Slack for communication, and QuickBooks for accounting. The cooperative controls the governance. The infrastructure is owned by someone else, and that someone has different incentives, different politics, and a different idea of what your data is worth.</p>
+<p>This is not a fringe concern. It is a structural problem. Every cooperative that relies on extractive infrastructure is one pricing change, one acquisition, one “we’re sunsetting this product” away from crisis. The democratic governance the members voted for is fully dependent on infrastructure they didn’t vote for and can’t control.</p>
+<p>ICN is the technical answer to that dependency.</p>
+<h2 id="what-coordination-substrate-actually-means">What “Coordination Substrate” Actually Means</h2>
+<p>A substrate is what sits under everything else. ICN provides:</p>
+<ul>
+<li>
+<p><strong>Identity</strong> without a central authority. Every member, every cooperative, every federation gets a decentralized identifier (DID) backed by a cryptographic key they hold. No username-password database. No account recovery email. No “sign in with Google.”</p>
+</li>
+<li>
+<p><strong>Governance</strong> that actually governs. Proposals, votes, and delegation chains are cryptographic artifacts, not rows in a database someone else owns. When your cooperative votes to allocate surplus, that decision is linked by hash to the execution that follows it. There is no gap between “we decided” and “it happened.”</p>
+</li>
+<li>
+<p><strong>Economic coordination</strong> without payment rails. ICN tracks obligations, receipts, and contributions. It doesn’t move money. It records who did what, who agreed to what, and what the evidence trail looks like. What you do with that evidence is your governance’s business.</p>
+</li>
+<li>
+<p><strong>Federation</strong> without a hub. Two cooperatives can transact, share resources, and govern their relationship without routing through a platform that extracts rent from both.</p>
+</li>
+</ul>
+<p>The substrate metaphor is intentional. You build on top of it. ICN does not tell you how to run your cooperative. It gives you the infrastructure to run it without asking permission.</p>
+<h2 id="what-icn-is-not">What ICN Is Not</h2>
+<p>ICN is not a payment system. This is not a hedge or a legal technicality. It is a design decision backed by architecture. ICN has no hosted balances. No operator routes value on your behalf. Every state transition is signed by the member who authorized it.</p>
+<p>The implication: ICN cannot be a payment intermediary because the protocol physically cannot hold money. There is nothing to seize, freeze, or comply-away. This is what “regulatory safety by architecture” means, and it is not a marketing line.</p>
+<p>ICN is not a DAO. DAOs are governance experiments on top of financial infrastructure. ICN is governance infrastructure that financial tools can be built on top of. The direction matters. Finance-first systems bolt governance on as an afterthought. ICN is governance-first; economic coordination is a consequence of that.</p>
+<p>ICN is not finished. We are building in public, on GitHub, under an open license. Sprint 18 is running right now. If you want to watch sausage get made with Rust and strong opinions, the commit log is public.</p>
+<h2 id="why-this-matters-now">Why This Matters Now</h2>
+<p>The cooperative sector is large, growing, and technically underserved. There are tens of thousands of worker cooperatives, housing cooperatives, credit unions, and mutual aid organizations in the United States alone. Almost none of them have technical infrastructure that reflects their values.</p>
+<p>ICN is the attempt to fix that. Not by disrupting the cooperative sector with technology, but by building the tools the sector has always needed and never had time or money to build itself.</p>
+<p>The summit is in October. The demo is getting sharper every sprint. The infrastructure is real.</p>
+<p>Come build with us.</p> </div> </div> </article>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html>

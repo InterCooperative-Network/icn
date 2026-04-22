@@ -1,0 +1,124 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="What it looks like when a cooperative actually runs on ICN. A walk-through of the four governance flows that make up our demo."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Institution-in-a-Box: A Live Demo | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.BI4mzcbW.css"></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <article class="section" style="padding-top: calc(64px + var(--space-3xl));"> <div class="container container-sm"> <div class="prose-header text-center mb-xl"> <div class="text-accent-teal text-sm font-bold uppercase tracking-wide mb-sm"> March 21, 2026 </div> <h1>Institution-in-a-Box: A Live Demo</h1>  </div> <div class="prose"> <p>The most common question we get is: “What does it actually do?”</p>
+<p>Fair question. Coordination infrastructure is abstract until it isn’t. So here is what it actually does, in the form of a demo you can run yourself.</p>
+<h2 id="the-setup">The Setup</h2>
+<p>Three nodes. Three cooperatives. One federation.</p>
+<p>Each node runs <code>icnd</code>, the ICN daemon. Each has a DID generated from a local keypair. The nodes discover each other over the local network via mDNS, establish encrypted QUIC connections, and begin gossiping governance state.</p>
+<p>Start time to three connected nodes: about thirty seconds. No configuration server. No cloud account. No “sign up for a developer key.” The network builds itself from the cryptographic identities.</p>
+<h2 id="flow-1-governance-proposal">Flow 1: Governance Proposal</h2>
+<p>A member of Cooperative A submits a governance proposal: allocate 500 commons credits to a shared infrastructure fund.</p>
+<p>The proposal goes to <code>icnd</code> via the RPC API. The governance engine encodes it as a signed artifact, gossips it to all members, and opens a voting period. Members vote by signing a vote transaction with their keypair. The vote is counted. The proposal is accepted.</p>
+<p>What makes this different from a voting app: the accepted proposal produces a <code>GovernanceReceipt</code> with a hash. That hash follows the proposal into every downstream action. If someone later tries to execute an allocation without that receipt in the chain, the protocol rejects it. The decision and the consequence are cryptographically linked.</p>
+<h2 id="flow-2-patronage-distribution">Flow 2: Patronage Distribution</h2>
+<p>Cooperative B runs <code>icnctl coop distribute-patronage</code>. The PatronageTracker computes each member’s contribution share for the period, generates a distribution receipt, and posts it to the ledger.</p>
+<p>The member who contributed the most doesn’t get to decide they contributed the most. The tracker computes it from the signed work records accumulated during the period. The math is public. The inputs are auditable. The output is a signed artifact.</p>
+<p>If your cooperative operates in New York and is required to distribute surplus based on patronage, this is the flow that does it correctly, in a way that can be audited and verified by members and, if necessary, by regulators.</p>
+<h2 id="flow-3-federated-resource-allocation">Flow 3: Federated Resource Allocation</h2>
+<p>Cooperative A has compute capacity. Cooperative C needs compute. They have a federation agreement.</p>
+<p>Cooperative C submits a compute task. The federation protocol routes it to Cooperative A’s available nodes. The task executes. An <code>ExecutionReceipt</code> comes back. The receipt is linked to the federation agreement that authorized the allocation. Commons credits move between the two cooperatives’ accounts, recorded on both sides as signed journal entries.</p>
+<p>No platform in the middle. No third-party routing compute marketplace. Two organizations that agreed to work together, doing so directly, with a verifiable record on both sides.</p>
+<h2 id="flow-4-audit-report">Flow 4: Audit Report</h2>
+<p>After the demo’s governance, patronage, and compute flows run, <code>icnctl audit verify</code> generates a report. Every decision links to its execution. Every execution links to its authorization. Every allocation links to the receipt that proves it happened.</p>
+<p>The audit report is not a dashboard that someone generated. It is a traversal of the cryptographic receipt chain. If the chain is valid, the report is valid. If anyone tampered with a record, the chain breaks and the report says so.</p>
+<p>This is what cooperative accountability looks like when the infrastructure takes it seriously.</p>
+<h2 id="run-it-yourself">Run It Yourself</h2>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">git</span><span style="color:#9ECBFF"> clone</span><span style="color:#9ECBFF"> https://github.com/InterCooperative-Network/icn</span></span>
+<span class="line"><span style="color:#79B8FF">cd</span><span style="color:#9ECBFF"> icn</span><span style="color:#E1E4E8"> &#x26;&#x26; </span><span style="color:#B392F0">just</span><span style="color:#9ECBFF"> devnet-up</span></span>
+<span class="line"><span style="color:#6A737D"># Three nodes start, form a network, ready for demo flows</span></span>
+<span class="line"><span style="color:#B392F0">bash</span><span style="color:#9ECBFF"> demo/scripts/present-governance.sh</span><span style="color:#79B8FF"> --port</span><span style="color:#79B8FF"> 9080</span></span></code></pre>
+<p>The demo runs on your laptop. No cloud required. No account required. The cryptographic infrastructure is local, real, and auditable.</p>
+<p>The summit is in October. The demo will run there. If you want to be part of building what it demonstrates, the issues are labeled, the codebase is open, and we have a Matrix room.</p>
+<p>The infrastructure is not theoretical anymore.</p> </div> </div> </article>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none" aria-hidden="true" focusable="false"> <rect width="128" height="128" rx="28" fill="#0c1420"></rect> <path d="M64 34 C84 34, 96 48, 96 64 C96 80, 84 94, 64 94 C44 94, 32 80, 32 64 C32 52, 39 42, 50 37" stroke="#2dd4bf" stroke-width="7" stroke-linecap="round" fill="none"></path> <path d="M50 37 L44 28 M50 37 L42 42" stroke="#2dd4bf" stroke-width="5.5" stroke-linecap="round"></path> <circle cx="64" cy="64" r="4.5" fill="#2dd4bf"></circle> </svg> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html>
