@@ -367,8 +367,8 @@ import MaturityCard from '../components/MaturityCard.astro';
   min-height: 0;
   height: auto;
   display: block;
-  padding-top: calc(64px + var(--space-3xl));
-  padding-bottom: var(--space-3xl);
+  padding-top: calc(64px + var(--space-2xl));
+  padding-bottom: var(--space-xl);
 }
 .hero-container {
   position: relative;
@@ -376,22 +376,23 @@ import MaturityCard from '../components/MaturityCard.astro';
 }
 .hero-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-  gap: var(--space-2xl);
+  grid-template-columns: minmax(0, 1.22fr) minmax(300px, 0.78fr);
+  gap: var(--space-xl);
   align-items: start;
 }
 .hero-home .hero-content {
-  max-width: 680px;
+  max-width: 720px;
 }
 .hero-home .hero-content h1 {
-  font-size: clamp(2rem, 4.7vw, 3.35rem);
-  line-height: 1.1;
-  max-width: 12ch;
+  font-size: clamp(2rem, 4.4vw, 3.15rem);
+  line-height: 1.08;
+  max-width: 14ch;
+  margin-bottom: var(--space-md);
 }
 .hero-home .hero-content > p {
-  max-width: 43em;
-  font-size: 1rem;
-  line-height: 1.6;
+  max-width: 40em;
+  font-size: 0.98rem;
+  line-height: 1.55;
 }
 
 
@@ -401,7 +402,7 @@ import MaturityCard from '../components/MaturityCard.astro';
 }
 .hero-panel {
   position: relative;
-  padding: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
   background:
     linear-gradient(180deg, rgba(17, 24, 39, 0.9), rgba(11, 17, 27, 0.96));
   border: 1px solid var(--border-default);
@@ -422,22 +423,22 @@ import MaturityCard from '../components/MaturityCard.astro';
   );
 }
 .hero-panel-head h2 {
-  font-size: clamp(1.1rem, 1.8vw, 1.4rem);
+  font-size: clamp(1.05rem, 1.7vw, 1.3rem);
   margin: var(--space-sm) 0;
 }
 .hero-panel-head p {
   margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.65;
+  font-size: 0.875rem;
+  line-height: 1.6;
   color: var(--text-secondary);
 }
 .hero-panel-list {
   display: grid;
   gap: var(--space-sm);
-  margin-top: var(--space-lg);
+  margin-top: var(--space-md);
 }
 .hero-panel-item {
-  padding: var(--space-md);
+  padding: 0.85rem var(--space-md);
   background: rgba(12, 17, 24, 0.78);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -454,8 +455,8 @@ import MaturityCard from '../components/MaturityCard.astro';
 }
 .hero-panel-item p {
   margin: 0;
-  font-size: 0.875rem;
-  line-height: 1.6;
+  font-size: 0.84rem;
+  line-height: 1.55;
   color: var(--text-secondary);
 }
 .hero-panel-item a {
@@ -464,20 +465,20 @@ import MaturityCard from '../components/MaturityCard.astro';
 .hero-panel-links {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-sm) var(--space-md);
-  margin-top: var(--space-md);
-  padding-top: var(--space-md);
+  gap: 0.4rem 0.5rem;
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
   border-top: 1px solid var(--border-subtle);
 }
 .hero-panel-links a {
   display: inline-flex;
   align-items: center;
-  padding: 0.38rem 0.6rem;
+  padding: 0.34rem 0.54rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   background: rgba(12, 17, 24, 0.56);
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   letter-spacing: 0.04em;
   line-height: 1;
   transition:
@@ -511,10 +512,11 @@ import MaturityCard from '../components/MaturityCard.astro';
 
 /* Tighten the section right after the hero so the fold is not empty */
 .hero-home + .section-tight {
-  padding-top: var(--space-xl);
+  padding-top: var(--space-md);
 }
 .homepage-paths {
-  padding-bottom: var(--space-3xl);
+  padding-top: var(--space-lg);
+  padding-bottom: var(--space-2xl);
 }
 .homepage-path-grid {
   gap: var(--space-md);
