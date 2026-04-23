@@ -516,10 +516,10 @@ pre code {
 /* Accent variants for inst-card — tie card color to semantic
    category (governance=amber, provenance=green, economics=blue,
    federation=purple, commons=rose). The accent cascades to the left
-   border, hover border, station number, and icon chip. Meaning never
-   depends on color alone — every card also carries a text category
-   label and a concept icon with its own silhouette. Color is
-   reinforcement, not source of truth. */
+   border, hover border, and icon chip. Meaning never depends on color
+   alone — every card also carries a text category label and a concept
+   icon with its own silhouette. Color is reinforcement, not source of
+   truth. */
 .inst-card.acc-teal { border-left-color: var(--accent-teal); }
 .inst-card.acc-teal:hover { border-color: var(--accent-teal); }
 .inst-card.acc-teal .inst-card-icon { color: var(--accent-teal); }
