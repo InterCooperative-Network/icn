@@ -497,14 +497,9 @@ pre code {
 }
 .inst-card-eyebrow .inst-card-eyebrow-labels {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-top: 0.2em;
+  align-items: center;
+  min-height: 1.75rem;
   min-width: 0;
-}
-.inst-card-eyebrow .inst-card-num {
-  color: var(--accent-teal);
-  white-space: nowrap;
 }
 .inst-card h3 {
   margin: 0;
@@ -521,38 +516,32 @@ pre code {
 /* Accent variants for inst-card — tie card color to semantic
    category (governance=amber, provenance=green, economics=blue,
    federation=purple, commons=rose). The accent cascades to the left
-   border, hover border, station number, and icon chip. Meaning never
-   depends on color alone — every card also carries a text category
-   label and a concept icon with its own silhouette. Color is
-   reinforcement, not source of truth. */
+   border, hover border, and icon chip. Meaning never depends on color
+   alone — every card also carries a text category label and a concept
+   icon with its own silhouette. Color is reinforcement, not source of
+   truth. */
 .inst-card.acc-teal { border-left-color: var(--accent-teal); }
 .inst-card.acc-teal:hover { border-color: var(--accent-teal); }
-.inst-card.acc-teal .inst-card-num,
 .inst-card.acc-teal .inst-card-icon { color: var(--accent-teal); }
 
 .inst-card.acc-amber { border-left-color: var(--accent-amber); }
 .inst-card.acc-amber:hover { border-color: var(--accent-amber); }
-.inst-card.acc-amber .inst-card-num,
 .inst-card.acc-amber .inst-card-icon { color: var(--accent-amber); }
 
 .inst-card.acc-green { border-left-color: var(--accent-green); }
 .inst-card.acc-green:hover { border-color: var(--accent-green); }
-.inst-card.acc-green .inst-card-num,
 .inst-card.acc-green .inst-card-icon { color: var(--accent-green); }
 
 .inst-card.acc-blue { border-left-color: var(--accent-blue); }
 .inst-card.acc-blue:hover { border-color: var(--accent-blue); }
-.inst-card.acc-blue .inst-card-num,
 .inst-card.acc-blue .inst-card-icon { color: var(--accent-blue); }
 
 .inst-card.acc-purple { border-left-color: var(--accent-purple); }
 .inst-card.acc-purple:hover { border-color: var(--accent-purple); }
-.inst-card.acc-purple .inst-card-num,
 .inst-card.acc-purple .inst-card-icon { color: var(--accent-purple); }
 
 .inst-card.acc-rose { border-left-color: var(--accent-rose); }
 .inst-card.acc-rose:hover { border-color: var(--accent-rose); }
-.inst-card.acc-rose .inst-card-num,
 .inst-card.acc-rose .inst-card-icon { color: var(--accent-rose); }
 
 /* Section frame — container that gives a section an institutional

@@ -118,7 +118,7 @@ import MaturityCard from '../components/MaturityCard.astro';
   </section>
 
   <!-- ═══ PROBLEM ═══════════════════════════════════════════════ -->
-  <section class="section section-tight">
+  <section class="section section-tight section-problem">
     <div class="container narrow">
       <div class="section-header section-header-left">
         <span class="badge badge-amber">The Problem</span>
@@ -165,7 +165,6 @@ import MaturityCard from '../components/MaturityCard.astro';
           <div class="inst-card-eyebrow">
             <span class="inst-card-icon" aria-hidden="true"><Icon name="identity" size={18} /></span>
             <div class="inst-card-eyebrow-labels">
-              <span class="inst-card-num">01 · 02 · 03</span>
               <span>Identity · Standing · Authority</span>
             </div>
           </div>
@@ -176,7 +175,6 @@ import MaturityCard from '../components/MaturityCard.astro';
           <div class="inst-card-eyebrow">
             <span class="inst-card-icon" aria-hidden="true"><Icon name="governance" size={18} /></span>
             <div class="inst-card-eyebrow-labels">
-              <span class="inst-card-num">04 · 05 · 07</span>
               <span>Governance · Policy · Execution</span>
             </div>
           </div>
@@ -187,7 +185,6 @@ import MaturityCard from '../components/MaturityCard.astro';
           <div class="inst-card-eyebrow">
             <span class="inst-card-icon" aria-hidden="true"><Icon name="provenance" size={18} /></span>
             <div class="inst-card-eyebrow-labels">
-              <span class="inst-card-num">08</span>
               <span>Receipts · Provenance</span>
             </div>
           </div>
@@ -198,7 +195,6 @@ import MaturityCard from '../components/MaturityCard.astro';
           <div class="inst-card-eyebrow">
             <span class="inst-card-icon" aria-hidden="true"><Icon name="accounting" size={18} /></span>
             <div class="inst-card-eyebrow-labels">
-              <span class="inst-card-num">06</span>
               <span>Accounting</span>
             </div>
           </div>
@@ -209,7 +205,6 @@ import MaturityCard from '../components/MaturityCard.astro';
           <div class="inst-card-eyebrow">
             <span class="inst-card-icon" aria-hidden="true"><Icon name="federation" size={18} /></span>
             <div class="inst-card-eyebrow-labels">
-              <span class="inst-card-num">Cross-scope</span>
               <span>Federation</span>
             </div>
           </div>
@@ -220,7 +215,6 @@ import MaturityCard from '../components/MaturityCard.astro';
           <div class="inst-card-eyebrow">
             <span class="inst-card-icon" aria-hidden="true"><Icon name="commons" size={18} /></span>
             <div class="inst-card-eyebrow-labels">
-              <span class="inst-card-num">Shared scope</span>
               <span>Commons · Compute</span>
             </div>
           </div>
@@ -404,8 +398,12 @@ import MaturityCard from '../components/MaturityCard.astro';
 
 
 .hero-qualifier {
-  font-size: .8125rem; color: var(--text-muted);
-  margin: 0.75rem auto 0; letter-spacing: .01em; max-width: 42em;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin: 0.9rem auto 0;
+  letter-spacing: 0;
+  line-height: 1.55;
+  max-width: 52rem;
 }
 .hero-home .hero-actions {
   justify-content: center;
@@ -413,10 +411,10 @@ import MaturityCard from '../components/MaturityCard.astro';
 .hero-panel {
   position: relative;
   margin-top: var(--space-xl);
-  max-width: 980px;
+  max-width: 1040px;
   margin-left: auto;
   margin-right: auto;
-  padding: 1rem 1rem 1.05rem;
+  padding: 1.25rem 1.25rem 1.2rem;
   background:
     linear-gradient(180deg, rgba(17, 24, 39, 0.9), rgba(11, 17, 27, 0.96));
   border: 1px solid var(--border-default);
@@ -437,41 +435,43 @@ import MaturityCard from '../components/MaturityCard.astro';
   );
 }
 .hero-panel-head h2 {
-  font-size: clamp(1rem, 1.45vw, 1.18rem);
-  margin: 0.45rem 0 0.5rem;
+  font-size: clamp(1.15rem, 1.8vw, 1.45rem);
+  margin: 0.45rem 0 0.6rem;
 }
 .hero-panel-head p {
-  margin: 0;
-  font-size: 0.84rem;
-  line-height: 1.55;
+  margin: 0 auto;
+  max-width: 46rem;
+  font-size: 0.98rem;
+  line-height: 1.65;
   color: var(--text-secondary);
 }
 .hero-panel-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.7rem;
-  margin-top: 0.85rem;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
 }
 .hero-panel-item {
-  padding: 0.72rem 0.85rem;
+  padding: 0.82rem 0.9rem 0.88rem;
   background: rgba(12, 17, 24, 0.78);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
+  text-align: left;
 }
 .hero-panel-kicker {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: 0.69rem;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--accent-teal);
-  margin-bottom: var(--space-xs);
+  margin-bottom: 0.35rem;
 }
 .hero-panel-item p {
   margin: 0;
-  font-size: 0.81rem;
-  line-height: 1.5;
+  font-size: 0.91rem;
+  line-height: 1.48;
   color: var(--text-secondary);
 }
 .hero-panel-item a {
@@ -481,8 +481,8 @@ import MaturityCard from '../components/MaturityCard.astro';
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.42rem;
-  margin-top: 0.85rem;
-  padding-top: 0.85rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
   border-top: 1px solid var(--border-subtle);
 }
 .hero-panel-links a {
@@ -495,8 +495,8 @@ import MaturityCard from '../components/MaturityCard.astro';
   border-radius: var(--radius-sm);
   background: rgba(12, 17, 24, 0.56);
   font-family: var(--font-mono);
-  font-size: 0.74rem;
-  letter-spacing: 0.04em;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
   line-height: 1.1;
   transition:
     border-color var(--duration-fast) var(--ease-out),
@@ -539,14 +539,25 @@ import MaturityCard from '../components/MaturityCard.astro';
 }
 .homepage-path-card {
   position: relative;
+  padding: 1.5rem 1.35rem;
+}
+.homepage-path-card h3 {
+  margin-bottom: 0.65rem;
+  font-size: clamp(1.15rem, 1.6vw, 1.5rem);
+  line-height: 1.18;
+}
+.homepage-path-card p {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  max-width: 32rem;
 }
 .homepage-path-num {
   display: inline-block;
-  margin-bottom: var(--space-sm);
+  margin-bottom: 0.75rem;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   color: var(--accent-teal);
 }
 
@@ -572,6 +583,15 @@ import MaturityCard from '../components/MaturityCard.astro';
   font-size: 1.0625rem; color: var(--text-body);
 }
 .prose-block p:last-child { margin-bottom: 0; }
+.section-problem .section-header h2 {
+  font-size: clamp(2.2rem, 4.3vw, 3.4rem);
+  line-height: 1.14;
+  max-width: 15ch;
+}
+.section-problem .prose-block p {
+  font-size: 1rem;
+  line-height: 1.65;
+}
 
 /* Institutional card grid — paired with .inst-card class in global.css.
    Adds a tighter gap than the default .grid gap for a denser system feel. */
