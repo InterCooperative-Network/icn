@@ -1,6 +1,8 @@
 //! icnctl - CLI for managing ICNd
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
+mod institution_bootstrap;
+
 use anyhow::{bail, Context, Result};
 use rust_i18n::t;
 
@@ -87,6 +89,10 @@ enum Commands {
     /// Governance operations (domains, proposals, votes)
     #[command(subcommand)]
     Gov(GovCommands),
+
+    /// Institution package bootstrap operations
+    #[command(subcommand)]
+    Institution(institution_bootstrap::InstitutionCommands),
 
     /// Backup data directory
     Backup {
@@ -2156,6 +2162,10 @@ async fn main() -> Result<()> {
         }
 
         Commands::Gov(gov_cmd) => handle_gov_command(gov_cmd, &data_dir, &args.endpoint).await?,
+
+        Commands::Institution(institution_cmd) => {
+            institution_bootstrap::handle_institution_command(institution_cmd, &data_dir).await?
+        }
 
         Commands::Snapshot(snapshot_cmd) => handle_snapshot_command(snapshot_cmd, &data_dir)?,
 

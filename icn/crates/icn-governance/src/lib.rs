@@ -81,6 +81,7 @@ pub mod vote;
 
 // Action items for meeting/task tracking
 pub mod action_item;
+pub mod bootstrap;
 
 // Institutional structure + event model (Tranche 2)
 pub mod activity;
@@ -140,9 +141,9 @@ pub use proof::{
 };
 pub use proposal::{
     AllocationOption, DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome,
-    FederationProposal, FederationTerms, ForcedOutcome, MembershipAction, Proposal, ProposalId,
-    ProposalPayload, ProposalScope, ProposalState, ResourceAccessAction, TreasuryApprovalType,
-    TreasuryProposalOperation, Version,
+    ExecutionClosureClass, FederationProposal, FederationTerms, ForcedOutcome, MembershipAction,
+    Proposal, ProposalId, ProposalPayload, ProposalScope, ProposalState, ResourceAccessAction,
+    TreasuryApprovalType, TreasuryProposalOperation, Version,
 };
 pub use resolver::{MembershipResolver, StaticMembershipResolver, TrustServiceMembershipResolver};
 pub use sdis::{
@@ -191,6 +192,15 @@ pub use action_item::{
 };
 pub use activity::{
     Activity, ActivityId, ActivityKind, ActivityStatus, ActivityStoreBackend, InMemoryActivityStore,
+};
+pub use bootstrap::{
+    ActivityProgramSeedManifest, BootstrapActivityRecord, BootstrapCharterRef,
+    BootstrapEntityRecord, BootstrapEntityType, BootstrapGovernanceDomainRecord,
+    BootstrapMilestoneRecord, BootstrapOperation, BootstrapPlan, BootstrapProgramKindName,
+    BootstrapProgramKindSpec, BootstrapProgramRecord, BootstrapRoleAssignmentRecord,
+    BootstrapSeedKind, BootstrapSeedManifest, BootstrapSeedRef, BootstrapStructureRecord,
+    EntitySeedManifest, GovernanceDomainSeedManifest, InstitutionBootstrapManifest,
+    MilestoneTemplateSeedManifest, RoleAssignmentSeedManifest, StructureSeedManifest,
 };
 pub use meeting::{
     AgendaItem, AgendaItemId, AttendanceStatus, InMemoryMeetingStore, Meeting, MeetingAttendee,

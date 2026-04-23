@@ -1,0 +1,13 @@
+app_id: nycn
+status: draft
+default_scope_order:
+  - entity:nycn-organizers
+  - structure:nycn-steering
+  - program:summit-cycle-2026
+default_views:
+  - organizer-home
+  - summit-operations
+  - sponsor-pipeline
+  - committee-work
+notes:
+  - "View identifiers are package-owned and may later move into a standalone repo UI."

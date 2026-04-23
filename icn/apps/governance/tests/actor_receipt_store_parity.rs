@@ -311,11 +311,11 @@ async fn actor_force_close_accept_emits_revoke_steward_effect() {
     actor_handle.shutdown().await;
 }
 
-/// Regression: force-close-accept without a receipt_store must not panic
-/// and must not emit (silent no-op is the honest behavior). This pins the
-/// "missing store" half of the parity contract.
+/// Execution-required proposals cannot be force-accepted without a receipt_store.
+/// The actor must reject the terminal transition rather than silently accepting
+/// an operationally unlinked decision.
 #[tokio::test]
-async fn actor_force_close_accept_without_receipt_store_emits_nothing() {
+async fn actor_force_close_accept_without_receipt_store_is_rejected() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let db_path = tmp.path().to_path_buf();
 
@@ -378,14 +378,20 @@ async fn actor_force_close_accept_without_receipt_store_emits_nothing() {
         .expect("open_proposal");
 
     // NOTE: no install_receipt_store call.
-    actor_handle
+    let result = actor_handle
         .submit(GovernanceCommand::ForceCloseProposal {
             proposal_id: proposal_id.clone(),
             forced_outcome: ForcedOutcome::Accept,
             reason: "no backend".to_string(),
         })
-        .await
-        .expect("ForceCloseProposal submit must not panic without a receipt_store");
+        .await;
+    assert!(
+        result
+            .as_ref()
+            .err()
+            .is_some_and(|e| e.to_string().contains("requires execution closure")),
+        "force-accept without receipt_store must be rejected with closure error; got {result:?}"
+    );
 
     actor_handle.shutdown().await;
 }

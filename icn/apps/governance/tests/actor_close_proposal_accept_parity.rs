@@ -255,13 +255,10 @@ async fn actor_close_proposal_accept_emits_appoint_steward_effect() {
     actor_handle.shutdown().await;
 }
 
-/// Negative parity: with no receipt_store installed, `CloseProposal::Accept`
-/// must not panic and must simply record nothing — the handler-level
-/// emission (or a later `install_receipt_store` + re-close in force mode)
-/// remains the writer. Mirrors the force-close variant in
-/// `actor_receipt_store_parity`.
+/// Execution-required proposals cannot terminate Accepted on actor path when
+/// `receipt_store` is absent.
 #[tokio::test(flavor = "current_thread")]
-async fn actor_close_proposal_accept_without_receipt_store_is_noop() {
+async fn actor_close_proposal_accept_without_receipt_store_is_rejected() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let db_path = tmp.path().to_path_buf();
 
@@ -327,33 +324,20 @@ async fn actor_close_proposal_accept_without_receipt_store_is_noop() {
         .await
         .expect("cast_vote");
 
-    // NOTE: no install_receipt_store call before close — at emission time
-    // the actor's receipt_store is None, so the CloseProposal::Accept
-    // emission branch is a documented no-op.
-    actor_handle
+    // NOTE: no install_receipt_store call before close.
+    let result = actor_handle
         .submit(GovernanceCommand::CloseProposal {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
         })
-        .await
-        .expect("CloseProposal submit must not panic without a receipt_store");
-
-    // Make the no-op contract observable: install a spy backend AFTER the
-    // close has already processed and confirm no IER exists for this
-    // proposal. The spy sees all writes routed through it — if the close
-    // had silently emitted anywhere it would show up, because the spy now
-    // owns the only readable institutional-effect surface.
-    let spy = Arc::new(MemoryReceiptBackend::new());
-    actor_handle.install_receipt_store(spy.clone()).await;
-
-    let post_close_effects = spy
-        .list_institutional_effects_by_proposal(&proposal_id.0)
-        .expect("list_institutional_effects_by_proposal");
+        .await;
     assert!(
-        post_close_effects.is_empty(),
-        "CloseProposal::Accept with no receipt_store at emission time must leave no \
-         InstitutionalEffectRecord behind; got {post_close_effects:?}"
+        result
+            .as_ref()
+            .err()
+            .is_some_and(|e| e.to_string().contains("requires execution closure")),
+        "CloseProposal::Accept without receipt_store must be rejected for execution-required payloads; got {result:?}"
     );
 
     actor_handle.shutdown().await;

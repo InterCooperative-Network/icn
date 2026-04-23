@@ -1,0 +1,35 @@
+seed_version: draft-0
+kind: role-assignment-seed
+assignments:
+  - structure_id: nycn-steering
+    role: coordinator
+    holder_label: steering-coordinator-placeholder
+    authority_scope:
+      - propose
+      - vote
+      - ratify-summit-plan
+  - structure_id: nycn-finance
+    role: treasurer
+    holder_label: finance-treasurer-placeholder
+    authority_scope:
+      - propose
+      - vote
+      - approve-budget-within-policy
+      - confirm-sponsor-commitment
+  - structure_id: nycn-content
+    role: program-coordinator
+    holder_label: content-program-coordinator-placeholder
+    authority_scope:
+      - propose
+      - vote
+      - curate-session-intake
+  - structure_id: nycn-logistics
+    role: operations-lead
+    holder_label: logistics-operations-lead-placeholder
+    authority_scope:
+      - propose
+      - vote
+      - manage-venue-workflow
+notes:
+  - "Illustrative authority scopes only; final assignments depend on charter rules and live organizers."
+  - "Assignments without person_did are intentionally deferred by the generic bootstrap planner until real DIDs exist."

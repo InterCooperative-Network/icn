@@ -73,6 +73,7 @@ The repo is split across several surfaces:
 - [`icn/`](icn/) — Rust workspace: crates in `icn/crates/`, runtime apps in `icn/apps/`, binaries in `icn/bins/`
 - [`website/`](website/) — public site for `intercooperative.network`
 - [`docs/`](docs/) — architecture, reference, contributor, and operator documentation
+- [`institutions/`](institutions/) — in-monorepo institution packages such as `institutions/nycn/`, kept boundary-clean for later extraction
 - [`sdk/`](sdk/) — TypeScript and React Native SDK work
 - [`deploy/`](deploy/) — deployment manifests and cluster configuration
 

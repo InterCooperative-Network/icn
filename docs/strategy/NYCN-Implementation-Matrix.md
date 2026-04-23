@@ -10,7 +10,7 @@
 >
 > This document predates `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md`. On any routing conflict between this matrix and the boundary doc, **the boundary doc wins.**
 >
-> Several rows below route institution-specific nouns (sponsor, budget-item, session, registration, venue accessibility, source-ref, institutional-document, speaker/attendee/sponsor-contact participation variants, institution-specific `ProgramKind` / `MilestoneType` names like `AnnualSummit` / `VenueLocked` / `BudgetLocked` / `PublicLaunchReady`) into `icn-governance::*`. That is drift. ICN core — `icn-governance` and `apps/governance` — must stay institution-agnostic.
+> Several rows below route institution-specific nouns (sponsor, budget-item, session, registration, venue accessibility, source-ref, institutional-document, speaker/attendee/sponsor-contact participation variants, institution-specific `ProgramKind` / `MilestoneType` names like `AnnualSummit` / `VenueLocked` / `BudgetLocked` / `PublicLaunchReady`) into `icn-governance::*`. That is drift. ICN core — `icn-governance` and `apps/governance` — must stay institution-agnostic. In this monorepo, those institution-owned artifacts now belong under `institutions/nycn/` until they are split into their own repo.
 >
 > **Corrected routing (authoritative):**
 >

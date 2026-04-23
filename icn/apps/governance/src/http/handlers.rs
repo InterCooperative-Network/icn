@@ -3314,15 +3314,21 @@ pub async fn create_activity<E: GovernanceEventEmitter + Clone + 'static>(
         .parent_program_id
         .as_deref()
         .map(|s| icn_governance::program::ProgramId(s.to_string()));
+    let linked_structures = req
+        .linked_structures
+        .iter()
+        .map(|id| StructureId(id.clone()))
+        .collect();
     let a = ctx
         .manager
-        .create_activity(
+        .create_activity_with_links(
             entity,
             kind,
             req.name.clone(),
             req.description.clone(),
             req.start_date,
             req.end_date,
+            linked_structures,
             parent_program_id,
         )
         .map_err(anyhow_to_api)?;
@@ -4980,6 +4986,54 @@ mod tests {
         (mgr, proposal_id)
     }
 
+    /// Same as `setup_freeze_proposal`, but with a receipt store wired so
+    /// accepted execution-required payloads can persist closure artifacts.
+    async fn setup_freeze_proposal_with_store(
+        coop_id: &str,
+        member_did: Did,
+        target_did: Did,
+        params: GovernanceParams,
+    ) -> (Arc<GovernanceManager>, ProposalId) {
+        let mgr = Arc::new(
+            GovernanceManager::new().with_receipt_store(Arc::new(HandlerTestReceiptBackend::new())),
+        );
+        let domain_id = GovernanceDomainId(coop_id.to_string());
+
+        mgr.create_domain(
+            domain_id.clone(),
+            format!("{coop_id} coop"),
+            "cooperative_default".to_string(),
+            params,
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member_did.clone()]),
+            },
+        )
+        .await
+        .unwrap();
+
+        let proposal_id = ProposalId("freeze-proposal-1".to_string());
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_id.clone(),
+            member_did,
+            "Freeze disruptive member".to_string(),
+            "Emergency action — account compromise suspected".to_string(),
+            ProposalPayload::FreezeMember {
+                member: target_did,
+                reason: "account compromise suspected".to_string(),
+                duration_seconds: Some(604_800),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86_400)
+            .await
+            .unwrap();
+        (mgr, proposal_id)
+    }
+
     /// Proves: when `close_proposal` finalises a `FreezeMember` proposal as
     /// `Accepted`, the `on_proposal_accepted` hook fires and delivers the
     /// correct member DID, reason, and duration.
@@ -4999,7 +5053,7 @@ mod tests {
         let target_did = test_did(2);
 
         // GovernanceParams(quorum=0, approval=0) → any close is Accepted
-        let (mgr, proposal_id) = setup_freeze_proposal(
+        let (mgr, proposal_id) = setup_freeze_proposal_with_store(
             "alpha",
             member_did.clone(),
             target_did.clone(),
@@ -5626,7 +5680,9 @@ mod tests {
         let alice_did = alice_kp.did().clone();
         let bob_did = bob_kp.did().clone();
 
-        let mgr = Arc::new(GovernanceManager::new());
+        let mgr = Arc::new(
+            GovernanceManager::new().with_receipt_store(Arc::new(HandlerTestReceiptBackend::new())),
+        );
         let domain_id = GovernanceDomainId("tt-resolver-test".to_string());
 
         // TrustThreshold domain: members cannot be enumerated without a resolver

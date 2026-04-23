@@ -1,0 +1,11 @@
+seed_version: draft-0
+kind: entity-seed
+entity:
+  id: nycn
+  entity_type: federation
+  display_name: New York Cooperative Network
+  governance_domain_id: nycn-federation-gov
+  charter_ref: ../charter/nycn-federation.charter.yaml
+  notes:
+    - "Top-level sovereign federation entity."
+    - "Member entity roster remains package-owned configuration, not a core enum."

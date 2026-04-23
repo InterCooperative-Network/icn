@@ -181,6 +181,19 @@ fn payload_effect_kind(payload: &ProposalPayload) -> &'static str {
     }
 }
 
+fn payload_requires_allocation_receipt(payload: &ProposalPayload) -> bool {
+    matches!(
+        payload,
+        ProposalPayload::Budget { .. }
+            | ProposalPayload::Treasury {
+                operation: icn_governance::TreasuryProposalOperation::CreateBudget { .. }
+                    | icn_governance::TreasuryProposalOperation::Spend { .. },
+            }
+            | ProposalPayload::Allocation { .. }
+            | ProposalPayload::SurplusAllocation { .. }
+    )
+}
+
 /// Unix-seconds timestamp the proposal reached a terminal lifecycle state,
 /// or `None` if still in-flight. Used by the deliberation endpoint to tag
 /// when a decision was recorded without depending on receipt fields.
@@ -3450,7 +3463,15 @@ impl GovernanceManager {
                 _ => unreachable!("final_state is always Accepted/Rejected/NoQuorum"),
             };
 
-            proposal.close(final_state)?;
+            let requires_execution_closure = matches!(outcome, ProofOutcome::Accepted)
+                && proposal.payload.requires_execution_closure();
+            if requires_execution_closure && self.receipt_store.is_none() {
+                anyhow::bail!(
+                    "Proposal '{}' requires execution closure but no receipt store is wired. \
+                     Refusing to finalize Accepted without a traceable closure artifact.",
+                    proposal_id.0
+                );
+            }
 
             if let Some(ref store) = self.receipt_store {
                 let receipt = GovernanceDecisionReceipt::new(
@@ -3468,6 +3489,12 @@ impl GovernanceManager {
                     );
                     // Escalated from warn to error: receipt store failure means
                     // the governance→economics provenance chain is broken (PS-3).
+                    if requires_execution_closure {
+                        anyhow::bail!(
+                            "Proposal '{}' requires execution closure but governance receipt persistence failed: {e}",
+                            proposal_id.0
+                        );
+                    }
                 }
 
                 // ADR-0014 constitutional-memory seam.
@@ -3557,9 +3584,16 @@ impl GovernanceManager {
                                 "Allocation receipt created: governance→economics chain bound"
                             );
                         }
+                    } else if payload_requires_allocation_receipt(&proposal.payload) {
+                        anyhow::bail!(
+                            "Proposal '{}' requires an allocation receipt closure artifact, but no receipt was generated.",
+                            proposal_id.0
+                        );
                     }
                 }
             }
+
+            proposal.close(final_state)?;
 
             // Decision→action bridge (standalone path).
             //
@@ -3696,13 +3730,8 @@ impl GovernanceManager {
                     // Look up the proposal to determine if it requires allocations.
                     match self.get_proposal(proposal_id).await.ok().flatten() {
                         Some(p) => {
-                            let is_economic_payload = matches!(
-                                p.payload,
-                                ProposalPayload::Budget { .. }
-                                    | ProposalPayload::Treasury { .. }
-                                    | ProposalPayload::Allocation { .. }
-                                    | ProposalPayload::SurplusAllocation { .. }
-                            );
+                            let is_economic_payload =
+                                payload_requires_allocation_receipt(&p.payload);
                             if is_economic_payload {
                                 has_allocations
                             } else {
@@ -5030,10 +5059,47 @@ impl GovernanceManager {
         end_date: Option<u64>,
         parent_program_id: Option<icn_governance::program::ProgramId>,
     ) -> Result<Activity> {
+        self.create_activity_with_links(
+            parent_entity_id,
+            kind,
+            name,
+            description,
+            start_date,
+            end_date,
+            Vec::new(),
+            parent_program_id,
+        )
+    }
+
+    /// Create a new activity with explicit linked structures.
+    pub fn create_activity_with_links(
+        &self,
+        parent_entity_id: String,
+        kind: ActivityKind,
+        name: String,
+        description: Option<String>,
+        start_date: Option<u64>,
+        end_date: Option<u64>,
+        linked_structures: Vec<StructureId>,
+        parent_program_id: Option<icn_governance::program::ProgramId>,
+    ) -> Result<Activity> {
         // Validate date range when both are provided
         if let (Some(start), Some(end)) = (start_date, end_date) {
             if end < start {
                 return Err(anyhow::anyhow!("Activity end_date must be >= start_date"));
+            }
+        }
+        for structure_id in &linked_structures {
+            if self
+                .structure_store
+                .get_structure(structure_id)
+                .map_err(|e| anyhow::anyhow!("Failed to look up structure: {e}"))?
+                .is_none()
+            {
+                return Err(anyhow::anyhow!(
+                    "Linked structure not found: {}",
+                    structure_id
+                ));
             }
         }
         let now = icn_time::current_timestamp_secs();
@@ -5042,6 +5108,7 @@ impl GovernanceManager {
         a.description = description;
         a.start_date = start_date;
         a.end_date = end_date;
+        a.linked_structures = linked_structures;
         a.parent_program_id = parent_program_id.clone();
         self.activity_store
             .save(&a)
@@ -6175,6 +6242,78 @@ mod tests {
         .unwrap();
 
         (mgr, domain_id, member_did)
+    }
+
+    #[tokio::test]
+    async fn declarative_text_proposal_can_close_without_receipt_store() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Adopt statement".to_string(),
+                "Declarative text".to_string(),
+                ProposalPayload::Text {
+                    body: "We endorse this statement.".to_string(),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(
+            proposal_id.clone(),
+            member_did.clone(),
+            VoteChoice::For,
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.close_proposal(proposal_id.clone()).await.unwrap();
+
+        let closed = mgr.get_proposal(&proposal_id).await.unwrap().unwrap();
+        assert!(
+            matches!(closed.state, ProposalState::Accepted { .. }),
+            "declarative payload should remain closable without execution linkage backend"
+        );
+    }
+
+    #[tokio::test]
+    async fn execution_required_payload_rejects_accept_without_receipt_store() {
+        let (mgr, domain_id, member_did) = make_manager_with_domain().await;
+        let target = test_did(77);
+        let proposal_id = mgr
+            .create_proposal(
+                ProposalId(format!("prop-{}", uuid::Uuid::new_v4())),
+                domain_id.clone(),
+                member_did.clone(),
+                "Freeze member".to_string(),
+                "Execution-required".to_string(),
+                ProposalPayload::FreezeMember {
+                    member: target,
+                    reason: "policy breach".to_string(),
+                    duration_seconds: Some(3600),
+                },
+                ProposalScope::Local,
+            )
+            .await
+            .unwrap();
+
+        mgr.open_proposal(proposal_id.clone(), 86400).await.unwrap();
+        mgr.cast_vote(proposal_id.clone(), member_did, VoteChoice::For, None)
+            .await
+            .unwrap();
+
+        let result = mgr.close_proposal(proposal_id.clone()).await;
+        assert!(
+            result
+                .as_ref()
+                .err()
+                .is_some_and(|e| e.to_string().contains("requires execution closure")),
+            "execution-required payload must not close Accepted without closure backend; got {result:?}"
+        );
     }
 
     /// INV-2 TEST: Accepted Budget proposal creates AllocationReceipt.
@@ -7660,6 +7799,55 @@ mod tests {
 
         // Activity was created and carries the reverse link.
         assert_eq!(act.parent_program_id.as_ref(), Some(&ghost_program_id));
+    }
+
+    #[tokio::test]
+    async fn create_activity_with_linked_structures_persists_links() {
+        let (mgr, _domain_id, _member) = make_manager_with_domain().await;
+        let structure = mgr
+            .create_structure(
+                "ent-1".to_string(),
+                StructureKind::Committee,
+                "Content".to_string(),
+                None,
+            )
+            .unwrap();
+
+        let act = mgr
+            .create_activity_with_links(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "Linked Activity".to_string(),
+                None,
+                None,
+                None,
+                vec![structure.id.clone()],
+                None,
+            )
+            .unwrap();
+
+        assert_eq!(act.linked_structures, vec![structure.id]);
+    }
+
+    #[tokio::test]
+    async fn create_activity_with_missing_linked_structure_fails() {
+        let (mgr, _domain_id, _member) = make_manager_with_domain().await;
+        let missing_structure = StructureId::generate();
+        let err = mgr
+            .create_activity_with_links(
+                "ent-1".to_string(),
+                icn_governance::ActivityKind::Event,
+                "Broken Linked Activity".to_string(),
+                None,
+                None,
+                None,
+                vec![missing_structure.clone()],
+                None,
+            )
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains(&format!("Linked structure not found: {missing_structure}")));
     }
 
     /// `link_activity_to_program` must write both directions: program gains the
