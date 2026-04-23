@@ -13,6 +13,10 @@
 #
 # Status: DRAFT — requires community review before ratification proposal.
 
+# Historical docs copy of the NYCN charter draft.
+# Working package-owned copy now lives at:
+# institutions/nycn/charter/nycn-federation.charter.yaml
+
 charter:
   name: "New York Cooperative Network"
   version: 1

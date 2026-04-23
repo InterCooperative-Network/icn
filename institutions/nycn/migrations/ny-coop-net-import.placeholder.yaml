@@ -1,0 +1,14 @@
+migration_id: ny-coop-net-import
+status: placeholder
+source_system: ny-coop-net
+targets:
+  - entities
+  - memberships
+  - contacts
+  - summit history links
+required_outputs:
+  - deterministic-id-crosswalk
+  - rerunnable-import-log
+  - provenance-notes
+notes:
+  - "Importer should live with the package, not as a core governance concept."

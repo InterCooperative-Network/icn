@@ -1,0 +1,17 @@
+template_id: summit-session-catalog
+scope: institution-package
+fields:
+  - id: title
+    type: string
+  - id: description
+    type: text
+  - id: presenters
+    type: list
+  - id: track_tag
+    type: string
+  - id: accessibility_notes
+    type: text
+  - id: status
+    type: string
+notes:
+  - "Session semantics are summit-specific and should not become core enums."

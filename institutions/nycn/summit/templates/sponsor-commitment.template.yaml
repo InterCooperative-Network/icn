@@ -1,0 +1,15 @@
+template_id: summit-sponsor-commitment
+scope: institution-package
+fields:
+  - id: sponsor_name
+    type: string
+  - id: commitment_tier_tag
+    type: string
+  - id: benefits_package_ref
+    type: string
+  - id: payment_status
+    type: string
+  - id: steward_structure_id
+    type: string
+notes:
+  - "Sponsor vocabulary stays package-owned."

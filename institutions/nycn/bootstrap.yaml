@@ -1,0 +1,27 @@
+manifest_version: v0
+package_id: nycn
+package_kind: institution
+charter:
+  path: charter/nycn-federation.charter.yaml
+seeds:
+  - order: 0
+    kind: entity-seed
+    path: seed/00-nycn-federation.seed.yaml
+  - order: 1
+    kind: entity-seed
+    path: seed/01-organizer-cooperative.seed.yaml
+  - order: 2
+    kind: governance-domain-seed
+    path: seed/02-governance-domains.seed.yaml
+  - order: 3
+    kind: structure-seed
+    path: seed/02-structures-committees.seed.yaml
+  - order: 4
+    kind: activity-program-seed
+    path: seed/03-summit-activity-program.seed.yaml
+  - order: 5
+    kind: milestone-template-seed
+    path: seed/04-milestone-template.seed.yaml
+  - order: 6
+    kind: role-assignment-seed
+    path: seed/05-role-assignment.seed.yaml

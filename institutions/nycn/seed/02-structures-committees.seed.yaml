@@ -1,0 +1,27 @@
+seed_version: draft-0
+kind: structure-seed
+parent_entity_id: nycn-organizers
+structures:
+  - id: nycn-backbone
+    kind: committee
+    name: Backbone Committee
+  - id: nycn-steering
+    kind: committee
+    name: Steering Committee
+  - id: nycn-content
+    kind: committee
+    name: Content Committee
+  - id: nycn-logistics
+    kind: committee
+    name: Logistics Committee
+  - id: nycn-marketing
+    kind: committee
+    name: Marketing Committee
+  - id: nycn-finance
+    kind: committee
+    name: Finance Committee
+  - id: nycn-accessibility-wg
+    kind: working_group
+    name: Accessibility Working Group
+notes:
+  - "These are institution structures built from generic core primitives."

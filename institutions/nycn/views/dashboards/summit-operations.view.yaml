@@ -1,0 +1,9 @@
+view_id: summit-operations
+scope: program:summit-cycle-2026
+panels:
+  - milestone-status
+  - committee-readiness
+  - registration-status
+  - venue-readiness
+notes:
+  - "The view is local to NYCN even when it reads generic program/action-item surfaces."

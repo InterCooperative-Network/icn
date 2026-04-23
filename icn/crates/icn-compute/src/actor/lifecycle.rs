@@ -1357,6 +1357,20 @@ impl ComputeActor {
         Ok(())
     }
 
+    fn required_commons_credits(&self, task: &ComputeTask) -> Result<i64, ComputeError> {
+        if let Some(ref policy_cb) = self.commons_required_credits_callback {
+            let required = policy_cb(task).map_err(ComputeError::PolicyViolation)?;
+            if required < 1 {
+                return Err(ComputeError::PolicyViolation(format!(
+                    "commons required credits must be >= 1, got {required}"
+                )));
+            }
+            return Ok(required);
+        }
+
+        Ok(crate::cost::compute_credits_required(task))
+    }
+
     /// Handle task submission (validation and broadcasting)
     pub(super) async fn handle_submit(&self, task: ComputeTask) -> Result<TaskHash, ComputeError> {
         tracing::debug!(
@@ -1425,6 +1439,14 @@ impl ComputeActor {
             }
         }
 
+        let required_commons_credits = if task.scope == icn_kernel_api::ScopeLevel::Commons
+            && (self.balance_callback.is_some() || self.commons_reserve_callback.is_some())
+        {
+            Some(self.required_commons_credits(&task)?)
+        } else {
+            None
+        };
+
         // Commons credit floor check (#1397)
         // Prevents zero-balance submitters from consuming commons compute.
         // Applies only to Commons-scoped tasks; Local/Cell tasks are unaffected.
@@ -1435,7 +1457,8 @@ impl ComputeActor {
         if task.scope == icn_kernel_api::ScopeLevel::Commons {
             if let Some(ref balance_cb) = self.balance_callback {
                 let balance = balance_cb(&task.submitter);
-                let required = crate::cost::compute_credits_required(&task);
+                let required = required_commons_credits
+                    .unwrap_or_else(|| crate::cost::compute_credits_required(&task));
                 if balance < required {
                     tracing::warn!(
                         task_id = %task.id,
@@ -1460,7 +1483,8 @@ impl ComputeActor {
         // This is not race-free correctness mode — configure the callback for correct enforcement.
         if task.scope == icn_kernel_api::ScopeLevel::Commons {
             if let Some(ref reserve_cb) = self.commons_reserve_callback {
-                let required = crate::cost::compute_credits_required(&task);
+                let required = required_commons_credits
+                    .unwrap_or_else(|| crate::cost::compute_credits_required(&task));
                 match reserve_cb(CommonsReserveRequest {
                     consumer: task.submitter.clone(),
                     amount: required,

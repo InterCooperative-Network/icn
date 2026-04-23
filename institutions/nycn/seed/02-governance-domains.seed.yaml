@@ -1,0 +1,26 @@
+seed_version: draft-0
+kind: governance-domain-seed
+domains:
+  - id: nycn-federation-gov
+    name: NYCN Federation Governance
+    profile: cooperative_default
+    quorum_percent: 50
+    approval_percent: 50
+    voting_period_days: 7
+    members:
+      - $bootstrap_subject_did
+    decision_mode: consent
+    max_objections: 0
+  - id: nycn-organizers-gov
+    name: NYCN Organizers Governance
+    profile: cooperative_default
+    quorum_percent: 50
+    approval_percent: 50
+    voting_period_days: 7
+    members:
+      - $bootstrap_subject_did
+    decision_mode: consent
+    max_objections: 0
+notes:
+  - "Explicit package-owned governance domains required by NYCN entities."
+  - "The bootstrap runner can resolve $bootstrap_subject_did to the authenticated bootstrap identity DID."

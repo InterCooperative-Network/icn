@@ -1,0 +1,327 @@
+# NYCN Charter — CCL YAML Draft
+#
+# New York Cooperative Network federation charter.
+# Based on Template 1 (Federation of Cooperatives) from ccl-charter-templates.md,
+# customized for NYCN's actual governance practices:
+#   - Consent-based decision-making (not majority vote)
+#   - 4 standing committees under an organizing cooperative
+#   - Annual summit as time-bounded community entity
+#   - 217+ member organizations across NY state
+#
+# This charter is ratified via a Charter governance proposal and deployed to
+# the CharterPolicyOracle. The kernel enforces it as a ConstraintSet.
+#
+# Status: DRAFT — requires community review before ratification proposal.
+
+charter:
+  name: "New York Cooperative Network"
+  version: 1
+  entity_type: federation
+  region: "New York State"
+
+  # ─── Federation Identity ──────────────────────────────
+  identity:
+    entity_id: "nycn"
+    display_name: "New York Cooperative Network"
+    description: >
+      A regional federation of cooperatives, communities, and aligned
+      organizations coordinating through shared governance, economic
+      solidarity, and the annual cooperative summit.
+
+  # ─── Federation Governance ────────────────────────────
+  # NYCN operates by consent: proposals pass unless objections exceed
+  # the threshold within the deliberation period. This reflects the
+  # cooperative tradition of consensus-seeking decision-making.
+  governance:
+    eligible_voters: federated_members
+    decision_mode: consent
+    default_max_objections: 0  # strict consensus — any objection blocks
+
+    decisions:
+      # Admitting new member organizations
+      membership_admission:
+        decision_mode: consent
+        max_objections: 0
+        quorum: 0.5
+        deliberation_period_hours: 168  # 7 days
+        voting_period_hours: 168        # 7 days
+
+      # Changing the charter itself — higher bar
+      charter_amendment:
+        decision_mode: consent
+        max_objections: 0
+        quorum: 0.5
+        deliberation_period_hours: 336  # 14 days
+        voting_period_hours: 336        # 14 days
+
+      # Removing a member organization — escalated
+      member_removal:
+        decision_mode: consent
+        max_objections: 0
+        quorum: 0.6
+        deliberation_period_hours: 336
+        voting_period_hours: 336
+
+      # Federation-wide initiatives and resolutions
+      initiative:
+        decision_mode: consent
+        max_objections: 1  # one objection tolerated for general initiatives
+        quorum: 0.4
+        deliberation_period_hours: 72
+        voting_period_hours: 168
+
+      # Annual budget approval
+      budget:
+        decision_mode: consent
+        max_objections: 0
+        quorum: 0.5
+        deliberation_period_hours: 168
+        voting_period_hours: 168
+
+  # ─── Organizing Cooperative ───────────────────────────
+  # The operational body that executes federation mandates.
+  # Holds the operational treasury and employs/coordinates staff.
+  operations:
+    entity_id: "nycn-organizers"
+    entity_type: cooperative
+    parent_id: "nycn"
+
+    governance:
+      eligible_voters: steering_members
+      decision_mode: consent
+      default_max_objections: 0
+
+      decisions:
+        budget_approval:
+          decision_mode: consent
+          max_objections: 0
+          quorum: 0.5
+          deliberation_period_hours: 72
+          voting_period_hours: 168
+
+        venue_selection:
+          decision_mode: consent
+          max_objections: 1
+          quorum: 0.5
+          voting_period_hours: 120
+
+        program_approval:
+          decision_mode: consent
+          max_objections: 1
+          quorum: 0.5
+          voting_period_hours: 120
+
+        spending_above_threshold:
+          decision_mode: consent
+          max_objections: 0
+          quorum: 0.5
+          voting_period_hours: 72
+
+        new_committee:
+          decision_mode: consent
+          max_objections: 0
+          quorum: 0.5
+          deliberation_period_hours: 48
+          voting_period_hours: 120
+
+        emergency_action:
+          decision_mode: consent
+          max_objections: 0
+          quorum: 0.3
+          voting_period_hours: 24
+
+  # ─── Committee Delegation ─────────────────────────────
+  # Committees are INTERNAL STRUCTURES of the organizing cooperative,
+  # NOT sovereign entities. They have delegated authority scopes but
+  # no independent governance domain, treasury, or federation membership.
+  # Decisions outside scope escalate to the organizing cooperative.
+  committees:
+    defaults:
+      decision_mode: consent
+      max_objections: 0
+      quorum: 0.5
+      voting_period_hours: 72
+
+    bodies:
+      - id: "nycn-steering"
+        name: "Steering Committee"
+        structure_type: committee
+        parent_entity: "nycn-organizers"
+        purpose: >
+          Overall strategic direction, inter-committee coordination,
+          and escalated decision authority for the organizing cooperative.
+        autonomous_scope:
+          - "Strategic direction within charter mandate"
+          - "Inter-committee coordination"
+          - "Approve committee membership changes"
+        escalation_required:
+          - "Charter amendments"
+          - "Federation-level membership changes"
+
+      - id: "nycn-content"
+        name: "Content Committee"
+        structure_type: committee
+        parent_entity: "nycn-organizers"
+        purpose: >
+          Summit programming, speaker curation, session design,
+          and year-round educational content.
+        autonomous_scope:
+          - "Approve individual sessions and speakers"
+          - "Assign speakers to sessions"
+          - "Set session schedule within approved structure"
+        escalation_required:
+          - "Overall program structure (tracks, keynote, session count)"
+          - "Speaker fees above $200"
+          - "Partnership with external orgs for content"
+
+      - id: "nycn-logistics"
+        name: "Logistics Committee"
+        structure_type: committee
+        parent_entity: "nycn-organizers"
+        purpose: >
+          Venue management, vendor coordination, day-of operations,
+          and physical infrastructure.
+        autonomous_scope:
+          - "Vendor selection within approved budget"
+          - "Day-of operational decisions"
+          - "Volunteer coordination"
+        escalation_required:
+          - "Venue selection or change"
+          - "Contracts above $1,000"
+          - "Changes affecting overall event structure"
+
+      - id: "nycn-finance"
+        name: "Finance Committee"
+        structure_type: committee
+        parent_entity: "nycn-organizers"
+        purpose: >
+          Budget management, sponsorship processing, financial reporting,
+          and fiscal accountability.
+        autonomous_scope:
+          - "Accept sponsorships up to $500"
+          - "Process routine expenses within committee allocations"
+          - "Generate and distribute financial reports"
+        escalation_required:
+          - "Sponsorships above $500"
+          - "Budget amendments or new expense categories"
+          - "End-of-year financial close decisions"
+
+  # ─── Summit Activity ──────────────────────────────────
+  # The summit is an EVENT/ACTIVITY, not a sovereign entity.
+  # It is produced by the organizing cooperative and contributed to
+  # by committees. Created fresh each year.
+  summit:
+    activity_template:
+      id_pattern: "nycn-summit-{year}"
+      activity_type: event
+      parent_entity: "nycn-organizers"
+      linked_structures:
+        - "nycn-steering"
+        - "nycn-content"
+        - "nycn-logistics"
+        - "nycn-finance"
+      lifecycle:
+        planned: "October (year-1)"
+        active: "January–summit date"
+        completed: "30 days post-summit"
+
+  # ─── Trust Thresholds ─────────────────────────────────
+  trust:
+    thresholds:
+      propose_discussion: 0.0       # Anyone can start a discussion
+      vote_committee: 0.1           # Minimal participation required
+      propose_budget_change: 0.5    # Established contributor
+      committee_coordinator: 0.5    # Proven track record
+      steering_membership: 0.7     # Core leadership
+      charter_amendment: 0.7       # High trust for constitutional changes
+
+  # ─── Budget Authority ─────────────────────────────────
+  budget:
+    spending_threshold: 500  # USD — above requires steering approval
+    currency: USD
+
+    committee_allocations:
+      approval_required: steering
+      approval_method: consent
+      approval_max_objections: 0
+
+    expense_approval:
+      within_allocation: autonomous
+      above_allocation: steering
+
+  # ─── Membership ───────────────────────────────────────
+  membership:
+    tiers:
+      - name: full_member
+        entity_types: [cooperative]
+        role: federated_member
+        rights: [vote, propose, treasury_access, invite]
+        obligations:
+          - "Maintain active participation"
+          - "Adhere to federation charter"
+          - "Send delegate to annual meeting or summit"
+          - "Cooperative in good standing under NY law"
+
+      - name: affiliate
+        entity_types: [cooperative, community]
+        role: associate_member
+        rights: [vote_limited, propose_limited]
+        obligations:
+          - "Mission-aligned organization"
+          - "Annual affirmation of affiliation"
+
+      - name: emerging
+        entity_types: [community]
+        role: provisional_member
+        rights: [propose_community]
+        obligations:
+          - "Working toward cooperative formation"
+          - "Mentorship engagement"
+
+      - name: individual_organizer
+        entity_types: [individual]
+        role: organizer
+        rights: [vote_in_committees, propose]
+        obligations:
+          - "Active committee participation"
+          - "Attend steering meetings or send summary"
+
+      - name: observer
+        entity_types: [individual, cooperative]
+        role: observer_member
+        rights: [read_only]
+
+  # ─── Action Item Bridge ───────────────────────────────
+  # Accepted proposals auto-create institutional obligations.
+  # This section documents the default action specs for common decisions.
+  action_item_defaults:
+    budget_approval:
+      - title: "Distribute committee allocations"
+        assignee_role: finance_coordinator
+        due_offset_days: 7
+        priority: high
+        tags: [budget, finance]
+      - title: "Publish approved budget to federation members"
+        assignee_role: steering_coordinator
+        due_offset_days: 3
+        priority: medium
+        tags: [communication]
+
+    membership_admission:
+      - title: "Send welcome packet to new member"
+        assignee_role: steering_coordinator
+        due_offset_days: 7
+        priority: medium
+        tags: [onboarding]
+      - title: "Add member entity to federation roster"
+        assignee_role: steering_coordinator
+        due_offset_days: 3
+        priority: high
+        tags: [membership, admin]
+
+    initiative:
+      - title: "Draft implementation plan for initiative"
+        assignee_role: steering_coordinator
+        due_offset_days: 14
+        priority: medium
+        tags: [planning]

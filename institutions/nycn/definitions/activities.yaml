@@ -1,0 +1,11 @@
+activities:
+  - id: summit-2026
+    core_primitive: Activity
+    subtype: event
+    institution_tag: annual-summit
+    purpose: "Primary summit event instance."
+  - id: regional-meetups-2026
+    core_primitive: Activity
+    subtype: initiative
+    institution_tag: regional-meetup-series
+    purpose: "Supporting organizer and movement activity outside the summit."

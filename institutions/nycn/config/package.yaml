@@ -1,0 +1,20 @@
+package_id: nycn
+display_name: New York Cooperative Network
+package_kind: institution
+status: scaffold
+boundary_mode: monorepo-package
+intended_future_extraction: standalone-repo
+platform_repo: InterCooperative-Network/icn
+canonical_boundary_doc: ../../docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md
+canonical_platform_architecture_doc: ../../docs/strategy/NYCN-Repo-Architecture-Spec.md
+local_entrypoints:
+  bootstrap: ../bootstrap.yaml
+  charter: ../charter/nycn-federation.charter.yaml
+  seeds: ../seed
+  definitions: ../definitions
+  summit: ../summit
+  views: ../views
+  workflows: ../workflows
+notes:
+  - "Generic loader entrypoint now lives at ../bootstrap.yaml."
+  - "Keep institution-specific semantics here and generic primitives in ICN core."

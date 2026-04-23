@@ -1,0 +1,25 @@
+seed_version: draft-0
+kind: activity-program-seed
+parent_entity_id: nycn-organizers
+activity:
+  id: summit-2026
+  kind: event
+  name: New York Cooperative Summit 2026
+  linked_structures:
+    - nycn-content
+    - nycn-logistics
+    - nycn-marketing
+    - nycn-finance
+program:
+  id: summit-cycle-2026
+  kind:
+    kind: custom
+    kind_tag: annual-summit
+  name: Summit Cycle 2026
+  parent_activity_id: summit-2026
+  prior_cycle_program_id: null
+  views:
+    - summit-operations
+    - sponsor-pipeline
+notes:
+  - "Summit semantics remain package-owned via kind_tag, templates, and workflows."

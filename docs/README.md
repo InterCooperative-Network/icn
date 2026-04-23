@@ -4,6 +4,8 @@ This directory contains comprehensive documentation for the ICN project.
 
 **→ Start here: [Documentation Index (INDEX.md)](INDEX.md)** - Complete navigation to all documentation.
 
+Institution-package note: platform-level docs stay under `docs/`, while NYCN package-local artifacts now live under [`../institutions/nycn/`](../institutions/nycn/README.md).
+
 ## Quick Links
 
 - **[Getting Started](GETTING_STARTED.md)** - Quick start for new developers

@@ -15,9 +15,10 @@ mod types;
 pub use handle::ComputeHandle;
 pub use types::{
     BalanceCallback, CommonsPaymentRequest, CommonsReleaseCallback, CommonsReleaseRequest,
-    CommonsReserveCallback, CommonsReserveRequest, CommonsSettlementCallback, ComputeEvent,
-    EventCallback, FederationClearingCallback, FederationClearingNotification, LocalityCallback,
-    PaymentCallback, PaymentRequest, SendCallback, TrustCallback,
+    CommonsRequiredCreditsCallback, CommonsReserveCallback, CommonsReserveRequest,
+    CommonsSettlementCallback, ComputeEvent, EventCallback, FederationClearingCallback,
+    FederationClearingNotification, LocalityCallback, PaymentCallback, PaymentRequest,
+    SendCallback, TrustCallback,
 };
 
 // Internal imports from submodules
@@ -119,6 +120,10 @@ pub struct ComputeActor {
     /// Callback for querying submitter ledger balances (E7 - #1134).
     /// Required for credit ceiling enforcement via `CommonsPoolPolicy::validate_submitter_credit`.
     balance_callback: Option<BalanceCallback>,
+    /// Policy-owned deterministic credit requirement contract for commons admission.
+    /// When configured, `handle_submit()` uses this callback instead of the local
+    /// `cost::compute_credits_required` fallback.
+    commons_required_credits_callback: Option<CommonsRequiredCreditsCallback>,
     /// Callback for settling commons credits on task completion (E7 - #948).
     /// Fires when a commons-scope task completes successfully.
     /// App-layer implementation must reconcile against the reservation established
@@ -191,6 +196,7 @@ impl ComputeActor {
             stale_participant_max_age: None,
             commons_pool_policy: None,
             balance_callback: None,
+            commons_required_credits_callback: None,
             commons_settlement_callback: None,
             commons_reserve_callback: None,
             commons_release_callback: None,
@@ -258,10 +264,19 @@ impl ComputeActor {
         self.balance_callback = Some(cb);
     }
 
+    /// Set deterministic commons credit requirement policy callback.
+    ///
+    /// This is the preferred seam for policy-owned cost meaning. Compute uses
+    /// the returned requirement mechanically at submit time and for reservation.
+    /// When not set, compute falls back to `cost::compute_credits_required`.
+    pub fn set_commons_required_credits_callback(&mut self, cb: CommonsRequiredCreditsCallback) {
+        self.commons_required_credits_callback = Some(cb);
+    }
+
     /// Set the authoritative commons credit reservation callback (#1404).
     ///
     /// When set, `handle_submit()` calls this after the advisory balance floor check
-    /// to atomically hold `compute_credits_required(&task)` credits. If the callee
+    /// to atomically hold the policy-determined required credits. If the callee
     /// returns `Err`, the task is rejected with `InsufficientCommonsCredits`.
     ///
     /// **Must be set alongside `set_commons_release_callback`** for complete two-phase

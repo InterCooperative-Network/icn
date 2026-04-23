@@ -32,20 +32,94 @@ use actix_web::{test, web, App};
 use actix_web_httpauth::middleware::HttpAuthentication;
 use icn_gateway::{api, auth::AuthManager, middleware::jwt_auth, rate_limit::IpRateLimiter};
 use icn_governance::{
-    GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource, ProposalId,
-    ProposalPayload, ProposalScope,
+    GovernanceDecisionReceipt, GovernanceDomainId, GovernanceParams, MembershipConfig,
+    MembershipSource, ProposalId, ProposalPayload, ProposalScope,
 };
 use icn_governance_actor::{
     events::NoopEventEmitter,
     http::configure::{GovernanceContext, GovernanceEffect, ProposalAcceptedHook},
     manager::GovernanceManager,
+    receipt_backend::GovernanceReceiptBackend,
 };
 use icn_identity::{IdentityBundle, KeyPair};
+use icn_kernel_api::receipts::CanonicalReceipt;
+use icn_kernel_api::{AllocationReceipt, Hash};
 use icn_ledger::{entry::JournalEntryBuilder, Ledger};
 use icn_store::SledStore;
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 use tokio::sync::RwLock;
+
+#[derive(Default)]
+struct TestReceiptBackend {
+    governance_by_proposal: Mutex<HashMap<String, GovernanceDecisionReceipt>>,
+    governance_by_decision: Mutex<HashMap<Hash, GovernanceDecisionReceipt>>,
+    allocations_by_decision: Mutex<HashMap<Hash, Vec<AllocationReceipt>>>,
+}
+
+impl GovernanceReceiptBackend for TestReceiptBackend {
+    fn put_governance(&self, receipt: &GovernanceDecisionReceipt) -> Result<(), String> {
+        self.governance_by_proposal
+            .lock()
+            .map_err(|e| e.to_string())?
+            .insert(receipt.proposal_id.clone(), receipt.clone());
+        self.governance_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .insert(receipt.decision_hash, receipt.clone());
+        Ok(())
+    }
+
+    fn get_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(self
+            .governance_by_proposal
+            .lock()
+            .map_err(|e| e.to_string())?
+            .get(proposal_id)
+            .cloned())
+    }
+
+    fn put_allocation(&self, receipt: &AllocationReceipt) -> Result<Hash, String> {
+        self.allocations_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .entry(receipt.decision_hash)
+            .or_default()
+            .push(receipt.clone());
+        Ok(receipt.canonical_hash())
+    }
+
+    fn get_governance_by_decision(
+        &self,
+        decision_hash: &Hash,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(self
+            .governance_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .get(decision_hash)
+            .cloned())
+    }
+
+    fn list_allocations_by_decision(
+        &self,
+        decision_hash: &Hash,
+    ) -> Result<Vec<AllocationReceipt>, String> {
+        Ok(self
+            .allocations_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .get(decision_hash)
+            .cloned()
+            .unwrap_or_default())
+    }
+}
 
 /// Auth helper: challenge → sign → JWT.
 async fn get_jwt(
@@ -139,7 +213,9 @@ async fn test_freeze_member_blocks_ledger_entries_after_governance_acceptance() 
     let jwt_secret = b"ledger-freeze-enforcement-test-sec32".to_vec();
     let auth_manager = Arc::new(AuthManager::new(jwt_secret));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
-    let governance_manager = Arc::new(GovernanceManager::new());
+    let governance_manager = Arc::new(
+        GovernanceManager::new().with_receipt_store(Arc::new(TestReceiptBackend::default())),
+    );
 
     let gov_ctx = GovernanceContext {
         manager: governance_manager.clone(),
