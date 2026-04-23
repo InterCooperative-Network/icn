@@ -106,7 +106,7 @@ self.wire_gossip_to_ledger().await?;
 
 1. **Message-passing handles** (e.g., `NetworkActor`):
    ```rust
-   // icn/crates/icn-net/src/actor.rs:122
+   // icn/crates/icn-net/src/actor/mod.rs
    pub struct NetworkHandle {
        tx: mpsc::Sender<NetworkCommand>,
    }

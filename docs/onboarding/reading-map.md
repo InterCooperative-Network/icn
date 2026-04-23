@@ -4,13 +4,13 @@ This map links each module to the highest-signal files and docs.
 
 ## Module 0: Setup and tooling
 - `README.md`
-- `docs/DEV_ENVIRONMENT.md`
+- `docs/guides/developer/DEV_ENVIRONMENT.md`
 - `CONTRIBUTING.md`
 - `scripts/dev-setup.sh`
 
 ## Module 1: Rust fundamentals
 - `icn/` crate structure
-- `icn/crates/*/src/lib.rs` (public APIs)
+- `icn/crates/` (see each crate's `src/lib.rs` for public APIs)
 
 ## Module 2: ICN architecture overview
 - `docs/ARCHITECTURE.md`
@@ -26,19 +26,19 @@ This map links each module to the highest-signal files and docs.
 - `icn/crates/icn-identity/`
 - `icn/crates/icn-trust/`
 - `docs/ARCHITECTURE.md` (Identity, Trust sections)
-- `docs/multi-device-identity-design.md`
+- `docs/design/multi-device-identity-design.md`
 
 ## Module 5: Network and gossip
 - `icn/crates/icn-net/`
 - `icn/crates/icn-gossip/`
 - `docs/ARCHITECTURE.md` (Network, Gossip sections)
-- `docs/gossip-signed-envelope-migration.md`
+- `docs/development/gossip-signed-envelope-migration.md`
 
 ## Module 6: Ledger and contracts
 - `icn/crates/icn-ledger/`
 - `icn/crates/icn-ccl/`
 - `docs/ARCHITECTURE.md` (Ledger, Contracts sections)
-- `docs/governance-primitives.md`
+- `docs/design/governance/governance-primitives.md`
 
 ## Module 7: Gateway API and SDK
 - `icn/crates/icn-gateway/README.md`
@@ -79,4 +79,4 @@ This map links each module to the highest-signal files and docs.
 ## Module 14: Governance and CCL deep dive
 - `icn/crates/icn-governance/`
 - `icn/crates/icn-ccl/`
-- `docs/governance-primitives.md`
+- `docs/design/governance/governance-primitives.md`

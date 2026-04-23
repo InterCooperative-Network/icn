@@ -17,11 +17,54 @@ import ReadingLadder from '../components/ReadingLadder.astro';
           ICN is neither. This page is where the public narrative meets the implementation.
         </p>
       </div>
+
+      <div class="truth-grid truth-grid-2">
+        <div class="truth-note truth-note-teal">
+          <span class="truth-note-label">Why build here</span>
+          <h3>Infrastructure for democratic institutions, not another SaaS</h3>
+          <p>
+            ICN is trying to become the substrate democratic organizations can rely on the way firms rely on ERP systems,
+            cloud platforms, and payment rails today, except without surrendering ownership or governance.
+          </p>
+        </div>
+        <div class="truth-note truth-note-amber">
+          <span class="truth-note-label">What kind of system this wants to be</span>
+          <h3>A shared public utility for institutional coordination</h3>
+          <p>
+            The long game is not a winner-take-all platform. It is shared digital infrastructure
+            that many organizations can run, extend, and govern without being captured by a landlord.
+          </p>
+        </div>
+      </div>
     </div>
   </section>
 
-  <section class="section-alt">
+  <section class="section-alt section-pre-ladder">
     <div class="container narrow prose">
+      <h2>Your first hour in the repo</h2>
+      <div class="truth-grid truth-grid-2">
+        <div class="truth-note truth-note-teal">
+          <span class="truth-note-label">1. Build</span>
+          <h3>Confirm the workspace compiles from the real root</h3>
+          <p>Clone the repo, change into <code>icn/</code>, then run <code>cargo build</code> and <code>cargo test --workspace --lib</code>. The Rust workspace is not at the repo root.</p>
+        </div>
+        <div class="truth-note truth-note-amber">
+          <span class="truth-note-label">2. Verify</span>
+          <h3>Use the same checks the repo expects</h3>
+          <p>Read <a href="/docs/GETTING_STARTED">Getting Started</a>, then run <code>cargo fmt --all --check</code>, <code>cargo clippy --workspace --all-targets --all-features -- -D warnings</code>, and the test scope that matches your change.</p>
+        </div>
+        <div class="truth-note truth-note-teal">
+          <span class="truth-note-label">3. Read the guardrails</span>
+          <h3>Start from the repo’s operating documents</h3>
+          <p><a href="/docs/GETTING_STARTED">Getting Started</a> tells you how to build and orient. <a href="https://github.com/InterCooperative-Network/icn/blob/main/AGENTS.md" target="_blank" rel="noopener"><code>AGENTS.md</code></a> and <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener"><code>CONTRIBUTING.md</code></a> tell you how not to break the repo.</p>
+        </div>
+        <div class="truth-note truth-note-amber">
+          <span class="truth-note-label">4. Choose a first patch</span>
+          <h3>Pick something scoped before you wander</h3>
+          <p>Use <a href="https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue" target="_blank" rel="noopener">good first issues</a> for a first code change, or close a concrete docs gap if you want to contribute without starting in the deepest Rust paths.</p>
+        </div>
+      </div>
+
       <h2>Why ICN may be interesting to technical readers</h2>
       <ul>
         <li><strong>Kernel/app separation with a strict meaning firewall.</strong> The kernel enforces generic constraints without understanding their domain semantics. Apps translate domain meaning into those constraints. The boundary is enforced in the crate graph.</li>
@@ -56,7 +99,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <ul>
         <li><strong>The meaning firewall.</strong> Kernel crates enforce constraints; app crates supply meaning. The kernel is not allowed to understand what a "trust score" or a "cooperative" is. The boundary is enforced in the crate graph itself, not as a design aspiration.</li>
         <li><strong>Policy oracles.</strong> An app that implements the <code>PolicyOracle</code> interface is the bridge between domain semantics and kernel enforcement. The trust oracle is the canonical example.</li>
-        <li><strong>The governance executor.</strong> A kernel-dispatch bridge between accepted governance payloads and the subsystems that carry them into operational effect. Widening the set of payload types it dispatches is the active frontier of the project.</li>
+        <li><strong>The governance executor.</strong> A kernel-dispatch bridge between accepted governance payloads and the subsystems that carry them into operational effect. Expanding the set of payload types it dispatches is one of the main areas of active work.</li>
         <li><strong>Scopes as first-class institutions.</strong> A member, a cooperative, a community, a federation, and a commons are each modeled as a distinct scope. Each has its own crate in the workspace.</li>
         <li><strong>Actors and supervision.</strong> The runtime is built around long-lived actors managed by a supervisor, communicating through message passing.</li>
         <li><strong>Trust-gated rate limiting and placement.</strong> Trust class affects message rate limits, credit relationships, and task placement. Trust is native, not trustless.</li>
@@ -109,8 +152,8 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <p>
         The main monorepo is at
         <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">InterCooperative-Network/icn</a>.
-        It is a Cargo workspace with crates in <code>icn/crates/</code> and apps in <code>icn/apps/</code>,
-        binaries in <code>icn/bins/</code>.
+        The Rust workspace lives under <code>icn/</code> inside the repo, with crates in <code>icn/crates/</code>,
+        apps in <code>icn/apps/</code>, and binaries in <code>icn/bins/</code>.
       </p>
       <p>A reasonable reading order for someone new:</p>
       <ol>
@@ -121,6 +164,20 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         <li>Read the ledger (<code>icn-ledger</code>) to see how mutual-credit accounting is carried as a replicated journal.</li>
         <li>Read the governance app to see how proposals, decisions, and the transition from governance to policy are handled today.</li>
       </ol>
+
+      <h2>If you want to contribute now</h2>
+      <p>
+        The shortest path to a truthful first contribution is: orient on the public framing,
+        build the workspace locally, choose one scoped issue, and verify only the checks that match
+        the area you touched.
+      </p>
+      <ul>
+        <li><strong>Start with the contributor entry docs.</strong> Read <a href="/docs/GETTING_STARTED">Getting Started</a>, then <a href="https://github.com/InterCooperative-Network/icn/blob/main/README.md" target="_blank" rel="noopener"><code>README.md</code></a>, then <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener"><code>CONTRIBUTING.md</code></a>.</li>
+        <li><strong>Use the onboarding curriculum when you want a deeper path.</strong> The full developer ladder is in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/README.md" target="_blank" rel="noopener"><code>docs/onboarding/README.md</code></a>.</li>
+        <li><strong>Choose a first area deliberately.</strong> Start with <a href="https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue" target="_blank" rel="noopener">good first issues</a> or with one documentation gap you can close cleanly.</li>
+        <li><strong>Run from the right directory.</strong> Cargo commands belong in <code>icn/</code>, not the repo root. That one detail prevents a surprising amount of confusion.</li>
+        <li><strong>Use the public contribution map if you are deciding how to help.</strong> <a href="/get-involved">Get Involved</a> is the route map for code, docs, design, institutional input, and financial support.</li>
+      </ul>
 
       <h2>How to contribute without misunderstanding the project</h2>
       <ul>
@@ -142,10 +199,12 @@ import ReadingLadder from '../components/ReadingLadder.astro';
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section-ladder">
     <div class="container narrow">
       <ReadingLadder current="for-developers">
         <Fragment slot="extras">
+          <a href="/get-involved" class="btn btn-ghost">Get Involved</a>
+          <a href="/docs/GETTING_STARTED" class="btn btn-ghost">Getting Started</a>
           <a href="/architecture" class="btn btn-ghost">Architecture reference →</a>
           <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="btn btn-ghost">GitHub ↗</a>
           <a href="/docs" class="btn btn-ghost">Docs</a>

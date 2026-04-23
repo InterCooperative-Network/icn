@@ -67,7 +67,7 @@ Complete **all three** artifacts below. Each demonstrates systems-level understa
 **Requirements**:
 - Practical, specific, actionable
 - Includes code examples or real file paths
-- Submitted as markdown in `docs/onboarding/resources/` or in #onboarding
+- Submitted as markdown in `docs/onboarding/resources/` or in a project discussion thread
 
 **Verification**: Your teaching artifact helps another contributor solve a problem.
 

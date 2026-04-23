@@ -618,6 +618,42 @@ impl GatewayServer {
         let receipt_store = Arc::new(crate::receipt_store::ReceiptStore::new(db.clone()));
         info!("Receipt store initialized");
 
+        // One-shot startup backfill for the ADR-0014 by-grantee index.
+        // Databases written between PR #1575 (grant primary + by-decision
+        // index) and PR #1579 (by-grantee index + acceptance-seam
+        // revocations) hold primary grant records without a by-grantee
+        // entry. Without this, `list_*_by_grantee` readers miss those
+        // legacy grants and an accepted RemoveSteward/SuspendSteward/
+        // RevokeAuthority lifecycle silently leaves them active after
+        // acceptance. The backfill is idempotent (deterministic keys,
+        // no-op when the index is already complete) and non-destructive
+        // (never mutates primary records), so running on every startup
+        // is safe; steady-state cost is a single prefix scan with no
+        // writes.
+        match receipt_store.backfill_grant_by_grantee_index() {
+            Ok(0) => {
+                info!("ADR-0014 by-grantee index backfill: no legacy grants found");
+            }
+            Ok(written) => {
+                info!(
+                    written,
+                    "ADR-0014 by-grantee index backfill: recovered legacy grants"
+                );
+            }
+            Err(e) => {
+                // Non-fatal: startup continues. Revocation lookups for
+                // legacy grants may miss until the next successful
+                // backfill run, but the gateway itself is operational.
+                // Surfacing the error loudly so operators can investigate
+                // (and optionally re-run a manual backfill).
+                tracing::error!(
+                    error = %e,
+                    "ADR-0014 by-grantee index backfill failed at startup; \
+                     legacy grants may be invisible to by-grantee readers until next successful run"
+                );
+            }
+        }
+
         // Install receipt_store on the actor so actor-path `CloseProposal::Accept`
         // and `ForceCloseProposal::Accept` emit `InstitutionalEffectRecord`
         // durably. Without this, the HTTP-close path was the sole writer and

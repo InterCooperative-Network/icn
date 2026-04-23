@@ -1,5 +1,6 @@
 import rss from "@astrojs/rss";
 import { getCollection } from "astro:content";
+import { blogSlugFromId } from "../lib/blog-slug";
 
 export async function GET(context: any) {
   const posts = await getCollection("blog");
@@ -11,7 +12,7 @@ export async function GET(context: any) {
       title: post.data.title,
       pubDate: post.data.pubDate,
       description: post.data.description,
-      link: `/blog/${post.slug}/`,
+      link: `/blog/${blogSlugFromId(post.id)}/`,
     })),
   });
 }

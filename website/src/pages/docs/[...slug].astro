@@ -52,7 +52,7 @@ const segments = slug!.split('/');
       <!-- Breadcrumb -->
       <nav class="breadcrumb">
         <a href="/docs">Docs</a>
-        {segments.length > 1 && segments.slice(0, -1).map((seg, i) => (
+        {segments.length > 1 && segments.slice(0, -1).map((seg) => (
           <span class="breadcrumb-sep">/</span>
           <span class="breadcrumb-dir">{seg.replace(/[-_]/g, ' ')}</span>
         ))}

@@ -18,7 +18,7 @@ the "how" and "why" of policy creation, voting, and capability enforcement.
 ## Key Reading
 - `icn/crates/icn-governance/` - Governance engine
 - `icn/crates/icn-ccl/` - Contract language implementation
-- `docs/governance-primitives.md` - Governance system reference
+- `docs/design/governance/governance-primitives.md` - Governance system reference
 - `icn/crates/icn-governance/tests/governance_integration.rs`
 
 ---
