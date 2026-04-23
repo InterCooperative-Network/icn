@@ -178,7 +178,7 @@ if trust_score < 0.5 {
 #### **✅ CORRECT: Oracle Translating Trust to Constraints**
 
 ```rust
-// In icn/crates/icn-net/src/actor.rs (CORRECT)
+// In icn/crates/icn-net/src/actor/mod.rs (CORRECT)
 let request = PolicyRequest::new(
     peer_did.clone(),
     ActionKind::custom("dial_peer"),

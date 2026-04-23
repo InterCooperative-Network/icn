@@ -1,7 +1,9 @@
 //! Abstraction over gateway's ReceiptStore so GovernanceManager can live
 //! in this crate without a circular dependency on icn-gateway.
 
-use icn_governance::{AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt, Mandate};
+use icn_governance::{
+    AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt, Grantee, Mandate, Timestamp,
+};
 use icn_kernel_api::{AllocationReceipt, Hash};
 
 use crate::dispatch_evidence::EffectDispatchEvidence;
@@ -244,5 +246,71 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         _decision_hash: &Hash,
     ) -> Result<Vec<AuthorityGrant>, String> {
         Ok(vec![])
+    }
+
+    /// List authority grants for a [`Grantee`] that are active at `now`.
+    ///
+    /// "Active" is defined by [`AuthorityGrant::is_active_at`]: not
+    /// revoked at or before `now`, `now >= valid_from`, and (if
+    /// `valid_until` is set) `now < valid_until`.
+    ///
+    /// Used by the ADR-0014 acceptance seam to resolve a target steward
+    /// or authority DID to its outstanding grants for revocation. The
+    /// default impl returns an empty list so backends that do not
+    /// durably persist grants produce the truthful "no grants to
+    /// revoke" answer; the sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
+    /// overrides via a dedicated by-grantee secondary index.
+    fn list_active_authority_grants_by_grantee(
+        &self,
+        _grantee: &Grantee,
+        _now: Timestamp,
+    ) -> Result<Vec<AuthorityGrant>, String> {
+        Ok(vec![])
+    }
+
+    /// List **all** authority grants ever issued to a [`Grantee`],
+    /// including revoked and expired ones, ordered oldest-first by
+    /// `valid_from`.
+    ///
+    /// Unlike [`Self::list_active_authority_grants_by_grantee`], this
+    /// method does not filter on `is_active_at`: the reinstatement seam
+    /// needs to inspect previously-revoked grants to clone class/scope/
+    /// grantor context for the fresh grant. Uses the same by-grantee
+    /// secondary index as the active-filtered variant; no new index is
+    /// introduced.
+    ///
+    /// Default impl returns an empty list.
+    fn list_authority_grants_by_grantee(
+        &self,
+        _grantee: &Grantee,
+    ) -> Result<Vec<AuthorityGrant>, String> {
+        Ok(vec![])
+    }
+
+    /// Revoke an [`AuthorityGrant`] by stamping `revoked_at` on its
+    /// primary record.
+    ///
+    /// **Seam contract:**
+    /// - First-write-wins: a grant already carrying `revoked_at: Some(_)`
+    ///   is a no-op; the recorded timestamp never moves. This keeps
+    ///   double-revocation safe and prevents a later proposal from
+    ///   silently rewriting the original revocation time.
+    /// - Missing grants are an error (`grant_not_found: …`). The
+    ///   acceptance seam logs and continues rather than aborting the
+    ///   entire decision.
+    ///
+    /// **Default impl:** no-op `Ok(())` so backends that do not durably
+    /// persist grants inherit the truthful "revocation not persisted"
+    /// behavior. Callers that need a real write-ack must use a backend
+    /// that overrides this method (the sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
+    /// overrides it with a transactional primary-record update).
+    fn revoke_authority_grant(
+        &self,
+        _grant_id: &AuthorityGrantId,
+        _revoked_at: Timestamp,
+    ) -> Result<(), String> {
+        Ok(())
     }
 }

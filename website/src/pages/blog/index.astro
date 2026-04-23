@@ -1,10 +1,12 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { getCollection } from 'astro:content';
+import { blogSlugFromId } from '../../lib/blog-slug';
 
 const posts = (await getCollection('blog')).sort(
 	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
 );
+
 ---
 
 <Layout title="Blog" activeNav="blog">
@@ -18,7 +20,7 @@ const posts = (await getCollection('blog')).sort(
 			
 			<div class="blog-grid">
 				{posts.map((post) => (
-					<a href={`/blog/${post.slug}/`} class="blog-card group">
+						<a href={`/blog/${blogSlugFromId(post.id)}/`} class="blog-card group">
 						{post.data.heroImage && (
 							<img width={720} height={360} src={post.data.heroImage} alt="" class="blog-img" />
 						)}
@@ -33,7 +35,7 @@ const posts = (await getCollection('blog')).sort(
 								</time>
 								{(post.data.tags ?? []).length > 0 && (
 									<span class="blog-tags">
-										{(post.data.tags ?? []).map(tag => `#${tag}`).join(' ')}
+										{(post.data.tags ?? []).map((tag: string) => `#${tag}`).join(' ')}
 									</span>
 								)}
 							</div>

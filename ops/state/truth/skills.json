@@ -3,7 +3,7 @@
   "description": "Registry of all skills with canonical paths and ownership. Generated indexes and routing tables should derive from here. Do not maintain separate skill lists in prompt files.",
   "canonical_skill_sources": {
     "ops_automation": "ops/automation/skills/",
-    "icn_level": ".claude/skills/",
+    "icn_level": ".agents/skills/",
     "project_level": "../../../.claude/skills/"
   },
   "note_on_duplication": "ops/automation/skills/ is the canonical source for shared operational skills. The project-level .claude/skills/ for {status, sync-and-build, worktree} MUST be symlinks to ops/automation/skills/. Run ops/scripts/setup-skill-symlinks.sh to create/verify.",
@@ -41,9 +41,9 @@
       "resume-session", "rust-verify", "update-session-state"
     ],
     "overlapping_ownership_notes": {
-      "fix-ci": "Both icn-level and project-level have this. icn/.claude/skills/fix-ci is authoritative for ICN-specific CI work.",
-      "icn-preflight": "Both levels have this. icn/.claude/skills/icn-preflight is authoritative — it uses the ICN-specific change routing matrix.",
-      "merge-prs": "Both levels have this. icn/.claude/skills/merge-prs is authoritative for ICN — has the correct squash policy and 10 required checks."
+      "fix-ci": "Both icn-level and project-level have this. .agents/skills/fix-ci is authoritative for ICN-specific CI work.",
+      "icn-preflight": "Both levels have this. .agents/skills/icn-preflight is authoritative — it uses the ICN-specific change routing matrix.",
+      "merge-prs": "Both levels have this. .agents/skills/merge-prs is authoritative for ICN — has the correct squash policy and 10 required checks."
     }
   }
 }

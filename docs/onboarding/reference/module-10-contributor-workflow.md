@@ -721,7 +721,7 @@ Update documentation when you:
 | Architecture | `docs/ARCHITECTURE.md` |
 | API reference | Code doc comments + OpenAPI |
 | Onboarding | `docs/onboarding/reference/` |
-| Deployment | `deploy/README.md`, `docs/HOMELAB_DEPLOYMENT.md` |
+| Deployment | `deploy/README.md`, `docs/operations/deployment/HOMELAB_DEPLOYMENT.md` |
 | Security | `docs/security/`, `docs/security/production-hardening.md` |
 | Changelog | `CHANGELOG.md` |
 

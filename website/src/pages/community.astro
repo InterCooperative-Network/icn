@@ -9,61 +9,83 @@ import stats from '../data/stats.json';
     <div class="container">
       <div class="section-header" style="text-align: left; max-width: none;">
         <span class="badge badge-purple">Community</span>
-        <h1>Join the Cooperative Movement</h1>
-        <p>ICN is built by and for cooperatives. Code, documentation, use cases, governance patterns, or just showing up and telling us what you need. Every contribution shapes what this becomes.</p>
+        <h1>Where the work is visible, discussable, and open to contribution.</h1>
+        <p>
+          ICN is built in the open. This page collects the working surfaces: how to choose a contribution path,
+          where to discuss design and institutional questions, where to file issues, and where financial support
+          actually goes today. Repository counts below are generated from the repo at build time.
+        </p>
       </div>
 
       <div class="grid grid-3">
+        <a href="/whats-real-now" class="community-card">
+          <div class="card-icon">00</div>
+          <h3>Truth anchor</h3>
+          <p>Read the current maturity account before you assume what ICN can already carry for contributors or institutions.</p>
+        </a>
+
+        <a href="/get-involved" class="community-card">
+          <div class="card-icon">01</div>
+          <h3>Get Involved</h3>
+          <p>The route map for developers, non-technical contributors, institutions, and sponsors.</p>
+        </a>
+
         <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener noreferrer" class="community-card">
-          <div class="card-icon">⭐</div>
+          <div class="card-icon">02</div>
           <h3>Star on GitHub</h3>
           <p>Show your support and stay updated. {stats.activeBranches} branches, {stats.mergedPRs} merged PRs.</p>
         </a>
 
         <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener noreferrer" class="community-card">
-          <div class="card-icon">🐛</div>
-          <h3>Report Issues</h3>
-          <p>Found a bug or have a feature idea? Open an issue and help us improve.</p>
+          <div class="card-icon">03</div>
+          <h3>Open or review issues</h3>
+          <p>Use issues for bugs, scoped implementation work, documentation gaps, and concrete follow-up tasks.</p>
         </a>
 
         <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener noreferrer" class="community-card">
-          <div class="card-icon">💬</div>
+          <div class="card-icon">04</div>
           <h3>Discussions</h3>
-          <p>Join conversations about cooperative technology, governance patterns, and ICN development.</p>
+          <p>Use discussions for design questions, governance patterns, institutional use cases, and broader project conversation.</p>
         </a>
 
         <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer" class="community-card">
-          <div class="card-icon">🤝</div>
+          <div class="card-icon">05</div>
           <h3>Contributing Guide</h3>
-          <p>Read the guidelines for contributing code, documentation, and architectural proposals.</p>
+          <p>Architectural guardrails, regulatory invariants, and what a good ICN pull request must respect.</p>
         </a>
 
         <a href="/docs/GETTING_STARTED" class="community-card">
-          <div class="card-icon">🚀</div>
-          <h3>Getting Started</h3>
-          <p>Set up your development environment and run ICN locally in minutes.</p>
+          <div class="card-icon">06</div>
+          <h3>Developer getting started</h3>
+          <p>Use the repo quickstart when you want to build the workspace, run the checks, and contribute without getting lost.</p>
         </a>
 
         <a href="/docs" class="community-card">
-          <div class="card-icon">📚</div>
+          <div class="card-icon">07</div>
           <h3>Documentation</h3>
           <p>{stats.docFiles}+ documents covering architecture, APIs, guides, economics, and governance.</p>
         </a>
 
-        <a href="https://matrix.to/#/#icn:matrix.org" target="_blank" rel="noopener noreferrer" class="community-card">
-          <div class="card-icon">💬</div>
-          <h3>Matrix Room</h3>
-          <p>Real-time chat with ICN developers and cooperative technologists. Join <code>#icn:matrix.org</code> — no account required to read.</p>
+        <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener noreferrer" class="community-card">
+          <div class="card-icon">08</div>
+          <h3>GitHub Sponsors</h3>
+          <p>The live financial-support rail today. Sponsor the organization-level work sustaining the substrate.</p>
+        </a>
+
+        <a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener noreferrer" class="community-card">
+          <div class="card-icon">09</div>
+          <h3>Discord</h3>
+          <p>The live real-time chat surface today. Join the ICN Discord server for coordination, contributor questions, and project discussion.</p>
         </a>
 
         <a href="https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue" target="_blank" rel="noopener noreferrer" class="community-card">
-          <div class="card-icon">🌱</div>
+          <div class="card-icon">10</div>
           <h3>Good First Issues</h3>
           <p>Labeled, scoped, and documented. If you want to contribute code but don't know where to start, start here.</p>
         </a>
 
         <a href="https://github.com/InterCooperative-Network/icn/discussions/categories/announcements" target="_blank" rel="noopener noreferrer" class="community-card">
-          <div class="card-icon">📬</div>
+          <div class="card-icon">11</div>
           <h3>Announcements</h3>
           <p>Sprint summaries, release notes, and major milestones. Subscribe to the Announcements discussion category on GitHub.</p>
         </a>
@@ -77,19 +99,19 @@ import stats from '../data/stats.json';
       <h2 class="text-center" style="margin-bottom: var(--space-xl);">Contributing Principles</h2>
       <div class="grid grid-2">
         <div class="card">
-          <h3>🏗️ Interfaces First</h3>
+          <h3>Interfaces First</h3>
           <p>Design the interface before the implementation. Every public API should be driven by use cases from cooperative governance, economics, or federation scenarios.</p>
         </div>
         <div class="card">
-          <h3>🧱 No Drive-By Refactors</h3>
+          <h3>No Drive-By Refactors</h3>
           <p>Each PR touches one concern. If you notice something that needs refactoring while working on a feature, open a separate issue.</p>
         </div>
         <div class="card">
-          <h3>🔥 The Meaning Firewall</h3>
+          <h3>The Meaning Firewall</h3>
           <p>The kernel must never understand the semantic meaning of what it processes. If domain logic leaks into kernel crates, the architecture is broken.</p>
         </div>
         <div class="card">
-          <h3>📐 Architectural Guardrails</h3>
+          <h3>Architectural Guardrails</h3>
           <p>All changes must respect crate boundaries, the app/kernel separation, and the constraint engine model. See CONTRIBUTING.md for details.</p>
         </div>
       </div>
@@ -116,8 +138,21 @@ import stats from '../data/stats.json';
   }
 
   .community-card .card-icon {
-    font-size: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    padding: 0 var(--space-sm);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--accent-teal);
     margin-bottom: var(--space-md);
+    background: var(--bg-surface);
   }
 
   .community-card h3 {

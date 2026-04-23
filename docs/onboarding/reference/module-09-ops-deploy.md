@@ -21,7 +21,7 @@ By the end of this module, you will:
 - `deploy/README.md`
 - `config/README.md`
 - `docs/security/production-hardening.md`
-- `docs/HOMELAB_DEPLOYMENT.md`
+- `docs/operations/deployment/HOMELAB_DEPLOYMENT.md`
 
 ---
 

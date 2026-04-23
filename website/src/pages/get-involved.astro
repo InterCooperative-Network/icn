@@ -1,0 +1,743 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout
+  title="Get Involved"
+  activeNav="get-involved"
+  description="Concrete paths to engage with ICN: build the codebase, contribute non-technically, bring an institutional use case, or support the project financially."
+>
+
+  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container narrow">
+      <div class="page-hero">
+        <span class="badge badge-teal">Get Involved</span>
+        <h1>How to engage with ICN.</h1>
+        <p class="lead">
+          ICN is open infrastructure. There are four concrete ways to engage — building the codebase,
+          contributing non-technically, bringing an institutional use case, or supporting the work financially.
+          Each path below tells you what the first step is, not where to start guessing.
+        </p>
+      </div>
+
+      <nav class="path-nav" aria-label="Jump to a path">
+        <a href="#build" class="path-nav-item">
+          <span class="path-nav-num">01</span>
+          <span class="path-nav-label">Build</span>
+          <span class="path-nav-hint">Developers and engineers</span>
+        </a>
+        <a href="#contribute" class="path-nav-item">
+          <span class="path-nav-num">02</span>
+          <span class="path-nav-label">Contribute</span>
+          <span class="path-nav-hint">Writers, designers, researchers, organizers</span>
+        </a>
+        <a href="#partner" class="path-nav-item">
+          <span class="path-nav-num">03</span>
+          <span class="path-nav-label">Partner</span>
+          <span class="path-nav-hint">Cooperatives, federations, aligned institutions</span>
+        </a>
+        <a href="#support" class="path-nav-item">
+          <span class="path-nav-num">04</span>
+          <span class="path-nav-label">Support</span>
+          <span class="path-nav-hint">Sponsor the work financially</span>
+        </a>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ═══ BUILD ═══════════════════════════════════════════════════ -->
+  <section id="build" class="section-alt path-section">
+    <div class="container narrow">
+      <div class="path-header">
+        <span class="path-header-num">01</span>
+        <div>
+          <span class="badge badge-teal">Build</span>
+          <h2>Developers and engineers.</h2>
+          <p class="path-header-lede">
+            Rust workspace, actor-based runtime, strict kernel/app separation. If you write systems code
+            and want to work on cooperative infrastructure that is not another SaaS or token protocol,
+            this is the path.
+          </p>
+        </div>
+      </div>
+
+      <ol class="path-steps">
+        <li>
+          <h3>Read first</h3>
+          <ul>
+            <li><a href="/for-developers">For Developers</a> — what ICN is as a system, and what it is not.</li>
+            <li><a href="/architecture">Architecture</a> — meaning firewall, kernel/app separation, policy oracles.</li>
+            <li><a href="/whats-real-now">What's Real Now</a> — what is load-bearing today and what is still being built.</li>
+          </ul>
+        </li>
+        <li>
+          <h3>Prerequisites</h3>
+          <ul>
+            <li>Rust toolchain (pinned — don't upgrade it). Toolchain version lives in <code>icn/rust-toolchain.toml</code>.</li>
+            <li>Git.</li>
+            <li>Roughly 8 GB of free disk for a full build + incremental cache.</li>
+          </ul>
+        </li>
+        <li>
+          <h3>Clone and build</h3>
+          <pre><code>git clone https://github.com/InterCooperative-Network/icn.git
+cd icn/icn
+cargo build
+cargo test --workspace --lib</code></pre>
+          <p class="path-step-note">
+            The Rust workspace lives inside the <code>icn/</code> subdirectory, not at the repo root.
+            Run all cargo commands from there.
+          </p>
+        </li>
+        <li>
+          <h3>Orient in the repo</h3>
+          <ul>
+            <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/README.md" target="_blank" rel="noopener"><code>README.md</code></a> — repo map and first-stop routing for contributors.</li>
+            <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/GETTING_STARTED.md" target="_blank" rel="noopener"><code>docs/GETTING_STARTED.md</code></a> — build, run, and verification quickstart.</li>
+            <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/AGENTS.md" target="_blank" rel="noopener"><code>AGENTS.md</code></a> — operating rules, verification commands, invariants, crate layout.</li>
+            <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener"><code>CONTRIBUTING.md</code></a> — architectural guardrails and the regulatory invariants PR checklist.</li>
+            <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE.md" target="_blank" rel="noopener"><code>CLAUDE.md</code></a> — deep project map (also useful even if you aren't using Claude Code).</li>
+          </ul>
+        </li>
+        <li>
+          <h3>Pick an initial area</h3>
+          <ul>
+            <li>
+              <a href="https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue" target="_blank" rel="noopener">Good first issues</a>
+              — scoped, labeled, and documented. The path of least resistance for a first PR.
+            </li>
+            <li>
+              <a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Open issues</a>
+              — every issue has one <code>epic:*</code> label and one <code>type:*</code> label. Pick an epic that matches your interest.
+            </li>
+            <li>
+              If you want to read the code first rather than an issue first,
+              <a href="/for-developers#how-to-explore-the-codebase-and-docs">the reading order on For Developers</a>
+              tells you where to start.
+            </li>
+            <li>
+              If you want a deeper contributor path rather than a first patch,
+              use <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/onboarding/README.md" target="_blank" rel="noopener"><code>docs/onboarding/README.md</code></a>.
+            </li>
+          </ul>
+        </li>
+        <li>
+          <h3>Verify before you push</h3>
+          <pre><code>cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --lib</code></pre>
+          <p class="path-step-note">
+            Run these from <code>icn/</code>, the Rust workspace you entered in the build step. Full routing table is in <code>AGENTS.md</code>.
+          </p>
+        </li>
+        <li>
+          <h3>Submit</h3>
+          <p>
+            Work on a feature branch (<code>feat/&lt;slug&gt;</code>, <code>fix/&lt;slug&gt;</code>,
+            <code>docs/&lt;slug&gt;</code>). Open a PR against <code>main</code>. Every PR includes a
+            <strong>what</strong>, <strong>why</strong>, <strong>risk</strong>, and <strong>test plan</strong>.
+            If the change touches gateway APIs, ledger logic, or member-facing text, step through the regulatory
+            invariants checklist in <code>CONTRIBUTING.md</code>.
+          </p>
+        </li>
+      </ol>
+
+      <div class="path-cta">
+        <a href="/for-developers" class="btn btn-primary">Read For Developers</a>
+        <a href="https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue" target="_blank" rel="noopener" class="btn btn-secondary">Good first issues ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ CONTRIBUTE (NON-TECHNICAL) ═════════════════════════════ -->
+  <section id="contribute" class="section path-section">
+    <div class="container narrow">
+      <div class="path-header">
+        <span class="path-header-num">02</span>
+        <div>
+          <span class="badge badge-amber">Contribute</span>
+          <h2>Writers, designers, researchers, organizers.</h2>
+          <p class="path-header-lede">
+            ICN is not only a Rust project. The substrate has to be described, designed, stress-tested, and
+            translated into something cooperatives can actually use. The work below is real and needed.
+          </p>
+        </div>
+      </div>
+
+      <div class="contribution-grid">
+        <article class="contribution-card">
+          <h3>Documentation</h3>
+          <p>
+            Writing that explains what the system actually does without overclaiming. Gaps we know about:
+            user-facing guides for non-developer members, step-by-step operator guides, explainers that
+            keep <a href="/whats-real-now">What's Real Now</a> honest as the surface changes.
+          </p>
+          <p class="contribution-next">
+            <strong>First step:</strong> read <code>docs/INDEX.md</code>, find a gap, open a
+            <a href="https://github.com/InterCooperative-Network/icn/issues/new" target="_blank" rel="noopener">docs issue</a>
+            with <code>type:doc</code>.
+          </p>
+        </article>
+
+        <article class="contribution-card">
+          <h3>Design and member-facing UX</h3>
+          <p>
+            The member-facing experience is the part of the system most visibly trailing the substrate underneath.
+            Design work on how identity, standing, governance, and receipts cohere into something a person can use
+            is wanted and has room.
+          </p>
+          <p class="contribution-next">
+            <strong>First step:</strong> read <code>docs/design-language/brief-v0.md</code> and
+            <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">start a discussion</a>
+            describing what you would want to work on.
+          </p>
+        </article>
+
+        <article class="contribution-card">
+          <h3>Research, policy, governance</h3>
+          <p>
+            Cooperative governance patterns, policy mechanisms, economic accounting rules, regulatory framing.
+            ICN is shaped by how real institutions actually run; we need people who know that terrain to push back
+            on designs that won't survive contact with a real membership.
+          </p>
+          <p class="contribution-next">
+            <strong>First step:</strong> open a
+            <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">GitHub Discussion</a>
+            under <em>Ideas</em> or <em>General</em> with the question or proposal.
+          </p>
+        </article>
+
+        <article class="contribution-card">
+          <h3>Testing and pilot feedback</h3>
+          <p>
+            Running the daemon, running through the flows, filing specific bugs, and telling us where the
+            experience breaks down. Adversarial reading of the public site and docs is valuable — inconsistency
+            between <a href="/whats-real-now">What's Real Now</a> and the rest of the site is a defect.
+          </p>
+          <p class="contribution-next">
+            <strong>First step:</strong>
+            <a href="/docs/GETTING_STARTED">Getting Started</a> to stand up a node, then open an
+            <a href="https://github.com/InterCooperative-Network/icn/issues/new" target="_blank" rel="noopener">issue</a>
+            for anything that breaks, misleads, or surprises.
+          </p>
+        </article>
+
+        <article class="contribution-card">
+          <h3>Community and ecosystem</h3>
+          <p>
+            Connecting ICN to the cooperative, solidarity-economy, and public-interest-technology networks that
+            should know about it. Introductions to aligned projects and institutions. Organizing conversations
+            about cooperative infrastructure that don't route through platform incumbents.
+          </p>
+          <p class="contribution-next">
+            <strong>First step:</strong> join the <a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">ICN Discord server</a>
+            or post in <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a>.
+          </p>
+        </article>
+
+        <article class="contribution-card">
+          <h3>Translation and localization</h3>
+          <p>
+            Cooperative movements are not Anglophone. The public site, docs, and concept glossary will need to be
+            readable across at least the languages where active cooperative infrastructure communities already exist.
+            This work has not started and is open.
+          </p>
+          <p class="contribution-next">
+            <strong>First step:</strong> open a
+            <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussion</a>
+            describing the target language and which surface (site, docs, glossary) you want to cover first.
+          </p>
+        </article>
+      </div>
+
+      <div class="path-cta">
+        <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener" class="btn btn-primary">Start a Discussion ↗</a>
+        <a href="https://github.com/InterCooperative-Network/icn/issues/new" target="_blank" rel="noopener" class="btn btn-secondary">Open an Issue ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PARTNER (INSTITUTIONS) ═════════════════════════════════ -->
+  <section id="partner" class="section-alt path-section">
+    <div class="container narrow">
+      <div class="path-header">
+        <span class="path-header-num">03</span>
+        <div>
+          <span class="badge badge-purple">Partner</span>
+          <h2>Cooperatives, federations, aligned institutions.</h2>
+          <p class="path-header-lede">
+            If your cooperative, network, or aligned project is thinking about ICN as institutional infrastructure,
+            the honest frame is not "vendor selection." It is early collaboration on a substrate that is still being built.
+          </p>
+        </div>
+      </div>
+
+      <div class="partner-stages">
+        <article class="partner-stage">
+          <span class="partner-stage-label">Observe</span>
+          <h3>Follow the work before committing</h3>
+          <p>
+            Read <a href="/for-cooperatives">For Cooperatives</a> and <a href="/whats-real-now">What's Real Now</a>.
+            Watch the repository on GitHub. This is the right relationship for most cooperatives right now — you
+            stay oriented without investing engineering capacity in something that isn't ready to hold your institution yet.
+          </p>
+        </article>
+
+        <article class="partner-stage">
+          <span class="partner-stage-label">Contribute expertise</span>
+          <h3>Bring how your institution actually runs</h3>
+          <p>
+            Governance patterns that work, accounting rules that don't fit generic tools, federation relationships
+            that current software can't carry — this knowledge shapes the substrate. You don't need to write code to do this.
+            Open a <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussion</a>
+            describing what your institution does and where the current stack fails.
+          </p>
+        </article>
+
+        <article class="partner-stage">
+          <span class="partner-stage-label">Early collaboration</span>
+          <h3>Work in depth, with engineering capacity</h3>
+          <p>
+            If your institution has the capacity and the interest, working with the project directly as a cooperative
+            or federation willing to shape how the substrate gets built is an option. This is engineering-heavy.
+            You are helping build it, not buying it finished.
+          </p>
+          <p>
+            There is no formal pilot-application process yet. The current path is: open a
+            <a href="https://github.com/InterCooperative-Network/icn/discussions/new?category=general" target="_blank" rel="noopener">Discussion</a>
+            describing your institution, the scope of engagement you have in mind, and the engineering capacity you can commit.
+          </p>
+        </article>
+      </div>
+
+      <div class="partner-caveat">
+        <p>
+          <strong>What we'd ask you not to do:</strong> treat ICN as a SaaS product to pilot next quarter.
+          That is not where the work stands today. <a href="/for-cooperatives#how-to-think-about-timing-and-adoption">What honest adoption looks like</a>.
+        </p>
+      </div>
+
+      <div class="path-cta">
+        <a href="/for-cooperatives" class="btn btn-primary">Read For Cooperatives</a>
+        <a href="https://github.com/InterCooperative-Network/icn/discussions/new?category=general" target="_blank" rel="noopener" class="btn btn-secondary">Open a partnership Discussion ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ SUPPORT (FINANCIAL) ═════════════════════════════════════ -->
+  <section id="support" class="section path-section">
+    <div class="container narrow">
+      <div class="path-header">
+        <span class="path-header-num">04</span>
+        <div>
+          <span class="badge badge-green">Support</span>
+          <h2>Sponsor the work financially.</h2>
+          <p class="path-header-lede">
+            ICN is open infrastructure. Financial support goes to sustaining engineering capacity on the
+            substrate — not to a commercial product with an investor ladder behind it.
+          </p>
+        </div>
+      </div>
+
+      <div class="support-card">
+        <div class="support-card-body">
+          <h3>GitHub Sponsors</h3>
+          <p>
+            The current financial-support rail is GitHub Sponsors, at the organization level. Sponsorship goes
+            to sustaining work across the whole project, not to a specific sub-project or individual.
+          </p>
+          <p>
+            This is the only live donation rail today. We are not running Patreon, Open Collective, or a
+            fiscal-sponsor donation portal. If a more structured funding path (fiscal sponsor, grants, institutional
+            membership) becomes appropriate, it will be described on this page when it exists — not before.
+          </p>
+          <a
+            href="https://github.com/sponsors/InterCooperative-Network"
+            target="_blank"
+            rel="noopener"
+            class="btn btn-primary btn-lg support-cta"
+          >
+            Sponsor on GitHub ↗
+          </a>
+        </div>
+      </div>
+
+      <div class="support-meta">
+        <h3>What we are honest about</h3>
+        <ul>
+          <li>
+            <strong>There is no paid support contract.</strong> Sponsoring the project does not buy you a
+            support SLA, a hotline, or prioritized issue handling.
+          </li>
+          <li>
+            <strong>Sponsorship is not a security audit commitment.</strong> ICN's security posture stands on its own
+            architecture and code review; sponsors are not promised an audit in exchange.
+          </li>
+          <li>
+            <strong>We are not issuing tokens, equity, or governance rights in exchange for funding.</strong>
+            ICN's governance lives in the cooperative substrate it builds, not in a funding tier.
+          </li>
+          <li>
+            <strong>For institutional funding conversations</strong> — grants, fiscal sponsorship, aligned-foundation
+            support — open a <a href="https://github.com/InterCooperative-Network/icn/discussions/new?category=general" target="_blank" rel="noopener">Discussion</a>
+            describing the funding context. The project will respond in the open where possible.
+          </li>
+        </ul>
+      </div>
+
+      <div class="path-cta">
+        <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="btn btn-primary">Sponsor on GitHub ↗</a>
+        <a href="https://github.com/InterCooperative-Network/icn/discussions/new?category=general" target="_blank" rel="noopener" class="btn btn-ghost">Funding conversation ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-alt">
+    <div class="container narrow">
+      <div class="section-header section-header-left" style="margin-bottom: var(--space-xl);">
+        <span class="badge badge-amber">What ICN Needs</span>
+        <h2>What is most useful now versus later.</h2>
+      </div>
+
+      <div class="contribution-grid">
+        <article class="contribution-card">
+          <h3>Useful now</h3>
+          <p>Developer work that expands execution coverage, improves contributor onboarding, or tightens member-facing and operator-facing surfaces.</p>
+          <p>Documentation work that makes the project easier to evaluate honestly and easier to contribute to without internal context.</p>
+          <p>Design, testing, and pilot feedback that exposes where the current user-facing surfaces still break down.</p>
+          <p>Institutional input from cooperatives, federations, and aligned networks about governance, accounting, and coordination problems the current stack fails to carry.</p>
+        </article>
+
+        <article class="contribution-card">
+          <h3>Later, not promised yet</h3>
+          <p>A polished non-technical onboarding flow for ordinary members, a formal pilot intake program, or a managed vendor-style adoption path.</p>
+          <p>Additional donation infrastructure beyond GitHub Sponsors.</p>
+          <p>A finished brand system or final ICN logo.</p>
+          <p>Any hosted sign-up surface that would let institutions treat ICN like a normal SaaS product.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FALLBACK / ROUTING ═════════════════════════════════════ -->
+  <section class="section-alt">
+    <div class="container narrow text-center">
+      <h2>Not sure which path fits?</h2>
+      <p class="section-lede">
+        If you are still figuring out what ICN is before deciding how to engage, start with
+        <a href="/what-is-icn">What is ICN</a> and <a href="/whats-real-now">What's Real Now</a>.
+        Then come back here.
+      </p>
+      <div class="hero-actions" style="justify-content: center;">
+        <a href="/what-is-icn" class="btn btn-primary">What is ICN</a>
+        <a href="/whats-real-now" class="btn btn-secondary">What's Real Now</a>
+        <a href="/community" class="btn btn-ghost">Where work happens</a>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+.narrow { max-width: 820px; }
+.page-hero { display: flex; flex-direction: column; gap: var(--space-md); align-items: flex-start; }
+.page-hero .badge { align-self: flex-start; }
+.page-hero h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 3.8vw, 2.5rem);
+  line-height: 1.2;
+}
+.lead { font-size: 1.125rem; color: var(--text-body); line-height: 1.6; margin: 0; }
+
+/* Path nav at the top */
+.path-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-sm);
+  margin-top: var(--space-2xl);
+}
+.path-nav-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  transition: border-color var(--duration-normal) var(--ease-out), transform var(--duration-normal) var(--ease-out);
+}
+.path-nav-item:hover {
+  border-color: var(--border-accent);
+  transform: translateY(-2px);
+}
+.path-nav-num {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--accent-teal);
+}
+.path-nav-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+.path-nav-hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Path sections */
+.path-section { scroll-margin-top: 80px; }
+.path-header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-lg);
+  align-items: start;
+  margin-bottom: var(--space-2xl);
+}
+.path-header-num {
+  font-family: var(--font-mono);
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-teal);
+  opacity: 0.35;
+}
+.path-header h2 {
+  margin: var(--space-xs) 0 var(--space-sm);
+  font-size: clamp(1.5rem, 3vw, 1.875rem);
+  line-height: 1.2;
+}
+.path-header-lede {
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: var(--text-body);
+  margin: 0;
+}
+
+/* Build path steps */
+.path-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-2xl);
+  counter-reset: step;
+  display: grid;
+  gap: var(--space-lg);
+}
+.path-steps > li {
+  position: relative;
+  padding: var(--space-lg) var(--space-lg) var(--space-lg) var(--space-2xl);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  counter-increment: step;
+}
+.path-steps > li::before {
+  content: counter(step, decimal-leading-zero);
+  position: absolute;
+  left: var(--space-md);
+  top: var(--space-lg);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-teal);
+  letter-spacing: 0.08em;
+}
+.path-steps h3 {
+  margin: 0 0 var(--space-sm);
+  font-size: 1.0625rem;
+  color: var(--text-heading);
+}
+.path-steps p { margin: 0 0 var(--space-sm); line-height: 1.65; }
+.path-steps ul {
+  margin: 0;
+  padding-left: var(--space-lg);
+  display: grid;
+  gap: var(--space-xs);
+}
+.path-steps li ul li { line-height: 1.6; }
+.path-steps pre {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  overflow-x: auto;
+  font-size: 0.875rem;
+  margin: var(--space-sm) 0;
+}
+.path-steps code {
+  font-size: 0.85em;
+  font-family: var(--font-mono);
+}
+.path-steps pre code {
+  background: none;
+  padding: 0;
+}
+.path-steps :not(pre) > code {
+  background: var(--bg-surface);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+}
+.path-step-note {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: var(--space-sm) !important;
+}
+
+/* Contribution grid */
+.contribution-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-2xl);
+}
+.contribution-card {
+  padding: var(--space-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+}
+.contribution-card h3 {
+  margin: 0 0 var(--space-sm);
+  font-size: 1.0625rem;
+  color: var(--text-heading);
+}
+.contribution-card p {
+  margin: 0 0 var(--space-sm);
+  line-height: 1.65;
+  font-size: 0.9375rem;
+}
+.contribution-card p:last-child { margin-bottom: 0; }
+.contribution-next {
+  padding-top: var(--space-sm);
+  margin-top: var(--space-sm) !important;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.875rem !important;
+  color: var(--text-muted);
+}
+.contribution-next strong { color: var(--text-body); }
+.contribution-card code {
+  font-size: 0.85em;
+  background: var(--bg-surface);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+}
+
+/* Partner stages */
+.partner-stages {
+  display: grid;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+}
+.partner-stage {
+  padding: var(--space-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  border-left: 3px solid var(--accent-purple, var(--accent-teal));
+}
+.partner-stage-label {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-teal);
+  margin-bottom: var(--space-xs);
+}
+.partner-stage h3 {
+  margin: 0 0 var(--space-sm);
+  font-size: 1.125rem;
+  color: var(--text-heading);
+}
+.partner-stage p {
+  margin: 0 0 var(--space-sm);
+  line-height: 1.65;
+}
+.partner-stage p:last-child { margin-bottom: 0; }
+.partner-caveat {
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-xl);
+}
+.partner-caveat p {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+.partner-caveat strong { color: var(--text-body); }
+
+/* Support path */
+.support-card {
+  padding: var(--space-xl);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-xl);
+}
+.support-card h3 {
+  margin: 0 0 var(--space-md);
+  font-size: 1.25rem;
+  color: var(--text-heading);
+}
+.support-card p {
+  margin: 0 0 var(--space-md);
+  line-height: 1.7;
+}
+.support-cta { margin-top: var(--space-md); }
+.support-meta h3 {
+  font-size: 1.0625rem;
+  margin-top: var(--space-xl);
+  margin-bottom: var(--space-sm);
+}
+.support-meta ul {
+  margin: 0 0 var(--space-xl);
+  padding-left: var(--space-lg);
+  display: grid;
+  gap: var(--space-sm);
+}
+.support-meta li { line-height: 1.65; }
+
+/* Shared CTA row for each path */
+.path-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-xl);
+}
+.btn-lg { font-size: 1rem; padding: 0.75rem 1.5rem; }
+
+.section-lede {
+  font-size: 1.0625rem;
+  color: var(--text-muted);
+  margin: 0 auto var(--space-xl);
+  max-width: 40em;
+}
+
+@media (max-width: 768px) {
+  .path-nav {
+    grid-template-columns: 1fr;
+  }
+  .path-header {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+  .path-header-num { font-size: 2rem; }
+  .contribution-grid {
+    grid-template-columns: 1fr;
+  }
+  .path-steps > li {
+    padding: var(--space-md) var(--space-md) var(--space-md) var(--space-xl);
+  }
+  .path-steps > li::before {
+    left: var(--space-sm);
+    top: var(--space-md);
+  }
+}
+</style>

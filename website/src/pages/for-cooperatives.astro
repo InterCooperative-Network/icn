@@ -10,17 +10,35 @@ import ReadingLadder from '../components/ReadingLadder.astro';
     <div class="container narrow">
       <div class="page-hero">
         <span class="badge badge-amber">For Cooperatives</span>
-        <h1>ICN is being built for the kind of institution that has to hold itself together with people, memory, and care.</h1>
+        <h1>ICN is institutional infrastructure for cooperatives and cooperative networks.</h1>
         <p class="lead">
-          If you run a cooperative, a community organization, or a federation,
-          you already know the shape of the problem. This page is not here to explain cooperatives to you.
-          It is here to explain what ICN is trying to do for you — and what it is not yet ready to do.
+          For cooperatives, the point is not software novelty. It is to reduce dependence on generic tools
+          and give governance, obligations, records, and federation a more reliable technical foundation.
         </p>
+      </div>
+
+      <div class="truth-grid truth-grid-2">
+        <div class="truth-note truth-note-teal">
+          <span class="truth-note-label">Partner value</span>
+          <h3>Continuity, accountability, and interoperability</h3>
+          <p>
+            The value is not only better tooling. It is stronger institutional memory,
+            more credible governance records, and better coordination across cooperative relationships.
+          </p>
+        </div>
+        <div class="truth-note truth-note-amber">
+          <span class="truth-note-label">Strategic direction</span>
+          <h3>Built with institutions, not sold to them as tenants</h3>
+          <p>
+            The larger goal is infrastructure that the movement can use, govern, and improve collectively
+            rather than license indefinitely from outside vendors.
+          </p>
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="section-alt">
+  <section class="section-alt section-pre-ladder">
     <div class="container narrow prose">
       <h2>The institutional problem you actually face</h2>
       <p>
@@ -33,6 +51,11 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         Execution depends on whoever remembered what they were supposed to do.
       </p>
       <p>
+        Concretely, that often means Google Workspace or Microsoft 365 for documents and internal records,
+        Loomio for voting, QuickBooks for accounting, Slack or Teams for day-to-day coordination,
+        and some combination of CRM, Airtable, or spreadsheets for membership and standing.
+      </p>
+      <p>
         Each of these tools, in isolation, can be made to work. Together, they produce drift.
         Decisions do not reliably become action. Rules do not reliably bind practice.
         Accountability decays into trust in the specific people holding the pieces together in their heads.
@@ -43,10 +66,15 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <h2>Why generic software is not enough</h2>
       <p>
         The underlying problem is that none of those tools model the institution itself.
-        They do not know what a member is, in the sense that matters to a cooperative.
-        They do not know what a rule is, in the sense that should bind practice.
+        They do not know what a member is in the sense that matters to a cooperative.
+        They do not know what a rule is in the sense that should bind practice.
         They do not know what it means for a decision to authorize an action.
         Integrating them only spreads the gap more evenly.
+      </p>
+      <p>
+        This also means ICN should not be understood as a one-for-one clone of Google, Microsoft, Slack, QuickBooks, or Loomio.
+        The aim is deeper than substitution at the app layer. It is to give the cooperative its own institutional substrate,
+        so those functions no longer depend on a bundle of external systems held together by staff discipline.
       </p>
 
       <h2>What changes when the institutional loop is closed</h2>
@@ -127,8 +155,25 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       </p>
       <p>
         What we would ask you not to do is treat ICN as a SaaS product to pilot next quarter.
-        That is not the current shape of the project.
+        That is not where the work stands today.
       </p>
+
+      <h2>How to engage right now</h2>
+      <p>
+        The practical next step depends on what kind of relationship you want with the project.
+        These are the current real paths:
+      </p>
+      <ol>
+        <li><strong>Evaluate first.</strong> Read <a href="/whats-real-now">What's Real Now</a> and confirm that the current maturity is compatible with your timing.</li>
+        <li><strong>Bring a concrete institutional case.</strong> Open a <a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">GitHub Discussion</a> that describes the governance, accounting, coordination, or federation problem your current stack does not carry well.</li>
+        <li><strong>If you only want to support the work without implying a vendor relationship,</strong> use the GitHub Sponsors rail on <a href="/get-involved#support">Get Involved</a>.</li>
+      </ol>
+      <ul>
+        <li><strong>Track the work before you commit institutional energy.</strong> Start with <a href="/whats-real-now">What's Real Now</a>, then use <a href="/community">Community</a> to follow the repository and discussions.</li>
+        <li><strong>Bring institutional patterns, not just product requests.</strong> If your cooperative, federation, or aligned project has a real governance, accounting, or coordination problem that the current stack cannot carry cleanly, use <a href="/get-involved">Get Involved</a> for the current collaboration path.</li>
+        <li><strong>Assume early collaboration is engineering-heavy.</strong> There is no formal pilot program or managed onboarding track yet. Institutions engaging in depth are helping shape the substrate directly.</li>
+        <li><strong>If you want to support the work financially without implying a vendor relationship,</strong> the live path today is the GitHub Sponsors rail surfaced on <a href="/get-involved#support">Get Involved</a>.</li>
+      </ul>
 
       <h2>This is about enhancing human institutions, not automating them away</h2>
       <p>
@@ -144,10 +189,11 @@ import ReadingLadder from '../components/ReadingLadder.astro';
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section-ladder">
     <div class="container narrow">
       <ReadingLadder current="for-cooperatives">
         <Fragment slot="extras">
+          <a href="/get-involved" class="btn btn-ghost">Get Involved</a>
           <a href="/community" class="btn btn-ghost">Community</a>
           <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="btn btn-ghost">GitHub ↗</a>
         </Fragment>

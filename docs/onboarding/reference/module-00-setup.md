@@ -43,7 +43,7 @@ and be ready to explore the codebase.
 - `README.md` - Project overview
 - `CLAUDE.md` - Developer guidance and conventions
 - `CONTRIBUTING.md` - How to contribute
-- `docs/DEV_ENVIRONMENT.md` - Detailed environment setup
+- `docs/guides/developer/DEV_ENVIRONMENT.md` - Detailed environment setup
 
 ## Walkthrough
 
