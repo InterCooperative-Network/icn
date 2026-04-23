@@ -44,6 +44,8 @@ If you find yourself about to add a noun from a specific institution's workflow 
 
 The boundary between the top two layers is what this document defines.
 
+For the current in-monorepo NYCN package home, see `institutions/nycn/`. That directory should be treated as if it were already an external institution repo.
+
 ---
 
 ## B. ICN vs Institution Package

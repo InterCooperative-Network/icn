@@ -1,0 +1,8 @@
+view_id: sponsor-pipeline
+scope: program:summit-cycle-2026
+panels:
+  - open-prospects
+  - commitments-awaiting-confirmation
+  - receipts-linked-to-commitments
+notes:
+  - "Sponsor pipeline is institution-package UI, not a generic core dashboard."

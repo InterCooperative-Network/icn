@@ -627,6 +627,9 @@ pub struct CreateActivityRequest {
     pub start_date: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_date: Option<u64>,
+    /// Structures linked to this activity by structure ID.
+    #[serde(default)]
+    pub linked_structures: Vec<String>,
     /// Optional parent program ID (e.g., "annual-summit-cycle")
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_program_id: Option<String>,

@@ -21,9 +21,11 @@ use icn_governance::{
     ProofOutcome, ProposalId, ProposalPayload, ProposalScope, StaticMembershipResolver, VoteChoice,
     VoteTally,
 };
+use icn_governance_actor::receipt_backend::GovernanceReceiptBackend;
 use icn_governance_actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite};
 use icn_identity::KeyPair;
 use icn_kernel_api::receipts::CanonicalReceipt;
+use icn_kernel_api::{AllocationReceipt, Hash};
 use icn_ledger::asset_types::{AssetClass, AssetCondition, AssetMetadata, AssetRegistry};
 use icn_ledger::create_budget_allocation;
 use icn_ledger::entry::JournalEntryBuilder;
@@ -33,7 +35,8 @@ use icn_membership_app::coop_core::actor::CoopActor;
 use icn_membership_app::coop_core::handle::CoopHandle;
 use icn_membership_app::coop_core::types::{CoopType, MemberRole};
 use icn_store::{SledStore, Store};
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
 use tracing::info;
 
@@ -60,6 +63,74 @@ impl TestIdentity {
 impl std::fmt::Display for TestIdentity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}({})", self.name, &self.did().to_string()[..16])
+    }
+}
+
+#[derive(Default)]
+struct TestReceiptBackend {
+    governance_by_proposal: Mutex<HashMap<String, GovernanceDecisionReceipt>>,
+    governance_by_decision: Mutex<HashMap<Hash, GovernanceDecisionReceipt>>,
+    allocations_by_decision: Mutex<HashMap<Hash, Vec<AllocationReceipt>>>,
+}
+
+impl GovernanceReceiptBackend for TestReceiptBackend {
+    fn put_governance(&self, receipt: &GovernanceDecisionReceipt) -> Result<(), String> {
+        self.governance_by_proposal
+            .lock()
+            .map_err(|e| e.to_string())?
+            .insert(receipt.proposal_id.clone(), receipt.clone());
+        self.governance_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .insert(receipt.decision_hash, receipt.clone());
+        Ok(())
+    }
+
+    fn get_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(self
+            .governance_by_proposal
+            .lock()
+            .map_err(|e| e.to_string())?
+            .get(proposal_id)
+            .cloned())
+    }
+
+    fn put_allocation(&self, receipt: &AllocationReceipt) -> Result<Hash, String> {
+        self.allocations_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .entry(receipt.decision_hash)
+            .or_default()
+            .push(receipt.clone());
+        Ok(receipt.canonical_hash())
+    }
+
+    fn get_governance_by_decision(
+        &self,
+        decision_hash: &Hash,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(self
+            .governance_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .get(decision_hash)
+            .cloned())
+    }
+
+    fn list_allocations_by_decision(
+        &self,
+        decision_hash: &Hash,
+    ) -> Result<Vec<AllocationReceipt>, String> {
+        Ok(self
+            .allocations_by_decision
+            .lock()
+            .map_err(|e| e.to_string())?
+            .get(decision_hash)
+            .cloned()
+            .unwrap_or_default())
     }
 }
 
@@ -305,6 +376,9 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         None, // no signing key
     )
     .await?;
+    gov_handle
+        .install_receipt_store(Arc::new(TestReceiptBackend::default()))
+        .await;
 
     // Create governance domain for the cooperative
     let domain_id = GovernanceDomainId::new("tool-library-gov");

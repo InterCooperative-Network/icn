@@ -13,7 +13,7 @@
 >
 > On any disagreement between this spec and `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md`, **the boundary doc wins.**
 >
-> This document, written before the boundary was pinned down, routes several institution-specific nouns into `icn-governance::*`. That is drift. ICN core — `icn-governance` crate and `apps/governance` — must remain institution-agnostic. Anything shaped specifically by NYCN or the NY Cooperative Summit (sponsor packets, session catalogs, conference registrations, venue-accessibility scoring, summit-year milestone names) belongs in the **institution package** (future `icn/apps/nycn/` or external `nycn-icn` repo), not in governance core. Per the App topology rule (`AGENTS.md`), runtime-integrated apps live under `icn/apps/`; no new top-level `apps/*` crates.
+> This document, written before the boundary was pinned down, routes several institution-specific nouns into `icn-governance::*`. That is drift. ICN core — `icn-governance` crate and `apps/governance` — must remain institution-agnostic. Anything shaped specifically by NYCN or the NY Cooperative Summit (sponsor packets, session catalogs, conference registrations, venue-accessibility scoring, summit-year milestone names) belongs in the **institution package** (currently `institutions/nycn/`, later split to an external `nycn-icn` repo), not in governance core. Per the App topology rule (`AGENTS.md`), runtime-integrated apps live under `icn/apps/`; no new top-level `apps/*` crates.
 >
 > **Corrected routing (authoritative):**
 >

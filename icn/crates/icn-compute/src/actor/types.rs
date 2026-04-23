@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use crate::scheduler::NodeCapacity;
-use crate::types::{ComputeMessage, ComputeResult, ExecutorCapability, TaskHash};
+use crate::types::{ComputeMessage, ComputeResult, ComputeTask, ExecutorCapability, TaskHash};
 
 /// Information about an available executor
 ///
@@ -165,6 +165,17 @@ pub type LocalityCallback = Arc<dyn Fn(&str) -> crate::scheduler::LocalityContex
 /// Negative balances indicate debt. Used by `CommonsPoolPolicy::validate_submitter_credit`.
 pub type BalanceCallback = Arc<dyn Fn(&str) -> i64 + Send + Sync>;
 
+/// Deterministic commons credit requirement contract for admission checks.
+///
+/// This callback lets app/policy layers own the "how many credits are required"
+/// meaning while compute remains the mechanical enforcer at submit time.
+///
+/// Return:
+/// - `Ok(required_credits)` for a valid requirement (`>= 1`)
+/// - `Err(reason)` when the policy path cannot produce a deterministic value
+pub type CommonsRequiredCreditsCallback =
+    Arc<dyn Fn(&ComputeTask) -> Result<i64, String> + Send + Sync>;
+
 /// Commons credit settlement request (E7 - #948).
 ///
 /// Fired by the compute actor when a commons-scope task completes successfully.
@@ -210,7 +221,7 @@ pub type CommonsSettlementCallback = Arc<dyn Fn(CommonsPaymentRequest) + Send + 
 pub struct CommonsReserveRequest {
     /// DID of the consumer (submitter — credits are held from their balance).
     pub consumer: String,
-    /// Credits to reserve. Computed by `cost::compute_credits_required(&task)`.
+    /// Credits to reserve. Computed via the configured commons requirement contract.
     pub amount: i64,
     /// Task ID used as the reservation key. Unique per submission.
     pub task_id: String,
