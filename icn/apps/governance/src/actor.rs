@@ -2059,9 +2059,12 @@ impl GovernanceActor {
                 // Update proposal
                 proposal.close(new_state)?;
 
-                // Persist updated state. All invariant checks and durable
-                // closure artifacts (Invariant 7 gate, IER, mandate, proof
-                // bytes) have already passed/persisted at this point.
+                // Persist updated state. Invariant 7 gate has passed and,
+                // for execution-required Accepted payloads, IER + mandate
+                // preflight writes have already landed. Proof bytes (when
+                // present) were persisted above. IER / mandate for
+                // Accepted + non-execution-required payloads may still be
+                // written below in the guarded post-save block.
                 self.store.save_proposal(&proposal)?;
 
                 // Create tally snapshot for broadcast

@@ -32,6 +32,7 @@ use icn_governance_actor::{
 };
 use icn_identity::IdentityBundle;
 use icn_store::SledStore;
+use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
@@ -49,6 +50,7 @@ struct CountingReceiptBackend {
     get_mandate_by_proposal_calls: AtomicUsize,
     fail_put_institutional_effect: bool,
     mandates_by_proposal: Mutex<Vec<icn_governance::Mandate>>,
+    grants: Mutex<HashMap<icn_governance::AuthorityGrantId, icn_governance::AuthorityGrant>>,
 }
 
 impl CountingReceiptBackend {
@@ -62,6 +64,7 @@ impl CountingReceiptBackend {
             get_mandate_by_proposal_calls: AtomicUsize::new(0),
             fail_put_institutional_effect: false,
             mandates_by_proposal: Mutex::new(vec![]),
+            grants: Mutex::new(HashMap::new()),
         }
     }
 
@@ -153,30 +156,29 @@ impl GovernanceReceiptBackend for CountingReceiptBackend {
     ) -> Result<(), String> {
         self.put_mandate_with_grants_calls
             .fetch_add(1, Ordering::SeqCst);
+        // Durably record the mandate and every grant so the seam's
+        // read-after-write contract holds.
         self.mandates_by_proposal
             .lock()
             .unwrap()
             .push(mandate.clone());
-        // Also record grants on the no-op defaults so the helper doesn't
-        // abort with grant_durability_not_supported.
         for g in grants {
             self.put_authority_grant(g)?;
-            // read-after-write: return the same grant.
-            let _ = self.get_authority_grant(&g.id)?;
         }
         Ok(())
     }
-    fn put_authority_grant(&self, _grant: &icn_governance::AuthorityGrant) -> Result<(), String> {
+    fn put_authority_grant(&self, grant: &icn_governance::AuthorityGrant) -> Result<(), String> {
+        self.grants
+            .lock()
+            .unwrap()
+            .insert(grant.id.clone(), grant.clone());
         Ok(())
     }
     fn get_authority_grant(
         &self,
-        _grant_id: &icn_governance::AuthorityGrantId,
+        grant_id: &icn_governance::AuthorityGrantId,
     ) -> Result<Option<icn_governance::AuthorityGrant>, String> {
-        // Return a sentinel so the default put_mandate_with_grants fallback
-        // doesn't trip the grant_durability_not_supported sentinel when the
-        // override is used; but the override above never invokes this.
-        Ok(None)
+        Ok(self.grants.lock().unwrap().get(grant_id).cloned())
     }
 }
 
