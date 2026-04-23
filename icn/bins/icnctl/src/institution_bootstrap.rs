@@ -1411,14 +1411,20 @@ mod tests {
 
     #[test]
     fn validates_nycn_package() {
-        let report = validate_package(&nycn_package_dir()).expect("package should validate");
+        let report = match validate_package(&nycn_package_dir()) {
+            Ok(report) => report,
+            Err(err) => panic!("package should validate: {err}"),
+        };
         assert!(report.charter_valid);
         assert_eq!(report.seed_count, 7);
     }
 
     #[test]
     fn builds_nycn_plan_with_expected_core_ops() {
-        let report = build_plan_report(&nycn_package_dir()).expect("plan should build");
+        let report = match build_plan_report(&nycn_package_dir()) {
+            Ok(report) => report,
+            Err(err) => panic!("plan should build: {err}"),
+        };
         assert!(report.plan.operations.len() >= 10);
         assert_eq!(report.preview.entity_count, 2);
         assert_eq!(report.preview.governance_domain_count, 2);
@@ -1455,19 +1461,22 @@ mod tests {
 
     #[test]
     fn plan_orders_domain_provisioning_before_program_creation() {
-        let report = build_plan_report(&nycn_package_dir()).expect("plan should build");
+        let report = match build_plan_report(&nycn_package_dir()) {
+            Ok(report) => report,
+            Err(err) => panic!("plan should build: {err}"),
+        };
         let domain_pos = report
             .plan
             .operations
             .iter()
             .position(|op| matches!(op, BootstrapOperation::ProvisionGovernanceDomain { id, .. } if id == "nycn-organizers-gov"))
-            .expect("domain provision step should exist");
+            .unwrap_or_else(|| panic!("domain provision step should exist"));
         let program_pos = report
             .plan
             .operations
             .iter()
             .position(|op| matches!(op, BootstrapOperation::CreateProgram { id, .. } if id == "summit-cycle-2026"))
-            .expect("program create step should exist");
+            .unwrap_or_else(|| panic!("program create step should exist"));
         assert!(domain_pos < program_pos);
     }
 
