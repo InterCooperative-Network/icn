@@ -1,0 +1,17 @@
+template_id: summit-registration
+scope: institution-package
+fields:
+  - id: attendee_name
+    type: string
+  - id: organization
+    type: string
+  - id: access_needs
+    type: text
+  - id: childcare_needs
+    type: text
+  - id: dietary_needs
+    type: text
+  - id: payment_state
+    type: string
+notes:
+  - "Registration form shape is package logic, not an ICN core primitive."

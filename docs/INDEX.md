@@ -399,6 +399,8 @@ Strategic direction and gap analysis (March 2026):
 - [NYCN-Repo-Architecture-Spec.md](strategy/NYCN-Repo-Architecture-Spec.md) - Repo-shaped architectural map grounded in current code: bounded domains, canonical objects, authority model, Program/cycle design (2026-04-14)
 - [NYCN-Implementation-Matrix.md](strategy/NYCN-Implementation-Matrix.md) - Execution ledger: per-object status (main/open_pr/branch_only/spec_only), touch points, bootstrap seed, ny-coop-net import crosswalk, phase-gated open questions (2026-04-14)
 - [NYCN-Execution-Tranches.md](strategy/NYCN-Execution-Tranches.md) - Merge-order + dependency plan across 7 tranches, rollback strategy, agent assignments (2026-04-14)
+- [../institutions/nycn/README.md](../institutions/nycn/README.md) - NYCN institution package boundary, ownership rules, and package scaffold (2026-04-22)
+- [../institutions/nycn/docs/INDEX.md](../institutions/nycn/docs/INDEX.md) - NYCN package-local docs, bootstrap runbook, summit materials, and seed entrypoints (2026-04-22)
 
 ### Current Status Reports (`status/`)
 
@@ -419,6 +421,10 @@ Formal architectural decisions:
 ### Templates (`templates/`)
 
 Documentation and code templates for consistency.
+
+### Reference Additions
+
+- [reference/institution-package-bootstrap.md](reference/institution-package-bootstrap.md) - Generic institution-package bootstrap manifest, ordering, and current executor reality
 
 ### Vision Documents (`vision/`)
 

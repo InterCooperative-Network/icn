@@ -1,0 +1,9 @@
+view_id: organizer-home
+backed_by_core_surfaces:
+  - /gov/me/scopes
+  - /gov/me/work
+panels:
+  - active-scopes
+  - urgent-work
+  - upcoming-meetings
+  - current-programs

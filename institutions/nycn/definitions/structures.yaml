@@ -1,0 +1,17 @@
+structures:
+  - id: nycn-steering
+    core_primitive: Structure
+    subtype: committee
+    purpose: "Ratification and cross-committee coordination."
+  - id: nycn-finance
+    core_primitive: Structure
+    subtype: committee
+    purpose: "Budget review, sponsorship review, treasury coordination."
+  - id: nycn-content
+    core_primitive: Structure
+    subtype: committee
+    purpose: "Program shaping and session review."
+  - id: nycn-logistics
+    core_primitive: Structure
+    subtype: committee
+    purpose: "Venue, schedule, and operations."

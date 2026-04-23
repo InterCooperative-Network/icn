@@ -3314,15 +3314,21 @@ pub async fn create_activity<E: GovernanceEventEmitter + Clone + 'static>(
         .parent_program_id
         .as_deref()
         .map(|s| icn_governance::program::ProgramId(s.to_string()));
+    let linked_structures = req
+        .linked_structures
+        .iter()
+        .map(|id| StructureId(id.clone()))
+        .collect();
     let a = ctx
         .manager
-        .create_activity(
+        .create_activity_with_links(
             entity,
             kind,
             req.name.clone(),
             req.description.clone(),
             req.start_date,
             req.end_date,
+            linked_structures,
             parent_program_id,
         )
         .map_err(anyhow_to_api)?;

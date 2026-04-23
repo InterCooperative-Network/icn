@@ -1,0 +1,31 @@
+seed_version: draft-0
+kind: milestone-template-seed
+program_id: summit-cycle-2026
+milestones:
+  - id: summit-strategy-locked
+    title: Strategy Locked
+    phase_index: 0
+    completion_criteria:
+      - "charter:governance-window-confirmed"
+      - "package:committee-owners-confirmed"
+  - id: summit-venue-ready
+    title: Venue Ready
+    phase_index: 1
+    completion_criteria:
+      - "package:venue-review-complete"
+      - "package:accessibility-review-complete"
+  - id: summit-public-launch-ready
+    title: Public Launch Ready
+    phase_index: 2
+    completion_criteria:
+      - "package:registration-flow-published"
+      - "package:communications-kit-approved"
+  - id: summit-cycle-closeout
+    title: Cycle Closeout
+    phase_index: 3
+    completion_criteria:
+      - "package:post-event-retrospective-linked"
+      - "package:next-cycle-handoff-prepared"
+notes:
+  - "Milestone names and criteria are institution-package semantics, not core enums."
+  - "This seed now targets a concrete program_id so the bootstrap planner can produce generic milestone-create operations."

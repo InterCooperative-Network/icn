@@ -1,0 +1,15 @@
+programs:
+  - id: summit-cycle-annual
+    core_primitive: Program
+    kind: custom
+    kind_tag: annual-summit
+    owned_semantics:
+      - summit milestones
+      - sponsor pipeline
+      - session intake
+      - registration operations
+    must_not_move_to_core:
+      - sponsor tiers
+      - session catalog states
+      - registration forms
+      - venue scoring rubrics

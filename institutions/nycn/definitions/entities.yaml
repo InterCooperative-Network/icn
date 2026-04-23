@@ -1,0 +1,9 @@
+entities:
+  - id: nycn
+    core_primitive: Entity
+    subtype: federation
+    meaning: "Regional network federation."
+  - id: nycn-organizers
+    core_primitive: Entity
+    subtype: cooperative
+    meaning: "Operational owner for NYCN structures and summit execution."

@@ -1,0 +1,12 @@
+seed_version: draft-0
+kind: entity-seed
+entity:
+  id: nycn-organizers
+  entity_type: cooperative
+  parent_entity_id: nycn
+  display_name: NYCN Organizers Cooperative
+  governance_domain_id: nycn-organizers-gov
+  operating_purpose: "Runs NYCN operations and summit execution inside the federation."
+  notes:
+    - "Operational owner for structures and activities."
+    - "Separate sovereign entity from the federation."
