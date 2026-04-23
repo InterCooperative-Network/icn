@@ -46,7 +46,7 @@ View source on GitHub →
 <blockquote>
 <h2>⚠️ Authoritative routing correction (2026-04-17)</h2>
 <p>This document predates <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code>. On any routing conflict between this matrix and the boundary doc, <strong>the boundary doc wins.</strong></p>
-<p>Several rows below route institution-specific nouns (sponsor, budget-item, session, registration, venue accessibility, source-ref, institutional-document, speaker/attendee/sponsor-contact participation variants, institution-specific <code>ProgramKind</code> / <code>MilestoneType</code> names like <code>AnnualSummit</code> / <code>VenueLocked</code> / <code>BudgetLocked</code> / <code>PublicLaunchReady</code>) into <code>icn-governance::*</code>. That is drift. ICN core — <code>icn-governance</code> and <code>apps/governance</code> — must stay institution-agnostic.</p>
+<p>Several rows below route institution-specific nouns (sponsor, budget-item, session, registration, venue accessibility, source-ref, institutional-document, speaker/attendee/sponsor-contact participation variants, institution-specific <code>ProgramKind</code> / <code>MilestoneType</code> names like <code>AnnualSummit</code> / <code>VenueLocked</code> / <code>BudgetLocked</code> / <code>PublicLaunchReady</code>) into <code>icn-governance::*</code>. That is drift. ICN core — <code>icn-governance</code> and <code>apps/governance</code> — must stay institution-agnostic. In this monorepo, those institution-owned artifacts now belong under <code>institutions/nycn/</code> until they are split into their own repo.</p>
 <p><strong>Corrected routing (authoritative):</strong></p>
 <table>
 <thead>
