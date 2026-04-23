@@ -1913,79 +1913,14 @@ impl GovernanceActor {
                     );
                 }
 
-                // For execution-required accepted outcomes, prove closure artifacts
-                // are persistable before committing terminal proposal state.
-                if requires_execution_closure {
-                    if let Some(ref store) = self.receipt_store {
-                        use icn_governance::proof::ProofOutcome;
-                        let preflight_receipt = GovernanceDecisionReceipt::new(
-                            proposal_id.0.clone(),
-                            proposal.domain_id.0.clone(),
-                            ProofOutcome::Accepted,
-                            tally.clone(),
-                            &votes,
-                        );
-                        crate::institutional_effect::emit_accepted_effect(
-                            store.as_ref(),
-                            &proposal_id.0,
-                            &proposal.domain_id.0,
-                            Some(preflight_receipt.decision_hash),
-                            &proposal.payload,
-                            now,
-                        )
-                        .map_err(|e| {
-                            anyhow::anyhow!(
-                                "Proposal '{}' requires execution closure but actor effect emission preflight failed: {e}",
-                                proposal_id.0
-                            )
-                        })?;
-
-                        match crate::grant_minting::mint_and_persist_for_accepted(
-                            store.as_ref(),
-                            &proposal_id.0,
-                            &proposal.domain_id,
-                            preflight_receipt.decision_hash,
-                            &proposal.payload,
-                            now,
-                        ) {
-                            Ok(crate::grant_minting::MandateMintOutcome::Minted { .. })
-                            | Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted {
-                                ..
-                            }) => {}
-                            Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
-                                anyhow::bail!(
-                                    "Proposal '{}' requires execution closure but actor mandate preflight hash failed.",
-                                    proposal_id.0
-                                );
-                            }
-                            Err(e) => {
-                                anyhow::bail!(
-                                    "Proposal '{}' requires execution closure but actor mandate preflight persistence failed: {e}",
-                                    proposal_id.0
-                                );
-                            }
-                        }
-                    }
-                }
-
-                // Update proposal
-                proposal.close(new_state)?;
-
-                // Persist updated state
-                self.store.save_proposal(&proposal)?;
-
-                // Invariant 7: gate all Accepted decisions before effect dispatch.
+                // Invariant 7 gate + closure preflight run BEFORE terminal proposal
+                // persistence. Any failure here must leave the proposal in its
+                // prior state — the only way to keep `save_proposal` and the
+                // caller's result in agreement is to bail before `close()`.
                 //
-                // Construct the receipt from current vote state and verify it passes
-                // check_execution_gate. This is the production enforcement point — no
-                // ProposalAccepted event fires without a receipt that is (a) Accepted and
-                // (b) internally consistent (verify() passes). Non-Accepted outcomes skip
-                // the gate entirely; they never produce resource-allocation effects.
-                //
-                // The canonical governance decision hash (gate_receipt.decision_hash) is
-                // propagated to the ProposalAccepted event so that journal entries created
-                // by create_effect_subscription carry the same hash that keys the
-                // governance receipt chain — enabling hash-level audit verification.
+                // The gate receipt here is canonical: its decision_hash keys the
+                // institutional-effect record, the ADR-0014 mandate, and the
+                // ProposalAccepted event. Construct it once and reuse.
                 let governance_decision_hash: Option<String> = if matches!(
                     outcome_result,
                     DecisionOutcome::Accepted
@@ -2002,25 +1937,78 @@ impl GovernanceActor {
                         error!(
                             proposal_id = %proposal_id.0,
                             error = %gate_err,
-                            "Invariant 7 gate rejected accepted proposal — blocking effect dispatch"
+                            "Invariant 7 gate rejected accepted proposal — blocking terminal persistence"
                         );
                         bail!(
                             "Invariant 7 gate failure for proposal {}: {gate_err}",
                             proposal_id.0
                         );
                     }
-                    let decision_hash_hex = hex::encode(gate_receipt.decision_hash);
+                    let decision_hash = gate_receipt.decision_hash;
                     info!(
                         proposal_id = %proposal_id.0,
-                        decision_hash = %decision_hash_hex,
+                        decision_hash = %hex::encode(decision_hash),
                         "Invariant 7 gate passed"
                     );
-                    Some(decision_hash_hex)
+
+                    // Execution-required preflight: prove closure artifacts are
+                    // persistable before committing terminal proposal state.
+                    if requires_execution_closure {
+                        if let Some(ref store) = self.receipt_store {
+                            crate::institutional_effect::emit_accepted_effect(
+                                store.as_ref(),
+                                &proposal_id.0,
+                                &proposal.domain_id.0,
+                                Some(decision_hash),
+                                &proposal.payload,
+                                now,
+                            )
+                            .map_err(|e| {
+                                anyhow::anyhow!(
+                                    "Proposal '{}' requires execution closure but actor effect emission preflight failed: {e}",
+                                    proposal_id.0
+                                )
+                            })?;
+
+                            match crate::grant_minting::mint_and_persist_for_accepted(
+                                store.as_ref(),
+                                &proposal_id.0,
+                                &proposal.domain_id,
+                                decision_hash,
+                                &proposal.payload,
+                                now,
+                            ) {
+                                Ok(crate::grant_minting::MandateMintOutcome::Minted { .. })
+                                | Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted {
+                                    ..
+                                }) => {}
+                                Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
+                                    anyhow::bail!(
+                                        "Proposal '{}' requires execution closure but actor mandate preflight hash failed.",
+                                        proposal_id.0
+                                    );
+                                }
+                                Err(e) => {
+                                    anyhow::bail!(
+                                        "Proposal '{}' requires execution closure but actor mandate preflight persistence failed: {e}",
+                                        proposal_id.0
+                                    );
+                                }
+                            }
+                        }
+                    }
+
+                    Some(hex::encode(decision_hash))
                 } else {
                     None
                 };
 
-                // Generate GovernanceProofV2 if signing key is available
+                // Generate + persist GovernanceProofV2 BEFORE terminal proposal
+                // save. If proof persistence fails, the proposal must not be
+                // persisted as closed — otherwise the API returns Err while the
+                // store disagrees. Non-Accepted outcomes still emit a proof
+                // (useful for audit of rejection / no-quorum signals) but they
+                // bypass the Invariant 7 gate above.
                 let proof_bytes = if let Some(ref signing_key) = self.signing_key {
                     use icn_governance::ProofOutcome;
 
@@ -2048,7 +2036,9 @@ impl GovernanceActor {
 
                     let serialized = serde_json::to_vec(&proof)?;
 
-                    // Persist proof for later retrieval
+                    // Persist proof for later retrieval. A failure here bails
+                    // before terminal proposal persistence — see block comment
+                    // above.
                     self.store.save_proof_bytes(&proposal_id, &serialized)?;
 
                     info!(
@@ -2065,6 +2055,14 @@ impl GovernanceActor {
                     );
                     None
                 };
+
+                // Update proposal
+                proposal.close(new_state)?;
+
+                // Persist updated state. All invariant checks and durable
+                // closure artifacts (Invariant 7 gate, IER, mandate, proof
+                // bytes) have already passed/persisted at this point.
+                self.store.save_proposal(&proposal)?;
 
                 // Create tally snapshot for broadcast
                 let tally_snapshot = TallySnapshot::new(
@@ -2156,18 +2154,23 @@ impl GovernanceActor {
                 }
 
                 // Canonical institutional-effect emission for actor-backed
-                // normal close. Idempotent on (proposal_id, effect_kind), so
-                // the HTTP close handler's post-actor emission will return
-                // AlreadyEmitted rather than duplicate. When no receipt store
-                // is wired, emission is a no-op and the HTTP handler remains
-                // the sole writer.
+                // normal close (non-execution-required payloads only).
+                // Execution-required payloads already emitted + minted in the
+                // preflight block above; repeating the call would be wasted
+                // work on the idempotent helpers. The HTTP close handler's
+                // post-actor emission remains idempotent on (proposal_id,
+                // effect_kind), so it returns AlreadyEmitted rather than
+                // duplicating. When no receipt store is wired, emission is a
+                // no-op and the HTTP handler remains the sole writer.
                 //
                 // ADR-0014 constitutional-memory seam: mandate + narrow
                 // authority grants are minted through the shared helper
                 // so this actor path produces the same constitutional
                 // artifacts as the standalone `close_proposal_inner`.
                 // Idempotent on `proposal_id` via `get_mandate_by_proposal`.
-                if matches!(outcome_result, DecisionOutcome::Accepted) {
+                if matches!(outcome_result, DecisionOutcome::Accepted)
+                    && !requires_execution_closure
+                {
                     if let Some(ref store) = self.receipt_store {
                         use icn_governance::proof::ProofOutcome;
                         let gate_receipt = GovernanceDecisionReceipt::new(
@@ -2334,60 +2337,97 @@ impl GovernanceActor {
                     );
                 }
 
-                // For execution-required forced accepts, prove closure artifacts are
-                // persistable before committing terminal proposal state.
-                if requires_execution_closure {
-                    if let Some(ref store) = self.receipt_store {
-                        use icn_governance::proof::ProofOutcome;
-                        let forced_receipt = GovernanceDecisionReceipt::new(
-                            proposal_id.0.clone(),
-                            proposal.domain_id.0.clone(),
-                            ProofOutcome::Accepted,
-                            VoteTally::empty(),
-                            &[],
+                // Invariant 7 gate + closure preflight for forced accepts.
+                //
+                // Force-close is an administrative override of vote thresholds,
+                // not of governance-receipt correctness. The gate still applies:
+                // a forced Accept must produce an internally consistent
+                // GovernanceDecisionReceipt before terminal proposal state is
+                // persisted. Forced accepts use VoteTally::empty() and no votes
+                // — the receipt still verifies because the stored hash is
+                // derived from those exact inputs.
+                let force_decision_hash: Option<icn_kernel_api::receipts::Hash> = if matches!(
+                    &forced_outcome,
+                    ForcedOutcome::Accept
+                ) {
+                    use icn_governance::proof::ProofOutcome;
+                    let forced_receipt = GovernanceDecisionReceipt::new(
+                        proposal_id.0.clone(),
+                        proposal.domain_id.0.clone(),
+                        ProofOutcome::Accepted,
+                        VoteTally::empty(),
+                        &[],
+                    );
+                    if let Err(gate_err) = check_execution_gate(&forced_receipt) {
+                        error!(
+                            proposal_id = %proposal_id.0,
+                            error = %gate_err,
+                            "Invariant 7 gate rejected forced-accept — blocking terminal persistence"
                         );
-                        crate::institutional_effect::emit_accepted_effect(
-                            store.as_ref(),
-                            &proposal_id.0,
-                            &proposal.domain_id.0,
-                            Some(forced_receipt.decision_hash),
-                            &proposal.payload,
-                            now_seconds(),
-                        )
-                        .map_err(|e| {
-                            anyhow::anyhow!(
-                                "Proposal '{}' requires execution closure but force-accept effect preflight failed: {e}",
-                                proposal_id.0
-                            )
-                        })?;
+                        bail!(
+                            "Invariant 7 gate failure for forced-accept of proposal {}: {gate_err}",
+                            proposal_id.0
+                        );
+                    }
+                    let decision_hash = forced_receipt.decision_hash;
+                    info!(
+                        proposal_id = %proposal_id.0,
+                        decision_hash = %hex::encode(decision_hash),
+                        "Invariant 7 gate passed (forced accept)"
+                    );
 
-                        match crate::grant_minting::mint_and_persist_for_accepted(
-                            store.as_ref(),
-                            &proposal_id.0,
-                            &proposal.domain_id,
-                            forced_receipt.decision_hash,
-                            &proposal.payload,
-                            now_seconds(),
-                        ) {
-                            Ok(crate::grant_minting::MandateMintOutcome::Minted { .. })
-                            | Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted {
-                                ..
-                            }) => {}
-                            Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
-                                anyhow::bail!(
-                                    "Proposal '{}' requires execution closure but force-accept mandate preflight hash failed.",
-                                    proposal_id.0
-                                );
-                            }
-                            Err(e) => {
-                                anyhow::bail!(
-                                    "Proposal '{}' requires execution closure but force-accept mandate preflight persistence failed: {e}",
-                                    proposal_id.0
-                                );
+                    // Execution-required preflight: prove closure artifacts
+                    // are persistable before committing terminal state.
+                    if requires_execution_closure {
+                        if let Some(ref store) = self.receipt_store {
+                            let now = now_seconds();
+                            crate::institutional_effect::emit_accepted_effect(
+                                    store.as_ref(),
+                                    &proposal_id.0,
+                                    &proposal.domain_id.0,
+                                    Some(decision_hash),
+                                    &proposal.payload,
+                                    now,
+                                )
+                                .map_err(|e| {
+                                    anyhow::anyhow!(
+                                        "Proposal '{}' requires execution closure but force-accept effect preflight failed: {e}",
+                                        proposal_id.0
+                                    )
+                                })?;
+
+                            match crate::grant_minting::mint_and_persist_for_accepted(
+                                store.as_ref(),
+                                &proposal_id.0,
+                                &proposal.domain_id,
+                                decision_hash,
+                                &proposal.payload,
+                                now,
+                            ) {
+                                Ok(crate::grant_minting::MandateMintOutcome::Minted { .. })
+                                | Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted {
+                                    ..
+                                }) => {}
+                                Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
+                                    anyhow::bail!(
+                                            "Proposal '{}' requires execution closure but force-accept mandate preflight hash failed.",
+                                            proposal_id.0
+                                        );
+                                }
+                                Err(e) => {
+                                    anyhow::bail!(
+                                            "Proposal '{}' requires execution closure but force-accept mandate preflight persistence failed: {e}",
+                                            proposal_id.0
+                                        );
+                                }
                             }
                         }
                     }
-                }
+
+                    Some(decision_hash)
+                } else {
+                    None
+                };
 
                 // Force close the proposal
                 proposal.force_close(proposal_outcome.clone(), reason.clone())?;
@@ -2404,26 +2444,10 @@ impl GovernanceActor {
                                 let canonical_payload_hash = serde_json::to_string(&payload)
                                     .ok()
                                     .map(|s| blake3::hash(s.as_bytes()).to_hex().to_string());
-                                // Compute a canonical governance decision hash for the forced
-                                // accept using the same GovernanceDecisionReceipt encoding as
-                                // voted accepts.  VoteTally{0,0,0} accurately represents
-                                // "forced by authority — no votes were cast."
-                                //
-                                // NOTE: no GovernanceDecisionReceipt is stored in the receipt
-                                // backend for forced accepts (the actor has no receipt_store).
-                                // Audit verify will find journal entries via this hash but will
-                                // report "No governance receipt present" — which is honest.
-                                use icn_governance::proof::ProofOutcome;
-                                let forced_decision_hash = {
-                                    let receipt = GovernanceDecisionReceipt::new(
-                                        proposal_id.0.clone(),
-                                        proposal.domain_id.0.clone(),
-                                        ProofOutcome::Accepted,
-                                        VoteTally::empty(),
-                                        &[],
-                                    );
-                                    Some(hex::encode(receipt.decision_hash))
-                                };
+                                // Reuse the gate-verified decision hash computed in the
+                                // preflight block above. VoteTally{0,0,0} accurately
+                                // represents "forced by authority — no votes were cast."
+                                let forced_decision_hash = force_decision_hash.map(hex::encode);
                                 SystemEvent::ProposalAccepted {
                                     proposal_id: proposal_id.0.clone(),
                                     domain_id: proposal.domain_id.0.clone(),
@@ -2466,32 +2490,29 @@ impl GovernanceActor {
                 }
 
                 // Canonical institutional-effect emission for force-accepted
-                // proposals. This closes the historical divergence where
-                // force-accept produced no InstitutionalEffectRecord while
-                // normal accept did. Uses the same translation helper so
-                // audit semantics are path-agnostic. Idempotent on
-                // (proposal_id, effect_kind).
-                if matches!(&forced_outcome, ForcedOutcome::Accept) {
-                    if let Some(ref store) = self.receipt_store {
+                // non-execution-required proposals. Execution-required
+                // payloads already emitted + minted in the preflight block
+                // above (this path's sole writer for them is the preflight);
+                // repeating the idempotent helpers here would be wasted work.
+                // For declarative / non-execution-required force-accepts we
+                // still need a writer, and this block is it — keeping audit
+                // semantics path-agnostic.
+                if matches!(&forced_outcome, ForcedOutcome::Accept) && !requires_execution_closure {
+                    // Reuse the gate-verified decision hash computed in the
+                    // preflight block above so we don't rebuild the receipt
+                    // twice per command. `force_decision_hash` is `Some`
+                    // whenever `forced_outcome == Accept`; if that invariant
+                    // ever breaks the inner block degrades to a no-op rather
+                    // than panicking.
+                    if let (Some(ref store), Some(forced_decision_hash)) =
+                        (self.receipt_store.as_ref(), force_decision_hash)
+                    {
                         let now = now_seconds();
-                        let forced_decision_hash: icn_kernel_api::receipts::Hash = {
-                            use icn_governance::proof::ProofOutcome;
-                            let receipt = GovernanceDecisionReceipt::new(
-                                proposal_id.0.clone(),
-                                proposal.domain_id.0.clone(),
-                                ProofOutcome::Accepted,
-                                VoteTally::empty(),
-                                &[],
-                            );
-                            receipt.decision_hash
-                        };
-                        let decision_hash_bytes: Option<icn_kernel_api::receipts::Hash> =
-                            Some(forced_decision_hash);
                         match crate::institutional_effect::emit_accepted_effect(
                             store.as_ref(),
                             &proposal_id.0,
                             &proposal.domain_id.0,
-                            decision_hash_bytes,
+                            Some(forced_decision_hash),
                             &proposal.payload,
                             now,
                         ) {
