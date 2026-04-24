@@ -55,6 +55,14 @@ const AUTHORITY_GRANT_BY_DECISION_PREFIX: &[u8] = b"adr0014:grant:by_decision:";
 /// DIDs and Entity IDs share this index under distinct tag bytes.
 const AUTHORITY_GRANT_BY_GRANTEE_PREFIX: &[u8] = b"adr0014:grant:by_grantee:";
 
+/// One-shot migration sentinels. Set after a successful pass converts
+/// legacy raw-colon `{proposal_id}:{…}` secondary index keys into the
+/// length-prefix colon-safe scheme used by `MANDATE_BY_PROPOSAL_PREFIX`.
+/// Sentinel prefix is distinct (`receipt_store:migration:`) so it cannot
+/// collide with any scan_prefix used for data lookups.
+const MIGRATION_FLAG_V2_PROPOSAL_INDEX: &[u8] = b"receipt_store:migration:v2_proposal_index:done";
+const MIGRATION_FLAG_V2_IER_BY_PROPOSAL: &[u8] = b"receipt_store:migration:v2_ier_by_proposal:done";
+
 /// Receipt storage service for governance and economic chain artifacts.
 ///
 /// Stores receipts by canonical hash for cross-node deterministic lookup.
@@ -64,8 +72,26 @@ pub struct ReceiptStore {
 
 impl ReceiptStore {
     /// Create a new receipt store backed by the given sled database.
+    ///
+    /// Runs a one-shot migration that converts any legacy raw-colon
+    /// `{proposal_id}:…` secondary index keys (see
+    /// [`MIGRATION_FLAG_V2_PROPOSAL_INDEX`] and
+    /// [`MIGRATION_FLAG_V2_IER_BY_PROPOSAL`]) into the colon-safe
+    /// length-prefix scheme. The migration is idempotent and gated by
+    /// sentinel keys so already-migrated stores pay only two `db.get`
+    /// lookups. Failures are logged but do not abort open, matching the
+    /// original infallible `new` contract; any entries that fail to
+    /// migrate will be invisible to length-prefixed readers until the
+    /// next successful run.
     pub fn new(db: Db) -> Self {
-        Self { db }
+        let store = Self { db };
+        if let Err(e) = store.migrate_legacy_proposal_indexes() {
+            tracing::error!(
+                error = %e,
+                "ReceiptStore: legacy proposal-index migration failed; some legacy entries may be hidden from length-prefixed readers"
+            );
+        }
+        store
     }
 
     /// Build a key from prefix and hex hash
@@ -100,20 +126,22 @@ impl ReceiptStore {
         prefix
     }
 
-    /// Build a proposal ID index key
+    /// Build a proposal ID index key using the colon-safe length-prefix
+    /// scheme. Proposal IDs are unconstrained strings that may legitimately
+    /// contain `:`, so a bare `:` delimiter (as used pre-#1589) allowed
+    /// `foo` and `foo:bar` to alias under `scan_prefix`. The length prefix
+    /// makes the proposal_id boundary unambiguous.
     fn make_proposal_index_key(proposal_id: &str, receipt_hash: &Hash) -> Vec<u8> {
         let mut key = PROPOSAL_INDEX_PREFIX.to_vec();
-        key.extend_from_slice(proposal_id.as_bytes());
-        key.push(b':');
+        key.extend_from_slice(&Self::len_prefixed(proposal_id.as_bytes()));
         key.extend_from_slice(hex::encode(receipt_hash).as_bytes());
         key
     }
 
-    /// Build a proposal ID scan prefix
+    /// Build a proposal ID scan prefix in the length-prefix scheme.
     fn make_proposal_scan_prefix(proposal_id: &str) -> Vec<u8> {
         let mut prefix = PROPOSAL_INDEX_PREFIX.to_vec();
-        prefix.extend_from_slice(proposal_id.as_bytes());
-        prefix.push(b':');
+        prefix.extend_from_slice(&Self::len_prefixed(proposal_id.as_bytes()));
         prefix
     }
 
@@ -179,20 +207,13 @@ impl ReceiptStore {
 
     /// Get a governance decision receipt by proposal_id.
     ///
-    /// Uses `scan_prefix` over a raw `{proposal_id}:{hex_hash}` secondary
-    /// index that predates the colon-safe length-prefix scheme used by
-    /// `MANDATE_BY_PROPOSAL_PREFIX`. Two proposal IDs where one is a
-    /// `:`-delimited prefix of the other (e.g. `foo` and `foo:bar`) would
-    /// otherwise alias under `scan_prefix`.
-    ///
-    /// **Repair strategy:** filter-on-read. The scan may return aliased
-    /// hits; we defuse them by loading candidate primary records and
-    /// keeping only those whose canonical `proposal_id` matches the
-    /// requested one. In aliasing cases this can require additional
-    /// reads and more than one candidate lookup, but it avoids any
-    /// migration of existing on-disk data — the index keys stay in
-    /// their legacy raw-colon shape, while reads converge to the
-    /// canonical truth stored on the primary record.
+    /// Uses `scan_prefix` over the length-prefixed secondary index
+    /// (`PROPOSAL_INDEX_PREFIX | len_prefixed(proposal_id) | hex_hash`).
+    /// The length prefix on the proposal_id eliminates the `foo` vs
+    /// `foo:bar` aliasing that the pre-#1589 raw-colon scheme allowed,
+    /// so no filter-on-read fallback is needed. Legacy raw-colon entries
+    /// are rewritten into this format by the one-shot migration that
+    /// runs in [`ReceiptStore::new`].
     pub fn get_governance_by_proposal(
         &self,
         proposal_id: &str,
@@ -207,25 +228,14 @@ impl ReceiptStore {
             }
             let mut hash = [0u8; 32];
             hash.copy_from_slice(&hash_bytes);
-            match self.get_governance(&hash)? {
-                Some(receipt) if receipt.proposal_id == proposal_id => {
-                    return Ok(Some(receipt));
-                }
-                Some(other) => {
-                    tracing::debug!(
-                        requested = %proposal_id,
-                        found = %other.proposal_id,
-                        "governance proposal index: filtered colon-aliased hit"
-                    );
-                }
-                None => {
-                    tracing::warn!(
-                        proposal_id = %proposal_id,
-                        receipt_hash = %hex::encode(hash),
-                        "governance proposal index skew: primary record missing"
-                    );
-                }
+            if let Some(receipt) = self.get_governance(&hash)? {
+                return Ok(Some(receipt));
             }
+            tracing::warn!(
+                proposal_id = %proposal_id,
+                receipt_hash = %hex::encode(hash),
+                "governance proposal index skew: primary record missing"
+            );
         }
         Ok(None)
     }
@@ -451,14 +461,12 @@ impl ReceiptStore {
             .insert(&primary_key, value)
             .map_err(|e| format!("sled insert primary: {e}"))?;
 
-        // Secondary index: effect:institutional:by_proposal:{proposal_id}:{recorded_at_be}:{record_id}
-        // recorded_at encoded big-endian so lexicographic scan yields ascending order.
-        let mut idx_key = INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX.to_vec();
-        idx_key.extend_from_slice(record.proposal_id.as_bytes());
-        idx_key.push(b':');
-        idx_key.extend_from_slice(&record.recorded_at.to_be_bytes());
-        idx_key.push(b':');
-        idx_key.extend_from_slice(record.record_id.as_bytes());
+        // Secondary index uses the colon-safe length-prefix scheme so
+        // `foo` and `foo:bar` cannot alias under `scan_prefix` — required
+        // because `emit_accepted_effect` dedup is
+        // `list_institutional_effects_by_proposal(proposal_id)`.
+        let idx_key =
+            Self::ier_by_proposal_key(&record.proposal_id, record.recorded_at, &record.record_id);
         self.db
             .insert(&idx_key, record.record_id.as_bytes())
             .map_err(|e| format!("sled insert index: {e}"))?;
@@ -539,29 +547,19 @@ impl ReceiptStore {
     /// Scan the secondary index for a proposal and hydrate records in
     /// chronological order (oldest-first).
     ///
-    /// The secondary index key is
-    /// `effect:institutional:by_proposal:{proposal_id}:{recorded_at_be}:{record_id}`
-    /// — raw bytes, not length-prefixed. A scan with prefix
-    /// `{…}:{proposal_id}:` would otherwise alias when two proposal IDs
-    /// share a `:`-delimited prefix (e.g. `foo` vs `foo:bar`). That
-    /// aliasing is load-bearing here because
+    /// Secondary index key:
+    /// `INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX | len_prefixed(proposal_id)
+    /// | recorded_at_be_u64 | record_id_bytes`. The length prefix on
+    /// `proposal_id` blocks the `foo` vs `foo:bar` aliasing the pre-#1589
+    /// raw-colon scheme allowed — load-bearing because
     /// [`emit_accepted_effect`](icn_governance_actor::institutional_effect::emit_accepted_effect)
-    /// uses this lookup for `(proposal_id, effect_kind)` dedup — a false
-    /// hit would silently drop a real new record.
-    ///
-    /// **Repair strategy:** filter-on-read. We already load each primary
-    /// record to hydrate it, so comparing its canonical `proposal_id`
-    /// against the requested one is free. Aliased entries are logged and
-    /// skipped, not returned. Zero extra I/O and no on-disk migration —
-    /// live K3s data keeps working, new writes stay in the same format,
-    /// and dedup now sees a truthful `(proposal_id, effect_kind)` set.
+    /// uses this lookup for `(proposal_id, effect_kind)` dedup and a
+    /// false hit would silently drop a real new record.
     pub fn list_institutional_effects_by_proposal(
         &self,
         proposal_id: &str,
     ) -> Result<Vec<InstitutionalEffectRecord>, String> {
-        let mut prefix = INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX.to_vec();
-        prefix.extend_from_slice(proposal_id.as_bytes());
-        prefix.push(b':');
+        let prefix = Self::ier_by_proposal_scan_prefix(proposal_id);
 
         let mut out = Vec::new();
         for entry in self.db.scan_prefix(&prefix) {
@@ -575,9 +573,6 @@ impl ReceiptStore {
                 .get(&primary_key)
                 .map_err(|e| format!("sled get primary: {e}"))?
             else {
-                // Index points to a missing primary record — log and skip
-                // rather than hard-fail the read. A warning here is how
-                // operators notice on-disk corruption or partial writes.
                 tracing::warn!(
                     proposal_id = %proposal_id,
                     record_id = %record_id,
@@ -587,18 +582,200 @@ impl ReceiptStore {
             };
             let record: InstitutionalEffectRecord = serde_json::from_slice(&bytes)
                 .map_err(|e| format!("deserialize InstitutionalEffectRecord: {e}"))?;
-            if record.proposal_id != proposal_id {
-                tracing::debug!(
-                    requested = %proposal_id,
-                    found = %record.proposal_id,
-                    record_id = %record_id,
-                    "institutional effect proposal index: filtered colon-aliased hit"
-                );
-                continue;
-            }
             out.push(record);
         }
         Ok(out)
+    }
+}
+
+impl ReceiptStore {
+    // ========================================================================
+    // Legacy colon-aliased proposal-id secondary index migration (#1589)
+    // ========================================================================
+    //
+    // `PROPOSAL_INDEX_PREFIX` and `INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX`
+    // pre-#1589 used raw `{proposal_id}:…` key shapes. Because proposal
+    // IDs are unconstrained strings that may contain `:`, `foo` and
+    // `foo:bar` could alias under `scan_prefix`. #1576 patched this on
+    // the read path with a filter-on-read guard; #1589 closes it on the
+    // write path by adopting the same length-prefix scheme as
+    // `MANDATE_BY_PROPOSAL_PREFIX` and migrating legacy on-disk entries
+    // into the new shape on first open.
+    //
+    // Migration properties:
+    // - Idempotent: gated by sentinel keys; re-running is a no-op after
+    //   a successful pass.
+    // - Preserves existing data: each legacy entry is rewritten under
+    //   the canonical length-prefix key derived from the primary record's
+    //   canonical `proposal_id` before the legacy key is removed.
+    // - Safe on already-migrated stores: new-format keys map to the
+    //   same new-format key (no-op write) and skip the delete step.
+    // - No operator step required: runs inside [`ReceiptStore::new`].
+    // - Orphans (index entries whose primary record is missing) are
+    //   removed with a warning log.
+
+    fn migrate_legacy_proposal_indexes(&self) -> Result<(), String> {
+        self.migrate_proposal_index_once()?;
+        self.migrate_ier_by_proposal_index_once()?;
+        Ok(())
+    }
+
+    fn migrate_proposal_index_once(&self) -> Result<(), String> {
+        if self
+            .db
+            .get(MIGRATION_FLAG_V2_PROPOSAL_INDEX)
+            .map_err(|e| format!("sled get migration flag v2_proposal_index: {e}"))?
+            .is_some()
+        {
+            return Ok(());
+        }
+        let keys: Vec<Vec<u8>> = self
+            .db
+            .scan_prefix(PROPOSAL_INDEX_PREFIX)
+            .filter_map(|e| e.ok().map(|(k, _)| k.to_vec()))
+            .collect();
+
+        let mut rewritten = 0usize;
+        let mut dropped = 0usize;
+        for old_key in keys {
+            let Some(val) = self
+                .db
+                .get(&old_key)
+                .map_err(|e| format!("sled get proposal_index entry: {e}"))?
+            else {
+                continue;
+            };
+            if val.len() != 32 {
+                // Unknown value shape — drop orphan so length-prefixed
+                // readers don't trip over a stale 32!= value.
+                self.db
+                    .remove(&old_key)
+                    .map_err(|e| format!("sled remove stale proposal_index entry: {e}"))?;
+                dropped += 1;
+                continue;
+            }
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&val);
+            let Some(receipt) = self.get_governance(&hash)? else {
+                tracing::warn!(
+                    receipt_hash = %hex::encode(hash),
+                    "proposal_index migration: primary governance record missing; dropping orphan index entry"
+                );
+                self.db
+                    .remove(&old_key)
+                    .map_err(|e| format!("sled remove orphan proposal_index entry: {e}"))?;
+                dropped += 1;
+                continue;
+            };
+            let new_key = Self::make_proposal_index_key(&receipt.proposal_id, &hash);
+            if new_key == old_key {
+                continue;
+            }
+            self.db
+                .insert(&new_key, &hash[..])
+                .map_err(|e| format!("sled insert migrated proposal_index key: {e}"))?;
+            self.db
+                .remove(&old_key)
+                .map_err(|e| format!("sled remove legacy proposal_index key: {e}"))?;
+            rewritten += 1;
+        }
+
+        self.db
+            .insert(MIGRATION_FLAG_V2_PROPOSAL_INDEX, &[1u8])
+            .map_err(|e| format!("sled set migration flag v2_proposal_index: {e}"))?;
+
+        if rewritten > 0 || dropped > 0 {
+            tracing::info!(
+                rewritten,
+                dropped,
+                "proposal_index: colon-alias migration complete"
+            );
+        }
+        Ok(())
+    }
+
+    fn migrate_ier_by_proposal_index_once(&self) -> Result<(), String> {
+        if self
+            .db
+            .get(MIGRATION_FLAG_V2_IER_BY_PROPOSAL)
+            .map_err(|e| format!("sled get migration flag v2_ier_by_proposal: {e}"))?
+            .is_some()
+        {
+            return Ok(());
+        }
+        let keys: Vec<Vec<u8>> = self
+            .db
+            .scan_prefix(INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX)
+            .filter_map(|e| e.ok().map(|(k, _)| k.to_vec()))
+            .collect();
+
+        let mut rewritten = 0usize;
+        let mut dropped = 0usize;
+        for old_key in keys {
+            let Some(val) = self
+                .db
+                .get(&old_key)
+                .map_err(|e| format!("sled get ier_by_proposal entry: {e}"))?
+            else {
+                continue;
+            };
+            let Ok(record_id) = std::str::from_utf8(&val) else {
+                self.db
+                    .remove(&old_key)
+                    .map_err(|e| format!("sled remove non-utf8 ier_by_proposal entry: {e}"))?;
+                dropped += 1;
+                continue;
+            };
+            let mut primary_key = INSTITUTIONAL_EFFECT_PREFIX.to_vec();
+            primary_key.extend_from_slice(record_id.as_bytes());
+            let Some(bytes) = self
+                .db
+                .get(&primary_key)
+                .map_err(|e| format!("sled get ier primary for migration: {e}"))?
+            else {
+                tracing::warn!(
+                    record_id = %record_id,
+                    "ier_by_proposal migration: primary record missing; dropping orphan index entry"
+                );
+                self.db
+                    .remove(&old_key)
+                    .map_err(|e| format!("sled remove orphan ier_by_proposal entry: {e}"))?;
+                dropped += 1;
+                continue;
+            };
+            let record: InstitutionalEffectRecord =
+                serde_json::from_slice(&bytes).map_err(|e| {
+                    format!("deserialize InstitutionalEffectRecord during migration: {e}")
+                })?;
+            let new_key = Self::ier_by_proposal_key(
+                &record.proposal_id,
+                record.recorded_at,
+                &record.record_id,
+            );
+            if new_key == old_key {
+                continue;
+            }
+            self.db
+                .insert(&new_key, record.record_id.as_bytes())
+                .map_err(|e| format!("sled insert migrated ier_by_proposal key: {e}"))?;
+            self.db
+                .remove(&old_key)
+                .map_err(|e| format!("sled remove legacy ier_by_proposal key: {e}"))?;
+            rewritten += 1;
+        }
+
+        self.db
+            .insert(MIGRATION_FLAG_V2_IER_BY_PROPOSAL, &[1u8])
+            .map_err(|e| format!("sled set migration flag v2_ier_by_proposal: {e}"))?;
+
+        if rewritten > 0 || dropped > 0 {
+            tracing::info!(
+                rewritten,
+                dropped,
+                "ier_by_proposal: colon-alias migration complete"
+            );
+        }
+        Ok(())
     }
 }
 
@@ -649,6 +826,24 @@ impl ReceiptStore {
 
     fn mandate_by_proposal_scan_prefix(proposal_id: &str) -> Vec<u8> {
         let mut prefix = MANDATE_BY_PROPOSAL_PREFIX.to_vec();
+        prefix.extend_from_slice(&Self::len_prefixed(proposal_id.as_bytes()));
+        prefix
+    }
+
+    /// InstitutionalEffectRecord by-proposal secondary index key. Same
+    /// length-prefix scheme as `mandate_by_proposal_key` so proposal IDs
+    /// containing `:` cannot alias, with `recorded_at` big-endian-encoded
+    /// so lexicographic scans yield ascending chronological order.
+    fn ier_by_proposal_key(proposal_id: &str, recorded_at: u64, record_id: &str) -> Vec<u8> {
+        let mut key = INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX.to_vec();
+        key.extend_from_slice(&Self::len_prefixed(proposal_id.as_bytes()));
+        key.extend_from_slice(&recorded_at.to_be_bytes());
+        key.extend_from_slice(record_id.as_bytes());
+        key
+    }
+
+    fn ier_by_proposal_scan_prefix(proposal_id: &str) -> Vec<u8> {
+        let mut prefix = INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX.to_vec();
         prefix.extend_from_slice(&Self::len_prefixed(proposal_id.as_bytes()));
         prefix
     }
@@ -2479,23 +2674,24 @@ mod tests {
     }
 
     // ============================================================
-    // Legacy proposal-id index colon-alias repair regression tests
+    // Proposal-id index colon-alias regression tests
     // ============================================================
     //
-    // The `PROPOSAL_INDEX_PREFIX` and `INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX`
-    // secondary indexes use raw `{proposal_id}:{…}` key shapes. The
-    // colon-safe length-prefix scheme used by `MANDATE_BY_PROPOSAL_PREFIX`
-    // was not retrofitted onto them because they carry live on-disk
-    // K3s data. Instead, their `get_governance_by_proposal` and
-    // `list_institutional_effects_by_proposal` readers perform a
-    // canonical-proposal-id match against the loaded primary record,
-    // so aliased scan hits never become returned results.
+    // `PROPOSAL_INDEX_PREFIX` and `INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX`
+    // now use the same colon-safe length-prefix scheme as
+    // `MANDATE_BY_PROPOSAL_PREFIX`, so `foo` and `foo:bar` have disjoint
+    // scan-prefix ranges by construction. Legacy raw-colon entries
+    // (pre-#1589) are rewritten into the new shape by the one-shot
+    // migration that runs in [`ReceiptStore::new`]. The #1576
+    // filter-on-read workaround has been removed; these tests pin the
+    // canonical schema-level separation and the migration path.
 
     #[test]
     fn governance_proposal_index_does_not_alias_colon_prefixes() {
         let store = ReceiptStore::new(temp_db());
-        // Write only the `foo:bar` receipt. A buggy scan on `foo:` would
-        // return this receipt; the filter must reject it.
+        // Write only the `foo:bar` receipt. Under the length-prefix
+        // scheme, scanning with the `foo` scan prefix must not see any
+        // entry whose length-prefix is the `foo:bar` byte pattern.
         store
             .put_governance(&make_test_governance_receipt("foo:bar"))
             .unwrap();
@@ -2544,8 +2740,9 @@ mod tests {
     #[test]
     fn institutional_effect_index_does_not_alias_colon_prefixes() {
         let store = ReceiptStore::new(temp_db());
-        // Write only a `foo:bar` record. A buggy scan on `foo:` would
-        // include it; the canonical-id filter must drop it.
+        // Write only a `foo:bar` record. Under the length-prefix scheme
+        // its scan prefix is disjoint from `foo`'s, so a scan for `foo`
+        // must return empty.
         let rec = InstitutionalEffectRecord::new(
             "foo:bar",
             "coop-a",
@@ -2640,6 +2837,267 @@ mod tests {
         assert!(
             before_foo.is_empty(),
             "dedup scan for \"foo\" leaked \"foo:bar\" and would cause silent write loss"
+        );
+    }
+
+    // ============================================================
+    // Migration regression tests (#1589)
+    // ============================================================
+    //
+    // These tests seed legacy raw-colon `{proposal_id}:{…}` entries
+    // into a fresh sled db (bypassing the public writers, which now
+    // only emit the length-prefix shape), then open a `ReceiptStore`
+    // on that db and assert:
+    //   1. Canonical reads return the migrated record.
+    //   2. The legacy key is gone.
+    //   3. The new length-prefix key exists with the expected value.
+    //   4. Re-opening the store is idempotent (sentinel key short-
+    //      circuits the scan).
+
+    /// Build a legacy `PROPOSAL_INDEX_PREFIX` key in the pre-#1589
+    /// raw-colon shape. Test-only helper: production writers use
+    /// `make_proposal_index_key` with length prefix.
+    fn legacy_proposal_index_key(proposal_id: &str, receipt_hash: &Hash) -> Vec<u8> {
+        let mut key = PROPOSAL_INDEX_PREFIX.to_vec();
+        key.extend_from_slice(proposal_id.as_bytes());
+        key.push(b':');
+        key.extend_from_slice(hex::encode(receipt_hash).as_bytes());
+        key
+    }
+
+    /// Build a legacy `INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX` key in
+    /// the pre-#1589 raw-colon shape.
+    fn legacy_ier_by_proposal_key(proposal_id: &str, recorded_at: u64, record_id: &str) -> Vec<u8> {
+        let mut key = INSTITUTIONAL_EFFECT_BY_PROPOSAL_PREFIX.to_vec();
+        key.extend_from_slice(proposal_id.as_bytes());
+        key.push(b':');
+        key.extend_from_slice(&recorded_at.to_be_bytes());
+        key.push(b':');
+        key.extend_from_slice(record_id.as_bytes());
+        key
+    }
+
+    #[test]
+    fn migration_rewrites_legacy_proposal_index_keys() {
+        let db = temp_db();
+
+        // Seed the primary governance record and its decision-hash
+        // index via the public writer, then overwrite the proposal
+        // index entry with the legacy-shape key. We want the db to
+        // contain a legacy key at open time.
+        let pre_store = ReceiptStore::new(db.clone());
+        let receipt = make_test_governance_receipt("foo:bar");
+        let hash = pre_store.put_governance(&receipt).unwrap();
+
+        // Delete the new-format key the writer just inserted, then
+        // insert its legacy equivalent.
+        let new_key = ReceiptStore::make_proposal_index_key("foo:bar", &hash);
+        db.remove(&new_key).unwrap();
+        let legacy_key = legacy_proposal_index_key("foo:bar", &hash);
+        db.insert(&legacy_key, &hash[..]).unwrap();
+
+        // Clear the migration sentinel so open re-runs the migration.
+        db.remove(MIGRATION_FLAG_V2_PROPOSAL_INDEX).unwrap();
+
+        // Open a fresh ReceiptStore — migration runs in `new`.
+        let store = ReceiptStore::new(db.clone());
+
+        // Legacy key must be gone.
+        assert!(
+            db.get(&legacy_key).unwrap().is_none(),
+            "legacy proposal_index key should be removed by migration"
+        );
+        // New-format key must exist with the hash as value.
+        let migrated = db
+            .get(&new_key)
+            .unwrap()
+            .expect("new-format proposal_index key must exist post-migration");
+        assert_eq!(&migrated[..], &hash[..]);
+
+        // Canonical read resolves via the length-prefix scan prefix.
+        let found = store
+            .get_governance_by_proposal("foo:bar")
+            .unwrap()
+            .expect("migrated receipt must be readable");
+        assert_eq!(found.proposal_id, "foo:bar");
+        assert_eq!(found.decision_hash, hash);
+
+        // Sentinel is now set.
+        assert!(db.get(MIGRATION_FLAG_V2_PROPOSAL_INDEX).unwrap().is_some());
+
+        // Second open is a no-op: migration is gated by the sentinel.
+        let _ = ReceiptStore::new(db);
+    }
+
+    #[test]
+    fn migration_drops_orphan_proposal_index_entries() {
+        let db = temp_db();
+        // Orphan legacy entry: index points at a hash whose primary
+        // governance receipt does not exist. Migration should remove it.
+        let orphan_hash = [0x11u8; 32];
+        let legacy_key = legacy_proposal_index_key("ghost", &orphan_hash);
+        db.insert(&legacy_key, &orphan_hash[..]).unwrap();
+
+        let _ = ReceiptStore::new(db.clone());
+
+        assert!(
+            db.get(&legacy_key).unwrap().is_none(),
+            "orphan legacy proposal_index entry should be dropped by migration"
+        );
+    }
+
+    #[test]
+    fn migration_rewrites_legacy_ier_by_proposal_keys() {
+        let db = temp_db();
+
+        // Use the public writer to land primary + new-format index,
+        // then drop the new-format index entry and insert a legacy one.
+        let pre_store = ReceiptStore::new(db.clone());
+        let rec = InstitutionalEffectRecord::new(
+            "foo:bar",
+            "coop-a",
+            Some([7u8; 32]),
+            "freeze_member",
+            Some("did:icn:x".into()),
+            None,
+            None,
+            42,
+            serde_json::json!({}),
+        );
+        pre_store.put_institutional_effect(&rec).unwrap();
+
+        let new_key =
+            ReceiptStore::ier_by_proposal_key(&rec.proposal_id, rec.recorded_at, &rec.record_id);
+        db.remove(&new_key).unwrap();
+        let legacy_key =
+            legacy_ier_by_proposal_key(&rec.proposal_id, rec.recorded_at, &rec.record_id);
+        db.insert(&legacy_key, rec.record_id.as_bytes()).unwrap();
+
+        // Clear sentinel so migration re-runs on open.
+        db.remove(MIGRATION_FLAG_V2_IER_BY_PROPOSAL).unwrap();
+
+        let store = ReceiptStore::new(db.clone());
+
+        assert!(
+            db.get(&legacy_key).unwrap().is_none(),
+            "legacy ier_by_proposal key should be removed by migration"
+        );
+        let migrated = db
+            .get(&new_key)
+            .unwrap()
+            .expect("new-format ier_by_proposal key must exist post-migration");
+        assert_eq!(&migrated[..], rec.record_id.as_bytes());
+
+        let list = store
+            .list_institutional_effects_by_proposal("foo:bar")
+            .unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].record_id, rec.record_id);
+
+        // Sentinel set, second open is a no-op.
+        assert!(db.get(MIGRATION_FLAG_V2_IER_BY_PROPOSAL).unwrap().is_some());
+        let _ = ReceiptStore::new(db);
+    }
+
+    #[test]
+    fn migration_disambiguates_legacy_colon_aliased_ier_entries() {
+        // The bug: a legacy db contains entries for both `foo` and
+        // `foo:bar`, raw-colon-shaped. Scanning for `foo:` in the old
+        // scheme would hit `foo:bar`'s entries too. After migration,
+        // each proposal's length-prefixed scan must return exactly
+        // its own records.
+        let db = temp_db();
+        let pre_store = ReceiptStore::new(db.clone());
+
+        let foo = InstitutionalEffectRecord::new(
+            "foo",
+            "coop-a",
+            None,
+            "freeze_member",
+            Some("did:icn:1".into()),
+            None,
+            None,
+            10,
+            serde_json::json!({"src": "foo"}),
+        );
+        let foo_bar = InstitutionalEffectRecord::new(
+            "foo:bar",
+            "coop-a",
+            None,
+            "freeze_member",
+            Some("did:icn:2".into()),
+            None,
+            None,
+            20,
+            serde_json::json!({"src": "foo:bar"}),
+        );
+        pre_store.put_institutional_effect(&foo).unwrap();
+        pre_store.put_institutional_effect(&foo_bar).unwrap();
+
+        // Replace both new-format index entries with legacy equivalents.
+        for r in [&foo, &foo_bar] {
+            let new_key =
+                ReceiptStore::ier_by_proposal_key(&r.proposal_id, r.recorded_at, &r.record_id);
+            db.remove(&new_key).unwrap();
+            let legacy_key =
+                legacy_ier_by_proposal_key(&r.proposal_id, r.recorded_at, &r.record_id);
+            db.insert(&legacy_key, r.record_id.as_bytes()).unwrap();
+        }
+        db.remove(MIGRATION_FLAG_V2_IER_BY_PROPOSAL).unwrap();
+
+        let store = ReceiptStore::new(db);
+        let foo_list = store.list_institutional_effects_by_proposal("foo").unwrap();
+        assert_eq!(foo_list.len(), 1, "foo must not see foo:bar's record");
+        assert_eq!(foo_list[0].proposal_id, "foo");
+        assert_eq!(foo_list[0].target_did.as_deref(), Some("did:icn:1"));
+
+        let foo_bar_list = store
+            .list_institutional_effects_by_proposal("foo:bar")
+            .unwrap();
+        assert_eq!(foo_bar_list.len(), 1);
+        assert_eq!(foo_bar_list[0].proposal_id, "foo:bar");
+        assert_eq!(foo_bar_list[0].target_did.as_deref(), Some("did:icn:2"));
+    }
+
+    #[test]
+    fn migration_is_idempotent_on_already_migrated_store() {
+        // Open and write via public API (always new-format); re-open
+        // after clearing the sentinel — migration should re-run but
+        // rewrite nothing because every key is already new-format.
+        let db = temp_db();
+        let pre = ReceiptStore::new(db.clone());
+        let _ = pre
+            .put_governance(&make_test_governance_receipt("foo:bar"))
+            .unwrap();
+        let rec = InstitutionalEffectRecord::new(
+            "foo:bar",
+            "coop-a",
+            None,
+            "freeze_member",
+            None,
+            None,
+            None,
+            1,
+            serde_json::json!({}),
+        );
+        pre.put_institutional_effect(&rec).unwrap();
+
+        // Clear both sentinels to force the migration loops to run.
+        db.remove(MIGRATION_FLAG_V2_PROPOSAL_INDEX).unwrap();
+        db.remove(MIGRATION_FLAG_V2_IER_BY_PROPOSAL).unwrap();
+
+        let store = ReceiptStore::new(db);
+        // Data unchanged.
+        assert!(store
+            .get_governance_by_proposal("foo:bar")
+            .unwrap()
+            .is_some());
+        assert_eq!(
+            store
+                .list_institutional_effects_by_proposal("foo:bar")
+                .unwrap()
+                .len(),
+            1
         );
     }
 }
