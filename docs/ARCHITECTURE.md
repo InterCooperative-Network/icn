@@ -878,6 +878,7 @@ Deep-dive documents by category. Generated from `docs/registry.toml`.
 
 **Architecture & Design**
 - [The Commons](architecture/THE_COMMONS.md) — Capital-C Commons doctrine; what ICN exists to enable (doctrine)
+- [Member Standing and Accessible Participation](architecture/MEMBER_STANDING.md) — `/me/standing` design contract; accessibility as anti-capture infrastructure (design contract)
 - [Kernel/App Separation](architecture/KERNEL_APP_SEPARATION.md) — Five invariants, Meaning Firewall design (normative)
 - [Institution-in-a-Box](design/institution-in-a-box.md) — Four institution primitives, starter kit (normative)
 - [ADR-001: What ICN Is](strategy/ADR-001-What-ICN-Is.md) — Scope, non-goals, boundary conditions (normative)
