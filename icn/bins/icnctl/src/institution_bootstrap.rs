@@ -1001,6 +1001,9 @@ async fn apply_operation(
                     }
                     Err(err) => ApplyOutcome::Failed(err.to_string()),
                 },
+                Err(ref err) if err.contains("HTTP 409") => {
+                    ApplyOutcome::Completed(format!("structure {id} already exists"))
+                }
                 Err(err) => ApplyOutcome::Failed(err),
             }
         }
@@ -1053,6 +1056,9 @@ async fn apply_operation(
                     }
                     Err(err) => ApplyOutcome::Failed(err.to_string()),
                 },
+                Err(ref err) if err.contains("HTTP 409") => {
+                    ApplyOutcome::Completed(format!("program {id} already exists"))
+                }
                 Err(err) => ApplyOutcome::Failed(err),
             }
         }
@@ -1109,6 +1115,9 @@ async fn apply_operation(
                     }
                     Err(err) => ApplyOutcome::Failed(err.to_string()),
                 },
+                Err(ref err) if err.contains("HTTP 409") => {
+                    ApplyOutcome::Completed(format!("activity {id} already exists"))
+                }
                 Err(err) => ApplyOutcome::Failed(err),
             }
         }
@@ -1155,6 +1164,9 @@ async fn apply_operation(
                     }
                     Err(err) => ApplyOutcome::Failed(err.to_string()),
                 },
+                Err(ref err) if err.contains("HTTP 409") => {
+                    ApplyOutcome::Completed(format!("milestone {id} already exists"))
+                }
                 Err(err) => ApplyOutcome::Failed(err),
             }
         }
@@ -1190,6 +1202,9 @@ async fn apply_operation(
             match post_json(client, gateway, &auth.token, &path, &body).await {
                 Ok(_) => ApplyOutcome::Completed(format!(
                     "assigned role {role} on live structure {resolved_structure_id}"
+                )),
+                Err(ref err) if err.contains("HTTP 409") => ApplyOutcome::Completed(format!(
+                    "role {role} on {resolved_structure_id} already assigned"
                 )),
                 Err(err) => ApplyOutcome::Failed(err),
             }
@@ -1880,6 +1895,238 @@ mod tests {
                 "deferred count must be stable across runs"
             );
 
+            handle.abort();
+        }
+
+        // ── 409 idempotency unit tests (per operation type) ──────────────────
+        //
+        // Each test uses a minimal actix-web stub that returns 200 for GET
+        // (prerequisite checks) and 409 Conflict for POST (create attempts).
+        // State is pre-populated with necessary alias bindings so that
+        // resolve_live_or_existing_id short-circuits without extra GET calls.
+        //
+        // These prove the `err.contains("HTTP 409")` guard added to each
+        // create/assign operation turns a conflict into ApplyOutcome::Completed.
+
+        /// Spin up a stub server: GET → 200 `{}`, POST → 409 Conflict.
+        async fn start_conflict_stub() -> (tokio::task::JoinHandle<()>, String) {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind stub");
+            let port = listener.local_addr().expect("addr").port();
+            let server = HttpServer::new(|| {
+                App::new().default_service(web::route().to(
+                    |req: actix_web::HttpRequest| async move {
+                        if req.method() == actix_web::http::Method::POST {
+                            actix_web::HttpResponse::Conflict().finish()
+                        } else {
+                            actix_web::HttpResponse::Ok().json(serde_json::json!({}))
+                        }
+                    },
+                ))
+            })
+            .listen(listener)
+            .expect("listen stub")
+            .run();
+            let handle = tokio::spawn(async move {
+                let _ = server.await;
+            });
+            (handle, format!("http://127.0.0.1:{port}"))
+        }
+
+        /// Stub server: every request returns 500 Internal Server Error.
+        async fn start_error_stub() -> (tokio::task::JoinHandle<()>, String) {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind error stub");
+            let port = listener.local_addr().expect("addr").port();
+            let server = HttpServer::new(|| {
+                App::new().default_service(
+                    web::route()
+                        .to(|| async { actix_web::HttpResponse::InternalServerError().finish() }),
+                )
+            })
+            .listen(listener)
+            .expect("listen error stub")
+            .run();
+            let handle = tokio::spawn(async move {
+                let _ = server.await;
+            });
+            (handle, format!("http://127.0.0.1:{port}"))
+        }
+
+        fn test_auth() -> BootstrapAuthContext {
+            BootstrapAuthContext {
+                token: "test-token".to_string(),
+                subject_did: "did:icn:testsubject".to_string(),
+            }
+        }
+
+        #[tokio::test]
+        async fn create_structure_409_is_idempotent() {
+            let (handle, base_url) = start_conflict_stub().await;
+            let op = BootstrapOperation::CreateStructure {
+                id: "test-structure".to_string(),
+                parent_entity_id: "parent-entity".to_string(),
+                kind: StructureKind::Committee,
+                name: "Test Committee".to_string(),
+                mandate: None,
+                scope: vec![],
+            };
+            let mut state = ApplyState::default();
+            state.bind("parent-entity", "entity-live-id");
+            let outcome = apply_operation(
+                &op,
+                &base_url,
+                &reqwest::Client::new(),
+                &test_auth(),
+                &mut state,
+            )
+            .await;
+            match outcome {
+                ApplyOutcome::Completed(_) => {}
+                _ => panic!("create_structure 409 must be Completed, not Failed/Unsupported"),
+            }
+            handle.abort();
+        }
+
+        #[tokio::test]
+        async fn create_program_409_is_idempotent() {
+            let (handle, base_url) = start_conflict_stub().await;
+            let op = BootstrapOperation::CreateProgram {
+                id: "test-program".to_string(),
+                domain_id: "test-domain".to_string(),
+                parent_entity_id: "parent-entity".to_string(),
+                kind: ProgramKind::Custom("annual".to_string()),
+                name: "Test Program".to_string(),
+                description: None,
+                prior_cycle_program_id: None,
+            };
+            let mut state = ApplyState::default();
+            state.bind("parent-entity", "entity-live-id");
+            // The domain check (remote_exists GET) is served by the stub returning 200 {}.
+            let outcome = apply_operation(
+                &op,
+                &base_url,
+                &reqwest::Client::new(),
+                &test_auth(),
+                &mut state,
+            )
+            .await;
+            match outcome {
+                ApplyOutcome::Completed(_) => {}
+                _ => panic!("create_program 409 must be Completed, not Failed/Unsupported"),
+            }
+            handle.abort();
+        }
+
+        #[tokio::test]
+        async fn create_activity_409_is_idempotent() {
+            let (handle, base_url) = start_conflict_stub().await;
+            let op = BootstrapOperation::CreateActivity {
+                id: "test-activity".to_string(),
+                parent_entity_id: "parent-entity".to_string(),
+                kind: ActivityKind::Event,
+                name: "Test Activity".to_string(),
+                description: None,
+                linked_structures: vec![],
+                parent_program_id: Some("parent-program".to_string()),
+            };
+            let mut state = ApplyState::default();
+            state.bind("parent-entity", "entity-live-id");
+            state.bind("parent-program", "program-live-id");
+            let outcome = apply_operation(
+                &op,
+                &base_url,
+                &reqwest::Client::new(),
+                &test_auth(),
+                &mut state,
+            )
+            .await;
+            match outcome {
+                ApplyOutcome::Completed(_) => {}
+                _ => panic!("create_activity 409 must be Completed, not Failed/Unsupported"),
+            }
+            handle.abort();
+        }
+
+        #[tokio::test]
+        async fn create_milestone_409_is_idempotent() {
+            let (handle, base_url) = start_conflict_stub().await;
+            let op = BootstrapOperation::CreateMilestone {
+                id: "test-milestone".to_string(),
+                program_id: "parent-program".to_string(),
+                title: "Test Milestone".to_string(),
+                description: None,
+                phase_index: 1,
+                target_date: None,
+                completion_criteria: vec![],
+            };
+            let mut state = ApplyState::default();
+            state.bind("parent-program", "program-live-id");
+            let outcome = apply_operation(
+                &op,
+                &base_url,
+                &reqwest::Client::new(),
+                &test_auth(),
+                &mut state,
+            )
+            .await;
+            match outcome {
+                ApplyOutcome::Completed(_) => {}
+                _ => panic!("create_milestone 409 must be Completed, not Failed/Unsupported"),
+            }
+            handle.abort();
+        }
+
+        #[tokio::test]
+        async fn assign_role_409_is_idempotent() {
+            let (handle, base_url) = start_conflict_stub().await;
+            let bundle = IdentityBundle::generate().expect("IdentityBundle");
+            let op = BootstrapOperation::AssignRole {
+                structure_id: "test-structure".to_string(),
+                person_did: bundle.did().clone(),
+                role: "coordinator".to_string(),
+                authority_scope: vec![],
+            };
+            let mut state = ApplyState::default();
+            state.bind("test-structure", "structure-live-id");
+            let outcome = apply_operation(
+                &op,
+                &base_url,
+                &reqwest::Client::new(),
+                &test_auth(),
+                &mut state,
+            )
+            .await;
+            match outcome {
+                ApplyOutcome::Completed(_) => {}
+                _ => panic!("assign_role 409 must be Completed, not Failed"),
+            }
+            handle.abort();
+        }
+
+        #[tokio::test]
+        async fn non_conflict_error_is_not_swallowed() {
+            let (handle, base_url) = start_error_stub().await;
+            let op = BootstrapOperation::CreateStructure {
+                id: "test-structure".to_string(),
+                parent_entity_id: "parent-entity".to_string(),
+                kind: StructureKind::Committee,
+                name: "Test Committee".to_string(),
+                mandate: None,
+                scope: vec![],
+            };
+            let mut state = ApplyState::default();
+            state.bind("parent-entity", "entity-live-id");
+            let outcome = apply_operation(
+                &op,
+                &base_url,
+                &reqwest::Client::new(),
+                &test_auth(),
+                &mut state,
+            )
+            .await;
+            match outcome {
+                ApplyOutcome::Failed(_) => {}
+                _ => panic!("HTTP 500 must remain Failed, not be swallowed as Completed"),
+            }
             handle.abort();
         }
 
