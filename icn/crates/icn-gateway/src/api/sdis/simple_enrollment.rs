@@ -54,6 +54,7 @@ use tokio::sync::RwLock;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::api::sessions::get_gateway_url;
 use crate::auth::AuthManager;
 use crate::error::{GatewayError, Result};
 use crate::steward_mgr::StewardManager;
@@ -279,6 +280,7 @@ pub struct CompleteEnrollmentResponse {
 /// POST /enrollment/start
 #[post("/enrollment/start")]
 pub async fn start_enrollment(
+    http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,
     req: web::Json<StartEnrollmentRequest>,
 ) -> Result<HttpResponse> {
@@ -292,7 +294,7 @@ pub async fn start_enrollment(
         "type": "icn-enrollment",
         "enrollment_id": enrollment_id,
         "challenge": base64::Engine::encode(&base64::engine::general_purpose::STANDARD, enrollment_id.as_bytes()),
-        "gateway_url": "http://10.8.10.40:30080"
+        "gateway_url": get_gateway_url(&http_req)
     });
 
     // Create enrollment session
@@ -1130,6 +1132,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use actix_web::App;
 
     #[test]
     fn test_enrollment_store_creation() {
@@ -1150,6 +1153,33 @@ mod tests {
             let enrollments = store.enrollments.read().await;
             assert!(enrollments.is_empty());
         });
+    }
+
+    #[actix_web::test]
+    async fn test_start_enrollment_uses_request_gateway_url() {
+        let app = actix_web::test::init_service(
+            App::new()
+                .app_data(web::Data::new(Arc::new(EnrollmentStore::new())))
+                .service(web::scope("/v1/sdis").service(start_enrollment)),
+        )
+        .await;
+
+        let req = actix_web::test::TestRequest::post()
+            .uri("/v1/sdis/enrollment/start")
+            .insert_header(("host", "10.8.30.40:30080"))
+            .insert_header(("content-type", "application/json"))
+            .set_payload(r#"{"identity_name":"Test User","coop_id":"test-coop"}"#)
+            .to_request();
+
+        let body = actix_web::test::call_and_read_body(&app, req).await;
+        let resp: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(
+            resp["qr_code"]
+                .as_str()
+                .unwrap()
+                .contains("\"gateway_url\":\"http://10.8.30.40:30080\""),
+            "qr payload should advertise the current request gateway"
+        );
     }
 
     #[test]
