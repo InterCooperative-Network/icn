@@ -104,7 +104,7 @@ Failed:      no
 3. Create Cooperative entity `nycn-organizers` → `entity:icn:cooperative:nycn-organizers`
 4. Provision governance domain `nycn-federation-gov`
 5. Provision governance domain `nycn-organizers-gov`
-6. Create 5 Committee structures (`nycn-backbone`, `nycn-steering`, `nycn-content`, `nycn-logistics`, `nycn-marketing`, `nycn-finance`) → `struct-*` UUIDs
+6. Create 6 Committee structures (`nycn-backbone`, `nycn-steering`, `nycn-content`, `nycn-logistics`, `nycn-marketing`, `nycn-finance`) → `struct-*` UUIDs
 7. Create 1 WorkingGroup structure (`nycn-accessibility-wg`) → `struct-*` UUID
 8. Create program `summit-cycle-2026` → `prog-*` UUID
 9. Create activity `summit-2026` → `act-*` UUID
@@ -121,14 +121,14 @@ Role assignments where `person_did` is not yet supplied in the seed:
 To apply these later:
 ```bash
 # Once you have real DIDs, edit 05-role-assignment.seed.yaml and re-run apply.
-# The apply is idempotent for already-completed steps (entities, domains, structures
-# will 409-conflict and be skipped; roles will be created fresh).
 ```
 
-**NOTE: idempotency for entities is partial.** Re-running apply against a live gateway
-that already has entities will return 409 conflicts. The apply code currently treats
-409 as a failure (not as "already exists / skip"). Until idempotency handling is added,
-run apply once against a fresh data dir, or handle 409 responses in the apply code.
+**Idempotency status.** Re-running apply against a live gateway that already has
+entities is an open issue. Today the gateway's duplicate-entity handler returns an
+`InternalError` wrapping "AlreadyExists"; work to map duplicate registrations to
+HTTP 409 and treat 409 as "already exists / skip" in `icnctl apply` is tracked in
+the bootstrap roadmap. Until that lands end-to-end, run apply once against a fresh
+data dir (or manually skip already-created resources).
 
 ### Unsupported (1)
 
