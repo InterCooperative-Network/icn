@@ -11,6 +11,7 @@ use crate::dispatch_evidence::{
 };
 use crate::institutional_effect::InstitutionalEffectRecord;
 use crate::receipt_backend::GovernanceReceiptBackend;
+use crate::state_store::{GovernanceStateStore, SledGovernanceStateStore};
 use anyhow::Result;
 use icn_federation::BilateralClearingAgreement;
 use icn_governance::{
@@ -30,6 +31,7 @@ use icn_governance::{
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
+use icn_store::SledStore;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 use tracing::debug;
@@ -2714,6 +2716,15 @@ pub struct GovernanceManager {
     milestone_store: Arc<dyn MilestoneStoreBackend>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
+    /// Optional persistent store for domains (standalone mode only).
+    ///
+    /// When `Some`, standalone-mode domain writes are written through to
+    /// this store and the in-memory `domains` map is seeded from it on
+    /// construction. Unused in actor-backed mode (the actor owns its own
+    /// store). Re-uses `SledGovernanceStateStore`'s `gov:domain:*` key
+    /// space so a future migration to actor-backed mode reads the same
+    /// records.
+    domain_store: Option<Arc<dyn GovernanceStateStore>>,
     /// Optional receipt store for persisting GovernanceDecisionReceipts
     receipt_store: Option<Arc<dyn GovernanceReceiptBackend>>,
     /// Optional append-only log of milestone status transitions.
@@ -2749,6 +2760,7 @@ impl GovernanceManager {
             program_store: Arc::new(InMemoryProgramStore::new()),
             milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: None,
+            domain_store: None,
             receipt_store: None,
             milestone_event_log: None,
             program_event_log: None,
@@ -2787,6 +2799,7 @@ impl GovernanceManager {
             program_store: Arc::new(InMemoryProgramStore::new()),
             milestone_store: Arc::new(InMemoryMilestoneStore::new()),
             governance_handle: Some(handle),
+            domain_store: None,
             receipt_store: None,
             milestone_event_log: None,
             program_event_log: None,
@@ -2893,6 +2906,9 @@ impl GovernanceManager {
             milestone_store: Arc::new(SledMilestoneStore::new(db.clone())),
             governance_handle: Some(handle),
             receipt_store: None,
+            // Actor-backed mode: the actor owns its own state store. Standalone-mode
+            // domain persistence is intentionally not wired here.
+            domain_store: None,
             milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db.clone()))),
             program_event_log: Some(Arc::new(SledProgramEventLog::new(db))),
         }
@@ -2901,10 +2917,42 @@ impl GovernanceManager {
     /// Create a standalone governance manager with Sled-backed action item storage
     ///
     /// Useful for testing persistence without a daemon connection.
+    ///
+    /// Governance domains are persisted in the same `gov:domain:*` key space
+    /// the GovernanceActor uses (see `state_store::SledGovernanceStateStore`).
+    /// Existing domains are loaded into the in-memory cache on construction so
+    /// reads stay fast; writes are written through to the store. This makes
+    /// NYCN-style bootstrap apply survive gateway restarts in standalone mode
+    /// (issue #1600).
     pub fn new_with_sled(db: Arc<sled::Db>) -> Self {
-        debug!("GovernanceManager created in standalone mode with Sled action item store");
+        debug!("GovernanceManager created in standalone mode with Sled stores");
+
+        let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::from_db((*db).clone()));
+        let domain_store: Arc<dyn GovernanceStateStore> =
+            Arc::new(SledGovernanceStateStore::new(store));
+
+        // Seed the in-memory cache from the persistent store. If load fails
+        // (e.g. a corrupt entry) we log and continue with an empty cache —
+        // create_domain() will surface conflicts on duplicate IDs once the
+        // failing rows are repaired.
+        let mut domains_map = HashMap::new();
+        match domain_store.list_domains() {
+            Ok(loaded) => {
+                debug!(
+                    "Loaded {} persisted governance domain(s) from store",
+                    loaded.len()
+                );
+                for d in loaded {
+                    domains_map.insert(d.id.clone(), d);
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load persisted governance domains; starting empty: {e}");
+            }
+        }
+
         GovernanceManager {
-            domains: RwLock::new(HashMap::new()),
+            domains: RwLock::new(domains_map),
             proposals: RwLock::new(HashMap::new()),
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),
@@ -2918,6 +2966,7 @@ impl GovernanceManager {
             program_store: Arc::new(SledProgramStore::new(db.clone())),
             milestone_store: Arc::new(SledMilestoneStore::new(db.clone())),
             governance_handle: None,
+            domain_store: Some(domain_store),
             receipt_store: None,
             milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db.clone()))),
             program_event_log: Some(Arc::new(SledProgramEventLog::new(db))),
@@ -2970,6 +3019,15 @@ impl GovernanceManager {
             );
         }
 
+        // Write-through to persistent store before mutating the in-memory cache,
+        // so a store failure aborts the create cleanly without leaving an
+        // unpersisted domain that disappears on restart.
+        if let Some(store) = self.domain_store.as_ref() {
+            store
+                .save_domain(&domain)
+                .map_err(|e| anyhow::anyhow!("Failed to persist domain '{}': {e}", domain_id.0))?;
+        }
+
         domains.insert(domain_id, domain);
         Ok(())
     }
@@ -3018,6 +3076,17 @@ impl GovernanceManager {
         }
 
         domain.updated_at = icn_time::current_timestamp_secs();
+
+        // Mirror the membership change into the persistent store so it
+        // survives gateway restart in standalone mode.
+        if let Some(store) = self.domain_store.as_ref() {
+            store.save_domain(domain).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to persist membership update for domain '{}': {e}",
+                    domain_id.0
+                )
+            })?;
+        }
         Ok(())
     }
 

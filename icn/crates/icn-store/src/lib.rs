@@ -616,6 +616,15 @@ impl SledStore {
         Ok(SledStore { db })
     }
 
+    /// Wrap an already-opened Sled database.
+    ///
+    /// Use this when a caller already holds a `sled::Db` (often via `Arc<sled::Db>`)
+    /// and needs `Store`-trait access without opening a second handle. `sled::Db`
+    /// is internally reference-counted, so cloning into the wrapper is cheap.
+    pub fn from_db(db: sled::Db) -> Self {
+        SledStore { db }
+    }
+
     /// Get direct access to underlying Sled database
     ///
     /// This is useful for components that need raw Sled access
