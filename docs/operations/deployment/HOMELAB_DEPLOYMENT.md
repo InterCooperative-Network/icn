@@ -78,6 +78,7 @@ via `deploy/k8s/monitoring/values-kube-prometheus-stack.yaml`. Apply with
 | **Specs** | 8 vCPU, 6GB RAM, 80GB disk |
 | **Labels** | `self-hosted, linux, x64, homelab, k3s` |
 | **Rust** | 1.88.0 with sccache |
+| **sccache** | Shared Atlas NFS at `/mnt/icn-sccache` (see [`deploy/ci-runner/`](../../../deploy/ci-runner/README.md), issue #1597) |
 | **Docker** | Configured with insecure registry (10.8.30.40:30500) |
 | **kubectl** | Has kubeconfig for cluster access |
 
