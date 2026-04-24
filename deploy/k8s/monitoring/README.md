@@ -13,14 +13,49 @@ the ICN-specific overlays that live alongside the chart release.
 
 ## Apply the Helm values overlay
 
-```bash
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
+Helm is installed on `k3s-control` (`10.8.30.40`) at `/usr/local/bin/helm`. It must be
+invoked with `KUBECONFIG=/etc/rancher/k3s/k3s.yaml` in non-interactive SSH sessions
+(the default kubeconfig falls back to `localhost:8080` which fails over SSH).
 
-helm upgrade --install kube-prometheus-stack \
-  prometheus-community/kube-prometheus-stack \
-  --namespace monitoring --create-namespace \
-  -f deploy/k8s/monitoring/values-kube-prometheus-stack.yaml
+**Copy values file to control node, then upgrade:**
+
+```bash
+# 1. Copy values file to control node
+scp deploy/k8s/monitoring/values-kube-prometheus-stack.yaml \
+    ubuntu@10.8.30.40:/tmp/values-kube-prometheus-stack.yaml
+
+# 2. Dry-run first
+ssh ubuntu@10.8.30.40 \
+  'KUBECONFIG=/etc/rancher/k3s/k3s.yaml sudo -E helm upgrade prometheus \
+    prometheus-community/kube-prometheus-stack \
+    --namespace monitoring \
+    --reuse-values \
+    -f /tmp/values-kube-prometheus-stack.yaml \
+    --dry-run'
+
+# 3. Apply
+ssh ubuntu@10.8.30.40 \
+  'KUBECONFIG=/etc/rancher/k3s/k3s.yaml sudo -E helm upgrade prometheus \
+    prometheus-community/kube-prometheus-stack \
+    --namespace monitoring \
+    --reuse-values \
+    -f /tmp/values-kube-prometheus-stack.yaml \
+    --wait --timeout 10m'
+```
+
+The release name is `prometheus` (not `kube-prometheus-stack`). Use `--reuse-values` to
+avoid resetting other chart defaults that were set at install time.
+
+**Alternative (if routed via icn-dev):**
+
+```bash
+scp deploy/k8s/monitoring/values-kube-prometheus-stack.yaml icn-dev-cursor:/tmp/
+ssh icn-dev-cursor "scp /tmp/values-kube-prometheus-stack.yaml ubuntu@10.8.30.40:/tmp/"
+ssh icn-dev-cursor "ssh ubuntu@10.8.30.40 \
+  'KUBECONFIG=/etc/rancher/k3s/k3s.yaml sudo -E helm upgrade prometheus \
+    prometheus-community/kube-prometheus-stack \
+    --namespace monitoring --reuse-values \
+    -f /tmp/values-kube-prometheus-stack.yaml --wait --timeout 10m'"
 ```
 
 ## Verify after rollout
