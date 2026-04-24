@@ -13,6 +13,9 @@ icn-kernel-api = { path = "../../crates/icn-kernel-api" }
 # Governance domain types (proposals, votes, domains, etc.)
 icn-governance = { path = "../../crates/icn-governance" }
 
+# CCL schema (charter YAML parsing/validation at the HTTP boundary)
+icn-ccl = { path = "../../crates/icn-ccl" }
+
 # Identity types (Did)
 icn-identity = { path = "../../crates/icn-identity" }
 

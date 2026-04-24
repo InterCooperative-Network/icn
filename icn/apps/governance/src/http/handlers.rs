@@ -635,6 +635,53 @@ pub async fn remove_domain_member<E: GovernanceEventEmitter + Clone + 'static>(
 }
 
 // ============================================================================
+// Charter activation handlers
+// ============================================================================
+
+/// POST /gov/charters — Activate a CCL charter directly.
+///
+/// Bootstrap-side counterpart to the governance-ratification path: hands a
+/// validated CCL document straight to the gateway's `on_charter_accepted`
+/// hook (which deploys it into the `CharterPolicyOracle`).  Does **not**
+/// create a proposal, record a vote, or emit a decision — the charter is
+/// treated as already-decided by an out-of-band ratification.
+///
+/// Idempotency: deploying the same `charter_id` again overwrites the prior
+/// document in the oracle. Reactivations therefore succeed and return the
+/// new `activated_at` timestamp; callers that need single-shot semantics
+/// must dedupe upstream.
+pub async fn activate_charter<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    req: web::Json<ActivateCharterRequest>,
+) -> Result<HttpResponse, ApiError> {
+    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+
+    val::validate_charter_id(&req.charter_id)?;
+    val::validate_charter_yaml(&req.charter_yaml)?;
+
+    // Parse and structurally validate at the boundary so malformed input
+    // returns 400 instead of being silently dropped by the fire-and-forget
+    // hook.
+    let doc = icn_ccl::schema::CclDocument::from_yaml(&req.charter_yaml)
+        .map_err(|e| err_bad(format!("Invalid CCL YAML: {e}")))?;
+    doc.validate()
+        .map_err(|e| err_bad(format!("Charter validation failed: {e}")))?;
+
+    let hook = ctx
+        .on_charter_accepted
+        .as_ref()
+        .ok_or_else(|| err_internal("Charter activation hook is not wired"))?;
+    hook(req.charter_id.clone(), req.charter_yaml.clone());
+
+    Ok(HttpResponse::Created().json(ActivateCharterResponse {
+        charter_id: req.charter_id.clone(),
+        status: "active".to_string(),
+        activated_at: current_time_secs(),
+    }))
+}
+
+// ============================================================================
 // Proposal handlers
 // ============================================================================
 

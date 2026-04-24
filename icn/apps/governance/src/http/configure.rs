@@ -295,6 +295,8 @@ where
                 .route(web::post().to(handlers::add_domain_member::<E>))
                 .route(web::delete().to(handlers::remove_domain_member::<E>)),
         )
+        // ── Charter activation ────────────────────────────────────────────
+        .service(web::resource("/charters").route(web::post().to(handlers::activate_charter::<E>)))
         // ── Proposal endpoints ────────────────────────────────────────────
         .service(
             web::resource("/proposals")

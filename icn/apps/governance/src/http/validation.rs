@@ -11,6 +11,11 @@ use icn_http_kit::error::ApiError;
 // ============================================================================
 
 pub const MAX_DOMAIN_ID_LEN: usize = 128;
+pub const MAX_CHARTER_ID_LEN: usize = 128;
+/// Hard cap on charter document size (1 MiB). Charter documents are CCL YAML;
+/// real institutional charters are well under this bound. The cap is a DoS
+/// guard, not a structural limit.
+pub const MAX_CHARTER_YAML_BYTES: usize = 1_048_576;
 pub const MAX_DOMAIN_NAME_LEN: usize = 256;
 pub const MAX_GOVERNANCE_MODEL_LEN: usize = 64;
 pub const MAX_PROPOSAL_TITLE_LEN: usize = 256;
@@ -48,6 +53,46 @@ pub fn validate_domain_id(id: &str) -> Result<(), ApiError> {
             "Domain ID must contain only alphanumeric characters, hyphens, underscores, and colons"
                 .into(),
         ));
+    }
+    Ok(())
+}
+
+/// Charter identifiers share the structural rules of governance domain IDs.
+/// Per governance convention `charter_id == domain_id` for the cooperative the
+/// charter governs, so reusing the alphabet keeps both surfaces consistent.
+pub fn validate_charter_id(id: &str) -> Result<(), ApiError> {
+    if id.is_empty() {
+        return Err(ApiError::BadRequest("Charter ID cannot be empty".into()));
+    }
+    if id.len() > MAX_CHARTER_ID_LEN {
+        return Err(ApiError::BadRequest(format!(
+            "Charter ID exceeds maximum length of {MAX_CHARTER_ID_LEN} characters"
+        )));
+    }
+    if !id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == ':')
+    {
+        return Err(ApiError::BadRequest(
+            "Charter ID must contain only alphanumeric characters, hyphens, underscores, and colons"
+                .into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Bound the raw YAML payload before handing it to the CCL parser. Empty input
+/// is rejected with a clear message; oversize input is rejected as a DoS guard.
+pub fn validate_charter_yaml(yaml: &str) -> Result<(), ApiError> {
+    if yaml.is_empty() || yaml.trim().is_empty() {
+        return Err(ApiError::BadRequest(
+            "Charter YAML cannot be empty or whitespace-only".into(),
+        ));
+    }
+    if yaml.len() > MAX_CHARTER_YAML_BYTES {
+        return Err(ApiError::BadRequest(format!(
+            "Charter YAML exceeds maximum size of {MAX_CHARTER_YAML_BYTES} bytes"
+        )));
     }
     Ok(())
 }
