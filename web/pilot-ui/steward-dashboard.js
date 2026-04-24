@@ -1,5 +1,16 @@
 // Steward Dashboard JavaScript
 
+// Derive the gateway API base URL from current browser context.
+// The host-derived detection matches app.js; this helper also applies the saved gateway
+// override that app.js handles separately when choosing between saved and detected URLs.
+function deriveGatewayUrl(hostname, protocol, savedGateway) {
+    if (savedGateway) return savedGateway;
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        return `${protocol}//${hostname}:30080`;
+    }
+    return 'http://localhost:8080';
+}
+
 class StewardDashboard {
     constructor() {
         this.apiBase = this.detectApiBase();
@@ -13,11 +24,11 @@ class StewardDashboard {
     }
 
     detectApiBase() {
-        // Use current origin or fallback to gateway
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            return 'http://10.8.10.40:30080';
-        }
-        return window.location.origin;
+        return deriveGatewayUrl(
+            window.location.hostname,
+            window.location.protocol,
+            localStorage.getItem('icn-gateway')
+        );
     }
 
     getAuthToken() {
