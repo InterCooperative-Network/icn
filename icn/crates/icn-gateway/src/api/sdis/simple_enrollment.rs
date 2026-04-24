@@ -1157,6 +1157,10 @@ mod tests {
 
     #[actix_web::test]
     async fn test_start_enrollment_uses_request_gateway_url() {
+        // Ensure env-based overrides do not short-circuit the request-derived path.
+        std::env::remove_var("GATEWAY_BASE_URL");
+        std::env::remove_var("TRUSTED_PROXY_IPS");
+
         let app = actix_web::test::init_service(
             App::new()
                 .app_data(web::Data::new(Arc::new(EnrollmentStore::new())))
