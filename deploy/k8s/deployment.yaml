@@ -19,6 +19,21 @@ spec:
         app: icn
         component: daemon
     spec:
+      affinity:
+        # Soft anti-affinity: prefer hosts that don't already run another ICN daemon
+        # (icn-daemon here plus the per-coop daemons in icn-coop-* namespaces). Keeps
+        # single-node dev clusters schedulable — this is a preference, not a requirement.
+        # See docs/operations/deployment/HOMELAB_DEPLOYMENT.md and issue #1598.
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                namespaceSelector: {}
+                labelSelector:
+                  matchLabels:
+                    app: icn
+                    component: daemon
       initContainers:
       - name: init-identity
         image: 10.8.30.40:30500/icn:latest
