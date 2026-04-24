@@ -14,7 +14,7 @@
 # Examples:
 #   ./full-deploy.sh                                    # Deploy latest
 #   ./full-deploy.sh $(git rev-parse --short HEAD)     # Deploy with git hash
-#   ./full-deploy.sh v1.0.0 ubuntu@10.8.10.40          # Custom tag and host
+#   ./full-deploy.sh v1.0.0 ubuntu@10.8.30.40          # Custom tag and host
 #   ./full-deploy.sh latest --no-cache --rollback      # Fresh build with auto-rollback
 
 set -e
@@ -22,7 +22,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 K8S_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 TAG="${1:-latest}"
-K3S_HOST="${2:-ubuntu@10.8.10.40}"
+K3S_HOST="${2:-ubuntu@10.8.30.40}"
 NO_CACHE=""
 VERIFY=true
 AUTO_ROLLBACK=false
@@ -167,8 +167,8 @@ echo "  Duration: ${DEPLOYMENT_DURATION}s"
 echo "  Status:   ✓ Healthy"
 echo ""
 echo "Access points:"
-echo "  Gateway: http://10.8.10.40:30080"
-echo "  Metrics: http://10.8.10.40:30091/metrics"
+echo "  Gateway: http://10.8.30.40:30080"
+echo "  Metrics: http://10.8.30.40:30090/metrics"
 echo ""
 echo "Commands:"
 echo "  Status:   make status"

@@ -147,7 +147,7 @@ To configure Slack/Email alerting, edit `deploy/k8s/alertmanager-config.yaml`.
 ```bash
 # Generate 10 auth failures quickly
 for i in {1..10}; do
-  curl -X POST http://10.8.10.40:30080/v1/auth/verify \
+  curl -X POST http://10.8.30.40:30080/v1/auth/verify \
     -H "Content-Type: application/json" \
     -d "{\"did\": \"did:icn:test$i\", \"challenge_id\": \"bad\", \"signature\": \"fake\"}" &
 done

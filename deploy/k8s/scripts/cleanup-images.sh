@@ -8,15 +8,15 @@
 #
 # Examples:
 #   ./cleanup-images.sh                           # Use default host
-#   ./cleanup-images.sh ubuntu@10.8.10.40        # Specify host
-#   ./cleanup-images.sh ubuntu@10.8.10.40 abc123 # Keep specific tag
+#   ./cleanup-images.sh ubuntu@10.8.30.40        # Specify host
+#   ./cleanup-images.sh ubuntu@10.8.30.40 abc123 # Keep specific tag
 
 set -e
 
-K3S_HOST="${1:-ubuntu@10.8.10.40}"
+K3S_HOST="${1:-ubuntu@10.8.30.40}"
 KEEP_TAG="${2:-}"
-K3S_WORKER1="${K3S_WORKER1:-ubuntu@10.8.10.41}"
-K3S_WORKER2="${K3S_WORKER2:-ubuntu@10.8.10.42}"
+K3S_WORKER1="${K3S_WORKER1:-ubuntu@10.8.30.41}"
+K3S_WORKER2="${K3S_WORKER2:-ubuntu@10.8.30.42}"
 
 # If no keep tag specified, get the current deployment image tag
 if [ -z "$KEEP_TAG" ]; then

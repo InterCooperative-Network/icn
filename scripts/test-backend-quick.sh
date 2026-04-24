@@ -2,7 +2,7 @@
 # Simple API Test - No mobile app needed
 # Tests the backend that the mobile app would use
 
-GATEWAY="http://10.8.10.40:30080"
+GATEWAY="http://10.8.30.40:30080"
 COOP_ID="test-coop"
 
 echo "========================================="

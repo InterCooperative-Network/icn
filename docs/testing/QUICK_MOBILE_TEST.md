@@ -2,7 +2,7 @@
 
 ## ✅ Status: Ready for Testing
 
-**Gateway**: http://10.8.10.40:30080  
+**Gateway**: http://10.8.30.40:30080
 **Last Updated**: 2025-12-16
 
 ---
@@ -19,7 +19,7 @@ Press `i` for iOS, `a` for Android, or `w` for web.
 
 ### 2. First Time Setup
 In the app:
-1. Enter Gateway URL: `http://10.8.10.40:30080`
+1. Enter Gateway URL: `http://10.8.30.40:30080`
 2. Enter Cooperative ID: `test-coop`
 3. Choose "New Identity" or "Import Existing"
 
@@ -36,13 +36,13 @@ In the app:
 
 ### Check Gateway Health
 ```bash
-curl http://10.8.10.40:30080/v1/health
+curl http://10.8.30.40:30080/v1/health
 # Should return: {"status":"ok","version":"0.1.0"}
 ```
 
 ### Check SDIS Health
 ```bash
-curl http://10.8.10.40:30080/v1/sdis/health
+curl http://10.8.30.40:30080/v1/sdis/health
 # Should return: {"service":"sdis","status":"ok","version":"1.0"}
 ```
 
@@ -56,12 +56,12 @@ curl http://10.8.10.40:30080/v1/sdis/health
 ## Common Issues
 
 ### "Cannot connect to gateway"
-- Check gateway is running: `ssh ubuntu@10.8.10.40 "sudo kubectl -n icn get pods"`
-- Test endpoint: `curl http://10.8.10.40:30080/v1/health`
+- Check gateway is running: `ssh ubuntu@10.8.30.40 "sudo kubectl -n icn get pods"`
+- Test endpoint: `curl http://10.8.30.40:30080/v1/health`
 
 ### "Authentication failed"
 - Make sure you created an identity first
-- Check gateway URL is exactly `http://10.8.10.40:30080` (no trailing slash)
+- Check gateway URL is exactly `http://10.8.30.40:30080` (no trailing slash)
 
 ### "Balance shows as 0"
 - This is normal for new identities
@@ -82,7 +82,7 @@ ICN_PASSPHRASE="test" ./target/release/icnctl id init
 ### Get Auth Token
 ```bash
 ICN_PASSPHRASE="test" ./target/release/icnctl auth token \
-  --gateway http://10.8.10.40:30080 \
+  --gateway http://10.8.30.40:30080 \
   --coop-id test-coop
 ```
 
@@ -90,7 +90,7 @@ ICN_PASSPHRASE="test" ./target/release/icnctl auth token \
 ```bash
 TOKEN="<your-token-here>"
 curl -H "Authorization: Bearer $TOKEN" \
-  http://10.8.10.40:30080/v1/ledger/test-coop/balance/<your-did>
+  http://10.8.30.40:30080/v1/ledger/test-coop/balance/<your-did>
 ```
 
 ---
@@ -99,16 +99,16 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ### Check Pod Status
 ```bash
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn get pods"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn get pods"
 ```
 
 ### View Logs
 ```bash
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs -f deployment/icn-daemon"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn logs -f deployment/icn-daemon"
 ```
 
 ### Grafana Dashboard
-Open: http://10.8.10.40:30300
+Open: http://10.8.30.40:30300
 
 ---
 

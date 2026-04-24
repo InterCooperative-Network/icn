@@ -673,8 +673,8 @@ These are Phase 2 Track A deliverables. They're the "governance constitution tem
 
 **K3s cluster on icn-dev (10.8.30.45):**
 - 4 pods: icn-alpha, icn-beta, icn-gamma (+ delta)
-- Gateway API accessible at `10.8.10.40:30080` (K3s NodePort)
-- SDIS API: `http://10.8.10.40:30080/v1/sdis/health`
+- Gateway API accessible at `10.8.30.40:30080` (K3s NodePort)
+- SDIS API: `http://10.8.30.40:30080/v1/sdis/health`
 
 **Known gaps in K3s deployment:**
 - `treasury:read/write` scopes not in `ALLOWED_SCOPES` → treasury API unreachable

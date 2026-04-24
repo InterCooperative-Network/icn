@@ -18,8 +18,8 @@
 
 set -euo pipefail
 
-K3S_HOST="${K3S_HOST:-ubuntu@10.8.10.40}"
-GATEWAY_HOST="${GATEWAY_HOST:-10.8.10.40}"
+K3S_HOST="${K3S_HOST:-ubuntu@10.8.30.40}"
+GATEWAY_HOST="${GATEWAY_HOST:-10.8.30.40}"
 DRY_RUN=false
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=true
 

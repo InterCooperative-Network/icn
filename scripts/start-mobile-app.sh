@@ -19,7 +19,7 @@ if [ ! -d "node_modules" ]; then
 fi
 
 echo "✅ Configuration:"
-echo "   Gateway: http://10.8.10.40:30080"
+echo "   Gateway: http://10.8.30.40:30080"
 echo "   Coop ID: test-coop"
 echo ""
 

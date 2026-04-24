@@ -32,7 +32,7 @@ This deployment setup provides a complete solution for syncing ICN development w
 │                                                               │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
 │  │ k3s-control  │  │ k3s-worker-1 │  │ k3s-worker-2 │      │
-│  │ 10.8.10.40   │  │ 10.8.10.41   │  │ 10.8.10.42   │      │
+│  │ 10.8.30.40   │  │ 10.8.30.41   │  │ 10.8.30.42   │      │
 │  │              │  │              │  │              │      │
 │  │ containerd   │  │ containerd   │  │ containerd   │      │
 │  │  ↓           │  │  ↓           │  │  ↓           │      │
@@ -59,7 +59,7 @@ This deployment setup provides a complete solution for syncing ICN development w
 
 1. **SSH Access**: Configured SSH key access to K3s nodes
    ```bash
-   ssh ubuntu@10.8.10.40  # Should work without password
+   ssh ubuntu@10.8.30.40  # Should work without password
    ```
 
 2. **Docker**: Installed on development machine
@@ -84,7 +84,7 @@ This deployment setup provides a complete solution for syncing ICN development w
 
 2. **Deploy Secrets**
    ```bash
-   ssh ubuntu@10.8.10.40 "sudo kubectl apply -f -" < secret.yaml
+   ssh ubuntu@10.8.30.40 "sudo kubectl apply -f -" < secret.yaml
    ```
 
 3. **Full Deployment**
@@ -151,7 +151,7 @@ cd deploy/k8s/scripts
 ./full-deploy.sh                                    # latest, default host
 ./full-deploy.sh v1.0.0                            # custom tag
 ./full-deploy.sh $(git rev-parse --short HEAD)     # git hash
-./full-deploy.sh latest ubuntu@10.8.10.40          # custom host
+./full-deploy.sh latest ubuntu@10.8.30.40          # custom host
 ```
 
 ### Method 3: Step-by-Step
@@ -168,7 +168,7 @@ cd deploy/k8s/scripts
 ./sync-image.sh v1.0.0
 
 # 3. Deploy manifests
-./deploy.sh ubuntu@10.8.10.40 v1.0.0
+./deploy.sh ubuntu@10.8.30.40 v1.0.0
 ```
 
 ### Method 4: Manual kubectl
@@ -277,7 +277,7 @@ spec:
 
 ```bash
 # Port forward metrics endpoint
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn port-forward svc/icn 9100:9100"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn port-forward svc/icn 9100:9100"
 # Visit http://localhost:9100/metrics
 ```
 
@@ -287,7 +287,7 @@ If Prometheus/Grafana is deployed:
 
 ```bash
 # Port forward Grafana
-ssh ubuntu@10.8.10.40 "sudo kubectl -n monitoring port-forward svc/prometheus-grafana 3000:80"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n monitoring port-forward svc/prometheus-grafana 3000:80"
 # Visit http://localhost:3000
 ```
 
@@ -296,7 +296,7 @@ ssh ubuntu@10.8.10.40 "sudo kubectl -n monitoring port-forward svc/prometheus-gr
 ```bash
 make status
 # OR
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn get pods,svc,pvc"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn get pods,svc,pvc"
 ```
 
 ### View Logs
@@ -309,7 +309,7 @@ make logs
 make logs-recent
 
 # Specific pod
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs <pod-name>"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn logs <pod-name>"
 ```
 
 ## Troubleshooting
@@ -328,7 +328,7 @@ ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs <pod-name>"
 **Problem**: Can't sync image to cluster
 
 **Solutions**:
-1. Check SSH access: `ssh ubuntu@10.8.10.40`
+1. Check SSH access: `ssh ubuntu@10.8.30.40`
 2. Check disk space on nodes
 3. Try manual sync (see Manual Image Sync section)
 
@@ -355,7 +355,7 @@ ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs <pod-name>"
 
 4. **Check image exists**:
    ```bash
-   ssh ubuntu@10.8.10.40 "sudo crictl images | grep icn"
+   ssh ubuntu@10.8.30.40 "sudo crictl images | grep icn"
    ```
 
 5. **Check logs**:
@@ -390,17 +390,17 @@ If automated sync fails, manually sync to a single node:
 docker save icn:latest -o /tmp/icn.tar
 
 # 2. Copy to node
-scp /tmp/icn.tar ubuntu@10.8.10.40:/tmp/
+scp /tmp/icn.tar ubuntu@10.8.30.40:/tmp/
 
 # 3. Import on node
-ssh ubuntu@10.8.10.40
+ssh ubuntu@10.8.30.40
 sudo ctr -n k8s.io images import /tmp/icn.tar
 # OR
 sudo ctr images import /tmp/icn.tar
 
 # 4. Cleanup
 rm /tmp/icn.tar
-ssh ubuntu@10.8.10.40 "rm /tmp/icn.tar"
+ssh ubuntu@10.8.30.40 "rm /tmp/icn.tar"
 ```
 
 ## Local Registry (Optional)

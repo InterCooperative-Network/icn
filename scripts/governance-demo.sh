@@ -11,7 +11,7 @@
 set -euo pipefail
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
-GATEWAY="${GATEWAY:-http://10.8.10.40:30080}"
+GATEWAY="${GATEWAY:-http://10.8.30.40:30080}"
 TOKEN="${TOKEN:-}"
 POD_NAMESPACE="${POD_NAMESPACE:-icn}"
 DOMAIN_ID="coop:demo-$(date +%s)"

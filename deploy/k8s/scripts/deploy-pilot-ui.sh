@@ -6,7 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-K3S_HOST="${1:-ubuntu@10.8.10.40}"
+K3S_HOST="${1:-ubuntu@10.8.30.40}"
 IMAGE_NAME="icn-pilot-ui"
 IMAGE_TAG="${2:-latest}"
 
@@ -22,7 +22,7 @@ cd "$PROJECT_ROOT/web/pilot-ui"
 
 # Update default Gateway URL for staging
 echo "Updating default Gateway URL for staging..."
-STAGING_GATEWAY="http://10.8.10.40:30080"
+STAGING_GATEWAY="http://10.8.30.40:30080"
 
 # Backup originals
 cp index.html index.html.bak
@@ -63,7 +63,7 @@ NODES=$(ssh "$K3S_HOST" "sudo kubectl get nodes -o jsonpath='{.items[*].status.a
 
 for NODE in $NODES; do
     echo "Importing to node: $NODE"
-    if [ "$NODE" == "10.8.10.40" ]; then
+    if [ "$NODE" == "10.8.30.40" ]; then
         # Control plane - already has the file
         ssh "$K3S_HOST" "sudo k3s ctr images import /tmp/${IMAGE_NAME}-${IMAGE_TAG}.tar"
     else
@@ -106,8 +106,8 @@ echo ""
 echo "=== Pilot UI deployed successfully! ==="
 echo ""
 echo "Access URLs:"
-echo "  - http://10.8.10.40:30030 (Control Plane)"
-echo "  - http://10.8.10.41:30030 (Worker 1)"
-echo "  - http://10.8.10.42:30030 (Worker 2)"
+echo "  - http://10.8.30.40:30030 (Control Plane)"
+echo "  - http://10.8.30.41:30030 (Worker 1)"
+echo "  - http://10.8.30.42:30030 (Worker 2)"
 echo ""
-echo "Gateway API: http://10.8.10.40:30080"
+echo "Gateway API: http://10.8.30.40:30080"

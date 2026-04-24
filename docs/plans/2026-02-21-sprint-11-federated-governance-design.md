@@ -306,8 +306,8 @@ cd /home/ubuntu/projects/icn && docker build -f deploy/Dockerfile.icnd -t icn:la
 **Step 3: Push to registry**
 
 ```bash
-docker tag icn:latest 10.8.10.40:30500/icn:latest
-docker push 10.8.10.40:30500/icn:latest
+docker tag icn:latest 10.8.30.40:30500/icn:latest
+docker push 10.8.30.40:30500/icn:latest
 ```
 
 **Step 4: Create PR**
@@ -366,7 +366,7 @@ In the deployment YAML (line 259-268), add after the HOME env var:
 
 ```yaml
         - name: ICN_CORS_ORIGINS
-          value: "http://10.8.10.40:30030"
+          value: "http://10.8.30.40:30030"
 ```
 
 **Step 3: Print gateway port in summary**
@@ -441,14 +441,14 @@ For each coop, patch the deployment to add `ICN_CORS_ORIGINS`:
 ```bash
 for COOP in alpha beta gamma delta; do
     NS="icn-coop-${COOP}"
-    kubectl -n $NS set env deployment/icn-${COOP} ICN_CORS_ORIGINS="http://10.8.10.40:30030"
+    kubectl -n $NS set env deployment/icn-${COOP} ICN_CORS_ORIGINS="http://10.8.30.40:30030"
 done
 ```
 
 **Step 3: Verify all 4 coop gateways respond**
 
 ```bash
-NODE_IP=10.8.10.40
+NODE_IP=10.8.30.40
 for PORT in 30081 30082 30083 30084; do
     echo -n "Port $PORT: "
     curl -s "http://${NODE_IP}:${PORT}/v1/health" | jq -r '.status'
@@ -481,7 +481,7 @@ gh pr create --title "feat(deploy): add gateway NodePorts for coop instances" --
 # Idempotent: re-running is safe.
 set -euo pipefail
 
-NODE_IP="${NODE_IP:-10.8.10.40}"
+NODE_IP="${NODE_IP:-10.8.30.40}"
 COOPS=("alpha:30081" "beta:30082" "gamma:30083" "delta:30084")
 FED_ID="${FED_ID:-pilot-fed}"
 

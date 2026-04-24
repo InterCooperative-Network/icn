@@ -6,7 +6,7 @@
 
 set -e
 
-K3S_HOST="${K3S_HOST:-ubuntu@10.8.10.40}"
+K3S_HOST="${K3S_HOST:-ubuntu@10.8.30.40}"
 
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║  Updating min_trust_threshold for all ICN coops            ║"

@@ -16,7 +16,7 @@ RUNNER_VERSION="2.321.0"
 RUNNER_NAME="homelab-runner"
 RUNNER_LABELS="self-hosted,linux,x64,homelab,k3s"
 REPO_URL="https://github.com/InterCooperative-Network/icn"
-K3S_HOST="${K3S_HOST:-ubuntu@10.8.10.40}"
+K3S_HOST="${K3S_HOST:-ubuntu@10.8.30.40}"
 
 if [ -z "$GITHUB_TOKEN" ]; then
     echo "Usage: $0 <github-token>"

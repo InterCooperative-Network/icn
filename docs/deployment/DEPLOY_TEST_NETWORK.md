@@ -20,9 +20,9 @@
 
 | Host | IP | Role |
 |------|-----|------|
-| k3s-control | 10.8.10.40 | K3s control plane |
-| k3s-worker-1 | 10.8.10.41 | K3s worker node |
-| k3s-worker-2 | 10.8.10.42 | K3s worker node |
+| k3s-control | 10.8.30.40 | K3s control plane |
+| k3s-worker-1 | 10.8.30.41 | K3s worker node |
+| k3s-worker-2 | 10.8.30.42 | K3s worker node |
 | Atlas | 10.8.10.25 | NFS storage (`atlas-nfs` StorageClass) |
 
 **Current ICN Identity**: `did:icn:z3TE1ei6B4L5j6Jp29RmJKt1FYonGaQAXQoYHJL3GULR3`
@@ -31,7 +31,7 @@
 
 ```bash
 # SSH to K3s control plane
-ssh ubuntu@10.8.10.40
+ssh ubuntu@10.8.30.40
 
 # Check cluster status
 sudo kubectl get nodes
@@ -52,7 +52,7 @@ curl http://localhost:9100/metrics
 
 | Service | Access |
 |---------|--------|
-| **Grafana** | http://10.8.10.40:30300 |
+| **Grafana** | http://10.8.30.40:30300 |
 | **ICN Metrics** | Port-forward to 9100 |
 | **Dashboard** | ICN Node Dashboard |
 

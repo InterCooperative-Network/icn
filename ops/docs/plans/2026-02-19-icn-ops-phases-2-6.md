@@ -605,7 +605,7 @@ You are the ICN development orchestrator. You understand the full development en
 
 - ICN docs sync one-way: `icn/docs/` → `icn-website/src/content/docs/` (via `sync-from-icn.sh`)
 - Worktrees are branches of `icn/` — build commands work the same (`cd icn-wt/<name>/icn && cargo build`)
-- Cluster at `10.8.10.40` runs whatever is in `icn/deploy/k8s/`
+- Cluster at `10.8.30.40` runs whatever is in `icn/deploy/k8s/`
 - `homelab-inventory` (not on this VM) manages the infrastructure — read-only from here
 
 ## Your Capabilities

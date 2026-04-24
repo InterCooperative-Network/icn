@@ -4,7 +4,7 @@
 
 **Last Deployed**: 2025-12-04 20:20 UTC  
 **Image Tag**: `2122145` (git commit hash)  
-**Cluster**: K3s on Hyperion (10.8.10.40)  
+**Cluster**: K3s on Hyperion (10.8.30.40)
 **Namespace**: `icn`
 
 ## Deployment Summary
@@ -76,7 +76,7 @@ make full-deploy-dev
 
 ```bash
 # Port forward to access metrics
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn port-forward svc/icn 9100:9100"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn port-forward svc/icn 9100:9100"
 # Then visit: http://localhost:9100/metrics
 ```
 
@@ -84,7 +84,7 @@ ssh ubuntu@10.8.10.40 "sudo kubectl -n icn port-forward svc/icn 9100:9100"
 
 ```bash
 # Tail logs
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs -f deployment/icn-daemon"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn logs -f deployment/icn-daemon"
 
 # Or use Makefile
 cd deploy/k8s
@@ -95,7 +95,7 @@ make logs
 
 ```bash
 # Check pod status
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn get pods -o wide"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn get pods -o wide"
 
 # Or use Makefile
 cd deploy/k8s
@@ -175,4 +175,3 @@ See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for complete documentation.
 **Last Updated**: 2025-12-04  
 **Maintainer**: Infrastructure Team  
 **Status**: ✅ Operational
-

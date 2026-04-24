@@ -4,9 +4,9 @@
 IMAGE_NAME ?= icn
 UI_IMAGE_NAME ?= icn-pilot-ui
 IMAGE_TAG ?= latest
-K3S_HOST ?= ubuntu@10.8.10.40
-K3S_WORKER1 ?= ubuntu@10.8.10.41
-K3S_WORKER2 ?= ubuntu@10.8.10.42
+K3S_HOST ?= ubuntu@10.8.30.40
+K3S_WORKER1 ?= ubuntu@10.8.30.41
+K3S_WORKER2 ?= ubuntu@10.8.30.42
 NAMESPACE ?= icn
 
 help: ## Show this help message
@@ -189,9 +189,9 @@ full-deploy-with-ui: build-all-images sync-all-images deploy-all ## Full deploym
 	@echo "✓ Full deployment complete!"
 	@echo ""
 	@echo "Access points:"
-	@echo "  Gateway: http://10.8.10.40:30080"
-	@echo "  Pilot UI: http://10.8.10.40:30030"
-	@echo "  Metrics: http://10.8.10.40:30091/metrics"
+	@echo "  Gateway: http://10.8.30.40:30080"
+	@echo "  Pilot UI: http://10.8.30.40:30030"
+	@echo "  Metrics: http://10.8.30.40:30090/metrics"
 	@echo ""
 	@echo "Check status: make status"
 	@echo "View logs: make logs (daemon) or make ui-logs (UI)"
@@ -223,7 +223,7 @@ image-count: ## Show container image count on all nodes
 	@ssh $(K3S_WORKER2) "echo -n 'k3s-worker-2: ' && sudo crictl images | grep -c 'icn ' || echo 0"
 
 
-REGISTRY ?= 10.8.10.40:30500
+REGISTRY ?= 10.8.30.40:30500
 
 push-registry: ## Push image to local in-cluster registry
 	@echo "Pushing $(IMAGE_NAME):$(IMAGE_TAG) to registry $(REGISTRY)..."

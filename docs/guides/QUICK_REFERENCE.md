@@ -77,7 +77,7 @@ cat DEPLOY_TO_K3S.md
 
 ### 1. Get Admin Token
 ```bash
-ssh ubuntu@10.8.10.40
+ssh ubuntu@10.8.30.40
 POD=$(sudo kubectl get pods -n icn -l component=daemon -o jsonpath='{.items[0].metadata.name}')
 sudo kubectl exec -it -n icn $POD -- icnctl id show
 sudo kubectl exec -it -n icn $POD -- icnctl auth login \
@@ -85,7 +85,7 @@ sudo kubectl exec -it -n icn $POD -- icnctl auth login \
 ```
 
 ### 2. Login to UI
-- Open: http://10.8.10.40:30030
+- Open: http://10.8.30.40:30030
 - Use credentials from step 1
 
 ### 3. Create Invite
@@ -103,7 +103,7 @@ sudo kubectl exec -it -n icn $POD -- icnctl auth login \
 
 ```bash
 # Check invite metrics
-curl http://10.8.10.40:30091/metrics | grep invite
+curl http://10.8.30.40:30090/metrics | grep invite
 
 # Expected output:
 # icn_gateway_invites_created_total{coop_id="test-coop"} N
@@ -153,26 +153,26 @@ make logs
 
 **Pods not starting?**
 ```bash
-ssh ubuntu@10.8.10.40 "sudo kubectl get pods -n icn"
-ssh ubuntu@10.8.10.40 "sudo kubectl describe pod -n icn -l component=daemon"
+ssh ubuntu@10.8.30.40 "sudo kubectl get pods -n icn"
+ssh ubuntu@10.8.30.40 "sudo kubectl describe pod -n icn -l component=daemon"
 ```
 
 **Gateway not responding?**
 ```bash
-curl http://10.8.10.40:30080/v1/health
-ssh ubuntu@10.8.10.40 "sudo kubectl logs -n icn -l component=daemon"
+curl http://10.8.30.40:30080/v1/health
+ssh ubuntu@10.8.30.40 "sudo kubectl logs -n icn -l component=daemon"
 ```
 
 **UI not loading?**
 ```bash
-curl http://10.8.10.40:30030/
-ssh ubuntu@10.8.10.40 "sudo kubectl logs -n icn -l component=pilot-ui"
+curl http://10.8.30.40:30030/
+ssh ubuntu@10.8.30.40 "sudo kubectl logs -n icn -l component=pilot-ui"
 ```
 
 **Disk space issues?**
 ```bash
-ssh ubuntu@10.8.10.40 "df -h /"
-ssh ubuntu@10.8.10.40 "sudo docker system prune -a"
+ssh ubuntu@10.8.30.40 "df -h /"
+ssh ubuntu@10.8.30.40 "sudo docker system prune -a"
 ```
 
 ---
@@ -182,7 +182,7 @@ ssh ubuntu@10.8.10.40 "sudo docker system prune -a"
 - **GitHub Repo:** https://github.com/InterCooperative-Network/icn
 - **Backend Code:** https://github.com/InterCooperative-Network/icn/blob/main/icn/crates/icn-gateway/src/invite.rs
 - **Frontend Code:** https://github.com/InterCooperative-Network/icn/blob/main/web/pilot-ui/app.js
-- **Live UI:** http://10.8.10.40:30030
+- **Live UI:** http://10.8.30.40:30030
 - **API Docs:** See `DEPLOYMENT_INVITE_SYSTEM.md`
 
 ---

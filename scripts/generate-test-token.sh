@@ -4,7 +4,7 @@
 
 set -e
 
-GATEWAY_URL="${1:-http://10.8.10.40:30080}"
+GATEWAY_URL="${1:-http://10.8.30.40:30080}"
 COOP_ID="${2:-test-coop}"
 
 # Find icnctl
@@ -57,4 +57,4 @@ echo "Token:       $TOKEN"
 echo ""
 echo "=== Copy these values into the Pilot UI login form ==="
 echo ""
-echo "Web UI URL: http://10.8.10.40:30030"
+echo "Web UI URL: http://10.8.30.40:30030"

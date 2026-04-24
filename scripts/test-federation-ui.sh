@@ -11,8 +11,8 @@
 set -euo pipefail
 
 # ── Config ──────────────────────────────────────────────────────────────────
-K3S_HOST="${K3S_HOST:-ubuntu@10.8.10.40}"
-GATEWAY_HOST="${GATEWAY_HOST:-10.8.10.40}"
+K3S_HOST="${K3S_HOST:-ubuntu@10.8.30.40}"
+GATEWAY_HOST="${GATEWAY_HOST:-10.8.30.40}"
 COOP="${COOP:-alpha}"
 UI_PORT="${UI_PORT:-30030}"
 

@@ -109,10 +109,10 @@ container_memory_working_set_bytes{namespace="icn", container="icnd"} / containe
 3. **Identify workload patterns**:
    ```bash
    # Check gossip message rate
-   curl -s http://10.8.10.40:30100/metrics | grep icn_gossip_messages
+   curl -s http://10.8.30.40:30090/metrics | grep icn_gossip_messages
 
    # Check active connections
-   curl -s http://10.8.10.40:30100/metrics | grep icn_network_connections
+   curl -s http://10.8.30.40:30090/metrics | grep icn_network_connections
    ```
 
 4. **Decision tree**:
@@ -154,7 +154,7 @@ sudo kubectl -n icn edit deployment icn-daemon
    sudo kubectl -n icn exec deploy/icn-daemon -- cat /proc/1/smaps > smaps.txt
 
    # Capture current metrics
-   curl -s http://10.8.10.40:30100/metrics > metrics-snapshot.txt
+   curl -s http://10.8.30.40:30090/metrics > metrics-snapshot.txt
    ```
 2. Report to ICN developers with:
    - Memory diagnostics (smaps, metrics snapshot)
@@ -195,7 +195,7 @@ sudo kubectl -n icn edit deployment icn-daemon
 
 ```bash
 # Check gossip metrics
-curl -s http://10.8.10.40:30100/metrics | grep icn_gossip
+curl -s http://10.8.30.40:30090/metrics | grep icn_gossip
 
 # Key metrics to watch:
 # - icn_gossip_entries_received_total (incoming entries)
@@ -210,7 +210,7 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_gossip
 1. **Check network connectivity**:
    ```bash
    # Verify peer count
-   curl http://10.8.10.40:30080/v1/health | jq '.active_connections'
+   curl http://10.8.30.40:30080/v1/health | jq '.active_connections'
 
    # Check if peers are reachable
    sudo kubectl -n icn exec deploy/icn-daemon -- curl -s localhost:9100/metrics | grep icn_network
@@ -219,7 +219,7 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_gossip
 2. **Check topic subscriptions**:
    ```bash
    # List subscribed topics
-   curl -s http://10.8.10.40:30100/metrics | grep icn_gossip_subscriptions
+   curl -s http://10.8.30.40:30090/metrics | grep icn_gossip_subscriptions
 
    # Compare subscription counts across nodes (if multi-node)
    ```
@@ -229,13 +229,13 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_gossip
    - Large imbalance indicates sync issues
    ```bash
    # Check message flow balance
-   curl -s http://10.8.10.40:30100/metrics | grep -E "icn_gossip_(entries_received|entries_published)_total"
+   curl -s http://10.8.30.40:30090/metrics | grep -E "icn_gossip_(entries_received|entries_published)_total"
    ```
 
 4. **Check for rejected messages**:
    ```bash
    # High rejection rate indicates trust or rate limiting issues
-   curl -s http://10.8.10.40:30100/metrics | grep rejected
+   curl -s http://10.8.30.40:30090/metrics | grep rejected
    ```
 
 5. **Decision tree**:
@@ -318,7 +318,7 @@ sudo kubectl -n icn rollout restart deployment/icn-daemon
 
 ```bash
 # Check ledger metrics
-curl -s http://10.8.10.40:30100/metrics | grep icn_ledger
+curl -s http://10.8.30.40:30090/metrics | grep icn_ledger
 
 # Key metrics:
 # - icn_ledger_sync_lag_seconds
@@ -331,12 +331,12 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_ledger
 
 1. **Check peer connectivity**:
    ```bash
-   curl http://10.8.10.40:30080/v1/health | jq '.active_connections'
+   curl http://10.8.30.40:30080/v1/health | jq '.active_connections'
    ```
 
 2. **Check quarantine size** (indicates problematic entries):
    ```bash
-   curl -s http://10.8.10.40:30100/metrics | grep quarantine
+   curl -s http://10.8.30.40:30090/metrics | grep quarantine
    ```
 
 3. **Verify entry propagation**:
@@ -368,7 +368,7 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_ledger
 **If slow propagation** (high volume):
 ```bash
 # Monitor progress - should improve over time
-watch -n 5 "curl -s http://10.8.10.40:30100/metrics | grep icn_ledger_entries_total"
+watch -n 5 "curl -s http://10.8.30.40:30090/metrics | grep icn_ledger_entries_total"
 ```
 
 **If quarantine issues**:
@@ -424,7 +424,7 @@ sudo kubectl -n icn rollout restart deployment/icn-daemon
 
 ```bash
 # Check trust metrics
-curl -s http://10.8.10.40:30100/metrics | grep icn_trust
+curl -s http://10.8.30.40:30090/metrics | grep icn_trust
 
 # Key metrics:
 # - icn_trust_computation_errors_total
@@ -443,7 +443,7 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_trust
 2. **Verify graph consistency**:
    ```bash
    # Check edge count
-   curl -s http://10.8.10.40:30100/metrics | grep icn_trust_edges
+   curl -s http://10.8.30.40:30090/metrics | grep icn_trust_edges
 
    # Check for cycles or invalid edges in logs
    sudo kubectl -n icn logs deployment/icn-daemon | grep -i "trust.*cycle\|invalid.*edge"
@@ -452,7 +452,7 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_trust
 3. **Check computation performance**:
    ```bash
    # High computation time indicates graph issues
-   curl -s http://10.8.10.40:30100/metrics | grep icn_trust_computation_duration
+   curl -s http://10.8.30.40:30090/metrics | grep icn_trust_computation_duration
    ```
 
 4. **Decision tree**:
@@ -478,7 +478,7 @@ sudo kubectl -n icn rollout restart deployment/icn-daemon
 **Verify edge data** via metrics:
 ```bash
 # Check edge count from Prometheus metrics
-curl -s http://10.8.10.40:30100/metrics | grep icn_trust_edges
+curl -s http://10.8.30.40:30090/metrics | grep icn_trust_edges
 ```
 
 **If graph corruption suspected**:
@@ -525,10 +525,10 @@ Currently, trust edges are managed through the RPC API or gossip protocol.
 
 ```bash
 # Check rate limiting metrics
-curl -s http://10.8.10.40:30100/metrics | grep rate_limit
+curl -s http://10.8.30.40:30090/metrics | grep rate_limit
 
 # Check gateway response codes
-curl -s http://10.8.10.40:30100/metrics | grep icn_gateway_requests | grep 429
+curl -s http://10.8.30.40:30090/metrics | grep icn_gateway_requests | grep 429
 ```
 
 ### Diagnosis Steps
@@ -548,7 +548,7 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_gateway_requests | grep 429
 3. **Analyze request patterns**:
    ```bash
    # Check request rate by endpoint
-   curl -s http://10.8.10.40:30100/metrics | grep icn_gateway_requests_total
+   curl -s http://10.8.30.40:30090/metrics | grep icn_gateway_requests_total
    ```
 
 4. **Decision tree**:

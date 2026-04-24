@@ -101,7 +101,7 @@ User Browser
 ### Prerequisites
 
 1. **Docker** installed on your development machine
-2. **SSH access** to K3s cluster control node (default: `ubuntu@10.8.10.40`)
+2. **SSH access** to K3s cluster control node (default: `ubuntu@10.8.30.40`)
 3. **Kubectl** access to the cluster (via SSH or local config)
 
 ### Full Deployment (Recommended)
@@ -161,19 +161,19 @@ make full-deploy-fresh  # Full deploy with fresh build
 
 ```bash
 # See what's running
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn get all"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn get all"
 
 # Check ICN health
-curl http://10.8.10.40:30080/v1/health
+curl http://10.8.30.40:30080/v1/health
 
 # View ICN logs
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs -l app=icn,component=daemon -f"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn logs -l app=icn,component=daemon -f"
 
 # Trigger backup manually
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn create job --from=cronjob/icn-backup backup-now"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn create job --from=cronjob/icn-backup backup-now"
 
 # Access Grafana
-open http://10.8.10.40:30300  # ICN dashboard under dashboards
+open http://10.8.30.40:30300  # ICN dashboard under dashboards
 ```
 
 ## File Structure
@@ -279,7 +279,7 @@ The `grafana-dashboard.yaml` provides visualization for:
 - Storage usage gauges
 - Network I/O
 
-Access at: `http://10.8.10.40:30300`
+Access at: `http://10.8.30.40:30300`
 
 ### View Metrics Directly
 
@@ -377,20 +377,20 @@ If the sync script fails:
 docker save icn:latest -o /tmp/icn.tar
 
 # Copy to node
-scp /tmp/icn.tar ubuntu@10.8.10.40:/tmp/
+scp /tmp/icn.tar ubuntu@10.8.30.40:/tmp/
 
 # Import on node
-ssh ubuntu@10.8.10.40 "sudo ctr -n k8s.io images import /tmp/icn.tar"
+ssh ubuntu@10.8.30.40 "sudo ctr -n k8s.io images import /tmp/icn.tar"
 ```
 
 ## Access Points
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| Gateway API | http://10.8.10.40:30080 | REST API |
-| Pilot UI | http://10.8.10.40:30030 | Web interface |
-| Metrics | http://10.8.10.40:30091/metrics | Prometheus metrics |
-| Grafana | http://10.8.10.40:30300 | Dashboards |
+| Gateway API | http://10.8.30.40:30080 | REST API |
+| Pilot UI | http://10.8.30.40:30030 | Web interface |
+| Metrics | http://10.8.30.40:30090/metrics | Prometheus metrics |
+| Grafana | http://10.8.30.40:30300 | Dashboards |
 
 ## CI/CD Integration
 
