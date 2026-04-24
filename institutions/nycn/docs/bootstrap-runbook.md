@@ -1,37 +1,157 @@
 # NYCN Bootstrap Runbook
 
-Current bootstrap entrypoint:
+Live-validated: 2026-04-24 against `icnd` debug binary on port 8085.
+
+## Prerequisites
+
+1. **Built binary** — structures and activities routes were added to `configure.rs` on
+   2026-04-19. Build must be at least this date:
+   ```bash
+   cd icn
+   cargo build -p icnd -p icnctl
+   ```
+
+2. **Fresh data directory with identity** — the gateway needs a keystore and a JWT secret.
+   On first use (or to reset state):
+   ```bash
+   mkdir -p /tmp/icn-bootstrap-test2
+   # Generate a JWT secret (min 32 bytes)
+   openssl rand -base64 32 > /tmp/icn-bootstrap-test2/jwt-secret.txt
+   # Create a new identity (or copy an existing identity.age)
+   ICN_KEYSTORE_PASSPHRASE='' icnd --data-dir /tmp/icn-bootstrap-test2 id init
+   ```
+   Use `ICN_KEYSTORE_PASSPHRASE=''` for keystores with no passphrase.
+
+3. **Ports** — port 8080 may be reserved by WSL/Hyper-V; prefer port 8085.
+
+## Step 1 — Start the gateway
+
+Write a launcher script (avoids command-substitution issues in `wsl -d` context):
 
 ```bash
-cd /home/matt/projects/icn/icn
-cargo run -p icnctl -- institution bootstrap validate --package ../institutions/nycn
-cargo run -p icnctl -- institution bootstrap plan --package ../institutions/nycn
-cargo run -p icnctl -- institution bootstrap apply --package ../institutions/nycn --coop-id <existing-auth-coop>
+cat > /tmp/icn-bootstrap-test2/run-gateway.sh <<'EOF'
+#!/bin/bash
+export ICN_KEYSTORE_PASSPHRASE=""
+export ICN_GATEWAY_JWT_SECRET="$(cat /tmp/icn-bootstrap-test2/jwt-secret.txt)"
+exec /path/to/icn/target/debug/icnd \
+  --data-dir /tmp/icn-bootstrap-test2 \
+  --gateway-enable \
+  --gateway-bind 127.0.0.1:8085 \
+  --log-level warn
+EOF
+chmod +x /tmp/icn-bootstrap-test2/run-gateway.sh
+nohup /tmp/icn-bootstrap-test2/run-gateway.sh >> /tmp/icn-bootstrap-test2/icnd.log 2>&1 &
 ```
 
-What works now:
-1. The package charter is loaded from `../charter/nycn-federation.charter.yaml`.
-2. The package bootstrap manifest is loaded from `../bootstrap.yaml`.
-3. Seed ordering is validated for entities, structures, activity/program, milestones, and role assignments.
-4. Governance domain declarations are validated against entity `governance_domain_id` references.
-5. Cross-reference checks run for parent entities, linked structures, and target programs.
-6. A generic bootstrap plan is emitted for entity, governance-domain, structure, activity, program, milestone, and role-assignment operations.
-7. `apply` can perform real live writes for the subset of steps the current generic gateway APIs can faithfully represent.
+Confirm it is up:
+```bash
+curl -s http://127.0.0.1:8085/v1/health
+# → {"status":"ok","version":"0.1.0"}
+```
 
-What `apply` can really persist today:
-1. The NYCN federation entity.
-2. The organizer cooperative entity.
-3. NYCN governance domains declared in `02-governance-domains.seed.yaml`.
-4. Committee and working-group structures under the organizer cooperative.
-5. Summit activity records including `linked_structures` when target structures are live-resolvable.
+## Step 2 — Validate the package
 
-What `apply` still cannot complete for NYCN:
-1. Charter storage and activation through a generic package bootstrap sink.
-2. Role assignment application where no `person_did` has been supplied yet.
+```bash
+cd icn
+ICN_KEYSTORE_PASSPHRASE='' ./target/debug/icnctl \
+  --data-dir /tmp/icn-bootstrap-test2 \
+  institution bootstrap validate \
+  --package ../institutions/nycn
+```
 
-Current practical order:
-1. Validate the package with `icnctl institution bootstrap validate`.
-2. Review the generic operation sequence with `icnctl institution bootstrap plan`.
-3. Run `icnctl institution bootstrap apply --package ../institutions/nycn --coop-id <existing-auth-coop>`.
-4. Inspect the apply report for completed, deferred, unsupported, and failed steps.
-5. Supply real DIDs for role assignments when organizer identities exist.
+Expected: `valid` with 4 warnings about role assignments that have no DID yet (expected — roles are deferred).
+
+## Step 3 — Review the plan
+
+```bash
+ICN_KEYSTORE_PASSPHRASE='' ./target/debug/icnctl \
+  --data-dir /tmp/icn-bootstrap-test2 \
+  institution bootstrap plan \
+  --package ../institutions/nycn
+```
+
+Expected: 22 operations — 2 entities, 2 governance domains, 7 structures, 1 program,
+1 activity, 4 milestones, 4 deferred role assignments.
+
+## Step 4 — Apply against a live gateway
+
+```bash
+ICN_KEYSTORE_PASSPHRASE='' ./target/debug/icnctl \
+  --data-dir /tmp/icn-bootstrap-test2 \
+  institution bootstrap apply \
+  --package ../institutions/nycn \
+  --gateway http://127.0.0.1:8085 \
+  --coop-id nycn
+```
+
+`--coop-id` is format-validated only (alphanumeric, hyphens, underscores, ≤64 chars).
+Any slug works — the value is stored in the JWT claim, not cross-checked against the
+entity registry.
+
+## Expected output (live-validated 2026-04-24)
+
+```
+Completed:   18
+Deferred:    4
+Unsupported: 1
+Failed:      no
+```
+
+### Completed (18)
+
+1. Validate charter (local only)
+2. Create Federation entity `nycn` → `entity:icn:federation:nycn`
+3. Create Cooperative entity `nycn-organizers` → `entity:icn:cooperative:nycn-organizers`
+4. Provision governance domain `nycn-federation-gov`
+5. Provision governance domain `nycn-organizers-gov`
+6. Create 5 Committee structures (`nycn-backbone`, `nycn-steering`, `nycn-content`, `nycn-logistics`, `nycn-marketing`, `nycn-finance`) → `struct-*` UUIDs
+7. Create 1 WorkingGroup structure (`nycn-accessibility-wg`) → `struct-*` UUID
+8. Create program `summit-cycle-2026` → `prog-*` UUID
+9. Create activity `summit-2026` → `act-*` UUID
+10. Create 4 milestones (`summit-strategy-locked`, `summit-venue-ready`, `summit-public-launch-ready`, `summit-cycle-closeout`) → `mile-*` UUIDs
+
+### Deferred (4)
+
+Role assignments where `person_did` is not yet supplied in the seed:
+- `coordinator` on `nycn-steering`
+- `treasurer` on `nycn-finance`
+- `program-coordinator` on `nycn-content`
+- `operations-lead` on `nycn-logistics`
+
+To apply these later:
+```bash
+# Once you have real DIDs, edit 05-role-assignment.seed.yaml and re-run apply.
+# The apply is idempotent for already-completed steps (entities, domains, structures
+# will 409-conflict and be skipped; roles will be created fresh).
+```
+
+**NOTE: idempotency for entities is partial.** Re-running apply against a live gateway
+that already has entities will return 409 conflicts. The apply code currently treats
+409 as a failure (not as "already exists / skip"). Until idempotency handling is added,
+run apply once against a fresh data dir, or handle 409 responses in the apply code.
+
+### Unsupported (1)
+
+- `store charter` — CCL charter registration/activation through a generic package
+  bootstrap sink is not yet implemented.
+
+## Remaining blockers
+
+| Blocker | Impact | Status |
+|---------|--------|--------|
+| Governance domain storage is in-memory (not persisted to Sled) | Domains lost on gateway restart; `remote_exists` check always 404 on restart → re-creates domains on every apply run | Pre-existing; `create_domain` in standalone mode writes to `Arc<RwLock<HashMap>>` not to Sled |
+| `apply` doesn't handle 409 as idempotent | Cannot safely re-run apply against a live gateway with existing entities | Needs a one-line fix in `post_json` to treat 409 as already-exists |
+| Binary must be post-2026-04-19 | Structures/activities routes not in older binaries | Resolved by building from current source |
+| Charter live registration | Charter not persisted to gateway | Known limitation; charter validates locally only |
+| Role assignments need real DIDs | 4 roles deferred | Operational — supply DIDs when organizer identities exist |
+
+## Governance domain persistence note
+
+In standalone gateway mode (no daemon/actor), `create_domain` stores domains in an
+in-memory map. Domains disappear on restart. This means:
+
+- The `remote_exists` check (`GET /v1/gov/domains/{id}`) always returns 404 after a
+  restart.
+- Apply will re-provision domains on every run after restart (idempotent on the domain
+  side — governance actor upserts are safe).
+- Structures and entities ARE persisted to Sled and survive restarts.
