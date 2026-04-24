@@ -25,7 +25,9 @@
 //! appropriate role in the target entity.
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
-use icn_entity::{CooperativeEntity, EntityId, EntityType, Membership, MembershipRole};
+use icn_entity::{
+    CooperativeEntity, EntityError, EntityId, EntityType, Membership, MembershipRole,
+};
 use icn_identity::Did;
 use icn_obs::metrics::gateway as gateway_metrics;
 use serde::{Deserialize, Serialize};
@@ -389,10 +391,15 @@ pub async fn register_entity(
     );
 
     // Register the entity
-    entity_mgr
-        .register(entity.clone())
-        .await
-        .map_err(|e| GatewayError::InternalError(format!("Failed to register entity: {e}")))?;
+    entity_mgr.register(entity.clone()).await.map_err(|e| {
+        if e.downcast_ref::<EntityError>()
+            .is_some_and(|err| matches!(err, EntityError::AlreadyExists(_)))
+        {
+            GatewayError::Conflict(format!("entity {} already exists", entity_id))
+        } else {
+            GatewayError::InternalError(format!("Failed to register entity: {e}"))
+        }
+    })?;
 
     // Add the creator as a founder member
     // If this fails, clean up the entity to avoid orphaned entities
