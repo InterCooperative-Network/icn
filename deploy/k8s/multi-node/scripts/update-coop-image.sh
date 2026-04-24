@@ -14,7 +14,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 K8S_SCRIPTS="$(cd "$SCRIPT_DIR/../../scripts" && pwd)"
-K3S_HOST="${K3S_HOST:-ubuntu@10.8.10.40}"
+K3S_HOST="${K3S_HOST:-ubuntu@10.8.30.40}"
 TAG="${1:-$(git rev-parse --short HEAD)}"
 
 echo "╔════════════════════════════════════════════════════════════╗"

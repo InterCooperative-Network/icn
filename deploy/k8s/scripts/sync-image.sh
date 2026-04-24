@@ -13,7 +13,7 @@
 # Examples:
 #   ./sync-image.sh                    # Syncs 'latest' tag to all nodes
 #   ./sync-image.sh v1.0.0             # Syncs 'v1.0.0' tag
-#   ./sync-image.sh latest ubuntu@10.8.10.40 --compress
+#   ./sync-image.sh latest ubuntu@10.8.30.40 --compress
 
 set -e
 
@@ -21,7 +21,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 IMAGE_NAME="${IMAGE_NAME:-icn}"
 TAG="${1:-latest}"
-K3S_HOST="${2:-ubuntu@10.8.10.40}"
+K3S_HOST="${2:-ubuntu@10.8.30.40}"
 FULL_IMAGE="${IMAGE_NAME}:${TAG}"
 USE_COMPRESS=false
 CONTROL_ONLY=false

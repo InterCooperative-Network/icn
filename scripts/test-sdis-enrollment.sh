@@ -4,7 +4,7 @@
 
 set -e
 
-GATEWAY_URL="http://10.8.10.40:30080"
+GATEWAY_URL="http://10.8.30.40:30080"
 COOP_ID="test-coop"
 IDENTITY_NAME="TestUser_$(date +%s)"
 
@@ -92,7 +92,7 @@ POD=$(kubectl get pods -n icn -l component=daemon -o jsonpath='{.items[0].metada
 if [ -z "$POD" ]; then
     echo -e "${YELLOW}⚠ Cannot get steward token - kubectl not available${NC}"
     echo "To complete this test manually:"
-    echo "  1. SSH to k3s node: ssh ubuntu@10.8.10.40"
+    echo "  1. SSH to k3s node: ssh ubuntu@10.8.30.40"
     echo "  2. Get pod: POD=\$(sudo kubectl get pods -n icn -l component=daemon -o jsonpath='{.items[0].metadata.name}')"
     echo "  3. Get token: sudo kubectl exec -it -n icn \$POD -- icnctl auth token --coop-id $COOP_ID --gateway http://localhost:8080"
     echo "  4. Use token for Level 2 verification"

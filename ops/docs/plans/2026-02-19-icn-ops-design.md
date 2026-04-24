@@ -343,7 +343,7 @@ Things that **stay** in `icn/`:
 These relationships are encoded in the orchestrator agent and MCP server:
 
 - `icn/docs/` → `icn-website/src/content/docs/` (content sync, one-way)
-- `icn/deploy/k8s/` manifests deploy to K3s cluster at 10.8.10.40-42
+- `icn/deploy/k8s/` manifests deploy to K3s cluster at 10.8.30.40-42
 - `icn/icn/` is the Cargo workspace root (NOT `icn/`)
 - `homelab-inventory` manages the infrastructure ICN runs on — read-only observation from `icn-ops`
 - Worktrees live in `icn-wt/` as siblings, managed via `scripts/worktrees.sh`

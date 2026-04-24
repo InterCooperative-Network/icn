@@ -23,7 +23,7 @@
                         │ SSH Connection
                         ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  K3s Cluster on Hyperion (10.8.10.40)                       │
+│  K3s Cluster on Hyperion (10.8.30.40)                       │
 │                                                              │
 │  • Image imported to containerd                              │
 │  • Kubernetes manifests applied                              │
@@ -61,8 +61,8 @@ make sync
 # This runs: ./scripts/sync-image.sh <tag>
 # Which:
 #   1. Exports image from your Docker: docker save icn:latest -o /tmp/icn.tar
-#   2. Copies to cluster via SSH: scp /tmp/icn.tar ubuntu@10.8.10.40:/tmp/
-#   3. Imports on cluster nodes via SSH: ssh ubuntu@10.8.10.40 "sudo ctr images import ..."
+#   2. Copies to cluster via SSH: scp /tmp/icn.tar ubuntu@10.8.30.40:/tmp/
+#   3. Imports on cluster nodes via SSH: ssh ubuntu@10.8.30.40 "sudo ctr images import ..."
 ```
 
 ### 4. **Deploy to Cluster**
@@ -72,7 +72,7 @@ make deploy
 
 # This runs: ./scripts/deploy.sh
 # Which:
-#   - Applies manifests via SSH: ssh ubuntu@10.8.10.40 "sudo kubectl apply ..."
+#   - Applies manifests via SSH: ssh ubuntu@10.8.30.40 "sudo kubectl apply ..."
 #   - Updates deployment on the cluster
 ```
 
@@ -122,7 +122,7 @@ You **never need to SSH into the cluster** manually. Everything is automated:
 
 ```bash
 # ❌ You DON'T need to do this:
-ssh ubuntu@10.8.10.40
+ssh ubuntu@10.8.30.40
 cd /some/path
 docker build ...
 kubectl apply ...
@@ -145,7 +145,7 @@ cp secret.yaml.example secret.yaml
 nano secret.yaml  # Add your passphrase
 
 # Then push it once:
-ssh ubuntu@10.8.10.40 "sudo kubectl apply -f -" < secret.yaml
+ssh ubuntu@10.8.30.40 "sudo kubectl apply -f -" < secret.yaml
 
 # After that, it stays on the cluster
 ```
@@ -168,11 +168,11 @@ ssh ubuntu@10.8.10.40 "sudo kubectl apply -f -" < secret.yaml
    ```
 4. **Check status** (from local machine):
    ```bash
-   make status  # Runs: ssh ubuntu@10.8.10.40 "sudo kubectl ..."
+   make status  # Runs: ssh ubuntu@10.8.30.40 "sudo kubectl ..."
    ```
 5. **View logs** (from local machine):
    ```bash
-   make logs  # Runs: ssh ubuntu@10.8.10.40 "sudo kubectl logs ..."
+   make logs  # Runs: ssh ubuntu@10.8.30.40 "sudo kubectl logs ..."
    ```
 
 ## Remote Operations

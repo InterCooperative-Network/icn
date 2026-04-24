@@ -21,7 +21,7 @@ spec:
     spec:
       initContainers:
       - name: init-identity
-        image: 10.8.10.40:30500/icn:latest
+        image: 10.8.30.40:30500/icn:latest
         imagePullPolicy: Always
         command: ["/bin/sh", "-c"]
         args:
@@ -57,7 +57,7 @@ spec:
               - ALL
       containers:
       - name: icnd
-        image: 10.8.10.40:30500/icn:latest
+        image: 10.8.30.40:30500/icn:latest
         imagePullPolicy: Always
         args:
           - --config
@@ -84,7 +84,7 @@ spec:
           value: "/data"
         # CORS: allow Pilot UI origin for cross-origin API access
         - name: ICN_CORS_ORIGINS
-          value: "http://10.8.10.40:30030"
+          value: "http://10.8.30.40:30030"
         # Gateway base URL for QR login - set this to the external URL where the gateway is accessible
         # This is used in QR codes for mobile wallet login
         - name: GATEWAY_BASE_URL

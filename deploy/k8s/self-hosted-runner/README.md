@@ -10,12 +10,12 @@ This guide sets up a self-hosted GitHub Actions runner on your homelab for autom
 
 ## Option A: Run on K3s Control Plane (Recommended)
 
-Since k3s-control (10.8.10.40) already has kubectl access, it's the ideal location.
+Since k3s-control (10.8.30.40) already has kubectl access, it's the ideal location.
 
 ### 1. Create Runner User
 
 ```bash
-ssh ubuntu@10.8.10.40
+ssh ubuntu@10.8.30.40
 
 # Create dedicated runner user
 sudo useradd -m -s /bin/bash github-runner

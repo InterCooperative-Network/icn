@@ -68,7 +68,7 @@ This section provides K3s-specific commands for the live homelab deployment.
 
 ```bash
 # SSH to control plane
-ssh ubuntu@10.8.10.40
+ssh ubuntu@10.8.30.40
 
 # All kubectl commands require sudo on control plane
 sudo kubectl -n icn <command>
@@ -103,13 +103,13 @@ sudo kubectl -n icn get pvc
 
 ```bash
 # ICN health endpoint
-curl http://10.8.10.40:30080/v1/health
+curl http://10.8.30.40:30080/v1/health
 
 # Prometheus metrics
-curl http://10.8.10.40:30100/metrics | head -50
+curl http://10.8.30.40:30090/metrics | head -50
 
 # Grafana dashboard
-# Open: http://10.8.10.40:30300
+# Open: http://10.8.30.40:30300
 
 # Check node identity
 sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show
@@ -165,10 +165,10 @@ sudo kubectl -n icn get svc
 
 ```bash
 # View active alerts
-curl -s http://10.8.10.40:30093/api/v1/alerts | jq '.data[] | {labels: .labels, state: .status.state}'
+curl -s http://10.8.30.40:30093/api/v1/alerts | jq '.data[] | {labels: .labels, state: .status.state}'
 
 # Silence an alert (for maintenance)
-# Use Alertmanager UI: http://10.8.10.40:30093
+# Use Alertmanager UI: http://10.8.30.40:30093
 ```
 
 ---
@@ -670,7 +670,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 1. **Check pod status**:
    ```bash
-   ssh ubuntu@10.8.10.40
+   ssh ubuntu@10.8.30.40
    sudo kubectl -n icn get pods -o wide
    ```
 
@@ -894,7 +894,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 1. **Check PVC status**:
    ```bash
-   ssh ubuntu@10.8.10.40
+   ssh ubuntu@10.8.30.40
    sudo kubectl -n icn get pvc
    sudo kubectl -n icn describe pvc icn-data
    ```
@@ -1009,7 +1009,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 1. **Check backup job status**:
    ```bash
-   ssh ubuntu@10.8.10.40
+   ssh ubuntu@10.8.30.40
    sudo kubectl -n icn get jobs -l component=backup
    sudo kubectl -n icn get jobs -l component=backup-verify
    ```
@@ -1147,7 +1147,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 6. **Verify restoration**:
    ```bash
    # Check health
-   curl http://10.8.10.40:30080/v1/health
+   curl http://10.8.30.40:30080/v1/health
 
    # Check identity
    sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show

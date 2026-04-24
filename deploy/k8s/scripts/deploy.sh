@@ -8,14 +8,14 @@
 #
 # Examples:
 #   ./deploy.sh                                    # Deploy to default host with latest
-#   ./deploy.sh ubuntu@10.8.10.40                 # Custom host
-#   ./deploy.sh ubuntu@10.8.10.40 v1.0.0          # Custom host and tag
+#   ./deploy.sh ubuntu@10.8.30.40                 # Custom host
+#   ./deploy.sh ubuntu@10.8.30.40 v1.0.0          # Custom host and tag
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 K8S_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-K3S_HOST="${1:-ubuntu@10.8.10.40}"
+K3S_HOST="${1:-ubuntu@10.8.30.40}"
 IMAGE_TAG="${2:-latest}"
 IMAGE_NAME="${IMAGE_NAME:-icn}"
 

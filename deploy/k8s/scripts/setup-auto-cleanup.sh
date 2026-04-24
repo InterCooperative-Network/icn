@@ -13,9 +13,9 @@
 
 set -e
 
-K3S_HOST="${1:-ubuntu@10.8.10.40}"
-K3S_WORKER1="${K3S_WORKER1:-ubuntu@10.8.10.41}"
-K3S_WORKER2="${K3S_WORKER2:-ubuntu@10.8.10.42}"
+K3S_HOST="${1:-ubuntu@10.8.30.40}"
+K3S_WORKER1="${K3S_WORKER1:-ubuntu@10.8.30.41}"
+K3S_WORKER2="${K3S_WORKER2:-ubuntu@10.8.30.42}"
 
 CLEANUP_SCRIPT='#!/bin/bash
 # ICN automatic image cleanup - installed by setup-auto-cleanup.sh

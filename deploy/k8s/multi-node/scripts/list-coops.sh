@@ -3,7 +3,7 @@
 # List all deployed ICN coop nodes
 #
 
-K3S_HOST="${K3S_HOST:-ubuntu@10.8.10.40}"
+K3S_HOST="${K3S_HOST:-ubuntu@10.8.30.40}"
 
 echo "ICN Coop Nodes:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

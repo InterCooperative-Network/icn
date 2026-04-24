@@ -5,11 +5,11 @@
 #   health → create domain → create proposal → open → vote → close → ledger linkage
 #
 # Usage:
-#   HOST=http://10.8.10.40:30080 TOKEN=<jwt> ./scripts/smoke-test.sh
-#   HOST=http://10.8.10.40:30080 TOKEN=<jwt> COOP_ID=my-coop ./scripts/smoke-test.sh
+#   HOST=http://10.8.30.40:30080 TOKEN=<jwt> ./scripts/smoke-test.sh
+#   HOST=http://10.8.30.40:30080 TOKEN=<jwt> COOP_ID=my-coop ./scripts/smoke-test.sh
 #
 # Environment:
-#   HOST     Gateway base URL (default: http://10.8.10.40:30080)
+#   HOST     Gateway base URL (default: http://10.8.30.40:30080)
 #   TOKEN    Pre-issued JWT (required for authenticated steps)
 #   COOP_ID  Cooperative identifier (default: pilot-coop-1)
 #
@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-HOST="${HOST:-http://10.8.10.40:30080}"
+HOST="${HOST:-http://10.8.30.40:30080}"
 TOKEN="${TOKEN:-}"
 COOP_ID="${COOP_ID:-pilot-coop-1}"
 

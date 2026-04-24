@@ -25,7 +25,7 @@
 
 | Component | Where | How to verify |
 |-----------|-------|---------------|
-| K3s control plane | `k3s-control` (10.8.10.40) | `kubectl get nodes` |
+| K3s control plane | `k3s-control` (10.8.30.40) | `kubectl get nodes` |
 | ICN gateway pods | `icn` namespace | `kubectl get pods -n icn` |
 | Atlas NFS | 10.8.10.25 | `kubectl get pvc -n icn` — must be `Bound` |
 
@@ -49,11 +49,11 @@ jq --version
 
 | Port  | Instance        | URL |
 |-------|----------------|-----|
-| 30080 | Default gateway | http://10.8.10.40:30080 |
-| 30081 | Coop instance 1 | http://10.8.10.40:30081 |
-| 30082 | Coop instance 2 | http://10.8.10.40:30082 |
-| 30083 | Coop instance 3 | http://10.8.10.40:30083 |
-| 30084 | Coop instance 4 | http://10.8.10.40:30084 |
+| 30080 | Default gateway | http://10.8.30.40:30080 |
+| 30081 | Coop instance 1 | http://10.8.30.40:30081 |
+| 30082 | Coop instance 2 | http://10.8.30.40:30082 |
+| 30083 | Coop instance 3 | http://10.8.30.40:30083 |
+| 30084 | Coop instance 4 | http://10.8.30.40:30084 |
 
 ---
 
@@ -62,7 +62,7 @@ jq --version
 Set these in your shell before running any commands:
 
 ```bash
-export HOST="http://10.8.10.40:30080"   # default gateway
+export HOST="http://10.8.30.40:30080"   # default gateway
 export COOP_ID="pilot-coop-1"           # your cooperative ID
 export TOKEN=""                         # filled in after auth (§4)
 ```
@@ -91,7 +91,7 @@ HTTP 200 means the gateway is up and accepting requests.
 
 ```bash
 for port in 30080 30081 30082 30083 30084; do
-    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://10.8.10.40:${port}/v1/health")
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://10.8.30.40:${port}/v1/health")
     echo "port $port → $code"
 done
 ```
@@ -442,7 +442,7 @@ curl -s "$HOST/v1/gov/proposals/$PROPOSAL_ID" \
 Prometheus scrapes on port 30090:
 
 ```bash
-curl -s http://10.8.10.40:30090/metrics | grep gateway_governance
+curl -s http://10.8.30.40:30090/metrics | grep gateway_governance
 ```
 
 Key metrics:

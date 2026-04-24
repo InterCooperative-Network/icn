@@ -4,7 +4,7 @@
 
 set -e
 
-GATEWAY="http://10.8.10.40:30080"
+GATEWAY="http://10.8.30.40:30080"
 COOP_ID="test-coop"
 ICNCTL="/home/matt/projects/icn/icn/target/release/icnctl"
 TEST_DATA_DIR="/tmp/icn-mobile-test-$$"

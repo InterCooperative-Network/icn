@@ -14,7 +14,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MULTI_NODE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 K8S_DIR="$(cd "$MULTI_NODE_DIR/.." && pwd)"
-K3S_HOST="${K3S_HOST:-ubuntu@10.8.10.40}"
+K3S_HOST="${K3S_HOST:-ubuntu@10.8.30.40}"
 
 COOP_NAME="${1:-}"
 COOP_DISPLAY_NAME="${2:-$COOP_NAME Cooperative}"
@@ -271,7 +271,7 @@ spec:
           type: RuntimeDefault
       initContainers:
       - name: init-identity
-        image: 10.8.10.40:30500/icn:latest
+        image: 10.8.30.40:30500/icn:latest
         imagePullPolicy: Always
         command: ["/bin/sh", "-c"]
         args:
@@ -307,7 +307,7 @@ spec:
               - ALL
       containers:
       - name: icnd
-        image: 10.8.10.40:30500/icn:latest
+        image: 10.8.30.40:30500/icn:latest
         imagePullPolicy: Always
         args:
           - --config
@@ -333,7 +333,7 @@ spec:
               name: icn-${COOP_NAME}-secrets
               key: jwt-secret
         - name: ICN_CORS_ORIGINS
-          value: "http://10.8.10.40:30030"
+          value: "http://10.8.30.40:30030"
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: "http://tempo.icn:4317"
         - name: OTEL_SERVICE_NAME

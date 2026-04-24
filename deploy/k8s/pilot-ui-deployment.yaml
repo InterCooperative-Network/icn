@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: pilot-ui
-        image: 10.8.10.40:30500/icn-pilot-ui:latest
+        image: 10.8.30.40:30500/icn-pilot-ui:latest
         imagePullPolicy: Always
         ports:
         - name: http

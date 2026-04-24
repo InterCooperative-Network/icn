@@ -114,10 +114,10 @@ Workstation (matt)
     |              |
     |              +-- kubectl --> K3s Cluster
     |                                  |
-    +-- SSH --> k3s-control (10.8.10.40)
+    +-- SSH --> k3s-control (10.8.30.40)
                     |
-                    +-- k3s-worker-1 (10.8.10.41)
-                    +-- k3s-worker-2 (10.8.10.42)
+                    +-- k3s-worker-1 (10.8.30.41)
+                    +-- k3s-worker-2 (10.8.30.42)
                            |
                            +-- ICN pods (NFS from Atlas 10.8.10.25)
 ```

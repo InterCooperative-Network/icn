@@ -6,7 +6,7 @@ Get ICN deployed on your K3s cluster in 5 minutes!
 
 ```bash
 # 1. SSH access to K3s cluster
-ssh ubuntu@10.8.10.40 "echo 'SSH works!'"
+ssh ubuntu@10.8.30.40 "echo 'SSH works!'"
 
 # 2. Docker installed
 docker --version
@@ -30,7 +30,7 @@ nano secret.yaml
 # Change CHANGE_ME to your actual ICN passphrase
 
 # Deploy secrets
-ssh ubuntu@10.8.10.40 "sudo kubectl apply -f -" < secret.yaml
+ssh ubuntu@10.8.30.40 "sudo kubectl apply -f -" < secret.yaml
 ```
 
 ### 2. Full Deployment (3 min)
@@ -104,7 +104,7 @@ make sync
 
 **Need to see more details?**
 ```bash
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn describe pod <pod-name>"
+ssh ubuntu@10.8.30.40 "sudo kubectl -n icn describe pod <pod-name>"
 ```
 
 For more help, see [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md#troubleshooting).
