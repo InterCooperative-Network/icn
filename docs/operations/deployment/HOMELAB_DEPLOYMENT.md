@@ -53,13 +53,19 @@ make logs
 
 ## Monitoring Stack (rebuilt 2026-02-21)
 
-Deployed via `kube-prometheus-stack` Helm chart in `monitoring` namespace.
+Deployed via `kube-prometheus-stack` Helm chart in `monitoring` namespace. The
+ICN-specific overlay (ServiceMonitor, alert rules, and durable storage values)
+lives in [`deploy/k8s/monitoring/`](../../../deploy/k8s/monitoring/README.md).
 
 | Component | Access | Notes |
 |-----------|--------|-------|
 | **Grafana** | http://10.8.30.40:30300 | Default admin/prom-operator |
 | **Prometheus** | http://10.8.30.40:30090 | Scrapes ICN metrics |
 | **AlertManager** | K3s internal only | Via kube-prometheus-stack |
+
+Storage: Prometheus and Alertmanager use PVCs on the `atlas-nfs` StorageClass
+via `deploy/k8s/monitoring/values-kube-prometheus-stack.yaml`. Apply with
+`helm upgrade --install kube-prometheus-stack … -f <that file>`.
 
 ## CI/CD Pipeline (rebuilt 2026-02-21)
 
