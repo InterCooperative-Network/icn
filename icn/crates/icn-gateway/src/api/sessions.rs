@@ -44,7 +44,7 @@ fn get_client_ip(req: &HttpRequest) -> String {
 /// **Security**: Pinned GATEWAY_BASE_URL prevents X-Forwarded-* header spoofing.
 /// If GATEWAY_BASE_URL is not set, X-Forwarded-* headers are only trusted if the
 /// request comes from a trusted proxy IP (configured via TRUSTED_PROXY_IPS).
-fn get_gateway_url(req: &HttpRequest) -> String {
+pub(crate) fn get_gateway_url(req: &HttpRequest) -> String {
     // First try environment variable (recommended for production)
     // This takes precedence over all headers to prevent spoofing
     if let Ok(url) = std::env::var("GATEWAY_BASE_URL") {
