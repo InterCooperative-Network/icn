@@ -18,6 +18,18 @@ spec:
         app: icn
         component: pilot-ui
     spec:
+      affinity:
+        # Soft anti-affinity: if pilot-ui is ever scaled > 1, prefer spreading replicas
+        # across hosts. Harmless for the current single-replica deployment. See #1598.
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: icn
+                    component: pilot-ui
       containers:
       - name: pilot-ui
         image: 10.8.30.40:30500/icn-pilot-ui:latest
