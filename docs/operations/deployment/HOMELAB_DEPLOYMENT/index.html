@@ -128,7 +128,9 @@ make logs
 </tr>
 </tbody></table>
 <h2>Monitoring Stack (rebuilt 2026-02-21)</h2>
-<p>Deployed via <code>kube-prometheus-stack</code> Helm chart in <code>monitoring</code> namespace.</p>
+<p>Deployed via <code>kube-prometheus-stack</code> Helm chart in <code>monitoring</code> namespace. The
+ICN-specific overlay (ServiceMonitor, alert rules, and durable storage values)
+lives in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/k8s/monitoring/README">`deploy/k8s/monitoring/`</a>.</p>
 <table>
 <thead>
 <tr>
@@ -153,6 +155,9 @@ make logs
 <td>Via kube-prometheus-stack</td>
 </tr>
 </tbody></table>
+<p>Storage: Prometheus and Alertmanager use PVCs on the <code>atlas-nfs</code> StorageClass
+via <code>deploy/k8s/monitoring/values-kube-prometheus-stack.yaml</code>. Apply with
+<code>helm upgrade --install kube-prometheus-stack … -f &lt;that file&gt;</code>.</p>
 <h2>CI/CD Pipeline (rebuilt 2026-02-21)</h2>
 <p><strong>Self-Hosted GitHub Actions Runner</strong> on dedicated VM (not inside K3s).</p>
 <table>
