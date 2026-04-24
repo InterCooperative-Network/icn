@@ -55,22 +55,22 @@ View source on GitHub →
 </thead>
 <tbody><tr>
 <td><strong>Web UI</strong></td>
-<td><a href="http://10.8.10.40:30030" target="_blank" rel="noopener">http://10.8.10.40:30030</a></td>
+<td><a href="http://10.8.30.40:30030" target="_blank" rel="noopener">http://10.8.30.40:30030</a></td>
 <td>Timebank pilot interface</td>
 </tr>
 <tr>
 <td><strong>Gateway API</strong></td>
-<td><a href="http://10.8.10.40:30080" target="_blank" rel="noopener">http://10.8.10.40:30080</a></td>
+<td><a href="http://10.8.30.40:30080" target="_blank" rel="noopener">http://10.8.30.40:30080</a></td>
 <td>REST + WebSocket API</td>
 </tr>
 <tr>
 <td><strong>Grafana</strong></td>
-<td><a href="http://10.8.10.40:30300" target="_blank" rel="noopener">http://10.8.10.40:30300</a></td>
+<td><a href="http://10.8.30.40:30300" target="_blank" rel="noopener">http://10.8.30.40:30300</a></td>
 <td>Monitoring dashboard</td>
 </tr>
 <tr>
 <td><strong>Prometheus</strong></td>
-<td><a href="http://10.8.10.40:30090" target="_blank" rel="noopener">http://10.8.10.40:30090</a></td>
+<td><a href="http://10.8.30.40:30090" target="_blank" rel="noopener">http://10.8.30.40:30090</a></td>
 <td>Metrics (internal)</td>
 </tr>
 </tbody></table>
@@ -180,19 +180,19 @@ ICN_PASSPHRASE=&quot;your-passphrase&quot; ./target/release/icnctl auth token \
 <h2>Monitoring &amp; Debugging</h2>
 <h3>Check System Health</h3>
 <pre><code class="language-bash"># Gateway health
-curl -s http://10.8.10.40:30080/v1/health | jq .
+curl -s http://10.8.30.40:30080/v1/health | jq .
 
 # Node status
-ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn get pods&quot;
+ssh ubuntu@10.8.30.40 &quot;sudo kubectl -n icn get pods&quot;
 
 # Node logs
-ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn logs -f deployment/icn-daemon --tail=50&quot;
+ssh ubuntu@10.8.30.40 &quot;sudo kubectl -n icn logs -f deployment/icn-daemon --tail=50&quot;
 
 # Pilot UI logs
-ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn logs -f deployment/pilot-ui&quot;
+ssh ubuntu@10.8.30.40 &quot;sudo kubectl -n icn logs -f deployment/pilot-ui&quot;
 </code></pre>
 <h3>Grafana Dashboard</h3>
-<p>Open <a href="http://10.8.10.40:30300" target="_blank" rel="noopener">http://10.8.10.40:30300</a> for metrics:</p>
+<p>Open <a href="http://10.8.30.40:30300" target="_blank" rel="noopener">http://10.8.30.40:30300</a> for metrics:</p>
 <ul>
 <li><strong>ICN Node Dashboard</strong>: Network, gossip, ledger metrics</li>
 <li><strong>Byzantine Detection</strong>: Quarantine status, anomalies</li>

@@ -44,9 +44,9 @@ View source on GitHub →
 <h2>🎯 What&#39;s Working Now</h2>
 <h3>1. ICN Gateway Deployed ✅</h3>
 <ul>
-<li><strong>URL:</strong> <code>http://10.8.10.40:30080</code></li>
-<li><strong>Health Check:</strong> <code>http://10.8.10.40:30080/v1/health</code> → Working</li>
-<li><strong>SDIS Health:</strong> <code>http://10.8.10.40:30080/v1/sdis/health</code> → Working</li>
+<li><strong>URL:</strong> <code>http://10.8.30.40:30080</code></li>
+<li><strong>Health Check:</strong> <code>http://10.8.30.40:30080/v1/health</code> → Working</li>
+<li><strong>SDIS Health:</strong> <code>http://10.8.30.40:30080/v1/sdis/health</code> → Working</li>
 </ul>
 <h3>2. SDIS API Endpoints ✅</h3>
 <p>All SDIS endpoints are deployed and accessible:</p>
@@ -90,7 +90,7 @@ View source on GitHub →
 </code></pre>
 <h3>4. Pilot UI Deployed ✅</h3>
 <ul>
-<li><strong>URL:</strong> <code>http://10.8.10.40:30030</code></li>
+<li><strong>URL:</strong> <code>http://10.8.30.40:30030</code></li>
 <li>Static files served via nginx</li>
 <li>Ready for SDIS UI integration</li>
 </ul>
@@ -203,16 +203,16 @@ Level 3: Anchor Created    → Permanent DID issued
 <hr>
 <h2>🚀 Testing the Current System</h2>
 <h3>Test SDIS Health</h3>
-<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/sdis/health
+<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/sdis/health
 </code></pre>
 <h3>Test Gateway Health</h3>
-<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/health
+<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/health
 </code></pre>
 <h3>Check Pod Status</h3>
-<pre><code class="language-bash">ssh ubuntu@10.8.10.40 &#39;sudo kubectl get pods -n icn&#39;
+<pre><code class="language-bash">ssh ubuntu@10.8.30.40 &#39;sudo kubectl get pods -n icn&#39;
 </code></pre>
 <h3>View Gateway Logs</h3>
-<pre><code class="language-bash">ssh ubuntu@10.8.10.40 &#39;sudo kubectl logs -n icn -l component=daemon --tail=50&#39;
+<pre><code class="language-bash">ssh ubuntu@10.8.30.40 &#39;sudo kubectl logs -n icn -l component=daemon --tail=50&#39;
 </code></pre>
 <hr>
 <h2>📚 Architecture References</h2>

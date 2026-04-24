@@ -40,7 +40,8 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Quick Mobile App Testing Guide</h1>
 <h2>✅ Status: Ready for Testing</h2>
-<p><strong>Gateway</strong>: <a href="http://10.8.10.40:30080" target="_blank" rel="noopener">http://10.8.10.40:30080</a><br><strong>Last Updated</strong>: 2025-12-16</p>
+<p><strong>Gateway</strong>: <a href="http://10.8.30.40:30080" target="_blank" rel="noopener">http://10.8.30.40:30080</a>
+<strong>Last Updated</strong>: 2025-12-16</p>
 <hr>
 <h2>Quick Start (5 minutes)</h2>
 <h3>1. Start the Mobile App</h3>
@@ -51,7 +52,7 @@ npm start
 <h3>2. First Time Setup</h3>
 <p>In the app:</p>
 <ol>
-<li>Enter Gateway URL: <code>http://10.8.10.40:30080</code></li>
+<li>Enter Gateway URL: <code>http://10.8.30.40:30080</code></li>
 <li>Enter Cooperative ID: <code>test-coop</code></li>
 <li>Choose &quot;New Identity&quot; or &quot;Import Existing&quot;</li>
 </ol>
@@ -66,11 +67,11 @@ npm start
 <hr>
 <h2>API Quick Tests</h2>
 <h3>Check Gateway Health</h3>
-<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/health
+<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/health
 # Should return: {&quot;status&quot;:&quot;ok&quot;,&quot;version&quot;:&quot;0.1.0&quot;}
 </code></pre>
 <h3>Check SDIS Health</h3>
-<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/sdis/health
+<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/sdis/health
 # Should return: {&quot;service&quot;:&quot;sdis&quot;,&quot;status&quot;:&quot;ok&quot;,&quot;version&quot;:&quot;1.0&quot;}
 </code></pre>
 <h3>Test SDIS Enrollment</h3>
@@ -80,13 +81,13 @@ npm start
 <h2>Common Issues</h2>
 <h3>&quot;Cannot connect to gateway&quot;</h3>
 <ul>
-<li>Check gateway is running: <code>ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn get pods&quot;</code></li>
-<li>Test endpoint: <code>curl http://10.8.10.40:30080/v1/health</code></li>
+<li>Check gateway is running: <code>ssh ubuntu@10.8.30.40 &quot;sudo kubectl -n icn get pods&quot;</code></li>
+<li>Test endpoint: <code>curl http://10.8.30.40:30080/v1/health</code></li>
 </ul>
 <h3>&quot;Authentication failed&quot;</h3>
 <ul>
 <li>Make sure you created an identity first</li>
-<li>Check gateway URL is exactly <code>http://10.8.10.40:30080</code> (no trailing slash)</li>
+<li>Check gateway URL is exactly <code>http://10.8.30.40:30080</code> (no trailing slash)</li>
 </ul>
 <h3>&quot;Balance shows as 0&quot;</h3>
 <ul>
@@ -103,24 +104,24 @@ ICN_PASSPHRASE=&quot;test&quot; ./target/release/icnctl id init
 </code></pre>
 <h3>Get Auth Token</h3>
 <pre><code class="language-bash">ICN_PASSPHRASE=&quot;test&quot; ./target/release/icnctl auth token \
-  --gateway http://10.8.10.40:30080 \
+  --gateway http://10.8.30.40:30080 \
   --coop-id test-coop
 </code></pre>
 <h3>Test Authenticated API Call</h3>
 <pre><code class="language-bash">TOKEN=&quot;&lt;your-token-here&gt;&quot;
 curl -H &quot;Authorization: Bearer $TOKEN&quot; \
-  http://10.8.10.40:30080/v1/ledger/test-coop/balance/&lt;your-did&gt;
+  http://10.8.30.40:30080/v1/ledger/test-coop/balance/&lt;your-did&gt;
 </code></pre>
 <hr>
 <h2>Monitoring</h2>
 <h3>Check Pod Status</h3>
-<pre><code class="language-bash">ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn get pods&quot;
+<pre><code class="language-bash">ssh ubuntu@10.8.30.40 &quot;sudo kubectl -n icn get pods&quot;
 </code></pre>
 <h3>View Logs</h3>
-<pre><code class="language-bash">ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn logs -f deployment/icn-daemon&quot;
+<pre><code class="language-bash">ssh ubuntu@10.8.30.40 &quot;sudo kubectl -n icn logs -f deployment/icn-daemon&quot;
 </code></pre>
 <h3>Grafana Dashboard</h3>
-<p>Open: <a href="http://10.8.10.40:30300" target="_blank" rel="noopener">http://10.8.10.40:30300</a></p>
+<p>Open: <a href="http://10.8.30.40:30300" target="_blank" rel="noopener">http://10.8.30.40:30300</a></p>
 <hr>
 <h2>Need Help?</h2>
 <ul>

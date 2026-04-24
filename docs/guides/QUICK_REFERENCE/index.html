@@ -115,7 +115,7 @@ cat DEPLOY_TO_K3S.md
 <hr>
 <h2>🧪 Test Invite Flow</h2>
 <h3>1. Get Admin Token</h3>
-<pre><code class="language-bash">ssh ubuntu@10.8.10.40
+<pre><code class="language-bash">ssh ubuntu@10.8.30.40
 POD=$(sudo kubectl get pods -n icn -l component=daemon -o jsonpath=&#39;{.items[0].metadata.name}&#39;)
 sudo kubectl exec -it -n icn $POD -- icnctl id show
 sudo kubectl exec -it -n icn $POD -- icnctl auth login \
@@ -123,7 +123,7 @@ sudo kubectl exec -it -n icn $POD -- icnctl auth login \
 </code></pre>
 <h3>2. Login to UI</h3>
 <ul>
-<li>Open: <a href="http://10.8.10.40:30030" target="_blank" rel="noopener">http://10.8.10.40:30030</a></li>
+<li>Open: <a href="http://10.8.30.40:30030" target="_blank" rel="noopener">http://10.8.30.40:30030</a></li>
 <li>Use credentials from step 1</li>
 </ul>
 <h3>3. Create Invite</h3>
@@ -140,7 +140,7 @@ sudo kubectl exec -it -n icn $POD -- icnctl auth login \
 <hr>
 <h2>📊 Metrics</h2>
 <pre><code class="language-bash"># Check invite metrics
-curl http://10.8.10.40:30091/metrics | grep invite
+curl http://10.8.30.40:30090/metrics | grep invite
 
 # Expected output:
 # icn_gateway_invites_created_total{coop_id=&quot;test-coop&quot;} N
@@ -180,20 +180,20 @@ make logs
 <hr>
 <h2>🆘 Troubleshooting</h2>
 <p><strong>Pods not starting?</strong></p>
-<pre><code class="language-bash">ssh ubuntu@10.8.10.40 &quot;sudo kubectl get pods -n icn&quot;
-ssh ubuntu@10.8.10.40 &quot;sudo kubectl describe pod -n icn -l component=daemon&quot;
+<pre><code class="language-bash">ssh ubuntu@10.8.30.40 &quot;sudo kubectl get pods -n icn&quot;
+ssh ubuntu@10.8.30.40 &quot;sudo kubectl describe pod -n icn -l component=daemon&quot;
 </code></pre>
 <p><strong>Gateway not responding?</strong></p>
-<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/health
-ssh ubuntu@10.8.10.40 &quot;sudo kubectl logs -n icn -l component=daemon&quot;
+<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/health
+ssh ubuntu@10.8.30.40 &quot;sudo kubectl logs -n icn -l component=daemon&quot;
 </code></pre>
 <p><strong>UI not loading?</strong></p>
-<pre><code class="language-bash">curl http://10.8.10.40:30030/
-ssh ubuntu@10.8.10.40 &quot;sudo kubectl logs -n icn -l component=pilot-ui&quot;
+<pre><code class="language-bash">curl http://10.8.30.40:30030/
+ssh ubuntu@10.8.30.40 &quot;sudo kubectl logs -n icn -l component=pilot-ui&quot;
 </code></pre>
 <p><strong>Disk space issues?</strong></p>
-<pre><code class="language-bash">ssh ubuntu@10.8.10.40 &quot;df -h /&quot;
-ssh ubuntu@10.8.10.40 &quot;sudo docker system prune -a&quot;
+<pre><code class="language-bash">ssh ubuntu@10.8.30.40 &quot;df -h /&quot;
+ssh ubuntu@10.8.30.40 &quot;sudo docker system prune -a&quot;
 </code></pre>
 <hr>
 <h2>🎯 Quick Links</h2>
@@ -201,7 +201,7 @@ ssh ubuntu@10.8.10.40 &quot;sudo docker system prune -a&quot;
 <li><strong>GitHub Repo:</strong> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn</a></li>
 <li><strong>Backend Code:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/icn/crates/icn-gateway/src/invite.rs" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/blob/main/icn/crates/icn-gateway/src/invite.rs</a></li>
 <li><strong>Frontend Code:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/web/pilot-ui/app.js" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/blob/main/web/pilot-ui/app.js</a></li>
-<li><strong>Live UI:</strong> <a href="http://10.8.10.40:30030" target="_blank" rel="noopener">http://10.8.10.40:30030</a></li>
+<li><strong>Live UI:</strong> <a href="http://10.8.30.40:30030" target="_blank" rel="noopener">http://10.8.30.40:30030</a></li>
 <li><strong>API Docs:</strong> See <code>DEPLOYMENT_INVITE_SYSTEM.md</code></li>
 </ul>
 <hr>

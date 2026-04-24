@@ -137,10 +137,10 @@ sudo kubectl -n icn exec deploy/icn-daemon -- ls -lh /data/
 </li>
 <li><p><strong>Identify workload patterns</strong>:</p>
 <pre><code class="language-bash"># Check gossip message rate
-curl -s http://10.8.10.40:30100/metrics | grep icn_gossip_messages
+curl -s http://10.8.30.40:30090/metrics | grep icn_gossip_messages
 
 # Check active connections
-curl -s http://10.8.10.40:30100/metrics | grep icn_network_connections
+curl -s http://10.8.30.40:30090/metrics | grep icn_network_connections
 </code></pre>
 </li>
 <li><p><strong>Decision tree</strong>:</p>
@@ -174,7 +174,7 @@ sudo kubectl -n icn edit deployment icn-daemon
 sudo kubectl -n icn exec deploy/icn-daemon -- cat /proc/1/smaps &gt; smaps.txt
 
 # Capture current metrics
-curl -s http://10.8.10.40:30100/metrics &gt; metrics-snapshot.txt
+curl -s http://10.8.30.40:30090/metrics &gt; metrics-snapshot.txt
 </code></pre>
 </li>
 <li>Report to ICN developers with:<ul>
@@ -213,7 +213,7 @@ curl -s http://10.8.10.40:30100/metrics &gt; metrics-snapshot.txt
 </ul>
 <h3>Detection</h3>
 <pre><code class="language-bash"># Check gossip metrics
-curl -s http://10.8.10.40:30100/metrics | grep icn_gossip
+curl -s http://10.8.30.40:30090/metrics | grep icn_gossip
 
 # Key metrics to watch:
 # - icn_gossip_entries_received_total (incoming entries)
@@ -226,7 +226,7 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_gossip
 <ol>
 <li><p><strong>Check network connectivity</strong>:</p>
 <pre><code class="language-bash"># Verify peer count
-curl http://10.8.10.40:30080/v1/health | jq &#39;.active_connections&#39;
+curl http://10.8.30.40:30080/v1/health | jq &#39;.active_connections&#39;
 
 # Check if peers are reachable
 sudo kubectl -n icn exec deploy/icn-daemon -- curl -s localhost:9100/metrics | grep icn_network
@@ -234,7 +234,7 @@ sudo kubectl -n icn exec deploy/icn-daemon -- curl -s localhost:9100/metrics | g
 </li>
 <li><p><strong>Check topic subscriptions</strong>:</p>
 <pre><code class="language-bash"># List subscribed topics
-curl -s http://10.8.10.40:30100/metrics | grep icn_gossip_subscriptions
+curl -s http://10.8.30.40:30090/metrics | grep icn_gossip_subscriptions
 
 # Compare subscription counts across nodes (if multi-node)
 </code></pre>
@@ -245,12 +245,12 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_gossip_subscriptions
 <li>Large imbalance indicates sync issues</li>
 </ul>
 <pre><code class="language-bash"># Check message flow balance
-curl -s http://10.8.10.40:30100/metrics | grep -E &quot;icn_gossip_(entries_received|entries_published)_total&quot;
+curl -s http://10.8.30.40:30090/metrics | grep -E &quot;icn_gossip_(entries_received|entries_published)_total&quot;
 </code></pre>
 </li>
 <li><p><strong>Check for rejected messages</strong>:</p>
 <pre><code class="language-bash"># High rejection rate indicates trust or rate limiting issues
-curl -s http://10.8.10.40:30100/metrics | grep rejected
+curl -s http://10.8.30.40:30090/metrics | grep rejected
 </code></pre>
 </li>
 <li><p><strong>Decision tree</strong>:</p>
@@ -319,7 +319,7 @@ Gossip anti-entropy runs automatically. To accelerate sync, restart the daemon:<
 </ul>
 <h3>Detection</h3>
 <pre><code class="language-bash"># Check ledger metrics
-curl -s http://10.8.10.40:30100/metrics | grep icn_ledger
+curl -s http://10.8.30.40:30090/metrics | grep icn_ledger
 
 # Key metrics:
 # - icn_ledger_sync_lag_seconds
@@ -330,11 +330,11 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_ledger
 <h3>Diagnosis Steps</h3>
 <ol>
 <li><p><strong>Check peer connectivity</strong>:</p>
-<pre><code class="language-bash">curl http://10.8.10.40:30080/v1/health | jq &#39;.active_connections&#39;
+<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/health | jq &#39;.active_connections&#39;
 </code></pre>
 </li>
 <li><p><strong>Check quarantine size</strong> (indicates problematic entries):</p>
-<pre><code class="language-bash">curl -s http://10.8.10.40:30100/metrics | grep quarantine
+<pre><code class="language-bash">curl -s http://10.8.30.40:30090/metrics | grep quarantine
 </code></pre>
 </li>
 <li><p><strong>Verify entry propagation</strong>:</p>
@@ -365,7 +365,7 @@ curl -s http://node2:9100/metrics | grep icn_ledger_entries_total
 <h3>Resolution Actions</h3>
 <p><strong>If slow propagation</strong> (high volume):</p>
 <pre><code class="language-bash"># Monitor progress - should improve over time
-watch -n 5 &quot;curl -s http://10.8.10.40:30100/metrics | grep icn_ledger_entries_total&quot;
+watch -n 5 &quot;curl -s http://10.8.30.40:30090/metrics | grep icn_ledger_entries_total&quot;
 </code></pre>
 <p><strong>If quarantine issues</strong>:</p>
 <pre><code class="language-bash"># List quarantined entries
@@ -410,7 +410,7 @@ sudo kubectl -n icn rollout restart deployment/icn-daemon
 </ul>
 <h3>Detection</h3>
 <pre><code class="language-bash"># Check trust metrics
-curl -s http://10.8.10.40:30100/metrics | grep icn_trust
+curl -s http://10.8.30.40:30090/metrics | grep icn_trust
 
 # Key metrics:
 # - icn_trust_computation_errors_total
@@ -426,7 +426,7 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_trust
 </li>
 <li><p><strong>Verify graph consistency</strong>:</p>
 <pre><code class="language-bash"># Check edge count
-curl -s http://10.8.10.40:30100/metrics | grep icn_trust_edges
+curl -s http://10.8.30.40:30090/metrics | grep icn_trust_edges
 
 # Check for cycles or invalid edges in logs
 sudo kubectl -n icn logs deployment/icn-daemon | grep -i &quot;trust.*cycle\|invalid.*edge&quot;
@@ -434,7 +434,7 @@ sudo kubectl -n icn logs deployment/icn-daemon | grep -i &quot;trust.*cycle\|inv
 </li>
 <li><p><strong>Check computation performance</strong>:</p>
 <pre><code class="language-bash"># High computation time indicates graph issues
-curl -s http://10.8.10.40:30100/metrics | grep icn_trust_computation_duration
+curl -s http://10.8.30.40:30090/metrics | grep icn_trust_computation_duration
 </code></pre>
 </li>
 <li><p><strong>Decision tree</strong>:</p>
@@ -456,7 +456,7 @@ sudo kubectl -n icn rollout restart deployment/icn-daemon
 </code></pre>
 <p><strong>Verify edge data</strong> via metrics:</p>
 <pre><code class="language-bash"># Check edge count from Prometheus metrics
-curl -s http://10.8.10.40:30100/metrics | grep icn_trust_edges
+curl -s http://10.8.30.40:30090/metrics | grep icn_trust_edges
 </code></pre>
 <p><strong>If graph corruption suspected</strong>:</p>
 <ol>
@@ -496,10 +496,10 @@ Currently, trust edges are managed through the RPC API or gossip protocol.</p>
 </ul>
 <h3>Detection</h3>
 <pre><code class="language-bash"># Check rate limiting metrics
-curl -s http://10.8.10.40:30100/metrics | grep rate_limit
+curl -s http://10.8.30.40:30090/metrics | grep rate_limit
 
 # Check gateway response codes
-curl -s http://10.8.10.40:30100/metrics | grep icn_gateway_requests | grep 429
+curl -s http://10.8.30.40:30090/metrics | grep icn_gateway_requests | grep 429
 </code></pre>
 <h3>Diagnosis Steps</h3>
 <ol>
@@ -515,7 +515,7 @@ sudo kubectl -n icn logs deployment/icn-daemon | grep -i &quot;rate.limit\|429&q
 </li>
 <li><p><strong>Analyze request patterns</strong>:</p>
 <pre><code class="language-bash"># Check request rate by endpoint
-curl -s http://10.8.10.40:30100/metrics | grep icn_gateway_requests_total
+curl -s http://10.8.30.40:30090/metrics | grep icn_gateway_requests_total
 </code></pre>
 </li>
 <li><p><strong>Decision tree</strong>:</p>

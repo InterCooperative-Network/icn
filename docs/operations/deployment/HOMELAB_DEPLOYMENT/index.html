@@ -55,19 +55,19 @@ View source on GitHub →
 </tr>
 <tr>
 <td><strong>K3s Control</strong></td>
-<td><code>k3s-control</code> (10.8.10.40) — 4 vCPU, 8GB RAM on Hyperion, tainted <code>NoSchedule</code></td>
+<td><code>k3s-control</code> (10.8.30.40) — 4 vCPU, 8GB RAM on Hyperion, tainted <code>NoSchedule</code></td>
 </tr>
 <tr>
 <td><strong>Worker 1</strong></td>
-<td><code>k3s-worker-1</code> (10.8.10.41) — 4 vCPU, 16GB RAM on node-2</td>
+<td><code>k3s-worker-1</code> (10.8.30.41) — 4 vCPU, 16GB RAM on node-2</td>
 </tr>
 <tr>
 <td><strong>Worker 2</strong></td>
-<td><code>k3s-worker-2</code> (10.8.10.42) — 4 vCPU, 16GB RAM on node-3</td>
+<td><code>k3s-worker-2</code> (10.8.30.42) — 4 vCPU, 16GB RAM on node-3</td>
 </tr>
 <tr>
 <td><strong>CI Runner</strong></td>
-<td><code>ci-runner</code> (10.8.10.46) — 8 vCPU, 6GB RAM on Hyperion (standalone, not in K3s)</td>
+<td><code>ci-runner</code> (10.8.30.46) — 8 vCPU, 6GB RAM on Hyperion (standalone, not in K3s)</td>
 </tr>
 <tr>
 <td><strong>Storage</strong></td>
@@ -75,7 +75,7 @@ View source on GitHub →
 </tr>
 <tr>
 <td><strong>Registry</strong></td>
-<td>In-cluster at <code>10.8.10.40:30500</code> (NFS-backed PVC)</td>
+<td>In-cluster at <code>10.8.30.40:30500</code> (NFS-backed PVC)</td>
 </tr>
 <tr>
 <td><strong>Ports</strong></td>
@@ -83,7 +83,7 @@ View source on GitHub →
 </tr>
 </tbody></table>
 <h3>Image Strategy</h3>
-<p>All images use <code>imagePullPolicy: Always</code> and pull from the in-cluster registry at <code>10.8.10.40:30500</code>. SCP-based image sync is deprecated.</p>
+<p>All images use <code>imagePullPolicy: Always</code> and pull from the in-cluster registry at <code>10.8.30.40:30500</code>. SCP-based image sync is deprecated.</p>
 <pre><code class="language-bash"># Default deploy path (build + push to registry + rolling restart)
 cd deploy/k8s &amp;&amp; make fast-deploy
 </code></pre>
@@ -96,11 +96,11 @@ cd deploy/k8s &amp;&amp; make fast-deploy-all
 
 # Check status
 make status
-# OR: ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn get pods&quot;
+# OR: ssh ubuntu@10.8.30.40 &quot;sudo kubectl -n icn get pods&quot;
 
 # View logs
 make logs
-# OR: ssh ubuntu@10.8.10.40 &quot;sudo kubectl -n icn logs -f deployment/icn-daemon&quot;
+# OR: ssh ubuntu@10.8.30.40 &quot;sudo kubectl -n icn logs -f deployment/icn-daemon&quot;
 </code></pre>
 <h2>Deployment Paths</h2>
 <table>
@@ -139,12 +139,12 @@ make logs
 </thead>
 <tbody><tr>
 <td><strong>Grafana</strong></td>
-<td><a href="http://10.8.10.40:30300" target="_blank" rel="noopener">http://10.8.10.40:30300</a></td>
+<td><a href="http://10.8.30.40:30300" target="_blank" rel="noopener">http://10.8.30.40:30300</a></td>
 <td>Default admin/prom-operator</td>
 </tr>
 <tr>
 <td><strong>Prometheus</strong></td>
-<td><a href="http://10.8.10.40:30090" target="_blank" rel="noopener">http://10.8.10.40:30090</a></td>
+<td><a href="http://10.8.30.40:30090" target="_blank" rel="noopener">http://10.8.30.40:30090</a></td>
 <td>Scrapes ICN metrics</td>
 </tr>
 <tr>
@@ -168,7 +168,7 @@ make logs
 </tr>
 <tr>
 <td><strong>Runner Host</strong></td>
-<td><code>ci-runner</code> VM (10.8.10.46) on Hyperion</td>
+<td><code>ci-runner</code> VM (10.8.30.46) on Hyperion</td>
 </tr>
 <tr>
 <td><strong>Specs</strong></td>
@@ -184,7 +184,7 @@ make logs
 </tr>
 <tr>
 <td><strong>Docker</strong></td>
-<td>Configured with insecure registry (10.8.10.40:30500)</td>
+<td>Configured with insecure registry (10.8.30.40:30500)</td>
 </tr>
 <tr>
 <td><strong>kubectl</strong></td>
@@ -192,8 +192,8 @@ make logs
 </tr>
 </tbody></table>
 <p><strong>Runner Management</strong>:</p>
-<pre><code class="language-bash">ssh ubuntu@10.8.10.46 &quot;sudo systemctl status actions.runner.InterCooperative-Network-icn.ci-runner&quot;
-ssh ubuntu@10.8.10.46 &quot;journalctl -u actions.runner.InterCooperative-Network-icn.ci-runner -f&quot;
+<pre><code class="language-bash">ssh ubuntu@10.8.30.46 &quot;sudo systemctl status actions.runner.InterCooperative-Network-icn.ci-runner&quot;
+ssh ubuntu@10.8.30.46 &quot;journalctl -u actions.runner.InterCooperative-Network-icn.ci-runner -f&quot;
 </code></pre>
 <h2>Pilot Testing Status (2025-12-05)</h2>
 <p><strong>5-Node Pilot Network</strong> on K3s with P2P mesh topology.</p>
@@ -237,8 +237,8 @@ ssh ubuntu@10.8.10.46 &quot;journalctl -u actions.runner.InterCooperative-Networ
 </tr>
 </tbody></table>
 <p><strong>Test Commands</strong> (via Gateway API):</p>
-<pre><code class="language-bash">TOKEN=$(icnctl auth token --gateway http://10.8.10.40:30080 --coop pilot-coop)
-curl -H &quot;Authorization: Bearer $TOKEN&quot; http://10.8.10.40:30080/v1/gov/domains
+<pre><code class="language-bash">TOKEN=$(icnctl auth token --gateway http://10.8.30.40:30080 --coop pilot-coop)
+curl -H &quot;Authorization: Bearer $TOKEN&quot; http://10.8.30.40:30080/v1/gov/domains
 </code></pre>
 <h2>SDIS &amp; Steward Dashboard (deployed 2025-12-13)</h2>
 <p><strong>Sovereign Digital Identity System</strong> with steward verification network.</p>
@@ -251,19 +251,19 @@ curl -H &quot;Authorization: Bearer $TOKEN&quot; http://10.8.10.40:30080/v1/gov/
 </thead>
 <tbody><tr>
 <td><strong>Pilot UI</strong></td>
-<td><a href="http://10.8.10.40:30030" target="_blank" rel="noopener">http://10.8.10.40:30030</a></td>
+<td><a href="http://10.8.30.40:30030" target="_blank" rel="noopener">http://10.8.30.40:30030</a></td>
 </tr>
 <tr>
 <td><strong>Steward Dashboard</strong></td>
-<td><a href="http://10.8.10.40:30030/steward-dashboard.html" target="_blank" rel="noopener">http://10.8.10.40:30030/steward-dashboard.html</a></td>
+<td><a href="http://10.8.30.40:30030/steward-dashboard.html" target="_blank" rel="noopener">http://10.8.30.40:30030/steward-dashboard.html</a></td>
 </tr>
 <tr>
 <td><strong>SDIS Enrollment</strong></td>
-<td><a href="http://10.8.10.40:30030/sdis-enrollment.html" target="_blank" rel="noopener">http://10.8.10.40:30030/sdis-enrollment.html</a></td>
+<td><a href="http://10.8.30.40:30030/sdis-enrollment.html" target="_blank" rel="noopener">http://10.8.30.40:30030/sdis-enrollment.html</a></td>
 </tr>
 <tr>
 <td><strong>Gateway API</strong></td>
-<td><a href="http://10.8.10.40:30080/v1/sdis/" target="_blank" rel="noopener">http://10.8.10.40:30080/v1/sdis/</a>*</td>
+<td><a href="http://10.8.30.40:30080/v1/sdis/" target="_blank" rel="noopener">http://10.8.30.40:30080/v1/sdis/</a>*</td>
 </tr>
 </tbody></table>
 <h3>SDIS API Endpoints</h3>
@@ -333,16 +333,16 @@ curl -H &quot;Authorization: Bearer $TOKEN&quot; http://10.8.10.40:30080/v1/gov/
 </tbody></table>
 <h3>Quick Test Commands</h3>
 <pre><code class="language-bash"># Check SDIS health
-curl http://10.8.10.40:30080/v1/sdis/health
+curl http://10.8.30.40:30080/v1/sdis/health
 
 # List pending enrollments
-curl http://10.8.10.40:30080/v1/sdis/pending
+curl http://10.8.30.40:30080/v1/sdis/pending
 
 # Get steward stats
-curl http://10.8.10.40:30080/v1/sdis/steward/stats
+curl http://10.8.30.40:30080/v1/sdis/steward/stats
 
 # Start an enrollment
-curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
+curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/start \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{&quot;identity_name&quot;:&quot;Test User&quot;,&quot;coop_id&quot;:&quot;pilot-coop&quot;}&#39;
 </code></pre>

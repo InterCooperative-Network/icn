@@ -90,7 +90,7 @@ Route truth source: <code>icn/crates/icn-gateway/src/api/sdis/mod.rs</code> and 
 <li>⚠️ Some older docs use <code>/v1/sdis/anchors/*</code> or <code>/v1/sdis/recovery/initiate</code>; current wired paths use <code>/v1/sdis/anchor/*</code> and <code>/v1/sdis/recovery/start</code>.</li>
 </ul>
 <p><strong>Verified Working:</strong></p>
-<pre><code class="language-bash">$ curl http://10.8.10.40:30080/v1/sdis/health
+<pre><code class="language-bash">$ curl http://10.8.30.40:30080/v1/sdis/health
 {&quot;status&quot;:&quot;healthy&quot;,&quot;timestamp&quot;:&quot;2025-12-12T22:00:00Z&quot;}
 </code></pre>
 <h3>2. Backend Implementation (WIRED WITH MIXED MATURITY)</h3>
@@ -188,14 +188,14 @@ Route truth source: <code>icn/crates/icn-gateway/src/api/sdis/mod.rs</code> and 
 <ol>
 <li><p><strong>Test SDIS API end-to-end:</strong></p>
 <pre><code class="language-bash"># Test enrollment
-curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
+curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/start \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{&quot;identity_name&quot;:&quot;TestUser&quot;,&quot;coop_id&quot;:&quot;test-coop&quot;}&#39;
 </code></pre>
 </li>
 <li><p><strong>Verify Pilot UI enrollment wizard:</strong></p>
 <ul>
-<li>Access Pilot UI at <code>http://10.8.10.40:30030</code></li>
+<li>Access Pilot UI at <code>http://10.8.30.40:30030</code></li>
 <li>Test enrollment flow</li>
 <li>Verify QR code generation</li>
 <li>Test verification levels</li>
@@ -286,10 +286,10 @@ kubectl exec -it -n icn $POD -- icnctl id show
 <h2>🧪 Testing Guide</h2>
 <h3>Manual API Testing</h3>
 <pre><code class="language-bash"># 1. Health check
-curl http://10.8.10.40:30080/v1/sdis/health
+curl http://10.8.30.40:30080/v1/sdis/health
 
 # 2. Start enrollment
-ENROLLMENT=$(curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
+ENROLLMENT=$(curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/start \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{&quot;identity_name&quot;:&quot;Alice&quot;,&quot;coop_id&quot;:&quot;test-coop&quot;}&#39; \
   | jq -r &#39;.enrollment_id&#39;)
@@ -297,7 +297,7 @@ ENROLLMENT=$(curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
 echo &quot;Enrollment ID: $ENROLLMENT&quot;
 
 # 3. Generate ephemeral DID
-EPHEMERAL=$(curl -X POST http://10.8.10.40:30080/v1/sdis/ephemeral/generate \
+EPHEMERAL=$(curl -X POST http://10.8.30.40:30080/v1/sdis/ephemeral/generate \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{&quot;purpose&quot;:&quot;enrollment&quot;,&quot;ttl_seconds&quot;:3600}&#39; \
   | jq -r &#39;.ephemeral_did&#39;)
@@ -311,7 +311,7 @@ TOKEN=$(kubectl exec -it -n icn $POD -- icnctl auth token \
   --gateway http://localhost:8080)
 
 # 5. Steward vouches for enrollment
-curl -X POST http://10.8.10.40:30080/v1/sdis/verify/level2 \
+curl -X POST http://10.8.30.40:30080/v1/sdis/verify/level2 \
   -H &quot;Content-Type: application/json&quot; \
   -H &quot;Authorization: Bearer $TOKEN&quot; \
   -d &quot;{\&quot;enrollment_id\&quot;:\&quot;$ENROLLMENT\&quot;,\&quot;vouch_statement\&quot;:\&quot;I vouch for Alice\&quot;}&quot;
@@ -319,7 +319,7 @@ curl -X POST http://10.8.10.40:30080/v1/sdis/verify/level2 \
 <h3>UI Testing</h3>
 <ol>
 <li><p><strong>Access Pilot UI:</strong></p>
-<pre><code>http://10.8.10.40:30030
+<pre><code>http://10.8.30.40:30030
 </code></pre>
 </li>
 <li><p><strong>Test enrollment flow:</strong></p>

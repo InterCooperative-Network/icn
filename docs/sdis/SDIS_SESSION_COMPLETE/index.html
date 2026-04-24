@@ -328,7 +328,7 @@ cd /home/matt/projects/icn/deploy/k8s
 make full-deploy-with-ui
 
 # Test enrollment endpoint
-curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
+curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/start \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{
     &quot;pathway&quot;: {&quot;type&quot;: &quot;genesis&quot;, &quot;reason&quot;: &quot;Testing&quot;},
