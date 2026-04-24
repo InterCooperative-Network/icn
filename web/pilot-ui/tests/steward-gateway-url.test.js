@@ -1,16 +1,25 @@
 /**
  * Tests for steward dashboard gateway URL derivation logic.
- * Mirrors the deriveGatewayUrl function in steward-dashboard.js.
+ * Loads the real deriveGatewayUrl function from steward-dashboard.js
+ * so tests exercise the production implementation.
  */
 
-// Inline the function under test (browser script has no module exports)
-function deriveGatewayUrl(hostname, protocol, savedGateway) {
-    if (savedGateway) return savedGateway;
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-        return `${protocol}//${hostname}:30080`;
+const fs = require('fs');
+const path = require('path');
+
+function loadDeriveGatewayUrl() {
+    const stewardDashboardPath = path.resolve(__dirname, '../steward-dashboard.js');
+    const source = fs.readFileSync(stewardDashboardPath, 'utf8');
+    const match = source.match(/function\s+deriveGatewayUrl\s*\([^)]*\)\s*\{[\s\S]*?\n\}/);
+
+    if (!match) {
+        throw new Error(`Could not locate deriveGatewayUrl in ${stewardDashboardPath}`);
     }
-    return 'http://localhost:8080';
+
+    return new Function(`${match[0]}; return deriveGatewayUrl;`)();
 }
+
+const deriveGatewayUrl = loadDeriveGatewayUrl();
 
 describe('deriveGatewayUrl', () => {
     test('explicit localStorage override wins over everything', () => {

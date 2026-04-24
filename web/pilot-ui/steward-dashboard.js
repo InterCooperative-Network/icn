@@ -1,8 +1,8 @@
 // Steward Dashboard JavaScript
 
 // Derive the gateway API base URL from current browser context.
-// Precedence: explicit localStorage override → host-derived port swap → localhost dev fallback.
-// Mirrors the detectGatewayUrl() logic in app.js so both pages use the same gateway.
+// The host-derived detection matches app.js; this helper also applies the saved gateway
+// override that app.js handles separately when choosing between saved and detected URLs.
 function deriveGatewayUrl(hostname, protocol, savedGateway) {
     if (savedGateway) return savedGateway;
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
