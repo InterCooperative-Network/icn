@@ -25,7 +25,9 @@
 //! appropriate role in the target entity.
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
-use icn_entity::{CooperativeEntity, EntityId, EntityType, Membership, MembershipRole};
+use icn_entity::{
+    CooperativeEntity, EntityError, EntityId, EntityType, Membership, MembershipRole,
+};
 use icn_identity::Did;
 use icn_obs::metrics::gateway as gateway_metrics;
 use serde::{Deserialize, Serialize};
@@ -389,10 +391,25 @@ pub async fn register_entity(
     );
 
     // Register the entity
-    entity_mgr
-        .register(entity.clone())
-        .await
-        .map_err(|e| GatewayError::InternalError(format!("Failed to register entity: {e}")))?;
+    //
+    // Actor-backed mode wraps the underlying `EntityError` with `anyhow!(...)`,
+    // which erases the source type — so we cannot rely solely on `downcast_ref`.
+    // Mirror the fallback pattern used by `EntityManager::ensure_entity_exists`
+    // and also match on the error message so duplicate-registration conflicts
+    // map to HTTP 409 in both standalone and actor-backed deployments.
+    entity_mgr.register(entity.clone()).await.map_err(|e| {
+        let error_text = e.to_string();
+        let is_already_exists = e
+            .downcast_ref::<EntityError>()
+            .is_some_and(|err| matches!(err, EntityError::AlreadyExists(_)))
+            || error_text.contains("AlreadyExists")
+            || error_text.contains("already exists");
+        if is_already_exists {
+            GatewayError::Conflict(format!("entity {} already exists", entity_id))
+        } else {
+            GatewayError::InternalError(format!("Failed to register entity: {e}"))
+        }
+    })?;
 
     // Add the creator as a founder member
     // If this fails, clean up the entity to avoid orphaned entities

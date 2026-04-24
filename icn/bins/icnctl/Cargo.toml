@@ -62,6 +62,10 @@ utoipa = { version = "5.4.0", features = ["yaml"] }
 
 [dev-dependencies]
 tempfile = "3.24"
+actix-web = "4"
+actix-web-httpauth = "0.8"
+actix-rt = "2"
+icn-governance-actor = { path = "../../apps/governance" }
 
 [lints]
 workspace = true

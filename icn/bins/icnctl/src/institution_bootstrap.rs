@@ -430,6 +430,31 @@ pub async fn apply_package(
     let loaded = load_package(package_dir)?;
     let plan = make_plan(&loaded);
     let auth = get_bootstrap_gateway_token(gateway, coop_id, data_dir).await?;
+    run_apply_plan(&loaded, &plan, gateway, &auth).await
+}
+
+/// Apply a pre-loaded plan with a caller-supplied auth context.
+///
+/// Separates authentication from execution so tests can inject a fixture token
+/// without touching the keystore.  The public CLI path is `apply_package`
+/// which obtains auth via the normal challenge/verify flow.
+#[cfg(test)]
+async fn apply_with_auth_ctx(
+    package_dir: &Path,
+    gateway: &str,
+    auth: BootstrapAuthContext,
+) -> Result<BootstrapApplyReport> {
+    let loaded = load_package(package_dir)?;
+    let plan = make_plan(&loaded);
+    run_apply_plan(&loaded, &plan, gateway, &auth).await
+}
+
+async fn run_apply_plan(
+    loaded: &LoadedPackage,
+    plan: &BootstrapPlan,
+    gateway: &str,
+    auth: &BootstrapAuthContext,
+) -> Result<BootstrapApplyReport> {
     let client = reqwest::Client::new();
     let mut state = ApplyState::default();
 
@@ -449,7 +474,7 @@ pub async fn apply_package(
 
     for op in &plan.operations {
         let operation = summarize_operation(op);
-        match apply_operation(op, gateway, &client, &auth, &mut state).await {
+        match apply_operation(op, gateway, &client, auth, &mut state).await {
             ApplyOutcome::Completed(detail) => report
                 .completed
                 .push(BootstrapApplyStepReport { operation, detail }),
@@ -835,6 +860,16 @@ fn preview_execute(plan: &BootstrapPlan) -> BootstrapPreview {
     preview
 }
 
+fn entity_id_from_seed(slug: &str, entity_type: BootstrapEntityType) -> String {
+    let type_slug = match entity_type {
+        BootstrapEntityType::Federation => "federation",
+        BootstrapEntityType::Cooperative => "cooperative",
+        BootstrapEntityType::Community => "community",
+        BootstrapEntityType::Individual => "individual",
+    };
+    format!("entity:icn:{type_slug}:{slug}")
+}
+
 async fn apply_operation(
     op: &BootstrapOperation,
     gateway: &str,
@@ -876,6 +911,12 @@ async fn apply_operation(
                     }
                     Err(err) => ApplyOutcome::Failed(err.to_string()),
                 },
+                Err(ref err) if err.contains("HTTP 409") => {
+                    // Entity already exists from a prior apply run — bind alias deterministically.
+                    let live_id = entity_id_from_seed(id, *entity_type);
+                    state.bind(id, &live_id);
+                    ApplyOutcome::Completed(format!("entity {live_id} already exists"))
+                }
                 Err(err) => ApplyOutcome::Failed(err),
             }
         }
@@ -1573,5 +1614,296 @@ mod tests {
                 "did:icn:static-member".to_string()
             ]
         );
+    }
+
+    // ── Integration tests: full NYCN bootstrap apply round-trip ─────────────
+    //
+    // These tests start a real TCP server (actix-web on 127.0.0.1:0) wired with
+    // the entity and governance HTTP handlers, obtain a fixture JWT token via the
+    // challenge/verify auth flow, then drive apply_with_auth_ctx against that URL.
+    //
+    // They prove that the complete NYCN seed sequence applies successfully and
+    // that the expected completed/deferred/unsupported counts are stable.
+
+    #[cfg(test)]
+    #[allow(clippy::expect_used)]
+    mod apply_integration {
+        use super::*;
+
+        use actix_web::{web, App, HttpServer};
+        use actix_web_httpauth::middleware::HttpAuthentication;
+        use icn_gateway::{
+            api, auth::AuthManager, entity_audit::EntityAuditManager, entity_mgr::EntityManager,
+            middleware::jwt_auth, rate_limit::IpRateLimiter,
+        };
+        use icn_governance_actor::{
+            events::NoopEventEmitter,
+            http::configure::{configure as configure_governance, GovernanceContext},
+            manager::GovernanceManager,
+        };
+        use icn_identity::IdentityBundle;
+        use icn_store::SledStore;
+        use std::{net::TcpListener, sync::Arc};
+
+        /// Stand up a real HTTP server and return the port + a ready-to-use auth context.
+        async fn start_test_server() -> (tokio::task::JoinHandle<()>, String, BootstrapAuthContext)
+        {
+            let jwt_secret = b"bootstrap-apply-integration-test!".to_vec();
+            let auth_mgr = Arc::new(AuthManager::new(jwt_secret));
+            let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
+            let entity_mgr = Arc::new(EntityManager::new());
+            let store = Arc::new(SledStore::temporary().expect("temp sled store"));
+            let audit_mgr = Arc::new(EntityAuditManager::new(store));
+            let gov_mgr = Arc::new(GovernanceManager::new());
+
+            let gov_ctx = GovernanceContext {
+                manager: gov_mgr.clone(),
+                emitter: NoopEventEmitter,
+                on_charter_accepted: None,
+                on_proposal_accepted: None,
+                on_proposal_accepted_with_evidence: None,
+                member_checker: None,
+                steward_checker: None,
+                suspension_checker: None,
+                membership_resolver: None,
+                sdis_service: None,
+            };
+
+            let auth_mgr2 = auth_mgr.clone();
+            let ip2 = ip_limiter.clone();
+            let entity2 = entity_mgr.clone();
+            let audit2 = audit_mgr.clone();
+            let gov_ctx2 = gov_ctx.clone();
+
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind test listener");
+            let port = listener.local_addr().expect("local addr").port();
+
+            let server = HttpServer::new(move || {
+                let auth_mw = HttpAuthentication::bearer(jwt_auth);
+                App::new()
+                    .app_data(web::Data::new(auth_mgr2.clone()))
+                    .app_data(web::Data::new(ip2.clone()))
+                    .app_data(web::Data::new(entity2.clone()))
+                    .app_data(web::Data::new(audit2.clone()))
+                    .service(
+                        web::scope("/v1")
+                            .service(api::auth::challenge)
+                            .service(api::auth::verify)
+                            .service(
+                                web::scope("/entities")
+                                    .configure(api::entity::configure)
+                                    .wrap(auth_mw.clone()),
+                            )
+                            .service(
+                                web::scope("/gov")
+                                    .configure({
+                                        let ctx = gov_ctx2.clone();
+                                        move |cfg| configure_governance(cfg, ctx.clone())
+                                    })
+                                    .wrap(auth_mw),
+                            ),
+                    )
+            })
+            .listen(listener)
+            .expect("server listen")
+            .run();
+
+            let handle = tokio::spawn(async move {
+                let _ = server.await;
+            });
+
+            let base_url = format!("http://127.0.0.1:{port}");
+            let bundle = IdentityBundle::generate().expect("IdentityBundle");
+            let did = bundle.did().to_string();
+
+            let client = reqwest::Client::new();
+
+            let challenge: serde_json::Value = client
+                .post(format!("{base_url}/v1/auth/challenge"))
+                .json(&serde_json::json!({ "did": &did }))
+                .send()
+                .await
+                .expect("challenge request")
+                .json()
+                .await
+                .expect("challenge json");
+            let nonce_bytes =
+                hex::decode(challenge["nonce"].as_str().expect("nonce")).expect("hex nonce");
+            let sig = bundle.sign(&nonce_bytes).expect("sign nonce");
+
+            let token_resp: serde_json::Value = client
+                .post(format!("{base_url}/v1/auth/verify"))
+                .json(&serde_json::json!({
+                    "did": &did,
+                    "signature": hex::encode(sig.to_bytes()),
+                    "coop_id": "test-coop",
+                    "scopes": ["entity:write", "governance:read", "governance:write"],
+                }))
+                .send()
+                .await
+                .expect("verify request")
+                .json()
+                .await
+                .expect("verify json");
+
+            let token = token_resp["token"]
+                .as_str()
+                .expect("token field")
+                .to_string();
+
+            let auth = BootstrapAuthContext {
+                token,
+                subject_did: did,
+            };
+
+            (handle, base_url, auth)
+        }
+
+        /// Full NYCN bootstrap apply: proves the complete seed sequence lands with
+        /// the expected completed / deferred / unsupported counts.
+        ///
+        /// Expected completed (18):
+        ///   1  validate-charter
+        ///   2  entities (nycn federation + nycn-organizers cooperative)
+        ///   2  governance domains (nycn-federation-gov + nycn-organizers-gov)
+        ///   7  structures (backbone, steering, content, logistics, marketing,
+        ///                  finance, accessibility-wg)
+        ///   1  program  (summit-cycle-2026)
+        ///   1  activity (summit-2026)
+        ///   4  milestones (strategy-locked, venue-ready, launch-ready, closeout)
+        ///
+        /// Expected deferred (4): role assignments without a real person_did.
+        /// Expected unsupported (1): charter store (no live CCL sink).
+        #[tokio::test]
+        async fn nycn_bootstrap_apply_round_trip() {
+            let (handle, base_url, auth) = start_test_server().await;
+
+            let report = apply_with_auth_ctx(&nycn_package_dir(), &base_url, auth)
+                .await
+                .expect("apply_with_auth_ctx should succeed");
+
+            assert!(
+                report.failed.is_none(),
+                "no operations should fail; first failure: {:?}",
+                report.failed
+            );
+            assert_eq!(
+                report.completed.len(),
+                18,
+                "expected 18 completed ops; got {:?}",
+                report
+                    .completed
+                    .iter()
+                    .map(|s| &s.operation)
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(
+                report.deferred.len(),
+                4,
+                "expected 4 deferred role assignments; got {:?}",
+                report
+                    .deferred
+                    .iter()
+                    .map(|s| &s.operation)
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(
+                report.unsupported.len(),
+                1,
+                "expected 1 unsupported op (charter store); got {:?}",
+                report
+                    .unsupported
+                    .iter()
+                    .map(|s| &s.operation)
+                    .collect::<Vec<_>>()
+            );
+
+            // Alias bindings: entities and objects that get live IDs back
+            assert!(
+                report.alias_bindings.contains_key("nycn"),
+                "alias 'nycn' must be bound after CreateEntity"
+            );
+            assert!(
+                report.alias_bindings.contains_key("nycn-organizers"),
+                "alias 'nycn-organizers' must be bound after CreateEntity"
+            );
+            assert!(
+                report.alias_bindings.contains_key("summit-cycle-2026"),
+                "alias 'summit-cycle-2026' must be bound after CreateProgram"
+            );
+            assert!(
+                report.alias_bindings.contains_key("summit-2026"),
+                "alias 'summit-2026' must be bound after CreateActivity"
+            );
+
+            handle.abort();
+        }
+
+        /// Idempotence: running apply twice against the same server does not fail.
+        /// Domains and entities that already exist should not cause a hard failure.
+        #[tokio::test]
+        async fn nycn_bootstrap_apply_idempotent() {
+            let (handle, base_url, auth_first) = start_test_server().await;
+
+            // Re-auth for the second run (token is single-use for request signing,
+            // but the JWT itself is valid for multiple calls — we just need a fresh
+            // BootstrapAuthContext to hold the same subject DID).
+            let auth_second = BootstrapAuthContext {
+                token: auth_first.token.clone(),
+                subject_did: auth_first.subject_did.clone(),
+            };
+
+            let first = apply_with_auth_ctx(&nycn_package_dir(), &base_url, auth_first)
+                .await
+                .expect("first apply");
+
+            assert!(
+                first.failed.is_none(),
+                "first apply: no failures expected; got {:?}",
+                first.failed
+            );
+
+            let second = apply_with_auth_ctx(&nycn_package_dir(), &base_url, auth_second)
+                .await
+                .expect("second apply");
+
+            assert!(
+                second.failed.is_none(),
+                "second apply: no failures expected; got {:?}",
+                second.failed
+            );
+
+            // Role assignments are always deferred (no person_did); count must be stable.
+            assert_eq!(
+                first.deferred.len(),
+                second.deferred.len(),
+                "deferred count must be stable across runs"
+            );
+
+            handle.abort();
+        }
+
+        /// Plan/apply count parity: the plan preview's counts match the apply report.
+        #[test]
+        fn nycn_plan_counts_match_apply_expectations() {
+            let report = build_plan_report(&nycn_package_dir()).expect("plan report");
+            // 18 completed = 1 validate + 2 entities + 2 domains + 7 structures +
+            //                1 program + 1 activity + 4 milestones
+            let expected_completed = 1  // validate-charter
+                + report.preview.entity_count
+                + report.preview.governance_domain_count
+                + report.preview.structure_count
+                + report.preview.program_count
+                + report.preview.activity_count
+                + report.preview.milestone_count;
+            assert_eq!(
+                expected_completed, 18,
+                "plan preview counts must sum to 18 completed ops"
+            );
+            assert_eq!(
+                report.preview.deferred_role_assignment_count, 4,
+                "plan preview must show 4 deferred role assignments"
+            );
+        }
     }
 }
