@@ -196,11 +196,12 @@ pub use activity::{
 pub use bootstrap::{
     ActivityProgramSeedManifest, BootstrapActivityRecord, BootstrapCharterRef,
     BootstrapEntityRecord, BootstrapEntityType, BootstrapGovernanceDomainRecord,
-    BootstrapMilestoneRecord, BootstrapOperation, BootstrapPlan, BootstrapProgramKindName,
-    BootstrapProgramKindSpec, BootstrapProgramRecord, BootstrapRoleAssignmentRecord,
-    BootstrapSeedKind, BootstrapSeedManifest, BootstrapSeedRef, BootstrapStructureRecord,
-    EntitySeedManifest, GovernanceDomainSeedManifest, InstitutionBootstrapManifest,
-    MilestoneTemplateSeedManifest, RoleAssignmentSeedManifest, StructureSeedManifest,
+    BootstrapMilestoneRecord, BootstrapOperation, BootstrapPersonDirectoryEntry, BootstrapPlan,
+    BootstrapProgramKindName, BootstrapProgramKindSpec, BootstrapProgramRecord,
+    BootstrapRoleAssignmentRecord, BootstrapSeedKind, BootstrapSeedManifest, BootstrapSeedRef,
+    BootstrapStructureRecord, EntitySeedManifest, GovernanceDomainSeedManifest,
+    InstitutionBootstrapManifest, MilestoneTemplateSeedManifest, PersonDirectorySeedManifest,
+    RoleAssignmentSeedManifest, StructureSeedManifest,
 };
 pub use meeting::{
     AgendaItem, AgendaItemId, AttendanceStatus, InMemoryMeetingStore, Meeting, MeetingAttendee,

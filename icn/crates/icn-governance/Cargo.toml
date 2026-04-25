@@ -32,6 +32,7 @@ tracing.workspace = true
 
 [dev-dependencies]
 icn-store = { path = "../icn-store" }
+serde_yaml = "0.9"
 tempfile = "3"
 
 [lints]
