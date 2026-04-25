@@ -184,6 +184,101 @@ Supersedes on routing conflicts: <code>docs/strategy/NYCN-Repo-Architecture-Spec
 <h3>The Rule</h3>
 <p>CCL describes <em>what is permitted and under what conditions</em>. The host runtime describes <em>how permitted actions are actually executed and stored</em>. Never put storage keys in CCL. Never put semantic authorization logic in a Rust match arm.</p>
 <hr>
+<h2>C2. Entity Primitives vs Local Purpose Metadata (the type/purpose firewall)</h2>
+<p><strong>The same rule that separates kernel from app applies to entity types.</strong></p>
+<p>ICN has exactly <strong>four entity primitives</strong>. They are sovereign types and they imply different machinery:</p>
+<table>
+<thead>
+<tr>
+<th>Primitive</th>
+<th>What it is</th>
+<th>What ICN guarantees</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Individual</code></td>
+<td>A DID-backed person.</td>
+<td>Identity, authentication, self-scoped reads.</td>
+</tr>
+<tr>
+<td><code>Cooperative</code></td>
+<td>An operating/economic body.</td>
+<td><code>governance_domain_id</code> + <code>treasury_account</code> (per <code>CooperativeProfile</code>).</td>
+</tr>
+<tr>
+<td><code>Community</code></td>
+<td>A civic/member/participant body.</td>
+<td><code>governance_domain_id</code> (per <code>CommunityProfile</code>). Treasury optional.</td>
+</tr>
+<tr>
+<td><code>Federation</code></td>
+<td>An association of member entities.</td>
+<td><code>governance_domain_id</code> + <code>member_entities</code> + optional <code>parent_id</code> (per <code>FederationProfile</code>).</td>
+</tr>
+</tbody></table>
+<p>These are the only legal values of <code>BootstrapEntityType</code> in <code>icn-governance::bootstrap</code> and the only legal values of the <code>entity_type</code> field on the gateway&#39;s <code>/v1/entities</code> API. The serde enum is <code>#[serde(rename_all = &quot;snake_case&quot;)]</code> and any other variant fails to deserialize at YAML parse time. <strong>This is the firewall</strong>: an institution package cannot smuggle a new entity type past ICN.</p>
+<p><strong>Committees and working groups are NOT entities.</strong> They are governance <code>Structure</code> records owned by a parent entity. They carry delegated authority via <code>RoleAssignment.authority_scope</code>, not sovereignty. They cannot hold treasury, cannot join federations, cannot appear in <code>member_entities</code>.</p>
+<p><strong>Events / programs / cycles (e.g. a Summit) are NOT entities.</strong> They are <code>Activity</code> and <code>Program</code> records owned by a parent entity.</p>
+<h3>Local institutional role goes in <code>operating_purpose</code>, not in a new type</h3>
+<p>Institution packages frequently want to mark <em>which kind</em> of cooperative or community a record represents in their local taxonomy: an &quot;organizing cooperative&quot;, a &quot;program participant community&quot;, a &quot;federation member community&quot;. These are valid local distinctions — but they are <strong>purpose metadata</strong>, not entity primitives.</p>
+<p><code>BootstrapEntityRecord</code> already carries:</p>
+<pre><code class="language-rust">pub operating_purpose: Option&lt;String&gt;,
+</code></pre>
+<p>That field is the only sanctioned home for this metadata. It is opaque to ICN — the runtime stores it (or, in the current importer, plans for it; see &quot;Known gap&quot; below) and never branches on its value.</p>
+<h3>Correct vs incorrect mapping</h3>
+<pre><code class="language-yaml"># ❌ WRONG — invents new entity primitives, will fail to parse
+entity_type: organizing_cooperative
+entity_type: program_community
+entity_type: committee
+entity_type: federation_member_community
+
+# ✅ RIGHT — uses ICN primitives, locales role via operating_purpose
+entity_type: cooperative
+operating_purpose: organizing_cooperative
+
+entity_type: community
+operating_purpose: program_participant_community
+# (with a separate Activity record for the related program)
+
+# Committee — not an entity at all:
+# Goes in a `kind: structure-seed` manifest:
+kind: structure-seed
+parent_entity_id: nycn-organizing
+structures:
+  - id: committee-finance
+    kind: committee
+    name: Finance Committee
+</code></pre>
+<h3>Worked example: NYCN reference federation</h3>
+<pre><code class="language-text">nycn                        entity_type: federation
+                            operating_purpose: regional_cooperative_network
+
+  nycn-organizing           entity_type: cooperative
+                            operating_purpose: organizing_cooperative
+                            (carries treasury_account)
+
+    committee-steering      structure-seed { kind: committee,  parent_entity_id: nycn-organizing }
+    committee-finance       structure-seed { kind: committee,  parent_entity_id: nycn-organizing }
+    committee-program       structure-seed { kind: committee,  parent_entity_id: nycn-organizing }
+    wg-accessibility        structure-seed { kind: working_group, parent_entity_id: nycn-organizing }
+
+    summit-2026             activity-program-seed { parent_entity_id: nycn-organizing }
+
+  nycn-community            entity_type: community
+                            operating_purpose: network_member_community
+
+  summit-2026-community     entity_type: community            (only if it actually governs/confers standing)
+                            operating_purpose: program_participant_community
+                            related_activity: summit-2026
+                            (otherwise: model as activity participant cohort,
+                             not as an entity at all)
+</code></pre>
+<h3>Why this is the firewall, not a style guide</h3>
+<p>The primitive layer is the machine. <code>CooperativeProfile</code> requiring <code>treasury_account</code> means ICN gives every cooperative a treasury account; <code>FederationProfile</code> requiring <code>member_entities</code> means ICN runs federation joins/leaves against that vector. If an institution were allowed to ship <code>entity_type: organizing_cooperative</code>, the runtime would either have to (a) treat it as <code>cooperative</code> (in which case the new type adds nothing) or (b) branch on it (in which case ICN now contains NYCN-specific code). Both options break the kernel/app separation.</p>
+<p><code>operating_purpose: &lt;string&gt;</code> lets the institution carry as much local meaning as it wants without the runtime understanding any of it. UI can read it and render labels. CCL contracts can compare it. ICN never branches on it.</p>
+<h3>Known gap (tracked, not blocking model adoption)</h3>
+<p>The current <code>BootstrapOperation::CreateEntity</code> payload sent to the gateway&#39;s <code>/v1/entities</code> API does <strong>not</strong> forward <code>operating_purpose</code> at apply time. The seed schema accepts it, the validator/planner sees it, but the apply step drops it. Institution packages can author the corrected model today; the metadata round-trips through <code>validate</code> and <code>plan</code> outputs, but does not yet land on the live entity record. Plumbing this through is a small follow-up.</p>
+<hr>
 <h2>D. Reusable Primitive Set</h2>
 <p>These belong in ICN because every cooperative institution needs them — verified against both what NYCN requires and what a second unrelated institution (housing federation, mutual aid collective) would also need unchanged.</p>
 <table>
