@@ -351,7 +351,16 @@ async fn response_uses_regulatory_safe_vocabulary() {
     let app = standing_test_app!(ctx, &caller, Some("governance:read"));
     let req = test::TestRequest::get().uri("/me/standing").to_request();
     let resp = test::call_service(&app, req).await;
+    let status = resp.status();
     let bytes = to_bytes(resp.into_body()).await.unwrap();
+    // Pin the status first — otherwise an auth/route regression that returns
+    // 401/403/500 with a clean error payload would still pass this scan.
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "regulatory vocab check requires a 200 success body, got {status}: {}",
+        String::from_utf8_lossy(&bytes)
+    );
     let raw_lower = String::from_utf8_lossy(&bytes).to_lowercase();
     for forbidden in ["payment", "currency", " balance"] {
         assert!(

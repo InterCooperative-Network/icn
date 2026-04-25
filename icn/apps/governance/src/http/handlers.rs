@@ -4943,16 +4943,21 @@ pub async fn get_my_standing<E: GovernanceEventEmitter + Clone + 'static>(
     domains.sort_by(|a, b| a.domain_id.cmp(&b.domain_id));
 
     // Role assignments: pull every role this caller holds, then join with
-    // structure metadata. A missing structure (deleted/unreadable) still
+    // structure metadata. A genuinely-deleted structure (Ok(None)) still
     // surfaces as a row with `structure_name: None` so the caller can see
-    // there is something to investigate, not a silent gap.
+    // something to investigate. A storage/decode failure (Err) propagates
+    // as 500 — silently dropping it would let a half-broken backend look
+    // like a clean "structure deleted" answer.
     let role_records = ctx
         .manager
         .list_roles_for_person(&caller)
         .map_err(anyhow_to_api)?;
     let mut roles: Vec<StandingRoleAssignment> = Vec::with_capacity(role_records.len());
     for r in &role_records {
-        let structure = ctx.manager.get_structure(&r.structure_id).ok().flatten();
+        let structure = ctx
+            .manager
+            .get_structure(&r.structure_id)
+            .map_err(anyhow_to_api)?;
         let parent_entity_id = structure.as_ref().map(|s| s.parent_entity_id.clone());
         let structure_name = structure.as_ref().map(|s| s.name.clone());
         if let Some(filter_id) = domain_filter {
