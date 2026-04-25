@@ -300,6 +300,51 @@ Returns Program + ordered Milestone statuses + ActionItem counts by status + Mee
 
 ---
 
+## F. Democratic cybernetics and support-institution boundary
+
+The next set of primitives ICN core will eventually model — **institutional signals, escalation policies, action cards, governed indicators, temporary authority grants, obligation/allocation/settlement, and the support-institution layer** — extends the same boundary discipline to a new surface. Doctrine for these primitives lives in [`DEMOCRATIC_CYBERNETIC_PRIMITIVES.md`](./DEMOCRATIC_CYBERNETIC_PRIMITIVES.md). This section pins the placement rule.
+
+### ICN core may know
+
+These are generic shapes that any cooperative federation needs with different content. They are candidates for runtime primitives once a second institution would need each one with the same shape:
+
+- **`InstitutionalSignal`** — a record that something at a defined scope crossed a threshold or was raised by a member and needs attention.
+- **`SignalRule`** — a rule (CCL- or data-expressed) that says when a signal is raised at what severity.
+- **`EscalationPolicy`** — a routing table for how a signal traverses bodies.
+- **`MemberSignal`** — a signal opened by a member acting in their own DID, addressed to a body they belong to.
+- **Action card view** — a derived view of standing + open work + open signals + expiring grants. Not a stored entity.
+- **`Indicator`** — a measurement with definition, owner, caveats, review interval, and challenge path.
+- **`TemporaryAuthorityGrant`** — scoped, expiring, receipted, post-reviewed extension of a member's authority.
+- **`Obligation`** — a commitment one party makes to another (sponsor commitment, mutual-aid pledge, federation contribution). Lifecycle: open → fulfilled / partially-fulfilled / lapsed / cancelled.
+- **`Allocation`** — an authorized intent to direct units toward a purpose, backed by a governance receipt.
+- **`Settlement`** — the terminal record that an allocation actually moved units, with full provenance.
+- **`Position`** — a snapshot of an account's units in a settlement asset at a point in time.
+- **Support program** — a `Program` with a particular semantic role: education, onboarding, technical/legal/admin support, peer mentorship.
+- **Service relationship** — a bilateral declaration that one entity provides a named service to another, under stated terms.
+- **Receipt** — the immutable provenance record of every state transition above.
+
+### ICN core must not know
+
+Each of these is a **local concept** — institution-specific vocabulary that NYCN, a housing federation, and a mutual-aid network would each express differently. They belong in institution packages and are forbidden in ICN core code review:
+
+- **Sponsor logo chase** / sponsor lifecycle vocabulary
+- **Summit session catalog** / conference session model
+- **Childcare checklist** / event accessibility intake
+- **Speaker bio** / curated content catalog
+- **Venue walkthrough** / venue accessibility scoring rubric
+- **Mondragón-style named school / fund / cooperative service** (`MondragonSchool`, `Caja`, `Eroski`)
+- **NYCN-specific committee workflow** (`SteeringApprovalDance`, `FinanceVetoFlow`)
+- **Fundraising tier names** (`Bronze`, `Silver`, `Platinum`)
+- **`OrganizingCooperative` / `SupportFederation` / `ProgramCommunity` as entity primitives** (already pinned by §C2 — restated here because the temptation re-emerges in support-institution work)
+
+### The placement test, restated
+
+If a local concept can be expressed as **`Program` + `Structure` + `ActionItem` + CCL + package data**, it stays in the institution package. If it requires shape that a second unrelated institution would also need, it earns consideration for an ICN-core primitive — and even then, only after a design RFC.
+
+The graduation rule from §B applies here without exception. *"NYCN and Mondragón both want a school"* is not a graduation argument unless their schools share **shape**, not just **theme**.
+
+---
+
 ## Boundary in One Sentence
 
 ICN provides the generic institutional operating system — typed shapes, enforced lifecycles, provenance, capability-gated APIs. The institution package provides the charter, the vocabulary, the seed data, and the specific rules that give those shapes meaning for one community.
