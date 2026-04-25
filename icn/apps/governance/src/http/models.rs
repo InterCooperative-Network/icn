@@ -79,6 +79,95 @@ pub struct ActivateCharterResponse {
 }
 
 // ============================================================================
+// Member standing (read model for `GET /me/standing`)
+// ============================================================================
+
+/// Optional query parameters for `GET /me/standing`.
+///
+/// All filters are inclusive: applying a filter narrows the response, never
+/// expands it. The caller is always derived from the authenticated DID — there
+/// is no `did` query parameter, so a caller cannot ask for someone else's
+/// standing.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+pub struct StandingQuery {
+    /// If set, restrict `domains` and `roles` to assignments under this
+    /// governance domain. Unknown ids are NOT a 404 — they simply produce an
+    /// empty standing for that filter, which is a valid answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain_id: Option<String>,
+}
+
+/// Caller-facing membership and authority read model.
+///
+/// Returned by `GET /v1/gov/me/standing`. Composes existing governance state
+/// (domain memberships + structure role assignments) into one digestible
+/// response so member-facing UI does not need to query four endpoints and
+/// stitch them together.
+///
+/// ## What this is NOT
+///
+/// - This is **not** an authorization token. Scopes here are descriptive,
+///   not bearer-issued. Authorization decisions still flow through the
+///   `PolicyOracle`.
+/// - This is **not** an action-card feed. Action-card generation builds on
+///   top of this read model in a separate endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct StandingResponse {
+    /// The authenticated caller's DID.
+    pub did: String,
+    /// Optional human-readable label. Reserved for a future identity-registry
+    /// lookup; always `None` in this version.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_label: Option<String>,
+    /// Governance domains in which this caller has membership standing.
+    /// May be empty.
+    pub domains: Vec<StandingDomainMembership>,
+    /// Role assignments held by this caller across all structures.
+    /// May be empty.
+    pub roles: Vec<StandingRoleAssignment>,
+    /// Union of `authority_scope` strings across `roles`, deduplicated and
+    /// sorted. Convenience field for UI; equivalent to flattening `roles`.
+    pub authority_scopes: Vec<String>,
+    /// Unix epoch seconds when this standing was computed. The response is a
+    /// snapshot; nothing is cached server-side.
+    pub generated_at: u64,
+}
+
+/// One governance-domain membership row in [`StandingResponse`].
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct StandingDomainMembership {
+    pub domain_id: String,
+    pub domain_name: String,
+    /// `"static_list"` or `"trust_threshold"`.
+    pub membership_source: String,
+    /// `"member"` if the caller is in the static member list,
+    /// `"unverified"` if membership comes from a trust-threshold source that
+    /// this read model does not evaluate (the caller may still be a member;
+    /// the trust graph is the source of truth).
+    pub status: String,
+}
+
+/// One role-assignment row in [`StandingResponse`]. Joins the underlying
+/// [`icn_governance::RoleAssignment`] with cheap structure metadata
+/// (name + parent entity) so UI does not have to fetch the structure.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct StandingRoleAssignment {
+    pub role_assignment_id: String,
+    pub structure_id: String,
+    /// `None` if the structure was deleted or is otherwise unreadable; the
+    /// role row is still surfaced so the caller can see something is off.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub structure_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_entity_id: Option<String>,
+    pub role: String,
+    pub authority_scope: Vec<String>,
+    pub start_date: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_date: Option<u64>,
+}
+
+// ============================================================================
 // Proposals
 // ============================================================================
 
