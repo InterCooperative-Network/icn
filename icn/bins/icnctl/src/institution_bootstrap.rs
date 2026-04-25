@@ -1232,7 +1232,7 @@ async fn apply_operation(
             structure_id,
             person_did,
             role,
-            ..
+            authority_scope,
         } => {
             let resolved_structure_id = match resolve_live_or_existing_id(
                 client,
@@ -1253,9 +1253,14 @@ async fn apply_operation(
                 Err(err) => return ApplyOutcome::Failed(err),
             };
             let path = format!("/v1/gov/structures/{resolved_structure_id}/roles");
+            // Forward the planned authority_scope so it lands on the live role
+            // assignment (#1629). Empty vector is fine — `AssignRoleRequest`
+            // defaults the field, and older planners that emit no scope still
+            // produce a clean POST body.
             let body = json!({
                 "did": person_did.to_string(),
                 "role": role,
+                "authority_scope": authority_scope,
             });
             match post_json(client, gateway, &auth.token, &path, &body).await {
                 Ok(_) => ApplyOutcome::Completed(format!(
