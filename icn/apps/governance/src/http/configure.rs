@@ -535,5 +535,6 @@ where
         .service(web::resource("/digest").route(web::get().to(handlers::get_digest::<E>)))
         // ── Me (caller-scoped views) ─────────────────────────────────────
         .service(web::resource("/me/scopes").route(web::get().to(handlers::get_my_scopes::<E>)))
+        .service(web::resource("/me/standing").route(web::get().to(handlers::get_my_standing::<E>)))
         .service(web::resource("/me/work").route(web::get().to(handlers::get_my_work::<E>)));
 }

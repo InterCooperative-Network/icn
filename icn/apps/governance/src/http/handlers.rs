@@ -4865,6 +4865,145 @@ pub async fn get_my_scopes<E: GovernanceEventEmitter + Clone + 'static>(
     Ok(HttpResponse::Ok().json(responses))
 }
 
+/// GET /gov/me/standing — Return the authenticated caller's institutional standing.
+///
+/// Composes existing governance state (domain membership + structure role
+/// assignments) into one read model so member-facing UI does not have to
+/// fan out to four endpoints.
+///
+/// ## What this returns
+///
+/// - The caller's DID (always — derived from the authenticated claims, not
+///   from a query parameter).
+/// - Each governance domain whose static member list contains the caller, or
+///   whose membership is sourced from a trust threshold (status `"unverified"`
+///   in that case — the trust graph is the source of truth, not this read
+///   model).
+/// - Each structure role assignment held by the caller, joined with cheap
+///   structure metadata (name + parent entity) so the UI does not need a
+///   second fetch per row.
+/// - The deduplicated union of `authority_scope` across those role
+///   assignments, as a convenience for UI.
+///
+/// ## Self-only
+///
+/// There is no `did` query parameter. The DID is always the caller's. A
+/// caller cannot use this endpoint to inspect another DID's standing.
+///
+/// ## Optional filter
+///
+/// `?domain_id=<id>` narrows both `domains` and `roles` to assignments under
+/// that domain. An unknown `domain_id` returns a valid empty standing rather
+/// than a 404 — "no standing in that domain" is a meaningful answer.
+///
+/// ## Empty caller is not an error
+///
+/// A caller with no role assignments and no static membership receives a
+/// 200 with empty `domains`, `roles`, and `authority_scopes`. UI should
+/// render an onboarding affordance, not an error.
+pub async fn get_my_standing<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    query: web::Query<StandingQuery>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let caller = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    let domain_filter = query.domain_id.as_deref();
+
+    // Domain memberships: scan all domains the manager knows about, keep
+    // those where the caller is in the static list, mark trust-threshold
+    // domains as "unverified" so the UI can prompt the user to look at the
+    // trust-graph view rather than silently dropping them.
+    let all_domains = ctx.manager.list_domains().await.map_err(anyhow_to_api)?;
+    let mut domains: Vec<StandingDomainMembership> = all_domains
+        .iter()
+        .filter(|d| domain_filter.is_none_or(|id| d.id.0 == id))
+        .filter_map(|d| match &d.config.membership.source {
+            icn_governance::MembershipSource::StaticList(members) => {
+                if members.contains(&caller) {
+                    Some(StandingDomainMembership {
+                        domain_id: d.id.0.clone(),
+                        domain_name: d.name.clone(),
+                        membership_source: "static_list".to_string(),
+                        status: "member".to_string(),
+                    })
+                } else {
+                    None
+                }
+            }
+            icn_governance::MembershipSource::TrustThreshold(_) => Some(StandingDomainMembership {
+                domain_id: d.id.0.clone(),
+                domain_name: d.name.clone(),
+                membership_source: "trust_threshold".to_string(),
+                status: "unverified".to_string(),
+            }),
+        })
+        .collect();
+    domains.sort_by(|a, b| a.domain_id.cmp(&b.domain_id));
+
+    // Role assignments: pull every role this caller holds, then join with
+    // structure metadata. A genuinely-deleted structure (Ok(None)) still
+    // surfaces as a row with `structure_name: None` so the caller can see
+    // something to investigate. A storage/decode failure (Err) propagates
+    // as 500 — silently dropping it would let a half-broken backend look
+    // like a clean "structure deleted" answer.
+    let role_records = ctx
+        .manager
+        .list_roles_for_person(&caller)
+        .map_err(anyhow_to_api)?;
+    let mut roles: Vec<StandingRoleAssignment> = Vec::with_capacity(role_records.len());
+    for r in &role_records {
+        let structure = ctx
+            .manager
+            .get_structure(&r.structure_id)
+            .map_err(anyhow_to_api)?;
+        let parent_entity_id = structure.as_ref().map(|s| s.parent_entity_id.clone());
+        let structure_name = structure.as_ref().map(|s| s.name.clone());
+        if let Some(filter_id) = domain_filter {
+            // Domain filter currently restricts roles by parent entity id
+            // when the entity id matches the requested domain id. This is
+            // the loose-but-correct join while structures do not carry an
+            // explicit governance-domain back-reference.
+            if parent_entity_id.as_deref() != Some(filter_id) {
+                continue;
+            }
+        }
+        roles.push(StandingRoleAssignment {
+            role_assignment_id: r.id.to_string(),
+            structure_id: r.structure_id.0.clone(),
+            structure_name,
+            parent_entity_id,
+            role: r.role.clone(),
+            authority_scope: r.authority_scope.clone(),
+            start_date: r.start_date,
+            end_date: r.end_date,
+        });
+    }
+    roles.sort_by(|a, b| {
+        a.parent_entity_id
+            .cmp(&b.parent_entity_id)
+            .then_with(|| a.structure_id.cmp(&b.structure_id))
+            .then_with(|| a.role.cmp(&b.role))
+    });
+
+    let mut authority_scopes: Vec<String> = roles
+        .iter()
+        .flat_map(|r| r.authority_scope.iter().cloned())
+        .collect();
+    authority_scopes.sort();
+    authority_scopes.dedup();
+
+    Ok(HttpResponse::Ok().json(StandingResponse {
+        did: caller.to_string(),
+        display_label: None,
+        domains,
+        roles,
+        authority_scopes,
+        generated_at: current_time_secs(),
+    }))
+}
+
 /// GET /gov/me/work — Return action items assigned to the authenticated DID.
 ///
 /// Returns items across **all** governance domains, sorted oldest-first

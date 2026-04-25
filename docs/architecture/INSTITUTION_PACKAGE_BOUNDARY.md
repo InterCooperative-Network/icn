@@ -115,6 +115,103 @@ CCL describes *what is permitted and under what conditions*. The host runtime de
 
 ---
 
+## C2. Entity Primitives vs Local Purpose Metadata (the type/purpose firewall)
+
+**The same rule that separates kernel from app applies to entity types.**
+
+ICN has exactly **four entity primitives**. They are sovereign types and they imply different machinery:
+
+| Primitive | What it is | What ICN guarantees |
+|-----------|------------|---------------------|
+| `Individual` | A DID-backed person. | Identity, authentication, self-scoped reads. |
+| `Cooperative` | An operating/economic body. | `governance_domain_id` + `treasury_account` (per `CooperativeProfile`). |
+| `Community` | A civic/member/participant body. | `governance_domain_id` (per `CommunityProfile`). Treasury optional. |
+| `Federation` | An association of member entities. | `governance_domain_id` + `member_entities` + optional `parent_id` (per `FederationProfile`). |
+
+These are the only legal values of `BootstrapEntityType` in `icn-governance::bootstrap` and the only legal values of the `entity_type` field on the gateway's `/v1/entities` API. The serde enum is `#[serde(rename_all = "snake_case")]` and any other variant fails to deserialize at YAML parse time. **This is the firewall**: an institution package cannot smuggle a new entity type past ICN.
+
+**Committees and working groups are NOT entities.** They are governance `Structure` records owned by a parent entity. They carry delegated authority via `RoleAssignment.authority_scope`, not sovereignty. They cannot hold treasury, cannot join federations, cannot appear in `member_entities`.
+
+**Events / programs / cycles (e.g. a Summit) are NOT entities.** They are `Activity` and `Program` records owned by a parent entity.
+
+### Local institutional role goes in `operating_purpose`, not in a new type
+
+Institution packages frequently want to mark *which kind* of cooperative or community a record represents in their local taxonomy: an "organizing cooperative", a "program participant community", a "federation member community". These are valid local distinctions — but they are **purpose metadata**, not entity primitives.
+
+`BootstrapEntityRecord` already carries:
+
+```rust
+pub operating_purpose: Option<String>,
+```
+
+That field is the only sanctioned home for this metadata. It is opaque to ICN — the runtime stores it (or, in the current importer, plans for it; see "Known gap" below) and never branches on its value.
+
+### Correct vs incorrect mapping
+
+```yaml
+# ❌ WRONG — invents new entity primitives, will fail to parse
+entity_type: organizing_cooperative
+entity_type: program_community
+entity_type: committee
+entity_type: federation_member_community
+
+# ✅ RIGHT — uses ICN primitives, locales role via operating_purpose
+entity_type: cooperative
+operating_purpose: organizing_cooperative
+
+entity_type: community
+operating_purpose: program_participant_community
+# (with a separate Activity record for the related program)
+
+# Committee — not an entity at all:
+# Goes in a `kind: structure-seed` manifest:
+kind: structure-seed
+parent_entity_id: nycn-organizing
+structures:
+  - id: committee-finance
+    kind: committee
+    name: Finance Committee
+```
+
+### Worked example: NYCN reference federation
+
+```text
+nycn                        entity_type: federation
+                            operating_purpose: regional_cooperative_network
+
+  nycn-organizing           entity_type: cooperative
+                            operating_purpose: organizing_cooperative
+                            (carries treasury_account)
+
+    committee-steering      structure-seed { kind: committee,  parent_entity_id: nycn-organizing }
+    committee-finance       structure-seed { kind: committee,  parent_entity_id: nycn-organizing }
+    committee-program       structure-seed { kind: committee,  parent_entity_id: nycn-organizing }
+    wg-accessibility        structure-seed { kind: working_group, parent_entity_id: nycn-organizing }
+
+    summit-2026             activity-program-seed { parent_entity_id: nycn-organizing }
+
+  nycn-community            entity_type: community
+                            operating_purpose: network_member_community
+
+  summit-2026-community     entity_type: community            (only if it actually governs/confers standing)
+                            operating_purpose: program_participant_community
+                            related_activity: summit-2026
+                            (otherwise: model as activity participant cohort,
+                             not as an entity at all)
+```
+
+### Why this is the firewall, not a style guide
+
+The primitive layer is the machine. `CooperativeProfile` requiring `treasury_account` means ICN gives every cooperative a treasury account; `FederationProfile` requiring `member_entities` means ICN runs federation joins/leaves against that vector. If an institution were allowed to ship `entity_type: organizing_cooperative`, the runtime would either have to (a) treat it as `cooperative` (in which case the new type adds nothing) or (b) branch on it (in which case ICN now contains NYCN-specific code). Both options break the kernel/app separation.
+
+`operating_purpose: <string>` lets the institution carry as much local meaning as it wants without the runtime understanding any of it. UI can read it and render labels. CCL contracts can compare it. ICN never branches on it.
+
+### Known gap (tracked, not blocking model adoption)
+
+The current `BootstrapOperation::CreateEntity` payload sent to the gateway's `/v1/entities` API does **not** forward `operating_purpose` at apply time. The seed schema accepts it, the validator/planner sees it, but the apply step drops it. Institution packages can author the corrected model today; the metadata round-trips through `validate` and `plan` outputs, but does not yet land on the live entity record. Plumbing this through is a small follow-up.
+
+---
+
 ## D. Reusable Primitive Set
 
 These belong in ICN because every cooperative institution needs them — verified against both what NYCN requires and what a second unrelated institution (housing federation, mutual aid collective) would also need unchanged.
