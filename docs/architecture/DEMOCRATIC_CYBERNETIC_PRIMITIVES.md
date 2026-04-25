@@ -92,14 +92,56 @@ InstitutionalSignal
 ├── domain_id            (governance domain)
 ├── source               (rule | member | external_observer | scheduled)
 ├── kind                 (opaque string — "blocked_work", "accessibility_concern",
-│                         "obligation_overdue", "metric_challenge", ...)
+│                         "obligation_overdue", "metric_challenge",
+│                         "capacity_growing", "milestone_ahead", ...)
+├── polarity             (positive | neutral | negative)   — see §2a
 ├── severity             (info | watch | concern | escalation | emergency)
+├── confidence           (optional — how certain the source is)
+├── actionability        (optional — informational | review_recommended | action_required)
 ├── opened_at, opened_by_did
 ├── closed_at, closed_by_decision_id  (decisions/receipts that resolved it)
 ├── escalation_state     (open | acknowledged | escalated | resolved | rejected)
 ├── related_refs         (proposals, structures, activities, role assignments)
 └── receipts[]           (every state transition leaves one)
 ```
+
+### 2a. `SignalPolarity` — feedback as sensation, not discipline
+
+A signal carries a **`polarity`** field whose value is one of three:
+
+| Polarity | Meaning |
+|---|---|
+| **positive** | Reinforcing / healthy / capacity-building / ahead-of-expectation. The body is doing something worth replicating, the indicator is moving in the desired direction, a member's work unlocked downstream capacity. |
+| **neutral** | Stable / informational / expected / no meaningful deviation. A scheduled checkpoint passed, an SLA met its window, an indicator stayed within tolerance. |
+| **negative** | Friction / stress / harm / blockage / overload / legitimacy concern. Something hurts, something is stuck, something deserves attention because it's degrading. |
+
+This is a **balanced-ternary feedback channel**, not a pass/fail flag. Reading the substrate's signal stream should let a body see *what's working*, *what's stable*, and *what's hurting* in one view.
+
+**`polarity` is intentionally orthogonal to:**
+
+| Field | What it answers |
+|---|---|
+| `polarity` | Is this feedback reinforcing, stable, or stressed? |
+| `severity` | How loud is this signal? (`info` … `emergency`) |
+| `confidence` | How certain is the source about what they're reporting? |
+| `actionability` | Does this need response, review, or is it informational? |
+
+These four can co-vary in any combination. A `polarity: positive` signal can be `severity: watch` and `actionability: review_recommended` — *"this is going well in a way worth examining and replicating."* A `polarity: negative` signal can be `severity: info` and `actionability: informational` — *"a small thing is degrading; nothing required, but on the record."*
+
+**Doctrinal rules for polarity:**
+
+1. **A negative signal is not punishment or discipline.** A blocked-work signal, an overload signal, a legitimacy challenge — none of these target a person for sanction. They are sensation. The institution responds with a receipt and (if needed) an obligation, not a reprimand. Punishment lives in a different surface (governance proposals with explicit due process), and that surface must be reached through the same scoped, receipted, contestable path as any other governance act.
+2. **A positive signal can be actionable.** `actionability: review_recommended` on a positive signal means "study this — it reveals a pattern worth replicating." Positive signals are not just morale boosters; they are how the substrate lets institutional learning travel as well as institutional pain.
+3. **Neutral is not silence.** A neutral signal is the substrate saying *"the threshold passed cleanly, on schedule, no surprises"* — and that record is itself useful, especially when later questions ask *"was this checkpoint actually met at the time?"*.
+4. **Polarity is the source's claim, not a verdict.** A member-originated `polarity: negative` signal is the member's reading. The institution can resolve it with a receipt that disagrees, but the original polarity claim is preserved on the record. Erasing or overwriting a member's polarity is a substrate violation.
+5. **Member-originated signals carry polarity too.** A worker raising *"this onboarding flow worked beautifully"* (`positive`) is as much a first-class signal as one raising *"this onboarding flow blocked me"* (`negative`). The substrate must not privilege complaint over praise — both are reality traveling upward.
+
+**Anti-patterns this field must refuse:**
+
+- Treating `polarity: negative` as an automatic discipline trigger.
+- Hiding `polarity: positive` signals from the action-card surface (they belong there too, as recommended-review work).
+- Collapsing polarity into severity (an "extra severity bit" loses the orthogonality this field exists for).
+- Letting an institution package add polarity values like `excellent`, `awful`, `mixed`, etc. The set is exactly three. Local nuance lives in `kind`, not in polarity.
 
 ### Sketch of `SignalRule` and `EscalationPolicy`
 
@@ -135,18 +177,24 @@ ICN's signal subsystem is **not** purely top-down sensing. It must include `Memb
 
 ### Examples (vocabulary owned by the institution package, not by ICN core)
 
-- A member raises an **accessibility concern** about a venue or process.
-- A worker raises a **blocked-work** signal because an upstream decision is overdue.
-- A volunteer raises an **overload** signal because their committee can't absorb more.
-- A member raises a **legitimacy challenge** against a decision they were excluded from.
-- A member raises a **metric challenge** against an indicator they believe misrepresents reality (see §6).
+Polarity in parentheses; vocabulary is illustrative.
+
+- A member raises an **accessibility concern** about a venue or process. *(negative)*
+- A worker raises a **blocked-work** signal because an upstream decision is overdue. *(negative)*
+- A volunteer raises an **overload** signal because their committee can't absorb more. *(negative)*
+- A member raises a **legitimacy challenge** against a decision they were excluded from. *(negative)*
+- A member raises a **metric challenge** against an indicator they believe misrepresents reality (see §6). *(negative)*
+- A member reports an **onboarding-worked** signal: a new member's first cycle landed cleanly and the flow is worth replicating. *(positive)*
+- A peer mentor reports a **capacity-growing** signal: a co-op took on a working-group role earlier than expected. *(positive)*
+- A scheduled checkpoint passed within tolerance — emitted by a rule, not a member, but still a record. *(neutral)*
 
 ### Doctrine
 
 - **No surveillance-only sensing.** If the only signals the substrate supports come from rules-on-state, the substrate is a panopticon.
-- **Member signals are first-class.** Same record shape, same escalation, same receipts as rule-originated signals.
+- **Member signals are first-class.** Same record shape, same escalation, same receipts as rule-originated signals. **Member signals carry `polarity` too** — praise travels upward as cleanly as pain.
 - **Anonymous-but-authenticated** must be a future option. A member should be able to raise a signal whose contents are visible and whose authorship is provable to a designated body without being publicly attributed. Out of scope for v1; design space reserved here.
 - **The institution must answer.** A member-originated signal that escalates without acknowledgement crosses a defined window and creates an obligation on the receiving body. The receipt of that obligation is permanent.
+- **A member's polarity claim is preserved.** The institution may resolve a `polarity: negative` signal with a receipt that disagrees, but the original polarity is on the record. Erasure is a substrate violation (see §2a).
 
 ### What belongs where
 
@@ -362,6 +410,8 @@ The following are **forbidden** in ICN core code review. Each one is a way the s
 | **Resource flows without receipts** | Allocations must have authorizing receipts; settlements must reference allocations (§7). |
 | **"Support institution" as a bespoke NYCN/Mondragón hardcode** | Use generic Program + Structure + Activity + future Obligation. |
 | **Signals-as-tickets** | Closing a signal without a receipt or decision reference erases institutional truth. |
+| **Polarity-as-discipline** | Treating `polarity: negative` as an automatic punishment trigger. Negative is sensation, not sanction (§2a). |
+| **Polarity-collapsed-into-severity** | Using polarity as an "extra severity bit" defeats the orthogonality the field exists for (§2a). |
 | **Action card as a new ontology** | Cards are a derived view of existing primitives (§4). |
 | **Federation-as-supreme-authority** | Recursive autonomy (§1) means federation coordinates only what cannot be coordinated locally. |
 
@@ -374,7 +424,7 @@ This document is doctrine. Each section above implies one or more future runtime
 | Track | Scope | Depends on |
 |---|---|---|
 | **`/v1/gov/me/action-cards`** | Standing-derived action queue (§4). | `/me/standing` (✅ landed), action items, proposals (already exist). |
-| **InstitutionalSignal + SignalRule + EscalationPolicy** | Generic signal record, lifecycle, store, escalation execution (§2). | None — can begin design RFC now. |
+| **InstitutionalSignal + SignalRule + EscalationPolicy** | Generic signal record, lifecycle, store, escalation execution (§2). Polarity ladder (§2a) is part of the record shape. | None — can begin design RFC now. |
 | **MemberSignal API** | `POST /v1/gov/signals` self-originated, with package-supplied kinds (§3). | InstitutionalSignal lifecycle. |
 | **TemporaryAuthorityGrant** | Scoped, expiring, receipted, post-reviewed authority extension (§5). | `RoleAssignment.authority_scope` (✅ landed via #1630). |
 | **Indicator primitive** | Definition + owner + caveats + review_interval + challenge_path (§6). | Signal primitive (for the challenge path). |
@@ -389,7 +439,7 @@ The following umbrella issues track the RFCs and design work each section above 
 
 - **#1608** — `feat(gateway): implement GET /me/action-cards — standing-derived participation queue` (§4).
 - **#1623** — persist standalone proposals/votes/delegations across gateway restart (cross-cutting; required before any of these primitives is meaningfully smoke-testable).
-- **#1631** — `docs(rfc): institutional signals, escalation policies, and member-originated signals` (§2 + §3).
+- **#1631** — `docs(rfc): institutional signals, escalation policies, and member-originated signals` (§2 + §2a + §3). Includes the `SignalPolarity` ternary (`positive | neutral | negative`) as a first-class field, orthogonal to severity / confidence / actionability.
 - **#1632** — `feat(governance): design temporary authority grants with expiry and post-review` (§5).
 - **#1633** — `docs(architecture): governed indicators and metric challenge paths` (§6).
 - **#1634** — `docs(rfc): obligation/allocation/settlement primitives` (§7), explicitly using regulatory-safe vocabulary.
