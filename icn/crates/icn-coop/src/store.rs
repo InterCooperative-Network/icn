@@ -811,8 +811,8 @@ mod tests {
         let db_path = dir.path().to_path_buf();
 
         // Open store, increment nonce, close
-        let db = sled::open(&db_path).unwrap();
-        let store = CoopStore::new(Arc::new(db));
+        let db = Arc::new(sled::open(&db_path).unwrap());
+        let store = CoopStore::new(Arc::clone(&db));
         store
             .check_and_increment_treasury_nonce("did:icn:persistent", 0)
             .unwrap();
@@ -823,6 +823,7 @@ mod tests {
         // before reopening. Block scoping alone is insufficient because
         // Arc<Db> drop order is not guaranteed under parallel test execution.
         drop(store);
+        drop(db);
 
         // Reopen store and verify nonce was persisted
         {
