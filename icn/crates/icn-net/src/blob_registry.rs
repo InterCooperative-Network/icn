@@ -363,7 +363,7 @@ impl BlobLocationRegistry {
 
         // Convert to sorted vec (most blobs first)
         let mut result: Vec<_> = peer_counts.into_iter().collect();
-        result.sort_by(|a, b| b.1.cmp(&a.1));
+        result.sort_by_key(|b| std::cmp::Reverse(b.1));
         result
     }
 

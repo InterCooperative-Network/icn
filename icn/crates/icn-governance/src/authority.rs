@@ -371,23 +371,17 @@ pub fn parse_authority_scope_strings(labels: &[String]) -> Option<TypedScope> {
             continue;
         };
         match prefix {
-            "domain" => {
-                if !rest.is_empty() {
-                    scope.domain = Some(GovernanceDomainId(rest.to_string()));
-                    any_recognized = true;
-                }
+            "domain" if !rest.is_empty() => {
+                scope.domain = Some(GovernanceDomainId(rest.to_string()));
+                any_recognized = true;
             }
-            "proposal_class" => {
-                if !rest.is_empty() {
-                    scope.proposal_class.push(rest.to_string());
-                    any_recognized = true;
-                }
+            "proposal_class" if !rest.is_empty() => {
+                scope.proposal_class.push(rest.to_string());
+                any_recognized = true;
             }
-            "action_kind" => {
-                if !rest.is_empty() {
-                    scope.action_kind.push(rest.to_string());
-                    any_recognized = true;
-                }
+            "action_kind" if !rest.is_empty() => {
+                scope.action_kind.push(rest.to_string());
+                any_recognized = true;
             }
             "amount_ceiling" => {
                 // Expect `<non-negative int>:<unit>` in `rest`.

@@ -530,10 +530,11 @@ impl fmt::Display for MembershipStatus {
 /// assert!(status.can_transition_to(&UnifiedMembershipStatus::Pending));
 /// assert!(!status.is_terminal());
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum UnifiedMembershipStatus {
     /// Initial application submitted, pending review
+    #[default]
     Applicant,
     /// Application approved, awaiting final activation
     Pending,
@@ -603,12 +604,6 @@ impl UnifiedMembershipStatus {
             MembershipStatus::Removed => Self::Terminated,
             MembershipStatus::Expelled => Self::Terminated,
         }
-    }
-}
-
-impl Default for UnifiedMembershipStatus {
-    fn default() -> Self {
-        Self::Applicant
     }
 }
 

@@ -680,7 +680,7 @@ impl SurplusAllocation {
             // Distribute remainder using largest-remainder method
             // Sort by remainder descending, add 1 to each until remainder is distributed
             if remainder > 0 {
-                base_allocations.sort_by(|a, b| b.2.cmp(&a.2));
+                base_allocations.sort_by_key(|b| std::cmp::Reverse(b.2));
                 for (_, base, _) in base_allocations.iter_mut() {
                     if remainder <= 0 {
                         break;

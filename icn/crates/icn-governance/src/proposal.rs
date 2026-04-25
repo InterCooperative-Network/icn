@@ -1304,19 +1304,14 @@ impl FederationProposal {
 }
 
 /// Scope of a proposal — determines gossip routing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ProposalScope {
     /// Local to this node's governance domain.
+    #[default]
     Local,
     /// Visible across a federation.
     Federation(String),
-}
-
-impl Default for ProposalScope {
-    fn default() -> Self {
-        Self::Local
-    }
 }
 
 /// A proposal for a decision

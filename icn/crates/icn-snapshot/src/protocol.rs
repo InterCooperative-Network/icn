@@ -201,7 +201,7 @@ impl SnapshotMetadata {
 
         // Sort participants for deterministic ordering
         let mut participants: Vec<_> = self.participant_hashes.iter().collect();
-        participants.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
+        participants.sort_by_key(|a| a.0.to_string());
 
         for (did, hash) in participants {
             hasher.update(did.to_string().as_bytes());

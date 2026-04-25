@@ -583,7 +583,7 @@ impl ActionItemStoreBackend for InMemoryActionItemStore {
             .filter(|i| i.assignee.as_ref() == Some(assignee))
             .cloned()
             .collect();
-        out.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        out.sort_by_key(|a| a.created_at);
         Ok(out)
     }
 }

@@ -757,11 +757,8 @@ fn run_app(
                             KeyCode::Char('3') => app.current_tab = 2,
                             KeyCode::Char('4') => app.current_tab = 3,
                             KeyCode::Char('5') => app.current_tab = 4,
-                            KeyCode::Enter => {
-                                // Action on selected item
-                                if app.current_tab() == Tab::Governance {
-                                    // Could open voting dialog
-                                }
+                            KeyCode::Enter if app.current_tab() == Tab::Governance => {
+                                // Could open voting dialog
                             }
                             _ => {}
                         },

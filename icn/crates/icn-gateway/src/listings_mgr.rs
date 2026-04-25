@@ -301,7 +301,7 @@ fn sort_listings(listings: &mut [Listing], sort_by: ListingSortBy) {
     match sort_by {
         ListingSortBy::CreatedAt => {
             // Newest first
-            listings.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+            listings.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         }
         ListingSortBy::Status => {
             // Active > Matched > Completed > Cancelled > Expired, then by created_at
@@ -817,7 +817,7 @@ impl SledListingsStore {
         }
 
         // Sort by created_at ascending
-        interests.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        interests.sort_by_key(|a| a.created_at);
 
         Ok(interests)
     }

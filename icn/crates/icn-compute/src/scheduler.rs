@@ -1404,15 +1404,11 @@ impl PlacementPolicy for DefaultPlacementPolicy {
                         }
                     }
                 }
-                LocalityHint::PreferDid(did) => {
-                    if &node_state.did == did {
-                        hint_bonus += 0.05;
-                    }
+                LocalityHint::PreferDid(did) if &node_state.did == did => {
+                    hint_bonus += 0.05;
                 }
-                LocalityHint::AvoidDid(did) => {
-                    if &node_state.did == did {
-                        return None;
-                    }
+                LocalityHint::AvoidDid(did) if &node_state.did == did => {
+                    return None;
                 }
                 _ => {}
             }

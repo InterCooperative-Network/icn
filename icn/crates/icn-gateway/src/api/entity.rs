@@ -788,7 +788,7 @@ pub async fn list_members(
 
     if sort_fields.is_empty() {
         // Default sort by joined_at ascending
-        response.sort_by(|a, b| a.joined_at.cmp(&b.joined_at));
+        response.sort_by_key(|a| a.joined_at);
     } else {
         // Multi-field sort: apply fields in order, using each as a tie-breaker
         response.sort_by(|a, b| {

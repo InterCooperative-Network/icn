@@ -141,7 +141,7 @@ impl ManualRateSource {
         }
 
         // Sort by timestamp descending (newest first)
-        history.sort_by(|a, b| b.changed_at.cmp(&a.changed_at));
+        history.sort_by_key(|b| std::cmp::Reverse(b.changed_at));
 
         // Apply limit
         history.truncate(limit);

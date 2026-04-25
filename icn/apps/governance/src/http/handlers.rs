@@ -500,9 +500,9 @@ pub async fn list_domains<E: GovernanceEventEmitter + Clone + 'static>(
             }
             "created_at" => {
                 if sort.ascending {
-                    domains.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+                    domains.sort_by_key(|a| a.created_at);
                 } else {
-                    domains.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                    domains.sort_by_key(|b| std::cmp::Reverse(b.created_at));
                 }
             }
             _ => unreachable!(),
@@ -1015,7 +1015,7 @@ pub async fn list_proposals<E: GovernanceEventEmitter + Clone + 'static>(
 
     let sort_fields = query.sort_fields();
     if sort_fields.is_empty() {
-        proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        proposals.sort_by_key(|b| std::cmp::Reverse(b.created_at));
     } else {
         let sort = &sort_fields[0];
         const VALID: &[&str] = &["created_at", "title"];
@@ -1029,9 +1029,9 @@ pub async fn list_proposals<E: GovernanceEventEmitter + Clone + 'static>(
         match sort.field.as_str() {
             "created_at" => {
                 if sort.ascending {
-                    proposals.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+                    proposals.sort_by_key(|a| a.created_at);
                 } else {
-                    proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                    proposals.sort_by_key(|b| std::cmp::Reverse(b.created_at));
                 }
             }
             "title" => {

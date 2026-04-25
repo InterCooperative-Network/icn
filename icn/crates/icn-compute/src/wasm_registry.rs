@@ -628,7 +628,7 @@ impl WasmRegistry {
             .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
         let mut all: Vec<WasmMetadata> = metadata.values().cloned().collect();
         // Sort by deployed_at descending for deterministic ordering
-        all.sort_by(|a, b| b.deployed_at.cmp(&a.deployed_at));
+        all.sort_by_key(|b| std::cmp::Reverse(b.deployed_at));
         Ok(all.into_iter().skip(offset).take(limit).collect())
     }
 

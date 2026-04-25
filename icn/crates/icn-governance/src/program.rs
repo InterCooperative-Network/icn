@@ -440,7 +440,7 @@ impl ProgramStoreBackend for InMemoryProgramStore {
             .filter(|p| &p.domain_id == domain_id)
             .cloned()
             .collect();
-        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(out)
     }
 
@@ -457,7 +457,7 @@ impl ProgramStoreBackend for InMemoryProgramStore {
             .filter(|p| p.parent_entity_id == entity_id)
             .cloned()
             .collect();
-        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(out)
     }
 

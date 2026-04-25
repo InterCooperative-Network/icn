@@ -1076,7 +1076,7 @@ pub async fn get_vouch_history(
         .collect();
 
     // Sort by vouched_at descending (most recent first)
-    vouched.sort_by(|a, b| b.vouched_at.cmp(&a.vouched_at));
+    vouched.sort_by_key(|b| std::cmp::Reverse(b.vouched_at));
 
     let total = vouched.len();
 

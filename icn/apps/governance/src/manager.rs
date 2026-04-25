@@ -399,7 +399,7 @@ impl ActionItemStoreBackend for SledActionItemStore {
         }
 
         // Sort by created_at descending (newest first)
-        items.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        items.sort_by_key(|b| std::cmp::Reverse(b.created_at));
 
         Ok(items)
     }
@@ -651,7 +651,7 @@ impl icn_governance::StructureStoreBackend for SledStructureStore {
                 out.push(s);
             }
         }
-        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(out)
     }
 
@@ -774,7 +774,7 @@ impl icn_governance::StructureStoreBackend for SledStructureStore {
                 }
             }
         }
-        out.sort_by(|a, b| a.start_date.cmp(&b.start_date));
+        out.sort_by_key(|a| a.start_date);
         Ok(out)
     }
 
@@ -824,7 +824,7 @@ impl icn_governance::StructureStoreBackend for SledStructureStore {
                 out.push(r);
             }
         }
-        out.sort_by(|a, b| a.start_date.cmp(&b.start_date));
+        out.sort_by_key(|a| a.start_date);
         Ok(out)
     }
 }
@@ -973,7 +973,7 @@ impl icn_governance::ActivityStoreBackend for SledActivityStore {
                 out.push(Self::decode_activity(&value)?);
             }
         }
-        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(out)
     }
 
@@ -1152,7 +1152,7 @@ impl icn_governance::ProgramStoreBackend for SledProgramStore {
                 out.push(p);
             }
         }
-        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(out)
     }
 
@@ -1189,7 +1189,7 @@ impl icn_governance::ProgramStoreBackend for SledProgramStore {
                 out.push(p);
             }
         }
-        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(out)
     }
 
@@ -1867,7 +1867,7 @@ impl MeetingStoreBackend for SledMeetingStore {
                 .map_err(|e| GovernanceError::Internal(format!("Failed to decode meeting: {e}")))?;
             out.push(m);
         }
-        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(out)
     }
 
@@ -7435,7 +7435,7 @@ mod tests {
         // By effective-timestamp ordering the sequence must be B (1000),
         // A (2000), C (3000). The old key would have produced A, C, B —
         // pushing B to the end because its `started_at` was None.
-        let mut xs = vec![
+        let mut xs = [
             entry("A", Some(2000), None),
             entry("B", None, Some(1000)),
             entry("C", Some(3000), None),

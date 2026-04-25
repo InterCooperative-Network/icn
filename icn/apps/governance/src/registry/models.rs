@@ -7,21 +7,16 @@
 use serde::{Deserialize, Serialize};
 
 /// Status of a governance decision.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum DecisionStatus {
     /// Decision is pending (voting in progress).
+    #[default]
     Pending,
     /// Decision was approved.
     Approved,
     /// Decision was rejected.
     Rejected,
-}
-
-impl Default for DecisionStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
 }
 
 /// A cooperative meeting record.

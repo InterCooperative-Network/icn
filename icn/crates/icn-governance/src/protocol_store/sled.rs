@@ -418,7 +418,7 @@ impl ProtocolParameterStore for SledParameterStore {
         }
 
         // Sort by timestamp descending (newest first)
-        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         // Remove entries beyond max_entries
         let mut removed = 0;

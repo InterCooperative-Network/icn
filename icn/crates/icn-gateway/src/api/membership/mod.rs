@@ -667,7 +667,7 @@ pub async fn list_members(
         .collect();
 
     // Sort by joined_at descending (newest first) for cursor pagination
-    member_responses.sort_by(|a, b| b.joined_at.cmp(&a.joined_at));
+    member_responses.sort_by_key(|b| std::cmp::Reverse(b.joined_at));
 
     // Apply cursor pagination
     let pagination_request = PaginationRequest {

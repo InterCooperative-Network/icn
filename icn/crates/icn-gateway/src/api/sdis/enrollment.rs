@@ -403,19 +403,15 @@ pub async fn approve_ceremony(
 fn validate_enrollment_request(req: &StartEnrollmentRequest) -> Result<()> {
     // Validate pathway-specific data
     match &req.pathway {
-        EnrollmentPathwayDto::GovernmentId { country, .. } => {
-            if country.len() != 2 {
-                return Err(GatewayError::BadRequest(
-                    "Country code must be 2 characters".to_string(),
-                ));
-            }
+        EnrollmentPathwayDto::GovernmentId { country, .. } if country.len() != 2 => {
+            return Err(GatewayError::BadRequest(
+                "Country code must be 2 characters".to_string(),
+            ));
         }
-        EnrollmentPathwayDto::WebOfTrust { vouchers } => {
-            if vouchers.len() < 3 {
-                return Err(GatewayError::BadRequest(
-                    "Web of trust requires at least 3 vouchers".to_string(),
-                ));
-            }
+        EnrollmentPathwayDto::WebOfTrust { vouchers } if vouchers.len() < 3 => {
+            return Err(GatewayError::BadRequest(
+                "Web of trust requires at least 3 vouchers".to_string(),
+            ));
         }
         _ => {}
     }
