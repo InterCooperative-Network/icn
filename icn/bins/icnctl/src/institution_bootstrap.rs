@@ -5,6 +5,7 @@ use icn_governance::{
     ActivityKind, BootstrapEntityType, BootstrapOperation, BootstrapPlan, BootstrapSeedManifest,
     BootstrapSeedRef, InstitutionBootstrapManifest, ProgramKind, StructureKind,
 };
+use icn_identity::Did;
 use serde::Serialize;
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
@@ -574,6 +575,22 @@ fn validate_seed_order(seeds: &[BootstrapSeedRef]) -> Result<()> {
     Ok(())
 }
 
+/// Build the merged person directory from any [`BootstrapSeedManifest::PersonDirectory`]
+/// seeds in the package. Later entries with the same `holder_label` override
+/// earlier ones, so a private overlay seed can shadow a placeholder shipped with
+/// the public package without re-issuing the public one.
+fn build_person_directory(seeds: &[BootstrapSeedManifest]) -> BTreeMap<String, Did> {
+    let mut directory = BTreeMap::new();
+    for seed in seeds {
+        if let BootstrapSeedManifest::PersonDirectory(manifest) = seed {
+            for entry in &manifest.entries {
+                directory.insert(entry.holder_label.clone(), entry.person_did.clone());
+            }
+        }
+    }
+    directory
+}
+
 fn validate_seed_graph(seeds: &[BootstrapSeedManifest]) -> (Vec<String>, Vec<String>) {
     let mut warnings = Vec::new();
     let mut blockers = Vec::new();
@@ -582,6 +599,7 @@ fn validate_seed_graph(seeds: &[BootstrapSeedManifest]) -> (Vec<String>, Vec<Str
     let mut referenced_domains = BTreeSet::new();
     let mut structures = BTreeSet::new();
     let mut programs = BTreeSet::new();
+    let person_directory = build_person_directory(seeds);
 
     for seed in seeds {
         match seed {
@@ -665,12 +683,29 @@ fn validate_seed_graph(seeds: &[BootstrapSeedManifest]) -> (Vec<String>, Vec<Str
                         ));
                     }
                     if assignment.person_did.is_none() {
-                        warnings.push(format!(
-                            "Role assignment for structure {} and role {} has no DID yet; it will be deferred",
-                            assignment.structure_id, assignment.role
-                        ));
+                        match &assignment.holder_label {
+                            Some(label) if !person_directory.contains_key(label) => {
+                                warnings.push(format!(
+                                    "Role assignment for structure {} and role {} references holder_label '{}' but no person directory entry exists; it will be deferred",
+                                    assignment.structure_id, assignment.role, label
+                                ));
+                            }
+                            Some(_) => {
+                                // Resolvable via directory; no warning needed.
+                            }
+                            None => {
+                                warnings.push(format!(
+                                    "Role assignment for structure {} and role {} has no person_did or holder_label; it will be deferred",
+                                    assignment.structure_id, assignment.role
+                                ));
+                            }
+                        }
                     }
                 }
+            }
+            BootstrapSeedManifest::PersonDirectory(_) => {
+                // Directory entries are collected in `person_directory` above
+                // and consumed by RoleAssignment validation; no per-seed warnings.
             }
         }
     }
@@ -704,6 +739,10 @@ fn make_plan(loaded: &LoadedPackage) -> BootstrapPlan {
     let mut entity_domains = BTreeMap::new();
     let mut declared_domains = BTreeMap::new();
     let mut provisioned_domains = BTreeSet::new();
+    // Pre-pass: merge all PersonDirectory seeds so RoleAssignment seeds can
+    // reference holder_labels without depending on seed ordering. Inline
+    // `person_did` on a role assignment still wins over directory lookup.
+    let person_directory = build_person_directory(&loaded.seeds);
 
     for seed in &loaded.seeds {
         match seed {
@@ -804,22 +843,41 @@ fn make_plan(loaded: &LoadedPackage) -> BootstrapPlan {
             }
             BootstrapSeedManifest::RoleAssignment(role_seed) => {
                 for assignment in &role_seed.assignments {
-                    match &assignment.person_did {
+                    let resolved = assignment.person_did.clone().or_else(|| {
+                        assignment
+                            .holder_label
+                            .as_ref()
+                            .and_then(|label| person_directory.get(label).cloned())
+                    });
+                    match resolved {
                         Some(did) => operations.push(BootstrapOperation::AssignRole {
                             structure_id: assignment.structure_id.clone(),
-                            person_did: did.clone(),
+                            person_did: did,
                             role: assignment.role.clone(),
                             authority_scope: assignment.authority_scope.clone(),
                         }),
-                        None => operations.push(BootstrapOperation::DeferRoleAssignment {
-                            structure_id: assignment.structure_id.clone(),
-                            role: assignment.role.clone(),
-                            holder_label: assignment.holder_label.clone(),
-                            authority_scope: assignment.authority_scope.clone(),
-                            reason: "no person_did supplied in seed".to_string(),
-                        }),
+                        None => {
+                            let reason = match &assignment.holder_label {
+                                Some(label) => {
+                                    format!("no DID for holder_label '{label}' in person directory")
+                                }
+                                None => "no person_did or holder_label supplied".to_string(),
+                            };
+                            operations.push(BootstrapOperation::DeferRoleAssignment {
+                                structure_id: assignment.structure_id.clone(),
+                                role: assignment.role.clone(),
+                                holder_label: assignment.holder_label.clone(),
+                                authority_scope: assignment.authority_scope.clone(),
+                                reason,
+                            });
+                        }
                     }
                 }
+            }
+            BootstrapSeedManifest::PersonDirectory(_) => {
+                // Already merged into `person_directory` above; no operations
+                // are emitted directly for a directory seed — its effect is
+                // entirely on RoleAssignment resolution.
             }
         }
     }
@@ -2150,6 +2208,351 @@ mod tests {
             assert_eq!(
                 report.preview.deferred_role_assignment_count, 4,
                 "plan preview must show 4 deferred role assignments"
+            );
+        }
+    }
+
+    /// Resolver tests for the person-directory overlay (#1603).
+    ///
+    /// Public institution packages reference role holders by `holder_label`.
+    /// Operators ship a private `PersonDirectorySeedManifest` overlay that
+    /// maps labels to real DIDs. These tests pin the four resolver paths:
+    /// inline DID wins, label resolves through the directory, missing labels
+    /// defer with a clear reason, and reruns are stable.
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    mod person_directory {
+        use super::*;
+        use icn_governance::{
+            BootstrapCharterRef, BootstrapEntityRecord, BootstrapEntityType,
+            BootstrapPersonDirectoryEntry, BootstrapRoleAssignmentRecord, BootstrapStructureRecord,
+            EntitySeedManifest, InstitutionBootstrapManifest, PersonDirectorySeedManifest,
+            RoleAssignmentSeedManifest, StructureKind, StructureSeedManifest,
+        };
+        use icn_identity::IdentityBundle;
+
+        fn fresh_did() -> Did {
+            IdentityBundle::generate()
+                .expect("IdentityBundle::generate")
+                .did()
+                .clone()
+        }
+
+        /// Build a minimal `LoadedPackage` for plan testing. Charter / manifest
+        /// paths are placeholders — `make_plan` only reads them for the
+        /// `ValidateCharter` op string, never the filesystem.
+        fn loaded_package_with(seeds: Vec<BootstrapSeedManifest>) -> LoadedPackage {
+            LoadedPackage {
+                manifest_path: PathBuf::from("test://manifest.yaml"),
+                charter_path: PathBuf::from("test://charter.yaml"),
+                seed_paths: vec![],
+                manifest: InstitutionBootstrapManifest {
+                    manifest_version: "draft-0".to_string(),
+                    package_id: "test-package".to_string(),
+                    package_kind: "institution".to_string(),
+                    charter: BootstrapCharterRef {
+                        path: "charter.yaml".to_string(),
+                    },
+                    seeds: vec![],
+                },
+                seeds,
+                warnings: vec![],
+                blockers: vec![],
+            }
+        }
+
+        /// Bootstrap seeds that satisfy the entity → structure prerequisites
+        /// for a role assignment to be considered well-formed. Includes a
+        /// governance-domain seed so unrelated `validate_seed_graph` blockers
+        /// do not contaminate role-assignment-specific assertions.
+        fn entity_and_structure_seeds() -> Vec<BootstrapSeedManifest> {
+            use icn_governance::{BootstrapGovernanceDomainRecord, GovernanceDomainSeedManifest};
+            vec![
+                BootstrapSeedManifest::GovernanceDomain(GovernanceDomainSeedManifest {
+                    seed_version: "draft-0".to_string(),
+                    domains: vec![BootstrapGovernanceDomainRecord {
+                        id: "domain-a".to_string(),
+                        name: "Domain A".to_string(),
+                        profile: "cooperative_default".to_string(),
+                        quorum_percent: 50,
+                        approval_percent: 50,
+                        voting_period_days: 7,
+                        members: vec!["did:icn:bootstrap-member".to_string()],
+                        decision_mode: None,
+                        max_objections: None,
+                    }],
+                    notes: vec![],
+                }),
+                BootstrapSeedManifest::Entity(EntitySeedManifest {
+                    seed_version: "draft-0".to_string(),
+                    entity: BootstrapEntityRecord {
+                        id: "entity-a".to_string(),
+                        entity_type: BootstrapEntityType::Cooperative,
+                        parent_entity_id: None,
+                        display_name: "Entity A".to_string(),
+                        governance_domain_id: "domain-a".to_string(),
+                        charter_ref: None,
+                        operating_purpose: None,
+                    },
+                    notes: vec![],
+                }),
+                BootstrapSeedManifest::Structure(StructureSeedManifest {
+                    seed_version: "draft-0".to_string(),
+                    parent_entity_id: "entity-a".to_string(),
+                    structures: vec![BootstrapStructureRecord {
+                        id: "committee-treasury".to_string(),
+                        kind: StructureKind::Committee,
+                        name: "Treasury".to_string(),
+                        mandate: None,
+                        scope: vec![],
+                    }],
+                    notes: vec![],
+                }),
+            ]
+        }
+
+        fn role_assignment_seed(
+            assignments: Vec<BootstrapRoleAssignmentRecord>,
+        ) -> BootstrapSeedManifest {
+            BootstrapSeedManifest::RoleAssignment(RoleAssignmentSeedManifest {
+                seed_version: "draft-0".to_string(),
+                assignments,
+                notes: vec![],
+            })
+        }
+
+        fn person_directory_seed(
+            entries: Vec<BootstrapPersonDirectoryEntry>,
+        ) -> BootstrapSeedManifest {
+            BootstrapSeedManifest::PersonDirectory(PersonDirectorySeedManifest {
+                seed_version: "draft-0".to_string(),
+                entries,
+                notes: vec![],
+            })
+        }
+
+        #[test]
+        fn inline_person_did_emits_assign_role() {
+            let alice = fresh_did();
+            let mut seeds = entity_and_structure_seeds();
+            seeds.push(role_assignment_seed(vec![BootstrapRoleAssignmentRecord {
+                structure_id: "committee-treasury".to_string(),
+                role: "treasurer".to_string(),
+                person_did: Some(alice.clone()),
+                holder_label: None,
+                authority_scope: vec![],
+            }]));
+            let plan = make_plan(&loaded_package_with(seeds));
+            let assign_count = plan
+                .operations
+                .iter()
+                .filter(|op| {
+                    matches!(op, BootstrapOperation::AssignRole { person_did, .. } if person_did == &alice)
+                })
+                .count();
+            assert_eq!(assign_count, 1, "inline person_did must emit AssignRole");
+            assert!(
+                !plan
+                    .operations
+                    .iter()
+                    .any(|op| matches!(op, BootstrapOperation::DeferRoleAssignment { .. })),
+                "inline person_did path must not produce a DeferRoleAssignment"
+            );
+        }
+
+        #[test]
+        fn holder_label_resolves_through_person_directory() {
+            let alice = fresh_did();
+            let mut seeds = entity_and_structure_seeds();
+            seeds.push(person_directory_seed(vec![BootstrapPersonDirectoryEntry {
+                holder_label: "treasurer-2026".to_string(),
+                person_did: alice.clone(),
+                display_name: Some("A. Operator".to_string()),
+            }]));
+            seeds.push(role_assignment_seed(vec![BootstrapRoleAssignmentRecord {
+                structure_id: "committee-treasury".to_string(),
+                role: "treasurer".to_string(),
+                person_did: None,
+                holder_label: Some("treasurer-2026".to_string()),
+                authority_scope: vec![],
+            }]));
+            let plan = make_plan(&loaded_package_with(seeds));
+            let resolved = plan.operations.iter().any(|op| {
+                matches!(op, BootstrapOperation::AssignRole { person_did, role, .. }
+                    if person_did == &alice && role == "treasurer")
+            });
+            assert!(resolved, "directory lookup must resolve to AssignRole");
+            assert!(
+                !plan
+                    .operations
+                    .iter()
+                    .any(|op| matches!(op, BootstrapOperation::DeferRoleAssignment { .. })),
+                "directory hit must not defer"
+            );
+        }
+
+        #[test]
+        fn inline_person_did_wins_over_directory_entry_for_same_label() {
+            let inline_did = fresh_did();
+            let directory_did = fresh_did();
+            assert_ne!(inline_did, directory_did);
+
+            let mut seeds = entity_and_structure_seeds();
+            seeds.push(person_directory_seed(vec![BootstrapPersonDirectoryEntry {
+                holder_label: "treasurer-2026".to_string(),
+                person_did: directory_did.clone(),
+                display_name: None,
+            }]));
+            seeds.push(role_assignment_seed(vec![BootstrapRoleAssignmentRecord {
+                structure_id: "committee-treasury".to_string(),
+                role: "treasurer".to_string(),
+                person_did: Some(inline_did.clone()),
+                holder_label: Some("treasurer-2026".to_string()),
+                authority_scope: vec![],
+            }]));
+            let plan = make_plan(&loaded_package_with(seeds));
+            let chosen = plan.operations.iter().find_map(|op| match op {
+                BootstrapOperation::AssignRole { person_did, .. } => Some(person_did.clone()),
+                _ => None,
+            });
+            assert_eq!(
+                chosen,
+                Some(inline_did),
+                "inline person_did must win over directory entry"
+            );
+        }
+
+        #[test]
+        fn missing_directory_entry_defers_with_label_aware_reason() {
+            let mut seeds = entity_and_structure_seeds();
+            // Note: no person directory seed in this package.
+            seeds.push(role_assignment_seed(vec![BootstrapRoleAssignmentRecord {
+                structure_id: "committee-treasury".to_string(),
+                role: "treasurer".to_string(),
+                person_did: None,
+                holder_label: Some("treasurer-2026".to_string()),
+                authority_scope: vec![],
+            }]));
+            let plan = make_plan(&loaded_package_with(seeds));
+            let deferred = plan.operations.iter().find_map(|op| match op {
+                BootstrapOperation::DeferRoleAssignment {
+                    holder_label,
+                    reason,
+                    ..
+                } => Some((holder_label.clone(), reason.clone())),
+                _ => None,
+            });
+            let (label, reason) = deferred.expect("missing label must defer");
+            assert_eq!(label.as_deref(), Some("treasurer-2026"));
+            assert!(
+                reason.contains("treasurer-2026") && reason.contains("person directory"),
+                "deferral reason must name the missing label and the directory; got: {reason}"
+            );
+        }
+
+        #[test]
+        fn validate_emits_warning_not_blocker_for_unresolvable_label() {
+            let mut seeds = entity_and_structure_seeds();
+            seeds.push(role_assignment_seed(vec![BootstrapRoleAssignmentRecord {
+                structure_id: "committee-treasury".to_string(),
+                role: "treasurer".to_string(),
+                person_did: None,
+                holder_label: Some("treasurer-2026".to_string()),
+                authority_scope: vec![],
+            }]));
+            let (warnings, blockers) = validate_seed_graph(&seeds);
+            assert!(
+                blockers.is_empty(),
+                "missing person-directory entry must NOT block apply: {blockers:?}"
+            );
+            assert!(
+                warnings
+                    .iter()
+                    .any(|w| w.contains("treasurer-2026") && w.contains("deferred")),
+                "validator must warn about the unresolvable label: {warnings:?}"
+            );
+        }
+
+        #[test]
+        fn directory_overlay_pattern_keeps_real_dids_out_of_public_seeds() {
+            // Public package: structure + a role assignment that references
+            // only a stable holder_label. No personal DID is committed.
+            let public_seeds: Vec<BootstrapSeedManifest> = {
+                let mut s = entity_and_structure_seeds();
+                s.push(role_assignment_seed(vec![BootstrapRoleAssignmentRecord {
+                    structure_id: "committee-treasury".to_string(),
+                    role: "treasurer".to_string(),
+                    person_did: None,
+                    holder_label: Some("treasurer-2026".to_string()),
+                    authority_scope: vec![],
+                }]));
+                s
+            };
+            // A scan of the public-only seeds must not surface any real DID.
+            for seed in &public_seeds {
+                if let BootstrapSeedManifest::RoleAssignment(role_seed) = seed {
+                    for assignment in &role_seed.assignments {
+                        assert!(
+                            assignment.person_did.is_none(),
+                            "public seed leaked an inline person_did for label {:?}",
+                            assignment.holder_label
+                        );
+                    }
+                }
+            }
+            // Public-only run defers the role assignment — apply continues
+            // for everything else.
+            let public_plan = make_plan(&loaded_package_with(public_seeds.clone()));
+            assert!(public_plan
+                .operations
+                .iter()
+                .any(|op| matches!(op, BootstrapOperation::DeferRoleAssignment { .. })));
+
+            // Private overlay: same seed list with a directory file appended.
+            let real_did = fresh_did();
+            let mut overlay_seeds = public_seeds;
+            overlay_seeds.insert(
+                0,
+                person_directory_seed(vec![BootstrapPersonDirectoryEntry {
+                    holder_label: "treasurer-2026".to_string(),
+                    person_did: real_did.clone(),
+                    display_name: None,
+                }]),
+            );
+            let overlay_plan = make_plan(&loaded_package_with(overlay_seeds));
+            let assigned = overlay_plan.operations.iter().any(|op| {
+                matches!(op, BootstrapOperation::AssignRole { person_did, .. } if person_did == &real_did)
+            });
+            assert!(
+                assigned,
+                "private overlay supplying the directory must upgrade defer → AssignRole"
+            );
+        }
+
+        #[test]
+        fn make_plan_is_stable_across_reruns_for_same_seeds() {
+            // Idempotency at the planner layer: identical inputs produce
+            // identical operation sequences. Apply-layer 409 handling for
+            // already-assigned roles is exercised by the live-apply suite
+            // (`apply_operation` returns Completed("…already assigned") on 409).
+            let alice = fresh_did();
+            let mut seeds = entity_and_structure_seeds();
+            seeds.push(person_directory_seed(vec![BootstrapPersonDirectoryEntry {
+                holder_label: "treasurer-2026".to_string(),
+                person_did: alice,
+                display_name: None,
+            }]));
+            seeds.push(role_assignment_seed(vec![BootstrapRoleAssignmentRecord {
+                structure_id: "committee-treasury".to_string(),
+                role: "treasurer".to_string(),
+                person_did: None,
+                holder_label: Some("treasurer-2026".to_string()),
+                authority_scope: vec![],
+            }]));
+            let plan_a = make_plan(&loaded_package_with(seeds.clone()));
+            let plan_b = make_plan(&loaded_package_with(seeds));
+            assert_eq!(
+                plan_a.operations, plan_b.operations,
+                "make_plan must be deterministic across reruns for identical seeds"
             );
         }
     }

@@ -3265,6 +3265,7 @@ dependencies = [
  "lru",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sha2",
  "sled",
  "tempfile",

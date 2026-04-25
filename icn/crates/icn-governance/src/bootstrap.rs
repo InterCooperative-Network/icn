@@ -48,6 +48,10 @@ pub enum BootstrapSeedKind {
     ActivityProgramSeed,
     MilestoneTemplateSeed,
     RoleAssignmentSeed,
+    /// Maps human-readable holder labels to real DIDs so role-assignment seeds
+    /// can reference labels and avoid committing real personal DIDs to the
+    /// public package. Typically supplied as a private overlay file.
+    PersonDirectorySeed,
 }
 
 /// Parsed seed manifest, tagged by the `kind` field in the YAML file.
@@ -66,6 +70,8 @@ pub enum BootstrapSeedManifest {
     MilestoneTemplate(MilestoneTemplateSeedManifest),
     #[serde(rename = "role-assignment-seed")]
     RoleAssignment(RoleAssignmentSeedManifest),
+    #[serde(rename = "person-directory-seed")]
+    PersonDirectory(PersonDirectorySeedManifest),
 }
 
 impl BootstrapSeedManifest {
@@ -77,6 +83,7 @@ impl BootstrapSeedManifest {
             Self::ActivityProgram(_) => BootstrapSeedKind::ActivityProgramSeed,
             Self::MilestoneTemplate(_) => BootstrapSeedKind::MilestoneTemplateSeed,
             Self::RoleAssignment(_) => BootstrapSeedKind::RoleAssignmentSeed,
+            Self::PersonDirectory(_) => BootstrapSeedKind::PersonDirectorySeed,
         }
     }
 }
@@ -267,6 +274,54 @@ pub struct BootstrapRoleAssignmentRecord {
     pub authority_scope: Vec<String>,
 }
 
+/// Maps human-readable holder labels to real DIDs.
+///
+/// ## Why this is a separate seed kind
+///
+/// Public institution packages (cooperative charters, structure layouts,
+/// program templates) are designed to be checked in and shared. Real
+/// personal DIDs are operational data and frequently sensitive — committing
+/// them couples the public package to a specific person and leaks identity.
+///
+/// The person directory is a **private overlay**: a separate seed file that
+/// the public package references by `holder_label` only. Operators ship the
+/// directory file out of band (private repo, encrypted store, env-injection
+/// at apply time). Without it, role-assignment seeds that reference labels
+/// stay in the deferred state and the rest of the package still applies.
+///
+/// ## Resolution precedence
+///
+/// At plan time the resolver:
+/// 1. Uses `BootstrapRoleAssignmentRecord::person_did` if present (inline DID
+///    wins so fixtures with synthetic test DIDs keep working unchanged).
+/// 2. Else looks up `holder_label` in the merged person directory.
+/// 3. Else emits `BootstrapOperation::DeferRoleAssignment` with a
+///    label-aware reason.
+///
+/// Multiple person-directory seeds may be supplied; later entries with the
+/// same `holder_label` override earlier ones, so a private overlay can
+/// shadow a placeholder shipped with the public package.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PersonDirectorySeedManifest {
+    pub seed_version: String,
+    pub entries: Vec<BootstrapPersonDirectoryEntry>,
+    #[serde(default)]
+    pub notes: Vec<String>,
+}
+
+/// One label → DID mapping in a [`PersonDirectorySeedManifest`].
+///
+/// `display_name` is optional metadata for operator-facing tooling (e.g. plan
+/// output, resolution audit logs). It is never assumed to be a legal name and
+/// must not be used for authorization.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BootstrapPersonDirectoryEntry {
+    pub holder_label: String,
+    pub person_did: Did,
+    #[serde(default)]
+    pub display_name: Option<String>,
+}
+
 /// Generic operation plan emitted by a package bootstrap loader.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BootstrapPlan {
@@ -401,5 +456,53 @@ mod tests {
             notes: vec![],
         });
         assert_eq!(seed.seed_kind(), BootstrapSeedKind::GovernanceDomainSeed);
+    }
+
+    #[test]
+    fn person_directory_seed_round_trips_through_yaml() {
+        // `Did` is cryptographically validated on deserialize (must decode
+        // to a valid Ed25519 public key), so we generate two real test DIDs
+        // via `IdentityBundle::generate()` and embed them in the YAML literal.
+        use icn_identity::IdentityBundle;
+        let alice = IdentityBundle::generate().expect("alice").did().clone();
+        let bob = IdentityBundle::generate().expect("bob").did().clone();
+        let alice_str = alice.as_str();
+        let bob_str = bob.as_str();
+        let yaml = format!(
+            "kind: person-directory-seed
+seed_version: draft-0
+entries:
+  - holder_label: alice
+    person_did: {alice_str}
+    display_name: Alice (placeholder)
+  - holder_label: bob
+    person_did: {bob_str}
+notes:
+  - \"Public placeholder directory; private overlay supplies real DIDs at apply time.\"
+"
+        );
+        let parsed: BootstrapSeedManifest = serde_yaml::from_str(&yaml).expect("parse");
+        assert_eq!(parsed.seed_kind(), BootstrapSeedKind::PersonDirectorySeed);
+        match parsed {
+            BootstrapSeedManifest::PersonDirectory(manifest) => {
+                assert_eq!(manifest.entries.len(), 2);
+                assert_eq!(manifest.entries[0].holder_label, "alice");
+                assert_eq!(manifest.entries[0].person_did, alice);
+                assert_eq!(
+                    manifest.entries[0].display_name.as_deref(),
+                    Some("Alice (placeholder)")
+                );
+                assert_eq!(manifest.entries[1].person_did, bob);
+                assert!(manifest.entries[1].display_name.is_none());
+            }
+            other => panic!("expected PersonDirectory, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn person_directory_seed_kind_serializes_kebab_case() {
+        let kind = BootstrapSeedKind::PersonDirectorySeed;
+        let json = serde_json::to_string(&kind).expect("serialize");
+        assert_eq!(json, "\"person-directory-seed\"");
     }
 }
