@@ -12,10 +12,15 @@ use icn_http_kit::error::ApiError;
 
 pub const MAX_DOMAIN_ID_LEN: usize = 128;
 pub const MAX_CHARTER_ID_LEN: usize = 128;
-/// Hard cap on charter document size (1 MiB). Charter documents are CCL YAML;
-/// real institutional charters are well under this bound. The cap is a DoS
-/// guard, not a structural limit.
-pub const MAX_CHARTER_YAML_BYTES: usize = 1_048_576;
+/// Hard cap on charter document size (256 KiB). Aligned with the gateway-wide
+/// `web::JsonConfig::default().limit(262_144)` in `icn-gateway/src/server.rs` so
+/// every request that reaches this validator is also accepted by Actix's JSON
+/// extractor — a request larger than this is rejected as 413 by the framework
+/// before the handler runs. Real institutional CCL charters are well under
+/// this bound; the cap is a DoS guard, not a structural limit.
+///
+/// If the gateway-wide JSON limit ever moves, this constant must move with it.
+pub const MAX_CHARTER_YAML_BYTES: usize = 262_144;
 pub const MAX_DOMAIN_NAME_LEN: usize = 256;
 pub const MAX_GOVERNANCE_MODEL_LEN: usize = 64;
 pub const MAX_PROPOSAL_TITLE_LEN: usize = 256;

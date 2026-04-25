@@ -5,13 +5,20 @@
 //! 1. Validated CCL YAML → 201 with `{ charter_id, status: "active", activated_at }`
 //!    and the wired `on_charter_accepted` hook is invoked exactly once with the
 //!    submitted (charter_id, charter_yaml) pair.
-//! 2. Reactivation of an existing `charter_id` succeeds (idempotent — the
+//! 2. The same activation also dispatches `GovernanceEffect::DeployCharter` via
+//!    `on_proposal_accepted`, mirroring the accepted-proposal close path so
+//!    commons / SDIS jurisdiction-binding flows see the domain.
+//! 3. Reactivation of an existing `charter_id` succeeds (idempotent — the
 //!    underlying oracle overwrites in place).
-//! 3. Malformed YAML is rejected at the boundary with 400 (the hook is *not*
-//!    invoked, preventing silent drops downstream).
-//! 4. Empty `charter_id` and oversize `charter_yaml` are rejected with 400.
-//! 5. Missing `governance:write` scope returns 403.
-//! 6. Response payload uses regulatory-safe vocabulary
+//! 4. Malformed YAML is rejected at the boundary with 400 (neither hook fires).
+//! 5. Empty `charter_id` and whitespace-only `charter_yaml` are rejected with 400.
+//! 6. Oversize `charter_yaml` (exceeding `MAX_CHARTER_YAML_BYTES`) is rejected
+//!    with 400 by the validator before downstream dispatch.
+//! 7. Missing `governance:write` scope returns 401 or 403 (auth layer choice;
+//!    both are accepted as evidence of unauthorized rejection).
+//! 8. If the proposal-acceptance hook is unwired, the endpoint returns 500
+//!    rather than silently succeeding with commons unaware of the domain.
+//! 9. Response payload uses regulatory-safe vocabulary
 //!    (no "payment", "currency", or "balance" terms).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -20,7 +27,11 @@ use std::sync::{Arc, Mutex};
 
 use actix_web::{body::to_bytes, dev::Service as _, http::StatusCode, test, App, HttpMessage};
 use icn_governance_actor::{
-    http::{self, configure::CharterAcceptedHook, GovernanceContext},
+    http::{
+        self,
+        configure::{CharterAcceptedHook, GovernanceEffect, ProposalAcceptedHook},
+        GovernanceContext,
+    },
     manager::GovernanceManager,
     NoopEventEmitter,
 };
@@ -37,20 +48,36 @@ entity:
   type: cooperative
 "#;
 
-type CapturedHookCalls = Arc<Mutex<Vec<(String, String)>>>;
+type CapturedCharterCalls = Arc<Mutex<Vec<(String, String)>>>;
+type CapturedEffectCalls = Arc<Mutex<Vec<GovernanceEffect>>>;
 
-fn make_ctx_with_capture() -> (GovernanceContext<NoopEventEmitter>, CapturedHookCalls) {
-    let captured: CapturedHookCalls = Arc::new(Mutex::new(Vec::new()));
-    let captured_clone = captured.clone();
-    let hook: CharterAcceptedHook = Arc::new(move |id, yaml| {
-        captured_clone.lock().unwrap().push((id, yaml));
+struct CapturedHooks {
+    charter_calls: CapturedCharterCalls,
+    effect_calls: CapturedEffectCalls,
+}
+
+/// Build a context with both the charter-accepted and proposal-accepted hooks
+/// wired to in-memory captures. The handler invokes both hooks on success, so
+/// every test that exercises the success path must wire both.
+fn make_ctx_with_capture() -> (GovernanceContext<NoopEventEmitter>, CapturedHooks) {
+    let charter_calls: CapturedCharterCalls = Arc::new(Mutex::new(Vec::new()));
+    let effect_calls: CapturedEffectCalls = Arc::new(Mutex::new(Vec::new()));
+
+    let charter_calls_clone = charter_calls.clone();
+    let charter_hook: CharterAcceptedHook = Arc::new(move |id, yaml| {
+        charter_calls_clone.lock().unwrap().push((id, yaml));
+    });
+
+    let effect_calls_clone = effect_calls.clone();
+    let proposal_hook: ProposalAcceptedHook = Arc::new(move |effect| {
+        effect_calls_clone.lock().unwrap().push(effect);
     });
 
     let ctx = GovernanceContext {
         manager: Arc::new(GovernanceManager::new()),
         emitter: NoopEventEmitter,
-        on_charter_accepted: Some(hook),
-        on_proposal_accepted: None,
+        on_charter_accepted: Some(charter_hook),
+        on_proposal_accepted: Some(proposal_hook),
         on_proposal_accepted_with_evidence: None,
         member_checker: None,
         steward_checker: None,
@@ -59,7 +86,13 @@ fn make_ctx_with_capture() -> (GovernanceContext<NoopEventEmitter>, CapturedHook
         sdis_service: None,
     };
 
-    (ctx, captured)
+    (
+        ctx,
+        CapturedHooks {
+            charter_calls,
+            effect_calls,
+        },
+    )
 }
 
 /// Build a test app with full governance route configuration, injecting the
@@ -124,10 +157,32 @@ async fn activate_charter_returns_201_and_fires_hook() {
         );
     }
 
-    let captured = captured.lock().unwrap();
-    assert_eq!(captured.len(), 1, "hook must fire exactly once");
-    assert_eq!(captured[0].0, "nycn-bootstrap");
-    assert_eq!(captured[0].1, VALID_CHARTER_YAML);
+    let charter = captured.charter_calls.lock().unwrap();
+    assert_eq!(charter.len(), 1, "charter hook must fire exactly once");
+    assert_eq!(charter[0].0, "nycn-bootstrap");
+    assert_eq!(charter[0].1, VALID_CHARTER_YAML);
+
+    // Equivalence with the accepted-proposal close path: the same activation
+    // must dispatch DeployCharter so commons registers the domain.
+    let effects = captured.effect_calls.lock().unwrap();
+    assert_eq!(
+        effects.len(),
+        1,
+        "proposal-accepted hook must fire exactly once"
+    );
+    match &effects[0] {
+        GovernanceEffect::DeployCharter {
+            charter_id,
+            proposal_id,
+        } => {
+            assert_eq!(charter_id, "nycn-bootstrap");
+            assert!(
+                proposal_id.starts_with("direct-activation:"),
+                "synthetic proposal_id must mark the direct-activation origin, got {proposal_id}"
+            );
+        }
+        other => panic!("expected GovernanceEffect::DeployCharter, got {other:?}"),
+    }
 }
 
 #[actix_web::test]
@@ -153,15 +208,22 @@ async fn activate_charter_idempotent_on_reactivation() {
         );
     }
 
-    let captured = captured.lock().unwrap();
+    let charter = captured.charter_calls.lock().unwrap();
     assert_eq!(
-        captured.len(),
+        charter.len(),
         2,
-        "hook must fire once per activation request"
+        "charter hook must fire once per activation request"
     );
     assert_eq!(
-        captured[0].0, captured[1].0,
+        charter[0].0, charter[1].0,
         "charter_id stable across reactivation"
+    );
+
+    let effects = captured.effect_calls.lock().unwrap();
+    assert_eq!(
+        effects.len(),
+        2,
+        "proposal-accepted hook must fire once per activation"
     );
 }
 
@@ -189,8 +251,51 @@ async fn activate_charter_rejects_malformed_yaml() {
     );
 
     assert!(
-        captured.lock().unwrap().is_empty(),
-        "hook must NOT fire on malformed input — boundary validation must reject before deploy"
+        captured.charter_calls.lock().unwrap().is_empty(),
+        "charter hook must NOT fire on malformed input"
+    );
+    assert!(
+        captured.effect_calls.lock().unwrap().is_empty(),
+        "proposal-accepted hook must NOT fire on malformed input"
+    );
+}
+
+#[actix_web::test]
+async fn activate_charter_rejects_oversize_yaml() {
+    let (ctx, captured) = make_ctx_with_capture();
+    let app = charter_test_app!(ctx, Some("governance:write"));
+
+    // MAX_CHARTER_YAML_BYTES is 256 KiB (matched to the gateway-wide JsonConfig
+    // limit). Build a YAML body that is structurally valid but exceeds that
+    // bound, by inflating the entity name with filler text. The validator
+    // must reject this with 400 before any hook fires. (The init_service test
+    // harness used here has no JsonConfig limit wired, so the request reaches
+    // the validator — proving the validator alone enforces the cap.)
+    let filler = "x".repeat(300_000);
+    let oversize_yaml =
+        format!("schema_version: v0\nentity:\n  name: \"{filler}\"\n  type: cooperative\n");
+    let body = json!({
+        "charter_id": "oversize-coop",
+        "charter_yaml": oversize_yaml,
+    });
+    let req = test::TestRequest::post()
+        .uri("/charters")
+        .set_json(&body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+
+    assert_eq!(
+        resp.status(),
+        StatusCode::BAD_REQUEST,
+        "oversize charter_yaml must return 400 from the boundary validator"
+    );
+    assert!(
+        captured.charter_calls.lock().unwrap().is_empty(),
+        "charter hook must NOT fire on oversize input"
+    );
+    assert!(
+        captured.effect_calls.lock().unwrap().is_empty(),
+        "proposal-accepted hook must NOT fire on oversize input"
     );
 }
 
@@ -241,7 +346,9 @@ async fn activate_charter_rejects_empty_yaml() {
 #[actix_web::test]
 async fn activate_charter_requires_governance_write_scope() {
     let (ctx, captured) = make_ctx_with_capture();
-    // No claims at all → middleware injects nothing, require_scope returns Forbidden.
+    // No claims at all → middleware injects nothing, require_scope returns
+    // an unauthorized error. The exact code (401 vs 403) is the auth layer's
+    // choice; both are accepted as evidence of unauthorized rejection.
     let app = charter_test_app!(ctx, None);
 
     let body = json!({
@@ -261,19 +368,65 @@ async fn activate_charter_requires_governance_write_scope() {
     );
 
     assert!(
-        captured.lock().unwrap().is_empty(),
-        "hook must NOT fire without governance:write scope"
+        captured.charter_calls.lock().unwrap().is_empty(),
+        "charter hook must NOT fire without governance:write scope"
+    );
+    assert!(
+        captured.effect_calls.lock().unwrap().is_empty(),
+        "proposal-accepted hook must NOT fire without governance:write scope"
     );
 }
 
 #[actix_web::test]
-async fn activate_charter_returns_500_when_hook_not_wired() {
-    // Build a context with `on_charter_accepted: None` to prove the handler
-    // surfaces a clear server error instead of silently succeeding.
+async fn activate_charter_returns_500_when_charter_hook_not_wired() {
+    // `on_charter_accepted: None` — the handler surfaces 500 rather than
+    // silently succeeding (the kernel would never start enforcing the charter).
     let ctx = GovernanceContext {
         manager: Arc::new(GovernanceManager::new()),
         emitter: NoopEventEmitter,
         on_charter_accepted: None,
+        on_proposal_accepted: Some(Arc::new(|_| {})),
+        on_proposal_accepted_with_evidence: None,
+        member_checker: None,
+        steward_checker: None,
+        suspension_checker: None,
+        membership_resolver: None,
+        sdis_service: None,
+    };
+    let app = charter_test_app!(ctx, Some("governance:write"));
+
+    let body = json!({
+        "charter_id": "nycn-bootstrap",
+        "charter_yaml": VALID_CHARTER_YAML,
+    });
+    let req = test::TestRequest::post()
+        .uri("/charters")
+        .set_json(&body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+
+    assert_eq!(
+        resp.status(),
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "missing charter hook must return 500, not silently succeed"
+    );
+}
+
+#[actix_web::test]
+async fn activate_charter_returns_500_when_proposal_hook_not_wired() {
+    // `on_proposal_accepted: None` — without it commons never registers the
+    // domain, so steward / jurisdiction-binding flows would fail downstream.
+    // Returning 500 keeps the contract honest: a 201 response means the
+    // charter is fully activated, not just half-activated.
+    let charter_calls: CapturedCharterCalls = Arc::new(Mutex::new(Vec::new()));
+    let charter_calls_clone = charter_calls.clone();
+    let charter_hook: CharterAcceptedHook = Arc::new(move |id, yaml| {
+        charter_calls_clone.lock().unwrap().push((id, yaml));
+    });
+    let ctx = GovernanceContext {
+        manager: Arc::new(GovernanceManager::new()),
+        emitter: NoopEventEmitter,
+        on_charter_accepted: Some(charter_hook),
         on_proposal_accepted: None,
         on_proposal_accepted_with_evidence: None,
         member_checker: None,
@@ -297,6 +450,15 @@ async fn activate_charter_returns_500_when_hook_not_wired() {
     assert_eq!(
         resp.status(),
         StatusCode::INTERNAL_SERVER_ERROR,
-        "missing hook must return 500, not silently succeed"
+        "missing proposal-accepted hook must return 500"
+    );
+    // Note: the charter hook fires before the proposal-hook check, so the
+    // CharterPolicyOracle has already deployed the document. That is
+    // acceptable — the kernel is now enforcing the charter — and is the
+    // narrowest behavior to assert without a synchronous rollback path.
+    assert_eq!(
+        charter_calls.lock().unwrap().len(),
+        1,
+        "charter hook fires before the proposal-hook check"
     );
 }

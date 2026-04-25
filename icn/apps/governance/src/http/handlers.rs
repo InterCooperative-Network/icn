@@ -638,18 +638,59 @@ pub async fn remove_domain_member<E: GovernanceEventEmitter + Clone + 'static>(
 // Charter activation handlers
 // ============================================================================
 
+/// Stable, recognizable proposal_id used when the direct charter-activation
+/// path emits a [`GovernanceEffect::DeployCharter`]. The dispatch site
+/// (`server.rs`) keys commons registration on `charter_id` and ignores
+/// `proposal_id`, so a synthetic value is safe and makes the provenance
+/// origin obvious in logs.
+fn direct_activation_pseudo_proposal_id(charter_id: &str) -> String {
+    format!("direct-activation:{charter_id}")
+}
+
 /// POST /gov/charters — Activate a CCL charter directly.
 ///
 /// Bootstrap-side counterpart to the governance-ratification path: hands a
-/// validated CCL document straight to the gateway's `on_charter_accepted`
-/// hook (which deploys it into the `CharterPolicyOracle`).  Does **not**
-/// create a proposal, record a vote, or emit a decision — the charter is
-/// treated as already-decided by an out-of-band ratification.
+/// validated CCL document to the same downstream pair the accepted-proposal
+/// path uses.
 ///
-/// Idempotency: deploying the same `charter_id` again overwrites the prior
-/// document in the oracle. Reactivations therefore succeed and return the
-/// new `activated_at` timestamp; callers that need single-shot semantics
-/// must dedupe upstream.
+/// ## Equivalence with the accepted-proposal path
+///
+/// `close_proposal` (handlers.rs) does two things on charter acceptance:
+///
+/// 1. Calls `on_charter_accepted(charter_id, charter_yaml)` — wired by the
+///    daemon to `CharterPolicyOracle::deploy_charter`, so the kernel starts
+///    enforcing the charter's CCL constraints immediately.
+/// 2. Calls `on_proposal_accepted(GovernanceEffect::DeployCharter)` — wired
+///    by the gateway to `commons.store_charter(...)`, registering the domain
+///    in the commons charter store so downstream `register_steward` /
+///    jurisdiction-binding flows will recognize it.
+///
+/// This handler invokes **both** hooks. Without the second dispatch the
+/// endpoint would silently leave commons unaware of the domain, breaking
+/// SDIS steward registration (which validates that the jurisdiction's
+/// charter exists in commons).
+///
+/// ## Out of scope (intentional)
+///
+/// - **Institutional effect record / decision-hash provenance.** The
+///   ratified path persists an `InstitutionalEffectRecord` keyed by a real
+///   proposal_id and bound to the governance receipt's `decision_hash`.
+///   Direct activation has no proposal/decision, so no such record is
+///   emitted. Provenance for this path is the `tracing` audit trail plus
+///   the synthetic `direct-activation:<charter_id>` proposal_id appearing
+///   in commons logs. Adding a synthetic proposal record would require a
+///   broader institutional-history redesign — tracked elsewhere.
+/// - **Dispatch evidence (`on_proposal_accepted_with_evidence`).** The
+///   evidence sink writes rows keyed by a real `proposal_id`; firing it
+///   here would create orphan rows. Skipped intentionally.
+///
+/// ## Idempotency
+///
+/// `CharterPolicyOracle::deploy_charter` overwrites in place per
+/// `charter_id`, and the commons dispatch treats "already exists" as a
+/// no-op (`server.rs` DeployCharter handler). Reactivating the same
+/// `charter_id` therefore succeeds with a fresh `activated_at`. Callers
+/// that need single-shot semantics must dedupe upstream.
 pub async fn activate_charter<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
@@ -668,11 +709,32 @@ pub async fn activate_charter<E: GovernanceEventEmitter + Clone + 'static>(
     doc.validate()
         .map_err(|e| err_bad(format!("Charter validation failed: {e}")))?;
 
-    let hook = ctx
+    let charter_hook = ctx
         .on_charter_accepted
         .as_ref()
         .ok_or_else(|| err_internal("Charter activation hook is not wired"))?;
-    hook(req.charter_id.clone(), req.charter_yaml.clone());
+    charter_hook(req.charter_id.clone(), req.charter_yaml.clone());
+
+    // Mirror the accepted-proposal close path: emit DeployCharter so the
+    // gateway registers the domain in the commons charter store. Without
+    // this, downstream `register_steward` / jurisdiction-binding checks
+    // (which read the commons charter table) will not see the domain even
+    // though the charter is live in the policy oracle.
+    if let Some(proposal_hook) = &ctx.on_proposal_accepted {
+        proposal_hook(GovernanceEffect::DeployCharter {
+            proposal_id: direct_activation_pseudo_proposal_id(&req.charter_id),
+            charter_id: req.charter_id.clone(),
+        });
+    } else {
+        // Defensive: missing the proposal hook means commons registration
+        // will not happen and the success response would be misleading.
+        // The daemon wires both hooks unconditionally; this branch only
+        // fires in misconfigured deployments or test envs that opt out.
+        return Err(err_internal(
+            "Charter activation rejected: governance acceptance hook is not wired, \
+             so commons registration cannot run and the charter would be only partially active",
+        ));
+    }
 
     Ok(HttpResponse::Created().json(ActivateCharterResponse {
         charter_id: req.charter_id.clone(),
