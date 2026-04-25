@@ -3284,6 +3284,7 @@ dependencies = [
  "blake3",
  "ed25519-dalek",
  "hex",
+ "icn-ccl",
  "icn-encoding",
  "icn-entity",
  "icn-federation",

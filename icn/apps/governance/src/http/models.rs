@@ -48,6 +48,37 @@ fn default_weight() -> f64 {
 }
 
 // ============================================================================
+// Charter activation
+// ============================================================================
+
+/// Activate a CCL charter so the running runtime starts enforcing it.
+///
+/// Hands a validated CCL document off to the gateway's charter ratification hook
+/// (which deploys it into `CharterPolicyOracle`). This is the bootstrap-side
+/// counterpart to the governance-ratification path: it does not create a
+/// proposal, it does not record a decision — it registers an already-decided
+/// charter so the kernel can enforce it.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ActivateCharterRequest {
+    /// Stable identifier for the charter. Convention: equals the governance
+    /// domain id this charter governs (e.g. cooperative DID or human handle).
+    pub charter_id: String,
+    /// Full CCL document, YAML-serialized. Parsed and validated at the
+    /// boundary; malformed input returns 400.
+    pub charter_yaml: String,
+}
+
+/// Response returned after a successful charter activation.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ActivateCharterResponse {
+    pub charter_id: String,
+    /// `"active"` once deployed into the policy oracle.
+    pub status: String,
+    /// Unix epoch seconds when activation was recorded.
+    pub activated_at: u64,
+}
+
+// ============================================================================
 // Proposals
 // ============================================================================
 
