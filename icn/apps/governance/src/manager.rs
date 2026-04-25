@@ -5038,6 +5038,7 @@ impl GovernanceManager {
         structure_id: StructureId,
         person_did: icn_identity::Did,
         role: String,
+        authority_scope: Vec<String>,
     ) -> Result<RoleAssignment> {
         // Validate the structure exists before persisting the role
         let exists = self
@@ -5048,7 +5049,8 @@ impl GovernanceManager {
             return Err(anyhow::anyhow!("Structure {} not found", structure_id));
         }
         let now = icn_time::current_timestamp_secs();
-        let assignment = RoleAssignment::new(structure_id, person_did, role, now);
+        let mut assignment = RoleAssignment::new(structure_id, person_did, role, now);
+        assignment.authority_scope = authority_scope;
         self.structure_store
             .save_role(&assignment)
             .map_err(|e| anyhow::anyhow!("Failed to save role assignment: {e}"))?;

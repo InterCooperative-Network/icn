@@ -18,6 +18,8 @@
 //!    "no standing in that domain" is a meaningful answer.
 //! 8. The response payload uses regulatory-safe vocabulary
 //!    (no payment / currency / balance terms).
+//! 9. `authority_scope` round-trips through `assign_role` and rolls up into
+//!    the top-level `authority_scopes` union (#1629).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -127,6 +129,7 @@ async fn direct_role_assignment_surfaces_in_standing() {
             structure.id.clone(),
             caller.clone(),
             "treasurer".to_string(),
+            vec!["approve_budget_within_policy".to_string()],
         )
         .expect("assign_role");
 
@@ -140,19 +143,26 @@ async fn direct_role_assignment_surfaces_in_standing() {
     assert_eq!(roles[0]["structure_name"], "Treasury");
     assert_eq!(roles[0]["parent_entity_id"], "entity-a");
     assert_eq!(roles[0]["structure_id"], structure.id.0);
-
-    // `authority_scopes` rolls up empty here because the public
-    // `manager.assign_role` and `POST /v1/gov/structures/{id}/roles` do not
-    // currently accept an `authority_scope` parameter — the field exists on
-    // `BootstrapRoleAssignmentRecord` but is dropped at apply time. Plumbing
-    // it through is a small follow-up tracked alongside #1603 and is
-    // intentionally out of scope here. The rollup logic itself (sort/dedup
-    // across role rows) is exercised by `direct_role_assignment_surfaces_in_standing`
-    // implicitly: zero scopes in, zero scopes out.
-    assert!(
-        body["authority_scopes"].as_array().unwrap().is_empty(),
-        "authority_scopes should be empty until apply-time plumbing carries scope"
+    assert_eq!(
+        roles[0]["authority_scope"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect::<Vec<_>>(),
+        vec!["approve_budget_within_policy".to_string()],
+        "authority_scope must round-trip on the role row"
     );
+
+    // Rollup union: the same scope appears in `authority_scopes` on the
+    // top-level standing.
+    let scopes: Vec<String> = body["authority_scopes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(scopes, vec!["approve_budget_within_policy".to_string()]);
 }
 
 #[actix_web::test]
@@ -178,6 +188,7 @@ async fn person_directory_resolved_role_lands_the_same_way() {
             structure.id.clone(),
             caller.clone(),
             "program-coordinator".to_string(),
+            vec!["curate_session_intake".to_string()],
         )
         .expect("assign_role (post-apply)");
 
@@ -216,6 +227,7 @@ async fn inline_did_precedence_from_1603_is_preserved_in_standing() {
             structure.id.clone(),
             inline_did.clone(),
             "treasurer".to_string(),
+            vec![],
         )
         .expect("assign_role for inline DID");
 
@@ -248,7 +260,7 @@ async fn caller_does_not_see_another_dids_standing() {
         )
         .expect("create_structure");
     ctx.manager
-        .assign_role(structure.id, alice.clone(), "treasurer".to_string())
+        .assign_role(structure.id, alice.clone(), "treasurer".to_string(), vec![])
         .expect("assign_role");
 
     // Bob authenticates and queries — he is the caller, not Alice. There
@@ -345,7 +357,12 @@ async fn response_uses_regulatory_safe_vocabulary() {
         )
         .expect("create_structure");
     ctx.manager
-        .assign_role(structure.id, caller.clone(), "treasurer".to_string())
+        .assign_role(
+            structure.id,
+            caller.clone(),
+            "treasurer".to_string(),
+            vec![],
+        )
         .expect("assign_role");
 
     let app = standing_test_app!(ctx, &caller, Some("governance:read"));

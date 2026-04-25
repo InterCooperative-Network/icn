@@ -3282,6 +3282,7 @@ fn role_to_response(r: &icn_governance::RoleAssignment) -> RoleAssignmentRespons
         structure_id: r.structure_id.0.clone(),
         person_did: r.person_did.to_string(),
         role: r.role.clone(),
+        authority_scope: r.authority_scope.clone(),
         start_date: r.start_date,
         end_date: r.end_date,
     }
@@ -3385,7 +3386,12 @@ pub async fn assign_role<E: GovernanceEventEmitter + Clone + 'static>(
 
     let assignment = ctx
         .manager
-        .assign_role(sid, person_did, req.role.clone())
+        .assign_role(
+            sid,
+            person_did,
+            req.role.clone(),
+            req.authority_scope.clone(),
+        )
         .map_err(anyhow_to_api)?;
 
     Ok(HttpResponse::Created().json(role_to_response(&assignment)))
@@ -6094,9 +6100,14 @@ mod tests {
             )
             .unwrap();
 
-        mgr.assign_role(s.id.clone(), caller.clone(), "coordinator".to_string())
-            .unwrap();
-        mgr.assign_role(s.id.clone(), other.clone(), "member".to_string())
+        mgr.assign_role(
+            s.id.clone(),
+            caller.clone(),
+            "coordinator".to_string(),
+            vec![],
+        )
+        .unwrap();
+        mgr.assign_role(s.id.clone(), other.clone(), "member".to_string(), vec![])
             .unwrap();
 
         let ctx = GovernanceContext {

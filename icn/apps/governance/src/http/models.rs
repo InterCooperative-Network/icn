@@ -717,6 +717,14 @@ pub struct AssignRoleRequest {
     pub did: String,
     /// Role name: "coordinator", "member", "facilitator", "note_taker", etc.
     pub role: String,
+    /// Delegated authority scopes attached to this assignment.
+    ///
+    /// Opaque to ICN — institutions define their own scope vocabulary
+    /// (e.g. `"approve_budget_within_policy"`, `"curate_session_intake"`).
+    /// Omitting the field defaults to an empty scope, preserving backward
+    /// compatibility with callers that predate #1629.
+    #[serde(default)]
+    pub authority_scope: Vec<String>,
 }
 
 /// Role assignment response
@@ -726,6 +734,11 @@ pub struct RoleAssignmentResponse {
     pub structure_id: String,
     pub person_did: String,
     pub role: String,
+    /// Delegated authority scopes for this assignment. May be empty.
+    /// Serialized even when empty so clients can rely on the field's
+    /// presence in the response shape.
+    #[serde(default)]
+    pub authority_scope: Vec<String>,
     pub start_date: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_date: Option<u64>,
