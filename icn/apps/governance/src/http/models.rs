@@ -177,7 +177,9 @@ pub struct StandingRoleAssignment {
 pub enum ProposalScopeRequest {
     #[default]
     Local,
-    Federation { federation_id: String },
+    Federation {
+        federation_id: String,
+    },
 }
 
 /// Create a new proposal

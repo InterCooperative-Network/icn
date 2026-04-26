@@ -832,9 +832,7 @@ fn mint_reconfirmation_grant(
     // Restrict candidates to grants issued by THIS deciding domain.
     // A cross-domain active grant does not authorize this domain to
     // refresh it — the grantor must match.
-    let template = actives
-        .iter()
-        .rfind(|g| g.grantor.0 == domain_id.0);
+    let template = actives.iter().rfind(|g| g.grantor.0 == domain_id.0);
     let template = match template {
         Some(t) => t.clone(),
         None => {
