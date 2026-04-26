@@ -38,8 +38,17 @@
 </script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>PHASE PROGRESS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/PHASE_PROGRESS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Phase Progress</h1>
-<p><strong>Last Updated:</strong> 2026-04-15
-<strong>Current Phase:</strong> Phase 2 — Pilot Launch (blocked on cooperative partners)</p>
+<p><strong>Last Updated:</strong> 2026-04-26
+<strong>Current Phase:</strong> Phase 2 — Pilot Launch (still blocked on cooperative partners; institutional-operability infrastructure for pilot enablement is now in place)</p>
+<!-- [sync edit] 2026-04-26: Phase 2 status unchanged (still blocked on
+     cooperative partners). Phase 2 deliverables list extended to record
+     that institutional-operability infrastructure to support pilot
+     deployment landed 2026-04-22 → 2026-04-26 (live charter activation,
+     person-directory overlay, /me/standing, authority_scope plumbing,
+     bootstrap-apply idempotency, persistent governance domains, NYCN
+     bootstrap apply integration tests + live-validate runbook). These
+     do not flip Phase 2 to ✅ on their own — that gate is partner-bound. -->
+
 <!-- [sync edit] 2026-04-15: Updated metrics tables with current measurements.
      Phase model, phase definitions, and completion criteria unchanged.
      Phase classification for NYCN institutional work is deferred to PR C. -->
@@ -207,8 +216,16 @@ View source on GitHub →
 <p><strong>Deliverables:</strong></p>
 <ul>
 <li><input checked="" disabled="" type="checkbox"> Pilot runbook (#1222 ✅ closed)</li>
+<li><input checked="" disabled="" type="checkbox"> Live charter activation endpoint (#1624) — pilots can activate a charter against a running gateway</li>
+<li><input checked="" disabled="" type="checkbox"> Persistent governance domains across gateway restart (#1621)</li>
+<li><input checked="" disabled="" type="checkbox"> Person-directory overlay for bootstrap role assignment (#1626) — DID binding from package-side person ids</li>
+<li><input checked="" disabled="" type="checkbox"> <code>GET /me/standing</code> read model (#1627) — member-facing standing surface</li>
+<li><input checked="" disabled="" type="checkbox"> <code>authority_scope</code> plumbed end-to-end through <code>assign_role</code> (#1630)</li>
+<li><input checked="" disabled="" type="checkbox"> Generic institution bootstrap package path (#1586)</li>
+<li><input checked="" disabled="" type="checkbox"> Bootstrap-apply 409 idempotency (#1617) — re-running bootstrap is safe</li>
+<li><input checked="" disabled="" type="checkbox"> NYCN bootstrap apply integration tests + live-validate runbook (#1592, #1593)</li>
 <li><input disabled="" type="checkbox"> One-command deployment script per cooperative</li>
-<li><input disabled="" type="checkbox"> Charter customization workflow documented</li>
+<li><input disabled="" type="checkbox"> Charter customization workflow documented (charter activation endpoint exists; non-technical workflow doc still missing)</li>
 <li><input disabled="" type="checkbox"> Pilot onboarding guide (non-technical audience)</li>
 <li><input disabled="" type="checkbox"> Deploy nodes for 3–5 pilot cooperatives</li>
 <li><input disabled="" type="checkbox"> Weekly check-in process established</li>
@@ -217,11 +234,12 @@ View source on GitHub →
 <p><strong>Blockers:</strong></p>
 <ul>
 <li><del>Requires Phase 1 complete</del> ✅ Charter Engine is live</li>
+<li><del>Requires bootstrap activation runtime</del> ✅ live charter activation + person-directory + standing read model landed 2026-04-22 → 2026-04-26</li>
 <li>Requires cooperative partners identified and committed (primary blocker)</li>
 </ul>
 <p><strong>Decisions Made:</strong></p>
 <ul>
-<li>(none yet)</li>
+<li>(2026-04-26) Pilot enablement infrastructure (bootstrap, charter activation, role binding, standing) is in place; Phase 2 remains ⏳ until partners run it for real.</li>
 </ul>
 <hr>
 <h3>Phase 3: Federation Depth</h3>

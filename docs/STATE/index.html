@@ -40,16 +40,127 @@ View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
 <h2>Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-04-15</h2>
+Last Reviewed: 2026-04-26</h2>
 <h1>ICN State (living doc)</h1>
+<!-- [sync edit] 2026-04-26: Append the institutional-operability sequence
+     (live charter activation, person-directory overlay, /me/standing,
+     authority_scope plumbing) and the doctrine/ADR canonicalization that
+     landed since 2026-04-15. Open-PR table updated; 4-15 entries kept
+     intact below for continuity. Phase model unchanged. -->
+
 <!-- [sync edit] 2026-04-15: Consolidated stacked changelog into single current snapshot.
      Aligned crate list, merged PRs, and metrics to verified repo state.
      Phase model unchanged — phase classification is governance territory (PR C). -->
 
-<h2>Current status (2026-04-15 snapshot)</h2>
+<h2>Current status (2026-04-26 snapshot)</h2>
 <p><strong>Current phase:</strong> Phase 2 — Pilot Launch (blocked on cooperative partners).
-Active execution: NYCN institutional integration work (meetings, structures, activities, notification digest, Program/Milestone in review). Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions and PR C for any future reclassification.</p>
-<h3>Recently merged (since last STATE.md update 2026-04-11)</h3>
+Active execution: institutional-operability runtime (live charter activation, person-directory overlay, <code>/me/standing</code>, <code>authority_scope</code> plumbing all landed) plus the feedback/support doctrine rename and ADR canonicalization under <code>docs/adr/</code>. NYCN package side dogfoods these via the institution-package boundary. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.</p>
+<h3>Recently merged (since 2026-04-15)</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Title</th>
+<th>Merged</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1637</td>
+<td>docs: reframe feedback doctrine and canonicalize ADR location</td>
+<td>2026-04-26</td>
+</tr>
+<tr>
+<td>#1630</td>
+<td>feat(governance): plumb authority_scope through assign_role end-to-end</td>
+<td>2026-04-25</td>
+</tr>
+<tr>
+<td>#1627</td>
+<td>feat(governance): add GET /me/standing read model</td>
+<td>2026-04-25</td>
+</tr>
+<tr>
+<td>#1626</td>
+<td>feat(governance): person-directory overlay for bootstrap role assignment</td>
+<td>2026-04-25</td>
+</tr>
+<tr>
+<td>#1625</td>
+<td>fix(coop): release sled db lock before reopen test</td>
+<td>2026-04-25</td>
+</tr>
+<tr>
+<td>#1624</td>
+<td>feat(governance): live charter activation endpoint</td>
+<td>2026-04-25</td>
+</tr>
+<tr>
+<td>#1622</td>
+<td>docs(strategy): institutional ecosystem arc — NYCN as first ecosystem seed</td>
+<td>2026-04-24</td>
+</tr>
+<tr>
+<td>#1621</td>
+<td>fix(governance): persist domains across gateway restart in standalone mode</td>
+<td>2026-04-24</td>
+</tr>
+<tr>
+<td>#1620</td>
+<td>fix(web): derive steward dashboard gateway URL from request context</td>
+<td>2026-04-24</td>
+</tr>
+<tr>
+<td>#1619</td>
+<td>feat(infra): add soft pod anti-affinity for ICN daemons</td>
+<td>2026-04-23</td>
+</tr>
+<tr>
+<td>#1618</td>
+<td>feat(ci): add Atlas-backed sccache setup for ci-runner</td>
+<td>2026-04-23</td>
+</tr>
+<tr>
+<td>#1617</td>
+<td>fix(bootstrap): treat remaining create conflicts as idempotent</td>
+<td>2026-04-22</td>
+</tr>
+<tr>
+<td>#1616</td>
+<td>docs(monitoring): document Helm access path for kube-prometheus-stack upgrade</td>
+<td>2026-04-22</td>
+</tr>
+<tr>
+<td>#1614</td>
+<td>fix(monitoring): move Prometheus to Atlas-backed persistent storage</td>
+<td>2026-04-22</td>
+</tr>
+<tr>
+<td>#1593</td>
+<td>docs(nycn): live-validate bootstrap apply and rewrite runbook</td>
+<td>2026-04-19</td>
+</tr>
+<tr>
+<td>#1592</td>
+<td>test(icnctl): NYCN bootstrap apply integration tests</td>
+<td>2026-04-19</td>
+</tr>
+<tr>
+<td>#1591</td>
+<td>fix(gateway): colon-safe proposal index keys with one-shot migration</td>
+<td>2026-04-19</td>
+</tr>
+<tr>
+<td>#1590</td>
+<td>fix(governance): close residual acceptance-closure atomicity hazards</td>
+<td>2026-04-18</td>
+</tr>
+<tr>
+<td>#1586</td>
+<td>feat(governance): add generic institution bootstrap package path</td>
+<td>2026-04-18</td>
+</tr>
+</tbody></table>
+<h3>Recently merged (2026-04-15 snapshot, retained)</h3>
 <table>
 <thead>
 <tr>
@@ -145,25 +256,25 @@ Active execution: NYCN institutional integration work (meetings, structures, act
 </tr>
 </thead>
 <tbody><tr>
-<td>#1550</td>
-<td>docs(state): canon-sync — align canonical docs to verified merged reality</td>
-<td>docs/canon-sync-2026-04</td>
-<td>Open</td>
-</tr>
-<tr>
-<td>#1549</td>
-<td>docs(ai): constitutional core + workflow architecture migration</td>
-<td>docs/workflow-migration</td>
-<td>Open</td>
-</tr>
-<tr>
-<td>#1548</td>
-<td>feat(governance): Program + Milestone primitives (Tranche 1a)</td>
-<td>feat/program-milestone</td>
-<td>Open</td>
+<td>#1636</td>
+<td>chore(toolchain): upgrade Rust 1.88.0 → 1.95.0</td>
+<td>copilot/upgrade-rust-1-88-to-1-95</td>
+<td>Open — fmt fix pushed; tests running</td>
 </tr>
 </tbody></table>
 <h3>What landed since Phase 1 (Charter Engine)</h3>
+<p>Institutional-operability runtime (added 2026-04-22 → 2026-04-26):</p>
+<ul>
+<li>Generic institution bootstrap package path — #1586</li>
+<li>Bootstrap-apply 409 idempotency for repeated bootstrap runs — #1617</li>
+<li>Persistent governance domains across gateway restart in standalone mode — #1621</li>
+<li>Live charter activation endpoint — #1624</li>
+<li>Person-directory overlay for bootstrap role assignment (DID binding) — #1626</li>
+<li><code>GET /me/standing</code> read model — #1627</li>
+<li><code>authority_scope</code> plumbed end-to-end through <code>assign_role</code> — #1630</li>
+<li>Feedback/support doctrine rename + ADR canonicalization under <code>docs/adr/</code> — #1637</li>
+<li>NYCN bootstrap apply integration tests + live-validate runbook — #1592, #1593</li>
+</ul>
 <p>Governance institutional primitives:</p>
 <ul>
 <li>Governance domains, structures, activities, parent (scope container) — #1540</li>
@@ -173,9 +284,16 @@ Active execution: NYCN institutional integration work (meetings, structures, act
 <li>Notification digest (pending votes, overdue items, upcoming meetings) — #1547</li>
 <li>NYCN architecture docs (repo-shaped spec, implementation matrix, execution tranches) — #1544</li>
 <li>NYCN institutional design correction (layered ontology) — #1545</li>
+<li>Residual acceptance-closure atomicity hazards closed — #1590</li>
+<li>Colon-safe proposal index keys with one-shot migration — #1591</li>
 </ul>
 <p>Infrastructure:</p>
 <ul>
+<li>Atlas-backed Prometheus persistent storage — #1614</li>
+<li>Atlas-backed sccache for ci-runner — #1618</li>
+<li>Soft pod anti-affinity for ICN daemons — #1619</li>
+<li>Helm path documented for kube-prometheus-stack — #1616</li>
+<li>Steward dashboard derives gateway URL from request context — #1620</li>
 <li>Security Audit CI fix (wasmtime bump) — #1522, #1542</li>
 <li>CI dual-signal guard — #1524</li>
 <li>Docker-build-deploy timeout fix — #1527</li>
