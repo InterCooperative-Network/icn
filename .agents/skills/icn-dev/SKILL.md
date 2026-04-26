@@ -90,7 +90,7 @@ icn-ledger, icn-ccl, icn-compute, icn-gateway, icn-governance, icn-federation, i
 
 **In-repo sources (authoritative):**
 - Sprint state: `icn/ops/state/sprint/current.json`
-- ADRs: `icn/ops/state/decisions/`
+- ADRs: `icn/docs/adr/` (canonical; `ops/state/decisions/` is a redirect)
 - Architecture: `icn/docs/ARCHITECTURE.md`
 - Current state: `icn/docs/STATE.md`
 - Planning: `icn/docs/planning/` and `icn/docs/strategy/`

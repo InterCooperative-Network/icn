@@ -1,38 +1,33 @@
 ---
 Status: normative (architecture doctrine)
-Authority: architecture (authoritative on what democratic-cybernetic primitives ICN core may model and what stays in institution packages)
+Authority: architecture (authoritative on what institutional feedback and support primitives ICN core may model and what stays in institution packages)
 Canonical: yes
 Last Reviewed: 2026-04-25
 Companions: `INSTITUTION_PACKAGE_BOUNDARY.md`, `KERNEL_APP_SEPARATION.md`, `IDENTITY_MEMBERSHIP_ARCHITECTURE.md`
 ---
 
-# Democratic Cybernetic Primitives
+# Institutional Feedback and Support Primitives
 
-> ICN is **not** a cybernetic command room. It is a substrate for democratic reflexes.
+This document defines the foundation for the next generation of generic primitives ICN core will eventually model:
 
-This document defines the foundation for the next generation of generic primitives ICN core will eventually model — institutional signals, escalation, action cards, temporary authority, governed indicators, obligation/allocation/settlement, and the support-institution layer — without implementing any of them in this PR.
+- **Institutional feedback primitives** — `InstitutionalSignal`, `SignalRule`, `EscalationPolicy`, `MemberSignal`, `SignalPolarity`.
+- **Member-facing read primitives** — `/me/standing` (landed), `/me/action-cards` (future).
+- **Authority primitives** — `RoleAssignment.authority_scope` (landed), `TemporaryAuthorityGrant` (future).
+- **Governed indicator primitive** — `Indicator` with definition, owner, caveats, review interval, challenge path.
+- **Resource governance primitives** — `Obligation`, `Allocation`, `Settlement`, `Position`, `Unit`, `SettlementAsset`.
+- **Support primitives** — package-declared support programs and service relationships, expressed via existing `Program` / `Structure` / `Activity` / future `Obligation`.
 
-The point is to fix doctrine before the runtime so that, when each primitive lands, it lands shaped like a nervous system reflex (member-originated, scoped, expiring, receipted, contestable) and not shaped like a dashboard for someone above the membership.
-
-The lessons encoded here come from four traditions:
-
-| Tradition | Lesson kept | Anti-pattern rejected |
-|---|---|---|
-| **Cybersyn / Stafford Beer** | Build a nervous system; recursive autonomy; institutional pain signals. | Priest-room dashboard socialism — central command pretending to be cybernetic. |
-| **OGAS** | Information bottlenecks are political power; transparency threatens bureaucracy; anti-bypass architecture (scope + source + receipt + review). | Modeling the whole economy first; surveillance pretending to be planning. |
-| **Participatory budgeting** | Democracy gets real when members touch resource decisions; visible tradeoffs; receipts. | Black-box allocation; "delegated to the staff" as the answer. |
-| **Mondragón** | Federations need support institutions, not just votes — education, onboarding, mutual aid, shared services. | Hardcoding any one federation's school/fund/service as a core primitive. |
+None of these are implemented in this PR. The point is to fix doctrine before the runtime so that, when each primitive lands, it is member-originated where it should be, scoped where it should be, expiring where it should be, receipted everywhere, and contestable by the people it acts on.
 
 ## Core stance
 
-We are not building dashboards.
-We are building **reflexes**:
+We are not building dashboards. We are building generic, reusable plumbing for institutional life:
 
 - **Standing** tells members where they are.
 - **Action cards** tell them what needs them.
-- **Signals** tell the institution where it hurts.
-- **Member-originated signals** let reality travel **upward from below**.
-- **Temporary authority** makes crisis power visible, scoped, expiring, and reviewable.
+- **Signals** tell the institution where it hurts — and where it's working.
+- **Member-originated signals** let reality travel upward from below, not just downward.
+- **Temporary authority** makes scoped, expiring, reviewable power-extension visible.
 - **Indicators** make metrics governable and challengeable.
 - **Receipts** prove legitimacy.
 - **CCL** expresses institutional rules.
@@ -41,11 +36,24 @@ We are building **reflexes**:
 
 If a future PR adds a primitive that doesn't earn its keep across at least two unrelated institutions, it belongs in an institution package, not in core.
 
+## Design influences
+
+The doctrine here owes specific debts to four traditions. They are influences on shape, not product language. **No ICN core primitive is named after any of them.** Substrate types stay boring and reusable: `InstitutionalSignal`, `SignalPolarity`, `Indicator`, `TemporaryAuthorityGrant`, `Obligation`, `Allocation`, `Settlement`, `Position`. There is no `Cybernetic*`, no `Mondragon*`, no `NervousSystem*` in core, ever.
+
+| Influence | What it contributes to the shape |
+|---|---|
+| **Cybersyn / Stafford Beer** | Distributed sensing and feedback as a primitive of institutional life; recursive autonomy across nested bodies; institutional stress signals routed by defined policy rather than ad-hoc reporting. |
+| **OGAS / Glushkov** | Information bottlenecks are political power; first-class member-originated feedback; anti-bypass architecture (scope + source + receipt + review). |
+| **Participatory budgeting** | Members must be able to authorize resource flows directly, with visible tradeoffs and receipted authorization. |
+| **Mondragón** | Federations require support institutions — education, onboarding, mutual aid, shared services — to reproduce themselves over time, expressed here as reusable federation patterns over generic primitives. |
+
+The anti-patterns each tradition refuses are folded into §9 (hard rules); they are not a separate ontology.
+
 ---
 
 ## 1. Recursive autonomy
 
-ICN's entity / structure / activity / program / federation graph is the substrate's expression of **recursive autonomy** (Beer's Viable System Model, expressed as data, not as a graphic).
+ICN's entity / structure / activity / program / federation graph is the substrate's expression of **recursive autonomy**: each layer has its own decision authority and its own coordination obligations to the layers above and below.
 
 | Layer | Authority comes from | What it owns |
 |---|---|---|
@@ -63,16 +71,14 @@ ICN's entity / structure / activity / program / federation graph is the substrat
 3. **Federation coordinates only what cannot be coordinated locally.** Treasury policy, charter conflicts, inter-cooperative settlement, federation-level legitimacy challenges. Not "everything."
 4. **Recursion all the way down.** A federation of federations works the same way. No special "top" layer.
 
-### Why ICN is a nervous system, not a command center
+### Why ICN is coordination plumbing, not a control panel
 
-A command center is a small group looking at a large screen and deciding for the rest. A nervous system is a body in which each part has its own reflexes, and signals travel up and down so that pain in one finger reaches the brain *and* the body's response respects the finger's autonomy.
-
-ICN's job is to provide the **wiring** for that nervous system:
+ICN's job is to provide the wiring that lets each layer of an institution function with its own authority while staying coordinated with the layers around it:
 
 - the standing, role, and authority surface that lets each part know who it is;
-- the signal/escalation surface that lets pain travel;
-- the receipt/decision surface that proves the response was legitimate;
-- the contestation surface that lets a part challenge a metric or decision aimed at it.
+- the signal and escalation surface that lets institutional feedback travel between layers;
+- the receipt / decision surface that proves the response was legitimate;
+- the contestation surface that lets a member challenge a metric or decision aimed at them.
 
 **Not in scope for ICN core**, ever: a "control panel for the federation president." A federation that needs one has misunderstood what federation is.
 
@@ -80,7 +86,7 @@ ICN's job is to provide the **wiring** for that nervous system:
 
 ## 2. Institutional signals (future generic primitive)
 
-> Cybersyn's actual contribution wasn't the room — it was the idea that **institutional pain should be visible and routable**.
+> Institutional feedback should be visible, routable, and receipted — not buried in private channels and not centralized in a dashboard.
 
 An `InstitutionalSignal` is a generic, future record that says: *"something at this scope crossed a threshold or was raised by a member, and it needs attention."* It is not yet implemented.
 
@@ -171,7 +177,7 @@ A signal at the appropriate severity, scoped to a body the caller belongs to, su
 
 ## 3. Member-originated signals
 
-> The OGAS lesson, harder than people remember: information bottlenecks are political power. If only the top can sense, the top owns reality.
+> Information bottlenecks are political power. If only "the top" can sense, then "the top" owns reality. ICN must support member-originated feedback as first-class records — same shape, same escalation, same receipts as rule-originated signals — or the substrate becomes asymmetric.
 
 ICN's signal subsystem is **not** purely top-down sensing. It must include `MemberSignal` — a signal opened by a member acting in their own DID, addressed to a body they belong to.
 
@@ -359,13 +365,11 @@ The runtime would have to know what an "asset" is and how a "position" is comput
 
 ---
 
-## 8. Mondragón support-institution layer
+## 8. Support-institution layer
 
-> Mondragón's actual lesson isn't its named institutions. It's that **a federation that doesn't invest in support institutions can't reproduce itself**.
+> A federation that invests only in governance and only in a treasury, and not in the support layer that reproduces it, runs out of capacity. Members burn out, new cooperatives never spin up, technical knowledge stays trapped in the few who hold it, and mutual aid happens informally and breaks under stress.
 
-A federation with only governance and only a treasury, but no support layer, runs out of capacity. Members burn out, new cooperatives never spin up, technical knowledge stays trapped in the few who have it, mutual aid happens informally and breaks under stress.
-
-The substrate must make it **possible** for a federation to declare its support layer — without baking any specific federation's school, fund, or service into core.
+The substrate must make it **possible** for a federation to declare its support layer — education, onboarding, technical / legal / admin support, peer mentorship, mutual aid, shared services — without baking any specific federation's school, fund, or service into core.
 
 ### What ICN core may eventually know
 
@@ -408,7 +412,7 @@ The following are **forbidden** in ICN core code review. Each one is a way the s
 | **Emergency powers without expiry/review** | Section 5 is non-negotiable: scoped, expiring, receipted, post-reviewed. |
 | **Metrics without challenge paths** | Indicators (§6) require a challenge signal kind. |
 | **Resource flows without receipts** | Allocations must have authorizing receipts; settlements must reference allocations (§7). |
-| **"Support institution" as a bespoke NYCN/Mondragón hardcode** | Use generic Program + Structure + Activity + future Obligation. |
+| **"Support institution" as a bespoke institution-specific hardcode** | Use generic Program + Structure + Activity + future Obligation. |
 | **Signals-as-tickets** | Closing a signal without a receipt or decision reference erases institutional truth. |
 | **Polarity-as-discipline** | Treating `polarity: negative` as an automatic punishment trigger. Negative is sensation, not sanction (§2a). |
 | **Polarity-collapsed-into-severity** | Using polarity as an "extra severity bit" defeats the orthogonality the field exists for (§2a). |

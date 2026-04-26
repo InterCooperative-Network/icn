@@ -300,9 +300,9 @@ Returns Program + ordered Milestone statuses + ActionItem counts by status + Mee
 
 ---
 
-## F. Democratic cybernetics and support-institution boundary
+## F. Institutional feedback and support-primitive boundary
 
-The next set of primitives ICN core will eventually model — **institutional signals, escalation policies, action cards, governed indicators, temporary authority grants, obligation/allocation/settlement, and the support-institution layer** — extends the same boundary discipline to a new surface. Doctrine for these primitives lives in [`DEMOCRATIC_CYBERNETIC_PRIMITIVES.md`](./DEMOCRATIC_CYBERNETIC_PRIMITIVES.md). This section pins the placement rule.
+The next set of primitives ICN core will eventually model — **institutional signals, escalation policies, action cards, governed indicators, temporary authority grants, obligation/allocation/settlement, and the support-institution layer** — extends the same boundary discipline to a new surface. Doctrine for these primitives lives in [`INSTITUTIONAL_FEEDBACK_AND_SUPPORT_PRIMITIVES.md`](./INSTITUTIONAL_FEEDBACK_AND_SUPPORT_PRIMITIVES.md). This section pins the placement rule.
 
 ### ICN core may know
 

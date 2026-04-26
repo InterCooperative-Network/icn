@@ -20,7 +20,7 @@ the operational layer that observes, coordinates, and automates.
 | `monitoring/dashboards/` | Grafana JSON dashboards |
 | `monitoring/alerts/` | Prometheus alert rules YAML |
 | `monitoring/runbooks/` | Operational runbooks (Markdown) |
-| `state/decisions/` | Architecture Decision Records (ADRs) — numbered, use `template.md` |
+| `state/decisions/` | Retired — ADRs are canonical under `docs/adr/`. This dir holds only a redirect README. |
 | `state/sprint/` | Sprint plans: `current.json` is the active sprint |
 | `state/config/` | `repo-map.json` (repo locations/relationships), `conventions.md` |
 | `state/truth/` | **Canonical truth spine** — sources.json, policy.json, agents.json, skills.json |
@@ -46,16 +46,16 @@ The MCP server uses **stdio transport** — Claude Code starts and manages its l
 - Do not commit `mcp/data/` to git
 
 ### Durable state (git-tracked files)
-- ADRs in `state/decisions/` — never delete, use `superseded` status
+- ADRs in `docs/adr/` (canonical) — never delete, use `superseded` status
 - Sprint state in `state/sprint/current.json` — update in place, archive to `history/` on close
 - Repo map in `state/config/repo-map.json` — keep in sync with actual repo locations
 
 ## Writing ADRs
 
-Copy `state/decisions/template.md`, increment the number from the last ADR in the directory.
+Copy `docs/adr/template.md`, increment the number from the last ADR in that directory.
 Use the `log_decision` MCP tool if available — it writes the file and updates the SQLite index atomically.
 
-Format: `NNNN-kebab-case-title.md`
+Format: `ADR-NNNN-kebab-case-title.md` under `docs/adr/`.
 
 ## What Stays Out of ops/
 
