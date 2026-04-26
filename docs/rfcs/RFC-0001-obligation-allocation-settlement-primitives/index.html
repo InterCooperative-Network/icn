@@ -1,0 +1,511 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>RFC 0001: Obligation / Allocation / Settlement Primitives and External Settlement Bridges | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>rfcs</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>RFC 0001 obligation allocation settlement primitives</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/rfcs/RFC-0001-obligation-allocation-settlement-primitives.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>id: &quot;0001&quot;
+title: &quot;Obligation / Allocation / Settlement Primitives and External Settlement Bridges&quot;
+status: &quot;draft&quot;
+created: &quot;2026-04-26&quot;
+updated: &quot;2026-04-26&quot;
+authors: [&quot;Matt Faherty&quot;]
+reviewers: []
+related_adr_candidates: [&quot;0044&quot;, &quot;0045&quot;, &quot;0046&quot;, &quot;0047&quot;, &quot;0048&quot;, &quot;0041&quot;, &quot;0026&quot;]
+related_issues: [&quot;#1634&quot;, &quot;#1635&quot;]
+supersedes: []
+superseded_by: []</h2>
+<h1>RFC 0001: Obligation / Allocation / Settlement Primitives and External Settlement Bridges</h1>
+<h2>Status</h2>
+<p><code>draft</code> — being written, not yet ready for review. Per <a href="https://github.com/InterCooperative-Network/icn/blob/main/RFC-0000-rfc-process">RFC-0000</a>, accepted RFC does not mean implemented; the follow-up ADRs and tests carry that work.</p>
+<h2>Summary</h2>
+<p>ICN needs a written model for cooperative economic coordination that is honest about two simultaneous realities:</p>
+<ol>
+<li><strong>ICN-native economic coordination.</strong> Obligations, allocations, settlements, units, positions, and receipts as governed institutional records — separate from payment-rail primitives, separate from currency.</li>
+<li><strong>External settlement bridges.</strong> Real institutions still need rent paid, venues deposited, payroll-equivalents disbursed, conversion loans funded, accountants engaged, and legal filings processed in the day-currency / regulated-financial systems they operate within today.</li>
+</ol>
+<p>This RFC explores the design space for both layers and the boundary between them. The recommended direction is <strong>Option B: External Bridge Receipts</strong> — ICN records governance authority, settlement intent, obligations, allocations, positions, and receipts; external regulated/cooperative partners execute day-currency or legal-financial actions under their own authority and return a bridge receipt. ICN never becomes a bank, payment processor, currency issuer, or convertibility engine.</p>
+<h2>Problem statement</h2>
+<p>Cooperatives, communities, and federations adopting ICN have to operate inside the present economy. They need to:</p>
+<ul>
+<li>Pay rent to a landlord that does not accept cooperative units.</li>
+<li>Cover venue deposits, travel support, printing, childcare, accessibility services, and legal filings using currency the wider world recognizes.</li>
+<li>Fund conversion loans, bridge loans, and payroll-equivalent disbursements through credit unions, cooperative lenders, CDFIs, fiscal sponsors, and (where applicable) public/community banks.</li>
+<li>Engage accountants, bookkeepers, legal/co-op developers, technical assistance firms, and organizer bodies whose work straddles the institutional boundary.</li>
+</ul>
+<p>If ICN ignores this and only models internal coordination, real institutions cannot use it for the work that funds their existence. If ICN absorbs day-currency mechanics into its core, it becomes a payment system — with the regulatory burden, capture risk, and conceptual contamination that implies. ICN-native vocabulary (position, obligation, allocation) collapses into wallet/balance/currency, and the cooperative model is undermined.</p>
+<p>The bridge problem is the gap. This RFC proposes that ICN occupies the <strong>internal coordination + governance authorization + receipts</strong> layer, and that external bridge institutions own the <strong>regulated execution</strong> layer, with a clean envelope between them.</p>
+<h2>Goals</h2>
+<ul>
+<li>Preserve regulatory-safe vocabulary in ICN-native primitives. ICN uses <code>obligation</code>, <code>allocation</code>, <code>settlement</code>, <code>unit</code>, <code>position</code>, <code>settlement asset</code>, <code>external settlement instruction</code>, <code>bridge receipt</code>. ICN does not use <code>payment</code>, <code>currency</code>, <code>balance</code>, or <code>wallet</code> for native primitives. (<code>currency</code> may appear only when explicitly discussing external day-currency systems ICN bridges to.)</li>
+<li>Define internal economic primitives at the schema level: obligation, allocation, settlement, unit, position, settlement asset, receipt, challenge.</li>
+<li>Define the external settlement bridge pattern: how ICN authorizes external execution, how the execution is carried out, how the result returns as a bridge receipt, how disputes are handled.</li>
+<li>Define the bridge receipt envelope as a first-class type, parallel to governance proofs and effect records.</li>
+<li>Define the challenge / reversal / appeal path for obligations, allocations, settlements, and bridge executions.</li>
+<li>Support the bridge institution roles credit unions, cooperative lenders, CDFIs, fiscal sponsors, public/community banks (where applicable), accountants, bookkeepers, legal/co-op developers, technical assistance firms.</li>
+<li>Support organizer bodies and technical-assistance bodies as <strong>operating institutions</strong> — not as informal helpers — with their own governance, authority, deliverables, and accountability.</li>
+<li>Keep ICN from implying convertibility between cooperative units and external currency. Bridge receipts attest to external execution; they are not exchange rates.</li>
+</ul>
+<h2>Non-goals</h2>
+<ul>
+<li>No ICN-native money or currency.</li>
+<li>No 1:1 convertibility promise between cooperative units and any external instrument.</li>
+<li>No payment processor, gateway, or rails design. ICN does not move money.</li>
+<li>No banking compliance implementation (KYC, AML, SOC, BSA, etc.) inside ICN core. Compliance lives where regulation lives — in the bridge institutions.</li>
+<li>No full general-ledger accounting system. Bridge institutions and cooperative accountants own that.</li>
+<li>No runtime implementation in this RFC. ADRs and issues follow.</li>
+<li>No NYCN-specific public website claims. NYCN may dogfood the patterns this RFC explores; the public website continues to use generic &quot;reference institution package&quot; framing.</li>
+</ul>
+<h2>Background / current state</h2>
+<p>ICN&#39;s existing decisions about economic coordination:</p>
+<ul>
+<li><a href="/docs/adr/ADR-0004-icn-base-layer-models-obligations-and-attestations-not-payment-rails">ADR-0004: ICN Base Layer Models Obligations and Attestations, Not Payment Rails</a> — the foundational rejection of payment-rail framing.</li>
+<li><a href="/docs/adr/ADR-0005-commons-credit-settlement-architecture">ADR-0005: Commons Credit Settlement Architecture</a> — direction on commons-credit settlement.</li>
+<li><a href="/docs/adr/ADR-0007-commons-resource-policy-ccl-formula-extraction">ADR-0007: Commons Resource Policy — CCL Formula Extraction</a> — CCL bridge for resource-policy formulas.</li>
+<li><a href="/docs/adr/ADR-0013-federation-clearing-adoption-contract">ADR-0013: Federation Clearing Adoption Contract</a> — dual-path clearing model with store isolation now proven by <code>crates/icn-federation/tests/store_isolation_clearing_adoption.rs</code> (PR #1650).</li>
+<li><a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026: Receipt and Provenance Proof Envelope</a> — the layered envelope this RFC&#39;s bridge receipts plug into.</li>
+<li><a href="/docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy">ADR-0031: Commons Compute Admission and Settlement Policy</a> — back-fill of the settlement engine producing balanced earn/spend journal entries.</li>
+</ul>
+<p>Open issues this RFC informs:</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/issues/1634" target="_blank" rel="noopener">#1634</a> — RFC obligation/allocation/settlement primitives.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/issues/1635" target="_blank" rel="noopener">#1635</a> — support-institution package pattern for federations.</li>
+</ul>
+<p>What does <em>not</em> exist today:</p>
+<ul>
+<li>A canonical schema for <code>Obligation</code>, <code>Allocation</code>, <code>Settlement</code> as first-class types with an explicit lifecycle. The settlement engine produces journal entries; it does not name the upstream commitments.</li>
+<li>Any envelope for external settlement instruction or bridge receipt. ICN cannot today record &quot;the gateway-side accountant paid the venue deposit; here is the proof.&quot;</li>
+<li>A written model for organizer bodies and support institutions as governed operating bodies with mandate, scope, and accountability.</li>
+</ul>
+<h2>Bridge flow</h2>
+<p>The bridge model is a single flow with explicit boundaries:</p>
+<pre><code class="language-text">need / request
+    ↓
+governance authorization                 (ICN: proposal → mandate → grant)
+    ↓
+obligation or allocation                 (ICN-native record; no day-currency assumption)
+    ↓
+settlement instruction                   (ICN-native envelope; addresses an external bridge)
+    ↓
+external bridge partner execution        (Bridge institution: credit union, CDFI, fiscal
+                                          sponsor, accountant, lender, etc., under its own
+                                          regulatory authority)
+    ↓
+bridge receipt returned                  (Bridge institution attests to what it did,
+                                          when, in what external system, with what reference)
+    ↓
+ICN records bridge receipt               (ICN-native record; links back to the obligation,
+                                          allocation, settlement instruction, mandate)
+    ↓
+challenge / reversal / appeal path       (per ADR-0029 / RFC-0002 territory; produces
+                                          counter-receipts, not deletions)
+</code></pre>
+<p>ICN owns every step on the left of the partner boundary. The bridge institution owns every step on its own side. The boundary is the settlement instruction (going out) and the bridge receipt (coming back).</p>
+<h2>Design options</h2>
+<h3>Option A — Internal-only economic records</h3>
+<p>ICN records obligations, allocations, settlements, and positions internally. External execution is invisible to ICN: members and institutions handle day-currency operations entirely outside.</p>
+<p><strong>Pros</strong>: simplest core, smallest surface, lowest regulatory exposure.
+<strong>Cons</strong>: not enough for real institutions. The cooperative still has to pay rent; the substrate provides no honest record of how that happened or under whose authority. Audit trail is broken at the boundary. Members who challenge an external action have no anchor on the ICN side.</p>
+<h3>Option B — External bridge receipts (recommended direction)</h3>
+<p>ICN records internal authorization (proposal → mandate → obligation/allocation → settlement instruction) and external execution receipts (bridge receipt returned by the partner). The settlement instruction and bridge receipt are first-class envelopes. ICN does not execute; it records.</p>
+<p><strong>Pros</strong>: practical transition path. The cooperative can use ICN for governance and provenance while still operating in the day-currency economy through trusted partners. Clean boundary: ICN never holds funds, never moves currency. Bridge receipts are auditable and challengeable. Supports the realistic landscape of credit unions, cooperative lenders, CDFIs, fiscal sponsors, accountants, lenders, and technical-assistance bodies.
+<strong>Cons</strong>: requires bridge partner trust and a receipt standard. Disputes about whether the bridge partner actually executed correctly route through partner relationships and external accounting. Onboarding a new bridge partner is a real institutional act, not a config flip.</p>
+<h3>Option C — Deep regulated integration</h3>
+<p>ICN integrates directly with banking, payment, and lending APIs. The substrate orchestrates external execution.</p>
+<p><strong>Pros</strong>: more automation; less manual partner coordination.
+<strong>Cons</strong>: ICN inherits the regulatory burden of every system it integrates with. Bank-grade compliance becomes a precondition for any deployment. Capture risk is high — once ICN depends on a payment processor&#39;s API, that processor can shape the substrate. The cooperative model is at risk of being absorbed into the regulated-finance model. <strong>Should be deferred. This RFC does not recommend Option C.</strong></p>
+<h2>Tradeoffs</h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Option A (internal-only)</th>
+<th>Option B (bridge receipts)</th>
+<th>Option C (deep integration)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ICN regulatory exposure</td>
+<td>none</td>
+<td>none — execution is the partner&#39;s</td>
+<td>high — ICN becomes a regulated party</td>
+</tr>
+<tr>
+<td>Real-world utility today</td>
+<td>limited; institutions still operate dual-track</td>
+<td>strong — institutions can use ICN for governance + provenance while still surviving</td>
+<td>strong if compliance is achievable</td>
+</tr>
+<tr>
+<td>Audit completeness</td>
+<td>broken at the external boundary</td>
+<td>complete — bridge receipts close the loop</td>
+<td>complete; but audit is tied to external system audits</td>
+</tr>
+<tr>
+<td>Capture risk</td>
+<td>low</td>
+<td>low — partners are pluggable</td>
+<td>high — integration partners can shape the substrate</td>
+</tr>
+<tr>
+<td>Conceptual integrity</td>
+<td>preserved</td>
+<td>preserved — ICN never claims convertibility</td>
+<td>at risk — substrate starts thinking in payment-rail terms</td>
+</tr>
+<tr>
+<td>Onboarding cost</td>
+<td>trivial</td>
+<td>moderate — bridge partner relationships are institutional</td>
+<td>high — compliance for every integrated system</td>
+</tr>
+<tr>
+<td>Failure mode if a partner exits</td>
+<td>no impact (no integration)</td>
+<td>obligations remain; settlement instructions stop until a new partner</td>
+<td>substrate-level outage</td>
+</tr>
+<tr>
+<td>Support for credit unions / CDFIs / fiscal sponsors</td>
+<td>none</td>
+<td>first-class</td>
+<td>possible but secondary to mainstream rails</td>
+</tr>
+</tbody></table>
+<p>The bridge-receipt path keeps ICN small, keeps the cooperative model intact, and meets institutions where they actually operate.</p>
+<h2>Core/package boundary</h2>
+<h3>ICN core owns</h3>
+<ul>
+<li>Generic <strong>obligation</strong>, <strong>allocation</strong>, <strong>settlement</strong>, <strong>position</strong>, and <strong>unit</strong> schemas with explicit lifecycles.</li>
+<li>The <strong>settlement instruction envelope</strong>: an ICN-native record naming what is being asked of an external bridge institution, under whose authority, against which obligation or allocation, with what expected reference data.</li>
+<li>The <strong>bridge receipt envelope</strong>: a record of what a bridge institution attests to having done, with provenance fields plugging into <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a>.</li>
+<li>The <strong>challenge / reversal / appeal lifecycle</strong> for obligations, allocations, settlements, and bridge executions.</li>
+<li>The <strong>authority / mandate linkage</strong>: every settlement instruction must be covered by a mandate per <a href="/docs/adr/ADR-0014-constitutional-object-model">ADR-0014</a> and <a href="/docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam">ADR-0019</a>.</li>
+<li>The <strong>proof / receipt linkage</strong> to governance proof envelopes (<a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a>).</li>
+</ul>
+<h3>Institution packages own</h3>
+<ul>
+<li>Local <strong>categories</strong> of obligation and allocation (e.g., &quot;venue deposit&quot;, &quot;childcare support&quot;, &quot;translation honorarium&quot;) — opaque to ICN core, expressed as <code>operating_purpose</code> strings or schema extensions per ADR-0024 candidate.</li>
+<li><strong>Program budgets</strong> and approval thresholds.</li>
+<li><strong>Support-institution definitions</strong> — which credit union, which fiscal sponsor, which accountant the package recognizes as bridge partners.</li>
+<li><strong>Organizer body roles</strong> and operating-body definitions.</li>
+<li><strong>Local approval thresholds</strong> for various obligation/allocation classes.</li>
+<li><strong>Bridge partner listings</strong> with public attribution; private overlays (per ADR-0020) hold the actual contact and authorization data.</li>
+<li><strong>Plain-language descriptions</strong> of what each obligation, allocation, or settlement instruction means to a member.</li>
+</ul>
+<h3>External bridge institutions own</h3>
+<ul>
+<li><strong>Actual day-currency execution</strong> through their existing rails.</li>
+<li><strong>Lending decisions</strong> and underwriting under their own authority.</li>
+<li><strong>Regulated custody</strong> of any funds in motion.</li>
+<li><strong>Legal / accounting duties</strong> under their jurisdiction.</li>
+<li><strong>External compliance</strong> — KYC, AML, BSA, SOC, or whatever applies to that institution.</li>
+</ul>
+<p>The meaning firewall holds: ICN never knows how a credit union processes an ACH; the credit union never knows what a <code>Mandate.authority_class</code> is. The bridge receipt is the only thing they share.</p>
+<h2>Organizer / operating body model</h2>
+<p>Organizer bodies are not informal helpers. They are governed operating bodies that can receive delegated authority for programs, events, projects, or other bounded efforts. Treating them as governed institutions — rather than as &quot;the volunteer crew&quot; — is what lets the cooperative substrate hold them accountable and protect them.</p>
+<p>An organizer body needs:</p>
+<ul>
+<li><strong>Scope</strong> — what it is authorized to do, in what entity, for what duration.</li>
+<li><strong>Mandate</strong> — a covering authority grant (per <a href="/docs/adr/ADR-0014-constitutional-object-model">ADR-0014</a>, <a href="/docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam">ADR-0019</a>) tying its actions back to a governing decision.</li>
+<li><strong>Budget / allocation authority</strong> — explicit ceilings on what obligations and allocations it may originate, and which classes it may issue settlement instructions for.</li>
+<li><strong>Roles</strong> — internal structure (coordinator, treasurer, facilitator, accessibility steward, etc.) with their own bounded authority.</li>
+<li><strong>Deliverables / milestones</strong> — what it agreed to produce, by when.</li>
+<li><strong>Receipts</strong> — for every settlement instruction it originates, the matching bridge receipt or counter-receipt, attached to the mandate.</li>
+<li><strong>Support-institution relationships</strong> — which fiscal sponsor, which credit union, which accountant it works through.</li>
+<li><strong>Conflict path</strong> — per <a href="/docs/adr/ADR-0029-conflict-resolution-object-model">ADR-0029</a> and the future RFC-0002, with explicit treatment of organizer overreach as a Shape-1 effect challenge.</li>
+<li><strong>Post-work accountability report</strong> — when scope ends, what was done, what was spent, what remains, what the next body inherits.</li>
+</ul>
+<p>Generic terms used in ICN core: <code>organizer body</code>, <code>operating body</code>, <code>program team</code>, <code>event lifecycle</code>, <code>program lifecycle</code>. NYCN-specific nouns (e.g., specific committee names) stay in NYCN&#39;s package.</p>
+<h2>Support institutions and technical assistance</h2>
+<p>Support institutions are bodies that provide cooperative-relevant services. They are not vendors in the SaaS / marketplace sense; they are institutional actors with service scopes, authority boundaries, receipts, and dispute paths.</p>
+<p>Examples of support-institution service scopes:</p>
+<ul>
+<li><strong>Co-op conversion support</strong> — guiding a worker-owned conversion through legal, governance, and financial steps.</li>
+<li><strong>Legal / accounting setup</strong> — entity formation, charter drafting, tax registration, ongoing books.</li>
+<li><strong>Facilitation</strong> — meeting design, deliberation support, decision-process stewardship.</li>
+<li><strong>Training</strong> — governance training, accessibility training, financial literacy for member-owners.</li>
+<li><strong>Governance support</strong> — committee design, charter amendment, conflict-resolution-process design.</li>
+<li><strong>Accessibility services</strong> — interpretation, captioning, document accessibility, deadline-justice planning.</li>
+<li><strong>Mediation / conflict support</strong> — per <a href="/docs/adr/ADR-0029-conflict-resolution-object-model">ADR-0029</a>.</li>
+<li><strong>Grant writing</strong> — proposal development, reporting, post-award compliance.</li>
+<li><strong>Design / communications</strong> — brand, public materials, member-facing surfaces.</li>
+<li><strong>IT / security</strong> — node operation, key custody, infrastructure stewardship.</li>
+<li><strong>Lending / loan packaging support</strong> — preparing applications to credit unions, CDFIs, cooperative lenders.</li>
+</ul>
+<p>Support institutions in ICN have:</p>
+<ul>
+<li>A declared <strong>service scope</strong> (what they do, what they don&#39;t).</li>
+<li>A bounded <strong>authority</strong> to act on behalf of the engaging institution (settlement instructions they may originate, signatures they may collect, decisions they may not unilaterally make).</li>
+<li>A <strong>service agreement</strong> (a charter-side document, not an ICN core type) recording the engagement.</li>
+<li><strong>Receipts</strong> for the work produced.</li>
+<li>A <strong>dispute path</strong> when service quality, scope, or accountability is contested.</li>
+</ul>
+<p>This RFC does not draft the service-agreement schema; that is RFC-0014 candidate territory.</p>
+<h2>Conflict / dispute path</h2>
+<p>Disputes about economic coordination route through the conflict resolution object model (<a href="/docs/adr/ADR-0029-conflict-resolution-object-model">ADR-0029</a>) once that model is implemented. Until then, the lifecycle here records what kinds of disputes are possible and how each maps:</p>
+<table>
+<thead>
+<tr>
+<th>Dispute</th>
+<th>Shape (per ADR-0029)</th>
+<th>Resolution direction</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Obligation challenge — &quot;I never agreed to this&quot;</td>
+<td>Effect challenge</td>
+<td>Counter-receipt voiding the obligation</td>
+</tr>
+<tr>
+<td>Allocation challenge — &quot;this allocation exceeded authority&quot;</td>
+<td>Effect challenge</td>
+<td>Counter-receipt reversing the allocation; possible authority-grant review</td>
+</tr>
+<tr>
+<td>External execution mismatch — &quot;the bridge institution did not do what we asked&quot;</td>
+<td>Effect challenge</td>
+<td>Counter-receipt; if systemic, Shape-2 process appeal against the bridge relationship</td>
+</tr>
+<tr>
+<td>Bridge partner failure (insolvency, refusal, regulatory action)</td>
+<td>Process appeal</td>
+<td>Governance review of the bridge relationship; contingency plan; replace partner</td>
+</tr>
+<tr>
+<td>Unauthorized settlement instruction — &quot;no covering mandate&quot;</td>
+<td>Process appeal</td>
+<td>Reversal; mandate audit; possible authority-grant revocation</td>
+</tr>
+<tr>
+<td>Organizer overreach — body acted beyond scope</td>
+<td>Effect challenge + relational conflict</td>
+<td>Counter-receipt for the unauthorized acts; relational conflict process for the body</td>
+</tr>
+<tr>
+<td>Support-institution service dispute</td>
+<td>Relational conflict</td>
+<td>Mediation per ADR-0029 Shape 3; service-agreement adjustment or termination</td>
+</tr>
+</tbody></table>
+<p>Reversal is always a counter-receipt — never a deletion. The institutional memory holds that a thing happened, was challenged, and was reversed. This is the audit-grade choice (per <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a>).</p>
+<h2>Accessibility implications</h2>
+<p>The economic surface is the most consequential member-facing surface, and the most likely to be opaque if not designed for accessibility from the start. Per <a href="/docs/adr/ADR-0028-accessibility-baseline-for-member-interfaces">ADR-0028</a> and the future RFC-0003:</p>
+<ul>
+<li><strong>Plain-language explanations</strong> of obligations and settlement instructions. A member must be able to read &quot;you owe a venue deposit of N units, authorized by the Tuesday meeting decision, executing through Credit Union X by Friday&quot; without parsing legal/financial vocabulary.</li>
+<li><strong>Member-readable receipts</strong>. Bridge receipts are not just for auditors. They render to a member with the transaction&#39;s plain-language summary, the authority chain, and the next step.</li>
+<li><strong>Low-bandwidth views</strong> for members on metered or limited connections.</li>
+<li><strong>Language / glossary support</strong> — the glossary endpoint (#1610) resolves &quot;obligation&quot;, &quot;allocation&quot;, &quot;settlement instruction&quot;, &quot;bridge receipt&quot; into the member&#39;s chosen language and reading level.</li>
+<li><strong>Deadline justice</strong> — settlement-instruction deadlines accommodate caregiving, shift-work, and timezone constraints. A 24-hour deadline is a structural exclusion of part of the membership.</li>
+<li><strong>No command-line requirement</strong>. Member-facing economic surfaces are non-CLI by default.</li>
+<li><strong>Assistance path</strong> for members who cannot interpret financial or legal documents — a designated support-institution role helps members understand what they are agreeing to before they confirm a settlement instruction.</li>
+</ul>
+<h2>Security / privacy implications</h2>
+<ul>
+<li><strong>Authority before settlement.</strong> Every settlement instruction must carry a mandate reference. Unauthorized settlement instructions are rejected at the schema boundary.</li>
+<li><strong>Bridge receipt verifiability.</strong> The bridge receipt envelope must support cryptographic verification of the bridge institution&#39;s signature, per <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/coordination/rfc_candidates.yaml">RFC-0008 candidate</a>.</li>
+<li><strong>Selective disclosure.</strong> A bridge receipt may reference an external transaction without disclosing the external counterparty&#39;s PII. The external system holds the sensitive data; the receipt holds the reference.</li>
+<li><strong>Real personal and financial data</strong> stays out of the public package and out of ICN core. Real DIDs bind through private overlays per <a href="/docs/adr/ADR-0020-institutional-bootstrap-activation-and-standing-read-model">ADR-0020</a>. External account numbers, routing data, and KYC artifacts stay in bridge institutions&#39; systems.</li>
+<li><strong>Replay protection</strong> for settlement instructions: each carries a unique id; bridge institutions reject duplicates by content-hash.</li>
+<li><strong>Bridge partner compromise</strong> is a conflict-of-shape Process appeal (ADR-0029 Shape 2). The substrate has no authority to override an external partner; it has authority to terminate the relationship and route around.</li>
+</ul>
+<h2>Compute / automation boundary</h2>
+<blockquote>
+<p><strong>Compute may advise; governance authorizes; mandates execute; receipts prove.</strong></p>
+</blockquote>
+<p>Compute, under <a href="/docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary">ADR-0030</a>:</p>
+<ul>
+<li><strong>May</strong>: calculate proposed allocations under a covering policy oracle, simulate budget impacts, summarize obligations for member readability, forecast settlement timing, validate settlement-instruction schema, flag risk patterns (over-budget, missing mandate, deadline slip, unfamiliar bridge partner).</li>
+<li><strong>May not</strong>: authorize an obligation, authorize an allocation, originate a settlement instruction, execute a bridge call, or forge a bridge receipt. Authority lives in mandates; execution lives in bridge institutions; both are governance acts, not compute acts.</li>
+</ul>
+<p>Determinism class is binding: a settlement instruction&#39;s amount, recipient, and authority chain are governance-grade and must be deterministic. Compute-produced advisory outputs (e.g., &quot;this is unusual relative to past patterns&quot;) are explicitly marked advisory.</p>
+<h2>Website / public truth implications</h2>
+<p>Per <a href="/docs/adr/ADR-0032-website-truth-boundary">ADR-0032</a> and <a href="/docs/adr/ADR-0033-public-maturity-claims-and-evidence-links">ADR-0033</a>:</p>
+<p>The public website may say:</p>
+<ul>
+<li>ICN is exploring resource-governance and external-settlement-bridge models.</li>
+<li>ICN models obligations and attestations, not payment rails.</li>
+<li>ICN does not claim to be a bank, currency, payment rail, lending platform, or convertibility engine.</li>
+</ul>
+<p>The public website may not say:</p>
+<ul>
+<li>That ICN settles funds, issues currency, processes payments, or holds custody.</li>
+<li>That obligations and allocations are equivalent to currency balances.</li>
+<li>That bridge receipts certify convertibility.</li>
+<li>That a specific institution package is a &quot;reference federation&quot; or names a specific institution. Generic framing only.</li>
+</ul>
+<p>Maturity-band claims for the economic subsystem must wait for accepted ADRs and implementation evidence (<code>partial</code>/<code>implemented</code>/<code>verified</code>). The current band is <code>advancing</code> for governed-social-accounting framing; the bridge layer is <code>not-yet</code>.</p>
+<h2>Migration / compatibility</h2>
+<ul>
+<li><strong>Existing CCL contracts</strong> that rely on the schema bridge (<a href="/docs/adr/ADR-0022-ccl-schema-bridge-and-constraint-compilation">ADR-0022</a>) continue to work. Obligation/allocation primitives extend the schema; they do not replace existing rule schemas.</li>
+<li><strong>Existing commons-credit settlement</strong> (<a href="/docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy">ADR-0031</a>) becomes a special case of the broader settlement primitive. Migration is additive; the existing balanced-journal-entry path remains correct.</li>
+<li><strong>Existing federation clearing</strong> (<a href="/docs/adr/ADR-0013-federation-clearing-adoption-contract">ADR-0013</a>) is a peer of the bridge model: cross-coop clearing is one kind of settlement, external bridge execution is another. Both produce receipts; both fit under <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a>.</li>
+<li><strong>Institution packages</strong> that already declare allocation templates extend them with bridge-partner references when those exist; absence of bridge partners is a valid configuration.</li>
+<li><strong>No breaking API changes</strong> in this RFC. Future ADRs may add new endpoints; they will be additive.</li>
+</ul>
+<h2>Open questions</h2>
+<ol>
+<li><strong>Settlement instruction envelope shape</strong>: what minimum fields, what optional, how does the envelope reference the external bridge institution unambiguously?</li>
+<li><strong>Bridge receipt envelope shape</strong>: what does the bridge institution sign? How is non-repudiation handled if the bridge institution disputes its own attestation later?</li>
+<li><strong>Multi-step bridge executions</strong>: when an action requires two bridge institutions in sequence (e.g., fiscal sponsor → credit union), does the substrate model that as one settlement instruction with multiple receipts, or a chain of instructions?</li>
+<li><strong>Conversion / loan-packaging support</strong>: how do cooperative lenders&#39; underwriting decisions show up — as a bridge receipt class, as a separate decision-receipt class, or both?</li>
+<li><strong>Currency reference</strong>: when a bridge receipt names &quot;$5000 USD&quot;, is that an annotation (external denomination) or a typed field? The RFC recommends an annotation only; the typed field would slide ICN into currency-as-primitive territory.</li>
+<li><strong>Bridge partner registry governance</strong>: how is a bridge partner added to or removed from a package? Charter amendment? Standing operating-body authority?</li>
+<li><strong>Settlement asset taxonomy</strong>: are settlement assets first-class typed objects or string identifiers? RFC recommends typed.</li>
+<li><strong>Position composition across bridges</strong>: can a single position aggregate obligations executed via multiple bridges? RFC recommends yes, with origin labeling per receipt.</li>
+<li><strong>Failure mode contracts</strong>: what does a bridge-institution-side failure look like to the substrate? Time-out, explicit-rejection, partial-execution — each needs a receipt class.</li>
+<li><strong>Conflict path interaction with RFC-0002</strong>: how does the obligation-challenge surface integrate with the conflict resolution object model when that lands?</li>
+</ol>
+<h2>Decision criteria</h2>
+<p>The project moves toward Option B when:</p>
+<ul>
+<li>The settlement-instruction and bridge-receipt envelope shapes are concrete enough to draft as ADRs.</li>
+<li>At least one realistic bridge institution (credit union, CDFI, or fiscal sponsor) has agreed in principle to receive settlement instructions and return receipts in the proposed shape.</li>
+<li>The conflict path (RFC-0002) has progressed to the point where bridge-execution disputes have a written resolution model.</li>
+<li>The accessibility baseline (RFC-0003) has been drafted enough that the bridge-receipt rendering contract can plug into it.</li>
+</ul>
+<p>The project moves toward Option A only if Option B&#39;s bridge-partner trust model proves untenable in practice. The project moves toward Option C only after explicit governance review acknowledging the regulatory and capture trade-offs.</p>
+<h2>Outcome</h2>
+<p>To be filled in when the RFC moves to <code>accepted</code> or <code>rejected</code>. Will name the chosen option and link to the follow-up ADRs.</p>
+<h2>Follow-up ADRs</h2>
+<p>If accepted, the RFC produces these ADRs (most are already in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/coordination/adr_candidates.yaml">`ops/coordination/adr_candidates.yaml`</a>):</p>
+<ul>
+<li>ADR — <strong>Obligation Lifecycle</strong>: states, transitions, authority requirements.</li>
+<li>ADR — <strong>Allocation Authorization Model</strong>: who may allocate, against which budget, under which mandate.</li>
+<li>ADR — <strong>Settlement and Position Semantics</strong>: how positions accumulate, how settlements zero them, how mutual-credit ceilings interact.</li>
+<li>ADR — <strong>External Settlement Bridge Boundary</strong>: the explicit ICN/bridge-institution boundary contract.</li>
+<li>ADR — <strong>Settlement Instruction Envelope</strong>: the schema for outgoing instructions.</li>
+<li>ADR — <strong>Bridge Receipt Envelope</strong>: the schema for returning receipts.</li>
+<li>ADR — <strong>Challenge and Reversal Path</strong>: counter-receipt lifecycle for obligations, allocations, settlements, bridge executions.</li>
+<li>ADR — <strong>Bridge Institution Role Model</strong>: typology of bridge institutions (credit union, CDFI, fiscal sponsor, etc.) and their authority profiles.</li>
+<li>ADR — <strong>Organizer / Operating Body Authority Model</strong>: the governance shape for operating bodies.</li>
+<li>ADR — <strong>Support Institution Service Agreement Model</strong>: the package-side schema for support engagements.</li>
+<li>ADR — <strong>Cooperative Lending and Conversion Support Model</strong>: the specific case of loan-packaging and conversion bridges.</li>
+<li>ADR — <strong>Regulatory-Safe Economic Vocabulary</strong>: the closed lexicon (use / avoid lists, with rationale).</li>
+</ul>
+<p>These map onto the candidate registry rows ADR-0044, 0045, 0046, 0047, 0048, 0041 in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/coordination/adr_candidates.yaml">`adr_candidates.yaml`</a>, plus several new candidates this RFC introduces (Bridge Institution Role Model, Organizer/Operating Body Authority Model, Support Institution Service Agreement Model, Bridge Receipt Envelope, Settlement Instruction Envelope).</p>
+<h2>Follow-up implementation issues</h2>
+<p>Likely to be opened after the RFC is accepted and ADRs land:</p>
+<ul>
+<li><code>schema(economics): obligation/allocation/settlement envelopes</code></li>
+<li><code>schema(economics): external settlement instruction</code></li>
+<li><code>schema(economics): bridge receipt</code></li>
+<li><code>docs(architecture): support institution role model</code></li>
+<li><code>docs(architecture): organizer/operating body model</code></li>
+<li><code>test(economics): settlement instruction cannot imply convertibility</code></li>
+<li><code>test(economics): bridge receipt round-trips through receipt envelope</code></li>
+<li><code>test(economics): challenge produces counter-receipt without state mutation</code></li>
+<li><code>feat(governance): mandate-gated settlement instruction origination</code></li>
+<li><code>website(public): public economic claims lint per ADR-0033</code></li>
+</ul>
+<h2>Validation / proof plan</h2>
+<p>Implementation status moves only when these are demonstrated:</p>
+<ul>
+<li><strong><code>partial</code></strong>: schemas defined; settlement instruction and bridge receipt envelopes parse; obligations and allocations have lifecycle handlers in <code>icn-ledger</code> or a new <code>icn-economics</code> crate; integration tests prove envelope round-trips.</li>
+<li><strong><code>implemented</code></strong>: at least one realistic bridge-institution flow operates end-to-end (e.g., a fiscal-sponsor stub returns a bridge receipt that ICN records and queries); challenge path produces counter-receipts without mutating originals; vocabulary lint passes (no <code>payment</code>/<code>currency</code>/<code>balance</code>/<code>wallet</code> in public surfaces).</li>
+<li><strong><code>verified</code></strong>: a deployed institution operates economic coordination through the substrate for a sustained period (≥ one quarter); audit replay reproduces every receipt; at least one challenge case has run to resolution; a cooperative lender has accepted a settlement instruction in production and returned a bridge receipt that closed the loop.</li>
+</ul>
+<p>The website maturity band moves from <code>not-yet</code> to <code>advancing</code> only at <code>partial</code>; from <code>advancing</code> to <code>maturing</code> only at <code>implemented</code>; from <code>maturing</code> to <code>strong</code> only at <code>verified</code> with public evidence.</p>
+<hr>
+<h2>Notes</h2>
+<ul>
+<li>For amendments during <code>draft</code> or <code>active</code>, edit in place and bump <code>updated</code>. Once <code>accepted</code>, prefer a successor RFC.</li>
+<li>This RFC is upstream of multiple ADRs. The economics tranche in <code>adr_candidates.yaml</code> (rows 0041, 0044–0048) should not be drafted until this RFC reaches <code>accepted</code>.</li>
+<li>This RFC introduces design space that may produce additional RFC candidates (RFC-0011 ICN project self-governance, RFC-0012 organizer/operating body model, RFC-0013 external bridge institutions, RFC-0014 technical assistance and cooperative conversion support). Those rows are added to <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/coordination/rfc_candidates.yaml">`rfc_candidates.yaml`</a>.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
