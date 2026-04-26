@@ -1,8 +1,23 @@
 # ADR-0001: Orchestration Plane Architecture (icn-ops)
 
 **Date**: 2026-02-19
-**Status**: accepted
+**Status**: superseded
+**Superseded by**: ADR-0017
 **Tags**: orchestration, mcp, multi-agent, cross-repo, state-management
+
+> **Update (2026-04-26):** the multi-repo physical topology described in
+> this ADR (separate `icn-ops/`, `icn-website/`, `icn/`) has been
+> superseded by monorepo consolidation. Website source, MCP
+> orchestration tooling, and ops state now live in the main ICN repo
+> under `website/`, `ops/mcp/`, and `ops/state/` respectively. See
+> [ADR-0017](ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries.md)
+> for the canonical roots.
+>
+> **Durable principle retained:** ICN needs an explicit orchestration /
+> state plane with hybrid state (live MCP + git-tracked durable state).
+> This ADR is the historical record of why that plane exists. The
+> *separate-repo* implementation form is what changed; the principle
+> did not. The body of this ADR is preserved as institutional memory.
 
 ## Context
 

@@ -2999,13 +2999,62 @@ owner = "matt"
 audiences = ["all"]
 
 [docs."docs/adr/ADR-0010-app-topology.md"]
+# DOC status is "living" — ADRs are institutional memory at their canonical
+# path even after the recorded DECISION is superseded. Decision lifecycle is
+# tracked inside the ADR frontmatter (status: superseded, superseded_by:
+# ADR-0017). See ADR-0018 for the lifecycle rules.
 category = "architecture"
 status = "living"
-title = "ADR-0010: App Topology"
-description = "Architectural decision record on app topology"
-last_updated = "2026-03-10"
+title = "ADR-0010: App Topology (decision superseded by ADR-0017)"
+description = "Architectural decision record on app topology — DECISION superseded by ADR-0017 (canonical-roots table); ADR file remains at canonical path as institutional memory."
+last_updated = "2026-04-26"
 owner = "matt"
 audiences = ["architects"]
+
+[docs."docs/adr/ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0017: Monorepo Consolidation with Explicit Internal Boundaries"
+description = "Canonical roots table for the consolidated monorepo: icn/, icn/apps/, apps/, website/, ops/mcp/, ops/state/, docs/, docs/adr/, deploy/, sdk/, web/. Decision supersedes ADR-0001 and ADR-0010; amends ADR-0002."
+last_updated = "2026-04-26"
+last_reviewed = "2026-04-26"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0018: ADR Lifecycle and Canonical Decision Index"
+description = "ADR lifecycle vocabulary (proposed/accepted/amended/superseded/deprecated), metadata convention (YAML frontmatter going forward, classic + bullet still supported), tooling contract for ops/mcp/src/tools/decisions.ts. Documents the docs/adr/ canonicalization landed in PR #1637."
+last_updated = "2026-04-26"
+last_reviewed = "2026-04-26"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/adr/ADR-0001-orchestration-plane-architecture.md"]
+# DOC status is "living" — ADRs stay at their canonical path even when the
+# DECISION has been superseded. Decision lifecycle is tracked in the ADR
+# frontmatter (status: superseded, superseded_by: ADR-0017).
+category = "architecture"
+status = "living"
+title = "ADR-0001: Orchestration Plane Architecture (decision superseded by ADR-0017)"
+description = "Original multi-repo orchestration-plane decision; physical layout DECISION superseded by ADR-0017, durable principle (explicit orchestration/state plane) retained. ADR remains as institutional memory at canonical path."
+last_updated = "2026-04-26"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/adr/ADR-0002-mcp-server-registration-via-mcp-json.md"]
+# DOC status is "living"; DECISION status is "amended" per the ADR
+# frontmatter and the amendment note in the body.
+category = "architecture"
+status = "living"
+title = "ADR-0002: MCP Server Registration via ~/.mcp.json (amended by ADR-0017)"
+description = "Registration mechanism unchanged; path moved from a separate icn-ops/ repo into ops/mcp/ in the main ICN repo (decision amended by ADR-0017)."
+last_updated = "2026-04-26"
+owner = "matt"
+audiences = ["developers"]
 
 [docs."docs/ci/GATE_RATCHET_PLAN.md"]
 category = "reference"
