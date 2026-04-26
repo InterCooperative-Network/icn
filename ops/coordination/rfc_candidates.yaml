@@ -43,18 +43,26 @@
 candidates:
 
   - id: "0001"
-    title: "Obligation / Allocation / Settlement Primitives"
-    status: candidate
+    title: "Obligation / Allocation / Settlement Primitives and External Settlement Bridges"
+    status: drafted
+    rfc_path: "docs/rfcs/RFC-0001-obligation-allocation-settlement-primitives.md"
     domain: economics
     why_it_matters: |
       ADR-0004 distinguishes obligations from payments. ICN ships a commons
       compute settlement engine (ADR-0005, ADR-0031) that produces balanced
       journal entries, and #1634 proposes formal obligation/allocation/
-      settlement primitives. The design space — what shape these primitives
-      take, what their lifecycles are, how challenges and reversals work — is
-      not yet fully written. Without an RFC, the resulting ADRs will be
-      shallow and the regulatory-safe vocabulary will be at risk.
-    related_adr_candidates: ["0044", "0045", "0046", "0047", "0048", "0041"]
+      settlement primitives. The design space has two simultaneous
+      realities: (1) ICN-native economic coordination (obligations,
+      allocations, settlements, units, positions, settlement assets,
+      receipts, challenge/reversal path), and (2) external settlement
+      bridges through which real institutions execute day-currency,
+      lending, and legal-financial actions today (credit unions,
+      cooperative lenders, CDFIs, fiscal sponsors, accountants, legal/co-op
+      developers, technical assistance firms, organizer/operating bodies).
+      Without an RFC the resulting ADRs would be shallow, the
+      regulatory-safe vocabulary would be at risk, and the bridge boundary
+      would erode into payment-rail framing.
+    related_adr_candidates: ["0044", "0045", "0046", "0047", "0048", "0041", "0026"]
     related_issues: ["#1634", "#1635"]
     design_questions:
       - "What are the canonical types: Obligation, Allocation, Settlement, Position, SettlementAsset?"
@@ -64,31 +72,59 @@ candidates:
       - "How do positions accumulate; how are they zeroed by settlement; how do mutual-credit ceilings interact with allocations?"
       - "What does cross-coop clearing look like at the settlement primitive level (extends ADR-0013)?"
       - "What is the boundary between treasury authority, patronage accounts, and commons pool settlement (ADR-0031)?"
-    icn_runtime_surface: "icn-ledger; icn-federation clearing path; future obligation/allocation actor; potential new icn-economics crate"
-    package_or_institution_expression: "Packages declare allocation templates and obligation kinds; ICN owns the lifecycle and settlement primitives."
+      - "What is the SettlementInstruction envelope shape — how does ICN address an external bridge institution unambiguously?"
+      - "What is the BridgeReceipt envelope shape — what does the bridge institution sign; how is non-repudiation handled?"
+      - "How does the substrate avoid implying convertibility between cooperative units and external currency?"
+      - "How are credit unions, cooperative lenders, CDFIs, fiscal sponsors, public/community banks modeled as bridge institution roles?"
+      - "How are accountants, bookkeepers, legal/co-op developers, technical assistance firms modeled as support institutions?"
+      - "How is an organizer body or operating body modeled as a governed institutional actor with mandate, scope, budget authority, and accountability?"
+      - "How do conversion loans and loan-packaging support fit into the bridge model?"
+      - "What failure modes for bridge institutions does the substrate handle (timeout, explicit-rejection, partial-execution, partner exit)?"
+      - "What is the bridge partner registry governance — charter amendment vs operating-body authority?"
+    icn_runtime_surface: "icn-ledger; icn-federation clearing path; future obligation/allocation actor; potential new icn-economics crate; settlement instruction + bridge receipt envelopes plugging into ADR-0026"
+    package_or_institution_expression: |
+      Packages declare allocation templates, obligation kinds, support
+      institution definitions, organizer body roles, local approval
+      thresholds, and bridge partner listings. ICN owns the lifecycle,
+      settlement instruction envelope, bridge receipt envelope, and
+      challenge/reversal lifecycle.
     accessibility_implications: |
-      Obligation and allocation surfaces must render in plain language and not
-      look like a bank statement. Members must be able to see what they owe,
-      what they are owed, and what is pending — without payment-rail metaphors
-      that obscure the cooperative accounting model.
+      Obligation and allocation surfaces must render in plain language and
+      not look like a bank statement. Members must be able to see what they
+      owe, what they are owed, what is pending, and what is being executed
+      through which bridge institution — without payment-rail metaphors
+      that obscure the cooperative accounting model. Bridge receipts must
+      render to members with plain-language summaries, the authority chain,
+      and the next step. Deadlines on settlement instructions must
+      accommodate caregiving, shift-work, and timezone constraints.
     conflict_or_dispute_path: |
-      Settlement disputes route through the conflict resolution object model
-      (ADR-0029 / RFC-0002). The RFC must specify whether challenges produce
-      counter-effects, reversals, or repair agreements, and how authority
-      grants for these flow.
+      Settlement disputes route through the conflict resolution object
+      model (ADR-0029 / RFC-0002). The RFC enumerates dispute classes:
+      obligation challenge, allocation challenge, external execution
+      mismatch, bridge partner failure, unauthorized settlement
+      instruction, organizer overreach, support-institution service
+      dispute. Reversal is always a counter-receipt, never a deletion.
     compute_or_automation_boundary: |
-      Compute may compute proposed allocations under a covering mandate;
-      compute may not finalize settlement without authority. Settlement is
-      governance-grade; advisory output is allowed but cannot move positions.
+      "Compute may advise; governance authorizes; mandates execute;
+      receipts prove." Compute may calculate proposed allocations,
+      simulate budget impacts, summarize obligations, forecast settlement
+      timing, validate envelope schemas, and flag risk patterns. Compute
+      may NOT authorize obligations, allocations, settlements, or bridge
+      execution. Settlement-instruction amount, recipient, and authority
+      chain are governance-grade and must be deterministic.
     website_truth_implication: |
-      Once the RFC is accepted and the primitives ship, the website may say
-      "ICN models obligations and allocations with explicit lifecycles" and
-      cite the ADRs. Until then, public claims must remain at "obligations,
-      not payments" framing without claiming a complete primitive surface.
+      Once accepted and primitives ship, the website may say "ICN models
+      obligations and attestations, not payment rails" and "ICN is
+      exploring external-settlement-bridge models." The website may NOT
+      say ICN settles funds, issues currency, processes payments, or holds
+      custody, and may NOT name specific institution packages as
+      "reference federations."
     proposed_outputs:
-      - "ADR(s) for obligation lifecycle, allocation authorization, settlement/position semantics, challenge/reversal path"
-      - "Issues for primitive type definitions, lifecycle handlers, settlement integration, ledger journal extensions"
-      - "Validation: integration tests proving lifecycle invariants and challenge paths"
+      - "ADRs for obligation lifecycle, allocation authorization, settlement/position semantics, challenge/reversal path"
+      - "ADRs for external settlement bridge boundary, settlement instruction envelope, bridge receipt envelope"
+      - "ADRs for bridge institution role model, organizer/operating body authority model, support institution service agreement model, cooperative lending and conversion support model, regulatory-safe economic vocabulary"
+      - "Issues for primitive type definitions, settlement instruction schema, bridge receipt schema, lifecycle handlers, settlement integration, ledger journal extensions, vocabulary lint"
+      - "Validation: integration tests proving lifecycle invariants, challenge paths, bridge receipt round-trip, and that settlement instructions cannot imply convertibility"
     priority: now
 
   - id: "0002"
@@ -512,4 +548,231 @@ candidates:
     proposed_outputs:
       - "ADR amendments / successors to 0032 and 0033 with finalized evidence schema, linter contract"
       - "Issues for linter implementation, MaturityBadge component schema update, existing usage backfill, live roadmap rendering (#1369)"
+    priority: soon
+
+  # ─────────────────────────────────────────────────────────────────────
+  # New candidates introduced by RFC-0001 (Obligation / Allocation /
+  # Settlement Primitives and External Settlement Bridges). These split
+  # off design spaces that RFC-0001 references but does not itself resolve.
+  # ─────────────────────────────────────────────────────────────────────
+
+  - id: "0011"
+    title: "ICN Project Self-Governance and GitHub Adapter Model"
+    status: candidate
+    domain: project-governance
+    why_it_matters: |
+      ICN's stated long-term direction is to govern its own project
+      development as an ICN institution — using the same charter,
+      mandate, allocation, and receipt primitives that other institutions
+      use. Today the project runs through GitHub, which is the right
+      adapter for now (issues, PRs, reviews, CI) but should not become
+      the constitution. RFC-0009 (Project Governance and ADR/RFC
+      Acceptance) covers acceptance process; this RFC covers the
+      transition path: GitHub as adapter first, ICN-hosted governance
+      later, and the dogfooding pattern between them. Without a written
+      direction the project drifts into "GitHub IS the governance" by
+      default.
+    related_adr_candidates: ["0063", "0064", "0065", "0066", "0067", "0068"]
+    related_issues: []
+    design_questions:
+      - "What is the GitHub adapter contract — which GitHub primitives map to which ICN primitives (issue → mandate? PR → effect record? review → attestation?)?"
+      - "What is the transition path from GitHub-as-source-of-truth to ICN-hosted governance dogfooding?"
+      - "How does ICN's own institution package look, and what does its charter say about the project's own governance?"
+      - "How are maintainer and steward authority modeled as ICN authority grants (per ADR-0019) instead of GitHub permissions?"
+      - "How do RFC and ADR acceptance decisions become governance proofs in the project's own ICN domain?"
+      - "What is the security/emergency-patch path that does not depend on GitHub admin authority alone?"
+      - "How does release authority dogfood the same primitives an institution release would use?"
+      - "What stays on GitHub permanently (CI, code hosting, contributor onboarding) vs migrates to ICN-native (governance acts, receipts, audit)?"
+    icn_runtime_surface: "doctrinal initially; later ICN's own institution package + a GitHub adapter actor or service"
+    package_or_institution_expression: "ICN itself becomes an institution package once primitives stabilize."
+    accessibility_implications: |
+      Project governance must itself meet the accessibility floor
+      (RFC-0003). Non-CLI participation, plain-language process docs,
+      deadline justice for contributors with caregiving or wage
+      constraints, and explicit non-GitHub paths for participation are
+      required.
+    conflict_or_dispute_path: |
+      Project disputes (contested RFC outcomes, contributor conflicts,
+      maintainer overreach) route through the conflict resolution
+      object model (ADR-0029 / RFC-0002) once the project dogfoods
+      ICN-native governance. Until then, disputes are informal; the RFC
+      must design the transition.
+    compute_or_automation_boundary: |
+      Project automation (CI checks, build-time linters per ADR-0033,
+      drift checks) operates under mandate from the project's own
+      governance. Compute does not decide RFC outcomes, ADR acceptance,
+      releases, or emergency patches.
+    website_truth_implication: |
+      Once accepted and the transition path is documented, the site can
+      describe ICN's own governance with the same maturity-band
+      discipline applied to other subsystems. Until then, project
+      governance is informal and the public framing should reflect that.
+      Key claim to avoid: that ICN governs itself today using ICN
+      primitives.
+    proposed_outputs:
+      - "ADRs for ICN project institution package, GitHub adapter contract, transition path, dogfooding milestones"
+      - "Issues for governance-as-code dogfooding (mandate-recorded merges, receipt-attached releases, etc.)"
+      - "Reference RFC-0009 (Project Governance and ADR/RFC Acceptance)"
+    priority: later
+
+  - id: "0012"
+    title: "Organizer / Operating Body Model"
+    status: candidate
+    domain: governance
+    why_it_matters: |
+      RFC-0001 introduces organizer bodies and operating bodies as
+      governed institutional actors with mandate, scope, budget
+      authority, deliverables, receipts, and accountability — distinct
+      from informal volunteer groups. The detailed authority model needs
+      its own RFC because it touches authority grants (ADR-0019),
+      mandates (ADR-0014), effect records (ADR-0025), and program/event
+      lifecycles. The pattern is general: any cooperative running
+      programs, events, or projects needs a way to delegate authority to
+      a body that operates under bounded scope.
+    related_adr_candidates: ["0014", "0019", "0025", "0050"]
+    related_issues: []
+    design_questions:
+      - "What is the canonical 'operating body' type — how is its scope expressed (entity / structure / activity / time-bounded)?"
+      - "What is the budget-authority model — ceiling per allocation class, ceiling per bridge, both?"
+      - "What internal roles does an operating body have (coordinator, treasurer, facilitator, accessibility steward, etc.)?"
+      - "What is the deliverables/milestones contract, and how does completion produce an effect record?"
+      - "How do post-work accountability reports work? Are they a required effect record at scope close?"
+      - "What is the conflict path for organizer overreach (effect challenge + relational conflict per ADR-0029)?"
+      - "How do operating bodies interact with support institutions (RFC-0014 cross-link)?"
+      - "What is the inheritance pattern — when an operating body's scope ends, how does work transfer to a successor body?"
+    icn_runtime_surface: "icn-governance authority/mandate layer; potential extensions to entity/structure types in icn-entity; effect record kinds (ADR-0025)"
+    package_or_institution_expression: |
+      Packages declare operating-body templates (e.g., 'event team',
+      'program coordinator group', 'transition committee'). ICN owns the
+      authority/mandate primitive and the lifecycle.
+    accessibility_implications: |
+      Operating bodies often produce member-facing artifacts (event
+      logistics, program calendars, accessibility-service coordination).
+      The RFC must specify how those artifacts inherit the accessibility
+      baseline (RFC-0003).
+    conflict_or_dispute_path: |
+      Organizer overreach is an effect challenge (ADR-0029 Shape 1) for
+      unauthorized acts plus a relational conflict (ADR-0029 Shape 3) for
+      the body itself. The RFC specifies the dual-shape resolution.
+    compute_or_automation_boundary: |
+      Compute may calculate budget consumption, milestone progress, and
+      forecast scope completion under a covering policy oracle. Compute
+      may not authorize a body's actions, originate settlement
+      instructions on its behalf, or extend its scope.
+    website_truth_implication: |
+      Once accepted, the website may describe operating bodies as a
+      first-class governance pattern. Specific institution names are not
+      surfaced publicly; generic 'organizer body' / 'operating body' /
+      'program team' terms only.
+    proposed_outputs:
+      - "ADR for organizer/operating body authority model (RFC-0001 follow-up)"
+      - "ADR for program/event lifecycle and post-work accountability"
+      - "Issues for operating-body type definitions, mandate-binding integration, accountability-report effect record"
+    priority: soon
+
+  - id: "0013"
+    title: "External Settlement Bridge Institutions"
+    status: candidate
+    domain: economics
+    why_it_matters: |
+      RFC-0001 introduces external settlement bridge institutions as the
+      execution layer for day-currency, lending, and legal-financial
+      actions: credit unions, cooperative lenders, CDFIs, fiscal
+      sponsors, public/community banks (where applicable), accountants,
+      bookkeepers, legal/co-op developers. The detailed role model — how
+      ICN recognizes a bridge institution, how authority flows, how
+      bridge receipts are validated, how a bridge partner is added or
+      removed from a package — is its own RFC.
+    related_adr_candidates: ["0044", "0045", "0046", "0047", "0048"]
+    related_issues: ["#1635"]
+    design_questions:
+      - "What is the bridge institution role model — how do credit unions, CDFIs, fiscal sponsors, lenders differ in their authority profiles?"
+      - "What is the bridge receipt verification model — what does the bridge sign; how is non-repudiation handled?"
+      - "How is a bridge institution added to a package? Charter amendment, standing operating-body authority, or both?"
+      - "How is a bridge institution removed (e.g., insolvency, regulatory action, partnership end)? What happens to in-flight settlement instructions?"
+      - "What is the multi-step bridge flow contract — when an action requires two bridges in sequence (fiscal sponsor → credit union)?"
+      - "How does the settlement-instruction envelope reference an external transaction without disclosing PII?"
+      - "How do bridge institutions handle counter-receipts when ICN issues a reversal?"
+      - "What is the cooperative-lending and conversion-support flow specifically — how do underwriting decisions appear in receipts?"
+    icn_runtime_surface: "Future: bridge institution registry; settlement instruction envelope plugging into ADR-0026; receipt store extension"
+    package_or_institution_expression: |
+      Packages list recognized bridge institutions with public attribution;
+      private overlays (per ADR-0020) hold contact and authorization data.
+      ICN owns the settlement-instruction and bridge-receipt envelopes.
+    accessibility_implications: |
+      Bridge receipts must render to members in plain language with the
+      authority chain visible. Settlement-instruction deadlines must
+      respect deadline justice (RFC-0003).
+    conflict_or_dispute_path: |
+      External execution mismatch and bridge partner failure are
+      enumerated dispute classes in RFC-0001. Resolution routes through
+      ADR-0029 / RFC-0002 once those land.
+    compute_or_automation_boundary: |
+      Compute may flag risk patterns (unusual settlement instruction,
+      unfamiliar bridge partner, deadline slip) under a covering policy
+      oracle. Compute may not originate settlement instructions or
+      forge bridge receipts.
+    website_truth_implication: |
+      Public framing remains 'ICN is exploring external-settlement-bridge
+      models' until accepted ADRs and implementation evidence support
+      stronger claims.
+    proposed_outputs:
+      - "ADR for bridge institution role model"
+      - "ADR for settlement instruction envelope"
+      - "ADR for bridge receipt envelope"
+      - "ADR for cooperative lending and conversion support model"
+      - "Issues for bridge institution type definitions, registry, receipt verification path"
+    priority: soon
+
+  - id: "0014"
+    title: "Technical Assistance and Cooperative Conversion Support"
+    status: candidate
+    domain: package
+    why_it_matters: |
+      RFC-0001 introduces support institutions as institutional actors —
+      not vendors — that provide cooperative-relevant services
+      (conversion support, legal/accounting setup, facilitation, training,
+      governance support, accessibility services, mediation, grant
+      writing, design/communications, IT/security, lending packaging
+      support). The service-agreement schema, authority boundaries, and
+      dispute paths need their own RFC. This is what lets the cooperative
+      ecosystem extend the substrate without dissolving its institutional
+      character.
+    related_adr_candidates: ["0024", "0050", "0029"]
+    related_issues: ["#1635"]
+    design_questions:
+      - "What is the canonical 'support institution' type? How does it differ from an operating body?"
+      - "What is the service-agreement schema — declared service scope, authority boundaries, deliverables, receipts, dispute path?"
+      - "How does a support institution receive a mandate from the engaging cooperative without becoming an operating body?"
+      - "How are receipts produced for support work (training delivered, document drafted, mediation completed, conversion stage closed)?"
+      - "How does cooperative conversion support specifically work — multi-stage engagement, governance-during-conversion, lender coordination?"
+      - "How are service disputes routed (relational conflict per ADR-0029 Shape 3, or service-agreement-specific path)?"
+      - "How do support institutions interact with bridge institutions (RFC-0013 cross-link) when their work intersects?"
+    icn_runtime_surface: "Future: support institution registry; service agreement schema (package-side); receipt extension for service work"
+    package_or_institution_expression: |
+      Packages declare recognized support institutions with service
+      scopes. Service-agreement documents are package-side artifacts.
+      ICN owns the receipt envelope and the conflict path.
+    accessibility_implications: |
+      Support institutions are often the path through which members
+      access institutional capacity — interpretation, accessibility
+      services, accommodation planning. The RFC must specify how
+      support-institution work itself meets the baseline.
+    conflict_or_dispute_path: |
+      Service disputes route as relational conflicts (ADR-0029 Shape 3)
+      with mediation-first defaults, escalating to service-agreement
+      adjustment or termination. Severe cases (service-institution
+      misrepresentation, retaliation) escalate further.
+    compute_or_automation_boundary: |
+      Compute may track service-engagement progress, milestone
+      completion, and budget consumption under a covering oracle.
+      Compute does not decide service quality or terminate engagements.
+    website_truth_implication: |
+      Public framing names support institutions as a recognized
+      institutional category, distinct from vendors. No specific support
+      institution is publicly named on the ICN site.
+    proposed_outputs:
+      - "ADR for support institution service agreement model"
+      - "ADR for cooperative conversion support multi-stage flow"
+      - "Issues for support-institution type definitions, service-agreement schema, receipt extension"
     priority: soon
