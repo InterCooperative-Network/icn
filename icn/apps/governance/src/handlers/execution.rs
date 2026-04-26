@@ -381,7 +381,9 @@ pub fn translate_payload_to_effects(
         },
 
         // Federation proposals
-        ProposalPayload::Federation(fed_proposal) => translate_federation_proposal(fed_proposal),
+        ProposalPayload::Federation(fed_proposal) => {
+            translate_federation_proposal(fed_proposal, domain_id)
+        }
 
         // Resource access proposals
         ProposalPayload::ResourceAccess {
@@ -608,9 +610,19 @@ fn translate_membership_action(
     }
 }
 
-/// Translate federation proposals to kernel effects
+/// Translate federation proposals to kernel effects.
+///
+/// `domain_id` is the governance domain that decided the proposal — i.e. the
+/// deciding cooperative's DID. It populates the deciding-coop side of every
+/// federation effect (`coop_a_did` for clearing establishment, `coop_did` for
+/// federation membership changes, `voucher_did` / `revoker_did` for
+/// vouches, `initiating_coop_did` for clearing termination). Passing
+/// `String::new()` here was the long-standing bug that ADR-0013 listed as an
+/// open item and that fix(governance) #1644 closes for the `EstablishClearing`
+/// case; the other five sites share one plumbing fix.
 fn translate_federation_proposal(
     proposal: &icn_governance::FederationProposal,
+    domain_id: &str,
 ) -> Result<Vec<KernelEffect>, TranslationError> {
     use icn_governance::FederationProposal;
 
@@ -618,7 +630,7 @@ fn translate_federation_proposal(
         FederationProposal::JoinFederation { federation_id, .. } => {
             Ok(vec![KernelEffect::Federation(
                 FederationEffect::JoinFederation {
-                    coop_did: String::new(),
+                    coop_did: domain_id.to_string(),
                     federation_id: federation_id.clone(),
                 },
             )])
@@ -626,7 +638,7 @@ fn translate_federation_proposal(
         FederationProposal::LeaveFederation { federation_id, .. } => {
             Ok(vec![KernelEffect::Federation(
                 FederationEffect::LeaveFederation {
-                    coop_did: String::new(),
+                    coop_did: domain_id.to_string(),
                     federation_id: federation_id.clone(),
                 },
             )])
@@ -639,7 +651,7 @@ fn translate_federation_proposal(
             ..
         } => Ok(vec![KernelEffect::Federation(
             FederationEffect::EstablishClearing {
-                coop_a_did: String::new(),
+                coop_a_did: domain_id.to_string(),
                 coop_b_did: partner_coop_did.to_string(),
                 agreement_hash: String::new(),
                 settlement_interval: Some(
@@ -659,7 +671,7 @@ fn translate_federation_proposal(
             target_coop_did, ..
         } => Ok(vec![KernelEffect::Federation(
             FederationEffect::VouchForCoop {
-                voucher_did: String::new(),
+                voucher_did: domain_id.to_string(),
                 vouchee_did: target_coop_did.to_string(),
                 attestation_hash: String::new(),
             },
@@ -669,7 +681,7 @@ fn translate_federation_proposal(
             reason,
         } => Ok(vec![KernelEffect::Federation(
             FederationEffect::TerminateClearing {
-                initiating_coop_did: String::new(),
+                initiating_coop_did: domain_id.to_string(),
                 partner_coop_did: partner_coop_id.clone(),
                 reason: reason.clone(),
             },
@@ -679,7 +691,7 @@ fn translate_federation_proposal(
             reason,
         } => Ok(vec![KernelEffect::Federation(
             FederationEffect::RevokeVouch {
-                revoker_did: String::new(),
+                revoker_did: domain_id.to_string(),
                 target_coop_did: target_coop_id.clone(),
                 reason: reason.clone(),
             },
@@ -1128,11 +1140,15 @@ mod tests {
         match &effects[0] {
             KernelEffect::Federation(
                 icn_kernel_api::effects::FederationEffect::TerminateClearing {
-                    initiating_coop_did: _,
+                    initiating_coop_did,
                     partner_coop_did,
                     reason,
                 },
             ) => {
+                assert_eq!(
+                    initiating_coop_did, "coop-alpha",
+                    "initiating_coop_did must be the deciding domain, not empty"
+                );
                 assert_eq!(partner_coop_did, "coop-beta");
                 assert_eq!(reason, "persistent imbalance violations");
             }
@@ -1154,14 +1170,75 @@ mod tests {
         assert_eq!(effects.len(), 1);
         match &effects[0] {
             KernelEffect::Federation(icn_kernel_api::effects::FederationEffect::RevokeVouch {
-                revoker_did: _,
+                revoker_did,
                 target_coop_did,
                 reason,
             }) => {
+                assert_eq!(
+                    revoker_did, "coop-alpha",
+                    "revoker_did must be the deciding domain, not empty"
+                );
                 assert_eq!(target_coop_did, "coop-gamma");
                 assert_eq!(reason, "governance misconduct");
             }
             other => panic!("expected RevokeVouch effect, got {other:?}"),
+        }
+    }
+
+    /// Regression test for ADR-0013 / icn#1644.
+    ///
+    /// Before the fix, `translate_federation_proposal` did not receive the
+    /// deciding domain and produced `coop_a_did: String::new()` for every
+    /// `EstablishClearing` effect, corrupting the caller-identity invariant
+    /// for governance-adopted clearing agreements. This test pins the new
+    /// behavior: `coop_a_did` must equal the deciding governance domain.
+    #[test]
+    fn test_translate_establish_clearing_populates_coop_a_did() {
+        let partner_did = icn_identity::Did::from_anchor_id(&[0x42; 32]);
+        let expected_partner = partner_did.to_string();
+        let payload = icn_governance::ProposalPayload::Federation(
+            icn_governance::FederationProposal::EstablishClearing {
+                partner_coop_id: "coop-beta".to_string(),
+                partner_coop_did: partner_did.clone(),
+                max_imbalance: 1000,
+                settlement_interval: icn_federation::SettlementInterval::Weekly,
+                currency: "HOURS".to_string(),
+                source_agreement_id: Some("agreement-direct-1".to_string()),
+            },
+        );
+        let effects =
+            translate_payload_to_effects(&payload, "receipt-ec-1", "hash-ec-1", "coop-alpha")
+                .expect("EstablishClearing should translate");
+        assert_eq!(effects.len(), 1);
+        match &effects[0] {
+            KernelEffect::Federation(
+                icn_kernel_api::effects::FederationEffect::EstablishClearing {
+                    coop_a_did,
+                    coop_b_did,
+                    settlement_interval,
+                    max_imbalance,
+                    source_agreement_id,
+                    ..
+                },
+            ) => {
+                assert!(
+                    !coop_a_did.is_empty(),
+                    "coop_a_did must not be empty (ADR-0013 / icn#1644)"
+                );
+                assert_eq!(
+                    coop_a_did, "coop-alpha",
+                    "coop_a_did must equal the deciding governance domain"
+                );
+                assert_eq!(coop_b_did, &expected_partner);
+                assert_eq!(settlement_interval.as_deref(), Some("weekly"));
+                assert_eq!(*max_imbalance, Some(1000));
+                assert_eq!(
+                    source_agreement_id.as_deref(),
+                    Some("agreement-direct-1"),
+                    "source_agreement_id should round-trip to label adopted clearing"
+                );
+            }
+            other => panic!("expected EstablishClearing effect, got {other:?}"),
         }
     }
 }
