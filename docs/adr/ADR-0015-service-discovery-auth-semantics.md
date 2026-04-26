@@ -1,9 +1,10 @@
-# ADR-0009: Service Discovery Auth Semantics — Auth-gated with Enumeration-Safe 404
+# ADR-0015: Service Discovery Auth Semantics — Auth-gated with Enumeration-Safe 404
 
 **Date**: 2026-03-21
 **Status**: accepted
 **Tags**: gateway, api, security, service-discovery
 **Supersedes**: N/A
+**Note**: Originally filed as ADR-0009 in `ops/state/decisions/` (collided with another decision sharing that number). Renumbered to 0015 when ADRs were canonicalized under `docs/adr/`.
 
 ## Context
 

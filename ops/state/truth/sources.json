@@ -29,9 +29,9 @@
       "description": "All available skills, their canonical paths, and ownership"
     },
     "adr_decisions": {
-      "owner": "ops/state/decisions/",
+      "owner": "docs/adr/",
       "stability": "slow-changing",
-      "description": "Architecture Decision Records. Never delete; use status: superseded."
+      "description": "Architecture Decision Records. Canonical under docs/adr/. Naming: ADR-NNNN-kebab-case-title.md. Never delete; use status: superseded."
     },
     "cluster_topology": {
       "owner": "ops/state/config/repo-map.json#infrastructure",

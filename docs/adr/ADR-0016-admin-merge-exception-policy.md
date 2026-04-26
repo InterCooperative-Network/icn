@@ -1,8 +1,9 @@
-# ADR-0010: Admin Merge Exception Policy for GitHub Runner Pool Saturation
+# ADR-0016: Admin Merge Exception Policy for GitHub Runner Pool Saturation
 
 **Date**: 2026-03-23
 **Status**: accepted
 **Tags**: ci, governance, deployment
+**Note**: Originally filed as ADR-0010 in `ops/state/decisions/` (collided with `ADR-0010-app-topology` in `docs/adr/`). Renumbered to 0016 when ADRs were canonicalized under `docs/adr/`.
 
 ## Context
 
