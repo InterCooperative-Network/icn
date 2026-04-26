@@ -776,6 +776,21 @@ depends_on = ["docs/architecture/KERNEL_APP_SEPARATION.md", "docs/strategy/ADR-0
 recommended_action = "keep"
 freshness = "current"
 
+[docs."docs/architecture/INSTITUTIONAL_FEEDBACK_AND_SUPPORT_PRIMITIVES.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+canonical = "yes"
+title = "Institutional Feedback and Support Primitives"
+description = "Doctrine for institutional feedback, member signals, governed indicators, action cards, temporary authority, resource governance, and support programs as planned ICN primitives"
+last_updated = "2026-04-25"
+last_reviewed = "2026-04-25"
+owner = "matt"
+audiences = ["developers", "architects"]
+depends_on = ["docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/architecture/KERNEL_APP_SEPARATION.md"]
+recommended_action = "keep"
+freshness = "current"
+
 [docs."docs/architecture/KERNEL_APP_SEPARATION.md"]
 category = "architecture"
 status = "living"
