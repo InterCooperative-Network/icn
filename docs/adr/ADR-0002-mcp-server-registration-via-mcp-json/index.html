@@ -40,8 +40,23 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ADR-0002: MCP Server Registration via ~/.mcp.json</h1>
 <p><strong>Date</strong>: 2026-02-19
-<strong>Status</strong>: accepted
+<strong>Status</strong>: amended
+<strong>Amended by</strong>: ADR-0017
 <strong>Tags</strong>: mcp, claude-code, setup</p>
+<blockquote>
+<p><strong>Amendment (2026-04-26):</strong> the registration mechanism described
+here remains correct — MCP servers are still registered in
+<code>~/.mcp.json</code> (user scope) or <code>.mcp.json</code> (project scope), with
+<code>enableAllProjectMcpServers: true</code> in <code>~/.claude/settings.json</code>.</p>
+<p>What changed is the path. MCP source is no longer in a separate
+<code>icn-ops/</code> repo; it lives in the main ICN repo under <code>ops/mcp/</code>.
+The <code>dist/</code> build path that <code>~/.mcp.json</code> references has moved
+accordingly. ADRs are canonical under <code>docs/adr/</code>, not under
+<code>ops/state/decisions/</code> (see <a href="https://github.com/InterCooperative-Network/icn/blob/main/ADR-0018-adr-lifecycle-and-canonical-decision-index">ADR-0018</a>).
+The decision recorded here is unchanged; its addresses are
+updated. See <a href="https://github.com/InterCooperative-Network/icn/blob/main/ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries">ADR-0017</a>
+for the canonical layout.</p>
+</blockquote>
 <h2>Context</h2>
 <p>Claude Code&#39;s ~/.claude/settings.json schema does not accept a top-level mcpServers field. MCP servers must be registered in ~/.mcp.json (user scope) or .mcp.json (project scope), with enableAllProjectMcpServers: true to auto-approve them.</p>
 <h2>Decision</h2>

@@ -1,0 +1,251 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0018: ADR Lifecycle and Canonical Decision Index | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0018 adr lifecycle and canonical decision index</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<p>id: &quot;0018&quot;
+title: &quot;ADR Lifecycle and Canonical Decision Index&quot;
+status: &quot;accepted&quot;
+date: &quot;2026-04-26&quot;
+deciders: [&quot;Matt Faherty&quot;]
+tags: [&quot;adr&quot;, &quot;process&quot;, &quot;decisions&quot;, &quot;documentation&quot;, &quot;tooling&quot;, &quot;lifecycle&quot;]
+supersedes: []
+superseded_by: []
+amends: []
+implementation_status: &quot;implemented (tooling: ops/mcp/src/tools/decisions.ts; canonical location: docs/adr/, established by PR #1637)&quot;
+references:</p>
+<ul>
+<li>&quot;ADR-0017 (Monorepo Consolidation)&quot;</li>
+<li>&quot;PR #1637 (ADR canonicalization under docs/adr/)&quot;</li>
+<li>&quot;docs/adr/template.md&quot;</li>
+</ul>
+<hr>
+<h1>ADR 0018: ADR Lifecycle and Canonical Decision Index</h1>
+<h2>Status</h2>
+<p><strong>Accepted (2026-04-26).</strong> Establishes the lifecycle vocabulary, metadata convention, and tooling contract for ICN ADRs. PR #1637 already moved the canonical location to <code>docs/adr/</code>; this ADR records the conventions that location follows.</p>
+<h2>Context</h2>
+<p>ICN&#39;s ADRs grew up across two physical locations (<code>docs/adr/</code> and the now-retired <code>ops/state/decisions/</code>) with three different metadata styles:</p>
+<ul>
+<li><strong>Classic markdown</strong>: <code>**Date**</code>, <code>**Status**</code>, <code>**Tags**</code> as bold labels (ADR-0001 through ADR-0009, 0011, 0015, 0016).</li>
+<li><strong>YAML frontmatter</strong>: <code>---</code> block at the top with <code>id</code>, <code>title</code>, <code>status</code>, <code>date</code>, etc. (ADR-0012, 0013, 0014).</li>
+<li><strong>Bullet list</strong>: <code>- Status: Proposed</code>, <code>- Date: ...</code> (ADR-0010).</li>
+</ul>
+<p>The MCP indexer in <code>ops/mcp/src/tools/decisions.ts</code> recognizes only the classic format. ADRs in the other styles fail to populate <code>decision_index.title</code>/<code>tags</code>/<code>date</code> correctly. This makes the institutional memory brittle.</p>
+<p>In addition, several decisions had implicit lifecycles that were never written down:</p>
+<ul>
+<li>&quot;Proposed&quot; ADRs that were silently being depended on as accepted.</li>
+<li>&quot;Accepted&quot; ADRs whose original decision had since been superseded by reality (multi-repo → monorepo) without a follow-up ADR being filed.</li>
+<li>&quot;Implementation status&quot; being tangled up with &quot;decision status&quot; — they are not the same thing. An accepted decision may be unimplemented, partially implemented, or fully implemented; the decision is still accepted.</li>
+</ul>
+<h2>Decision</h2>
+<h3>1. Canonical location</h3>
+<p>Human-readable ADRs live under <code>docs/adr/</code> only. <code>ops/state/decisions/</code> is retired and the directory holds only a redirect README (PR #1637). Operational state may <em>index</em> ADRs (the MCP <code>log_decision</code> / <code>search_decisions</code> / <code>get_decision</code> tools), but indexing is not authoring. There is one canonical decision tree, and it is <code>docs/adr/</code>.</p>
+<h3>2. ADR lifecycle vocabulary</h3>
+<p>Every ADR has a <code>status</code> from this closed list:</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>proposed</code></td>
+<td>Documented and circulating for review. Not yet the project&#39;s decision. May still be revised in body.</td>
+</tr>
+<tr>
+<td><code>accepted</code></td>
+<td>The decision is in force. Body is frozen except for amendment notes. New behavior must conform.</td>
+</tr>
+<tr>
+<td><code>amended</code></td>
+<td>An accepted ADR with one or more amendment notes added after acceptance. The original decision still holds; the amendments narrow, clarify, or extend it without overturning it.</td>
+</tr>
+<tr>
+<td><code>superseded</code></td>
+<td>An accepted-or-amended ADR whose decision has been replaced by a successor ADR. The body remains as institutional memory. The successor is named in <code>superseded_by</code>.</td>
+</tr>
+<tr>
+<td><code>deprecated</code></td>
+<td>An accepted-or-amended ADR whose decision no longer applies, but no successor ADR replaces it (the entire concern went away). Rare.</td>
+</tr>
+</tbody></table>
+<h3>3. Decision status is separate from implementation status</h3>
+<p>A decision can be <code>accepted</code> without code; code can exist without a decision being recorded. The two statuses are tracked independently:</p>
+<ul>
+<li><code>status</code> (decision lifecycle, above).</li>
+<li><code>implementation_status</code> (free-form text or a closed enum: <code>proposed</code>, <code>partially implemented</code>, <code>implemented</code>, <code>not yet implemented</code>, <code>needs verification</code>, <code>unknown</code>).</li>
+</ul>
+<p>When code lands that proves an accepted ADR&#39;s intent, update <code>implementation_status</code> and cite the evidence (PR number, file path, test name). Do NOT silently flip <code>status</code> from <code>proposed</code> to <code>accepted</code> because code was written. The decision lifecycle moves only when the project decides; the implementation status moves when the code does.</p>
+<h3>4. Supersession is explicit and traceable</h3>
+<p>When a new ADR replaces an old one:</p>
+<ul>
+<li>The new ADR&#39;s frontmatter sets <code>supersedes: [ADR-NNNN]</code>.</li>
+<li>The old ADR&#39;s frontmatter sets <code>superseded_by: ADR-NNNN</code>.</li>
+<li>The old ADR keeps its body. <strong>History is preserved.</strong> Add a short header note explaining the supersession; do not rewrite the body to match the new decision.</li>
+<li>Searching for either ADR in the MCP index returns the chain.</li>
+</ul>
+<p>When a new ADR amends without replacing:</p>
+<ul>
+<li>The new ADR&#39;s frontmatter sets <code>amends: [ADR-NNNN]</code>.</li>
+<li>The old ADR&#39;s status changes from <code>accepted</code> to <code>amended</code> and gets an amendment note pointing to the new ADR.</li>
+</ul>
+<h3>5. Metadata convention going forward</h3>
+<p><strong>New ADRs use YAML frontmatter</strong> with at minimum:</p>
+<pre><code class="language-yaml">---
+id: &quot;NNNN&quot;
+title: &quot;Short Decision Title&quot;
+status: &quot;proposed | accepted | amended | superseded | deprecated&quot;
+date: &quot;YYYY-MM-DD&quot;
+deciders: [&quot;…&quot;]
+tags: [&quot;…&quot;, &quot;…&quot;]
+supersedes: []      # optional; list of &quot;ADR-NNNN&quot;
+superseded_by: []   # optional; &quot;ADR-NNNN&quot; or empty list
+amends: []          # optional; list of &quot;ADR-NNNN&quot;
+implementation_status: &quot;…&quot;  # optional; free-form or one of the closed values above
+references:
+  - &quot;ADR-NNNN (relationship description)&quot;
+  - &quot;docs/path/to/related.md&quot;
+---
+</code></pre>
+<p><strong>Existing ADRs keep their original metadata format.</strong> They are not mass-rewritten. The MCP indexer is taught to parse all three formats so the index stays consistent across the historical record. When an existing ADR is touched for an amendment or supersession, the touch may include a metadata-format upgrade in the same edit, but a doc-only mass migration is out of scope for normal work.</p>
+<h3>6. Tooling contract</h3>
+<p><code>ops/mcp/src/tools/decisions.ts</code> indexes <code>docs/adr/</code> on boot and on each ADR write:</p>
+<ul>
+<li>Recognizes filenames <code>ADR-NNNN-slug.md</code> (canonical) and <code>NNNN-slug.md</code> (legacy, for safety).</li>
+<li>Parses metadata in three forms: YAML frontmatter, classic <code>**Field**:</code> markdown, bullet list.</li>
+<li>Extracts: <code>id</code>, <code>title</code>, <code>status</code>, <code>date</code>, <code>tags</code>, <code>supersedes</code>, <code>superseded_by</code>, <code>amends</code>, <code>implementation_status</code>.</li>
+<li>Re-points stale <code>file_path</code> rows to the canonical <code>docs/adr/</code> location on every boot (<code>INSERT OR REPLACE</code>).</li>
+<li><code>get_decision</code> falls through to a filesystem scan when a stored row&#39;s <code>file_path</code> no longer exists.</li>
+</ul>
+<h3>7. Template</h3>
+<p><code>docs/adr/template.md</code> is the source of truth for new-ADR shape. It uses the metadata convention above. Authors are not required to use every field, but the schema is the schema.</p>
+<h2>Consequences</h2>
+<ul>
+<li>ADR drift between <code>docs/adr/</code> and any other location is impossible by rule (only one canonical location exists) and indexed by tooling.</li>
+<li>Old decisions remain readable as written; their relevance to today is encoded in <code>status</code> + <code>superseded_by</code> + amendment notes, not in a rewrite.</li>
+<li>Searching the MCP decision index now works uniformly across all metadata formats. Brittleness from format inconsistency is gone.</li>
+<li>Decision-vs-implementation status separation prevents two failure modes: (a) &quot;code lands so I&#39;ll quietly mark the ADR accepted,&quot; (b) &quot;ADR is still proposed so I&#39;ll act as if no decision was made.&quot;</li>
+<li>Future authors have a written rule for &quot;what do I do when the world changes after my ADR was accepted?&quot; — file a new ADR, update the old one&#39;s <code>status</code> and frontmatter, point at the successor. No silent rewrites.</li>
+</ul>
+<h2>Alternatives Considered</h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why rejected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Mass-migrate every existing ADR to YAML frontmatter</td>
+<td>Touches every historical record without changing institutional meaning. The brittleness cost is paid by the indexer once; the rewrite cost would be paid forever in noisy commits and lost git-blame. Indexer change is the right place.</td>
+</tr>
+<tr>
+<td>Keep <code>ops/state/decisions/</code> as a parallel index</td>
+<td>Was the source of the drift problem in the first place. PR #1637 retired it; this ADR records the principle behind that retirement.</td>
+</tr>
+<tr>
+<td>Combine &quot;decision status&quot; and &quot;implementation status&quot; into one field</td>
+<td>Conflates two genuinely independent variables. Loses the ability to say &quot;we decided this, code is not yet here&quot; or &quot;we didn&#39;t decide this, but code shipped that depends on it.&quot; Both states need to exist; they need separate fields.</td>
+</tr>
+<tr>
+<td>Skip writing this ADR</td>
+<td>The lifecycle is real whether it is documented or not. Implicit conventions are how drift gets back in.</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

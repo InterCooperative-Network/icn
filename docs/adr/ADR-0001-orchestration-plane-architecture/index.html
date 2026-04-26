@@ -40,8 +40,23 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ADR-0001: Orchestration Plane Architecture (icn-ops)</h1>
 <p><strong>Date</strong>: 2026-02-19
-<strong>Status</strong>: accepted
+<strong>Status</strong>: superseded
+<strong>Superseded by</strong>: ADR-0017
 <strong>Tags</strong>: orchestration, mcp, multi-agent, cross-repo, state-management</p>
+<blockquote>
+<p><strong>Update (2026-04-26):</strong> the multi-repo physical topology described in
+this ADR (separate <code>icn-ops/</code>, <code>icn-website/</code>, <code>icn/</code>) has been
+superseded by monorepo consolidation. Website source, MCP
+orchestration tooling, and ops state now live in the main ICN repo
+under <code>website/</code>, <code>ops/mcp/</code>, and <code>ops/state/</code> respectively. See
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries">ADR-0017</a>
+for the canonical roots.</p>
+<p><strong>Durable principle retained:</strong> ICN needs an explicit orchestration /
+state plane with hybrid state (live MCP + git-tracked durable state).
+This ADR is the historical record of why that plane exists. The
+<em>separate-repo</em> implementation form is what changed; the principle
+did not. The body of this ADR is preserved as institutional memory.</p>
+</blockquote>
 <h2>Context</h2>
 <p>ICN development spans multiple repositories (<code>icn/</code>, <code>icn-website/</code>, <code>icn-wt/</code>) and increasingly involves parallel Claude Code agent sessions working across git worktrees. Three persistent problems emerged:</p>
 <ol>

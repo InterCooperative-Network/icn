@@ -40,7 +40,8 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ADR-0010: App topology and canonical app roots</h1>
 <ul>
-<li>Status: Proposed</li>
+<li>Status: Superseded</li>
+<li>Superseded by: ADR-0017</li>
 <li>Date: 2026-02-09</li>
 <li>Decision drivers:<ul>
 <li>Reduce contributor confusion</li>
@@ -49,6 +50,22 @@ View source on GitHub →
 </ul>
 </li>
 </ul>
+<blockquote>
+<p><strong>Update (2026-04-26):</strong> this ADR opened the question of canonical
+app roots but never closed it (it was filed <code>Proposed</code> and not
+ratified). <a href="https://github.com/InterCooperative-Network/icn/blob/main/ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries">ADR-0017</a>
+answers the question:</p>
+<ul>
+<li><code>icn/apps/</code> is the <strong>runtime-wired</strong> location and the home for
+any new app crate that participates in <code>icnd</code>.</li>
+<li><code>apps/</code> (top-level) holds <strong>prototypes and external
+demonstrators</strong> that are not part of the Rust workspace.</li>
+<li>Neither root may accumulate institution-specific vocabulary.</li>
+</ul>
+<p>The ambiguity this ADR documented is real and is now resolved by
+ADR-0017&#39;s canonical-roots table. Body preserved as the historical
+motivation; current rule lives in ADR-0017.</p>
+</blockquote>
 <h2>Context</h2>
 <p>The repo currently contains two app roots:</p>
 <ul>

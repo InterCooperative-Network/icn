@@ -1,0 +1,263 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0017: Monorepo Consolidation with Explicit Internal Boundaries | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0017 monorepo consolidation with explicit internal boundaries</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<p>id: &quot;0017&quot;
+title: &quot;Monorepo Consolidation with Explicit Internal Boundaries&quot;
+status: &quot;accepted&quot;
+date: &quot;2026-04-26&quot;
+deciders: [&quot;Matt Faherty&quot;]
+tags: [&quot;topology&quot;, &quot;monorepo&quot;, &quot;orchestration&quot;, &quot;architecture&quot;, &quot;boundaries&quot;, &quot;kernel-app-separation&quot;]
+supersedes: [&quot;ADR-0001&quot;, &quot;ADR-0010&quot;]
+superseded_by: []
+amends: [&quot;ADR-0002&quot;]
+implementation_status: &quot;implemented (physical layout in main ICN repo)&quot;
+references:</p>
+<ul>
+<li>&quot;ADR-0001 (Orchestration Plane Architecture — superseded by this ADR)&quot;</li>
+<li>&quot;ADR-0002 (MCP Server Registration — amended by this ADR)&quot;</li>
+<li>&quot;ADR-0010 (App topology — superseded by this ADR)&quot;</li>
+<li>&quot;ADR-0011 (Canonical Truth Ownership)&quot;</li>
+<li>&quot;docs/architecture/KERNEL_APP_SEPARATION.md&quot;</li>
+<li>&quot;docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md&quot;</li>
+</ul>
+<hr>
+<h1>ADR 0017: Monorepo Consolidation with Explicit Internal Boundaries</h1>
+<h2>Status</h2>
+<p><strong>Accepted (2026-04-26).</strong> This ADR records the topology that already exists in <code>main</code> and replaces the multi-repo assumptions in ADR-0001 and the dual-app-roots ambiguity in ADR-0010 with a single canonical layout.</p>
+<p>This ADR makes no behavior changes to running code. It is a topology statement: where work belongs, and what the boundary lines are.</p>
+<h2>Context</h2>
+<p>Earlier ADRs assumed a multi-repo topology:</p>
+<ul>
+<li><code>icn/</code> — substrate runtime workspace.</li>
+<li><code>icn-website/</code> — public website.</li>
+<li><code>icn-ops/</code> — orchestration plane (MCP, automation, ops state).</li>
+</ul>
+<p>That topology was not retained. The website source, MCP/orchestration tooling, deploy assets, docs, and ADRs all moved into the main ICN repo. ADR-0001 still describes the multi-repo arrangement; ADR-0010 still describes &quot;two app roots&quot; without resolving which is canonical.</p>
+<p>The risk has shifted:</p>
+<ul>
+<li><strong>Old risk</strong> (multi-repo era): cross-repo drift. Dependencies, conventions, and decisions diverged between <code>icn-ops/</code>, <code>icn-website/</code>, and <code>icn/</code> because nothing forced them to converge.</li>
+<li><strong>New risk</strong> (monorepo era): semantic-layer collapse. Everything sits next to everything else; physical proximity invites the assumption that the boundaries dissolved with the directory walls. They did not.</li>
+</ul>
+<p><strong>The kernel/app boundary, the substrate/app/website boundary, the docs/state boundary, and the institution-package/runtime boundary are unchanged. Only their physical location changed.</strong></p>
+<h2>Decision</h2>
+<p>ICN&#39;s main repo is the canonical physical home for substrate runtime, app surfaces, website/docs, MCP/orchestration tooling, operational state, deploy assets, and any in-tree institution-package scaffolding. Physical consolidation does not collapse architectural boundaries.</p>
+<h3>Canonical roots</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Layer</th>
+<th>Owns</th>
+<th>Must not</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn/</code></td>
+<td>substrate / Rust workspace root</td>
+<td><code>Cargo.toml</code>, kernel crates (<code>icn-core</code>, <code>icn-kernel-api</code>, <code>icn-identity</code>, <code>icn-net</code>, <code>icn-gossip</code>, <code>icn-store</code>, <code>icn-encoding</code>, <code>icn-time</code>, <code>icn-testkit</code>, <code>icn-protocol</code>, <code>icn-services</code>, <code>icn-crypto</code>, <code>icn-obs</code>, <code>icn-security</code>, <code>icn-authz</code>, <code>icn-http-kit</code>, <code>icn-naming</code>), domain crates that the kernel depends on (<code>icn-governance</code>, <code>icn-ledger</code>, <code>icn-trust</code>, <code>icn-ccl</code>, <code>icn-federation</code>, <code>icn-compute</code>, <code>icn-privacy</code>, <code>icn-snapshot</code>, <code>icn-crypto-pq</code>, <code>icn-steward</code>, <code>icn-zkp</code>, <code>icn-coop</code>, <code>icn-community</code>, <code>icn-entity</code>, <code>icn-api</code>, <code>icn-gateway</code>, <code>icn-rpc</code>), bins (<code>icnd</code>, <code>icnctl</code>, <code>icn-console</code>)</td>
+<td>hold website assets, MCP tools, deploy YAML, or institution-package fixtures</td>
+</tr>
+<tr>
+<td><code>icn/apps/</code></td>
+<td>runtime-wired app crates (PolicyOracle implementations, app lifecycle wiring)</td>
+<td><code>governance</code>, <code>ledger</code>, <code>membership</code>, <code>charter</code> — the app crates that are part of the workspace and integrate with <code>icnd</code></td>
+<td>accumulate domain-only logic that should live in a kernel crate, or accumulate institution-specific vocabulary</td>
+</tr>
+<tr>
+<td><code>apps/</code> (top-level)</td>
+<td>external/standalone app prototypes and demonstrators</td>
+<td><code>echo</code>, <code>governance</code>, <code>ledger</code>, <code>trust</code> (demonstrators / standalone surfaces, not part of the Rust workspace)</td>
+<td>be conflated with <code>icn/apps/</code>. New runtime-wired apps go in <code>icn/apps/</code>, not here. This root remains for legacy prototypes and external demonstrators only.</td>
+</tr>
+<tr>
+<td><code>website/</code></td>
+<td>public/narrative/docs/discovery surface</td>
+<td>landing pages, public docs, narrative/strategy content, public roadmap</td>
+<td>hold proprietary or pre-publication operational state</td>
+</tr>
+<tr>
+<td><code>ops/mcp/</code></td>
+<td>MCP/orchestration tooling</td>
+<td>TypeScript MCP server, decision/sprint/repo tools, <code>dist/</code> build artifact</td>
+<td>become a parallel decision-doc tree (see ADR-0018)</td>
+</tr>
+<tr>
+<td><code>ops/state/</code></td>
+<td>operational machine state</td>
+<td><code>truth/sources.json</code>, <code>sprint/current.json</code>, <code>config/repo-map.json</code>, MCP SQLite (gitignored)</td>
+<td>hold human-readable docs (those live under <code>docs/</code>)</td>
+</tr>
+<tr>
+<td><code>docs/</code></td>
+<td>human-readable documentation root</td>
+<td><code>STATE.md</code>, <code>ARCHITECTURE.md</code>, <code>architecture/</code>, <code>design/</code>, <code>spec/</code>, <code>reference/</code>, <code>guides/</code>, <code>planning/</code>, <code>strategy/</code>, <code>dev/</code>, <code>dev-journal/</code>, etc.</td>
+<td>duplicate state owned by <code>ops/state/</code></td>
+</tr>
+<tr>
+<td><code>docs/adr/</code></td>
+<td>canonical Architecture Decision Records</td>
+<td><code>ADR-NNNN-slug.md</code>, <code>template.md</code></td>
+<td>be parallel to any other ADR location (see ADR-0018)</td>
+</tr>
+<tr>
+<td><code>deploy/</code></td>
+<td>deployment manifests and runbooks</td>
+<td><code>k8s/</code>, helm charts, deploy READMEs</td>
+<td>hold runtime code</td>
+</tr>
+<tr>
+<td><code>sdk/</code></td>
+<td>language SDKs</td>
+<td><code>typescript/</code>, <code>react-native/</code>, generated API types</td>
+<td>hold runtime code</td>
+</tr>
+<tr>
+<td><code>web/</code></td>
+<td>in-repo web UIs</td>
+<td><code>pilot-ui/</code> (PWA), <code>dashboard/</code> (static)</td>
+<td>be conflated with <code>website/</code> (which is the public surface, not pilot tooling)</td>
+</tr>
+</tbody></table>
+<h3>Rules</h3>
+<ol>
+<li><p><strong>Physical proximity is not a license to collapse layers.</strong> A file inside <code>icn/</code> may not import a domain noun from an institution package. A file inside <code>ops/mcp/</code> may not be substituted for a doc under <code>docs/</code>. The Meaning Firewall, the kernel/app separation, and the institution-package boundary remain enforced exactly as they were across the multi-repo era.</p>
+</li>
+<li><p><strong>Two app roots are not a bug, but they are different.</strong> <code>icn/apps/</code> is the runtime-wired location and the home for new apps that participate in <code>icnd</code>. <code>apps/</code> (top-level) holds prototypes and external demonstrators that are not part of the Rust workspace. Neither shall accumulate institution-specific vocabulary; that belongs in an institution package (see <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code>).</p>
+</li>
+<li><p><strong><code>ops/state/</code> is machine state, not documentation.</strong> Anything a human is meant to read first goes under <code>docs/</code>. The MCP server and other tooling may <em>index</em> docs by reading them, but indexing is not authoring.</p>
+</li>
+<li><p><strong><code>website/</code> is the public surface; <code>web/</code> is the in-repo pilot/dashboard surface.</strong> Do not confuse them.</p>
+</li>
+<li><p><strong>Cross-cutting tooling lives in <code>tools/</code>, <code>scripts/</code>, or <code>ops/</code>.</strong> Do not park it in <code>icn/</code> or <code>docs/</code>.</p>
+</li>
+</ol>
+<h2>Consequences</h2>
+<ul>
+<li>The &quot;where does this go?&quot; question now has a single canonical answer table. Any ambiguity is a doc bug, not a topology question.</li>
+<li>ADR-0001&#39;s separate-repo <code>icn-ops/</code> topology no longer matches reality. ADR-0001 stays in the record as the historical decision that motivated the orchestration plane in the first place; this ADR replaces its physical layout. The durable principle from ADR-0001 — that ICN needs an explicit orchestration/state plane — is retained. The implementation form changed; the principle did not.</li>
+<li>ADR-0010&#39;s &quot;two app roots&quot; question is answered: both exist, with non-overlapping purposes (workspace-wired vs prototypes/external). New runtime-wired apps go in <code>icn/apps/</code>. ADR-0010 is superseded by this ADR.</li>
+<li>ADR-0002&#39;s MCP-registration mechanism is unchanged in spirit; the path moved from a separate repo into <code>ops/mcp/</code>. ADR-0002 is amended, not superseded — the registration mechanism is still the right one, the address just changed.</li>
+</ul>
+<h2>Alternatives Considered</h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why rejected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Re-split into <code>icn-ops/</code>, <code>icn-website/</code>, <code>icn/</code></td>
+<td>The merge happened for real reasons (cross-cutting work, single-PR review, atomic CI, single source of truth). Re-splitting would re-introduce the drift this ADR&#39;s predecessor existed to fight.</td>
+</tr>
+<tr>
+<td>Leave ADR-0001 / ADR-0010 in place without a successor ADR</td>
+<td>Future contributors would read the old ADRs as current truth and re-derive the wrong topology. Recording the supersession explicitly is what makes the ADR record honest.</td>
+</tr>
+<tr>
+<td>Collapse <code>apps/</code> into <code>icn/apps/</code></td>
+<td>The two roots have non-overlapping purposes (prototypes vs workspace). Collapsing them now would drag legacy prototype code into the workspace surface, breaking kernel/app separation more, not less. The right move is a clear written rule, not a rename.</td>
+</tr>
+<tr>
+<td>One mega-ADR that replaces 0001, 0002, 0010, plus authority/bootstrap</td>
+<td>Too large to review honestly. This ADR records the topology decision only. Authority/mandate (ADR-0019) and bootstrap activation (ADR-0020) get their own records.</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
