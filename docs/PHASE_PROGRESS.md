@@ -1,6 +1,15 @@
 # ICN Phase Progress
-**Last Updated:** 2026-04-15
-**Current Phase:** Phase 2 — Pilot Launch (blocked on cooperative partners)
+**Last Updated:** 2026-04-26
+**Current Phase:** Phase 2 — Pilot Launch (still blocked on cooperative partners; institutional-operability infrastructure for pilot enablement is now in place)
+
+<!-- [sync edit] 2026-04-26: Phase 2 status unchanged (still blocked on
+     cooperative partners). Phase 2 deliverables list extended to record
+     that institutional-operability infrastructure to support pilot
+     deployment landed 2026-04-22 → 2026-04-26 (live charter activation,
+     person-directory overlay, /me/standing, authority_scope plumbing,
+     bootstrap-apply idempotency, persistent governance domains, NYCN
+     bootstrap apply integration tests + live-validate runbook). These
+     do not flip Phase 2 to ✅ on their own — that gate is partner-bound. -->
 
 <!-- [sync edit] 2026-04-15: Updated metrics tables with current measurements.
      Phase model, phase definitions, and completion criteria unchanged.
@@ -108,8 +117,16 @@
 
 **Deliverables:**
 - [x] Pilot runbook (#1222 ✅ closed)
+- [x] Live charter activation endpoint (#1624) — pilots can activate a charter against a running gateway
+- [x] Persistent governance domains across gateway restart (#1621)
+- [x] Person-directory overlay for bootstrap role assignment (#1626) — DID binding from package-side person ids
+- [x] `GET /me/standing` read model (#1627) — member-facing standing surface
+- [x] `authority_scope` plumbed end-to-end through `assign_role` (#1630)
+- [x] Generic institution bootstrap package path (#1586)
+- [x] Bootstrap-apply 409 idempotency (#1617) — re-running bootstrap is safe
+- [x] NYCN bootstrap apply integration tests + live-validate runbook (#1592, #1593)
 - [ ] One-command deployment script per cooperative
-- [ ] Charter customization workflow documented
+- [ ] Charter customization workflow documented (charter activation endpoint exists; non-technical workflow doc still missing)
 - [ ] Pilot onboarding guide (non-technical audience)
 - [ ] Deploy nodes for 3–5 pilot cooperatives
 - [ ] Weekly check-in process established
@@ -117,10 +134,11 @@
 
 **Blockers:**
 - ~~Requires Phase 1 complete~~ ✅ Charter Engine is live
+- ~~Requires bootstrap activation runtime~~ ✅ live charter activation + person-directory + standing read model landed 2026-04-22 → 2026-04-26
 - Requires cooperative partners identified and committed (primary blocker)
 
 **Decisions Made:**
-- (none yet)
+- (2026-04-26) Pilot enablement infrastructure (bootstrap, charter activation, role binding, standing) is in place; Phase 2 remains ⏳ until partners run it for real.
 
 ---
 
