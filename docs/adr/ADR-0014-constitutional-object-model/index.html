@@ -41,30 +41,103 @@ View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
 <p>id: &quot;0014&quot;
 title: &quot;Constitutional Object Model — AuthorityClass, AuthorityGrant, TypedScope, Mandate&quot;
-status: &quot;proposed&quot;
+status: &quot;accepted&quot;
 date: &quot;2026-04-19&quot;
 context: &quot;post-SDIS-evidence arc (#1571); post-institution-package-boundary (#1560); pre-executor-gating; pre-federation-authority-narrowing&quot;
 deciders: [&quot;Matt Faherty&quot;]
 tags: [&quot;governance&quot;, &quot;architecture&quot;, &quot;authority&quot;, &quot;charter&quot;, &quot;federation&quot;, &quot;mandate&quot;, &quot;meaning-firewall&quot;, &quot;semantic-freeze&quot;]
 supersedes: []
 superseded_by: []
+amends: []
+implementation_status: &quot;partially implemented (types + minting seam landed; kernel dispatch not gated)&quot;
 references:</p>
 <ul>
 <li>&quot;ADR-0010 (App topology)&quot;</li>
 <li>&quot;ADR-0012 (Federation state origin model)&quot;</li>
 <li>&quot;ADR-0013 (Federation clearing adoption contract)&quot;</li>
+<li>&quot;ADR-0017 (Monorepo Consolidation)&quot;</li>
+<li>&quot;ADR-0018 (ADR Lifecycle)&quot;</li>
+<li>&quot;ADR-0019 (Authority Grant Minting and Mandate Persistence Seam)&quot;</li>
 <li>&quot;docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md&quot;</li>
 <li>&quot;docs/architecture/KERNEL_APP_SEPARATION.md&quot;</li>
 </ul>
 <hr>
 <h1>ADR 0014: Constitutional Object Model</h1>
 <h2>Status</h2>
+<p><strong>Accepted; implementation partially landed (status updated 2026-04-26).</strong> The
+ADR was originally filed as <code>proposed</code> (docs-only semantic freeze); the
+semantic content was never revised. Code has since landed that proves the
+type model out at the governance app layer. See the <strong>Implementation Update</strong>
+section below for evidence and what remains. Per ADR-0018, the decision
+lifecycle (<code>accepted</code>) is independent from the <code>implementation_status</code>
+(<code>partially implemented</code>).</p>
+<p>The original Status note is preserved verbatim below as the historical
+record of what this ADR claimed at filing time.</p>
+<h3>Original status note (2026-04-19)</h3>
+<blockquote>
 <p><strong>Proposed (docs-only semantic freeze).</strong> This ADR introduces no behavior changes, no
 new code paths, no new crate public surface. It freezes the meaning of four constitutional
 objects — <code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code> — so that a later
 implementation tranche can land them without reopening what they are.</p>
 <p>Implementation follows this ADR in a separate PR. Nothing in this ADR promotes any phase
 status or claims completion.</p>
+</blockquote>
+<h2>Implementation Update (2026-04-26)</h2>
+<p>The four constitutional types frozen by this ADR are now implemented at the
+governance app layer. The accepted-decision seam mints <code>AuthorityGrant</code>s
+and persists <code>Mandate</code>s. The minting/persistence behavior is recorded
+separately as a decision in <a href="https://github.com/InterCooperative-Network/icn/blob/main/ADR-0019-authority-grant-minting-and-mandate-persistence-seam">ADR-0019</a>;
+this section records what is verifiable in code as of this date.</p>
+<h3>What is implemented</h3>
+<table>
+<thead>
+<tr>
+<th>Claim</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>AuthorityClass</code> is a closed three-variant enum (Representation / Execution / Attestation)</td>
+<td><code>icn/crates/icn-governance/src/authority.rs</code> (<code>pub enum AuthorityClass</code> ~line 61, with serde tests at line 439)</td>
+</tr>
+<tr>
+<td><code>AuthorityGrant</code> is a typed record with <code>class: AuthorityClass</code>, grantor, grantee, scope</td>
+<td><code>icn/crates/icn-governance/src/authority.rs</code> (<code>pub struct AuthorityGrant</code> ~line 273)</td>
+</tr>
+<tr>
+<td><code>TypedScope</code> is the typed replacement for <code>RoleAssignment.authority_scope: Vec&lt;String&gt;</code></td>
+<td><code>icn/crates/icn-governance/src/authority.rs</code> (TypedScope type), referenced by <code>icn/crates/icn-governance/src/structure.rs:230</code></td>
+</tr>
+<tr>
+<td><code>Mandate</code> is a first-class institutional-memory record with two constructors (<code>new</code>, <code>new_pending_grants</code>)</td>
+<td><code>icn/crates/icn-governance/src/mandate.rs</code> (full module documents the distinction from delegation, role assignment, structure, etc.)</td>
+</tr>
+<tr>
+<td>Accepted-decision seam mints grants narrowly and falls through to pending-grants mandates otherwise</td>
+<td><code>icn/apps/governance/src/grant_minting.rs</code> (module doc + steward-appointment / steward-reconfirmation classes)</td>
+</tr>
+<tr>
+<td>Mandate parity through the close-proposal actor flow</td>
+<td><code>icn/apps/governance/tests/actor_close_proposal_mandate_parity.rs:311</code></td>
+</tr>
+<tr>
+<td>Layer placement: types live at governance app layer, never imported by kernel crates</td>
+<td><code>icn/crates/icn-governance/src/authority.rs</code> module doc lines 1-30 explicitly states this rule</td>
+</tr>
+</tbody></table>
+<h3>What is NOT implemented</h3>
+<ul>
+<li><strong>Kernel dispatch is not gated by mandates or authority grants.</strong> A grep of <code>icn/crates/icn-kernel-api/</code> and <code>icn/crates/icn-core/src/dispatch*</code> for <code>Mandate</code> / <code>mandate</code> returns no matches as of 2026-04-26. Mandates exist as institutional memory; they are not yet a precondition for <code>KernelEffect</code> execution.</li>
+<li><strong>Kernel <code>Capability</code> tokens are not minted from <code>AuthorityGrant</code>s.</strong> ADR-0014 explicitly leaves this for a future implementation tranche, and that tranche has not landed.</li>
+<li><strong>Authority revocation end-to-end is partial.</strong> Revocation writes are referenced in <code>grant_minting.rs:343</code>; the full revocation lifecycle has not been verified by this update.</li>
+<li><strong>Federation-side mandate recognition is not specified or implemented.</strong> Federation peers do not yet read or honor mandates from another entity.</li>
+</ul>
+<h3>What this update does NOT change</h3>
+<ul>
+<li>The semantic content of this ADR (Context, Decision, Consequences, Alternatives) is unchanged from the original filing.</li>
+<li>The decision recorded here is the same decision; only its lifecycle marker (<code>status: accepted</code>) and <code>implementation_status</code> (<code>partially implemented</code>) are updated, per ADR-0018&#39;s rule that historical content is preserved while current status can change.</li>
+<li>This update does not authorize kernel-side enforcement. That requires a separate decision.</li>
+</ul>
 <hr>
 <h2>Context</h2>
 <p>The repository now has a working governance-to-evidence pipeline post-#1562/#1567/#1571:</p>
