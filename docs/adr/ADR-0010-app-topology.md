@@ -1,11 +1,27 @@
 # ADR-0010: App topology and canonical app roots
 
-- Status: Proposed
+- Status: Superseded
+- Superseded by: ADR-0017
 - Date: 2026-02-09
 - Decision drivers:
   - Reduce contributor confusion
   - Preserve kernel/app separation invariant
   - Make app ownership and migration paths explicit
+
+> **Update (2026-04-26):** this ADR opened the question of canonical
+> app roots but never closed it (it was filed `Proposed` and not
+> ratified). [ADR-0017](ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries.md)
+> answers the question:
+>
+> - `icn/apps/` is the **runtime-wired** location and the home for
+>   any new app crate that participates in `icnd`.
+> - `apps/` (top-level) holds **prototypes and external
+>   demonstrators** that are not part of the Rust workspace.
+> - Neither root may accumulate institution-specific vocabulary.
+>
+> The ambiguity this ADR documented is real and is now resolved by
+> ADR-0017's canonical-roots table. Body preserved as the historical
+> motivation; current rule lives in ADR-0017.
 
 ## Context
 

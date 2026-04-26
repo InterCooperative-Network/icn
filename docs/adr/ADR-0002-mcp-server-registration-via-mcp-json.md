@@ -1,8 +1,23 @@
 # ADR-0002: MCP Server Registration via ~/.mcp.json
 
 **Date**: 2026-02-19
-**Status**: accepted
+**Status**: amended
+**Amended by**: ADR-0017
 **Tags**: mcp, claude-code, setup
+
+> **Amendment (2026-04-26):** the registration mechanism described
+> here remains correct — MCP servers are still registered in
+> `~/.mcp.json` (user scope) or `.mcp.json` (project scope), with
+> `enableAllProjectMcpServers: true` in `~/.claude/settings.json`.
+>
+> What changed is the path. MCP source is no longer in a separate
+> `icn-ops/` repo; it lives in the main ICN repo under `ops/mcp/`.
+> The `dist/` build path that `~/.mcp.json` references has moved
+> accordingly. ADRs are canonical under `docs/adr/`, not under
+> `ops/state/decisions/` (see [ADR-0018](ADR-0018-adr-lifecycle-and-canonical-decision-index.md)).
+> The decision recorded here is unchanged; its addresses are
+> updated. See [ADR-0017](ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries.md)
+> for the canonical layout.
 
 ## Context
 
