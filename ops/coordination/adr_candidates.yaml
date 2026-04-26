@@ -7,6 +7,18 @@
 # Rows here exist so the long arc of architecture does not get designed
 # out by accident between sessions.
 #
+# RFCs precede some ADR candidates. Where an ADR candidate's design space is
+# unsettled, the project should draft an RFC first (see
+# ops/coordination/rfc_candidates.yaml and docs/rfcs/RFC-0000-rfc-process.md).
+# Examples currently in this registry:
+#   ADR-0023 (CCL Institutional Process Language)         → RFC-0004
+#   ADR-0027 (Action Card Contract)                       → RFC-0005
+#   ADR-0028 (Accessibility Baseline)                     → RFC-0003
+#   ADR-0029 (Conflict Resolution Object Model)           → RFC-0002
+#   ADR-0044/0045/0046/0047/0048 (Economics tranche)      → RFC-0001
+# Back-fill candidates (e.g., 0021, 0022, 0030, 0031) do not need an RFC
+# because they record decisions already settled by code.
+#
 # Conventions: see ops/coordination/README.md
 # ADR lifecycle: see docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index.md
 # Numbering: continues from the highest existing ADR (0020 at registry-creation time)

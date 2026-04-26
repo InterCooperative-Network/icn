@@ -1,0 +1,515 @@
+# ICN RFC Candidate Registry
+#
+# A planning index of unresolved design spaces that need an RFC before an ADR
+# or implementation. This file is NOT a decision record. It exists so the
+# project knows what design conversations are pending and does not lose them
+# between sessions.
+#
+# RFCs themselves live in docs/rfcs/. ADRs live in docs/adr/. ADR candidates
+# live in ops/coordination/adr_candidates.yaml.
+#
+# RFCs explore. ADRs decide. Issues build. Tests prove. The website claims
+# only what the proof supports. See docs/rfcs/RFC-0000-rfc-process.md.
+#
+# Updated: 2026-04-26
+#
+# Field reference:
+#   id: RFC number (zero-padded, 4 digits)
+#   title: Short RFC title
+#   status: candidate (until promoted to draft, when an RFC file is created)
+#   domain: economics | conflict | accessibility | ccl | member-shell |
+#           governance | federation | provenance | project-governance |
+#           website | compute | package
+#   why_it_matters: 1-2 sentence rationale
+#   related_adr_candidates: ADR ids the RFC may inform (from adr_candidates.yaml)
+#   related_issues: GitHub issue references
+#   design_questions: open questions the RFC must address
+#   icn_runtime_surface: what kernel/runtime surface this affects, or "doctrinal"
+#   package_or_institution_expression: how institution packages express this
+#   accessibility_implications: how this lands for low-bandwidth/low-device/
+#                               non-English/disabled members
+#   conflict_or_dispute_path: how disputes about this surface are handled
+#   compute_or_automation_boundary: what compute can and cannot do here
+#   website_truth_implication: what the public site can claim once accepted
+#                              and implemented
+#   proposed_outputs: what ADRs or implementation issues the RFC should produce
+#   priority: now | soon | later
+#
+# Note: some ADR candidates in adr_candidates.yaml should be preceded by an RFC
+# in this file. The pipeline is one-way in spirit: RFC explores → ADR decides
+# → issue commits → tests prove → ADR.implementation_status updates → website
+# claims. See RFC-0000 for the full process.
+
+candidates:
+
+  - id: "0001"
+    title: "Obligation / Allocation / Settlement Primitives"
+    status: candidate
+    domain: economics
+    why_it_matters: |
+      ADR-0004 distinguishes obligations from payments. ICN ships a commons
+      compute settlement engine (ADR-0005, ADR-0031) that produces balanced
+      journal entries, and #1634 proposes formal obligation/allocation/
+      settlement primitives. The design space — what shape these primitives
+      take, what their lifecycles are, how challenges and reversals work — is
+      not yet fully written. Without an RFC, the resulting ADRs will be
+      shallow and the regulatory-safe vocabulary will be at risk.
+    related_adr_candidates: ["0044", "0045", "0046", "0047", "0048", "0041"]
+    related_issues: ["#1634", "#1635"]
+    design_questions:
+      - "What are the canonical types: Obligation, Allocation, Settlement, Position, SettlementAsset?"
+      - "What is the lifecycle of an obligation? When does it form, when does it close, when does it convert to a settlement?"
+      - "What authority is required to create an allocation? What authority is required to settle?"
+      - "What is the challenge/reversal path when an obligation is disputed?"
+      - "How do positions accumulate; how are they zeroed by settlement; how do mutual-credit ceilings interact with allocations?"
+      - "What does cross-coop clearing look like at the settlement primitive level (extends ADR-0013)?"
+      - "What is the boundary between treasury authority, patronage accounts, and commons pool settlement (ADR-0031)?"
+    icn_runtime_surface: "icn-ledger; icn-federation clearing path; future obligation/allocation actor; potential new icn-economics crate"
+    package_or_institution_expression: "Packages declare allocation templates and obligation kinds; ICN owns the lifecycle and settlement primitives."
+    accessibility_implications: |
+      Obligation and allocation surfaces must render in plain language and not
+      look like a bank statement. Members must be able to see what they owe,
+      what they are owed, and what is pending — without payment-rail metaphors
+      that obscure the cooperative accounting model.
+    conflict_or_dispute_path: |
+      Settlement disputes route through the conflict resolution object model
+      (ADR-0029 / RFC-0002). The RFC must specify whether challenges produce
+      counter-effects, reversals, or repair agreements, and how authority
+      grants for these flow.
+    compute_or_automation_boundary: |
+      Compute may compute proposed allocations under a covering mandate;
+      compute may not finalize settlement without authority. Settlement is
+      governance-grade; advisory output is allowed but cannot move positions.
+    website_truth_implication: |
+      Once the RFC is accepted and the primitives ship, the website may say
+      "ICN models obligations and allocations with explicit lifecycles" and
+      cite the ADRs. Until then, public claims must remain at "obligations,
+      not payments" framing without claiming a complete primitive surface.
+    proposed_outputs:
+      - "ADR(s) for obligation lifecycle, allocation authorization, settlement/position semantics, challenge/reversal path"
+      - "Issues for primitive type definitions, lifecycle handlers, settlement integration, ledger journal extensions"
+      - "Validation: integration tests proving lifecycle invariants and challenge paths"
+    priority: now
+
+  - id: "0002"
+    title: "Conflict Resolution and Institutional Care"
+    status: candidate
+    domain: conflict
+    why_it_matters: |
+      ADR-0029 names three conflict shapes (effect challenges, process
+      appeals, relational conflicts) and notes that compute disputes are
+      implemented while institutional resolution is at the type-sketch level
+      only. The design space — object model detail, evidence handling,
+      mediation roles, remedy taxonomy, repair-first defaults — is unsettled
+      and consequential. Conflict is the human reality layer; getting it
+      wrong erodes institutional trust faster than any other surface.
+    related_adr_candidates: ["0029", "0060", "0061", "0062", "0042"]
+    related_issues: []
+    design_questions:
+      - "What is the canonical ConflictCase type? What lifecycle does it carry?"
+      - "What is the EvidenceBundle shape? How does selective disclosure work?"
+      - "What process roles exist (mediator, facilitator, arbiter, observer)? Who can hold them?"
+      - "What is the MediationProcess vs Appeal vs structured agreement distinction?"
+      - "What remedies are first-class (counter-effect, reversal, repair agreement, sanction)?"
+      - "How does retaliation protection work? What enforcement mechanism guards process integrity?"
+      - "How do CCL-defined resolution processes (ADR-0060) plug into this?"
+      - "What is private vs public in a resolution? What gets redacted, what gets archived?"
+    icn_runtime_surface: "Future: icn-conflict crate or extension of icn-governance; CCL process runner integration"
+    package_or_institution_expression: "Packages declare resolution processes as CCL workflows; ICN owns conflict object identity and lifecycle."
+    accessibility_implications: |
+      Resolution flows must accommodate language, time, technology, and
+      caregiving constraints. Testimony submission must support assistive
+      technology. Deadlines for response must be just rather than
+      pre-empting members who cannot respond on a fixed schedule.
+    conflict_or_dispute_path: "This RFC IS the path."
+    compute_or_automation_boundary: |
+      Compute mediates evidence and timing; compute does not decide outcomes.
+      Decisions are human or governance acts. Compute may compile evidence
+      summaries, surface deadlines, and route notifications under a covering
+      mandate.
+    website_truth_implication: |
+      Once accepted, the website may describe conflict resolution as a
+      first-class architectural goal with a written object model. It may NOT
+      claim a complete runtime surface until ADRs land and integration tests
+      prove the path end-to-end.
+    proposed_outputs:
+      - "ADRs for object model detail, evidence bundle, remedy taxonomy, appeals lifecycle, retaliation protection"
+      - "Follow-up RFCs on cross-institution conflict resolution (extends RFC-0007 territory)"
+      - "Issues for runtime support across icn-governance and a future conflict actor"
+    priority: now
+
+  - id: "0003"
+    title: "Accessibility Baseline and Member Participation"
+    status: candidate
+    domain: accessibility
+    why_it_matters: |
+      ADR-0028 names accessibility as a participation floor with five layers
+      (sensory, cognitive, linguistic, economic, temporal) and proposes the
+      floor; it does not prescribe the runtime contract that ties every
+      member-facing surface to a measurable target. Action cards (ADR-0027 /
+      RFC-0005) are about to ship and need this floor to be concrete; the
+      glossary endpoint (#1610) and mobile SDK (#1366) likewise.
+    related_adr_candidates: ["0028", "0054", "0055", "0056", "0057", "0058", "0059"]
+    related_issues: ["#1610", "#1611", "#1366"]
+    design_questions:
+      - "What is the WCAG 2.2 AA floor checklist concretely for each ICN surface?"
+      - "What is the language justice workflow? Who translates; how is the canonical-vs-translated boundary maintained?"
+      - "What is the deadline-justice profile on action cards? What metadata travels with deadlines?"
+      - "How does the glossary endpoint resolve institutional vocabulary? What is the canonical definition source?"
+      - "What is the offline tolerance contract for mobile read paths? For mobile write paths?"
+      - "What is the assistive-tech contract (ARIA roles, semantic HTML, focus order) for action cards specifically?"
+      - "What hardware floor does ICN target (low-end Android, screen reader on iOS, low-resolution displays)?"
+      - "What is the caregiving / shift-work / wage barrier accommodation model? Is this CCL territory or runtime configuration?"
+    icn_runtime_surface: "Future: GET /me/glossary endpoint; locale fields on standing schema; offline queue in mobile SDK; build-time accessibility linter"
+    package_or_institution_expression: "Packages declare locale and assistive metadata; package fixtures must pass baseline checks before bootstrap."
+    accessibility_implications: "This RFC IS the implication."
+    conflict_or_dispute_path: |
+      Accessibility violations are graded as institutional defects, not bugs.
+      Remediation routes through the conflict resolution model (RFC-0002).
+      The RFC must specify the escalation path for violations that block
+      participation.
+    compute_or_automation_boundary: |
+      Compute does not decide accessibility outcomes. Compute may render
+      assistive content under explicit member opt-in (e.g., simplified
+      summaries, reading-level adjustments) but the canonical content is
+      authority's, not compute's.
+    website_truth_implication: |
+      Once accepted, the website may describe accessibility as a
+      first-class architectural goal with a measurable floor and
+      evidence-linked claims. The site itself must conform to the floor.
+    proposed_outputs:
+      - "ADR amendments / successors to 0028 detailing the WCAG checklist, glossary contract, language justice flow, deadline-justice profile"
+      - "ADRs for plain-language and glossary contract (0055), assistive-tech semantics for action cards (0056), caregiving/time/wage accommodation (0057), offline participation (0058), non-CLI workflows (0059)"
+      - "Issues for /me/glossary endpoint, locale-aware standing, offline queue, build-time accessibility linter"
+    priority: now
+
+  - id: "0004"
+    title: "CCL Institutional Process Language"
+    status: candidate
+    domain: ccl
+    why_it_matters: |
+      ADR-0023 names CCL-as-process-language as a forward direction. CCL
+      today encodes thresholds and formulas via the schema bridge
+      (ADR-0022). The design space for processes — step grammar, deadlines,
+      escalation, human-judgment pauses, conflict workflows, accessibility
+      rules, federation agreements — is non-trivial. Drafting an ADR
+      without an RFC would lock in language design choices without
+      tradeoff analysis.
+    related_adr_candidates: ["0023", "0036", "0060"]
+    related_issues: ["#863"]
+    design_questions:
+      - "What is the Process step grammar? AutoStep, MemberStep, RoleStep, SignalStep — closed taxonomy or extensible?"
+      - "What are deadline semantics? How do escalation rules compose? Are deadlines preemptive or declarative?"
+      - "How does process amendment affect in-flight processes? Is migration explicit or transparent?"
+      - "What is the process runner's relationship to the supervisor and the actor system?"
+      - "How do processes interact with mandates and effect records (ADR-0019, ADR-0025)?"
+      - "How do CCL processes express conflict resolution flows (RFC-0002 dependency)?"
+      - "How do CCL processes express accessibility requirements (RFC-0003 dependency)?"
+      - "How are processes ratified through governance? Is activation the same as charter activation?"
+    icn_runtime_surface: "Future: process-runner actor; new icn-process crate or extension of icn-governance; schema additions to icn-ccl"
+    package_or_institution_expression: "Packages ship process definitions (onboarding, grievance, allocation review, etc.) as CCL alongside charter rules."
+    accessibility_implications: |
+      Process steps with deadlines must respect the temporal-justice floor
+      (RFC-0003). Member-facing steps must be plain-language, accessible,
+      and assistive-tech-friendly. Caregiving and shift-work accommodation
+      must be expressible as deadline metadata.
+    conflict_or_dispute_path: |
+      CCL processes express conflict resolution workflows (ADR-0060). The
+      RFC must specify how a dispute about the process itself is handled
+      (process appeal vs effect challenge per ADR-0029).
+    compute_or_automation_boundary: |
+      Process steps that are deterministic and bounded are executed by
+      compute; human-judgment steps pause for member input. The RFC must
+      specify what counts as deterministic in a process context and how
+      pauses interact with deadlines.
+    website_truth_implication: |
+      Once accepted and a process runner ships, the site may describe CCL
+      as the institutional process language. Until then, public framing
+      is at "rule/process language direction; charter constraints prove
+      the pattern" only.
+    proposed_outputs:
+      - "ADR(s) for process step grammar, deadline semantics, escalation rules, amendment migration"
+      - "Follow-up RFC for cross-process composition (deferred per ADR-0023)"
+      - "Issues for process runner actor, schema additions, integration tests"
+    priority: soon
+
+  - id: "0005"
+    title: "Action Card Contract and Prioritization"
+    status: candidate
+    domain: member-shell
+    why_it_matters: |
+      ADR-0027 defines action cards as derived views over standing,
+      pending governance objects, and signals. The design space —
+      kind taxonomy, prioritization policy, accessibility metadata,
+      active-scope binding, member-attention model — is not yet fully
+      written. #1608 is the implementation issue; without an RFC, the
+      first /me/action-cards version risks shipping a shape that later
+      needs costly migration.
+    related_adr_candidates: ["0027", "0049", "0050", "0052", "0056"]
+    related_issues: ["#1608", "#1646", "#1605", "#1537"]
+    design_questions:
+      - "What is the closed kind taxonomy at v1? What can grow by ADR amendment?"
+      - "What is the priority policy? Static rules, PolicyOracle, or hybrid? What inputs go in?"
+      - "How does active scope (#1605) affect card derivation?"
+      - "What accessibility metadata travels on a card (locale, deadline-justice profile, plain-language summary, assistive notes)?"
+      - "What is the receipt expectation — does opening a card produce a receipt? Does dismissing one?"
+      - "How does the attention model differ from notifications (RFC dependency on ADR-0052)?"
+      - "How does derivation interact with caching at the gateway? Is determinism preserved request-to-request?"
+    icn_runtime_surface: "Future: GET /v1/gov/me/action-cards in icn-gateway; derivation logic in icn-governance; card-priority PolicyOracle"
+    package_or_institution_expression: "Packages contribute card templates and rendering hints; ICN owns the envelope, kind taxonomy, and prioritization."
+    accessibility_implications: |
+      Cards are the primary member surface. Per RFC-0003, every card must
+      carry plain-language summary, locale metadata, deadline-justice
+      profile, and assistive-tech semantics. The RFC must make these
+      mandatory at the schema level.
+    conflict_or_dispute_path: |
+      Cards reference underlying objects (proposals, action items,
+      allocations). Disputes proceed against those, not the card. The RFC
+      must specify how a dispute about the priority policy itself is
+      handled.
+    compute_or_automation_boundary: |
+      Cards are derived views; compute is involved in priority scoring
+      under a covering policy oracle but not in card content. The RFC
+      must specify whether priority is governance-grade (deterministic)
+      or advisory (allowed to use non-deterministic ranking).
+    website_truth_implication: |
+      Once accepted and shipped, the site may describe action cards as
+      the member-facing nervous system with a documented contract. Until
+      shipped, public framing remains at "named, not yet implemented."
+    proposed_outputs:
+      - "ADR amending or successing 0027 with finalized kind taxonomy, priority contract, accessibility schema"
+      - "Issues for endpoint implementation, derivation logic, priority oracle"
+      - "Validation: integration tests proving determinism, priority correctness, accessibility metadata presence"
+    priority: now
+
+  - id: "0006"
+    title: "Governance Payload Execution Dispatch"
+    status: candidate
+    domain: governance
+    why_it_matters: |
+      ADR-0019 records the authority grant minting seam at proposal
+      acceptance. The next gap is dispatch: what happens when the
+      governance actor closes a proposal whose payload should produce an
+      institutional effect? Today, only a few proposal kinds dispatch;
+      most are accepted-but-non-executable. The pattern needs an RFC
+      before more kinds are added piecemeal.
+    related_adr_candidates: ["0069", "0070", "0071", "0074", "0075"]
+    related_issues: ["#1588", "#1607"]
+    design_questions:
+      - "What is the dispatch map shape? Per-kind handlers, or a payload-driven trait dispatch?"
+      - "What is the accepted-but-non-executable status semantically? Does it produce an effect record (ADR-0025)?"
+      - "How does mandate-gated mutation work in dispatch — when is the mandate consulted?"
+      - "What atomicity guarantees does dispatch provide? (See ADR-0075 candidate, #1588.)"
+      - "What is the proposal type taxonomy at v1? What can grow?"
+      - "How does cross-institution dispatch interact (RFC-0007 dependency)?"
+      - "What is the rollback path when dispatch partially fails?"
+    icn_runtime_surface: "icn-governance dispatch layer; integration with icn-kernel-api effect record schema; supervisor actor handlers"
+    package_or_institution_expression: "Packages declare which proposal kinds are accepted at their domain; dispatch is shared infrastructure."
+    accessibility_implications: |
+      Dispatch outcomes feed action cards (RFC-0005). The RFC must
+      specify what plain-language summary travels on the resulting effect
+      record so member-facing surfaces can render it without
+      re-interpretation.
+    conflict_or_dispute_path: |
+      Effect challenges (ADR-0029 Shape 1) are the dispute path against
+      dispatched outcomes. The RFC must specify how challenges produce
+      counter-effects through the same dispatch surface.
+    compute_or_automation_boundary: |
+      Dispatch is governance-grade; compute may execute the work under a
+      mandate but cannot decide whether to dispatch. The RFC must specify
+      what is governance-only vs what compute may perform under
+      authority.
+    website_truth_implication: |
+      Once accepted and the dispatch path lands for major proposal kinds,
+      the site can describe execution coverage as "advancing to strong"
+      with evidence-linked claims for each kind. Currently the band is
+      "advancing" because coverage is partial; this RFC is the precondition
+      for moving the band.
+    proposed_outputs:
+      - "ADRs for dispatch architecture, proposal type taxonomy, accepted-but-non-executable semantics, atomicity, mandate-gated kernel dispatch (0069)"
+      - "Issues for dispatch implementation per kind, integration tests, replay validation"
+    priority: soon
+
+  - id: "0007"
+    title: "Cross-Institution Mandate Recognition"
+    status: candidate
+    domain: federation
+    why_it_matters: |
+      ADR-0011/0012/0013 govern federation state origin, two-store
+      isolation, and clearing adoption. The next layer is mandate
+      recognition: when coop A grants authority for a cross-coop action,
+      coop B must have a written rule for whether and how to honor it.
+      Today the answer is implicit. The RFC must make it explicit before
+      more federation primitives are added.
+    related_adr_candidates: ["0035", "0036", "0037", "0038", "0039", "0040"]
+    related_issues: ["#1607", "#1609", "#863"]
+    design_questions:
+      - "What is the recognition policy schema? Per-treaty, per-mandate-class, per-issuer-DID?"
+      - "What is the difference between Representation and Delegation across institutions?"
+      - "What is the federation membership lifecycle (ADR-0035) and how does it gate recognition?"
+      - "How does entity-level voting eligibility (#1609) interact with cross-coop representation receipts (#1607)?"
+      - "What happens when coop A revokes a mandate that coop B has already acted on?"
+      - "How does federation agreement support (ADR-0036, #863) express recognition rules in CCL?"
+      - "What audit trail does cross-coop dispatch produce?"
+    icn_runtime_surface: "icn-federation; icn-governance representation/delegation logic; potential new icn-recognition crate"
+    package_or_institution_expression: "Packages declare which external authorities they recognize and under what conditions; ICN owns the recognition primitive."
+    accessibility_implications: |
+      Cross-institution actions surface in a holder's standing across
+      multiple entities. The RFC must specify how the assistive-tech
+      contract (RFC-0003) extends to multi-entity standing reads.
+    conflict_or_dispute_path: |
+      Recognition disputes route through federation dispute resolution
+      (ADR-0042 / RFC-0002 cross-link). The RFC must specify the
+      escalation path when coops disagree on whether a mandate is valid.
+    compute_or_automation_boundary: |
+      Compute may compute recognition decisions under a covering policy
+      oracle (deterministic, fuel-bounded); compute does not have
+      authority to recognize on its own. The RFC must specify the
+      PolicyOracle contract.
+    website_truth_implication: |
+      Once accepted and recognition primitives ship, the site may
+      describe federation depth in concrete terms (membership lifecycle,
+      recognition policy, audit trail). Until then, federation framing
+      stays at "real implementation, public surfaces still maturing."
+    proposed_outputs:
+      - "ADRs for federation membership lifecycle, recognition policy, representation/delegation distinction, entity-level voting eligibility, RepresentativeVote receipts"
+      - "Issues for federation primitive implementations, integration tests across multi-coop scenarios"
+      - "Reference Tranche 2 in adr_candidates.yaml"
+    priority: soon
+
+  - id: "0008"
+    title: "Publicly Verifiable Provenance"
+    status: candidate
+    domain: provenance
+    why_it_matters: |
+      ADR-0026 records the receipt and provenance proof envelope spanning
+      ADR-0008/0011/0012/0014/0019/0020 and PR #1648. Layer 4 of that
+      envelope — the publicly verifiable query surface — is not yet
+      designed. Three open issues (#1435, #1436, #1438) target pieces of
+      this design: per-entry signing instead of HMAC, signature semantics
+      disambiguation, and the auditor-accessible query endpoint.
+    related_adr_candidates: ["0072", "0073"]
+    related_issues: ["#1435", "#1436", "#1438"]
+    design_questions:
+      - "What is the proof envelope shape at the public-query boundary? What is included; what is omitted for privacy?"
+      - "What is the per-entry signing scheme that replaces JWT-secret-bound HMAC fingerprinting (#1435)?"
+      - "What does ProvenanceRef::DirectMember.signature actually attest to (#1436)?"
+      - "What is the auditor-facing query endpoint shape (#1438)? Pagination, filtering, redaction?"
+      - "What is the federation peer's verification path? Same as auditor's, or separate?"
+      - "What is the canonical event log and replay semantics (ADR-0073 candidate)?"
+      - "How does publicly verifiable provenance interact with privacy-class-bounded compute (ADR-0082 candidate)?"
+    icn_runtime_surface: "icn-governance proof layer; icn-federation provenance store; new query endpoint in icn-gateway; potential icn-audit crate"
+    package_or_institution_expression: "Packages do not author provenance; they consume it via the public query surface and audit endpoints."
+    accessibility_implications: |
+      Auditors and federated peers may not be the primary consumers, but
+      members may also want to verify their own provenance. The query
+      surface must support plain-language receipt rendering (per ADR-0028
+      / RFC-0003).
+    conflict_or_dispute_path: |
+      Provenance disputes ARE conflicts about effects (ADR-0029 Shape 1).
+      The RFC must specify what evidence the query surface produces to
+      support a challenge and what re-verification looks like.
+    compute_or_automation_boundary: |
+      Compute may produce provenance entries under mandate; compute may
+      not mint provenance without a covering authority grant. The RFC
+      must specify how compute-produced entries are signed and verified
+      independently of the producing actor.
+    website_truth_implication: |
+      Once accepted and the public query surface ships, the site may say
+      provenance is "publicly verifiable" with evidence-linked claims.
+      Currently the strongest public claim is "provenance is the strongest
+      part of the system" — true at the gateway/supervisor layer; the
+      cross-coop and auditor verifiability layer is future work.
+    proposed_outputs:
+      - "ADRs for cross-node verifiable provenance (0072), canonical event log and replay semantics (0073)"
+      - "Issues for per-entry signing migration, query endpoint, replay validation"
+    priority: soon
+
+  - id: "0009"
+    title: "Project Governance and ADR/RFC Acceptance"
+    status: candidate
+    domain: project-governance
+    why_it_matters: |
+      ICN's own governance — who can accept an RFC, who can merge an
+      ADR, who controls release authority, who issues emergency patches —
+      is currently informal. The forward direction is to use ICN's own
+      governance primitives to govern ICN. The RFC is the place to design
+      that transition.
+    related_adr_candidates: ["0063", "0064", "0065", "0066", "0067", "0068"]
+    related_issues: []
+    design_questions:
+      - "What is the maintainer authority model at v1? Who has merge rights, who has accept rights?"
+      - "What is the contributor role model beyond code (docs, design, research, testing, partnership)?"
+      - "What is the RFC acceptance process? Quorum, lazy consensus, maintainer call?"
+      - "What is the ADR acceptance process? How does it differ from RFC acceptance?"
+      - "What is the release authority and cadence model?"
+      - "What is the security authority and emergency patch path?"
+      - "What is the transition path toward ICN-hosted governance — when is the substrate stable enough?"
+      - "How does ICN dogfood its own governance primitives (charters, mandates, effect records, conflict resolution)?"
+    icn_runtime_surface: "doctrinal initially; later ICN's own institutional package"
+    package_or_institution_expression: "ICN itself becomes an institution package once primitives stabilize."
+    accessibility_implications: |
+      Project governance must itself be accessible — non-CLI workflows
+      (RFC-0003), plain-language process docs, deadline justice for
+      contributors with caregiving or wage constraints. The RFC must
+      specify how ICN's own governance honors the floor it asks
+      institutions to honor.
+    conflict_or_dispute_path: |
+      Project disputes (e.g., contested RFC outcomes, contributor
+      conflicts) need a path. Initially this is informal; the RFC must
+      design the transition to a formalized path that uses the same
+      conflict resolution model (RFC-0002).
+    compute_or_automation_boundary: |
+      Project governance may use compute under mandate (e.g., automated
+      checks, build-time linters per ADR-0033) but compute does not
+      decide RFC outcomes or emergency patches.
+    website_truth_implication: |
+      Once accepted and the transition path is documented, the site can
+      describe ICN's own governance with the same maturity-band
+      discipline applied to other subsystems. Until then, project
+      governance is informal and the public framing should reflect that.
+    proposed_outputs:
+      - "ADRs for project governance, maintainer authority, contributor roles, security authority, release authority, transition path"
+      - "Issues for governance-as-code dogfooding"
+    priority: later
+
+  - id: "0010"
+    title: "Website Maturity Evidence and Public Claim Linting"
+    status: candidate
+    domain: website
+    why_it_matters: |
+      ADR-0032 records the website truth boundary (maturity bands,
+      evidence chain). ADR-0033 proposes a build-time linter that
+      verifies every banded claim cites an ADR, issue, code path, or
+      phase reference. The design space — what counts as evidence, how
+      the linter resolves references, how editorial discipline interacts
+      with mechanical checks — is not yet fully written.
+    related_adr_candidates: ["0032", "0033"]
+    related_issues: ["#1369"]
+    design_questions:
+      - "What is the evidence-reference schema? ADR-NNNN, #NNNN, repo path, phase reference — same field or separate?"
+      - "How does the linter resolve references at build time? GitHub API for issues, file existence for paths?"
+      - "How does the linter handle superseded ADRs or closed issues? Stale references — fail build, warn, or auto-update?"
+      - "What is the threshold for prose claims that imply a band but don't use a MaturityBadge component?"
+      - "How does the live roadmap page (#1369) interact with the evidence schema?"
+      - "What caching strategy keeps build time reasonable when GitHub API is involved?"
+    icn_runtime_surface: "doctrinal — applies to website/ build pipeline only"
+    package_or_institution_expression: "n/a"
+    accessibility_implications: |
+      Evidence-linked claims are themselves an accessibility property —
+      members and partners can audit any claim by following its
+      reference. The RFC must specify how linked references are
+      rendered (visible vs hover, plain vs URL).
+    conflict_or_dispute_path: |
+      Disputes about a claim resolve against the cited ADR/issue. The
+      RFC must specify what happens when an evidence reference becomes
+      stale (e.g., ADR superseded, issue closed without resolution).
+    compute_or_automation_boundary: |
+      The linter is a build-time check; no runtime. Compute does not
+      decide what bands to apply.
+    website_truth_implication: |
+      This RFC IS the public-claim implication.
+    proposed_outputs:
+      - "ADR amendments / successors to 0032 and 0033 with finalized evidence schema, linter contract"
+      - "Issues for linter implementation, MaturityBadge component schema update, existing usage backfill, live roadmap rendering (#1369)"
+    priority: soon

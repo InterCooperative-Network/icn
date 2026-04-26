@@ -13,7 +13,7 @@ allowlisted_docs_subdirs = [
   "adr", "ai", "api", "architecture", "archive", "ci", "crate-manifests", "demo", "deployment",
   "design", "design-language", "dev", "development", "examples", "features", "guides", "internal",
   "maintenance", "manual", "migration-guides", "mobile", "observability", "onboarding", "operations",
-  "ops", "performance", "phases", "pilots", "planning", "plans", "reference", "scripts", "sdis",
+  "ops", "performance", "phases", "pilots", "planning", "plans", "reference", "rfcs", "scripts", "sdis",
   "security", "spec", "sprints", "state", "status", "strategy", "summit", "superpowers",
   "templates", "testing", "vision",
 ]
@@ -370,6 +370,16 @@ freshness = "unknown"
 domain_tags = ["adr"]
 recommended_action = "keep"
 last_reviewed = "unknown"
+
+[[doc_path_defaults]]
+prefix = "docs/rfcs/"
+truth_class = "draft"
+role = "design"
+canonical = "no"
+freshness = "current"
+domain_tags = ["rfc"]
+recommended_action = "keep"
+last_reviewed = "2026-04-26"
 
 [[doc_path_defaults]]
 prefix = "docs/api/"
