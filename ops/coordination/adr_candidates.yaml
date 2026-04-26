@@ -1,0 +1,901 @@
+# ICN ADR Candidate Registry
+#
+# A planning index of every ADR ICN intends to write — both back-fills of
+# existing implementation reality and forward-state direction.
+#
+# This file is NOT a decision record. Decisions live in docs/adr/.
+# Rows here exist so the long arc of architecture does not get designed
+# out by accident between sessions.
+#
+# Conventions: see ops/coordination/README.md
+# ADR lifecycle: see docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index.md
+# Numbering: continues from the highest existing ADR (0020 at registry-creation time)
+# Updated: 2026-04-26
+#
+# Field reference:
+#   id: ADR number (zero-padded, 4 digits)
+#   title: Short decision title
+#   proposed_status: status the ADR will carry once written (proposed | accepted)
+#   registry_state: candidate | drafted | merged
+#   adr_path: path to the file (set when registry_state >= drafted)
+#   domain: ccl | governance | federation | economics | compute | member-shell | accessibility | conflict | package | website | project-governance | provenance
+#   why_it_matters: 1-2 sentence rationale
+#   icn_runtime_surface: what kernel/runtime surface this affects, or "doctrinal" for pure design
+#   package_or_institution_expression: how institution packages express this
+#   accessibility_implications: how this lands for low-bandwidth/low-device/non-English/disabled members
+#   conflict_or_dispute_path: how disputes about this surface are handled
+#   compute_or_automation_boundary: what compute can and cannot do here
+#   website_truth_implication: what the public site can claim once this ADR is accepted and implemented
+#   existing_issues: GitHub issue references that already exist
+#   missing_issues: issues that should be opened to drive this work
+#   depends_on: ADR ids that must land first
+#   priority: now | soon | later
+#   tranche: 1 | 2 | 3 | 4
+
+candidates:
+
+  # ─────────────────────────────────────────────────────────────────────
+  # TRANCHE 1 — drafted in this PR
+  # Foundational ADRs without which later ADRs cannot stably reference
+  # shared concepts. Mix of back-fills (accepted, evidence-linked) and
+  # forward direction (proposed, named-but-not-decided).
+  # ─────────────────────────────────────────────────────────────────────
+
+  - id: "0021"
+    title: "CCL Determinism, Fuel, and Capability Safety"
+    proposed_status: accepted
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0021-ccl-determinism-fuel-and-capability-safety.md"
+    domain: ccl
+    why_it_matters: "CCL's safety properties (deterministic, fuel-metered, not Turing-complete, capability-bounded) are the precondition for trusting CCL output as governance-grade input. They have been implemented for some time without a written decision."
+    icn_runtime_surface: "icn-ccl interpreter; LocalExecutor and WasmExecutor in icn-compute; schema bridge in icn-ccl/src/schema/bridge.rs"
+    package_or_institution_expression: "Packages author CCL contracts and schema-bound charters; safety properties apply to both."
+    accessibility_implications: "Determinism gives every member the same answer regardless of node, which is the precondition for accessibility at the result layer."
+    conflict_or_dispute_path: "Disputes over CCL outputs re-execute the contract under the same fuel/capability bounds; divergence is detectable."
+    compute_or_automation_boundary: "CCL is the only sanctioned execution surface for governance-grade computation; non-deterministic or Turing-complete code is rejected."
+    website_truth_implication: "Site may say CCL is deterministic, fuel-metered, and capability-bounded — and link to this ADR for the formal claim."
+    existing_issues: []
+    missing_issues: []
+    depends_on: []
+    priority: now
+    tranche: 1
+
+  - id: "0022"
+    title: "CCL Schema Bridge and Constraint Compilation"
+    proposed_status: accepted
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0022-ccl-schema-bridge-and-constraint-compilation.md"
+    domain: ccl
+    why_it_matters: "The schema bridge is where institutional design (charters) becomes kernel-enforceable constraints. This is the meaning firewall for CCL-driven policy."
+    icn_runtime_surface: "icn-ccl/src/schema/{mod,bridge,governance,economics,agreement}.rs; ConstraintSet output to icn-kernel-api"
+    package_or_institution_expression: "Packages ship YAML charters with thresholds, weights, formulas; the bridge compiles these into ConstraintSet at proposal acceptance time."
+    accessibility_implications: "Plain-language schemas make charter authoring legible to non-engineers."
+    conflict_or_dispute_path: "Disputes over compiled constraints re-run the bridge; divergence indicates either schema bug or charter ambiguity."
+    compute_or_automation_boundary: "Compute receives compiled ConstraintSet only. Compute cannot read raw charter semantics."
+    website_truth_implication: "Site may explain how a charter becomes enforced policy without overclaiming that CCL runs full institutional workflows."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0021"]
+    priority: now
+    tranche: 1
+
+  - id: "0023"
+    title: "CCL Institutional Process Language"
+    proposed_status: proposed
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0023-ccl-institutional-process-language.md"
+    domain: ccl
+    why_it_matters: "CCL today encodes thresholds and formulas. The forward direction is CCL as the language for institutional processes — workflows, deadlines, escalations, conflict resolution steps. Naming this direction now lets later ADRs depend on it."
+    icn_runtime_surface: "Future: process-runner inside icn-governance or a new icn-process crate; schema additions in icn-ccl"
+    package_or_institution_expression: "Packages ship process definitions (e.g., onboarding, grievance, allocation review) as CCL alongside charter rules."
+    accessibility_implications: "Process steps must be expressible in plain language and renderable as action cards; deadline semantics must accommodate caregiving and time-justice constraints."
+    conflict_or_dispute_path: "Process definitions themselves can be amended via governance; in-flight processes get appeal/escalation rules from the same CCL surface."
+    compute_or_automation_boundary: "Compute executes process steps that are deterministic and bounded; human judgment steps pause for member input."
+    website_truth_implication: "Site can describe CCL as the rule/process language direction (charter constraints already prove the pattern) without claiming process runtime exists."
+    existing_issues: ["#863"]
+    missing_issues: ["scope: process step grammar", "scope: deadline semantics", "scope: escalation rules"]
+    depends_on: ["0021", "0022"]
+    priority: soon
+    tranche: 1
+
+  - id: "0024"
+    title: "Institution Package Manifest Schema"
+    proposed_status: proposed
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0024-institution-package-manifest-schema.md"
+    domain: package
+    why_it_matters: "BootstrapSeedManifest covers entity/structure/role primitives, but there is no formal Rust schema for institution-specific extensions (operating_purpose taxonomy, indicator definitions, signal rules, allocation templates). Packages currently extend ad-hoc."
+    icn_runtime_surface: "icn-governance/src/bootstrap.rs; new schema validators in a future icn-package crate"
+    package_or_institution_expression: "Packages declare manifest with a stable contract; ICN validates and refuses unknown extension shapes (or accepts under explicit opt-in)."
+    accessibility_implications: "Manifests carry plain-language fields readable by non-engineers; fixtures support default accessible values."
+    conflict_or_dispute_path: "Manifest validation errors produce structured remediation, not opaque parse failures."
+    compute_or_automation_boundary: "Manifest content is data, not code; compute does not run during manifest application beyond schema validation."
+    website_truth_implication: "Site can describe the institution-package layer once the manifest contract is named (currently ad-hoc per package)."
+    existing_issues: ["#1635", "#1628"]
+    missing_issues: ["schema: indicator definition", "schema: signal rules", "schema: allocation template"]
+    depends_on: []
+    priority: now
+    tranche: 1
+
+  - id: "0025"
+    title: "Institutional Effect Record Canonical Schema"
+    proposed_status: proposed
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md"
+    domain: provenance
+    why_it_matters: "When a mandate dispatches and produces an effect (role assigned, allocation made, member admitted), there is no canonical record schema. Institutional memory needs one type to anchor receipts, provenance, and audit."
+    icn_runtime_surface: "Future: EffectRecord type in icn-governance or icn-kernel-api; persistence wired to ReceiptBackend"
+    package_or_institution_expression: "Packages produce effects of declared kinds (allocate, admit, assign, settle, decline); the kind taxonomy is closed."
+    accessibility_implications: "Effects expose plain-language summaries readable by holders; records are queryable from /me/standing."
+    conflict_or_dispute_path: "Effect records are addressable for appeal/reversal; reversal produces a counter-effect, not a deletion."
+    compute_or_automation_boundary: "Compute may produce effect records under mandate; cannot produce effects without a covering authority grant."
+    website_truth_implication: "Site can describe ICN's institutional memory once effect records have a canonical schema and dispatch consults mandates (today, kernel does not gate on mandates)."
+    existing_issues: ["#1607"]
+    missing_issues: ["scope: effect kind taxonomy", "scope: effect record persistence"]
+    depends_on: ["0024"]
+    priority: soon
+    tranche: 1
+
+  - id: "0026"
+    title: "Receipt and Provenance Proof Envelope"
+    proposed_status: accepted
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md"
+    domain: provenance
+    why_it_matters: "GovernanceProof, FederationProvenance, and ArtifactReceipt have shipped piecemeal across ADR-0008/0011/0012/0014/0019/0020. A single ADR records the envelope shape so later work (cross-coop verifiability, audit endpoints) plugs in cleanly."
+    icn_runtime_surface: "icn-governance/src/proof.rs; icn-federation provenance store (PR #1648); icn-gateway receipt store"
+    package_or_institution_expression: "Packages do not author receipts; they consume them via /me/standing and (future) audit endpoints."
+    accessibility_implications: "Receipts are queryable by holder DID and renderable as plain-language statements (today: schema only, no rendering helpers)."
+    conflict_or_dispute_path: "Receipts are immutable; disputes proceed against the underlying decision, not the receipt envelope."
+    compute_or_automation_boundary: "Compute produces receipts under mandate; cannot mint receipts without a covering authority grant."
+    website_truth_implication: "Site may say provenance is the strongest part of ICN today; receipts are persistent (post-#1648) with cross-coop verifiability noted as future work."
+    existing_issues: ["#1438", "#1436", "#1435"]
+    missing_issues: ["spec: receipt rendering helpers"]
+    depends_on: []
+    priority: now
+    tranche: 1
+
+  - id: "0027"
+    title: "Action Card Contract"
+    proposed_status: proposed
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0027-action-card-contract.md"
+    domain: member-shell
+    why_it_matters: "Action cards are the proposed member-facing nervous system: derived views answering 'what do I need to do today?'. ADR-0020 promised an action-card surface; the schema and contract have not been decided."
+    icn_runtime_surface: "Future: GET /me/action-cards in icn-gateway; derivation logic over standing + pending proposals + assigned action items + signals"
+    package_or_institution_expression: "Packages contribute action-card templates (e.g., 'review draft proposal', 'attend deliberation', 'sign as steward'); ICN owns the envelope and prioritization."
+    accessibility_implications: "Cards are the primary accessibility surface — must be plain-language, low-bandwidth, screen-reader semantic, deadline-aware with caregiving accommodation."
+    conflict_or_dispute_path: "Cards reference underlying objects (proposals, action items); disputes proceed against those, not the card."
+    compute_or_automation_boundary: "Cards are derived views, not stored entities; compute may be involved in prioritization but not in card content."
+    website_truth_implication: "Site must NOT claim action cards exist until the endpoint ships. Once accepted as ADR + implemented, site can describe the member-facing surface."
+    existing_issues: ["#1608", "#1646"]
+    missing_issues: []
+    depends_on: ["0028"]
+    priority: now
+    tranche: 1
+
+  - id: "0028"
+    title: "Accessibility Baseline for Member Interfaces"
+    proposed_status: proposed
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0028-accessibility-baseline-for-member-interfaces.md"
+    domain: accessibility
+    why_it_matters: "Accessibility is a participation floor, not a feature. A baseline ADR names the floor (sensory, cognitive, linguistic, economic, temporal layers) so every member-facing surface can be measured against it."
+    icn_runtime_surface: "Future: GET /me/glossary endpoint; language/locale fields in standing schema; offline-tolerance in mobile SDK"
+    package_or_institution_expression: "Packages declare locale and assistive metadata; package fixtures must pass baseline checks."
+    accessibility_implications: "This ADR IS the accessibility implication. WCAG 2.2 AA is the floor; ICN-specific concerns (deadline justice, economic barriers, language justice) extend it."
+    conflict_or_dispute_path: "Accessibility violations are graded as institutional defects with a remediation pathway, not as bugs."
+    compute_or_automation_boundary: "Compute does not decide accessibility outcomes; compute may render assistive content under explicit member opt-in."
+    website_truth_implication: "Site may say accessibility is a first-class architectural goal, not a complete runtime surface; glossary endpoint named as proposed."
+    existing_issues: ["#1610", "#1611"]
+    missing_issues: ["spec: WCAG floor checklist for ICN surfaces", "spec: language justice workflow"]
+    depends_on: []
+    priority: now
+    tranche: 1
+
+  - id: "0029"
+    title: "Conflict Resolution Object Model"
+    proposed_status: proposed
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0029-conflict-resolution-object-model.md"
+    domain: conflict
+    why_it_matters: "Compute disputes have an actor (icn-ccl/src/disputes.rs); institutional conflicts (member-vs-member, decision appeal, remediation) have a type sketch (Appeal) but no runtime. Naming the object model is the precondition for institutional care work."
+    icn_runtime_surface: "icn-ccl/src/disputes.rs (compute scope, implemented); icn-governance/src/appeal.rs (governance scope, type-only); future: process-runner integration with ADR-0023"
+    package_or_institution_expression: "Packages declare conflict resolution processes (mediation, facilitation, arbitration) as CCL processes; ICN owns object identity and lifecycle."
+    accessibility_implications: "Resolution flows must accommodate language, time, technology constraints; testimony and evidence must support assistive submission."
+    conflict_or_dispute_path: "This ADR defines the path. Distinguishes conflicts about effects (post-decision) from conflicts about decisions (process appeal) from conflicts between members (relational)."
+    compute_or_automation_boundary: "Compute mediates evidence and timing; compute does not decide outcomes."
+    website_truth_implication: "Site may describe conflict resolution as a first-class architectural goal; runtime exists for compute disputes only; institutional resolution is spec-stage."
+    existing_issues: []
+    missing_issues: ["spec: appeal lifecycle", "spec: mediation role taxonomy", "spec: remediation/repair semantics"]
+    depends_on: ["0023", "0025"]
+    priority: soon
+    tranche: 1
+
+  - id: "0030"
+    title: "Compute Workload Manifest and Authority Boundary"
+    proposed_status: accepted
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md"
+    domain: compute
+    why_it_matters: "ComputeTask has shipped with code (CCL/WASM/SQL ref), fuel limit, privacy/determinism class, scope, and trust gating. The authority boundary — compute as constrained execution, never autonomous decision — has not been written down."
+    icn_runtime_surface: "icn-compute/src/{task,types,executor,actor}.rs; icn-gateway/src/compute_mgr.rs"
+    package_or_institution_expression: "Packages submit tasks under a covering mandate; tasks declare their scope (Commons / Coop / Federation) and privacy class."
+    accessibility_implications: "Task descriptions and results expose plain-language summaries; long-running tasks emit progress for assistive UIs."
+    conflict_or_dispute_path: "DisputeManager (icn-compute/src/dispute.rs) re-executes contested tasks; divergence triggers misbehavior callbacks."
+    compute_or_automation_boundary: "This ADR IS the boundary. Compute executes; compute does not decide. Compute outputs feed governance, not replace it."
+    website_truth_implication: "Site may say compute is real and trust-gated, with public surfaces still maturing; explicitly does not claim compute makes institutional decisions."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0021"]
+    priority: now
+    tranche: 1
+
+  - id: "0031"
+    title: "Commons Compute Admission and Settlement Policy"
+    proposed_status: accepted
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md"
+    domain: compute
+    why_it_matters: "CommonsPool admission (trust-gated, sybil-aware) and SettlementEngine (balanced earn/spend journal entries) have shipped. ADR-0005 set commons-credit settlement direction; this ADR records the operational policy."
+    icn_runtime_surface: "icn-compute/src/commons_pool.rs; icn-ledger/src/settlement.rs; icn-compute/src/receipt.rs"
+    package_or_institution_expression: "Packages declare which roles may consume commons compute; ICN enforces capacity and trust gating."
+    accessibility_implications: "Affiliated/unaffiliated split protects low-trust newcomers from being squeezed out; commons capacity rules are surfaced via standing."
+    conflict_or_dispute_path: "Settlement disputes use the existing receipt + dispute path; admission disputes proceed against the trust graph."
+    compute_or_automation_boundary: "Pool admission is a policy decision (PolicyOracle); execution is constrained as in ADR-0030."
+    website_truth_implication: "Site may say commons compute has real implementation, including admission and balanced settlement, with governance integration still maturing."
+    existing_issues: ["#992"]
+    missing_issues: ["spec: governance-controlled admission policy"]
+    depends_on: ["0030"]
+    priority: now
+    tranche: 1
+
+  - id: "0032"
+    title: "Website Truth Boundary"
+    proposed_status: accepted
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0032-website-truth-boundary.md"
+    domain: website
+    why_it_matters: "The public site already follows a maturity-band convention (strong / advancing / maturing / behind / not-yet) anchored on whats-real-now.astro. ADR records the rule so the convention does not drift across PRs."
+    icn_runtime_surface: "doctrinal — applies to website/src/ content authoring"
+    package_or_institution_expression: "Institution packages may have their own public surfaces; the ICN site does not host institution-specific content beyond demo system pages."
+    accessibility_implications: "Truth boundary protects members from making decisions based on overclaims; honesty is itself an accessibility property."
+    conflict_or_dispute_path: "Drift is caught by review; whats-real-now bears a 'reviewed' date and is the truth anchor."
+    compute_or_automation_boundary: "No compute role; this is editorial."
+    website_truth_implication: "This ADR IS the truth-boundary rule. Site claims must align with implementation status of cited code/ADRs; no autonomous-compute-decision claims; no payment/wallet/balance vocabulary for ICN economic primitives."
+    existing_issues: []
+    missing_issues: []
+    depends_on: []
+    priority: now
+    tranche: 1
+
+  - id: "0033"
+    title: "Public Maturity Claims and Evidence Links"
+    proposed_status: proposed
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0033-public-maturity-claims-and-evidence-links.md"
+    domain: website
+    why_it_matters: "Truth boundary is the rule; evidence linking is the practice. Forward direction is to require every maturity-banded claim on the site to cite an ADR or issue, so claim drift becomes mechanically detectable."
+    icn_runtime_surface: "Future: a build-time linter that verifies every MaturityBadge usage carries an evidence reference"
+    package_or_institution_expression: "n/a — this is about the ICN site"
+    accessibility_implications: "Evidence links let skeptical members audit any claim; precondition for trust at the public surface."
+    conflict_or_dispute_path: "Disputes about a claim resolve against the cited ADR/issue."
+    compute_or_automation_boundary: "Build-time check only; no runtime."
+    website_truth_implication: "Once accepted, every maturity claim on the site cites an ADR or issue."
+    existing_issues: []
+    missing_issues: ["impl: maturity-claim evidence linter"]
+    depends_on: ["0032"]
+    priority: soon
+    tranche: 1
+
+  - id: "0034"
+    title: "ADR Candidate Registry as Architectural Memory"
+    proposed_status: accepted
+    registry_state: drafted
+    adr_path: "docs/adr/ADR-0034-adr-candidate-registry-as-architectural-memory.md"
+    domain: project-governance
+    why_it_matters: "Without a registry, the long arc of design (60+ ADRs across 11 domains) tends to fade between sessions. The registry pre-stages the work so nothing gets accidentally designed out."
+    icn_runtime_surface: "doctrinal — ops/coordination/adr_candidates.yaml"
+    package_or_institution_expression: "n/a"
+    accessibility_implications: "The registry itself is plain-language and structured; future agents and contributors can pick up tranches without rediscovery cost."
+    conflict_or_dispute_path: "Registry rows are non-binding; ADR-0018 governs lifecycle when a row is drafted."
+    compute_or_automation_boundary: "No compute role."
+    website_truth_implication: "The site does not surface the registry; it is internal architectural memory."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0018"]
+    priority: now
+    tranche: 1
+
+  # ─────────────────────────────────────────────────────────────────────
+  # TRANCHE 2 — federation, delegation, representation, federation economics
+  # Trigger to draft: after #1606 (reverse-index) lands, ADR-0011/0012/0013
+  # are anchor citations.
+  # ─────────────────────────────────────────────────────────────────────
+
+  - id: "0035"
+    title: "Federation Membership Lifecycle"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: federation
+    why_it_matters: "Federation join/leave/reconfigure is a lifecycle, not a one-shot. Naming the states protects against silent partial-state bugs."
+    existing_issues: []
+    missing_issues: ["spec: federation membership state machine"]
+    depends_on: ["0026"]
+    priority: soon
+    tranche: 2
+
+  - id: "0036"
+    title: "Federation Agreement Support"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: federation
+    why_it_matters: "Federation agreements (treaties between coops) need a CCL expression and a ratification path."
+    existing_issues: ["#863"]
+    missing_issues: []
+    depends_on: ["0023", "0035"]
+    priority: later
+    tranche: 2
+
+  - id: "0037"
+    title: "Cross-Institution Mandate Recognition"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: federation
+    why_it_matters: "When coop A grants authority, coop B needs a rule for whether/how to honor it. ADR-0012 owns federation state origin; this ADR owns recognition policy."
+    existing_issues: []
+    missing_issues: ["spec: recognition policy"]
+    depends_on: ["0026", "0035"]
+    priority: later
+    tranche: 2
+
+  - id: "0038"
+    title: "Entity-Level Voting Eligibility"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: governance
+    why_it_matters: "When an entity (coop) votes inside a federation, the eligibility rule is non-obvious. Issue #1609 names the gap."
+    existing_issues: ["#1609"]
+    missing_issues: []
+    depends_on: ["0035"]
+    priority: soon
+    tranche: 2
+
+  - id: "0039"
+    title: "RepresentativeVote / EntityAction Receipts"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: governance
+    why_it_matters: "Representative voting needs a receipt that captures both the representative DID and the entity-on-whose-behalf. Issue #1607 is open."
+    existing_issues: ["#1607"]
+    missing_issues: []
+    depends_on: ["0026", "0038"]
+    priority: soon
+    tranche: 2
+
+  - id: "0040"
+    title: "Delegation vs Representation Semantics"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: governance
+    why_it_matters: "Delegation (transfer of authority) and representation (action on behalf of) have distinct semantics; conflating them produces accountability gaps."
+    existing_issues: []
+    missing_issues: ["spec: delegation/representation distinction"]
+    depends_on: ["0039"]
+    priority: later
+    tranche: 2
+
+  - id: "0041"
+    title: "Federation Clearing Provenance and Settlement Terms"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: economics
+    why_it_matters: "ADR-0013 records clearing-adoption architecture; this ADR records the settlement-term contract for cleared obligations."
+    existing_issues: []
+    missing_issues: ["spec: clearing settlement terms"]
+    depends_on: ["0026"]
+    priority: later
+    tranche: 2
+
+  - id: "0042"
+    title: "Federation Dispute Resolution Model"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: federation
+    why_it_matters: "Inter-cooperative disputes (treaty violations, mis-recognition) need a resolution path that is not member-grade conflict resolution."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0029", "0036"]
+    priority: later
+    tranche: 2
+
+  - id: "0043"
+    title: "Peer Federation Discovery and Admission"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: federation
+    why_it_matters: "How do federations find each other and decide whom to admit? Today: manual configuration. Forward: discovery + admission policy."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0035"]
+    priority: later
+    tranche: 2
+
+  - id: "0044"
+    title: "Obligation / Allocation / Settlement Lifecycle"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: economics
+    why_it_matters: "ADR-0004 distinguishes obligations from payments; #1634 RFC names the primitives. This ADR records the lifecycle."
+    existing_issues: ["#1634"]
+    missing_issues: []
+    depends_on: []
+    priority: soon
+    tranche: 2
+
+  - id: "0045"
+    title: "Mutual Credit Position Semantics"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: economics
+    why_it_matters: "Mutual credit positions are not balances; their lifecycle and limits need a written contract distinguished from payment-rail vocabulary."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0044"]
+    priority: later
+    tranche: 2
+
+  - id: "0046"
+    title: "Treasury and Budget Authority Model"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: economics
+    why_it_matters: "Treasury actions need a covering authority grant and a budget-ceiling check. Today: ad hoc."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0025", "0026"]
+    priority: later
+    tranche: 2
+
+  - id: "0047"
+    title: "Patronage and Internal Capital Accounts"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: economics
+    why_it_matters: "Cooperative patronage and internal capital are first-class accounting concerns; need a model that does not collapse into 'a balance.'"
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0044"]
+    priority: later
+    tranche: 2
+
+  - id: "0048"
+    title: "Support-Institution Resource Pools"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: economics
+    why_it_matters: "Some federations operate support institutions (mutual aid, education funds) with shared pools. Issue #1635 names the pattern."
+    existing_issues: ["#1635"]
+    missing_issues: []
+    depends_on: ["0044"]
+    priority: later
+    tranche: 2
+
+  # ─────────────────────────────────────────────────────────────────────
+  # TRANCHE 3 — member shell, mobile, action cards detail, language/glossary
+  # Trigger to draft: after action-card spec (0027) accepted and #1608 in flight.
+  # ─────────────────────────────────────────────────────────────────────
+
+  - id: "0049"
+    title: "Member Standing Read Model Expansion"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: member-shell
+    why_it_matters: "Standing today returns memberships + roles; expansion adds active scope, recent effects, pending obligations."
+    existing_issues: ["#1605"]
+    missing_issues: []
+    depends_on: ["0025"]
+    priority: soon
+    tranche: 3
+
+  - id: "0050"
+    title: "Active Scope / Session-Selected Scope"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: member-shell
+    why_it_matters: "When a holder has multiple roles, the active scope determines which standing slice is current."
+    existing_issues: ["#1605"]
+    missing_issues: []
+    depends_on: ["0049"]
+    priority: soon
+    tranche: 3
+
+  - id: "0051"
+    title: "Mobile Wallet / Member Shell Boundary"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: member-shell
+    why_it_matters: "The mobile shell is a key signer + receipt verifier + standing reader. Boundary against gateway is unsettled."
+    existing_issues: ["#1366"]
+    missing_issues: []
+    depends_on: ["0027", "0049"]
+    priority: soon
+    tranche: 3
+
+  - id: "0052"
+    title: "Notification and Attention Model"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: member-shell
+    why_it_matters: "Notification design that respects member time; opposite of social-media attention capture."
+    existing_issues: ["#1537"]
+    missing_issues: []
+    depends_on: ["0027", "0028"]
+    priority: soon
+    tranche: 3
+
+  - id: "0053"
+    title: "Receipt and Provenance UX"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: member-shell
+    why_it_matters: "Receipts are runtime contracts; their member-facing rendering is a separate UX decision."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0026", "0028"]
+    priority: later
+    tranche: 3
+
+  - id: "0054"
+    title: "Language / Glossary Model"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: accessibility
+    why_it_matters: "Glossary endpoint translates institutional vocabulary; #1610 is open."
+    existing_issues: ["#1610"]
+    missing_issues: []
+    depends_on: ["0028"]
+    priority: now
+    tranche: 3
+
+  - id: "0055"
+    title: "Plain-Language and Glossary Contract"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: accessibility
+    why_it_matters: "Beyond endpoint: a contract that all member-facing strings carry plain-language equivalents."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0054"]
+    priority: soon
+    tranche: 3
+
+  - id: "0056"
+    title: "Assistive Technology Semantics for Action Cards"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: accessibility
+    why_it_matters: "Cards are the primary surface; assistive-tech contract (ARIA roles, semantic HTML, focus order) belongs to ICN, not consumers."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0027", "0028"]
+    priority: soon
+    tranche: 3
+
+  - id: "0057"
+    title: "Caregiving / Time / Wage Barrier Accommodation"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: accessibility
+    why_it_matters: "Deadlines and required participation can exclude caregivers, shift workers, low-wage members. Accommodation must be a runtime concept, not a footnote."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0028"]
+    priority: later
+    tranche: 3
+
+  - id: "0058"
+    title: "Offline / Intermittent Connectivity Participation"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: accessibility
+    why_it_matters: "Mobile and rural access need offline-tolerant flows; specific affordances differ from compute checkpoints."
+    existing_issues: ["#1366"]
+    missing_issues: []
+    depends_on: ["0028", "0051"]
+    priority: later
+    tranche: 3
+
+  - id: "0059"
+    title: "Non-Command-Line Operator and Member Workflows"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: accessibility
+    why_it_matters: "ICN's CLI surface is rich; member surface must not require CLI literacy."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0028"]
+    priority: later
+    tranche: 3
+
+  - id: "0060"
+    title: "CCL-Defined Conflict Resolution Processes"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: conflict
+    why_it_matters: "Once conflict object model (0029) exists, processes that operate on it should be CCL definitions, not hard-coded."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0023", "0029"]
+    priority: later
+    tranche: 3
+
+  - id: "0061"
+    title: "Evidence Bundle and Testimony Model"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: conflict
+    why_it_matters: "Resolution processes ingest evidence; the bundle and testimony format must support assistive submission and selective disclosure."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0029"]
+    priority: later
+    tranche: 3
+
+  - id: "0062"
+    title: "Remedies, Sanctions, and Repair Agreements"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: conflict
+    why_it_matters: "Outcomes of resolution: repair-first, sanction-aware, sanction-only-as-last-resort."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0029"]
+    priority: later
+    tranche: 3
+
+  # ─────────────────────────────────────────────────────────────────────
+  # TRANCHE 4 — project governance, release discipline, transition path
+  # Trigger to draft: after tranches 2-3 visible, when policy stability
+  # is more legible.
+  # ─────────────────────────────────────────────────────────────────────
+
+  - id: "0063"
+    title: "ICN Core Project Governance"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: project-governance
+    why_it_matters: "ICN itself needs a governance model — currently informal. Forward direction is a self-hosted governance once primitives stabilize."
+    existing_issues: []
+    missing_issues: []
+    depends_on: []
+    priority: later
+    tranche: 4
+
+  - id: "0064"
+    title: "Maintainer and Steward Authority"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: project-governance
+    why_it_matters: "Who can merge what; how stewardship transfers."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0063"]
+    priority: later
+    tranche: 4
+
+  - id: "0065"
+    title: "Contributor Role Model"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: project-governance
+    why_it_matters: "Contribution paths beyond code (docs, design, research, testing, partnership)."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0063"]
+    priority: later
+    tranche: 4
+
+  - id: "0066"
+    title: "Security Authority and Emergency Patch Process"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: project-governance
+    why_it_matters: "Who can issue emergency patches and how disclosure works."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0063"]
+    priority: later
+    tranche: 4
+
+  - id: "0067"
+    title: "Release Authority and Cadence"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: project-governance
+    why_it_matters: "Who releases what, on what cadence, with what audit."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0063"]
+    priority: later
+    tranche: 4
+
+  - id: "0068"
+    title: "Transition Path Toward ICN-Hosted Governance"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: project-governance
+    why_it_matters: "Forward direction: ICN governs ICN, dogfooding the same primitives. The transition needs a written plan."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0063", "0064", "0065", "0066", "0067"]
+    priority: later
+    tranche: 4
+
+  - id: "0069"
+    title: "Mandate-Gated Kernel Dispatch"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: governance
+    why_it_matters: "Kernel does not yet consult mandates before dispatching effects. Closing this gap is the precondition for a complete provenance chain."
+    existing_issues: []
+    missing_issues: ["impl: dispatch consults mandates"]
+    depends_on: ["0026"]
+    priority: soon
+    tranche: 4
+
+  - id: "0070"
+    title: "Governance Payload Execution Dispatch"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: governance
+    why_it_matters: "Accepted proposals carry payloads that should dispatch to executor surfaces; today the linkage is sparse."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0069"]
+    priority: soon
+    tranche: 4
+
+  - id: "0071"
+    title: "Proposal Type Taxonomy and Executability"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: governance
+    why_it_matters: "Not all proposals dispatch (some are advisory, some informational). The taxonomy needs explicit boundaries."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0070"]
+    priority: soon
+    tranche: 4
+
+  - id: "0072"
+    title: "Cross-Node Verifiable Provenance"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: provenance
+    why_it_matters: "Receipts are persistent on a node; cross-node verifiability needs a published path."
+    existing_issues: ["#1438"]
+    missing_issues: []
+    depends_on: ["0026"]
+    priority: later
+    tranche: 4
+
+  - id: "0073"
+    title: "Canonical Event Log and Replay Semantics"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: provenance
+    why_it_matters: "Replay is the audit primitive; its semantics need to be canonical."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0026"]
+    priority: later
+    tranche: 4
+
+  - id: "0074"
+    title: "Accepted-but-Non-Executable Proposal Semantics"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: governance
+    why_it_matters: "What does it mean when a proposal is accepted but cannot dispatch (missing authority, unsupported class)?"
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0071"]
+    priority: later
+    tranche: 4
+
+  - id: "0075"
+    title: "Institutional Atomicity and Terminal-State Safety"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: governance
+    why_it_matters: "Some institutional effects must be atomic (admit + assign role + grant authority); partial-state recovery rules need writing."
+    existing_issues: ["#1588"]
+    missing_issues: []
+    depends_on: ["0025", "0069"]
+    priority: later
+    tranche: 4
+
+  - id: "0076"
+    title: "Public Package vs Private Overlay Boundary"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: package
+    why_it_matters: "ADR-0020 names the pattern; this ADR records the rule (real DIDs and sensitive data never in public package)."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0024"]
+    priority: soon
+    tranche: 4
+
+  - id: "0077"
+    title: "Package Contract Pinning and Compatibility"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: package
+    why_it_matters: "Packages target specific ICN runtime versions; compatibility rules prevent silent breakage."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0024"]
+    priority: later
+    tranche: 4
+
+  - id: "0078"
+    title: "Package Migration and Upgrade Semantics"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: package
+    why_it_matters: "When ICN evolves, packages need a migration path; not just code, but data shape."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0077"]
+    priority: later
+    tranche: 4
+
+  - id: "0079"
+    title: "Backup, Export, and Institutional Continuity"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: package
+    why_it_matters: "An institution must be able to leave a node without losing its memory."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0024"]
+    priority: later
+    tranche: 4
+
+  - id: "0080"
+    title: "Compute Result Receipt and Verification Model"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: compute
+    why_it_matters: "Compute results need cryptographically verifiable receipts that consumers can re-check."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0026", "0030"]
+    priority: later
+    tranche: 4
+
+  - id: "0081"
+    title: "WASM Module Registry and Governance Approval"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: compute
+    why_it_matters: "Today: any DID can publish a module. Forward: governance gates which modules run."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0030"]
+    priority: later
+    tranche: 4
+
+  - id: "0082"
+    title: "Compute Privacy / Data Locality / Selective Disclosure"
+    proposed_status: proposed
+    registry_state: candidate
+    domain: compute
+    why_it_matters: "Privacy class exists in code; the policy contract — when is encrypted execution required? — needs writing."
+    existing_issues: []
+    missing_issues: []
+    depends_on: ["0030"]
+    priority: later
+    tranche: 4
