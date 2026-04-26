@@ -1,17 +1,22 @@
 ---
 id: "0014"
 title: "Constitutional Object Model — AuthorityClass, AuthorityGrant, TypedScope, Mandate"
-status: "proposed"
+status: "accepted"
 date: "2026-04-19"
 context: "post-SDIS-evidence arc (#1571); post-institution-package-boundary (#1560); pre-executor-gating; pre-federation-authority-narrowing"
 deciders: ["Matt Faherty"]
 tags: ["governance", "architecture", "authority", "charter", "federation", "mandate", "meaning-firewall", "semantic-freeze"]
 supersedes: []
 superseded_by: []
+amends: []
+implementation_status: "partially implemented (types + minting seam landed; kernel dispatch not gated)"
 references:
   - "ADR-0010 (App topology)"
   - "ADR-0012 (Federation state origin model)"
   - "ADR-0013 (Federation clearing adoption contract)"
+  - "ADR-0017 (Monorepo Consolidation)"
+  - "ADR-0018 (ADR Lifecycle)"
+  - "ADR-0019 (Authority Grant Minting and Mandate Persistence Seam)"
   - "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md"
   - "docs/architecture/KERNEL_APP_SEPARATION.md"
 ---
@@ -20,13 +25,59 @@ references:
 
 ## Status
 
-**Proposed (docs-only semantic freeze).** This ADR introduces no behavior changes, no
-new code paths, no new crate public surface. It freezes the meaning of four constitutional
-objects — `AuthorityClass`, `AuthorityGrant`, `TypedScope`, `Mandate` — so that a later
-implementation tranche can land them without reopening what they are.
+**Accepted; implementation partially landed (status updated 2026-04-26).** The
+ADR was originally filed as `proposed` (docs-only semantic freeze); the
+semantic content was never revised. Code has since landed that proves the
+type model out at the governance app layer. See the **Implementation Update**
+section below for evidence and what remains. Per ADR-0018, the decision
+lifecycle (`accepted`) is independent from the `implementation_status`
+(`partially implemented`).
 
-Implementation follows this ADR in a separate PR. Nothing in this ADR promotes any phase
-status or claims completion.
+The original Status note is preserved verbatim below as the historical
+record of what this ADR claimed at filing time.
+
+### Original status note (2026-04-19)
+
+> **Proposed (docs-only semantic freeze).** This ADR introduces no behavior changes, no
+> new code paths, no new crate public surface. It freezes the meaning of four constitutional
+> objects — `AuthorityClass`, `AuthorityGrant`, `TypedScope`, `Mandate` — so that a later
+> implementation tranche can land them without reopening what they are.
+>
+> Implementation follows this ADR in a separate PR. Nothing in this ADR promotes any phase
+> status or claims completion.
+
+## Implementation Update (2026-04-26)
+
+The four constitutional types frozen by this ADR are now implemented at the
+governance app layer. The accepted-decision seam mints `AuthorityGrant`s
+and persists `Mandate`s. The minting/persistence behavior is recorded
+separately as a decision in [ADR-0019](ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md);
+this section records what is verifiable in code as of this date.
+
+### What is implemented
+
+| Claim | Evidence |
+|---|---|
+| `AuthorityClass` is a closed three-variant enum (Representation / Execution / Attestation) | `icn/crates/icn-governance/src/authority.rs` (`pub enum AuthorityClass` ~line 61, with serde tests at line 439) |
+| `AuthorityGrant` is a typed record with `class: AuthorityClass`, grantor, grantee, scope | `icn/crates/icn-governance/src/authority.rs` (`pub struct AuthorityGrant` ~line 273) |
+| `TypedScope` is the typed replacement for `RoleAssignment.authority_scope: Vec<String>` | `icn/crates/icn-governance/src/authority.rs` (TypedScope type), referenced by `icn/crates/icn-governance/src/structure.rs:230` |
+| `Mandate` is a first-class institutional-memory record with two constructors (`new`, `new_pending_grants`) | `icn/crates/icn-governance/src/mandate.rs` (full module documents the distinction from delegation, role assignment, structure, etc.) |
+| Accepted-decision seam mints grants narrowly and falls through to pending-grants mandates otherwise | `icn/apps/governance/src/grant_minting.rs` (module doc + steward-appointment / steward-reconfirmation classes) |
+| Mandate parity through the close-proposal actor flow | `icn/apps/governance/tests/actor_close_proposal_mandate_parity.rs:311` |
+| Layer placement: types live at governance app layer, never imported by kernel crates | `icn/crates/icn-governance/src/authority.rs` module doc lines 1-30 explicitly states this rule |
+
+### What is NOT implemented
+
+- **Kernel dispatch is not gated by mandates or authority grants.** A grep of `icn/crates/icn-kernel-api/` and `icn/crates/icn-core/src/dispatch*` for `Mandate` / `mandate` returns no matches as of 2026-04-26. Mandates exist as institutional memory; they are not yet a precondition for `KernelEffect` execution.
+- **Kernel `Capability` tokens are not minted from `AuthorityGrant`s.** ADR-0014 explicitly leaves this for a future implementation tranche, and that tranche has not landed.
+- **Authority revocation end-to-end is partial.** Revocation writes are referenced in `grant_minting.rs:343`; the full revocation lifecycle has not been verified by this update.
+- **Federation-side mandate recognition is not specified or implemented.** Federation peers do not yet read or honor mandates from another entity.
+
+### What this update does NOT change
+
+- The semantic content of this ADR (Context, Decision, Consequences, Alternatives) is unchanged from the original filing.
+- The decision recorded here is the same decision; only its lifecycle marker (`status: accepted`) and `implementation_status` (`partially implemented`) are updated, per ADR-0018's rule that historical content is preserved while current status can change.
+- This update does not authorize kernel-side enforcement. That requires a separate decision.
 
 ---
 
