@@ -3033,6 +3033,31 @@ last_reviewed = "2026-04-26"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/adr/ADR-0014-constitutional-object-model.md"]
+# DOC status is "living"; DECISION status is "accepted" with
+# implementation_status "partially implemented" (see ADR-0019 and the
+# Implementation Update section in the ADR body).
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0014: Constitutional Object Model — AuthorityClass, AuthorityGrant, TypedScope, Mandate"
+description = "Semantic freeze for the four governance constitutional types. Decision: accepted; implementation: partially landed (types + accepted-decision minting seam land at the governance app layer; kernel dispatch is not yet gated by mandates). See ADR-0019 for the minting/persistence seam decision."
+last_updated = "2026-04-26"
+last_reviewed = "2026-04-26"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0019: Authority Grant Minting and Mandate Persistence Seam"
+description = "Records the deterministic seam where accepted governance decisions emit zero or more truthful AuthorityGrants plus exactly one Mandate. Conservative minting (only steward-appointment / steward-reconfirmation today); pending-grants fall-through is the truthful failure mode; kernel dispatch is NOT gated by mandates. Implementation: partially landed."
+last_updated = "2026-04-26"
+last_reviewed = "2026-04-26"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/adr/ADR-0001-orchestration-plane-architecture.md"]
 # DOC status is "living" — ADRs stay at their canonical path even when the
 # DECISION has been superseded. Decision lifecycle is tracked in the ADR
