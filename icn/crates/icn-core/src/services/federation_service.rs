@@ -22,14 +22,32 @@ use icn_kernel_api::{
     FederationTerminateClearingResult, FederationVouchRequest, FederationVouchResult,
     LedgerService, TreasuryEntryRequest,
 };
+use icn_store::{SledStore, Store};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tracing::info;
 
+/// Sled key prefix for join/leave-side federation provenance records.
+///
+/// Per-coop key: `federation:provenance:{coop_did}`. Mirrors the pattern
+/// used by `LedgerServiceImpl::receipt_index` (`ledger:receipt_index:{...}`).
+const PROVENANCE_KEY_PREFIX: &str = "federation:provenance:";
+
 /// Provenance record for a federation operation.
-#[derive(Debug, Clone)]
+///
+/// Persisted as JSON under `federation:provenance:{coop_did}` in the
+/// Sled store provided to [`FederationServiceImpl::with_provenance_store`].
+/// JSON is the established pattern for receipt-index records in this
+/// crate (see `LedgerServiceImpl`); BillBilateral clearing-agreement
+/// provenance lives separately on the agreement record itself.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct FederationProvenance {
     decision_receipt_id: String,
     decision_hash: String,
+}
+
+fn provenance_key(coop_did: &str) -> Vec<u8> {
+    format!("{PROVENANCE_KEY_PREFIX}{coop_did}").into_bytes()
 }
 
 /// Adapter implementing `FederationService` using `CooperativeRegistry` and `ClearingManager`.
@@ -45,9 +63,25 @@ pub struct FederationServiceImpl {
     /// net settlement to produce ledger entries)
     ledger: Option<Arc<dyn LedgerService>>,
 
-    /// Provenance tracking for registered cooperatives
-    /// Maps coop_did -> (decision_receipt_id, decision_hash)
+    /// Provenance tracking for registered cooperatives.
+    ///
+    /// Maps `coop_did -> (decision_receipt_id, decision_hash)`. The map
+    /// acts as a write-through cache when [`Self::provenance_store`] is
+    /// configured; without a store, the map is the only state and does
+    /// not survive process restart.
     provenance: RwLock<HashMap<String, FederationProvenance>>,
+
+    /// Optional Sled store for durable provenance.
+    ///
+    /// When set (via [`Self::with_provenance_store`]), every join writes
+    /// to both the in-memory cache and this store; every leave deletes
+    /// from both. On construction the cache is hydrated by scanning the
+    /// store, so provenance survives a process restart (ADR-0013 open
+    /// item; closes icn#1643 for the join/leave path). Clearing-side
+    /// provenance is independent and lives on the
+    /// `BilateralClearingAgreement` record (see existing test
+    /// `test_establish_clearing_with_source_agreement_id_stores_provenance`).
+    provenance_store: Option<Arc<SledStore>>,
 }
 
 impl FederationServiceImpl {
@@ -58,6 +92,7 @@ impl FederationServiceImpl {
             clearing: None,
             ledger: None,
             provenance: RwLock::new(HashMap::new()),
+            provenance_store: None,
         }
     }
 
@@ -74,6 +109,127 @@ impl FederationServiceImpl {
     pub fn with_ledger(mut self, ledger: Arc<dyn LedgerService>) -> Self {
         self.ledger = Some(ledger);
         self
+    }
+
+    /// Attach a Sled-backed provenance store, making join/leave provenance durable.
+    ///
+    /// Hydrates the in-memory cache from any rows the store already
+    /// contains under the `federation:provenance:` prefix, so a service
+    /// constructed against a non-empty store sees prior provenance
+    /// immediately. Subsequent join/leave calls write through to the
+    /// store as well as the cache.
+    ///
+    /// Closes the join/leave half of ADR-0013's `FederationProvenance`
+    /// open item (icn#1643). The clearing-agreement half is already
+    /// Sled-persisted via `BilateralClearingAgreement.source_agreement_id`.
+    pub fn with_provenance_store(mut self, store: Arc<SledStore>) -> Self {
+        // Hydrate cache from the store. Failures are logged and ignored:
+        // a bad row should not prevent service start, and the next
+        // successful write will overwrite a stale cache entry.
+        match store.scan(PROVENANCE_KEY_PREFIX.as_bytes()) {
+            Ok(rows) => {
+                let mut cache = match self.provenance.write() {
+                    Ok(g) => g,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                for (key, value) in rows {
+                    let key_str = match std::str::from_utf8(&key) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            tracing::warn!(
+                                error = %e,
+                                "Skipping non-UTF8 provenance key during hydration"
+                            );
+                            continue;
+                        }
+                    };
+                    let coop_did = match key_str.strip_prefix(PROVENANCE_KEY_PREFIX) {
+                        Some(s) => s.to_string(),
+                        None => continue,
+                    };
+                    match serde_json::from_slice::<FederationProvenance>(&value) {
+                        Ok(prov) => {
+                            cache.insert(coop_did, prov);
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                coop_did = %coop_did,
+                                error = %e,
+                                "Skipping unparseable provenance row during hydration"
+                            );
+                        }
+                    }
+                }
+                info!(
+                    rows = cache.len(),
+                    "Hydrated FederationServiceImpl provenance cache from store"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "Failed to scan provenance store during hydration; starting with empty cache"
+                );
+            }
+        }
+        self.provenance_store = Some(store);
+        self
+    }
+
+    /// Write a provenance record through the cache and (if configured) the store.
+    fn write_provenance(&self, coop_did: &str, prov: FederationProvenance) {
+        // Cache: always.
+        {
+            let mut cache = match self.provenance.write() {
+                Ok(g) => g,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            cache.insert(coop_did.to_string(), prov.clone());
+        }
+        // Store: when present. Persistence failures are logged but do
+        // not roll back the federation registration — the cache still
+        // reflects the operator's intent and the operator can reissue
+        // the decision if durability matters.
+        if let Some(store) = &self.provenance_store {
+            match serde_json::to_vec(&prov) {
+                Ok(bytes) => {
+                    if let Err(e) = store.put(&provenance_key(coop_did), &bytes) {
+                        tracing::warn!(
+                            coop_did = %coop_did,
+                            error = %e,
+                            "Failed to persist provenance to Sled; cache-only fallback"
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        coop_did = %coop_did,
+                        error = %e,
+                        "Failed to serialize provenance; cache-only fallback"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Remove a provenance record from cache and (if configured) the store.
+    fn delete_provenance(&self, coop_did: &str) {
+        {
+            let mut cache = match self.provenance.write() {
+                Ok(g) => g,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            cache.remove(coop_did);
+        }
+        if let Some(store) = &self.provenance_store {
+            if let Err(e) = store.delete(&provenance_key(coop_did)) {
+                tracing::warn!(
+                    coop_did = %coop_did,
+                    error = %e,
+                    "Failed to delete persisted provenance row; cache-only removal"
+                );
+            }
+        }
     }
 
     /// Compute a state change hash for a join operation.
@@ -162,18 +318,15 @@ impl FederationService for FederationServiceImpl {
             Ok(()) => {
                 let state_change_hash = Self::compute_join_hash(&request);
 
-                // Store provenance
-                #[allow(clippy::unwrap_used)]
-                {
-                    let mut prov = self.provenance.write().unwrap();
-                    prov.insert(
-                        request.coop_did.clone(),
-                        FederationProvenance {
-                            decision_receipt_id: request.decision_receipt_id.clone(),
-                            decision_hash: request.decision_hash.clone(),
-                        },
-                    );
-                }
+                // Store provenance — write-through to Sled when configured
+                // so the record survives process restart (ADR-0013 / icn#1643).
+                self.write_provenance(
+                    &request.coop_did,
+                    FederationProvenance {
+                        decision_receipt_id: request.decision_receipt_id.clone(),
+                        decision_hash: request.decision_hash.clone(),
+                    },
+                );
 
                 info!(
                     coop_did = %request.coop_did,
@@ -218,12 +371,9 @@ impl FederationService for FederationServiceImpl {
             Ok(()) => {
                 let state_change_hash = Self::compute_leave_hash(&request);
 
-                // Remove provenance record
-                #[allow(clippy::unwrap_used)]
-                {
-                    let mut prov = self.provenance.write().unwrap();
-                    prov.remove(&request.coop_did);
-                }
+                // Remove provenance from cache and (if configured) the
+                // Sled store so the absence survives process restart.
+                self.delete_provenance(&request.coop_did);
 
                 info!(
                     coop_did = %request.coop_did,
@@ -2009,5 +2159,122 @@ mod tests {
             idempotent_result.success,
             "Second leave should be idempotent (no-op delete returns success)"
         );
+    }
+
+    /// Closes the join/leave half of ADR-0013's `FederationProvenance` open
+    /// item (icn#1643). Provenance written via `with_provenance_store` must
+    /// survive a process boundary — opening a fresh service against the same
+    /// Sled path must hydrate the cache so `get_registration_provenance`
+    /// returns the prior decision-receipt/decision-hash pair.
+    #[test]
+    fn test_join_provenance_survives_restart() {
+        let registry_temp = tempfile::tempdir().unwrap();
+        let prov_temp = tempfile::tempdir().unwrap();
+        let coop_did = "did:icn:zRestartProv12345678901234567890123";
+        let federation_id = "restart-prov-coop";
+        let decision_receipt_id = "gov:receipt:restart-prov-001";
+        let decision_hash = "sha256:restart-prov-hash";
+
+        // Phase A: open service with provenance store, register, drop.
+        {
+            let registry = make_registry_at_path(registry_temp.path());
+            let prov_store = Arc::new(SledStore::open(prov_temp.path()).expect("open prov store"));
+            let service = FederationServiceImpl::new(registry).with_provenance_store(prov_store);
+
+            let result = service
+                .join_federation(FederationJoinRequest {
+                    coop_did: coop_did.to_string(),
+                    coop_name: "Restart Prov Coop".to_string(),
+                    federation_id: federation_id.to_string(),
+                    gateway_endpoints: vec![],
+                    decision_receipt_id: decision_receipt_id.to_string(),
+                    decision_hash: decision_hash.to_string(),
+                })
+                .unwrap();
+            assert!(result.success, "join must succeed: {:?}", result.error);
+
+            let cached = service
+                .get_registration_provenance(coop_did)
+                .expect("provenance must be in cache after join");
+            assert_eq!(cached.0, decision_receipt_id);
+            assert_eq!(cached.1, decision_hash);
+        } // service drops; the SledStore handle is released.
+
+        // Phase B: reopen service against the same provenance path,
+        // hydrate cache, verify provenance survived.
+        {
+            let registry = make_registry_at_path(registry_temp.path());
+            let prov_store =
+                Arc::new(SledStore::open(prov_temp.path()).expect("reopen prov store"));
+            let service = FederationServiceImpl::new(registry).with_provenance_store(prov_store);
+
+            let restored = service
+                .get_registration_provenance(coop_did)
+                .expect("provenance must survive Sled reload (icn#1643)");
+            assert_eq!(
+                restored.0, decision_receipt_id,
+                "decision_receipt_id must survive restart"
+            );
+            assert_eq!(
+                restored.1, decision_hash,
+                "decision_hash must survive restart"
+            );
+        }
+    }
+
+    /// `leave_federation` must remove provenance from both cache and store
+    /// so the absence survives restart. Otherwise a restarted service would
+    /// resurrect a deleted-coop provenance row from the on-disk tree.
+    #[test]
+    fn test_leave_provenance_removal_persists_across_restart() {
+        let registry_temp = tempfile::tempdir().unwrap();
+        let prov_temp = tempfile::tempdir().unwrap();
+        let coop_did = "did:icn:zRemoveProv1234567890123456789012345";
+        let federation_id = "remove-prov-coop";
+
+        // Phase A: join then leave.
+        {
+            let registry = make_registry_at_path(registry_temp.path());
+            let prov_store = Arc::new(SledStore::open(prov_temp.path()).expect("open prov store"));
+            let service = FederationServiceImpl::new(registry).with_provenance_store(prov_store);
+
+            service
+                .join_federation(FederationJoinRequest {
+                    coop_did: coop_did.to_string(),
+                    coop_name: "Remove Prov Coop".to_string(),
+                    federation_id: federation_id.to_string(),
+                    gateway_endpoints: vec![],
+                    decision_receipt_id: "gov:receipt:remove-prov-join".to_string(),
+                    decision_hash: "sha256:remove-prov-hash".to_string(),
+                })
+                .unwrap();
+
+            service
+                .leave_federation(FederationLeaveRequest {
+                    coop_did: coop_did.to_string(),
+                    federation_id: federation_id.to_string(),
+                    decision_receipt_id: "gov:receipt:remove-prov-leave".to_string(),
+                    decision_hash: "sha256:remove-prov-leave-hash".to_string(),
+                })
+                .unwrap();
+
+            assert!(
+                service.get_registration_provenance(coop_did).is_none(),
+                "cache must reflect removal immediately"
+            );
+        }
+
+        // Phase B: reopen, verify the deleted-coop row did not resurrect.
+        {
+            let registry = make_registry_at_path(registry_temp.path());
+            let prov_store =
+                Arc::new(SledStore::open(prov_temp.path()).expect("reopen prov store"));
+            let service = FederationServiceImpl::new(registry).with_provenance_store(prov_store);
+
+            assert!(
+                service.get_registration_provenance(coop_did).is_none(),
+                "leave must persist absence — restarted service must not resurrect provenance"
+            );
+        }
     }
 }
