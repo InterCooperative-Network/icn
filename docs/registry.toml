@@ -3081,6 +3081,50 @@ last_updated = "2026-04-26"
 owner = "matt"
 audiences = ["developers"]
 
+[docs."docs/adr/ADR-0012-federation-state-origin-model.md"]
+# DOC status is "living"; DECISION lifecycle is "amended" (ADR-0013 owns
+# Step 3 status). Per ADR-0018, doc status and decision status are
+# separate.
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0012: Federation State Origin Model (decision amended by ADR-0013)"
+description = "Model C (Explicit Parallel) for federation clearing state origins. Decision still holds; Step 3 status now owned by ADR-0013."
+last_updated = "2026-04-26"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/adr/ADR-0013-federation-clearing-adoption-contract.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0013: Federation Clearing Adoption Contract"
+description = "Step 3 architecture for federation clearing adoption (3a–3d implemented). Open items remain: FederationProvenance not Sled-persisted, coop_a_did empty in execution handler, store-isolation tests not written. Verified unresolved 2026-04-26."
+last_updated = "2026-04-26"
+owner = "matt"
+audiences = ["architects"]
+
+[docs."docs/adr/ADR-0015-service-discovery-auth-semantics.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0015: Service Discovery Auth Semantics — Auth-gated with Enumeration-Safe 404"
+description = "Decision: all /v1/services/* require JWT; missing/unauthorized -> 404 (enumeration-safe). Implementation status (2026-04-26): needs verification — route-level auth gating not visible in api/services.rs; follow-up audit issue suggested."
+last_updated = "2026-04-26"
+owner = "matt"
+audiences = ["architects", "developers"]
+
+[docs."docs/adr/ADR-0020-institutional-bootstrap-activation-and-standing-read-model.md"]
+category = "architecture"
+status = "living"
+truth_class = "normative"
+title = "ADR-0020: Institutional Bootstrap Activation and Standing Read Model"
+description = "Reusable activation chain: package manifest -> private overlay -> bootstrap apply -> charter activation -> entity/structure/role creation -> /me/standing -> (future) action cards. Locks the boundary between ICN runtime contract and institution-package vocabulary. Steps 1-6 implemented; action cards (icn#1608) future."
+last_updated = "2026-04-26"
+last_reviewed = "2026-04-26"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/ci/GATE_RATCHET_PLAN.md"]
 category = "reference"
 status = "living"
