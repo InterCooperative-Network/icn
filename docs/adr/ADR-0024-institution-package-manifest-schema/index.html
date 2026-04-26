@@ -1,0 +1,200 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0024: Institution Package Manifest Schema | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0024 institution package manifest schema</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0024-institution-package-manifest-schema.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<p>id: &quot;0024&quot;
+title: &quot;Institution Package Manifest Schema&quot;
+status: &quot;proposed&quot;
+date: &quot;2026-04-26&quot;
+deciders: []
+tags: [&quot;package&quot;, &quot;manifest&quot;, &quot;schema&quot;, &quot;institution-boundary&quot;, &quot;forward-direction&quot;]
+supersedes: []
+superseded_by: []
+amends: []
+implementation_status: &quot;partial&quot;
+references:</p>
+<ul>
+<li>&quot;ADR-0017 (Monorepo Consolidation)&quot;</li>
+<li>&quot;ADR-0020 (Bootstrap Activation and Standing Read Model)&quot;</li>
+<li>&quot;docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md&quot;</li>
+<li>&quot;icn/crates/icn-governance/src/bootstrap.rs&quot;</li>
+<li>&quot;GitHub #1628 (operating_purpose at apply time)&quot;</li>
+<li>&quot;GitHub #1635 (support-institution package pattern)&quot;</li>
+</ul>
+<hr>
+<h1>ADR 0024: Institution Package Manifest Schema</h1>
+<h2>Status</h2>
+<p><strong>Proposed (2026-04-26).</strong> Names the forward direction. Back-fills the partial reality (BootstrapSeedManifest covers entity/structure/role primitives) and identifies the gap (no formal schema for institution-specific extensions like indicators, signal rules, allocation templates). Modifiable.</p>
+<h2>Context</h2>
+<p>ADR-0020 named the activation chain from manifest-on-disk to a member-facing standing surface and locked the contract surface ICN owns at each step. Step 1 is &quot;package manifest schema.&quot; Today, <code>BootstrapSeedManifest</code> covers the four primitive seeds (entity, structure, activity, role) and a person-directory overlay shape, with <code>operating_purpose: Option&lt;String&gt;</code> as the sanctioned home for institution-specific taxonomy.</p>
+<p>What does <strong>not</strong> exist today is a formal schema for the broader institution-package contract:</p>
+<ul>
+<li>Indicator definitions (what does this institution count and how?)</li>
+<li>Signal rules (what observations trigger what attention?)</li>
+<li>Allocation templates (what shape does a fresh allocation request take here?)</li>
+<li>Locale and accessibility metadata (which languages, which assistive defaults?)</li>
+<li>Package-level operating intent and stewardship metadata.</li>
+</ul>
+<p>Without a schema, packages extend ad-hoc. Different packages develop different shapes for the same concept; the boundary contract erodes.</p>
+<h2>Decision (proposed)</h2>
+<p>Institution packages declare a <code>package.yaml</code> manifest validated against a stable schema with the following sections:</p>
+<ol>
+<li><strong>Identity.</strong> Package name, version, ICN-runtime-version-target, package authority chain.</li>
+<li><strong>Bootstrap seeds.</strong> Entity, structure, activity, role records as today (<code>BootstrapSeedManifest</code>).</li>
+<li><strong>Person-directory overlay reference.</strong> Pointer to the private overlay file (real-DID binding, never in public package).</li>
+<li><strong>Indicator definitions.</strong> Named indicators with kind (count, ratio, presence), source (which records to count), schedule (how often to recompute).</li>
+<li><strong>Signal rules.</strong> Named rules with trigger condition, attention target, escalation policy.</li>
+<li><strong>Allocation templates.</strong> Default shapes for allocation requests (fields, validators, default authority requirements).</li>
+<li><strong>Process catalog (forward).</strong> References to CCL process definitions (ADR-0023) the package activates.</li>
+<li><strong>Locale and accessibility metadata.</strong> Declared languages; assistive defaults; deadline-justice profile.</li>
+<li><strong>Action card templates (forward).</strong> Template references for <code>/me/action-cards</code> (ADR-0027).</li>
+</ol>
+<p>Schema validation rejects unknown extension shapes by default. Packages may declare <code>extensions: { ... }</code> blocks under explicit opt-in for ICN-future-version fields.</p>
+<h2>Boundary rules</h2>
+<ul>
+<li>ICN owns the manifest schema and the four primitive seed kinds. Packages do not redefine them.</li>
+<li>Packages own the <strong>content</strong> of every section (which entities, which indicators, which signal rules). ICN does not learn institution-specific nouns.</li>
+<li><code>operating_purpose</code> strings remain opaque to ICN; the manifest schema validates that they are present where required, not what they mean.</li>
+<li>Indicator and signal rule <strong>content</strong> is package-side; the <strong>shape</strong> (count vs ratio, threshold vs duration) is ICN-side.</li>
+</ul>
+<h2>Consequences</h2>
+<ul>
+<li>Packages become validatable: a package either matches the schema or does not. Drift becomes mechanically detectable.</li>
+<li>Cross-package learning becomes possible: shared indicator and signal-rule patterns can be lifted into the schema as new kinds.</li>
+<li>Trade-off: schema growth has a cost. Each new section is a future migration burden if the substrate evolves.</li>
+<li>Trade-off: validation has to be lenient enough that real institutions can express what they need. Over-strict validation produces packages that satisfy ICN but do not satisfy their institutions.</li>
+</ul>
+<h2>Implementation status</h2>
+<p>Partial.</p>
+<ul>
+<li><strong>Implemented:</strong> Bootstrap seeds, person-directory overlay binding, <code>operating_purpose</code> field. See <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-governance/src/bootstrap.rs">icn/crates/icn-governance/src/bootstrap.rs</a>.</li>
+<li><strong>Not implemented:</strong> Indicator definitions, signal rules, allocation templates, process catalog, locale metadata, action-card templates as schema sections. Reference institution packages currently express these informally outside the validated manifest.</li>
+</ul>
+<p>To call this <code>implemented</code> would require:</p>
+<ul>
+<li>Schema definition for each new section in a Rust type or JSON-Schema artifact under <code>icn-governance</code> or a new <code>icn-package</code> crate.</li>
+<li>Validator integration in the bootstrap-apply CLI path.</li>
+<li>Migration story for existing packages that don&#39;t declare these sections (the schema must be additive).</li>
+</ul>
+<h2>Alternatives Considered</h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why rejected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Keep extensions ad-hoc per package</td>
+<td>Erodes the boundary contract; every package becomes its own bespoke shape; cross-package patterns are unobservable.</td>
+</tr>
+<tr>
+<td>Define one giant rigid schema covering every conceivable institution</td>
+<td>Different institutions are differently shaped. Over-rigid schemas produce false friction at the boundary; institutions either fork or work around.</td>
+</tr>
+<tr>
+<td>Use a generic config schema (JSON-Schema, OpenAPI) without ICN-specific structure</td>
+<td>The point is not to validate YAML; it is to validate institutional shape. ICN owns the shape vocabulary.</td>
+</tr>
+<tr>
+<td>Defer until a second institution package is in production</td>
+<td>Two packages without a schema cement two different shapes. The schema work is cheaper before the second package than after.</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

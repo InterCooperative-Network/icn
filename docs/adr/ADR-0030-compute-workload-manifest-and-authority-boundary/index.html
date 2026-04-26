@@ -1,0 +1,221 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0030: Compute Workload Manifest and Authority Boundary | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0030 compute workload manifest and authority boundary</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<p>id: &quot;0030&quot;
+title: &quot;Compute Workload Manifest and Authority Boundary&quot;
+status: &quot;accepted&quot;
+date: &quot;2026-04-26&quot;
+deciders: [&quot;Matt Faherty&quot;]
+tags: [&quot;compute&quot;, &quot;authority-boundary&quot;, &quot;constrained-execution&quot;, &quot;workload-manifest&quot;, &quot;back-fill&quot;]
+supersedes: []
+superseded_by: []
+amends: []
+implementation_status: &quot;implemented&quot;
+references:</p>
+<ul>
+<li>&quot;ADR-0014 (Constitutional Object Model)&quot;</li>
+<li>&quot;ADR-0021 (CCL Determinism, Fuel, and Capability Safety)&quot;</li>
+<li>&quot;ADR-0026 (Receipt and Provenance Proof Envelope)&quot;</li>
+<li>&quot;ADR-0031 (Commons Compute Admission and Settlement Policy)&quot;</li>
+<li>&quot;icn/crates/icn-compute/src/task.rs&quot;</li>
+<li>&quot;icn/crates/icn-compute/src/executor.rs&quot;</li>
+<li>&quot;icn/crates/icn-compute/src/types.rs&quot;</li>
+<li>&quot;icn/crates/icn-gateway/src/compute_mgr.rs&quot;</li>
+</ul>
+<hr>
+<h1>ADR 0030: Compute Workload Manifest and Authority Boundary</h1>
+<h2>Status</h2>
+<p><strong>Accepted (2026-04-26).</strong> Back-fill of the existing compute task model and the authority boundary it operates under. Compute has shipped with these properties; this ADR records the decision so the boundary does not erode.</p>
+<h2>Context</h2>
+<p>ICN&#39;s compute layer (<code>icn-compute</code>) executes workloads — CCL contracts, WASM modules, and a small SQL-reference surface — with fuel limits, privacy/determinism classes, scope tags (Commons / Coop / Federation), and trust-gated executor admission.</p>
+<p>Compute is real and runs today. What is <strong>not</strong> written down is the authority boundary: compute as <strong>constrained execution</strong>, never autonomous decision. The kernel/app separation doctrine (<a href="/docs/architecture/KERNEL_APP_SEPARATION">docs/architecture/KERNEL_APP_SEPARATION.md</a>) covers the broader meaning firewall; this ADR specializes it for compute.</p>
+<p>The boundary matters now because:</p>
+<ol>
+<li>Future ADRs (0080 result verification, 0081 WASM module governance, 0082 privacy/locality) plug into this boundary.</li>
+<li>Public-facing claims about compute on the website (per ADR-0032) need a written authority claim to cite.</li>
+<li>As LLM-style work and large-task patterns grow, the temptation to let compute &quot;decide&quot; things grows with them. The ADR closes that drift before it starts.</li>
+</ol>
+<h2>Decision</h2>
+<p>A compute workload is described by a <code>ComputeTask</code> manifest with the following properties, and operates under the following authority boundary.</p>
+<h3>Workload manifest</h3>
+<ol>
+<li><strong>Code reference.</strong> One of: a CCL contract, a WASM module hash, a SQL-reference query.</li>
+<li><strong>Fuel limit.</strong> A finite numeric ceiling.</li>
+<li><strong>Privacy class.</strong> Public, Encrypted, or Sealed (the privacy ADR-0082 will refine; for now: ICN supports each as a class).</li>
+<li><strong>Determinism class.</strong> Required for governance-grade output; advisory for assistive output.</li>
+<li><strong>Scope.</strong> <code>Commons | Coop(coop_id) | Federation(fed_id)</code>. Determines admission and settlement policy.</li>
+<li><strong>Resource profile.</strong> CPU, memory, storage envelope. Used by the commons pool and by federated placement.</li>
+<li><strong>Mandate reference (optional).</strong> If the workload&#39;s output will produce institutional effects, a reference to the covering mandate (ADR-0014, ADR-0019).</li>
+</ol>
+<h3>Authority boundary</h3>
+<ol>
+<li><strong>Compute executes; compute does not decide.</strong> Compute outputs feed governance; they do not replace governance.</li>
+<li><strong>Outputs are advisory unless covered by a mandate.</strong> A workload without a covering mandate may produce useful information; that information cannot itself produce institutional effects (no role assignment, no allocation, no admission). To produce effects, a covering mandate is required (ADR-0019).</li>
+<li><strong>Trust-gated admission.</strong> Executors are admitted via PolicyOracle (today: trust score + sybil checks); the kernel never sees raw trust scores.</li>
+<li><strong>Fuel and capability bounded.</strong> Every execution is bounded; runaway is impossible (ADR-0021).</li>
+<li><strong>Privacy class is binding.</strong> A <code>Sealed</code> workload cannot be re-disclosed; an <code>Encrypted</code> workload restricts who can read inputs and outputs; a <code>Public</code> workload is freely re-distributable.</li>
+<li><strong>Determinism class is binding for governance grade.</strong> Non-deterministic results cannot feed governance; they may feed assistive surfaces with a clear &quot;advisory&quot; marker.</li>
+</ol>
+<h3>What compute is allowed to do</h3>
+<ul>
+<li>Execute under fuel; emit results.</li>
+<li>Compute prioritization scores for action cards (ADR-0027) under a covering mandate.</li>
+<li>Pre-compile schema bridges (ADR-0022) for a charter under proposal.</li>
+<li>Compute commons pool admission scores (input to PolicyOracle), but not the admission decision itself.</li>
+<li>Re-execute a CCL contract during a dispute (ADR-0029) for divergence detection.</li>
+</ul>
+<h3>What compute is not allowed to do</h3>
+<ul>
+<li>Issue effect records without a covering mandate (ADR-0025).</li>
+<li>Decide governance outcomes (proposal acceptance, role assignment, sanction issuance).</li>
+<li>Cross privacy class boundaries (a Public workload reading a Sealed input is rejected).</li>
+<li>Emit non-deterministic output to a governance-grade consumer.</li>
+</ul>
+<h2>Consequences</h2>
+<ul>
+<li>The compute layer is auditable as a constrained-execution surface. Any temptation to drift into decision authority is a violation of this ADR.</li>
+<li>Public claims about compute on the ICN site can honestly say &quot;real implementation, trust-gated, constrained execution; not autonomous decision-making.&quot;</li>
+<li>Future work on assistive compute (LLM-augmented, member-helper) plugs into the boundary by being declared <code>Advisory</code> and bound by privacy class.</li>
+<li>Trade-off: every workload that wants to produce institutional effects needs a covering mandate. This is the right cost; silent dispatch through compute is precisely what the ADR forecloses.</li>
+<li>Trade-off: the privacy class enforcement requires runtime support for re-disclosure prevention. Not all of that exists today; the ADR records the contract and registry candidate ADR-0082 will record the implementation policy.</li>
+</ul>
+<h2>Implementation status</h2>
+<p>Implemented for the manifest and core boundary; partial for the privacy/locality enforcement.</p>
+<p>Evidence:</p>
+<ul>
+<li>Task type and fields: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-compute/src/task.rs">icn/crates/icn-compute/src/task.rs</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-compute/src/types.rs">icn/crates/icn-compute/src/types.rs</a>.</li>
+<li>Executor surface and fuel: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-compute/src/executor.rs">icn/crates/icn-compute/src/executor.rs</a>.</li>
+<li>Gateway compute manager: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-gateway/src/compute_mgr.rs">icn/crates/icn-gateway/src/compute_mgr.rs</a>.</li>
+<li>Trust-gated admission via PolicyOracle: see ADR-0014 for the boundary.</li>
+<li>Test coverage: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-compute/tests/compute_integration.rs">icn/crates/icn-compute/tests/compute_integration.rs</a>.</li>
+<li>Federation cross-signing: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-compute/tests/federation_integration.rs">icn/crates/icn-compute/tests/federation_integration.rs</a>.</li>
+</ul>
+<p>What is not yet covered by this ADR (and is intentionally out of scope here):</p>
+<ul>
+<li>Result verification model — registry candidate ADR-0080.</li>
+<li>WASM module registry governance — registry candidate ADR-0081.</li>
+<li>Privacy / data locality / selective disclosure — registry candidate ADR-0082.</li>
+</ul>
+<h2>Alternatives Considered</h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why rejected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Allow compute to dispatch institutional effects directly</td>
+<td>Collapses the kernel/app separation. Compute under a mandate can produce effect records; without a mandate, it cannot.</td>
+</tr>
+<tr>
+<td>Make all compute output &quot;governance-grade&quot; by default</td>
+<td>Forces unnecessary determinism on assistive use cases. The class system is the right granularity.</td>
+</tr>
+<tr>
+<td>Treat each compute scope (Commons / Coop / Federation) as a separate ADR</td>
+<td>They share the boundary contract. The settlement and admission differences are scope-specific; ADR-0031 handles the commons specifics.</td>
+</tr>
+<tr>
+<td>Defer this ADR until LLM-style assistive compute lands</td>
+<td>Earlier is cheaper. Without a written boundary now, assistive compute will be tempted to grow decision authority by default.</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

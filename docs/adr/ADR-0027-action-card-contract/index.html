@@ -1,0 +1,219 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0027: Action Card Contract | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0027 action card contract</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0027-action-card-contract.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<p>id: &quot;0027&quot;
+title: &quot;Action Card Contract&quot;
+status: &quot;proposed&quot;
+date: &quot;2026-04-26&quot;
+deciders: []
+tags: [&quot;action-cards&quot;, &quot;member-shell&quot;, &quot;standing&quot;, &quot;derived-views&quot;, &quot;forward-direction&quot;]
+supersedes: []
+superseded_by: []
+amends: []
+implementation_status: &quot;proposed&quot;
+references:</p>
+<ul>
+<li>&quot;ADR-0020 (Bootstrap Activation and Standing Read Model)&quot;</li>
+<li>&quot;ADR-0025 (Institutional Effect Record Canonical Schema)&quot;</li>
+<li>&quot;ADR-0028 (Accessibility Baseline for Member Interfaces)&quot;</li>
+<li>&quot;GitHub #1608 (GET /me/action-cards)&quot;</li>
+<li>&quot;GitHub #1646 (action card implementation)&quot;</li>
+</ul>
+<hr>
+<h1>ADR 0027: Action Card Contract</h1>
+<h2>Status</h2>
+<p><strong>Proposed (2026-04-26).</strong> Names what action cards will be. ADR-0020 promised the surface; this ADR records the contract so issue <a href="https://github.com/InterCooperative-Network/icn/issues/1608" target="_blank" rel="noopener">#1608</a> plugs into a written shape rather than re-deriving one.</p>
+<h2>Context</h2>
+<p>Action cards are the proposed member-facing nervous system. The intent: a member opens their shell and sees a prioritized list of &quot;things you need to do&quot; — proposals to deliberate, action items assigned, signals requiring attention, allocations awaiting approval, charters awaiting signature. Today this surface does not exist. Issue <a href="https://github.com/InterCooperative-Network/icn/issues/1608" target="_blank" rel="noopener">#1608</a> is the implementation issue.</p>
+<p>Without a written contract, action-card implementation will be tempted to:</p>
+<ul>
+<li>Treat cards as stored entities (creating a card table, mutation API, lifecycle).</li>
+<li>Bake institution-specific UX into the gateway (NYCN-style cards, coop-X-style cards).</li>
+<li>Hard-code prioritization rules (deadlines first, severity second, …) instead of letting policy decide.</li>
+</ul>
+<p>This ADR forecloses those failure modes by writing the contract.</p>
+<h2>Decision (proposed)</h2>
+<p>Action cards are <strong>derived views</strong>, not stored entities. The contract:</p>
+<h3>Endpoint</h3>
+<p><code>GET /v1/gov/me/action-cards</code></p>
+<p>Returns a prioritized list of cards for the calling DID. No mutation API. Cards reference underlying objects; mutation flows through those.</p>
+<h3>Card shape</h3>
+<p>Each card carries:</p>
+<ol>
+<li><strong>Identity.</strong> <code>card_id</code> (deterministic hash of derivation inputs), <code>card_kind</code> (closed taxonomy).</li>
+<li><strong>Subject.</strong> <code>entity_id</code>, optional <code>structure_id</code>, optional <code>holder_role</code>. Where this card lives in the holder&#39;s standing.</li>
+<li><strong>Reference.</strong> Pointer to the underlying object (proposal id, action item id, allocation request id, signal id).</li>
+<li><strong>Plain-language summary.</strong> The &quot;what does this mean to me&quot; one-line string.</li>
+<li><strong>Suggested action.</strong> The &quot;what do I do next&quot; hint (open proposal, sign charter, attend deliberation).</li>
+<li><strong>Deadline (optional).</strong> ISO-8601 timestamp; absent means no time pressure encoded by the card.</li>
+<li><strong>Priority hint.</strong> Numeric score from a policy oracle; UI may sort but should not hide cards.</li>
+<li><strong>Accessibility metadata.</strong> Locale, assistive notes, deadline-justice profile (per ADR-0028).</li>
+</ol>
+<h3>Card kind taxonomy (closed; growable by ADR amendment)</h3>
+<ul>
+<li><code>ProposalDeliberation</code>, <code>ProposalVote</code></li>
+<li><code>ActionItemAssigned</code>, <code>ActionItemDue</code></li>
+<li><code>AllocationApproval</code>, <code>AllocationDecline</code></li>
+<li><code>CharterSignature</code>, <code>CharterRatification</code></li>
+<li><code>RoleAcceptance</code>, <code>RoleRevocation</code></li>
+<li><code>SignalAttention</code> (requires ADR-0029 conflict object model and the future signals ADR)</li>
+<li><code>MembershipApproval</code>, <code>MembershipDeparture</code></li>
+</ul>
+<p>Unknown card kinds are not emitted.</p>
+<h3>Derivation rules</h3>
+<p>Cards are computed at request time from:</p>
+<ul>
+<li>The holder&#39;s standing (memberships, roles, authority scope) — ADR-0020.</li>
+<li>Pending governance objects (proposals, votes, action items) in entities the holder is a member of.</li>
+<li>Effect records affecting the holder (ADR-0025) — for &quot;FYI&quot; cards.</li>
+<li>Signal rules (future ADR) — for attention triggers.</li>
+</ul>
+<p>Derivation is <strong>stateless from the gateway&#39;s perspective.</strong> A card is what falls out of the current state. Two requests at the same moment from the same DID return identical cards.</p>
+<h3>What action cards are not</h3>
+<ul>
+<li>Not a notification system (notifications are a separate surface; ADR-0052 candidate).</li>
+<li>Not a task tracker (tasks are action items, owned by governance).</li>
+<li>Not a stored entity (no card lifecycle, no mutation, no archival).</li>
+<li>Not institution-specific (institution packages contribute card <em>templates</em> and rendering hints, not card kinds).</li>
+</ul>
+<h2>Consequences</h2>
+<ul>
+<li>Action cards as derived views means the surface stays composable: any new institutional concept that produces a card kind plugs in without a schema change.</li>
+<li>Statelessness means cards never get out of sync with reality. The cost: every request re-derives.</li>
+<li>Holder-side rendering (mobile shell, web member portal) is free to design UX without coordinating on backend state shape.</li>
+<li>Trade-off: prioritization is centralized (a policy oracle assigns scores). Priority disputes are policy disputes, not state disputes.</li>
+<li>Trade-off: adding a card kind requires ADR amendment. This is the right trade — silent expansion of the surface is exactly what member-experience reviewers should not accept.</li>
+</ul>
+<h2>Implementation status</h2>
+<p>Proposed. Not implemented. Issue <a href="https://github.com/InterCooperative-Network/icn/issues/1608" target="_blank" rel="noopener">#1608</a> is the open issue.</p>
+<p>To call this <code>implemented</code> would require:</p>
+<ul>
+<li><code>GET /me/action-cards</code> handler in <code>icn-gateway</code>.</li>
+<li>Card-kind enum and derivation logic in <code>icn-governance</code>.</li>
+<li>Priority policy oracle (a <code>PolicyOracle</code> impl returning a numeric score).</li>
+<li>Test coverage proving derivation is deterministic and stateless.</li>
+<li>Accessibility metadata wiring (ADR-0028 dependency).</li>
+</ul>
+<h2>Alternatives Considered</h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why rejected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cards as stored entities with a lifecycle</td>
+<td>Re-introduces a mutable surface that can drift from underlying state. The whole point of cards is to be a deterministic view.</td>
+</tr>
+<tr>
+<td>Per-institution card kinds</td>
+<td>Couples the substrate to institution vocabulary. Institution packages contribute card templates and rendering hints, not new kinds.</td>
+</tr>
+<tr>
+<td>Hard-coded prioritization rules</td>
+<td>Priority is a policy concern. The kernel/oracle separation says policy belongs in oracles.</td>
+</tr>
+<tr>
+<td>Notification system instead of cards</td>
+<td>Notifications optimize for capturing attention; cards optimize for surfacing the right work at the right time. Different design problems; both may exist; this ADR is about cards.</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
