@@ -14,9 +14,10 @@ use serde::{Deserialize, Serialize};
 ///
 /// This enum encodes what kind of "claim on value" is being transferred.
 /// ICN's thesis: money is not value, it's a claim on value.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum AssetType {
     /// Standard fungible asset (mutual credit, currency)
+    #[default]
     Fungible,
 
     /// Single-use asset (compute hours, one-time vouchers)
@@ -50,12 +51,6 @@ pub enum AssetType {
         /// Conditions for claim fulfillment
         conditions: Option<String>,
     },
-}
-
-impl Default for AssetType {
-    fn default() -> Self {
-        Self::Fungible
-    }
 }
 
 /// Depreciation schedule for depreciating assets
@@ -582,7 +577,7 @@ mod tests {
 
     #[test]
     fn test_asset_type_all_variants_have_different_hashes() {
-        let variants = vec![
+        let variants = [
             AssetType::Fungible,
             AssetType::Consumable { expires_at: None },
             AssetType::Depreciating {

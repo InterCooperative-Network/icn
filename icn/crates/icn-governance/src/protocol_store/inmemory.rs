@@ -138,7 +138,7 @@ impl ProtocolParameterStore for InMemoryParameterStore {
             // Auto-prune history to prevent unbounded growth (DoS mitigation)
             if entries.len() > MAX_HISTORY_ENTRIES_PER_PARAM {
                 // Sort by timestamp descending (newest first)
-                entries.sort_by(|a, b| b.changed_at.cmp(&a.changed_at));
+                entries.sort_by_key(|b| std::cmp::Reverse(b.changed_at));
                 let pruned = entries.len() - MAX_HISTORY_ENTRIES_PER_PARAM;
                 entries.truncate(MAX_HISTORY_ENTRIES_PER_PARAM);
                 debug!(parameter_id = %id, pruned_entries = pruned, "Auto-pruned history entries");
@@ -230,7 +230,7 @@ impl ProtocolParameterStore for InMemoryParameterStore {
         if let Some(entries) = history.get_mut(id) {
             if entries.len() > max_entries {
                 // Sort by timestamp descending (newest first)
-                entries.sort_by(|a, b| b.changed_at.cmp(&a.changed_at));
+                entries.sort_by_key(|b| std::cmp::Reverse(b.changed_at));
                 // Keep only the most recent max_entries
                 let removed = entries.len() - max_entries;
                 entries.truncate(max_entries);

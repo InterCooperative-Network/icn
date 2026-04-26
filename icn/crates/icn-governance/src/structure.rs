@@ -344,7 +344,7 @@ impl StructureStoreBackend for InMemoryStructureStore {
             .filter(|s| s.parent_entity_id == entity_id)
             .cloned()
             .collect();
-        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(out)
     }
 
@@ -397,7 +397,7 @@ impl StructureStoreBackend for InMemoryStructureStore {
             .filter(|r| r.structure_id == *sid)
             .cloned()
             .collect();
-        out.sort_by(|a, b| a.start_date.cmp(&b.start_date));
+        out.sort_by_key(|a| a.start_date);
         Ok(out)
     }
 
@@ -422,7 +422,7 @@ impl StructureStoreBackend for InMemoryStructureStore {
             .filter(|r| &r.person_did == did)
             .cloned()
             .collect();
-        out.sort_by(|a, b| a.start_date.cmp(&b.start_date));
+        out.sort_by_key(|a| a.start_date);
         Ok(out)
     }
 }

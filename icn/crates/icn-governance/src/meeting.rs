@@ -446,7 +446,7 @@ impl MeetingStoreBackend for InMemoryMeetingStore {
             .filter(|m| m.domain_id == domain_id)
             .cloned()
             .collect();
-        out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(out)
     }
 

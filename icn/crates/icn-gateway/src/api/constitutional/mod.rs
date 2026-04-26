@@ -711,7 +711,7 @@ pub async fn list_amendments(
     // Convert to responses and sort by updated_at descending (most recent first)
     let mut responses: Vec<AmendmentResponse> =
         amendments.iter().map(amendment_to_response).collect();
-    responses.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    responses.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
 
     // Apply cursor pagination
     let pagination_request = PaginationRequest {
@@ -1089,7 +1089,7 @@ pub async fn list_appeals(
 
     // Convert to responses and sort by updated_at descending (most recent first)
     let mut responses: Vec<AppealResponse2> = appeals.iter().map(appeal_to_response).collect();
-    responses.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    responses.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
 
     // Apply cursor pagination
     let pagination_request = PaginationRequest {

@@ -179,7 +179,7 @@ impl ScopedReplicationAdjuster {
                         .collect();
                     // Sort widest scope first (highest ordinal), so we prefer to remove
                     // the least-local replicas.
-                    in_scope_healthy.sort_by(|a, b| b.1.cmp(&a.1));
+                    in_scope_healthy.sort_by_key(|b| std::cmp::Reverse(b.1));
                     for (peer, _) in in_scope_healthy.iter().take(excess) {
                         actions.push(RepairAction::RemoveReplica {
                             content_hash: hash,

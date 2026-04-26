@@ -591,8 +591,7 @@ impl Amendment {
         }
 
         // Check approval threshold
-        if total_ratifications > 0 {
-            let approval_percent = (approvals * 100) / total_ratifications;
+        if let Some(approval_percent) = (approvals * 100).checked_div(total_ratifications) {
             if approval_percent >= self.requirements.approval_percent as usize {
                 return RatificationResult::Approved {
                     approvals,
@@ -601,13 +600,14 @@ impl Amendment {
             }
 
             // Check if rejection is inevitable
-            let rejection_percent = (rejections * 100) / total_ratifications;
-            if rejection_percent > (100 - self.requirements.approval_percent as usize) {
-                return RatificationResult::Rejected {
-                    approvals,
-                    rejections,
-                    reason: "Cannot achieve approval threshold".to_string(),
-                };
+            if let Some(rejection_percent) = (rejections * 100).checked_div(total_ratifications) {
+                if rejection_percent > (100 - self.requirements.approval_percent as usize) {
+                    return RatificationResult::Rejected {
+                        approvals,
+                        rejections,
+                        reason: "Cannot achieve approval threshold".to_string(),
+                    };
+                }
             }
         }
 

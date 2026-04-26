@@ -190,7 +190,7 @@ impl QuarantineStore {
         }
 
         // Sort by observed_at (newest first)
-        items.sort_by(|a, b| b.observed_at.cmp(&a.observed_at));
+        items.sort_by_key(|b| std::cmp::Reverse(b.observed_at));
 
         Ok(items)
     }

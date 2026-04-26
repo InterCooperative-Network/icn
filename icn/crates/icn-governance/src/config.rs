@@ -10,19 +10,14 @@ use serde::{Deserialize, Serialize};
 /// - `Majority`: Traditional majority vote. Proposals pass when `for_votes > approval_threshold`.
 /// - `Consent`: Proposals pass unless objections exceed `max_objections`. An "against" vote
 ///   in consent mode counts as an objection. Quorum still applies.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum DecisionMode {
     /// Traditional majority-rule voting (default).
+    #[default]
     Majority,
     /// Consent-based decision-making: proposals pass unless objections exceed threshold.
     Consent,
-}
-
-impl Default for DecisionMode {
-    fn default() -> Self {
-        Self::Majority
-    }
 }
 
 /// Complete governance configuration for a domain

@@ -669,7 +669,7 @@ pub fn list_snapshots(data_dir: impl AsRef<Path>) -> Result<Vec<(String, u64, u6
     }
 
     // Sort by timestamp descending (newest first)
-    snapshots.sort_by(|a, b| b.1.cmp(&a.1));
+    snapshots.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     Ok(snapshots)
 }

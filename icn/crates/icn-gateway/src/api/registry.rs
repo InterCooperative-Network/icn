@@ -34,21 +34,16 @@ use icn_store::Store;
 // ============================================================================
 
 /// Status of a governance decision.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum DecisionStatus {
     /// Decision is pending (voting in progress).
+    #[default]
     Pending,
     /// Decision was approved.
     Approved,
     /// Decision was rejected.
     Rejected,
-}
-
-impl Default for DecisionStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
 }
 
 /// A cooperative meeting record.
@@ -571,7 +566,7 @@ pub async fn list_meetings(
 
     // Sort by starts_at descending (most recent first)
     let mut meetings: Vec<_> = all_meetings;
-    meetings.sort_by(|a, b| b.starts_at.cmp(&a.starts_at));
+    meetings.sort_by_key(|b| std::cmp::Reverse(b.starts_at));
 
     // Apply pagination
     let data: Vec<_> = meetings.into_iter().skip(offset).take(limit).collect();
@@ -700,7 +695,7 @@ pub async fn list_decisions(
 
     // Sort by created_at descending (most recent first)
     let mut decisions = all_decisions;
-    decisions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    decisions.sort_by_key(|b| std::cmp::Reverse(b.created_at));
 
     // Apply pagination
     let data: Vec<_> = decisions.into_iter().skip(offset).take(limit).collect();

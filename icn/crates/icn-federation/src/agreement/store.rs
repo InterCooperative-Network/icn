@@ -253,7 +253,7 @@ impl AgreementStoreOps for AgreementStore {
         }
 
         // Sort by created_at descending (most recent first)
-        agreements.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        agreements.sort_by_key(|b| std::cmp::Reverse(b.created_at));
 
         Ok(agreements)
     }
@@ -274,7 +274,7 @@ impl AgreementStoreOps for AgreementStore {
         }
 
         // Sort by created_at descending
-        agreements.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        agreements.sort_by_key(|b| std::cmp::Reverse(b.created_at));
 
         Ok(agreements)
     }
@@ -314,7 +314,7 @@ impl AgreementStoreOps for AgreementStore {
         }
 
         // Sort by proposed_at
-        amendments.sort_by(|a, b| a.proposed_at.cmp(&b.proposed_at));
+        amendments.sort_by_key(|a| a.proposed_at);
 
         Ok(amendments)
     }
@@ -383,7 +383,7 @@ impl AgreementStoreOps for InMemoryAgreementStore {
             p.into_inner()
         });
         let mut agreements: Vec<_> = guard.values().cloned().collect();
-        agreements.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        agreements.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(agreements)
     }
 
@@ -397,7 +397,7 @@ impl AgreementStoreOps for InMemoryAgreementStore {
             .filter(|a| a.parties.iter().any(|p| &p.did == party_did))
             .cloned()
             .collect();
-        agreements.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        agreements.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(agreements)
     }
 
@@ -445,7 +445,7 @@ impl AgreementStoreOps for InMemoryAgreementStore {
             .filter(|a| &a.agreement_id == agreement_id)
             .cloned()
             .collect();
-        amendments.sort_by(|a, b| a.proposed_at.cmp(&b.proposed_at));
+        amendments.sort_by_key(|a| a.proposed_at);
         Ok(amendments)
     }
 }

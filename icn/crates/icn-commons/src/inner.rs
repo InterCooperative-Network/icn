@@ -707,7 +707,7 @@ impl CommonsInner {
             .collect();
 
         // Sort by creation time, newest first
-        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        results.sort_by_key(|b| std::cmp::Reverse(b.created_at));
 
         Ok(results)
     }
@@ -1813,7 +1813,7 @@ impl CommonsInner {
         }
 
         // Sort by created_at descending
-        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        results.sort_by_key(|b| std::cmp::Reverse(b.created_at));
 
         Ok(results)
     }
@@ -1829,7 +1829,7 @@ impl CommonsInner {
         results.retain(|a| {
             matches!(&a.scope, icn_governance::AmendmentScope::Jurisdiction { domain_id: d } if d == domain_id)
         });
-        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        results.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(results)
     }
 
@@ -1842,7 +1842,7 @@ impl CommonsInner {
         results.retain(|a| {
             matches!(&a.scope, icn_governance::AppealScope::Jurisdiction { domain_id: d } if d == domain_id)
         });
-        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        results.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(results)
     }
 
@@ -2055,7 +2055,7 @@ impl CommonsInner {
         }
 
         // Sort by created_at descending
-        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        results.sort_by_key(|b| std::cmp::Reverse(b.created_at));
 
         Ok(results)
     }

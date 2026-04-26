@@ -717,8 +717,7 @@ fn mint_reinstatement_grant(
     //       take the last matching entry (most-recent revoked).
     let template = all
         .iter()
-        .filter(|g| g.grantor.0 == domain_id.0 && g.revoked_at.is_some())
-        .next_back();
+        .rfind(|g| g.grantor.0 == domain_id.0 && g.revoked_at.is_some());
     let template = match template {
         Some(t) => t.clone(),
         None => {
@@ -833,10 +832,7 @@ fn mint_reconfirmation_grant(
     // Restrict candidates to grants issued by THIS deciding domain.
     // A cross-domain active grant does not authorize this domain to
     // refresh it — the grantor must match.
-    let template = actives
-        .iter()
-        .filter(|g| g.grantor.0 == domain_id.0)
-        .next_back();
+    let template = actives.iter().rfind(|g| g.grantor.0 == domain_id.0);
     let template = match template {
         Some(t) => t.clone(),
         None => {

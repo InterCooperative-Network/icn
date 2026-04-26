@@ -172,17 +172,14 @@ pub struct StandingRoleAssignment {
 // ============================================================================
 
 /// Scope for a proposal (local or federation-wide)
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ProposalScopeRequest {
+    #[default]
     Local,
-    Federation { federation_id: String },
-}
-
-impl Default for ProposalScopeRequest {
-    fn default() -> Self {
-        Self::Local
-    }
+    Federation {
+        federation_id: String,
+    },
 }
 
 /// Create a new proposal
