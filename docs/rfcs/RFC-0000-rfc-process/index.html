@@ -1,0 +1,265 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>RFC 0000: RFC Process | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>rfcs</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>RFC 0000 rfc process</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/rfcs/RFC-0000-rfc-process.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>id: &quot;0000&quot;
+title: &quot;RFC Process&quot;
+status: &quot;accepted&quot;
+created: &quot;2026-04-26&quot;
+updated: &quot;2026-04-26&quot;
+authors: [&quot;Matt Faherty&quot;]
+reviewers: []
+related_adr_candidates: []
+related_issues: []
+supersedes: []
+superseded_by: []</h2>
+<h1>RFC 0000: RFC Process</h1>
+<h2>Status</h2>
+<p><code>accepted</code> — this RFC defines its own process and is the seed RFC for the system. Future amendments are made by drafting a successor RFC.</p>
+<h2>The one-line model</h2>
+<blockquote>
+<p><strong>RFCs explore. ADRs decide. Issues build. Tests prove. The website claims only what the proof supports.</strong></p>
+</blockquote>
+<h2>Pipeline</h2>
+<pre><code class="language-text">                 ┌─────────────────┐
+   design        │ rfc_candidates  │  ops/coordination/rfc_candidates.yaml
+   space         │     .yaml       │  unresolved design spaces, no decision yet
+                 └────────┬────────┘
+                          │  promote
+                          ▼
+                 ┌─────────────────┐
+   exploration   │      RFC        │  docs/rfcs/RFC-NNNN-*.md
+                 │ draft → active  │  options, tradeoffs, alternatives
+                 └────────┬────────┘
+                          │  accept (project converges)
+                          ▼
+                 ┌─────────────────┐
+   decision      │ adr_candidates  │  ops/coordination/adr_candidates.yaml
+   queued        │     .yaml       │  rows updated to point at the accepted RFC
+                 └────────┬────────┘
+                          │  draft ADR
+                          ▼
+                 ┌─────────────────┐
+   decision      │      ADR        │  docs/adr/ADR-NNNN-*.md
+                 │ proposed →      │  records the decision and rationale
+                 │ accepted        │
+                 └────────┬────────┘
+                          │  open issue(s)
+                          ▼
+                 ┌─────────────────┐
+   commitment    │   GitHub issue  │  links back to ADR + RFC
+                 └────────┬────────┘
+                          │  implement
+                          ▼
+                 ┌─────────────────┐
+   evidence      │   tests / proof │  crates/*/tests/, docs, observability
+                 └────────┬────────┘
+                          │  proof passes
+                          ▼
+                 ┌─────────────────┐
+   status update │ ADR.implementation_status →
+                 │   not_started → partial → implemented → verified
+                 └────────┬────────┘
+                          │  evidence is public
+                          ▼
+                 ┌─────────────────┐
+   public claim  │     website     │  website/src/
+                 │  claims only    │  evidence-linked maturity band
+                 │  what&#39;s proven  │
+                 └─────────────────┘
+</code></pre>
+<p>The pipeline is one-way in spirit. Anyone can write an RFC; not every RFC reaches <code>accepted</code>; not every accepted RFC produces an ADR; not every ADR is implemented; not every implementation is publicly claimed. Each arrow above filters out designs that should not advance.</p>
+<h2>When to write an RFC</h2>
+<p>Write an RFC when:</p>
+<ul>
+<li>The design space is <strong>non-obvious</strong>. Multiple viable approaches exist; tradeoffs are real; picking one without writing them down would lose information.</li>
+<li>The change crosses <strong>multiple subsystems</strong> or <strong>kernel/app boundaries</strong>. Anything that touches the meaning firewall benefits from explicit exploration.</li>
+<li>The change has <strong>accessibility, conflict-resolution, or compute-authority</strong> consequences. These are first-class concerns; an RFC forces them to be addressed in writing.</li>
+<li>The project is <strong>forming a north star</strong>. Forward-direction architecture (e.g., CCL as institutional process language; cross-institution mandate recognition) needs design exploration before decisions are made.</li>
+<li>A <strong>public claim is at stake</strong>. If the website would describe a capability differently after the change, an RFC keeps the truth boundary honest.</li>
+<li>A <strong>reviewer can&#39;t make sense of an ADR</strong> because the alternatives are missing. The fix is to write the RFC the ADR was implicitly depending on.</li>
+</ul>
+<h2>When NOT to write an RFC</h2>
+<p>Do not write an RFC when:</p>
+<ul>
+<li>The change is a <strong>bug fix</strong> with a single correct answer.</li>
+<li>The change is a <strong>straightforward implementation</strong> of an already-accepted ADR.</li>
+<li>The design is <strong>constrained by existing invariants</strong> to a single path. (Write a short ADR instead, citing the invariant.)</li>
+<li>The change is <strong>scoped to one file</strong>, has no cross-cutting effects, and would be reviewable in a normal PR.</li>
+<li>The decision is <strong>already made</strong> elsewhere and the work is to record it. (Write an ADR back-fill instead.)</li>
+<li>The design space is <strong>so unsettled</strong> that a candidate row in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/coordination/rfc_candidates.yaml">`rfc_candidates.yaml`</a> is the right artifact and the RFC itself can wait.</li>
+</ul>
+<p>If in doubt, prefer a candidate row first; promote to an RFC when the design space is concrete enough to compare options.</p>
+<h2>How RFCs move to ADRs</h2>
+<ol>
+<li>RFC drafted → <code>status: draft</code>. Author writes alone.</li>
+<li>RFC opened for review → <code>status: active</code>. Reviewers comment, propose alternatives, surface invariants.</li>
+<li>Project converges on an option (or rejects all). RFC moves to <code>status: accepted</code> (or <code>rejected</code>). The <code>Outcome</code> section names the choice and the rationale.</li>
+<li>The follow-up ADR(s) are drafted. They reference the accepted RFC. ADR <code>status</code> lifecycle then takes over per <a href="/docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index">ADR-0018</a>.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/coordination/adr_candidates.yaml">`adr_candidates.yaml`</a> rows are updated to point at the accepted RFC and the new ADR file paths.</li>
+</ol>
+<p>An RFC may produce <strong>zero, one, or multiple</strong> ADRs. A complex RFC (e.g., obligation/allocation/settlement) routinely produces three or four. A narrow RFC may produce one. A rejected RFC produces zero.</p>
+<h2>How RFCs relate to issues</h2>
+<ul>
+<li>An RFC may <strong>cite</strong> existing issues as evidence of the design problem. RFCs do not own implementation; issues do.</li>
+<li>An accepted RFC&#39;s <code>Follow-up implementation issues</code> section names the issues that should exist (or be opened) to drive implementation. Those issues link back to the RFC and the resulting ADR(s).</li>
+<li>Issues do not change RFC status. Issues track work; RFCs track design.</li>
+</ul>
+<h2>How implementation evidence updates ADRs</h2>
+<p>ADR <code>implementation_status</code> is a separate field with the closed taxonomy <code>not_started | partial | implemented | verified</code>. It moves only when:</p>
+<ul>
+<li><code>partial</code> requires landed code that exercises the decision in production paths.</li>
+<li><code>implemented</code> requires landed code <strong>and</strong> integration tests proving the decision&#39;s invariants.</li>
+<li><code>verified</code> requires implementation <strong>and</strong> evidence the invariant holds under the production deployment (telemetry, fault injection, replay audit, etc.).</li>
+</ul>
+<p><strong>Accepted RFC does not move ADR implementation status.</strong> Accepted ADR does not move implementation status. Only code and tests do. This separation is what keeps the website honest.</p>
+<h2>How public website claims depend on evidence</h2>
+<p>The public website (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/src/">website/src/</a>) claims only what implementation evidence supports. The maturity bands (<code>strong | advancing | maturing | behind | not-yet</code>) are documented in <a href="/docs/adr/ADR-0032-website-truth-boundary">ADR-0032</a>. The chain is:</p>
+<ul>
+<li><code>not-yet</code> claim: the RFC may exist; no ADR or no implementation. Public framing must be aspirational.</li>
+<li><code>behind</code> claim: ADR exists; implementation is partial; member-facing surface is missing.</li>
+<li><code>maturing</code> claim: implementation exists; integration paths and public surfaces are still being completed.</li>
+<li><code>advancing</code> claim: implementation exists; gaps are visible; the system can stand behind it for some uses but not all.</li>
+<li><code>strong</code> claim: implementation is complete and hardened; ADR <code>implementation_status: verified</code>; the project is willing to stand behind it in production.</li>
+</ul>
+<p><a href="/docs/adr/ADR-0033-public-maturity-claims-and-evidence-links">ADR-0033</a> proposes a build-time linter that verifies every banded claim cites an ADR, issue, code path, or phase reference. Until that linter ships, evidence-linking is editorial discipline.</p>
+<h2>How to supersede or withdraw RFCs</h2>
+<p><strong>Supersede</strong> when the design space changes meaningfully or a better proposal emerges:</p>
+<ol>
+<li>Draft the successor RFC.</li>
+<li>In the successor&#39;s frontmatter, set <code>supersedes: [&quot;NNNN&quot;]</code>.</li>
+<li>In the original RFC&#39;s frontmatter, set <code>status: superseded</code> and <code>superseded_by: [&quot;MMMM&quot;]</code>.</li>
+<li>Add a <code>&gt; Update (YYYY-MM-DD)</code> block at the top of the original pointing to the successor.</li>
+<li><strong>Do not delete the original body.</strong> Superseded RFCs preserve institutional memory of why the project changed direction.</li>
+</ol>
+<p><strong>Withdraw</strong> when the author or project removes the proposal before a decision:</p>
+<ol>
+<li>Set <code>status: withdrawn</code> in frontmatter.</li>
+<li>Add a short note at the top explaining why.</li>
+<li>Preserve the body. A withdrawn RFC is part of the design history.</li>
+</ol>
+<h2>How RFCs interact with <code>ops/coordination/adr_candidates.yaml</code></h2>
+<p>The two registries are complementary, not redundant.</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/coordination/rfc_candidates.yaml">`rfc_candidates.yaml`</a> lists <strong>unresolved design spaces</strong>. A row here means &quot;the project knows this is a place where decisions will eventually need to be made; we have not yet explored the space enough to draft an RFC.&quot;</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/coordination/adr_candidates.yaml">`adr_candidates.yaml`</a> lists <strong>likely future decisions</strong>. A row here means &quot;the project knows this decision will need to be recorded; the decision may follow from an RFC, may follow from an obvious-direction back-fill, or may be a forward-state proposal that can be modified later.&quot;</li>
+</ul>
+<p>Some ADR candidates <strong>should be preceded by an RFC</strong> because the design space is unsettled. Examples in the current registry:</p>
+<ul>
+<li>ADR-0029 (Conflict Resolution Object Model) — broad design space, multiple plausible models. → RFC-0002.</li>
+<li>ADR-0023 (CCL Institutional Process Language) — forward direction with non-trivial language design. → RFC-0004.</li>
+<li>ADR-0027 (Action Card Contract) — multi-stakeholder UX surface. → RFC-0005.</li>
+<li>ADR-0028 (Accessibility Baseline) — five-layer model with explicit floor commitments. → RFC-0003.</li>
+</ul>
+<p>Other ADR candidates can proceed without an RFC because they back-fill existing implementation reality (e.g., ADR-0021 CCL determinism, ADR-0030 compute workload manifest). The signal is whether the design is <em>settled by code</em> or <em>unsettled in writing</em>.</p>
+<p>When an RFC moves to <code>accepted</code>, update the relevant ADR candidate row(s) to add <code>related_rfc: NNNN</code> and the candidate&#39;s <code>priority</code> may shift. This keeps the two registries in sync without forcing either to become authoritative over the other.</p>
+<h2>Numbering</h2>
+<ul>
+<li>RFC numbers are sequential, four-digit zero-padded (<code>RFC-0001</code>, <code>RFC-0002</code>, …).</li>
+<li>Numbers are allocated when an RFC moves from <code>candidate</code> to <code>draft</code>. The author picks the next unused number; collisions are resolved by bumping.</li>
+<li>Withdrawn or rejected numbers are <strong>not</strong> reused. The number reflects the chronology of the conversation, not the chronology of accepted decisions.</li>
+<li>This RFC is <code>RFC-0000</code> because it is the seed for the system. No future RFC takes that number.</li>
+</ul>
+<h2>What this RFC is not</h2>
+<ul>
+<li>Not a project-governance ADR. ICN&#39;s broader project governance is the territory of <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/coordination/adr_candidates.yaml">ADR-0063 candidate</a> and a future RFC-0009.</li>
+<li>Not a license to bypass ADR review. Accepting an RFC does not skip the ADR step; it just makes the ADR step easier.</li>
+<li>Not a documentation treadmill. RFCs are written when the design space justifies them. Most ICN work does not need an RFC. The pipeline filters at every step for a reason.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
