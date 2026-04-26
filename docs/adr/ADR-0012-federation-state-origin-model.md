@@ -1,18 +1,36 @@
 ---
 id: "0012"
 title: "Federation State Origin Model — Gateway vs Governance vs Compute"
-status: "accepted"
+status: "amended"
 date: "2026-03-31"
 context: "federation-clearing-position-api / post-ADR-0011 architecture pass"
 deciders: ["Matt Faherty"]
 tags: ["gateway", "architecture", "federation", "clearing", "state-origins", "parallel-model"]
+amends: []
+amended_by: ["ADR-0013"]
+implementation_status: "partially implemented (Steps 1–2 implemented; Step 3 design in ADR-0013, with Step 3d landed and remaining open items tracked there)"
+references:
+  - "ADR-0011 (Canonical Truth Ownership)"
+  - "ADR-0013 (Federation Clearing Adoption Contract — Step 3 design + Step 3d implementation)"
+  - "ADR-0018 (ADR Lifecycle)"
 ---
 
 # ADR 0012: Federation State Origin Model
 
 ## Status
 
-Accepted (2026-03-31)
+**Accepted (2026-03-31); amended (2026-04-26).**
+
+> **Amendment (2026-04-26):** the Step 3 (CCL adoption contract) work
+> this ADR scoped as "future, high complexity" was designed in
+> [ADR-0013](ADR-0013-federation-clearing-adoption-contract.md), and
+> Step 3d (the adoption proposal endpoint) has since landed. ADR-0013
+> retains an open-items section listing what remains unresolved
+> (`FederationProvenance` persistence, `coop_a_did` plumbing,
+> store-isolation tests). This ADR's Model C (Explicit Parallel) is
+> unchanged; ADR-0013 is the current source of truth for the *adoption
+> path's* status. Decision lifecycle is `amended`, not `superseded`:
+> Model C still holds.
 
 ## Context
 

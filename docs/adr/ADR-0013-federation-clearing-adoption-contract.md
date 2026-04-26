@@ -6,22 +6,44 @@ date: "2026-04-01"
 context: "federation-clearing-position-api / ADR 0012 Step 3 design pass"
 deciders: ["Matt Faherty"]
 tags: ["gateway", "architecture", "federation", "clearing", "governance", "adoption", "ccl"]
+amends: ["ADR-0012"]
+implementation_status: "partially implemented (Steps 3a–3d landed; persistence and integration gaps remain — see Open Items)"
+references:
+  - "ADR-0012 (Federation State Origin Model — amended by this ADR)"
+  - "ADR-0018 (ADR Lifecycle)"
+  - "ADR-0020 (Institutional Bootstrap Activation — out-of-scope for this ADR's federation territory)"
 ---
 
 # ADR 0013: Federation Clearing Adoption Contract
 
 ## Status
 
-**Step 3d implemented (2026-04-01)** — adoption proposal endpoint is live.
+**Accepted (2026-04-01); open items unresolved as of 2026-04-26.**
 
 Steps 3a (terms propagation), 3b (source reference), 3c (read surface), and 3d (adoption
 proposal endpoint) are all implemented. Step 3a/b/c landed in PRs #1478/#1479.
-Step 3d landed in this session (branch `feat/clearing-adoption-step3d`).
+Step 3d landed on branch `feat/clearing-adoption-step3d`.
 
-Remaining open items from this design:
-- `FederationProvenance` still in-memory (not persisted to Sled) — open Q4
-- `establish_clearing()` coop_a_did is still `String::new()` — governance executor needs fixing
-- Store-isolation tests (Phase 5) not yet written
+### Open items (verified unresolved as of 2026-04-26)
+
+The three open items from the original status note remain real. They were re-checked
+against current code and are not closed:
+
+- **`FederationProvenance` still in-memory (not persisted to Sled).** Verified at
+  `icn/crates/icn-core/src/services/federation_service.rs:50`:
+  `provenance: RwLock<HashMap<String, FederationProvenance>>`. Restart-survival is
+  unproven; the type is constructed at line 171 but no Sled tree is written.
+- **`establish_clearing()` `coop_a_did` is still `String::new()`.** Verified at
+  `icn/apps/governance/src/handlers/execution.rs:642`:
+  `coop_a_did: String::new()`. The governance executor still passes an empty Did
+  through to clearing; downstream consumers receive no caller identity.
+- **Store-isolation tests (Phase 5) not yet written.** No `store_isolation`
+  test files found under `icn/crates/icn-federation/tests/` or the gateway's
+  federation tests. The isolation invariant remains unverified by tests.
+
+These are not closed by this update. They are listed here so a future ADR or PR
+that resolves them must explicitly link back to ADR-0013 and explain which item
+its change resolves.
 
 ## Context
 
