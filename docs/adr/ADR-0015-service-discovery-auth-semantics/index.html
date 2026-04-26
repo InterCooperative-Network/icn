@@ -41,9 +41,47 @@ View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ADR-0015: Service Discovery Auth Semantics — Auth-gated with Enumeration-Safe 404</h1>
 <p><strong>Date</strong>: 2026-03-21
 <strong>Status</strong>: accepted
+<strong>Implementation status</strong>: needs verification (see Implementation Status note below — 2026-04-26)
 <strong>Tags</strong>: gateway, api, security, service-discovery
 <strong>Supersedes</strong>: N/A
 <strong>Note</strong>: Originally filed as ADR-0009 in <code>ops/state/decisions/</code> (collided with another decision sharing that number). Renumbered to 0015 when ADRs were canonicalized under <code>docs/adr/</code>.</p>
+<h2>Implementation status (2026-04-26)</h2>
+<p><strong><code>needs verification</code>.</strong> A code read on 2026-04-26 found:</p>
+<ul>
+<li><code>icn/crates/icn-gateway/src/api/services.rs</code> registers the service-discovery
+routes (<code>announce</code>, <code>discover</code>, <code>query</code>, <code>get</code>, <code>withdraw</code>) without any
+visible JWT extractor (<code>JwtUser</code>, <code>auth_wrap</code>) at the route level. The
+<code>configure(cfg: &amp;mut web::ServiceConfig)</code> block mounts the routes directly:<pre><code class="language-text">cfg.service(announce_service)
+    .service(discover_services)
+    .service(query_services)
+    .service(get_service)
+    .service(withdraw_service);
+</code></pre>
+No per-route auth middleware was found in the file.</li>
+<li>A &quot;no results → 404&quot; code path is documented at
+<code>icn/crates/icn-gateway/src/api/services.rs:387</code> (in <code>query_services</code>),
+matching half of the ADR&#39;s decision (the missing-resource → 404 case).</li>
+<li>The auth-boundary tests file <code>icn/crates/icn-gossip/tests/service_discovery_auth_boundary.rs</code>
+exists but exercises gossip-side auth, not the gateway HTTP route gating
+this ADR mandates.</li>
+<li>The original auth gating may live in route configuration outside
+<code>api/services.rs</code> (e.g. in <code>server.rs</code> or via a higher-level scope
+middleware). This was not traced in the 2026-04-26 read.</li>
+</ul>
+<p><strong>What this means for the ADR:</strong> the <em>decision</em> (Option B — all
+<code>/v1/services/*</code> endpoints require JWT, with enumeration-safe 404 for
+unauthorized callers) is unchanged and remains accepted. Whether the
+<em>implementation</em> fully matches that decision today requires a focused
+verification pass against the live gateway: an integration test that
+asserts each of <code>POST /v1/services/announce</code>, <code>GET /v1/services</code>,
+<code>GET /v1/services/{id}</code>, <code>DELETE /v1/services/{id}</code> returns 401 (or
+the configured equivalent) without a JWT, returns 404 for a
+non-existent resource with a valid JWT, and returns 404 (not 401) for
+a non-existent resource without a JWT.</p>
+<p><strong>Follow-up issue (suggested):</strong> open an ICN issue
+<code>audit(gateway): verify ADR-0015 service-discovery auth + enumeration-safe 404 in code</code>
+before marking implementation <code>implemented</code>. The current 2026-04-26 read is
+inconclusive enough that a guess either way would falsify the ADR.</p>
 <h2>Context</h2>
 <p>During end-to-end demo validation (PR #1115), <code>GET /v1/services/:id</code> returned <strong>401</strong> when a
 service had been withdrawn and no JWT was present. The expected behavior for a missing resource

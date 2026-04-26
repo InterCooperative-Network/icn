@@ -1,0 +1,327 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR 0020: Institutional Bootstrap Activation and Standing Read Model | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0020 institutional bootstrap activation and standing read model</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0020-institutional-bootstrap-activation-and-standing-read-model.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<p>id: &quot;0020&quot;
+title: &quot;Institutional Bootstrap Activation and Standing Read Model&quot;
+status: &quot;accepted&quot;
+date: &quot;2026-04-26&quot;
+deciders: [&quot;Matt Faherty&quot;]
+tags: [&quot;bootstrap&quot;, &quot;activation&quot;, &quot;standing&quot;, &quot;institution-package&quot;, &quot;charter&quot;, &quot;person-directory&quot;, &quot;authority-scope&quot;, &quot;nycn-dogfood&quot;]
+supersedes: []
+superseded_by: []
+amends: []
+implementation_status: &quot;partially implemented (bootstrap → charter activation → standing path landed; action cards not yet)&quot;
+references:</p>
+<ul>
+<li>&quot;ADR-0011 (Canonical Truth Ownership)&quot;</li>
+<li>&quot;ADR-0014 (Constitutional Object Model)&quot;</li>
+<li>&quot;ADR-0017 (Monorepo Consolidation)&quot;</li>
+<li>&quot;ADR-0018 (ADR Lifecycle)&quot;</li>
+<li>&quot;ADR-0019 (Authority Grant Minting Seam)&quot;</li>
+<li>&quot;docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md&quot;</li>
+<li>&quot;PR #1586 (generic institution bootstrap package path)&quot;</li>
+<li>&quot;PR #1617 (bootstrap-apply 409 idempotency)&quot;</li>
+<li>&quot;PR #1621 (persistent governance domains across gateway restart)&quot;</li>
+<li>&quot;PR #1624 (live charter activation endpoint)&quot;</li>
+<li>&quot;PR #1626 (person-directory overlay for bootstrap role assignment)&quot;</li>
+<li>&quot;PR #1627 (GET /me/standing read model)&quot;</li>
+<li>&quot;PR #1630 (authority_scope plumbed through assign_role end-to-end)&quot;</li>
+</ul>
+<hr>
+<h1>ADR 0020: Institutional Bootstrap Activation and Standing Read Model</h1>
+<h2>Status</h2>
+<p><strong>Accepted (2026-04-26).</strong> Records the reusable activation path that an institution package follows from manifest-on-disk to a member-facing standing surface on a running ICN node. Separates ICN&#39;s <strong>runtime contract</strong> (the activation pipeline, the standing read model) from the <strong>institution package layer</strong> (local vocabulary, fixtures, real-DID overlays).</p>
+<h2>Context</h2>
+<p>ICN now ships a working institutional-operability runtime: a package can be applied to a node, a charter can be activated against that node, real DIDs can be bound to package-side person ids, role assignments carry typed authority scope, and the member-facing <code>/me/standing</code> read model surfaces what a holder is allowed to do today. NYCN dogfoods this end-to-end (see <a href="https://github.com/InterCooperative-Network/nycn" target="_blank" rel="noopener">InterCooperative-Network/nycn</a> — institution package, person-directory overlays, <code>/me/standing</code> smoke verifier).</p>
+<p>The pieces are in code; what is not yet recorded as a decision is <strong>the contract between the institution package layer and the ICN runtime</strong>. NYCN&#39;s package shape, fixture content, and verifier tools have been growing without a written rule for &quot;what does ICN promise to consume, and what stays on the package side?&quot; That ambiguity is the same drift hazard ADR-0011 (canonical truth ownership) and the institution-package boundary doc were filed against. Without an ADR locking the activation path, package authors will start expecting whatever the gateway happened to do this week.</p>
+<p>Two pressures forced the decision now:</p>
+<ol>
+<li><p><strong>NYCN as reference institution package</strong> is shipping fixtures (signals, indicators, action-card templates, temporary authority, support institutions — see NYCN PR #7) ahead of the corresponding ICN runtime primitives (icn#1631, #1632, #1633, #1634, #1635). The package marks those <code>icn_target_status: planned</code>; that discipline is correct, but it depends on a stable ICN-side activation contract for the things that <em>are</em> implemented today. This ADR provides the stable spine.</p>
+</li>
+<li><p><strong>Action cards (icn#1608)</strong> are about to ship and will be the next member-facing surface plugged into this same path. Recording the activation chain now means action cards plug into a written contract instead of an inferred one.</p>
+</li>
+</ol>
+<h2>Decision</h2>
+<p>Institution package activation follows a single reusable path. Each step has a written contract surface; ICN owns each surface; institution packages bind their local vocabulary to it.</p>
+<h3>Activation chain</h3>
+<pre><code class="language-text">[1] package manifest (institution/package.yaml + bootstrap fixtures)
+        ↓
+[2] private operator overlay (real DIDs, contact bindings — never in public repo)
+        ↓
+[3] bootstrap apply (icnctl institution bootstrap apply)
+        ↓
+[4] live charter activation endpoint (POST /v1/charters/...)
+        ↓
+[5] entity / structure / role creation (governance domains persisted across restart)
+        ↓
+[6] /me/standing read model (member-facing standing surface)
+        ↓
+[7] action cards (FUTURE — icn#1608)
+</code></pre>
+<h3>Contract surfaces (ICN owns; packages bind to)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Surface</th>
+<th>ICN owns</th>
+<th>Package owns</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Package manifest schema (entity / structure / activity / role primitives, <code>operating_purpose</code> metadata)</td>
+<td>The four-primitive ontology; the <code>BootstrapEntityRecord</code> shape; <code>operating_purpose: Option&lt;String&gt;</code> as the only sanctioned home for local taxonomy</td>
+<td>The manifest content (which entities, which structures, which <code>purpose</code> strings)</td>
+<td>implemented (<code>icn-governance::bootstrap</code>)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Private overlay binding</td>
+<td>The expectation that real DIDs bind through a private overlay outside the public repo; the placeholder-id-to-DID resolution pattern</td>
+<td>The overlay format, the storage location, the operator workflow</td>
+<td>partially implemented; NYCN ships templates and the <code>tools/export-private-activation.py</code> resolver</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Bootstrap apply path</td>
+<td><code>icnctl institution bootstrap apply</code>, idempotency on re-runs (<code>PR #1617</code>), persistent governance domains across restart (<code>PR #1621</code>)</td>
+<td>Calling the CLI / API at activation time</td>
+<td>implemented</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Live charter activation endpoint</td>
+<td><code>POST /v1/charters/...</code> taking ratified charter content and binding it to a governance domain (<code>PR #1624</code>)</td>
+<td>The charter document content (CCL YAML or equivalent)</td>
+<td>implemented</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Entity / structure / role creation</td>
+<td><code>BootstrapEntityRecord</code> parsing, person-directory overlay for DID binding (<code>PR #1626</code>), <code>authority_scope</code> plumbed end-to-end through <code>assign_role</code> (<code>PR #1630</code>)</td>
+<td>Per-package ids, per-package authority scope strings</td>
+<td>implemented</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>/me/standing</code> read model</td>
+<td>The endpoint shape, the standing schema, the smoke contract (<code>PR #1627</code>)</td>
+<td>Smoke verifier on the package side that asserts each holder&#39;s expected standing matches the live response</td>
+<td>implemented; NYCN ships <code>tools/verify-standing.py</code> against the contract</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Action cards</td>
+<td><code>GET /me/action-cards</code> (icn#1608, future)</td>
+<td>Action-card template catalog, holder-side rendering</td>
+<td>NOT YET IMPLEMENTED — icn#1608 is open. NYCN ships planned fixtures (<code>institution/action-card-templates.example.yaml</code>) marked <code>icn_target_status: planned</code>.</td>
+</tr>
+</tbody></table>
+<h3>Boundary rules</h3>
+<ul>
+<li><strong>ICN owns runtime and standing contract.</strong> The activation pipeline shape, the persistence guarantees, and the <code>/me/standing</code> schema are runtime contracts. Institution packages may not redefine them.</li>
+<li><strong>Institution packages own local vocabulary and fixtures.</strong> Per-coop role names, per-program structures, package-specific <code>operating_purpose</code> strings, indicator definitions, signal rules, support-institution patterns. None of these are ICN core primitives. They live in the package; they do not infect ICN core.</li>
+<li><strong>Private overlays bind real DIDs and sensitive data outside the public repo.</strong> Real names, emails, phone numbers, demographic data, payment identifiers, and pre-commit sponsor pipelines never enter the public package repo. The activation path resolves them at apply time from operator-controlled overlay files.</li>
+<li><strong>Action cards are future surface.</strong> No package may claim <code>icn_target_status: supported</code> for action cards until icn#1608 ships and a stable schema is published.</li>
+<li><strong>NYCN-specific nouns stay on the NYCN side.</strong> ICN core does not learn what a &quot;Summit,&quot; a &quot;sponsor tier,&quot; a &quot;education-onboarding cohort,&quot; or a &quot;community contract amendment&quot; is. The package layer translates those into ICN&#39;s four entity primitives + structure + activity + role records.</li>
+</ul>
+<h3>What <code>/me/standing</code> promises today (the read-model contract)</h3>
+<p>The <code>/me/standing</code> response is the canonical answer to &quot;what am I currently authorized to do, in which entities, under what scope?&quot; for the calling DID. Its current shape:</p>
+<ul>
+<li>The caller&#39;s DID and the entities they are a member of (with <code>operating_purpose</code> metadata).</li>
+<li>For each membership, the role assignments held, with their <code>authority_scope</code> strings.</li>
+<li>For each role assignment, the structure (committee / working_group) the role is held in.</li>
+</ul>
+<p>The schema is the runtime contract. NYCN&#39;s smoke verifier (<code>tools/verify-standing.py</code>) reads its expectations from <code>institution/standing-smoke-test.example.yaml</code> and asserts a superset match against the live response. The contract is <code>match_mode: superset</code> — ICN may add fields to the response without breaking package-side verifiers; ICN may not remove or rename fields without superseding this ADR.</p>
+<h3>What does NOT cross the contract</h3>
+<ul>
+<li><strong>Domain semantics.</strong> ICN does not know what &quot;education-onboarding completion&quot; means. It knows <code>Activity { kind: Program, parent_entity_id: X }</code> and <code>RoleAssignment { authority_scope: [...] }</code>. The <code>operating_purpose</code> and authority-scope strings are opaque to ICN.</li>
+<li><strong>Real personal data.</strong> Names, emails, contact channels, accommodation needs are never in the public package or in the activation request body. They live in the operator overlay.</li>
+<li><strong>Federation-side recognition.</strong> A package activated on coop A is not automatically visible to coop B. Cross-cooperative recognition is governed by federation primitives (ADR-0012, ADR-0013) and is independent of this ADR.</li>
+</ul>
+<h2>Implementation status</h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Status</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1. Manifest + bootstrap fixtures</td>
+<td>implemented</td>
+<td><code>icn/crates/icn-governance/src/bootstrap.rs</code> (<code>BootstrapEntityRecord</code>, <code>BootstrapEntityType</code> enum, <code>operating_purpose: Option&lt;String&gt;</code>); NYCN <code>institution/package.yaml</code></td>
+</tr>
+<tr>
+<td>2. Private overlay binding</td>
+<td>implemented</td>
+<td>NYCN <code>tools/export-private-activation.py</code>; <code>summit/2026/sponsors.private.example.yaml</code> template</td>
+</tr>
+<tr>
+<td>3. Bootstrap apply (idempotent)</td>
+<td>implemented</td>
+<td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>; PR #1586 (generic path), PR #1617 (idempotency)</td>
+</tr>
+<tr>
+<td>4. Live charter activation endpoint</td>
+<td>implemented</td>
+<td><code>POST /v1/charters/...</code> (PR #1624)</td>
+</tr>
+<tr>
+<td>5. Entity / structure / role creation, persistent</td>
+<td>implemented</td>
+<td>PR #1621 (persist domains across restart), PR #1626 (person-directory overlay), PR #1630 (authority_scope plumbing)</td>
+</tr>
+<tr>
+<td>6. <code>/me/standing</code> read model</td>
+<td>implemented</td>
+<td>PR #1627; NYCN <code>tools/verify-standing.py</code></td>
+</tr>
+<tr>
+<td>7. Action cards</td>
+<td>NOT YET IMPLEMENTED</td>
+<td>icn#1608 open; NYCN ships planned fixtures only</td>
+</tr>
+</tbody></table>
+<h2>Consequences</h2>
+<ul>
+<li>The activation path has a written contract that NYCN (and any future institution package) can pin to. Drift between &quot;what NYCN expects&quot; and &quot;what ICN does&quot; becomes detectable at the contract surface, not by reading code.</li>
+<li>The boundary between ICN core (runtime) and institution packages (local vocabulary) is locked. ICN does not accumulate NYCN-specific nouns; NYCN does not redefine ICN runtime contracts.</li>
+<li>Action cards (icn#1608) have a written place to plug in without inventing a new activation chain.</li>
+<li>The &quot;private overlay&quot; pattern is acknowledged as a first-class architectural concern: real-DID and sensitive-data binding happens outside the public package repo by design. Future operator-tooling work has a reference model.</li>
+<li>Future federation-side recognition work (ADR-0012/0013 territory) is explicitly out of scope here, which prevents this ADR from over-reaching into territory those ADRs already own.</li>
+</ul>
+<h2>Non-decisions (out of scope)</h2>
+<ul>
+<li>Action card schema, semantics, lifecycle, or rendering. Those decisions go in a separate ADR after icn#1608 lands.</li>
+<li>Federation-side mandate or membership recognition. ADR-0012 and ADR-0013 own that.</li>
+<li>The CCL charter-document grammar. Charters are inputs to step 4; their internal shape is governed elsewhere.</li>
+<li>Authority enforcement (kernel dispatch gating on mandates). ADR-0019 records the minting seam; enforcement gating is its own future ADR.</li>
+<li>Signals, indicators, temporary-authority, obligation/allocation/settlement primitives. Each is open as a separate ICN issue (#1631 / #1632 / #1633 / #1634) and will graduate via its own ADR when accepted.</li>
+</ul>
+<h2>Alternatives Considered</h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why rejected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Let NYCN&#39;s expectations <em>be</em> the runtime contract</td>
+<td>Folds institution-specific vocabulary into ICN core. The whole point of the package boundary is that ICN runs on more than NYCN.</td>
+</tr>
+<tr>
+<td>Skip writing this ADR — the code already implements the path</td>
+<td>The code implements the path; the boundary contract between ICN runtime and packages is what was missing. Without a written contract, every PR risks redrawing the line.</td>
+</tr>
+<tr>
+<td>Defer until action cards (icn#1608) ship</td>
+<td>Action cards plug into this path. Recording the path <em>before</em> action cards land means action cards plug into a written contract; recording after means action cards risk redrawing the line first.</td>
+</tr>
+<tr>
+<td>Bundle this ADR with ADR-0019</td>
+<td>Two distinct decisions (mint/persist authority records vs activate institution packages). Bundling would make either decision harder to review and harder to supersede independently.</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

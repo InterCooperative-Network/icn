@@ -39,16 +39,38 @@
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0012 federation state origin model</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0012-federation-state-origin-model.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
-<h2>id: &quot;0012&quot;
+<p>id: &quot;0012&quot;
 title: &quot;Federation State Origin Model — Gateway vs Governance vs Compute&quot;
-status: &quot;accepted&quot;
+status: &quot;amended&quot;
 date: &quot;2026-03-31&quot;
 context: &quot;federation-clearing-position-api / post-ADR-0011 architecture pass&quot;
 deciders: [&quot;Matt Faherty&quot;]
-tags: [&quot;gateway&quot;, &quot;architecture&quot;, &quot;federation&quot;, &quot;clearing&quot;, &quot;state-origins&quot;, &quot;parallel-model&quot;]</h2>
+tags: [&quot;gateway&quot;, &quot;architecture&quot;, &quot;federation&quot;, &quot;clearing&quot;, &quot;state-origins&quot;, &quot;parallel-model&quot;]
+amends: []
+amended_by: [&quot;ADR-0013&quot;]
+implementation_status: &quot;partially implemented (Steps 1–2 implemented; Step 3 design in ADR-0013, with Step 3d landed and remaining open items tracked there)&quot;
+references:</p>
+<ul>
+<li>&quot;ADR-0011 (Canonical Truth Ownership)&quot;</li>
+<li>&quot;ADR-0013 (Federation Clearing Adoption Contract — Step 3 design + Step 3d implementation)&quot;</li>
+<li>&quot;ADR-0018 (ADR Lifecycle)&quot;</li>
+</ul>
+<hr>
 <h1>ADR 0012: Federation State Origin Model</h1>
 <h2>Status</h2>
-<p>Accepted (2026-03-31)</p>
+<p><strong>Accepted (2026-03-31); amended (2026-04-26).</strong></p>
+<blockquote>
+<p><strong>Amendment (2026-04-26):</strong> the Step 3 (CCL adoption contract) work
+this ADR scoped as &quot;future, high complexity&quot; was designed in
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/ADR-0013-federation-clearing-adoption-contract">ADR-0013</a>, and
+Step 3d (the adoption proposal endpoint) has since landed. ADR-0013
+retains an open-items section listing what remains unresolved
+(<code>FederationProvenance</code> persistence, <code>coop_a_did</code> plumbing,
+store-isolation tests). This ADR&#39;s Model C (Explicit Parallel) is
+unchanged; ADR-0013 is the current source of truth for the <em>adoption
+path&#39;s</em> status. Decision lifecycle is <code>amended</code>, not <code>superseded</code>:
+Model C still holds.</p>
+</blockquote>
 <h2>Context</h2>
 <p>ADR 0011 established the canonical truth invariant: no gateway-local state for supervisor-owned
 domains. It identified that federation clearing position reads must go through the supervisor&#39;s
