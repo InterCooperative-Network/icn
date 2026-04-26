@@ -7,43 +7,64 @@ context: "federation-clearing-position-api / ADR 0012 Step 3 design pass"
 deciders: ["Matt Faherty"]
 tags: ["gateway", "architecture", "federation", "clearing", "governance", "adoption", "ccl"]
 amends: ["ADR-0012"]
-implementation_status: "partially implemented (Steps 3a–3d landed; persistence and integration gaps remain — see Open Items)"
+implementation_status: "partially implemented (Steps 3a–3d landed; verification gaps from 2026-04-26 closed: provenance persistence via #1648, coop_a_did via #1647, store-isolation tests in this PR. Step 3 adoption-specific tests against FederationServiceImpl remain future work — see Open Items)"
 references:
   - "ADR-0012 (Federation State Origin Model — amended by this ADR)"
   - "ADR-0018 (ADR Lifecycle)"
   - "ADR-0020 (Institutional Bootstrap Activation — out-of-scope for this ADR's federation territory)"
+  - "ADR-0026 (Receipt and Provenance Proof Envelope)"
+  - "PR #1647 (coop_a_did populated in clearing adoption)"
+  - "PR #1648 (FederationProvenance persistence via optional Sled store)"
+  - "icn/crates/icn-federation/tests/store_isolation_clearing_adoption.rs (Phase 5 store-isolation tests)"
 ---
 
 # ADR 0013: Federation Clearing Adoption Contract
 
 ## Status
 
-**Accepted (2026-04-01); open items unresolved as of 2026-04-26.**
+**Accepted (2026-04-01); 2026-04-26 verification gaps closed; Step 3
+integration tests against `FederationServiceImpl` remain future work.**
 
 Steps 3a (terms propagation), 3b (source reference), 3c (read surface), and 3d (adoption
 proposal endpoint) are all implemented. Step 3a/b/c landed in PRs #1478/#1479.
 Step 3d landed on branch `feat/clearing-adoption-step3d`.
 
-### Open items (verified unresolved as of 2026-04-26)
+### Open items — status update (2026-04-26 → 2026-04-26)
 
-The three open items from the original status note remain real. They were re-checked
-against current code and are not closed:
+The three open items recorded in the previous status note are now closed by
+landed work. They are listed here as a journal entry so anyone reading the ADR
+can trace the evidence chain.
 
-- **`FederationProvenance` still in-memory (not persisted to Sled).** Verified at
-  `icn/crates/icn-core/src/services/federation_service.rs:50`:
-  `provenance: RwLock<HashMap<String, FederationProvenance>>`. Restart-survival is
-  unproven; the type is constructed at line 171 but no Sled tree is written.
-- **`establish_clearing()` `coop_a_did` is still `String::new()`.** Verified at
-  `icn/apps/governance/src/handlers/execution.rs:642`:
-  `coop_a_did: String::new()`. The governance executor still passes an empty Did
-  through to clearing; downstream consumers receive no caller identity.
-- **Store-isolation tests (Phase 5) not yet written.** No `store_isolation`
-  test files found under `icn/crates/icn-federation/tests/` or the gateway's
-  federation tests. The isolation invariant remains unverified by tests.
+- **`FederationProvenance` persistence — RESOLVED by PR
+  [#1648](https://github.com/InterCooperative-Network/icn/pull/1648).** The optional
+  Sled-backed provenance store landed; `FederationProvenance` survives restart.
+  ADR-0026 (Receipt and Provenance Proof Envelope) records the consolidated
+  envelope shape this work fits into.
+- **`establish_clearing()` `coop_a_did` empty-string — RESOLVED by PR
+  [#1647](https://github.com/InterCooperative-Network/icn/pull/1647).** The governance
+  executor now populates the caller DID end-to-end. Downstream consumers
+  receive a real identity rather than `String::new()`.
+- **Store-isolation tests (Phase 5) — RESOLVED in this PR.** Evidence:
+  [`icn/crates/icn-federation/tests/store_isolation_clearing_adoption.rs`](../../icn/crates/icn-federation/tests/store_isolation_clearing_adoption.rs).
+  Six tests exercise the dual-path invariant at the `ClearingManager` substrate:
+  cross-store invisibility, distinct adoption record with `source_agreement_id`
+  linkage, persistence round-trip of the source link, position-write isolation
+  under a real transfer flow, fresh starting position for the canonical record,
+  and disjoint list surfaces. The tests construct two `ClearingManager`
+  instances backed by separate `SledStore::temporary()` instances — the same
+  composition the gateway and supervisor use in production.
 
-These are not closed by this update. They are listed here so a future ADR or PR
-that resolves them must explicitly link back to ADR-0013 and explain which item
-its change resolves.
+### Remaining work (separate from the verification gaps above)
+
+The Phase 5 *Step 3 adoption-specific* tests prescribed below
+(`test_establish_clearing_uses_provided_terms_not_defaults`,
+`test_establish_clearing_with_source_agreement_id_stores_provenance`,
+`test_adopted_agreement_position_starts_fresh`,
+`test_read_surface_shows_source_reference_for_adopted_agreement`) target the
+`FederationServiceImpl::establish_clearing()` path in `icn-core`. They are
+scoped to that crate's test surface and are not in scope for this PR. The
+substrate-level isolation tests landing here are the precondition for those
+higher-layer tests; the canonical record contract they assume is now proven.
 
 ## Context
 
