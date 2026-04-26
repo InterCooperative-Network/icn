@@ -20,8 +20,12 @@ export function syncDecisionIndex(db: Database.Database): void {
   if (!existsSync(DECISIONS_DIR)) return;
 
   const files = readdirSync(DECISIONS_DIR).filter((f) => ADR_FILENAME_RE.test(f));
-  const insert = db.prepare(
-    "INSERT OR IGNORE INTO decision_index (id, title, tags, file_path, created_at) VALUES (?, ?, ?, ?, ?)"
+  // Use INSERT OR REPLACE so existing rows whose `file_path` still points
+  // to the retired `ops/state/decisions/` location are re-pointed to the
+  // canonical `docs/adr/` path on the next boot. INSERT OR IGNORE would
+  // leave stale paths in place, breaking `get_decision` after the move.
+  const upsert = db.prepare(
+    "INSERT OR REPLACE INTO decision_index (id, title, tags, file_path, created_at) VALUES (?, ?, ?, ?, ?)"
   );
 
   for (const file of files) {
@@ -45,7 +49,7 @@ export function syncDecisionIndex(db: Database.Database): void {
     const dateMatch = content.match(/\*\*Date\*\*:\s+(\S+)/);
     const date = dateMatch ? dateMatch[1] : null;
 
-    insert.run(id, title, tags, filePath, date);
+    upsert.run(id, title, tags, filePath, date);
   }
 }
 
@@ -173,18 +177,23 @@ ${alternatives}
       id: z.string().describe("ADR number (e.g. '0001') or partial title"),
     },
     async ({ id }) => {
-      // Try exact ID first
+      // Try exact ID first. Treat a row whose `file_path` no longer exists
+      // (e.g. a pre-migration row pointing into ops/state/decisions/) as
+      // "not found" so the filesystem fallback below has a chance to
+      // resolve the real file under docs/adr/.
       let row = db
         .prepare("SELECT file_path FROM decision_index WHERE id = ?")
         .get(id) as { file_path: string } | undefined;
+      if (row && !existsSync(row.file_path)) row = undefined;
 
-      // Fall back to partial title match
+      // Fall back to partial title match — same staleness check.
       if (!row) {
         row = db
           .prepare(
             "SELECT file_path FROM decision_index WHERE title LIKE ? ORDER BY id DESC LIMIT 1"
           )
           .get(`%${id}%`) as { file_path: string } | undefined;
+        if (row && !existsSync(row.file_path)) row = undefined;
       }
 
       // Final fallback: scan filesystem for a file matching the ID prefix.
