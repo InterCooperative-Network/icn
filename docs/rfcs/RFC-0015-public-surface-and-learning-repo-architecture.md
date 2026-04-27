@@ -66,7 +66,7 @@ This RFC explicitly does **not**:
 
 - **Canonical site**: `intercooperative.network`. Live, GitHub-Pages-deployed, sourced from `website/src/` in this repo. Bound by [ADR-0032 — Website Truth Boundary](../adr/ADR-0032-website-truth-boundary.md) and [ADR-0033 — Public Maturity Claims and Evidence Links](../adr/ADR-0033-public-maturity-claims-and-evidence-links.md).
 - **Utility routing**: `icn.zone` plus `api.icn.zone`, `pilot.icn.zone`, `metrics.icn.zone`. Documented in [docs/deployment/ICN_ZONE_ROUTING.md](../deployment/ICN_ZONE_ROUTING.md). Root redirect to `intercooperative.network` is the entire root behavior; subdomains serve K3s endpoints.
-- **No onboarding home**: ICN has rich docs in this repo (`docs/onboarding/`, `docs/getting-started`, `docs/development/`), but no single learner-facing site. Material that wants to be progressive ("welcome → orientation → deep dive") has no home.
+- **No onboarding home**: ICN has rich docs in this repo (`docs/onboarding/`, `docs/GETTING_STARTED.md`, `docs/development/`), but no single learner-facing site. Material that wants to be progressive ("welcome → orientation → deep dive") has no home.
 - **Adjacent ideas have surfaced**: a future Cooperative Systems Institute (broader theory/research/field-building) and a future Summit/event surface (`thesync.net`) have been mentioned in planning conversations but never assigned a doctrinal role.
 - **NYCN / Summit content is already segregated**: the NYCN repo (private) holds NYCN- and Summit-specific docs and assets per the boundary established in PR #9 and the [ICN_DESIGN_SYSTEM.md](../design/ICN_DESIGN_SYSTEM.md) "no NYCN/Summit on the public ICN website" rule.
 - **The project has an RFC process**: see [RFC-0000](RFC-0000-rfc-process.md). This RFC follows that lifecycle.
@@ -159,7 +159,7 @@ The canonical site continues to enforce: no NYCN, no "New York Cooperative Netwo
 
 - No existing content moves in this RFC. The current `intercooperative.network` source under `website/src/` is unchanged.
 - The existing `icn.zone` redirect at root (per [docs/deployment/ICN_ZONE_ROUTING.md](../deployment/ICN_ZONE_ROUTING.md)) is preserved.
-- Existing onboarding docs in `docs/onboarding/`, `docs/getting-started`, and `docs/development/` remain in place. They may eventually be referenced from the future learning repo via deep link, but no migration is forced.
+- Existing onboarding docs in `docs/onboarding/`, `docs/GETTING_STARTED.md`, and `docs/development/` remain in place. They may eventually be referenced from the future learning repo via deep link, but no migration is forced.
 - No archived wallet or mobile docs are renamed by this RFC.
 
 ## Open questions
