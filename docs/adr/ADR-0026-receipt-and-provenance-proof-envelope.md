@@ -35,7 +35,7 @@ ICN's institutional-memory story has been built incrementally:
 - ADR-0012 placed federation state at the gateway, not governance/compute.
 - ADR-0014 introduced `GovernanceProof` and the typed authority object model.
 - ADR-0019 recorded the mandate persistence seam.
-- ADR-0020 threaded receipt persistence into the institutional activation chain.
+- ADR-0020 threaded receipt persistence into the institutional activation chain. ADR-0020 step 7 (action cards) verifies end-to-end that the `proposal`/`vote` action-card source path closes the proof loop into a Layer 2 `GovernanceDecisionReceipt` keyed by the same `proposal_id` the card surfaces as `source_id` (see `icn/apps/governance/tests/me_action_card_receipt_chain.rs`).
 - PR [#1648](https://github.com/InterCooperative-Network/icn/pull/1648) made FederationProvenance persistent (no more in-memory loss across restart).
 
 The pieces are real and shipping. What was not written down is the **envelope shape that all of these contribute to**. Without a single named envelope, follow-up work (cross-node verifiability, audit query endpoint, public attestation surface) risks rebuilding the wrapper for the third time.
@@ -60,7 +60,7 @@ The query surface that exposes the chain to auditors and federated peers. Not ye
 
 - **Immutable.** Once a layer's record is signed and persisted, it is not edited. Reversal is a counter-record, not a mutation.
 - **Re-verifiable.** Anyone with the public keys can verify the signature chain. Vote sets are merkle-rooted; proof hashes bind the set.
-- **Holder-queryable.** A holder DID can query its own proofs and receipts via `/me/standing` (today, partial — surfaces standing slice; full receipt query is future work).
+- **Holder-queryable.** A holder DID can query its own proofs and receipts via `/me/standing` plus `/me/action-cards` (today, partial — `/me/action-cards` carries `source_id` which keys the existing Layer 2 `GovernanceDecisionReceipt` by `proposal_id` for the `proposal`/`vote` path; full receipt query is future work in Layer 4).
 - **Cross-coop verifiable.** A federated peer can, in principle, verify a `FederationProvenance` chain. The query surface (Layer 4) is what is missing for "in practice."
 
 ## Consequences
@@ -77,7 +77,7 @@ Partial.
 | Layer | Status | Evidence |
 |---|---|---|
 | 1 — GovernanceProof | implemented | [icn/crates/icn-governance/src/proof.rs](../../icn/crates/icn-governance/src/proof.rs) |
-| 2 — ArtifactReceipt | implemented | Gateway receipt store; ADR-0020 chain |
+| 2 — ArtifactReceipt | implemented | Gateway receipt store; ADR-0020 chain. End-to-end action-card linkage verified for `proposal`/`vote` at `icn/apps/governance/tests/me_action_card_receipt_chain.rs`. |
 | 3 — FederationProvenance | implemented (persistent) | PR [#1648](https://github.com/InterCooperative-Network/icn/pull/1648) |
 | 4 — ProvenanceQuery | NOT IMPLEMENTED | Issue [#1438](https://github.com/InterCooperative-Network/icn/issues/1438); ADR-0072 in registry |
 

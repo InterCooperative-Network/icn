@@ -8,7 +8,7 @@ tags: ["action-cards", "member-shell", "standing", "derived-views", "forward-dir
 supersedes: []
 superseded_by: []
 amends: []
-implementation_status: "proposed"
+implementation_status: "partially implemented (vertical slice; proof-loop verified for proposal/vote source path)"
 references:
   - "ADR-0020 (Bootstrap Activation and Standing Read Model)"
   - "ADR-0025 (Institutional Effect Record Canonical Schema)"
@@ -98,7 +98,7 @@ Derivation is **stateless from the gateway's perspective.** A card is what falls
 
 ## Implementation status
 
-Proposed. Not implemented. Issue [#1608](https://github.com/InterCooperative-Network/icn/issues/1608) is the open issue.
+Partially implemented (vertical slice; icn#1646). The handler `GET /v1/gov/me/action-cards` is live; cards derive from `/me/standing` + open governance state for the `proposal`/`vote`, `meeting`/`attend`, and `action_item`/`complete` source paths. The full proof loop `standing → action card → authorized action → receipt` is verified end-to-end for the `proposal`/`vote` source path only — see `icn/apps/governance/tests/me_action_card_receipt_chain.rs`, which pins that the action card's `source_id` equals the persisted `GovernanceDecisionReceipt.proposal_id` (ADR-0026 Layer 2). Issue [#1608](https://github.com/InterCooperative-Network/icn/issues/1608) and the implementation issue [#1646](https://github.com/InterCooperative-Network/icn/issues/1646) remain open.
 
 To call this `implemented` would require:
 - `GET /me/action-cards` handler in `icn-gateway`.
