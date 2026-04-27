@@ -4850,6 +4850,7 @@ impl GovernanceManager {
         domain_id: &GovernanceDomainId,
         id: &ActionItemId,
         status: ActionItemStatus,
+        actor: &icn_identity::Did,
     ) -> Result<ActionItem> {
         let mut item = self
             .action_items
@@ -4857,12 +4858,41 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Failed to get action item: {e}"))?
             .ok_or_else(|| anyhow::anyhow!("Action item not found: {id}"))?;
 
+        let was_completed = matches!(item.status, ActionItemStatus::Completed);
+
         item.status = status;
         item.updated_at = icn_time::current_timestamp_secs();
 
         self.action_items
             .save(&item)
             .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
+
+        // Emit an ADR-0026 Layer 2 ActionItemCompletionReceipt on the
+        // first transition into Completed. Subsequent re-saves with
+        // status=Completed are idempotent and do not re-emit.
+        if matches!(status, ActionItemStatus::Completed) && !was_completed {
+            if let Some(ref store) = self.receipt_store {
+                let receipt = icn_governance::ActionItemCompletionReceipt::new(
+                    item.id.to_string(),
+                    item.domain_id.0.clone(),
+                    actor.to_string(),
+                    icn_governance::ActionItemTransition::Completed,
+                    item.updated_at,
+                );
+                if let Err(e) = store.put_action_item_completion(&receipt) {
+                    // Log but do not fail the status update — completion is
+                    // the primary write; receipt persistence is the
+                    // provenance trail. A backend that does not implement
+                    // put_action_item_completion is expected to no-op.
+                    tracing::warn!(
+                        item_id = %item.id,
+                        actor = %actor,
+                        error = %e,
+                        "Failed to persist action item completion receipt"
+                    );
+                }
+            }
+        }
 
         Ok(item)
     }

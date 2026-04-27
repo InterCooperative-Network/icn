@@ -2,7 +2,8 @@
 //! in this crate without a circular dependency on icn-gateway.
 
 use icn_governance::{
-    AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt, Grantee, Mandate, Timestamp,
+    ActionItemCompletionReceipt, AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt,
+    Grantee, Mandate, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -312,5 +313,42 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         _revoked_at: Timestamp,
     ) -> Result<(), String> {
         Ok(())
+    }
+
+    /// Persist an [`ActionItemCompletionReceipt`] emitted when an action
+    /// item transitions to `Completed` via an authorized actor (assignee
+    /// or creator).
+    ///
+    /// Append-only: implementations should treat a same-`item_id`
+    /// re-write as idempotent. The runtime's
+    /// `update_action_item_status` path emits at most one receipt per
+    /// transition and only for transitions listed in
+    /// [`icn_governance::ActionItemTransition`].
+    ///
+    /// Default impl is a no-op so backends that do not yet durably
+    /// persist these receipts inherit a truthful "completion receipt
+    /// not persisted" behavior. Test backends and the sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
+    /// override.
+    fn put_action_item_completion(
+        &self,
+        _receipt: &ActionItemCompletionReceipt,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    /// Retrieve the latest [`ActionItemCompletionReceipt`] for an action
+    /// item id (string form of `ActionItemId`), or `None` when no
+    /// completion has been recorded.
+    ///
+    /// Default impl returns `Ok(None)` so backends that do not implement
+    /// completion-receipt storage are indistinguishable from "no
+    /// completion recorded". Callers that need to assert a receipt
+    /// exists must use a backend that overrides this method.
+    fn get_action_item_completion_by_item(
+        &self,
+        _item_id: &str,
+    ) -> Result<Option<ActionItemCompletionReceipt>, String> {
+        Ok(None)
     }
 }

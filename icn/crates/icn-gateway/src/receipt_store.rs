@@ -9,8 +9,8 @@
 
 #[cfg_attr(not(test), allow(unused_imports))]
 use icn_governance::{
-    AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt, Grantee, Mandate, MandateId,
-    ProofOutcome, Timestamp, VoteTally,
+    ActionItemCompletionReceipt, AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt,
+    Grantee, Mandate, MandateId, ProofOutcome, Timestamp, VoteTally,
 };
 use icn_governance_actor::dispatch_evidence::EffectDispatchEvidence;
 use icn_governance_actor::institutional_effect::InstitutionalEffectRecord;
@@ -30,6 +30,11 @@ const INTENT_PREFIX: &[u8] = b"receipt:intent:";
 const DECISION_INDEX_PREFIX: &[u8] = b"receipt:by_decision:";
 /// Index prefix for proposal ID lookups (governance receipts only)
 const PROPOSAL_INDEX_PREFIX: &[u8] = b"receipt:by_proposal:";
+/// Key prefix for action-item completion receipts (primary by item_id).
+///
+/// One receipt per item_id; the runtime emits at most one receipt per
+/// transition into `Completed` (idempotent re-write on the same item_id).
+const ACTION_ITEM_COMPLETION_PREFIX: &[u8] = b"receipt:action_item_completion:";
 /// Key prefix for institutional effect records (primary by record_id)
 const INSTITUTIONAL_EFFECT_PREFIX: &[u8] = b"effect:institutional:";
 /// Secondary index: effect records by proposal_id (sortable by recorded_at)
@@ -1547,6 +1552,43 @@ impl GovernanceReceiptBackend for ReceiptStore {
         grants: &[AuthorityGrant],
     ) -> Result<(), String> {
         self.put_mandate_with_grants_atomic(mandate, grants)
+    }
+
+    fn put_action_item_completion(
+        &self,
+        receipt: &ActionItemCompletionReceipt,
+    ) -> Result<(), String> {
+        let mut key = ACTION_ITEM_COMPLETION_PREFIX.to_vec();
+        key.extend_from_slice(receipt.item_id.as_bytes());
+        let value = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize action item completion receipt: {e}"))?;
+        self.db
+            .insert(&key, value)
+            .map_err(|e| format!("sled put_action_item_completion: {e}"))?;
+        self.db
+            .flush()
+            .map_err(|e| format!("sled flush after put_action_item_completion: {e}"))?;
+        Ok(())
+    }
+
+    fn get_action_item_completion_by_item(
+        &self,
+        item_id: &str,
+    ) -> Result<Option<ActionItemCompletionReceipt>, String> {
+        let mut key = ACTION_ITEM_COMPLETION_PREFIX.to_vec();
+        key.extend_from_slice(item_id.as_bytes());
+        let raw = self
+            .db
+            .get(&key)
+            .map_err(|e| format!("sled get_action_item_completion: {e}"))?;
+        match raw {
+            Some(bytes) => {
+                let r: ActionItemCompletionReceipt = serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("deserialize action item completion receipt: {e}"))?;
+                Ok(Some(r))
+            }
+            None => Ok(None),
+        }
     }
 }
 

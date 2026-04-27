@@ -2771,7 +2771,7 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
     let new_status = parse_status(&req.status)?;
     let item = ctx
         .manager
-        .update_action_item_status(&domain, &id, new_status)
+        .update_action_item_status(&domain, &id, new_status, &user_did)
         .map_err(anyhow_to_api)?;
 
     Ok(HttpResponse::Ok().json(action_item_to_response(&item)))
