@@ -1,6 +1,15 @@
 # ICN Phase Progress
 **Last Updated:** 2026-04-27
-**Current Phase:** Phase 2 — Pilot Launch (still blocked on cooperative partners; institutional-operability infrastructure and partial action-card runtime are now in place)
+**Current Phase:** Phase 2 — Pilot Launch (still blocked on cooperative partners; institutional-operability infrastructure and the action-card runtime are now in place — all currently emitted source paths are proof-bearing)
+
+<!-- [sync edit] 2026-04-27 (post-#1663): Phase 2 status unchanged (still
+     blocked on cooperative partners). Action-card runtime now has
+     proof-bearing receipt loops for all three currently emitted source
+     paths: proposal/vote (#1660), action_item/complete (#1661), and
+     meeting/attend (#1663). Issue #1646 remains open with two RFC-
+     gated paths still pending: signal_rule (gated on #1631) and
+     obligation_lifecycle (gated on #1634). These landings do not flip
+     Phase 2 to ✅ on their own — that gate is partner-bound. -->
 
 <!-- [sync edit] 2026-04-27: Phase 2 status unchanged (still blocked on
      cooperative partners). Phase 2 deliverables list extended to record
@@ -137,7 +146,8 @@
 - [x] `GET /v1/gov/me/action-cards` member endpoint with closed source/action enums (#1659)
 - [x] Action card → `GovernanceDecisionReceipt` proof linkage for proposal/vote (#1660) — proof loop verified
 - [x] `action_item`/`complete` source path emits append-only `ActionItemCompletionReceipt` (#1661) — proof loop verified
-- [ ] Action-card runtime — remaining gates under #1646: `meeting`/`attend` receipt seam; `signal_rule` source path (gated on #1631); `obligation_lifecycle` source path (gated on #1634)
+- [x] `meeting`/`attend` source path emits append-only `MeetingAttendanceReceipt` (#1663) — proof loop verified; `Present`/`Remote` are receipt-bearing transitions; `Absent` is not; steward-recorded attendance distinguished by `recorded_by` vs `attendee_did`
+- [ ] Action-card runtime — remaining gates under #1646 (RFC-gated): `signal_rule` source path (gated on #1631); `obligation_lifecycle` source path (gated on #1634)
 - [ ] One-command deployment script per cooperative
 - [ ] Charter customization workflow documented (charter activation endpoint exists; non-technical workflow doc still missing)
 - [ ] Pilot onboarding guide (non-technical audience)
@@ -151,6 +161,7 @@
 - Requires cooperative partners identified and committed (primary blocker)
 
 **Decisions Made:**
+- (2026-04-27, post-#1663) Action-card runtime is now proof-bearing for **all three currently emitted source paths**: `proposal`/`vote` (#1660), `action_item`/`complete` (#1661), and `meeting`/`attend` (#1663). Issue #1646 remains open for the two RFC-gated paths: `signal_rule` (#1631) and `obligation_lifecycle` (#1634). Phase 2 status is unaffected (still partner-bound).
 - (2026-04-27) Action-card runtime is partial: `/me/action-cards` exists, `proposal`/`vote` and `action_item`/`complete` source paths have verified end-to-end receipt proof loops, and `meeting`/`attend`, `signal_rule`, `obligation_lifecycle` paths remain pending under #1646. Phase 2 status is unaffected.
 - (2026-04-26) Pilot enablement infrastructure (bootstrap, charter activation, role binding, standing) is in place; Phase 2 remains ⏳ until partners run it for real.
 
