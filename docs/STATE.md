@@ -1,10 +1,17 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-04-26
+Last Reviewed: 2026-04-27
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-04-27: Append the action-card runtime sequence
+     (/me/action-cards endpoint, proposal/vote receipt linkage,
+     action_item completion receipt seam) landed via #1659/#1660/#1661.
+     Issue #1646 remains open; meeting/attend, signal_rule, and
+     obligation_lifecycle source paths remain pending. Phase model
+     unchanged. -->
 
 <!-- [sync edit] 2026-04-26: Append the institutional-operability sequence
      (live charter activation, person-directory overlay, /me/standing,
@@ -16,15 +23,20 @@ Last Reviewed: 2026-04-26
      Aligned crate list, merged PRs, and metrics to verified repo state.
      Phase model unchanged — phase classification is governance territory (PR C). -->
 
-## Current status (2026-04-26 snapshot)
+## Current status (2026-04-27 snapshot)
 
 **Current phase:** Phase 2 — Pilot Launch (blocked on cooperative partners).
-Active execution: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing all landed) plus the feedback/support doctrine rename and ADR canonicalization under `docs/adr/`. NYCN package side dogfoods these via the institution-package boundary. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
+Active execution: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote and `ActionItemCompletionReceipt` for action_item/complete). NYCN package side dogfoods these via the institution-package boundary. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
 
 ### Recently merged (since 2026-04-15)
 
 | PR | Title | Merged |
 |----|-------|--------|
+| #1661 | feat(governance): add action item completion receipts | 2026-04-27 |
+| #1660 | feat(governance): connect action cards to receipts | 2026-04-27 |
+| #1659 | feat(gateway): add member action cards endpoint | 2026-04-27 |
+| #1658 | docs(sync): record ICN Academy repo creation | 2026-04-27 |
+| #1656 | docs(site): add curated docs pathways | 2026-04-27 |
 | #1637 | docs: reframe feedback doctrine and canonicalize ADR location | 2026-04-26 |
 | #1630 | feat(governance): plumb authority_scope through assign_role end-to-end | 2026-04-25 |
 | #1627 | feat(governance): add GET /me/standing read model | 2026-04-25 |
@@ -72,6 +84,14 @@ Active execution: institutional-operability runtime (live charter activation, pe
 | #1636 | chore(toolchain): upgrade Rust 1.88.0 → 1.95.0 | copilot/upgrade-rust-1-88-to-1-95 | Open — fmt fix pushed; tests running |
 
 ### What landed since Phase 1 (Charter Engine)
+
+Action-card runtime (added 2026-04-27, partial — issue #1646 remains open):
+- `GET /v1/gov/me/action-cards` member endpoint with closed source/action enums — #1659
+- Proposal/vote action card → `GovernanceDecisionReceipt` proof linkage, end-to-end test — #1660
+- `action_item`/`complete` source path emits append-only `ActionItemCompletionReceipt` (ADR-0026 Layer 2); persist-before-commit semantics; full-update handler routes status changes through receipt-bearing path — #1661
+- Source paths currently emitted by `/me/action-cards`: `proposal`/`vote`, `meeting`/`attend`, `action_item`/`complete`
+- Proof loop verified end-to-end for `proposal`/`vote` and `action_item`/`complete`
+- Pending under #1646: `meeting`/`attend` receipt seam; `signal_rule` source path (gated on #1631); `obligation_lifecycle` source path (gated on #1634)
 
 Institutional-operability runtime (added 2026-04-22 → 2026-04-26):
 - Generic institution bootstrap package path — #1586
