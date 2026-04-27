@@ -40,8 +40,15 @@ View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
 <h2>Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-04-26</h2>
+Last Reviewed: 2026-04-27</h2>
 <h1>ICN State (living doc)</h1>
+<!-- [sync edit] 2026-04-27: Append the action-card runtime sequence
+     (/me/action-cards endpoint, proposal/vote receipt linkage,
+     action_item completion receipt seam) landed via #1659/#1660/#1661.
+     Issue #1646 remains open; meeting/attend, signal_rule, and
+     obligation_lifecycle source paths remain pending. Phase model
+     unchanged. -->
+
 <!-- [sync edit] 2026-04-26: Append the institutional-operability sequence
      (live charter activation, person-directory overlay, /me/standing,
      authority_scope plumbing) and the doctrine/ADR canonicalization that
@@ -52,9 +59,9 @@ Last Reviewed: 2026-04-26</h2>
      Aligned crate list, merged PRs, and metrics to verified repo state.
      Phase model unchanged — phase classification is governance territory (PR C). -->
 
-<h2>Current status (2026-04-26 snapshot)</h2>
+<h2>Current status (2026-04-27 snapshot)</h2>
 <p><strong>Current phase:</strong> Phase 2 — Pilot Launch (blocked on cooperative partners).
-Active execution: institutional-operability runtime (live charter activation, person-directory overlay, <code>/me/standing</code>, <code>authority_scope</code> plumbing all landed) plus the feedback/support doctrine rename and ADR canonicalization under <code>docs/adr/</code>. NYCN package side dogfoods these via the institution-package boundary. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.</p>
+Active execution: institutional-operability runtime (live charter activation, person-directory overlay, <code>/me/standing</code>, <code>authority_scope</code> plumbing) plus the action-card runtime (<code>/me/action-cards</code> endpoint with proof-loop linkage to <code>GovernanceDecisionReceipt</code> for proposal/vote and <code>ActionItemCompletionReceipt</code> for action_item/complete). NYCN package side dogfoods these via the institution-package boundary. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.</p>
 <h3>Recently merged (since 2026-04-15)</h3>
 <table>
 <thead>
@@ -65,6 +72,31 @@ Active execution: institutional-operability runtime (live charter activation, pe
 </tr>
 </thead>
 <tbody><tr>
+<td>#1661</td>
+<td>feat(governance): add action item completion receipts</td>
+<td>2026-04-27</td>
+</tr>
+<tr>
+<td>#1660</td>
+<td>feat(governance): connect action cards to receipts</td>
+<td>2026-04-27</td>
+</tr>
+<tr>
+<td>#1659</td>
+<td>feat(gateway): add member action cards endpoint</td>
+<td>2026-04-27</td>
+</tr>
+<tr>
+<td>#1658</td>
+<td>docs(sync): record ICN Academy repo creation</td>
+<td>2026-04-27</td>
+</tr>
+<tr>
+<td>#1656</td>
+<td>docs(site): add curated docs pathways</td>
+<td>2026-04-27</td>
+</tr>
+<tr>
 <td>#1637</td>
 <td>docs: reframe feedback doctrine and canonicalize ADR location</td>
 <td>2026-04-26</td>
@@ -263,6 +295,15 @@ Active execution: institutional-operability runtime (live charter activation, pe
 </tr>
 </tbody></table>
 <h3>What landed since Phase 1 (Charter Engine)</h3>
+<p>Action-card runtime (added 2026-04-27, partial — issue #1646 remains open):</p>
+<ul>
+<li><code>GET /v1/gov/me/action-cards</code> member endpoint with closed source/action enums — #1659</li>
+<li>Proposal/vote action card → <code>GovernanceDecisionReceipt</code> proof linkage, end-to-end test — #1660</li>
+<li><code>action_item</code>/<code>complete</code> source path emits append-only <code>ActionItemCompletionReceipt</code> (ADR-0026 Layer 2); persist-before-commit semantics; full-update handler routes status changes through receipt-bearing path — #1661</li>
+<li>Source paths currently emitted by <code>/me/action-cards</code>: <code>proposal</code>/<code>vote</code>, <code>meeting</code>/<code>attend</code>, <code>action_item</code>/<code>complete</code></li>
+<li>Proof loop verified end-to-end for <code>proposal</code>/<code>vote</code> and <code>action_item</code>/<code>complete</code></li>
+<li>Pending under #1646: <code>meeting</code>/<code>attend</code> receipt seam; <code>signal_rule</code> source path (gated on #1631); <code>obligation_lifecycle</code> source path (gated on #1634)</li>
+</ul>
 <p>Institutional-operability runtime (added 2026-04-22 → 2026-04-26):</p>
 <ul>
 <li>Generic institution bootstrap package path — #1586</li>
