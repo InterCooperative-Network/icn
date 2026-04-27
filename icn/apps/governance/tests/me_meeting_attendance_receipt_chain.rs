@@ -120,12 +120,13 @@ impl GovernanceReceiptBackend for TestReceiptStore {
         meeting_id: &str,
         attendee_did: &str,
     ) -> Result<Option<MeetingAttendanceReceipt>, String> {
-        // Latest = receipt with the largest `recorded_at`.
+        // Latest = receipt with the largest `recorded_at`. The
+        // underlying chain is sorted ascending by `recorded_at`, so
+        // `.rfind(...)` returns the most recent matching receipt.
         Ok(self
             .list_meeting_attendance_for_meeting(meeting_id)?
             .into_iter()
-            .filter(|r| r.attendee_did == attendee_did)
-            .next_back())
+            .rfind(|r| r.attendee_did == attendee_did))
     }
 
     fn list_meeting_attendance_for_meeting(
