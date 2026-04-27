@@ -1,0 +1,381 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>RFC 0015: Public Surface and Learning Repo Architecture | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>rfcs</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>RFC 0015 public surface and learning repo architecture</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>id: &quot;0015&quot;
+title: &quot;Public Surface and Learning Repo Architecture&quot;
+status: &quot;draft&quot;
+created: &quot;2026-04-27&quot;
+updated: &quot;2026-04-27&quot;
+authors: [&quot;Matt Faherty&quot;]
+reviewers: []
+related_adr_candidates: [&quot;0028&quot;, &quot;0032&quot;, &quot;0033&quot;, &quot;0034&quot;]
+related_issues: []
+supersedes: []
+superseded_by: []</h2>
+<h1>RFC 0015: Public Surface and Learning Repo Architecture</h1>
+<h2>Status</h2>
+<p><code>draft</code> — being written, not yet ready for review.</p>
+<p>This RFC clarifies how ICN&#39;s public-facing identity is split across multiple domains and across multiple repos, and defines a future learning/onboarding repo (deploying to <code>learn.icn.zone</code>) without creating it in this RFC.</p>
+<p><strong>Accepted RFC does not mean implemented.</strong> This RFC is doctrinal coordination; the follow-up work is repo creation and content authoring, both of which happen outside this RFC.</p>
+<h2>Summary</h2>
+<p>ICN currently confuses three things into one surface: the canonical public truth about ICN (intercooperative.network), utility routing for cluster endpoints and short links (icn.zone and its subdomains), and the future role-based learning/onboarding material that should not pollute the canonical site (a future <code>learn.icn.zone</code>). This RFC names six domains, assigns each a single role, and defines a future learning repo that teaches ICN without claiming the authority to define ICN. It explicitly does <strong>not</strong> create that repo, build that site, or change DNS — those are follow-up tasks.</p>
+<h2>Problem statement</h2>
+<p>The project currently has more domains than well-defined surfaces. Several distinct concerns are conflated, which produces drift over time:</p>
+<ul>
+<li><strong>Canonical truth</strong> is mixed with <strong>marketing</strong>, <strong>onboarding pedagogy</strong>, and <strong>operational endpoints</strong>. Without naming each surface separately, contributors land doc and content changes in whichever repo or branch is closest to hand, and the public site slowly accumulates onboarding content that should live elsewhere.</li>
+<li><strong>Onboarding and curriculum</strong> (&quot;how to join&quot;, &quot;how to contribute as a developer / designer / organizer / operator / cooperative partner&quot;) have no home. Putting them on intercooperative.network risks (a) overclaiming program maturity per ADR-0032 and ADR-0033, and (b) burying the canonical truth surface under teaching material.</li>
+<li><strong>Adjacent surfaces</strong> (a future Cooperative Systems Institute, a future Summit/event/convergence surface, Matt&#39;s personal hub) need to exist as named possibilities with assigned roles so they do not later silently take over the ICN identity.</li>
+<li><strong><code>icn.zone</code> is already documented</strong> (<a href="/docs/deployment/ICN_ZONE_ROUTING">docs/deployment/ICN_ZONE_ROUTING.md</a>) as utility routing with a redirect at root. That decision is correct and should be preserved here.</li>
+</ul>
+<p>The cost of leaving this implicit: the public truth surface keeps drifting, contributors don&#39;t know where to put new content, and the project ships either an overclaiming front page or an underexplained one.</p>
+<h2>Goals</h2>
+<ul>
+<li>Name every public-facing domain ICN currently controls or anticipates, with one role each.</li>
+<li>Make explicit the rule that a learning/onboarding surface lives in a separate repo and a separate domain.</li>
+<li>Preserve the canonical truth boundary at intercooperative.network (ADR-0032, ADR-0033).</li>
+<li>Preserve the <code>icn.zone</code> utility routing model documented in <a href="/docs/deployment/ICN_ZONE_ROUTING">docs/deployment/ICN_ZONE_ROUTING.md</a>.</li>
+<li>Define the future <code>learn.icn.zone</code> learning repo&#39;s purpose, guardrails, and content areas — without committing to its content here.</li>
+<li>Keep the regulatory-safe vocabulary discipline (RFC-0001, <a href="/docs/design/CONTENT_STYLE_GUIDE">docs/design/CONTENT_STYLE_GUIDE.md</a>) intact across surfaces.</li>
+<li>Keep the public website free of NYCN, &quot;New York Cooperative Network&quot;, &quot;Summit&quot;, &quot;reference federation&quot;, or &quot;first institution package&quot; references.</li>
+</ul>
+<h2>Non-goals</h2>
+<p>This RFC explicitly does <strong>not</strong>:</p>
+<ul>
+<li>Create a third repo (<code>InterCooperative-Network/icn-learn</code> or any other).</li>
+<li>Build the <code>learn.icn.zone</code> site.</li>
+<li>Draft the curriculum.</li>
+<li>Change DNS records.</li>
+<li>Change Cloudflare configuration.</li>
+<li>Move existing developer or contributor docs out of the main ICN repo.</li>
+<li>Make the public ICN website mention NYCN, Summit, reference federation, or any institution package.</li>
+<li>Create content for <code>cooperative-systems.org</code> or <code>thesync.net</code>.</li>
+<li>Decide what <code>faherty.network</code> contains — only its role.</li>
+<li>Mass-rename archived wallet or mobile docs (those are a separate scoped change).</li>
+</ul>
+<h2>Background / current state</h2>
+<ul>
+<li><strong>Canonical site</strong>: <code>intercooperative.network</code>. Live, GitHub-Pages-deployed, sourced from <code>website/src/</code> in this repo. Bound by <a href="/docs/adr/ADR-0032-website-truth-boundary">ADR-0032 — Website Truth Boundary</a> and <a href="/docs/adr/ADR-0033-public-maturity-claims-and-evidence-links">ADR-0033 — Public Maturity Claims and Evidence Links</a>.</li>
+<li><strong>Utility routing</strong>: <code>icn.zone</code> plus <code>api.icn.zone</code>, <code>pilot.icn.zone</code>, <code>metrics.icn.zone</code>. Documented in <a href="/docs/deployment/ICN_ZONE_ROUTING">docs/deployment/ICN_ZONE_ROUTING.md</a>. Root redirect to <code>intercooperative.network</code> is the entire root behavior; subdomains serve K3s endpoints.</li>
+<li><strong>No onboarding home</strong>: ICN has rich docs in this repo (<code>docs/onboarding/</code>, <code>docs/GETTING_STARTED.md</code>, <code>docs/development/</code>), but no single learner-facing site. Material that wants to be progressive (&quot;welcome → orientation → deep dive&quot;) has no home.</li>
+<li><strong>Adjacent ideas have surfaced</strong>: a future Cooperative Systems Institute (broader theory/research/field-building) and a future Summit/event surface (<code>thesync.net</code>) have been mentioned in planning conversations but never assigned a doctrinal role.</li>
+<li><strong>NYCN / Summit content is already segregated</strong>: the NYCN repo (private) holds NYCN- and Summit-specific docs and assets per the boundary established in PR #9 and the <a href="/docs/design/ICN_DESIGN_SYSTEM">ICN_DESIGN_SYSTEM.md</a> &quot;no NYCN/Summit on the public ICN website&quot; rule.</li>
+<li><strong>The project has an RFC process</strong>: see <a href="https://github.com/InterCooperative-Network/icn/blob/main/RFC-0000-rfc-process">RFC-0000</a>. This RFC follows that lifecycle.</li>
+</ul>
+<h2>Design options</h2>
+<h3>Option A — Single canonical site, ad-hoc onboarding</h3>
+<p>Keep onboarding and curriculum inside this repo. Add a <code>learn/</code> section under <code>intercooperative.network</code>. Treat any future <code>learn.icn.zone</code> as a CNAME to a path on the canonical site. Adjacent surfaces (<code>cooperative-systems.org</code>, <code>thesync.net</code>) are deferred until they have content.</p>
+<h3>Option B — Separate learning repo + named domain roles (recommended)</h3>
+<p>Define one role per domain:</p>
+<table>
+<thead>
+<tr>
+<th>Domain</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>intercooperative.network</td>
+<td>Canonical ICN public truth surface</td>
+</tr>
+<tr>
+<td>icn.zone</td>
+<td>Utility routing — short links, QR, redirects, cluster subdomains</td>
+</tr>
+<tr>
+<td>learn.icn.zone</td>
+<td>Future role-based learning/onboarding site, separate repo</td>
+</tr>
+<tr>
+<td>cooperative-systems.org</td>
+<td>Future Cooperative Systems Institute; broader field-building</td>
+</tr>
+<tr>
+<td>thesync.net</td>
+<td>Future Summit/event/demo/convergence surface</td>
+</tr>
+<tr>
+<td>faherty.network</td>
+<td>Matt&#39;s personal/professional hub; points at the work, doesn&#39;t define it</td>
+</tr>
+</tbody></table>
+<p>Create a future repo <code>InterCooperative-Network/icn-learn</code> for <code>learn.icn.zone</code> content. That repo teaches ICN; it does not define ICN. Architecture, ADRs, RFCs, state, and code remain in this repo. The learning repo references canonical truth via deep links rather than rewriting it.</p>
+<h3>Option C — Single super-repo / monorepo</h3>
+<p>Pull all content into this repo: canonical site, learning, future Cooperative Systems Institute, future Summit/event surface. Use path-based routing or build pipelines to deploy to multiple domains from one source.</p>
+<h2>Tradeoffs</h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Easier</th>
+<th>Harder</th>
+<th>Invariants preserved</th>
+<th>Invariants stressed</th>
+<th>New failure modes</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A</td>
+<td>Adding onboarding content fast</td>
+<td>Keeping ADR-0032/0033 truth boundary; preventing curriculum from overclaiming program maturity; finding canonical truth amid teaching</td>
+<td>Single source of build artifacts</td>
+<td>Canonical truth boundary; member-first information design</td>
+<td>Curriculum gradually rewrites canonical claims; public site becomes an explainer instead of a truth surface</td>
+<td>Low up-front; high later (cleanup)</td>
+</tr>
+<tr>
+<td><strong>B</strong> (recommended)</td>
+<td>Keeping canonical truth surface clean; letting curriculum evolve at its own cadence; keeping NYCN/Summit boundaries intact; future repos start with explicit guardrails</td>
+<td>Maintaining cross-repo links; coordinating two release cadences</td>
+<td>Truth boundary; meaning firewall; institution-package boundary; vocabulary discipline</td>
+<td>Cross-repo navigation requires deliberate UX</td>
+<td>Stale cross-repo links; duplicated explanations if the learning repo is not disciplined</td>
+<td>Modest — new repo + deploy target</td>
+</tr>
+<tr>
+<td>C</td>
+<td>Single deploy pipeline</td>
+<td>Every constraint above (truth boundary, institution boundary, surface separation) routed through path-based hacks</td>
+<td>None — actively erodes most of them</td>
+<td>All of them</td>
+<td>Single repo becomes the everything-bucket; new contributors can&#39;t tell what the canonical truth is</td>
+<td>High in coupling; rework cost when surfaces diverge</td>
+</tr>
+</tbody></table>
+<p>Option B is recommended. The canonical site stays small, evidence-bound, and stable. The learning repo can iterate fast without touching the truth surface. Adjacent surfaces (<code>cooperative-systems.org</code>, <code>thesync.net</code>) have named roles waiting for them when content exists.</p>
+<h2>Core/package boundary</h2>
+<p>This RFC is doctrinal: it defines surface separation, not a runtime contract. It nonetheless interacts with the kernel/app and institution-package boundaries:</p>
+<ul>
+<li>The canonical public site sources content from this repo. Public claims are bound by ADR-0032 and ADR-0033; they may not silently encode institution-package vocabulary.</li>
+<li>The future learning repo consumes ICN substrate documentation. It does not define ICN primitives, ADRs, or RFCs. Its README must declare this guardrail explicitly.</li>
+<li>The institution-package boundary stays at the NYCN/ICN seam. The learning repo can teach how to use ICN with an institution package conceptually; it must not encode any specific institution package as canonical.</li>
+<li>The vocabulary discipline (<a href="/docs/design/CONTENT_STYLE_GUIDE">docs/design/CONTENT_STYLE_GUIDE.md</a>) applies to every surface: obligation/allocation/settlement/unit/position/settlement asset/external settlement instruction/bridge receipt for ICN-native primitives; payment/wallet/balance/currency only when describing external systems on their own terms.</li>
+</ul>
+<h2>Accessibility implications</h2>
+<p>The learning repo is the highest-leverage accessibility surface in the ecosystem because it is where new contributors meet ICN.</p>
+<ul>
+<li>The future <code>learn.icn.zone</code> site must inherit <a href="/docs/design/ACCESSIBILITY_BASELINE">docs/design/ACCESSIBILITY_BASELINE.md</a> (WCAG 2.2 AA floor; plain language; mobile-first; low-bandwidth; reduced motion; multilingual support paths).</li>
+<li>Curriculum content must use plain language, with glossary linkage rather than expert-only phrasing.</li>
+<li>Role-based paths (developer / designer / organizer / cooperative partner / node operator / tester / researcher / communications / educator / maintainer / trusted collaborator) must each have a phone-readable, low-bandwidth-readable entry point.</li>
+<li>The canonical public site keeps its current accessibility commitments; this RFC neither raises nor lowers that floor.</li>
+</ul>
+<h2>Conflict / dispute path</h2>
+<p>This RFC defines a doctrinal split, not a runtime mechanism. If a downstream change attempts to put learning material on the canonical site or canonical truth on the learning site, the resolution path is:</p>
+<ul>
+<li>Reviewer flags the surface violation in PR review.</li>
+<li>Author moves content to the correct surface.</li>
+<li>If the question is whether content belongs on the canonical site at all, ADR-0032 governs.</li>
+<li>If the question is whether content overclaims program maturity, ADR-0033 governs.</li>
+<li>This RFC is not the venue for relational conflicts (those route through ADR-0029 once accepted).</li>
+</ul>
+<h2>Security / privacy implications</h2>
+<ul>
+<li>Splitting surfaces reduces leak risk: curriculum and onboarding flows that expect input from learners (forms, contact, accounts) live on a separate domain from the canonical truth surface, so a future contact form on <code>learn.icn.zone</code> does not put PII on the canonical site.</li>
+<li>The canonical site remains static, member-data-free, and low-attack-surface.</li>
+<li>DNS posture is unchanged by this RFC; that is a Non-goal.</li>
+<li>Cross-domain analytics, if ever introduced, must be opt-in and must respect <a href="/docs/design/CONTENT_STYLE_GUIDE">docs/design/CONTENT_STYLE_GUIDE.md</a> and accessibility baseline.</li>
+</ul>
+<h2>Compute / automation boundary</h2>
+<p>Compute is not directly involved. Build pipelines deploying multiple sites must remain deterministic and reproducible. No runtime authority flows through these surfaces; they are static and informational.</p>
+<h2>Website / public truth implications</h2>
+<ul>
+<li><code>intercooperative.network</code> remains the only surface bound by ADR-0032 and ADR-0033.</li>
+<li><code>learn.icn.zone</code> is <strong>not</strong> a truth surface. It teaches; it does not claim. Maturity-band statements about ICN primitives must defer to the canonical site or to ADRs cited by deep link.</li>
+<li><code>icn.zone</code> has no truth content; it is utility routing.</li>
+<li><code>cooperative-systems.org</code> and <code>thesync.net</code> are not yet content-bearing; their truth posture is to be defined when they have content.</li>
+<li><code>faherty.network</code> is personal; it does not carry ICN truth claims.</li>
+</ul>
+<p>The canonical site continues to enforce: no NYCN, no &quot;New York Cooperative Network&quot;, no &quot;Summit&quot;, no &quot;reference federation&quot;, no &quot;first institution package&quot;.</p>
+<h2>Migration / compatibility</h2>
+<ul>
+<li>No existing content moves in this RFC. The current <code>intercooperative.network</code> source under <code>website/src/</code> is unchanged.</li>
+<li>The existing <code>icn.zone</code> redirect at root (per <a href="/docs/deployment/ICN_ZONE_ROUTING">docs/deployment/ICN_ZONE_ROUTING.md</a>) is preserved.</li>
+<li>Existing onboarding docs in <code>docs/onboarding/</code>, <code>docs/GETTING_STARTED.md</code>, and <code>docs/development/</code> remain in place. They may eventually be referenced from the future learning repo via deep link, but no migration is forced.</li>
+<li>No archived wallet or mobile docs are renamed by this RFC.</li>
+</ul>
+<h2>Open questions</h2>
+<ul>
+<li>Should the learning repo and the canonical site share design tokens once those exist, or should each keep an independent visual layer?</li>
+<li>Should <code>learn.icn.zone</code> present an &quot;I am a [developer / designer / organizer / cooperative partner / node operator / tester / researcher]&quot; picker on first visit, or should role paths be discoverable through navigation?</li>
+<li>What is the canonical-truth deep-link convention from the learning repo to ICN ADRs and RFCs? Permalink anchors? Versioned references?</li>
+<li>Does Cooperative Systems Institute (<code>cooperative-systems.org</code>) deserve its own RFC when it has content, or is it a reuse of this surface model?</li>
+<li>Does <code>thesync.net</code> need its own RFC, or is the surface model from this RFC sufficient when content is ready?</li>
+</ul>
+<h2>Decision criteria</h2>
+<p>Pick <strong>Option B</strong> if:</p>
+<ul>
+<li>The project intends to keep ADR-0032&#39;s truth-boundary discipline.</li>
+<li>The project intends to grow role-based onboarding without overclaiming program maturity.</li>
+<li>The project values cross-repo navigation cost less than monorepo coupling cost.</li>
+</ul>
+<p>Pick <strong>Option A</strong> only if:</p>
+<ul>
+<li>The project is willing to absorb learning content under the canonical site and accepts the truth-boundary stress that creates.</li>
+</ul>
+<p>Pick <strong>Option C</strong> only if:</p>
+<ul>
+<li>The project commits to building a single deployment pipeline that can route per-domain content correctly <em>and</em> enforce per-surface truth posture inside one repo.</li>
+</ul>
+<h2>Outcome</h2>
+<p>To be filled in when this RFC moves to <code>accepted</code> or <code>rejected</code>. If accepted, the follow-up work is enumerated under &quot;Follow-up implementation issues&quot; below; this RFC does not produce ADRs by itself, but a small ADR may follow if cross-surface deployment policy needs to be recorded.</p>
+<h2>Follow-up ADRs</h2>
+<p>If accepted, this RFC may produce:</p>
+<ul>
+<li>An ADR recording the canonical-site / learning-site truth-boundary policy (the rule that learning material may not encode canonical truth claims and must defer via deep link).</li>
+<li>A small ADR describing the cross-domain deployment guardrail (per-domain build, no shared analytics without opt-in, vocabulary discipline carried across surfaces).</li>
+</ul>
+<p>ADRs are not pre-allocated in this RFC; they will be enumerated when this RFC moves toward <code>accepted</code>.</p>
+<h2>Follow-up implementation issues</h2>
+<p>If accepted, the project should open issues to:</p>
+<ol>
+<li>Create <code>InterCooperative-Network/icn-learn</code> repo with explicit README guardrail: &quot;This repo teaches ICN. It does not define ICN. Canonical architecture, implementation status, ADRs, RFCs, contribution rules, and runtime documentation live in the main ICN repo.&quot;</li>
+<li>Scaffold the static site for <code>learn.icn.zone</code> (build target chosen by the new repo&#39;s contributors; not constrained here).</li>
+<li>Add the README guardrail in #1 with explicit links back to the main ICN repo&#39;s <code>README.md</code>, <code>docs/INDEX.md</code>, <code>docs/STATE.md</code>, and <code>docs/rfcs/RFC-0000-rfc-process.md</code>.</li>
+<li>Add a first curriculum structure in icn-learn organized by role:<ul>
+<li>universal ICN orientation</li>
+<li>developer path</li>
+<li>docs/writer path</li>
+<li>designer / member-experience path</li>
+<li>accessibility path</li>
+<li>organizer path</li>
+<li>cooperative partner path</li>
+<li>node operator path</li>
+<li>tester / QA path</li>
+<li>researcher path</li>
+<li>communications / outreach path</li>
+<li>educator / facilitator path</li>
+<li>maintainer / steward path</li>
+<li>trusted collaborator path</li>
+<li>generic institution-package onboarding hooks (no specific package named)</li>
+<li>glossary and language drills</li>
+<li>exercises, workshops, templates</li>
+<li>&quot;where truth lives&quot; reference page</li>
+</ul>
+</li>
+<li>Add canonical-doc references back to this repo using a stable deep-link convention.</li>
+<li>Add a domain-map reference page in icn-learn naming the six domains and their roles.</li>
+<li>Add vocabulary and public-claims discipline to icn-learn&#39;s contribution guide (carry <a href="/docs/design/CONTENT_STYLE_GUIDE">CONTENT_STYLE_GUIDE.md</a> discipline across).</li>
+<li>Configure the deployment target for <code>learn.icn.zone</code> (specific provider chosen at repo-creation time).</li>
+<li>Configure DNS for <code>learn.icn.zone</code> only after the repo and site exist and pass an internal review.</li>
+<li>Later: update the canonical site&#39;s &quot;Get involved&quot; content (currently in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/src/pages/get-involved.astro">website/src/pages/get-involved.astro</a>) to link into <code>learn.icn.zone</code> once that site is live, replacing or augmenting in-repo onboarding pointers as appropriate.</li>
+</ol>
+<p>These are pointers, not commitments. The follow-up work happens after this RFC reaches <code>accepted</code> (or its substance is rolled into a smaller, faster decision).</p>
+<h2>Validation / proof plan</h2>
+<p>This RFC is doctrinal. &quot;Proof&quot; of acceptance is structural:</p>
+<ul>
+<li>A future PR creates <code>InterCooperative-Network/icn-learn</code> with the README guardrail.</li>
+<li>A future PR adds the canonical-truth deep-link convention.</li>
+<li>A future deployment connects the new repo&#39;s build artifact to <code>learn.icn.zone</code>.</li>
+<li>The canonical <code>intercooperative.network</code> build remains green and continues to pass:<ul>
+<li><code>python3 docs/scripts/doc_control_check.py --strict</code></li>
+<li><code>cd website &amp;&amp; npm run build &amp;&amp; npm run lint</code></li>
+<li><code>grep -RIE &#39;NYCN|New York Cooperative|reference federation|Summit|first institution package&#39; website/src/</code> returns clean</li>
+</ul>
+</li>
+<li>ADR-0032 / ADR-0033 enforcement remains the truth gate for the canonical site; no exception is created here.</li>
+</ul>
+<hr>
+<h2>Notes</h2>
+<ul>
+<li>This RFC is a small, deliberate piece. It does not draft curriculum, create repos, or change DNS. Its job is to make those follow-ups possible without re-opening the surface debate later.</li>
+<li>For <em>amendments</em> during <code>draft</code>, edit in place and bump <code>updated</code>.</li>
+<li>This RFC&#39;s relationship to ADR-0032 and ADR-0033 is downstream: it extends the truth-boundary doctrine across multiple domains rather than concentrating it on one site.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
