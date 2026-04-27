@@ -22,13 +22,15 @@
 //!
 //! Source paths still without a receipt path verified here:
 //!   - `meeting` / `attend` — meeting-attendance write path is not yet
-//!     receipt-bearing in the runtime; tracked separately.
+//!     receipt-bearing in the runtime and currently surfaces
+//!     `receipt_expected: false`; tracked separately.
 //!   - `action_item` / `complete` — action-item completion is currently a
-//!     status update; no receipt envelope is emitted today.
+//!     status update; the card advertises `receipt_expected: true`
+//!     because that is the intended target, but no receipt envelope is
+//!     emitted today.
 //!
-//! These remain `receipt_expected: true` on the card surface but are out
-//! of scope for the slice this test pins. ADR-0020 row 7 records the
-//! coverage status.
+//! These paths are out of scope for the slice this test pins. ADR-0020
+//! row 7 records the coverage status.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -37,7 +39,8 @@ use std::sync::{Arc, Mutex};
 use actix_web::{body::to_bytes, dev::Service as _, http::StatusCode, test, App, HttpMessage};
 use icn_governance::{
     AuthorityGrant, GovernanceDecisionReceipt, GovernanceDomainId, GovernanceParams,
-    MembershipConfig, MembershipSource, ProposalId, ProposalPayload, ProposalScope, VoteChoice,
+    MembershipConfig, MembershipSource, ProofOutcome, ProposalId, ProposalPayload, ProposalScope,
+    VoteChoice,
 };
 use icn_governance_actor::{
     dispatch_evidence::EffectDispatchEvidence,
@@ -337,8 +340,8 @@ async fn vote_action_card_receipt_chain_end_to_end() {
         "receipt domain must match the domain the card lives under"
     );
     assert_eq!(
-        format!("{:?}", receipt.outcome).to_lowercase(),
-        "accepted",
+        receipt.outcome,
+        ProofOutcome::Accepted,
         "single yes-vote with quorum=1 / approval=51 must accept"
     );
     // proof_hash and decision_hash must be populated — these are the layer-1

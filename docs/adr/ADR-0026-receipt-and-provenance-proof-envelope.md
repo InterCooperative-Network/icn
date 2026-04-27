@@ -60,7 +60,7 @@ The query surface that exposes the chain to auditors and federated peers. Not ye
 
 - **Immutable.** Once a layer's record is signed and persisted, it is not edited. Reversal is a counter-record, not a mutation.
 - **Re-verifiable.** Anyone with the public keys can verify the signature chain. Vote sets are merkle-rooted; proof hashes bind the set.
-- **Holder-queryable.** A holder DID can query its own proofs and receipts via `/me/standing` plus `/me/action-cards` (today, partial — `/me/action-cards` carries `source_id` which keys the existing Layer 2 `GovernanceDecisionReceipt` by `proposal_id` for the `proposal`/`vote` path; full receipt query is future work in Layer 4).
+- **Holder-queryable.** A holder DID can discover its relevant governance artifacts via `/me/standing` plus `/me/action-cards`; today `/me/action-cards` is the discovery / index surface, exposing `source_id` (`proposal_id`) for the `proposal`/`vote` path. The actual proof / provenance retrieval surface for that path is the proposal-scoped endpoints — `GET /v1/gov/proposals/{proposal_id}/proof` and `/chain` — and the persisted Layer 2 `GovernanceDecisionReceipt`. Full holder-oriented receipt query remains future work in Layer 4.
 - **Cross-coop verifiable.** A federated peer can, in principle, verify a `FederationProvenance` chain. The query surface (Layer 4) is what is missing for "in practice."
 
 ## Consequences
