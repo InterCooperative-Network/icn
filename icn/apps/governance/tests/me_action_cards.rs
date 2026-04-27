@@ -247,7 +247,10 @@ async fn mixed_inputs_produce_one_card_per_source() {
         meeting_card["deadline"].as_u64().unwrap() >= now_secs,
         "scheduled meeting deadline must be in the future"
     );
-    assert_eq!(meeting_card["receipt_expected"], false);
+    assert_eq!(
+        meeting_card["receipt_expected"], true,
+        "meeting/attend now emits a MeetingAttendanceReceipt on Present/Remote transitions"
+    );
 
     let item_card = by_source
         .get("action_item")

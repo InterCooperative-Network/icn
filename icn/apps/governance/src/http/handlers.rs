@@ -3826,6 +3826,13 @@ pub async fn add_attendee<E: GovernanceEventEmitter + Clone + 'static>(
 }
 
 /// PUT /gov/meetings/{meeting_id}/attendance — Mark attendance for a participant.
+///
+/// Routes through `GovernanceManager::update_meeting_attendance` so a
+/// transition into `Present` / `Remote` emits an
+/// `icn_governance::MeetingAttendanceReceipt` (ADR-0026 Layer 2). The
+/// authenticated caller is recorded as `recorded_by`; the request's
+/// `did` is recorded as `attendee_did`. The two may differ —
+/// attendance is steward-recorded, not self-attestation only.
 pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
@@ -3835,8 +3842,9 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
     let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
     let id = MeetingId(meeting_id.into_inner());
     let status = parse_attendance_status(&req.status)?;
+    let recorded_by = parse_did(&claims.sub, "Invalid DID in token")?;
 
-    let mut m = ctx
+    let m = ctx
         .manager
         .get_meeting(&id)
         .map_err(anyhow_to_api)?
@@ -3847,7 +3855,7 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
     check_domain_membership(
         &ctx.manager,
         &GovernanceDomainId(m.domain_id.clone()),
-        &parse_did(&claims.sub, "Invalid DID in token")?,
+        &recorded_by,
     )
     .await?;
 
@@ -3859,15 +3867,15 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
             .json(serde_json::json!({"error": "Cannot modify a completed or cancelled meeting"})));
     }
 
-    let attendee = m
-        .attendees
-        .iter_mut()
-        .find(|a| a.did == req.did)
-        .ok_or_else(|| err_not_found("Attendee not found in this meeting"))?;
+    if !m.attendees.iter().any(|a| a.did == req.did) {
+        return Err(err_not_found("Attendee not found in this meeting"));
+    }
 
-    attendee.status = status;
-    ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
-    Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
+    let updated = ctx
+        .manager
+        .update_meeting_attendance(&id, &req.did, status, &recorded_by)
+        .map_err(anyhow_to_api)?;
+    Ok(HttpResponse::Ok().json(meeting_to_response(&updated)))
 }
 
 /// POST /gov/meetings/{meeting_id}/agenda — Add an agenda item.
@@ -5149,7 +5157,11 @@ pub async fn get_my_action_cards<E: GovernanceEventEmitter + Clone + 'static>(
             accessibility_hint:
                 "Meeting accessibility provisions available on request from the host structure."
                     .to_string(),
-            receipt_expected: false,
+            // Attending the meeting emits an `icn_governance::MeetingAttendanceReceipt`
+            // (ADR-0026 Layer 2) keyed by `(meeting_id, caller_did)`. The card's
+            // `source_id` is `meeting_id`; the `(source_id, caller)` pair is the
+            // documented receipt lookup.
+            receipt_expected: true,
             source_id: m.meeting_id,
             domain_id: Some(m.domain_id),
         });

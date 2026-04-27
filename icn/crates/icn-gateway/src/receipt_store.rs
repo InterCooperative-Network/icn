@@ -10,7 +10,7 @@
 #[cfg_attr(not(test), allow(unused_imports))]
 use icn_governance::{
     ActionItemCompletionReceipt, AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt,
-    Grantee, Mandate, MandateId, ProofOutcome, Timestamp, VoteTally,
+    Grantee, Mandate, MandateId, MeetingAttendanceReceipt, ProofOutcome, Timestamp, VoteTally,
 };
 use icn_governance_actor::dispatch_evidence::EffectDispatchEvidence;
 use icn_governance_actor::institutional_effect::InstitutionalEffectRecord;
@@ -43,6 +43,28 @@ const ACTION_ITEM_COMPLETION_REC_PREFIX: &[u8] = b"receipt:action_item_completio
 /// Distinct from the primary prefix's tail (`rec:`) so blake3 record
 /// hashes cannot alias the by-item index range.
 const ACTION_ITEM_COMPLETION_BY_ITEM_PREFIX: &[u8] = b"receipt:action_item_completion:by_item:";
+/// Primary key prefix for meeting attendance receipts, keyed by the
+/// receipt's canonical `record_hash`. Append-only: a `Present`→`Remote`
+/// transition (or any other field change) produces a distinct
+/// `record_hash` and a new primary record; prior receipts are preserved.
+const MEETING_ATTENDANCE_REC_PREFIX: &[u8] = b"receipt:meeting_attendance:rec:";
+/// Secondary index prefix for meeting attendance receipts, keyed by
+/// `(meeting_id, attendee_did)` and ordered by `recorded_at` so audit
+/// chains read oldest-first under `scan_prefix`. Layout per entry:
+///   `<prefix><u64 BE meeting_id_len><meeting_id bytes><u64 BE attendee_did_len>
+///    <attendee_did bytes><u64 BE recorded_at><32-byte record_hash>`
+/// Distinct from the primary prefix's tail (`rec:`) so blake3 record
+/// hashes cannot alias the by-pair index range.
+const MEETING_ATTENDANCE_BY_PAIR_PREFIX: &[u8] = b"receipt:meeting_attendance:by_pair:";
+/// Secondary index prefix for meeting attendance receipts, keyed by
+/// `meeting_id` only and ordered by `recorded_at`. Used for
+/// `list_meeting_attendance_for_meeting` (every attendee in one meeting,
+/// audit-chain ordering). Distinct from the by-pair index so a single
+/// scan does not need to skip across attendee boundaries. Layout per
+/// entry:
+///   `<prefix><u64 BE meeting_id_len><meeting_id bytes><u64 BE recorded_at>
+///    <32-byte record_hash>`
+const MEETING_ATTENDANCE_BY_MEETING_PREFIX: &[u8] = b"receipt:meeting_attendance:by_meeting:";
 /// Key prefix for institutional effect records (primary by record_id)
 const INSTITUTIONAL_EFFECT_PREFIX: &[u8] = b"effect:institutional:";
 /// Secondary index: effect records by proposal_id (sortable by recorded_at)
@@ -1637,6 +1659,121 @@ impl GovernanceReceiptBackend for ReceiptStore {
             if let Some(bytes) = raw {
                 let r: ActionItemCompletionReceipt = serde_json::from_slice(&bytes)
                     .map_err(|e| format!("deserialize action item completion receipt: {e}"))?;
+                out.push(r);
+            }
+        }
+        Ok(out)
+    }
+
+    fn put_meeting_attendance(&self, receipt: &MeetingAttendanceReceipt) -> Result<(), String> {
+        // Primary record by record_hash. Identical-content receipts
+        // collapse to a single record (idempotent); any change in
+        // attendee/recorded_by/transition/recorded_at produces a distinct
+        // hash and a distinct record. Append-only history is preserved.
+        let mut primary_key = MEETING_ATTENDANCE_REC_PREFIX.to_vec();
+        primary_key.extend_from_slice(&receipt.record_hash);
+        let value = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize meeting attendance receipt: {e}"))?;
+        self.db
+            .insert(&primary_key, value)
+            .map_err(|e| format!("sled put_meeting_attendance primary: {e}"))?;
+
+        // Secondary index by (meeting_id, attendee_did) ordered by
+        // recorded_at — supports per-attendee chain reads and the
+        // canonical "latest receipt for this attendee at this meeting"
+        // lookup.
+        let mut by_pair_key = MEETING_ATTENDANCE_BY_PAIR_PREFIX.to_vec();
+        by_pair_key.extend_from_slice(&(receipt.meeting_id.len() as u64).to_be_bytes());
+        by_pair_key.extend_from_slice(receipt.meeting_id.as_bytes());
+        by_pair_key.extend_from_slice(&(receipt.attendee_did.len() as u64).to_be_bytes());
+        by_pair_key.extend_from_slice(receipt.attendee_did.as_bytes());
+        by_pair_key.extend_from_slice(&receipt.recorded_at.to_be_bytes());
+        by_pair_key.extend_from_slice(&receipt.record_hash);
+        self.db
+            .insert(&by_pair_key, b"")
+            .map_err(|e| format!("sled put_meeting_attendance by_pair: {e}"))?;
+
+        // Secondary index by meeting_id ordered by recorded_at —
+        // supports per-meeting chain reads spanning every attendee.
+        let mut by_meeting_key = MEETING_ATTENDANCE_BY_MEETING_PREFIX.to_vec();
+        by_meeting_key.extend_from_slice(&(receipt.meeting_id.len() as u64).to_be_bytes());
+        by_meeting_key.extend_from_slice(receipt.meeting_id.as_bytes());
+        by_meeting_key.extend_from_slice(&receipt.recorded_at.to_be_bytes());
+        by_meeting_key.extend_from_slice(&receipt.record_hash);
+        self.db
+            .insert(&by_meeting_key, b"")
+            .map_err(|e| format!("sled put_meeting_attendance by_meeting: {e}"))?;
+
+        // No per-write `db.flush()`; matches the convention of other
+        // receipt write paths in this store.
+        Ok(())
+    }
+
+    fn get_meeting_attendance(
+        &self,
+        meeting_id: &str,
+        attendee_did: &str,
+    ) -> Result<Option<MeetingAttendanceReceipt>, String> {
+        // Latest = receipt with the largest `recorded_at`. The by_pair
+        // index orders entries by `recorded_at` ascending under a fixed
+        // (meeting_id, attendee_did) prefix, so the latest is the last
+        // hit.
+        let mut prefix = MEETING_ATTENDANCE_BY_PAIR_PREFIX.to_vec();
+        prefix.extend_from_slice(&(meeting_id.len() as u64).to_be_bytes());
+        prefix.extend_from_slice(meeting_id.as_bytes());
+        prefix.extend_from_slice(&(attendee_did.len() as u64).to_be_bytes());
+        prefix.extend_from_slice(attendee_did.as_bytes());
+
+        let mut latest: Option<MeetingAttendanceReceipt> = None;
+        for entry in self.db.scan_prefix(&prefix) {
+            let (key, _) =
+                entry.map_err(|e| format!("sled scan_prefix get_meeting_attendance: {e}"))?;
+            if key.len() < 32 {
+                continue;
+            }
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&key[key.len() - 32..]);
+            let mut primary_key = MEETING_ATTENDANCE_REC_PREFIX.to_vec();
+            primary_key.extend_from_slice(&hash);
+            let raw = self
+                .db
+                .get(&primary_key)
+                .map_err(|e| format!("sled get get_meeting_attendance primary: {e}"))?;
+            if let Some(bytes) = raw {
+                let r: MeetingAttendanceReceipt = serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("deserialize meeting attendance receipt: {e}"))?;
+                latest = Some(r);
+            }
+        }
+        Ok(latest)
+    }
+
+    fn list_meeting_attendance_for_meeting(
+        &self,
+        meeting_id: &str,
+    ) -> Result<Vec<MeetingAttendanceReceipt>, String> {
+        let mut prefix = MEETING_ATTENDANCE_BY_MEETING_PREFIX.to_vec();
+        prefix.extend_from_slice(&(meeting_id.len() as u64).to_be_bytes());
+        prefix.extend_from_slice(meeting_id.as_bytes());
+
+        let mut out = Vec::new();
+        for entry in self.db.scan_prefix(&prefix) {
+            let (key, _) = entry.map_err(|e| {
+                format!("sled scan_prefix list_meeting_attendance_for_meeting: {e}")
+            })?;
+            if key.len() < 32 {
+                continue;
+            }
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&key[key.len() - 32..]);
+            let mut primary_key = MEETING_ATTENDANCE_REC_PREFIX.to_vec();
+            primary_key.extend_from_slice(&hash);
+            let raw = self.db.get(&primary_key).map_err(|e| {
+                format!("sled get list_meeting_attendance_for_meeting primary: {e}")
+            })?;
+            if let Some(bytes) = raw {
+                let r: MeetingAttendanceReceipt = serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("deserialize meeting attendance receipt: {e}"))?;
                 out.push(r);
             }
         }
