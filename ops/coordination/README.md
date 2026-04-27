@@ -94,8 +94,13 @@ A single concern often appears in both — first as an RFC candidate (design spa
 - [ADR-0018](../../docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index.md) governs ADR lifecycle.
 - Issue numbers in registry rows are pointers, not promises. Issues may be closed without the ADR landing, and ADRs may land without an issue.
 
+## Cross-surface architecture
+
+Public-surface and learning-repo architecture (the role split across `intercooperative.network`, `icn.zone`, future `learn.icn.zone`, and adjacent domains) is tracked by [RFC-0015](../../docs/rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md).
+
 ## See also
 
 - [docs/rfcs/](../../docs/rfcs/) — RFC documents (RFC-0000 is the seed)
 - [docs/adr/](../../docs/adr/) — ADR decision receipts
 - [docs/strategy/ICN_CONSTITUTIONAL_ROADMAP.md](../../docs/strategy/ICN_CONSTITUTIONAL_ROADMAP.md) — long-arc architectural roadmap
+- [docs/deployment/ICN_ZONE_ROUTING.md](../../docs/deployment/ICN_ZONE_ROUTING.md) — `icn.zone` utility routing plan
