@@ -285,7 +285,7 @@ What is already in the codebase as substrate this design will sit on (citations 
 | `/me/action-cards` member endpoint | PR #1659 (closed source/action enums per [ADR-0027](../adr/ADR-0027-action-card-contract.md)) |
 | Proposal/vote action card → `GovernanceDecisionReceipt` proof linkage | PR #1660 |
 | Action-item / complete → `ActionItemCompletionReceipt` (ADR-0026 Layer 2) | PR #1661 |
-| Meeting / attend → `MeetingAttendanceReceipt` (ADR-0026 Layer 2) | PR #1663 (in flight at time of writing) |
+| Meeting / attend → `MeetingAttendanceReceipt` (ADR-0026 Layer 2) | PR #1663 |
 | Meeting management (schedule, agenda, attendance, minutes) | PR #1543 |
 | Action items + decision-to-action bridge | PRs #1532, #1547 |
 | Receipts and provenance proof envelope | [ADR-0026](../adr/ADR-0026-receipt-and-provenance-proof-envelope.md) |
