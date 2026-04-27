@@ -39,7 +39,16 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Phase Progress</h1>
 <p><strong>Last Updated:</strong> 2026-04-27
-<strong>Current Phase:</strong> Phase 2 — Pilot Launch (still blocked on cooperative partners; institutional-operability infrastructure and partial action-card runtime are now in place)</p>
+<strong>Current Phase:</strong> Phase 2 — Pilot Launch (still blocked on cooperative partners; institutional-operability infrastructure and the action-card runtime are now in place — all currently emitted source paths are proof-bearing)</p>
+<!-- [sync edit] 2026-04-27 (post-#1663): Phase 2 status unchanged (still
+     blocked on cooperative partners). Action-card runtime now has
+     proof-bearing receipt loops for all three currently emitted source
+     paths: proposal/vote (#1660), action_item/complete (#1661), and
+     meeting/attend (#1663). Issue #1646 remains open with two RFC-
+     gated paths still pending: signal_rule (gated on #1631) and
+     obligation_lifecycle (gated on #1634). These landings do not flip
+     Phase 2 to ✅ on their own — that gate is partner-bound. -->
+
 <!-- [sync edit] 2026-04-27: Phase 2 status unchanged (still blocked on
      cooperative partners). Phase 2 deliverables list extended to record
      the action-card runtime that landed 2026-04-27 (#1659/#1660/#1661):
@@ -236,7 +245,8 @@ View source on GitHub →
 <li><input checked="" disabled="" type="checkbox"> <code>GET /v1/gov/me/action-cards</code> member endpoint with closed source/action enums (#1659)</li>
 <li><input checked="" disabled="" type="checkbox"> Action card → <code>GovernanceDecisionReceipt</code> proof linkage for proposal/vote (#1660) — proof loop verified</li>
 <li><input checked="" disabled="" type="checkbox"> <code>action_item</code>/<code>complete</code> source path emits append-only <code>ActionItemCompletionReceipt</code> (#1661) — proof loop verified</li>
-<li><input disabled="" type="checkbox"> Action-card runtime — remaining gates under #1646: <code>meeting</code>/<code>attend</code> receipt seam; <code>signal_rule</code> source path (gated on #1631); <code>obligation_lifecycle</code> source path (gated on #1634)</li>
+<li><input checked="" disabled="" type="checkbox"> <code>meeting</code>/<code>attend</code> source path emits append-only <code>MeetingAttendanceReceipt</code> (#1663) — proof loop verified; <code>Present</code>/<code>Remote</code> are receipt-bearing transitions; <code>Absent</code> is not; steward-recorded attendance distinguished by <code>recorded_by</code> vs <code>attendee_did</code></li>
+<li><input disabled="" type="checkbox"> Action-card runtime — remaining gates under #1646 (RFC-gated): <code>signal_rule</code> source path (gated on #1631); <code>obligation_lifecycle</code> source path (gated on #1634)</li>
 <li><input disabled="" type="checkbox"> One-command deployment script per cooperative</li>
 <li><input disabled="" type="checkbox"> Charter customization workflow documented (charter activation endpoint exists; non-technical workflow doc still missing)</li>
 <li><input disabled="" type="checkbox"> Pilot onboarding guide (non-technical audience)</li>
@@ -252,6 +262,7 @@ View source on GitHub →
 </ul>
 <p><strong>Decisions Made:</strong></p>
 <ul>
+<li>(2026-04-27, post-#1663) Action-card runtime is now proof-bearing for <strong>all three currently emitted source paths</strong>: <code>proposal</code>/<code>vote</code> (#1660), <code>action_item</code>/<code>complete</code> (#1661), and <code>meeting</code>/<code>attend</code> (#1663). Issue #1646 remains open for the two RFC-gated paths: <code>signal_rule</code> (#1631) and <code>obligation_lifecycle</code> (#1634). Phase 2 status is unaffected (still partner-bound).</li>
 <li>(2026-04-27) Action-card runtime is partial: <code>/me/action-cards</code> exists, <code>proposal</code>/<code>vote</code> and <code>action_item</code>/<code>complete</code> source paths have verified end-to-end receipt proof loops, and <code>meeting</code>/<code>attend</code>, <code>signal_rule</code>, <code>obligation_lifecycle</code> paths remain pending under #1646. Phase 2 status is unaffected.</li>
 <li>(2026-04-26) Pilot enablement infrastructure (bootstrap, charter activation, role binding, standing) is in place; Phase 2 remains ⏳ until partners run it for real.</li>
 </ul>

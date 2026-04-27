@@ -42,6 +42,13 @@ View source on GitHub →
 Canonical: yes
 Last Reviewed: 2026-04-27</h2>
 <h1>ICN State (living doc)</h1>
+<!-- [sync edit] 2026-04-27 (post-#1663): Action-card runtime now has
+     proof-bearing receipt loops for all three currently emitted source
+     paths: proposal/vote (#1660), action_item/complete (#1661), and
+     meeting/attend (#1663). Issue #1646 remains open with two RFC-
+     gated paths still pending: signal_rule (gated on #1631) and
+     obligation_lifecycle (gated on #1634). Phase model unchanged. -->
+
 <!-- [sync edit] 2026-04-27: Append the action-card runtime sequence
      (/me/action-cards endpoint, proposal/vote receipt linkage,
      action_item completion receipt seam) landed via #1659/#1660/#1661.
@@ -61,7 +68,7 @@ Last Reviewed: 2026-04-27</h2>
 
 <h2>Current status (2026-04-27 snapshot)</h2>
 <p><strong>Current phase:</strong> Phase 2 — Pilot Launch (blocked on cooperative partners).
-Active execution: institutional-operability runtime (live charter activation, person-directory overlay, <code>/me/standing</code>, <code>authority_scope</code> plumbing) plus the action-card runtime (<code>/me/action-cards</code> endpoint with proof-loop linkage to <code>GovernanceDecisionReceipt</code> for proposal/vote and <code>ActionItemCompletionReceipt</code> for action_item/complete). NYCN package side dogfoods these via the institution-package boundary. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.</p>
+Active execution: institutional-operability runtime (live charter activation, person-directory overlay, <code>/me/standing</code>, <code>authority_scope</code> plumbing) plus the action-card runtime (<code>/me/action-cards</code> endpoint with proof-loop linkage to <code>GovernanceDecisionReceipt</code> for proposal/vote, <code>ActionItemCompletionReceipt</code> for action_item/complete, and <code>MeetingAttendanceReceipt</code> for meeting/attend). NYCN package side dogfoods these via the institution-package boundary. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.</p>
 <h3>Recently merged (since 2026-04-15)</h3>
 <table>
 <thead>
@@ -72,6 +79,16 @@ Active execution: institutional-operability runtime (live charter activation, pe
 </tr>
 </thead>
 <tbody><tr>
+<td>#1663</td>
+<td>feat(governance): add meeting attendance receipts</td>
+<td>2026-04-27</td>
+</tr>
+<tr>
+<td>#1662</td>
+<td>docs(state): record action-card runtime landing (#1659/#1660/#1661)</td>
+<td>2026-04-27</td>
+</tr>
+<tr>
 <td>#1661</td>
 <td>feat(governance): add action item completion receipts</td>
 <td>2026-04-27</td>
@@ -295,14 +312,15 @@ Active execution: institutional-operability runtime (live charter activation, pe
 </tr>
 </tbody></table>
 <h3>What landed since Phase 1 (Charter Engine)</h3>
-<p>Action-card runtime (added 2026-04-27, partial — issue #1646 remains open):</p>
+<p>Action-card runtime (added 2026-04-27, all currently emitted source paths now proof-bearing — issue #1646 remains open for the two RFC-gated paths):</p>
 <ul>
 <li><code>GET /v1/gov/me/action-cards</code> member endpoint with closed source/action enums — #1659</li>
 <li>Proposal/vote action card → <code>GovernanceDecisionReceipt</code> proof linkage, end-to-end test — #1660</li>
 <li><code>action_item</code>/<code>complete</code> source path emits append-only <code>ActionItemCompletionReceipt</code> (ADR-0026 Layer 2); persist-before-commit semantics; full-update handler routes status changes through receipt-bearing path — #1661</li>
+<li><code>meeting</code>/<code>attend</code> source path emits append-only <code>MeetingAttendanceReceipt</code> (ADR-0026 Layer 2) keyed by <code>(meeting_id, attendee_did)</code>; <code>Present</code> and <code>Remote</code> are receipt-bearing transitions, <code>Absent</code> is not; <code>recorded_by</code> is the authenticated caller (distinct from <code>attendee_did</code> for steward-recorded attendance); persist-before-commit semantics — #1663</li>
 <li>Source paths currently emitted by <code>/me/action-cards</code>: <code>proposal</code>/<code>vote</code>, <code>meeting</code>/<code>attend</code>, <code>action_item</code>/<code>complete</code></li>
-<li>Proof loop verified end-to-end for <code>proposal</code>/<code>vote</code> and <code>action_item</code>/<code>complete</code></li>
-<li>Pending under #1646: <code>meeting</code>/<code>attend</code> receipt seam; <code>signal_rule</code> source path (gated on #1631); <code>obligation_lifecycle</code> source path (gated on #1634)</li>
+<li><strong>Proof loop verified end-to-end for all three currently emitted source paths.</strong></li>
+<li>Pending under #1646 (RFC-gated): <code>signal_rule</code> source path (gated on #1631); <code>obligation_lifecycle</code> source path (gated on #1634)</li>
 </ul>
 <p>Institutional-operability runtime (added 2026-04-22 → 2026-04-26):</p>
 <ul>
