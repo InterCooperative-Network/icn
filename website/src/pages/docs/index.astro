@@ -166,6 +166,107 @@ const allDocs = sections.flatMap(s => s.docs);
         </a>
       </div>
 
+      <!-- Curated reading pathways -->
+      <section class="docs-pathways" aria-labelledby="docs-pathways-heading">
+        <header class="docs-pathways-header">
+          <h2 id="docs-pathways-heading">Choose a docs path</h2>
+          <p>If you do not yet know what to search for, start here. Each path is a short reading sequence built from existing pages and docs.</p>
+        </header>
+
+        <ol class="docs-pathways-grid">
+          <li class="docs-pathway">
+            <span class="docs-pathway-num">01</span>
+            <h3>Understand the project</h3>
+            <p>What ICN is, what problem it addresses, and how the closure loop holds the institution together.</p>
+            <ul>
+              <li><a href="/what-is-icn">What is ICN</a></li>
+              <li><a href="/why-icn">Why ICN</a></li>
+              <li><a href="/cooperative-economy">The cooperative economy needs its own machinery</a></li>
+              <li><a href="/how-it-works">How It Works</a></li>
+            </ul>
+          </li>
+
+          <li class="docs-pathway">
+            <span class="docs-pathway-num">02</span>
+            <h3>Build or contribute</h3>
+            <p>Get the workspace running and find a contribution path that matches the repo as it actually exists.</p>
+            <ul>
+              <li><a href="/for-developers">For Developers</a></li>
+              <li><a href="/get-involved">Get Involved</a></li>
+              <li><a href="/docs/GETTING_STARTED">Getting Started</a></li>
+              <li><a href="/docs/ARCHITECTURE">Architecture overview</a></li>
+            </ul>
+          </li>
+
+          <li class="docs-pathway">
+            <span class="docs-pathway-num">03</span>
+            <h3>Run infrastructure</h3>
+            <p>Deployment routing, K3s, and the public domain map for nodes, gateways, and short links.</p>
+            <ul>
+              <li><a href="/docs/deployment/ICN_ZONE_ROUTING">icn.zone routing plan</a></li>
+              <li><a href="/docs/deployment/DEPLOYMENT_GUIDE">Deployment guide</a></li>
+              <li><a href="/docs/HOMELAB_DEPLOYMENT">Homelab deployment</a></li>
+            </ul>
+          </li>
+
+          <li class="docs-pathway">
+            <span class="docs-pathway-num">04</span>
+            <h3>Understand governance</h3>
+            <p>How proposals, decisions, mandates, and the kernel-app boundary actually work in ICN.</p>
+            <ul>
+              <li><a href="/docs/architecture/GOVERNANCE_STATE_MACHINE">Governance state machine</a></li>
+              <li><a href="/docs/architecture/KERNEL_APP_SEPARATION">Kernel / app separation</a></li>
+              <li><a href="/docs/adr">ADR index</a></li>
+            </ul>
+          </li>
+
+          <li class="docs-pathway">
+            <span class="docs-pathway-num">05</span>
+            <h3>Understand economics and resource governance</h3>
+            <p>The vocabulary discipline (obligation / allocation / settlement) and the draft RFC that frames external bridge institutions.</p>
+            <ul>
+              <li><a href="/cooperative-economy">The cooperative economy needs its own machinery</a></li>
+              <li><a href="/docs/rfcs/RFC-0001-obligation-allocation-settlement-primitives">RFC-0001 — Obligation / Allocation / Settlement Primitives</a></li>
+              <li><a href="/docs/design/CONTENT_STYLE_GUIDE">Content Style Guide (vocabulary)</a></li>
+            </ul>
+          </li>
+
+          <li class="docs-pathway">
+            <span class="docs-pathway-num">06</span>
+            <h3>Understand federation</h3>
+            <p>How distinct cooperatives coordinate without merger — treaties, attestations, and cross-institutional clearing.</p>
+            <ul>
+              <li><a href="/docs/architecture/FEDERATION_ACTIONS">Federation actions</a></li>
+              <li><a href="/docs/architecture/FEDERATION_INTEROP_CONTRACT">Federation interop contract</a></li>
+              <li><a href="/docs/adr/ADR-0013-federation-clearing-adoption-contract">ADR-0013 — Federation clearing adoption</a></li>
+            </ul>
+          </li>
+
+          <li class="docs-pathway">
+            <span class="docs-pathway-num">07</span>
+            <h3>Understand design and accessibility</h3>
+            <p>The cross-surface design system, content style discipline, and accessibility floor for member-facing surfaces.</p>
+            <ul>
+              <li><a href="/docs/design/ICN_DESIGN_SYSTEM">ICN Design System</a></li>
+              <li><a href="/docs/design/ACCESSIBILITY_BASELINE">Accessibility Baseline</a></li>
+              <li><a href="/docs/design/CONTENT_STYLE_GUIDE">Content Style Guide</a></li>
+              <li><a href="/docs/rfcs/RFC-0015-public-surface-and-learning-repo-architecture">RFC-0015 — Public surface architecture</a></li>
+            </ul>
+          </li>
+
+          <li class="docs-pathway">
+            <span class="docs-pathway-num">08</span>
+            <h3>Check current project state</h3>
+            <p>Honest, dated maturity. Read this before treating any subsystem as production-ready.</p>
+            <ul>
+              <li><a href="/whats-real-now">What's Real Now</a></li>
+              <li><a href="/docs/STATE">State (project status)</a></li>
+              <li><a href="/docs/INDEX">Documentation index</a></li>
+            </ul>
+          </li>
+        </ol>
+      </section>
+
       <!-- Search -->
       <Search searchList={allDocs} />
 
@@ -314,6 +415,91 @@ const allDocs = sections.flatMap(s => s.docs);
   @media (max-width: 900px) {
     .docs-quickstart {
       grid-template-columns: 1fr;
+    }
+  }
+
+  /* Curated reading pathways — sit above the search/index */
+  .docs-pathways {
+    margin: var(--space-xl) 0;
+    padding: var(--space-xl);
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+  }
+  .docs-pathways-header {
+    margin-bottom: var(--space-lg);
+  }
+  .docs-pathways-header h2 {
+    font-size: 1.25rem;
+    margin: 0 0 var(--space-xs);
+  }
+  .docs-pathways-header p {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    max-width: 48rem;
+  }
+  .docs-pathways-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md);
+  }
+  .docs-pathway {
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-base, transparent);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+  }
+  .docs-pathway-num {
+    display: inline-block;
+    margin-bottom: var(--space-xs);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent-teal);
+  }
+  .docs-pathway h3 {
+    font-size: 1rem;
+    margin: 0 0 var(--space-xs);
+    line-height: 1.3;
+  }
+  .docs-pathway > p {
+    margin: 0 0 var(--space-sm);
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+  .docs-pathway ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+  .docs-pathway li a {
+    display: block;
+    padding: 0.25rem 0;
+    font-size: 0.875rem;
+    color: var(--text-body);
+    border-bottom: 1px solid transparent;
+    transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+  }
+  .docs-pathway li a:hover {
+    color: var(--accent-teal);
+    border-bottom-color: var(--accent-teal);
+  }
+
+  @media (max-width: 900px) {
+    .docs-pathways-grid {
+      grid-template-columns: 1fr;
+    }
+    .docs-pathways {
+      padding: var(--space-lg);
     }
   }
 </style>
