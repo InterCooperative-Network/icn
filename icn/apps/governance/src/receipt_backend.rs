@@ -2,7 +2,8 @@
 //! in this crate without a circular dependency on icn-gateway.
 
 use icn_governance::{
-    AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt, Grantee, Mandate, Timestamp,
+    ActionItemCompletionReceipt, AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt,
+    Grantee, Mandate, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -312,5 +313,65 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         _revoked_at: Timestamp,
     ) -> Result<(), String> {
         Ok(())
+    }
+
+    /// Persist an [`ActionItemCompletionReceipt`] emitted when an action
+    /// item transitions to `Completed` via an authorized actor (assignee
+    /// or creator).
+    ///
+    /// Append-only: implementations should treat a same-`item_id`
+    /// re-write as idempotent. The runtime's
+    /// `update_action_item_status` path emits at most one receipt per
+    /// transition and only for transitions listed in
+    /// [`icn_governance::ActionItemTransition`].
+    ///
+    /// Default impl is a no-op so backends that do not yet durably
+    /// persist these receipts inherit a truthful "completion receipt
+    /// not persisted" behavior. Test backends and the sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
+    /// override.
+    fn put_action_item_completion(
+        &self,
+        _receipt: &ActionItemCompletionReceipt,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    /// Retrieve the latest [`ActionItemCompletionReceipt`] for an action
+    /// item id (string form of `ActionItemId`), or `None` when no
+    /// completion has been recorded.
+    ///
+    /// Backends that store multiple receipts per item (e.g. for a
+    /// reopen/re-complete cycle that produces an append-only chain of
+    /// completions) must return the receipt with the largest
+    /// `completed_at`.
+    ///
+    /// Default impl returns `Ok(None)` so backends that do not implement
+    /// completion-receipt storage are indistinguishable from "no
+    /// completion recorded". Callers that need to assert a receipt
+    /// exists must use a backend that overrides this method.
+    fn get_action_item_completion_by_item(
+        &self,
+        _item_id: &str,
+    ) -> Result<Option<ActionItemCompletionReceipt>, String> {
+        Ok(None)
+    }
+
+    /// List **all** [`ActionItemCompletionReceipt`]s ever persisted for an
+    /// action item id, oldest-first by `completed_at`.
+    ///
+    /// The append-only contract: a reopen/re-complete cycle on the same
+    /// item produces a new receipt; previous receipts are not
+    /// overwritten. This method exposes the full chain so audits can see
+    /// every completion event for the item.
+    ///
+    /// Default impl returns an empty vector. Backends that override
+    /// [`Self::put_action_item_completion`] should also override this
+    /// method to keep the audit chain readable.
+    fn list_action_item_completions_by_item(
+        &self,
+        _item_id: &str,
+    ) -> Result<Vec<ActionItemCompletionReceipt>, String> {
+        Ok(vec![])
     }
 }

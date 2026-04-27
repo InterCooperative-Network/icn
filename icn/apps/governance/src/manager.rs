@@ -4850,6 +4850,7 @@ impl GovernanceManager {
         domain_id: &GovernanceDomainId,
         id: &ActionItemId,
         status: ActionItemStatus,
+        actor: &icn_identity::Did,
     ) -> Result<ActionItem> {
         let mut item = self
             .action_items
@@ -4857,8 +4858,37 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Failed to get action item: {e}"))?
             .ok_or_else(|| anyhow::anyhow!("Action item not found: {id}"))?;
 
+        let was_completed = matches!(item.status, ActionItemStatus::Completed);
+        let now = icn_time::current_timestamp_secs();
+
+        // On the first transition into Completed (was_completed: false →
+        // status: Completed), persist the ADR-0026 Layer 2 receipt
+        // BEFORE committing the status change. If the backend rejects
+        // the receipt, the status save does not run — the holder's
+        // standing never advertises a completion that has no provenance.
+        // This makes `receipt_expected: true` honest under storage-fault
+        // conditions; the alternative of "log and continue" can drop
+        // receipts permanently because the `was_completed` guard skips
+        // re-emission on subsequent re-saves.
+        if matches!(status, ActionItemStatus::Completed) && !was_completed {
+            if let Some(ref store) = self.receipt_store {
+                let receipt = icn_governance::ActionItemCompletionReceipt::new(
+                    item.id.to_string(),
+                    item.domain_id.0.clone(),
+                    actor.to_string(),
+                    icn_governance::ActionItemTransition::Completed,
+                    now,
+                );
+                store.put_action_item_completion(&receipt).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to persist action item completion receipt for {id}: {e}"
+                    )
+                })?;
+            }
+        }
+
         item.status = status;
-        item.updated_at = icn_time::current_timestamp_secs();
+        item.updated_at = now;
 
         self.action_items
             .save(&item)

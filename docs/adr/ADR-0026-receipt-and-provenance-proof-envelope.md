@@ -60,7 +60,7 @@ The query surface that exposes the chain to auditors and federated peers. Not ye
 
 - **Immutable.** Once a layer's record is signed and persisted, it is not edited. Reversal is a counter-record, not a mutation.
 - **Re-verifiable.** Anyone with the public keys can verify the signature chain. Vote sets are merkle-rooted; proof hashes bind the set.
-- **Holder-queryable.** A holder DID can discover its relevant governance artifacts via `/me/standing` plus `/me/action-cards`; today `/me/action-cards` is the discovery / index surface, exposing `source_id` (`proposal_id`) for the `proposal`/`vote` path. The actual proof / provenance retrieval surface for that path is the proposal-scoped endpoints — `GET /v1/gov/proposals/{proposal_id}/proof` and `/chain` — and the persisted Layer 2 `GovernanceDecisionReceipt`. Full holder-oriented receipt query remains future work in Layer 4.
+- **Holder-queryable.** A holder DID can discover its relevant governance artifacts via `/me/standing` plus `/me/action-cards`; today `/me/action-cards` is the discovery / index surface, exposing `source_id` for two source paths: `proposal_id` for the `proposal`/`vote` path (retrievable via the persisted Layer 2 `GovernanceDecisionReceipt` and the proposal-scoped endpoints `GET /v1/gov/proposals/{proposal_id}/proof` and `/chain`) and `item_id` for the `action_item`/`complete` path (retrievable via the persisted Layer 2 `ActionItemCompletionReceipt` keyed by `item_id`). Full holder-oriented receipt query — including a generic `GET /me/receipts` index — remains future work in Layer 4.
 - **Cross-coop verifiable.** A federated peer can, in principle, verify a `FederationProvenance` chain. The query surface (Layer 4) is what is missing for "in practice."
 
 ## Consequences
@@ -77,7 +77,7 @@ Partial.
 | Layer | Status | Evidence |
 |---|---|---|
 | 1 — GovernanceProof | implemented | [icn/crates/icn-governance/src/proof.rs](../../icn/crates/icn-governance/src/proof.rs) |
-| 2 — ArtifactReceipt | implemented | Gateway receipt store; ADR-0020 chain. End-to-end action-card linkage verified for `proposal`/`vote` at `icn/apps/governance/tests/me_action_card_receipt_chain.rs`. |
+| 2 — ArtifactReceipt | implemented | Gateway receipt store; ADR-0020 chain. End-to-end action-card linkage verified for `proposal`/`vote` (`GovernanceDecisionReceipt` keyed by `proposal_id`) at `icn/apps/governance/tests/me_action_card_receipt_chain.rs` and for `action_item`/`complete` (`ActionItemCompletionReceipt` keyed by `item_id`) at `icn/apps/governance/tests/me_action_item_receipt_chain.rs`. The `ActionItemCompletionReceipt` envelope (`icn/crates/icn-governance/src/proof.rs`) carries `item_id`, `domain_id`, `actor_did`, a closed `transition` taxonomy (`Completed` only today), `completed_at`, and a canonical `record_hash` under domain-tag `icn:gov:action_item_completion:v1`. |
 | 3 — FederationProvenance | implemented (persistent) | PR [#1648](https://github.com/InterCooperative-Network/icn/pull/1648) |
 | 4 — ProvenanceQuery | NOT IMPLEMENTED | Issue [#1438](https://github.com/InterCooperative-Network/icn/issues/1438); ADR-0072 in registry |
 

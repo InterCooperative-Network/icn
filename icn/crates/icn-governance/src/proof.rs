@@ -478,6 +478,120 @@ fn outcome_ordinal(outcome: ProofOutcome) -> u8 {
     }
 }
 
+// ============================================================================
+// Action item completion receipts (ADR-0026 Layer 2 — non-proposal source)
+// ============================================================================
+
+/// Closed taxonomy of state transitions that produce an
+/// [`ActionItemCompletionReceipt`].
+///
+/// Today the only receipt-bearing transition is `Completed`. Variants are
+/// added when a corresponding write path lands; the runtime never emits a
+/// transition not listed here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionItemTransition {
+    /// The action item moved into `ActionItemStatus::Completed`. The
+    /// authorized actor is the assignee or creator (per the existing
+    /// `update_action_item_status` handler authorization check).
+    Completed,
+}
+
+/// Cross-node deterministic completion receipt for a governance action
+/// item.
+///
+/// Sits alongside [`GovernanceDecisionReceipt`] in ADR-0026 Layer 2: it
+/// records the *fact* of a state transition the runtime can attest to,
+/// keyed so a holder shell can locate it via the action card's `source_id`.
+///
+/// Equality is anchored to `record_hash`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ActionItemCompletionReceipt {
+    /// Action item id (string form of `ActionItemId`). This is the same
+    /// string the holder's `ActionCard.source_id` carries — it is the
+    /// link between the card and the receipt.
+    pub item_id: String,
+    /// Governance domain the action item lives under.
+    pub domain_id: String,
+    /// DID of the actor whose authorized completion call produced this
+    /// receipt (must be the action item's assignee or creator at call
+    /// time, per the handler's authorization check).
+    pub actor_did: String,
+    /// Transition this receipt records. Closed enum; see
+    /// [`ActionItemTransition`].
+    pub transition: ActionItemTransition,
+    /// Unix-seconds the transition was recorded (typically the
+    /// `updated_at` of the post-transition action item).
+    pub completed_at: u64,
+    /// blake3 canonical record hash binding the fields above.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for ActionItemCompletionReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for ActionItemCompletionReceipt {}
+
+impl ActionItemCompletionReceipt {
+    /// Domain separation tag for canonical action-item completion record
+    /// hashes. Distinct from the proposal-decision tag so a record can
+    /// never collide with a `GovernanceDecisionReceipt`.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:action_item_completion:v1";
+
+    /// Build a new receipt and compute its canonical `record_hash`.
+    pub fn new(
+        item_id: String,
+        domain_id: String,
+        actor_did: String,
+        transition: ActionItemTransition,
+        completed_at: u64,
+    ) -> Self {
+        let record_hash =
+            Self::compute_record_hash(&item_id, &domain_id, &actor_did, transition, completed_at);
+        Self {
+            item_id,
+            domain_id,
+            actor_did,
+            transition,
+            completed_at,
+            record_hash,
+        }
+    }
+
+    /// Compute the canonical record hash from the input fields. Inputs
+    /// are length-prefixed under the [`Self::DOMAIN_TAG`] so no two
+    /// distinct field bindings can produce the same hash.
+    pub fn compute_record_hash(
+        item_id: &str,
+        domain_id: &str,
+        actor_did: &str,
+        transition: ActionItemTransition,
+        completed_at: u64,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        // Use u64 length prefixes to match the canonical encoding used by
+        // `GovernanceProof::compute_proof_hash` and `compute_vote_hash`
+        // elsewhere in this module — keeps the hash binding consistent
+        // across receipt types and avoids any risk of u32 truncation.
+        for field in [item_id, domain_id, actor_did] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        let transition_byte: u8 = match transition {
+            ActionItemTransition::Completed => 0,
+        };
+        hasher.update(&[transition_byte]);
+        hasher.update(&completed_at.to_le_bytes());
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
