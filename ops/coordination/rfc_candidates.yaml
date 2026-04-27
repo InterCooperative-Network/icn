@@ -776,3 +776,74 @@ candidates:
       - "ADR for cooperative conversion support multi-stage flow"
       - "Issues for support-institution type definitions, service-agreement schema, receipt extension"
     priority: soon
+
+  - id: "0015"
+    title: "Public Surface and Learning Repo Architecture"
+    status: drafted
+    rfc_path: "docs/rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md"
+    domain: website
+    why_it_matters: |
+      ICN's public-facing identity is currently split across multiple
+      domains with overlapping or undefined roles
+      (intercooperative.network as canonical truth, icn.zone as utility
+      routing, plus future learn.icn.zone, cooperative-systems.org,
+      thesync.net, faherty.network). Without an explicit role
+      assignment, onboarding/curriculum content drifts onto the
+      canonical site and erodes ADR-0032's truth boundary; learning
+      material has no separate home; adjacent surfaces silently
+      compete for the ICN identity. The RFC names six domains, assigns
+      each a single role, and defines a future learning/onboarding
+      repo (deploying to learn.icn.zone) without creating it.
+    related_adr_candidates: ["0028", "0032", "0033", "0034"]
+    related_issues: []
+    related_docs:
+      - "docs/deployment/ICN_ZONE_ROUTING.md"
+      - "docs/design/ICN_DESIGN_SYSTEM.md"
+      - "docs/design/CONTENT_STYLE_GUIDE.md"
+      - "docs/design/ACCESSIBILITY_BASELINE.md"
+    related_future_repos:
+      - "InterCooperative-Network/icn-learn"
+    related_future_domains:
+      - "learn.icn.zone"
+      - "cooperative-systems.org"
+      - "thesync.net"
+      - "faherty.network"
+    design_questions:
+      - "Should the future learning repo and the canonical site share design tokens, or each keep an independent visual layer?"
+      - "Should learn.icn.zone present a role picker on first visit, or surface role paths through navigation?"
+      - "What is the canonical-truth deep-link convention from learning material to ICN ADRs and RFCs?"
+      - "Does cooperative-systems.org deserve its own RFC when it has content, or is it a reuse of this surface model?"
+      - "Does thesync.net need its own RFC, or is the surface model from this RFC sufficient when content is ready?"
+    icn_runtime_surface: "doctrinal — no kernel/runtime surface; downstream affects website source and deployment configuration"
+    package_or_institution_expression: |
+      Institution packages remain in their own repos. Public-facing
+      institution-package mentions stay off the canonical ICN site;
+      learning material may explain how packages work without naming
+      specific packages as canonical.
+    accessibility_implications: |
+      The future learn.icn.zone is the highest-leverage accessibility
+      surface in the ecosystem because it is where new contributors
+      meet ICN. It must inherit the accessibility baseline (ADR-0028,
+      docs/design/ACCESSIBILITY_BASELINE.md): WCAG 2.2 AA, plain
+      language, mobile-first, low-bandwidth, reduced motion,
+      multilingual support paths.
+    conflict_or_dispute_path: |
+      Surface-violation conflicts (curriculum on canonical site or
+      canonical truth on learning site) resolve through ADR-0032 /
+      ADR-0033 enforcement during PR review.
+    compute_or_automation_boundary: |
+      No runtime compute. Build pipelines must remain deterministic
+      and reproducible across surfaces.
+    website_truth_implication: |
+      intercooperative.network remains the only ADR-0032/ADR-0033 truth
+      surface. learn.icn.zone is not a truth surface; it teaches via
+      deep links to canonical material. icn.zone has no truth content.
+      Adjacent domains' truth posture is defined when they have content.
+    proposed_outputs:
+      - "Future PR creating InterCooperative-Network/icn-learn with README guardrail"
+      - "Future PR scaffolding learn.icn.zone static site"
+      - "Future PR adding role-based curriculum structure"
+      - "Future PR adding canonical-truth deep-link convention"
+      - "Future PR linking canonical site Get-Involved into learn.icn.zone once the site is live"
+      - "Possible small ADR recording cross-surface deployment / truth-boundary policy"
+    priority: soon
