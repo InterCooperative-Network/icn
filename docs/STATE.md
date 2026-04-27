@@ -6,6 +6,13 @@ Last Reviewed: 2026-04-27
 
 # ICN State (living doc)
 
+<!-- [sync edit] 2026-04-27 (post-#1663): Action-card runtime now has
+     proof-bearing receipt loops for all three currently emitted source
+     paths: proposal/vote (#1660), action_item/complete (#1661), and
+     meeting/attend (#1663). Issue #1646 remains open with two RFC-
+     gated paths still pending: signal_rule (gated on #1631) and
+     obligation_lifecycle (gated on #1634). Phase model unchanged. -->
+
 <!-- [sync edit] 2026-04-27: Append the action-card runtime sequence
      (/me/action-cards endpoint, proposal/vote receipt linkage,
      action_item completion receipt seam) landed via #1659/#1660/#1661.
@@ -26,12 +33,14 @@ Last Reviewed: 2026-04-27
 ## Current status (2026-04-27 snapshot)
 
 **Current phase:** Phase 2 — Pilot Launch (blocked on cooperative partners).
-Active execution: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote and `ActionItemCompletionReceipt` for action_item/complete). NYCN package side dogfoods these via the institution-package boundary. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
+Active execution: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). NYCN package side dogfoods these via the institution-package boundary. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
 
 ### Recently merged (since 2026-04-15)
 
 | PR | Title | Merged |
 |----|-------|--------|
+| #1663 | feat(governance): add meeting attendance receipts | 2026-04-27 |
+| #1662 | docs(state): record action-card runtime landing (#1659/#1660/#1661) | 2026-04-27 |
 | #1661 | feat(governance): add action item completion receipts | 2026-04-27 |
 | #1660 | feat(governance): connect action cards to receipts | 2026-04-27 |
 | #1659 | feat(gateway): add member action cards endpoint | 2026-04-27 |
@@ -85,13 +94,14 @@ Active execution: institutional-operability runtime (live charter activation, pe
 
 ### What landed since Phase 1 (Charter Engine)
 
-Action-card runtime (added 2026-04-27, partial — issue #1646 remains open):
+Action-card runtime (added 2026-04-27, all currently emitted source paths now proof-bearing — issue #1646 remains open for the two RFC-gated paths):
 - `GET /v1/gov/me/action-cards` member endpoint with closed source/action enums — #1659
 - Proposal/vote action card → `GovernanceDecisionReceipt` proof linkage, end-to-end test — #1660
 - `action_item`/`complete` source path emits append-only `ActionItemCompletionReceipt` (ADR-0026 Layer 2); persist-before-commit semantics; full-update handler routes status changes through receipt-bearing path — #1661
+- `meeting`/`attend` source path emits append-only `MeetingAttendanceReceipt` (ADR-0026 Layer 2) keyed by `(meeting_id, attendee_did)`; `Present` and `Remote` are receipt-bearing transitions, `Absent` is not; `recorded_by` is the authenticated caller (distinct from `attendee_did` for steward-recorded attendance); persist-before-commit semantics — #1663
 - Source paths currently emitted by `/me/action-cards`: `proposal`/`vote`, `meeting`/`attend`, `action_item`/`complete`
-- Proof loop verified end-to-end for `proposal`/`vote` and `action_item`/`complete`
-- Pending under #1646: `meeting`/`attend` receipt seam; `signal_rule` source path (gated on #1631); `obligation_lifecycle` source path (gated on #1634)
+- **Proof loop verified end-to-end for all three currently emitted source paths.**
+- Pending under #1646 (RFC-gated): `signal_rule` source path (gated on #1631); `obligation_lifecycle` source path (gated on #1634)
 
 Institutional-operability runtime (added 2026-04-22 → 2026-04-26):
 - Generic institution bootstrap package path — #1586
