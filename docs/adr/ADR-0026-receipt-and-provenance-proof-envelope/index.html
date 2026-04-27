@@ -90,7 +90,7 @@ references:</p>
 <ul>
 <li><strong>Immutable.</strong> Once a layer&#39;s record is signed and persisted, it is not edited. Reversal is a counter-record, not a mutation.</li>
 <li><strong>Re-verifiable.</strong> Anyone with the public keys can verify the signature chain. Vote sets are merkle-rooted; proof hashes bind the set.</li>
-<li><strong>Holder-queryable.</strong> A holder DID can discover its relevant governance artifacts via <code>/me/standing</code> plus <code>/me/action-cards</code>; today <code>/me/action-cards</code> is the discovery / index surface, exposing <code>source_id</code> (<code>proposal_id</code>) for the <code>proposal</code>/<code>vote</code> path. The actual proof / provenance retrieval surface for that path is the proposal-scoped endpoints — <code>GET /v1/gov/proposals/{proposal_id}/proof</code> and <code>/chain</code> — and the persisted Layer 2 <code>GovernanceDecisionReceipt</code>. Full holder-oriented receipt query remains future work in Layer 4.</li>
+<li><strong>Holder-queryable.</strong> A holder DID can discover its relevant governance artifacts via <code>/me/standing</code> plus <code>/me/action-cards</code>; today <code>/me/action-cards</code> is the discovery / index surface, exposing <code>source_id</code> for two source paths: <code>proposal_id</code> for the <code>proposal</code>/<code>vote</code> path (retrievable via the persisted Layer 2 <code>GovernanceDecisionReceipt</code> and the proposal-scoped endpoints <code>GET /v1/gov/proposals/{proposal_id}/proof</code> and <code>/chain</code>) and <code>item_id</code> for the <code>action_item</code>/<code>complete</code> path (retrievable via the persisted Layer 2 <code>ActionItemCompletionReceipt</code> keyed by <code>item_id</code>). Full holder-oriented receipt query — including a generic <code>GET /me/receipts</code> index — remains future work in Layer 4.</li>
 <li><strong>Cross-coop verifiable.</strong> A federated peer can, in principle, verify a <code>FederationProvenance</code> chain. The query surface (Layer 4) is what is missing for &quot;in practice.&quot;</li>
 </ul>
 <h2>Consequences</h2>
@@ -118,7 +118,7 @@ references:</p>
 <tr>
 <td>2 — ArtifactReceipt</td>
 <td>implemented</td>
-<td>Gateway receipt store; ADR-0020 chain. End-to-end action-card linkage verified for <code>proposal</code>/<code>vote</code> at <code>icn/apps/governance/tests/me_action_card_receipt_chain.rs</code>.</td>
+<td>Gateway receipt store; ADR-0020 chain. End-to-end action-card linkage verified for <code>proposal</code>/<code>vote</code> (<code>GovernanceDecisionReceipt</code> keyed by <code>proposal_id</code>) at <code>icn/apps/governance/tests/me_action_card_receipt_chain.rs</code> and for <code>action_item</code>/<code>complete</code> (<code>ActionItemCompletionReceipt</code> keyed by <code>item_id</code>) at <code>icn/apps/governance/tests/me_action_item_receipt_chain.rs</code>. The <code>ActionItemCompletionReceipt</code> envelope (<code>icn/crates/icn-governance/src/proof.rs</code>) carries <code>item_id</code>, <code>domain_id</code>, <code>actor_did</code>, a closed <code>transition</code> taxonomy (<code>Completed</code> only today), <code>completed_at</code>, and a canonical <code>record_hash</code> under domain-tag <code>icn:gov:action_item_completion:v1</code>.</td>
 </tr>
 <tr>
 <td>3 — FederationProvenance</td>
