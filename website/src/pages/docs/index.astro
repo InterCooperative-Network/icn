@@ -175,7 +175,7 @@ const allDocs = sections.flatMap(s => s.docs);
 
         <ol class="docs-pathways-grid">
           <li class="docs-pathway">
-            <span class="docs-pathway-num">01</span>
+            <span class="docs-pathway-num" aria-hidden="true">01</span>
             <h3>Understand the project</h3>
             <p>What ICN is, what problem it addresses, and how the closure loop holds the institution together.</p>
             <ul>
@@ -187,7 +187,7 @@ const allDocs = sections.flatMap(s => s.docs);
           </li>
 
           <li class="docs-pathway">
-            <span class="docs-pathway-num">02</span>
+            <span class="docs-pathway-num" aria-hidden="true">02</span>
             <h3>Build or contribute</h3>
             <p>Get the workspace running and find a contribution path that matches the repo as it actually exists.</p>
             <ul>
@@ -199,29 +199,29 @@ const allDocs = sections.flatMap(s => s.docs);
           </li>
 
           <li class="docs-pathway">
-            <span class="docs-pathway-num">03</span>
+            <span class="docs-pathway-num" aria-hidden="true">03</span>
             <h3>Run infrastructure</h3>
             <p>Deployment routing, K3s, and the public domain map for nodes, gateways, and short links.</p>
             <ul>
               <li><a href="/docs/deployment/ICN_ZONE_ROUTING">icn.zone routing plan</a></li>
               <li><a href="/docs/deployment/DEPLOYMENT_GUIDE">Deployment guide</a></li>
-              <li><a href="/docs/HOMELAB_DEPLOYMENT">Homelab deployment</a></li>
+              <li><a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">Homelab deployment</a></li>
             </ul>
           </li>
 
           <li class="docs-pathway">
-            <span class="docs-pathway-num">04</span>
+            <span class="docs-pathway-num" aria-hidden="true">04</span>
             <h3>Understand governance</h3>
             <p>How proposals, decisions, mandates, and the kernel-app boundary actually work in ICN.</p>
             <ul>
               <li><a href="/docs/architecture/GOVERNANCE_STATE_MACHINE">Governance state machine</a></li>
               <li><a href="/docs/architecture/KERNEL_APP_SEPARATION">Kernel / app separation</a></li>
-              <li><a href="/docs/adr">ADR index</a></li>
+              <li><a href="/docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index">ADR-0018 — ADR lifecycle and canonical decision index</a></li>
             </ul>
           </li>
 
           <li class="docs-pathway">
-            <span class="docs-pathway-num">05</span>
+            <span class="docs-pathway-num" aria-hidden="true">05</span>
             <h3>Understand economics and resource governance</h3>
             <p>The vocabulary discipline (obligation / allocation / settlement) and the draft RFC that frames external bridge institutions.</p>
             <ul>
@@ -232,7 +232,7 @@ const allDocs = sections.flatMap(s => s.docs);
           </li>
 
           <li class="docs-pathway">
-            <span class="docs-pathway-num">06</span>
+            <span class="docs-pathway-num" aria-hidden="true">06</span>
             <h3>Understand federation</h3>
             <p>How distinct cooperatives coordinate without merger — treaties, attestations, and cross-institutional clearing.</p>
             <ul>
@@ -243,7 +243,7 @@ const allDocs = sections.flatMap(s => s.docs);
           </li>
 
           <li class="docs-pathway">
-            <span class="docs-pathway-num">07</span>
+            <span class="docs-pathway-num" aria-hidden="true">07</span>
             <h3>Understand design and accessibility</h3>
             <p>The cross-surface design system, content style discipline, and accessibility floor for member-facing surfaces.</p>
             <ul>
@@ -255,7 +255,7 @@ const allDocs = sections.flatMap(s => s.docs);
           </li>
 
           <li class="docs-pathway">
-            <span class="docs-pathway-num">08</span>
+            <span class="docs-pathway-num" aria-hidden="true">08</span>
             <h3>Check current project state</h3>
             <p>Honest, dated maturity. Read this before treating any subsystem as production-ready.</p>
             <ul>
@@ -485,11 +485,12 @@ const allDocs = sections.flatMap(s => s.docs);
     display: block;
     padding: 0.25rem 0;
     font-size: 0.875rem;
-    color: var(--text-body);
-    border-bottom: 1px solid transparent;
+    color: var(--accent-teal);
+    border-bottom: 1px solid var(--border-subtle);
     transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
   }
-  .docs-pathway li a:hover {
+  .docs-pathway li a:hover,
+  .docs-pathway li a:focus-visible {
     color: var(--accent-teal);
     border-bottom-color: var(--accent-teal);
   }
