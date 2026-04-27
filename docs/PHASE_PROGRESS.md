@@ -1,6 +1,15 @@
 # ICN Phase Progress
-**Last Updated:** 2026-04-26
-**Current Phase:** Phase 2 — Pilot Launch (still blocked on cooperative partners; institutional-operability infrastructure for pilot enablement is now in place)
+**Last Updated:** 2026-04-27
+**Current Phase:** Phase 2 — Pilot Launch (still blocked on cooperative partners; institutional-operability infrastructure and partial action-card runtime are now in place)
+
+<!-- [sync edit] 2026-04-27: Phase 2 status unchanged (still blocked on
+     cooperative partners). Phase 2 deliverables list extended to record
+     the action-card runtime that landed 2026-04-27 (#1659/#1660/#1661):
+     /me/action-cards endpoint, proposal/vote receipt proof loop verified,
+     action_item/complete receipt proof loop verified. Issue #1646 remains
+     open; meeting/attend, signal_rule, and obligation_lifecycle source
+     paths remain pending. These do not flip Phase 2 to ✅ on their own —
+     that gate is partner-bound. -->
 
 <!-- [sync edit] 2026-04-26: Phase 2 status unchanged (still blocked on
      cooperative partners). Phase 2 deliverables list extended to record
@@ -125,6 +134,10 @@
 - [x] Generic institution bootstrap package path (#1586)
 - [x] Bootstrap-apply 409 idempotency (#1617) — re-running bootstrap is safe
 - [x] NYCN bootstrap apply integration tests + live-validate runbook (#1592, #1593)
+- [x] `GET /v1/gov/me/action-cards` member endpoint with closed source/action enums (#1659)
+- [x] Action card → `GovernanceDecisionReceipt` proof linkage for proposal/vote (#1660) — proof loop verified
+- [x] `action_item`/`complete` source path emits append-only `ActionItemCompletionReceipt` (#1661) — proof loop verified
+- [ ] Action-card runtime — remaining gates under #1646: `meeting`/`attend` receipt seam; `signal_rule` source path (gated on #1631); `obligation_lifecycle` source path (gated on #1634)
 - [ ] One-command deployment script per cooperative
 - [ ] Charter customization workflow documented (charter activation endpoint exists; non-technical workflow doc still missing)
 - [ ] Pilot onboarding guide (non-technical audience)
@@ -138,6 +151,7 @@
 - Requires cooperative partners identified and committed (primary blocker)
 
 **Decisions Made:**
+- (2026-04-27) Action-card runtime is partial: `/me/action-cards` exists, `proposal`/`vote` and `action_item`/`complete` source paths have verified end-to-end receipt proof loops, and `meeting`/`attend`, `signal_rule`, `obligation_lifecycle` paths remain pending under #1646. Phase 2 status is unaffected.
 - (2026-04-26) Pilot enablement infrastructure (bootstrap, charter activation, role binding, standing) is in place; Phase 2 remains ⏳ until partners run it for real.
 
 ---
