@@ -4859,17 +4859,17 @@ impl GovernanceManager {
             .ok_or_else(|| anyhow::anyhow!("Action item not found: {id}"))?;
 
         let was_completed = matches!(item.status, ActionItemStatus::Completed);
+        let now = icn_time::current_timestamp_secs();
 
-        item.status = status;
-        item.updated_at = icn_time::current_timestamp_secs();
-
-        self.action_items
-            .save(&item)
-            .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
-
-        // Emit an ADR-0026 Layer 2 ActionItemCompletionReceipt on the
-        // first transition into Completed. Subsequent re-saves with
-        // status=Completed are idempotent and do not re-emit.
+        // On the first transition into Completed (was_completed: false →
+        // status: Completed), persist the ADR-0026 Layer 2 receipt
+        // BEFORE committing the status change. If the backend rejects
+        // the receipt, the status save does not run — the holder's
+        // standing never advertises a completion that has no provenance.
+        // This makes `receipt_expected: true` honest under storage-fault
+        // conditions; the alternative of "log and continue" can drop
+        // receipts permanently because the `was_completed` guard skips
+        // re-emission on subsequent re-saves.
         if matches!(status, ActionItemStatus::Completed) && !was_completed {
             if let Some(ref store) = self.receipt_store {
                 let receipt = icn_governance::ActionItemCompletionReceipt::new(
@@ -4877,22 +4877,22 @@ impl GovernanceManager {
                     item.domain_id.0.clone(),
                     actor.to_string(),
                     icn_governance::ActionItemTransition::Completed,
-                    item.updated_at,
+                    now,
                 );
-                if let Err(e) = store.put_action_item_completion(&receipt) {
-                    // Log but do not fail the status update — completion is
-                    // the primary write; receipt persistence is the
-                    // provenance trail. A backend that does not implement
-                    // put_action_item_completion is expected to no-op.
-                    tracing::warn!(
-                        item_id = %item.id,
-                        actor = %actor,
-                        error = %e,
-                        "Failed to persist action item completion receipt"
-                    );
-                }
+                store.put_action_item_completion(&receipt).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to persist action item completion receipt for {id}: {e}"
+                    )
+                })?;
             }
         }
+
+        item.status = status;
+        item.updated_at = now;
+
+        self.action_items
+            .save(&item)
+            .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
 
         Ok(item)
     }

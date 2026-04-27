@@ -573,8 +573,12 @@ impl ActionItemCompletionReceipt {
     ) -> Hash {
         let mut hasher = blake3::Hasher::new();
         hasher.update(Self::DOMAIN_TAG);
+        // Use u64 length prefixes to match the canonical encoding used by
+        // `GovernanceProof::compute_proof_hash` and `compute_vote_hash`
+        // elsewhere in this module — keeps the hash binding consistent
+        // across receipt types and avoids any risk of u32 truncation.
         for field in [item_id, domain_id, actor_did] {
-            hasher.update(&(field.len() as u32).to_le_bytes());
+            hasher.update(&(field.len() as u64).to_le_bytes());
             hasher.update(field.as_bytes());
         }
         let transition_byte: u8 = match transition {

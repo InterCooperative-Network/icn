@@ -341,6 +341,11 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// item id (string form of `ActionItemId`), or `None` when no
     /// completion has been recorded.
     ///
+    /// Backends that store multiple receipts per item (e.g. for a
+    /// reopen/re-complete cycle that produces an append-only chain of
+    /// completions) must return the receipt with the largest
+    /// `completed_at`.
+    ///
     /// Default impl returns `Ok(None)` so backends that do not implement
     /// completion-receipt storage are indistinguishable from "no
     /// completion recorded". Callers that need to assert a receipt
@@ -350,5 +355,23 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         _item_id: &str,
     ) -> Result<Option<ActionItemCompletionReceipt>, String> {
         Ok(None)
+    }
+
+    /// List **all** [`ActionItemCompletionReceipt`]s ever persisted for an
+    /// action item id, oldest-first by `completed_at`.
+    ///
+    /// The append-only contract: a reopen/re-complete cycle on the same
+    /// item produces a new receipt; previous receipts are not
+    /// overwritten. This method exposes the full chain so audits can see
+    /// every completion event for the item.
+    ///
+    /// Default impl returns an empty vector. Backends that override
+    /// [`Self::put_action_item_completion`] should also override this
+    /// method to keep the audit chain readable.
+    fn list_action_item_completions_by_item(
+        &self,
+        _item_id: &str,
+    ) -> Result<Vec<ActionItemCompletionReceipt>, String> {
+        Ok(vec![])
     }
 }

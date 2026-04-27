@@ -31,6 +31,15 @@
 //! 6. A different DID does not see another holder's action-item card or
 //!    receive a card pointing at their item, regardless of the
 //!    receipt's existence in the shared store.
+//! 7. The full-update handler (`update_action_item`) routes status
+//!    changes through `update_action_item_status` so a `status=Completed`
+//!    full update cannot bypass receipt emission.
+//! 8. A receipt backend that rejects `put_action_item_completion`
+//!    aborts the status transition — the item does not silently
+//!    commit `Completed` without provenance.
+//! 9. A reopen / re-complete cycle (Completed → Open → Completed)
+//!    preserves the prior completion receipt and adds a new one;
+//!    the audit chain is append-only.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -144,13 +153,27 @@ impl GovernanceReceiptBackend for TestReceiptStore {
         &self,
         item_id: &str,
     ) -> Result<Option<ActionItemCompletionReceipt>, String> {
+        // Latest = receipt with the largest `completed_at`.
         Ok(self
+            .list_action_item_completions_by_item(item_id)?
+            .into_iter()
+            .next_back())
+    }
+
+    fn list_action_item_completions_by_item(
+        &self,
+        item_id: &str,
+    ) -> Result<Vec<ActionItemCompletionReceipt>, String> {
+        let mut hits: Vec<ActionItemCompletionReceipt> = self
             .action_item_completions
             .lock()
             .unwrap()
             .iter()
-            .find(|r| r.item_id == item_id)
-            .cloned())
+            .filter(|r| r.item_id == item_id)
+            .cloned()
+            .collect();
+        hits.sort_by_key(|r| r.completed_at);
+        Ok(hits)
     }
 }
 
@@ -162,6 +185,41 @@ impl TestReceiptStore {
             .iter()
             .filter(|r| r.item_id == item_id)
             .count()
+    }
+}
+
+/// A backend whose `put_action_item_completion` always rejects, used to
+/// prove the manager's "persist before commit" guarantee.
+#[derive(Default)]
+struct FailingCompletionStore;
+
+impl GovernanceReceiptBackend for FailingCompletionStore {
+    fn put_governance(&self, _r: &GovernanceDecisionReceipt) -> Result<(), String> {
+        Ok(())
+    }
+    fn get_governance_by_proposal(
+        &self,
+        _p: &str,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn put_allocation(&self, _r: &AllocationReceipt) -> Result<Hash, String> {
+        Ok([0u8; 32])
+    }
+    fn get_governance_by_decision(
+        &self,
+        _h: &Hash,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn list_allocations_by_decision(&self, _h: &Hash) -> Result<Vec<AllocationReceipt>, String> {
+        Ok(vec![])
+    }
+    fn put_action_item_completion(
+        &self,
+        _receipt: &ActionItemCompletionReceipt,
+    ) -> Result<(), String> {
+        Err("simulated receipt backend failure".to_string())
     }
 }
 
@@ -441,4 +499,240 @@ async fn completion_receipt_uses_regulatory_safe_vocabulary() {
             "ActionItemCompletionReceipt must not contain forbidden term '{forbidden}': {serialized}"
         );
     }
+}
+
+#[actix_web::test]
+async fn full_update_to_completed_emits_completion_receipt() {
+    // Pins that the full-update handler does NOT bypass the receipt path:
+    // a request that sets status=Completed via PUT
+    // /v1/gov/domains/{domain_id}/action-items/{item_id} routes through
+    // update_action_item_status and persists a receipt.
+    use actix_web::http::StatusCode;
+    use serde_json::json;
+
+    let h = make_harness();
+    let caller = fresh_did();
+    let domain = seed_domain_with_member(&h.ctx.manager, &caller, "test-coop").await;
+
+    let item = h
+        .ctx
+        .manager
+        .create_action_item(
+            domain.clone(),
+            "Full-update completion (fictional)".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec!["fictional".to_string()],
+        )
+        .expect("create_action_item");
+    let item_id_str = item.id.to_string();
+
+    // Build a write-scoped app — the full-update endpoint requires
+    // governance:write, unlike the read-only `/me/action-cards` macro.
+    let caller_str = caller.to_string();
+    let ctx_clone = h.ctx.clone();
+    let app = test::init_service(
+        App::new()
+            .wrap_fn(move |req, srv| {
+                req.extensions_mut().insert(BasicClaims {
+                    sub: caller_str.clone(),
+                    scope: Some("governance:write governance:read".to_string()),
+                });
+                srv.call(req)
+            })
+            .configure(|cfg| http::configure(cfg, ctx_clone)),
+    )
+    .await;
+
+    let body = json!({ "status": "completed" });
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/domains/{}/action-items/{}",
+            domain.0, item_id_str
+        ))
+        .set_json(&body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "full-update to status=completed should succeed"
+    );
+
+    // The full-update handler must have routed through
+    // update_action_item_status, so a completion receipt must exist.
+    let receipt = h
+        .receipts
+        .get_action_item_completion_by_item(&item_id_str)
+        .unwrap();
+    assert!(
+        receipt.is_some(),
+        "full-update setting status=completed must emit a completion receipt — \
+         it must not bypass the receipt-bearing status path"
+    );
+    let r = receipt.unwrap();
+    assert_eq!(r.item_id, item_id_str);
+    assert_eq!(r.actor_did, caller.to_string());
+    assert_eq!(r.transition, ActionItemTransition::Completed);
+}
+
+#[actix_web::test]
+async fn receipt_backend_failure_prevents_completed_status_commit() {
+    // Pins the manager's "persist before commit" guarantee: when the
+    // receipt backend rejects put_action_item_completion, the action
+    // item save does NOT run — the item must not silently advance into
+    // Completed without provenance.
+    let receipts = Arc::new(FailingCompletionStore);
+    let manager = GovernanceManager::new()
+        .with_receipt_store(receipts.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let manager = Arc::new(manager);
+
+    let caller = fresh_did();
+    let domain = GovernanceDomainId::new("test-coop");
+    manager
+        .create_domain(
+            domain.clone(),
+            "Test Coop".to_string(),
+            "default".to_string(),
+            GovernanceParams {
+                quorum_percentage: 1,
+                approval_threshold_percentage: 51,
+                voting_period_seconds: 86_400,
+                require_deliberation: false,
+                ..GovernanceParams::default()
+            },
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![caller.clone()]),
+            },
+        )
+        .await
+        .expect("create_domain");
+
+    let item = manager
+        .create_action_item(
+            domain.clone(),
+            "Will fail to complete (fictional)".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec!["fictional".to_string()],
+        )
+        .expect("create_action_item");
+    let prior_status = item.status;
+
+    let result =
+        manager.update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller);
+    assert!(
+        result.is_err(),
+        "completion must fail when the receipt backend rejects the receipt"
+    );
+
+    // The item's stored state must not have advanced into Completed —
+    // the receipt store's rejection is an abort, not a warning.
+    let after = manager
+        .get_action_item(&domain, &item.id)
+        .expect("get_action_item")
+        .expect("item still present");
+    assert_eq!(
+        after.status, prior_status,
+        "status must not commit Completed when receipt persistence failed"
+    );
+}
+
+#[actix_web::test]
+async fn reopen_and_recomplete_preserves_completion_history() {
+    // Pins the append-only contract: a Completed → Open → Completed
+    // cycle on the same item must produce two distinct receipts; the
+    // first must not be overwritten.
+    let h = make_harness();
+    let caller = fresh_did();
+    let domain = seed_domain_with_member(&h.ctx.manager, &caller, "test-coop").await;
+
+    let item = h
+        .ctx
+        .manager
+        .create_action_item(
+            domain.clone(),
+            "Reopenable task (fictional)".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec!["fictional".to_string()],
+        )
+        .expect("create_action_item");
+    let item_id_str = item.id.to_string();
+
+    // First completion.
+    h.ctx
+        .manager
+        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .expect("first complete");
+    let first_receipt = h
+        .receipts
+        .get_action_item_completion_by_item(&item_id_str)
+        .unwrap()
+        .expect("first receipt");
+
+    // Sleep enough that `completed_at` (Unix-seconds) advances when we
+    // re-complete, so the two receipts are distinct on
+    // (item_id, completed_at) and produce distinct record_hashes. The
+    // canonical hash is over (item_id, domain_id, actor_did,
+    // transition, completed_at), so a strict +1s wall-clock advance is
+    // sufficient.
+    std::thread::sleep(std::time::Duration::from_millis(1_100));
+
+    // Reopen.
+    h.ctx
+        .manager
+        .update_action_item_status(&domain, &item.id, ActionItemStatus::InProgress, &caller)
+        .expect("reopen via InProgress");
+
+    // Second completion.
+    h.ctx
+        .manager
+        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .expect("second complete");
+
+    let chain = h
+        .receipts
+        .list_action_item_completions_by_item(&item_id_str)
+        .unwrap();
+    assert_eq!(
+        chain.len(),
+        2,
+        "reopen / re-complete cycle must produce two completion receipts; the chain is append-only"
+    );
+    assert_eq!(
+        chain[0].record_hash, first_receipt.record_hash,
+        "first receipt in the chain must be the original (oldest-first ordering)"
+    );
+    assert!(
+        chain[0].completed_at < chain[1].completed_at,
+        "second receipt's completed_at must be strictly later"
+    );
+    assert_ne!(
+        chain[0].record_hash, chain[1].record_hash,
+        "the two receipts must have distinct record_hashes — append-only history"
+    );
+
+    // The "latest" lookup returns the most recent.
+    let latest = h
+        .receipts
+        .get_action_item_completion_by_item(&item_id_str)
+        .unwrap()
+        .expect("latest receipt");
+    assert_eq!(latest.record_hash, chain[1].record_hash);
 }

@@ -30,11 +30,19 @@ const INTENT_PREFIX: &[u8] = b"receipt:intent:";
 const DECISION_INDEX_PREFIX: &[u8] = b"receipt:by_decision:";
 /// Index prefix for proposal ID lookups (governance receipts only)
 const PROPOSAL_INDEX_PREFIX: &[u8] = b"receipt:by_proposal:";
-/// Key prefix for action-item completion receipts (primary by item_id).
-///
-/// One receipt per item_id; the runtime emits at most one receipt per
-/// transition into `Completed` (idempotent re-write on the same item_id).
-const ACTION_ITEM_COMPLETION_PREFIX: &[u8] = b"receipt:action_item_completion:";
+/// Primary key prefix for action-item completion receipts, keyed by the
+/// receipt's canonical `record_hash`. Append-only: a reopen/re-complete
+/// cycle on the same `item_id` produces a distinct `record_hash` (because
+/// `completed_at` advances) and thus a distinct primary record. The
+/// previous receipt is preserved.
+const ACTION_ITEM_COMPLETION_REC_PREFIX: &[u8] = b"receipt:action_item_completion:rec:";
+/// Secondary index prefix for action-item completion receipts, keyed
+/// by `item_id` and ordered by `completed_at` so the audit chain reads
+/// oldest-first under `scan_prefix`. Layout per entry:
+///   `<prefix><u64 BE item_id_len><item_id bytes><u64 BE completed_at><32-byte record_hash>`
+/// Distinct from the primary prefix's tail (`rec:`) so blake3 record
+/// hashes cannot alias the by-item index range.
+const ACTION_ITEM_COMPLETION_BY_ITEM_PREFIX: &[u8] = b"receipt:action_item_completion:by_item:";
 /// Key prefix for institutional effect records (primary by record_id)
 const INSTITUTIONAL_EFFECT_PREFIX: &[u8] = b"effect:institutional:";
 /// Secondary index: effect records by proposal_id (sortable by recorded_at)
@@ -1558,16 +1566,34 @@ impl GovernanceReceiptBackend for ReceiptStore {
         &self,
         receipt: &ActionItemCompletionReceipt,
     ) -> Result<(), String> {
-        let mut key = ACTION_ITEM_COMPLETION_PREFIX.to_vec();
-        key.extend_from_slice(receipt.item_id.as_bytes());
+        // Primary record by record_hash. Two receipts with identical
+        // content collapse to one (idempotent), but any change in
+        // actor/completed_at/transition produces a distinct hash and a
+        // distinct record — append-only history is preserved.
+        let mut primary_key = ACTION_ITEM_COMPLETION_REC_PREFIX.to_vec();
+        primary_key.extend_from_slice(&receipt.record_hash);
         let value = serde_json::to_vec(receipt)
             .map_err(|e| format!("serialize action item completion receipt: {e}"))?;
         self.db
-            .insert(&key, value)
-            .map_err(|e| format!("sled put_action_item_completion: {e}"))?;
+            .insert(&primary_key, value)
+            .map_err(|e| format!("sled put_action_item_completion primary: {e}"))?;
+
+        // Secondary index by_item, ordered by completed_at for chain
+        // reads. Empty value — the index points at the record via the
+        // record_hash suffix in the key.
+        let mut idx_key = ACTION_ITEM_COMPLETION_BY_ITEM_PREFIX.to_vec();
+        idx_key.extend_from_slice(&(receipt.item_id.len() as u64).to_be_bytes());
+        idx_key.extend_from_slice(receipt.item_id.as_bytes());
+        idx_key.extend_from_slice(&receipt.completed_at.to_be_bytes());
+        idx_key.extend_from_slice(&receipt.record_hash);
         self.db
-            .flush()
-            .map_err(|e| format!("sled flush after put_action_item_completion: {e}"))?;
+            .insert(&idx_key, b"")
+            .map_err(|e| format!("sled put_action_item_completion by_item: {e}"))?;
+
+        // Note: no per-write `db.flush()`. Other receipt writes in this
+        // store (`put_governance`, `put_allocation`, …) rely on sled's
+        // normal durability semantics; this path follows the same
+        // pattern.
         Ok(())
     }
 
@@ -1575,20 +1601,46 @@ impl GovernanceReceiptBackend for ReceiptStore {
         &self,
         item_id: &str,
     ) -> Result<Option<ActionItemCompletionReceipt>, String> {
-        let mut key = ACTION_ITEM_COMPLETION_PREFIX.to_vec();
-        key.extend_from_slice(item_id.as_bytes());
-        let raw = self
-            .db
-            .get(&key)
-            .map_err(|e| format!("sled get_action_item_completion: {e}"))?;
-        match raw {
-            Some(bytes) => {
+        // Latest = receipt with the largest `completed_at`. Because the
+        // by_item index orders entries by `completed_at` ascending under
+        // a fixed item-id prefix, the latest is the last hit.
+        Ok(self
+            .list_action_item_completions_by_item(item_id)?
+            .into_iter()
+            .next_back())
+    }
+
+    fn list_action_item_completions_by_item(
+        &self,
+        item_id: &str,
+    ) -> Result<Vec<ActionItemCompletionReceipt>, String> {
+        let mut prefix = ACTION_ITEM_COMPLETION_BY_ITEM_PREFIX.to_vec();
+        prefix.extend_from_slice(&(item_id.len() as u64).to_be_bytes());
+        prefix.extend_from_slice(item_id.as_bytes());
+
+        let mut out = Vec::new();
+        for entry in self.db.scan_prefix(&prefix) {
+            let (key, _) = entry.map_err(|e| {
+                format!("sled scan_prefix list_action_item_completions_by_item: {e}")
+            })?;
+            // Tail of the key is the 32-byte record_hash.
+            if key.len() < 32 {
+                continue;
+            }
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&key[key.len() - 32..]);
+            let mut primary_key = ACTION_ITEM_COMPLETION_REC_PREFIX.to_vec();
+            primary_key.extend_from_slice(&hash);
+            let raw = self.db.get(&primary_key).map_err(|e| {
+                format!("sled get list_action_item_completions_by_item primary: {e}")
+            })?;
+            if let Some(bytes) = raw {
                 let r: ActionItemCompletionReceipt = serde_json::from_slice(&bytes)
                     .map_err(|e| format!("deserialize action item completion receipt: {e}"))?;
-                Ok(Some(r))
+                out.push(r);
             }
-            None => Ok(None),
         }
+        Ok(out)
     }
 }
 

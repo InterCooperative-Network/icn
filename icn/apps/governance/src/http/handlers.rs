@@ -2664,7 +2664,16 @@ pub async fn update_action_item<E: GovernanceEventEmitter + Clone + 'static>(
         ));
     }
 
-    // Validate
+    // Parse the requested status (if any) BEFORE mutating anything else,
+    // so a status string error rejects the request cleanly.
+    let requested_status = if let Some(ref s) = req.status {
+        Some(parse_status(s)?)
+    } else {
+        None
+    };
+    let prior_status = item.status;
+
+    // Validate + apply non-status fields.
     if let Some(ref title) = req.title {
         val::validate_action_item_title(title)?;
         item.title = title.clone();
@@ -2687,13 +2696,11 @@ pub async fn update_action_item<E: GovernanceEventEmitter + Clone + 'static>(
     if let Some(ref priority) = req.priority {
         item.priority = parse_priority(priority)?;
     }
-    if let Some(ref status) = req.status {
-        item.status = parse_status(status)?;
-    }
     if let Some(ref tags) = req.tags {
         val::validate_tags(tags)?;
         item.tags = tags.clone();
     }
+    // Note: status is intentionally NOT applied here — see below.
 
     item.updated_at = current_time_secs();
 
@@ -2701,7 +2708,25 @@ pub async fn update_action_item<E: GovernanceEventEmitter + Clone + 'static>(
         .update_action_item(&item)
         .map_err(anyhow_to_api)?;
 
-    Ok(HttpResponse::Ok().json(action_item_to_response(&item)))
+    // If the caller requested a status change, route it through the same
+    // receipt-emitting path the dedicated `/status` endpoint uses. This
+    // closes the bypass: a full-update setting status=Completed cannot
+    // commit without producing the ADR-0026 Layer 2
+    // ActionItemCompletionReceipt that the action card's
+    // `receipt_expected: true` advertises.
+    let final_item = if let Some(new_status) = requested_status {
+        if new_status != prior_status {
+            ctx.manager
+                .update_action_item_status(&domain, &id, new_status, &user_did)
+                .map_err(anyhow_to_api)?
+        } else {
+            item
+        }
+    } else {
+        item
+    };
+
+    Ok(HttpResponse::Ok().json(action_item_to_response(&final_item)))
 }
 
 /// DELETE /gov/domains/{domain_id}/action-items/{item_id} — Delete an action item.
