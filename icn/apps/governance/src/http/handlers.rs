@@ -5042,6 +5042,152 @@ pub async fn get_my_work<E: GovernanceEventEmitter + Clone + 'static>(
     Ok(HttpResponse::Ok().json(responses))
 }
 
+/// GET /gov/me/action-cards — Return pending action cards for the caller.
+///
+/// Action cards are derived views — computed at request time from the caller's
+/// `/me/standing` inputs plus open governance state. There is no mutation API;
+/// the card carries a `source_id` and the holder acts on the underlying
+/// object. See ADR-0027.
+///
+/// ## Sources currently emitted
+///
+/// - `proposal` / `vote` — Open proposals in domains where the caller has
+///   voting standing and has not yet voted.
+/// - `meeting` / `attend` — Meetings scheduled in the next 48 h where the
+///   caller is on the attendee list.
+/// - `action_item` / `complete` — Open action items assigned to the caller.
+///
+/// ## Sources reserved (not emitted today)
+///
+/// - `signal_rule` — pending icn#1631
+/// - `obligation_lifecycle` — pending icn#1634
+///
+/// Per ADR-0027 the taxonomy is closed; new variants land alongside their
+/// source-path implementation.
+///
+/// ## Self-only
+///
+/// There is no `did` query parameter. The caller's DID is always derived from
+/// the authenticated claims; no card-set for a third party is reachable here.
+pub async fn get_my_action_cards<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let caller = parse_did(&claims.sub, "Invalid DID in token")?;
+    let now = current_time_secs();
+
+    let mut cards: Vec<ActionCard> = Vec::new();
+
+    // 1. Pending votes + upcoming meetings come from the existing digest
+    //    pipeline. That pipeline already enforces "open proposal the caller
+    //    has not yet voted on" and "meeting in the next 48 h where caller is
+    //    on the attendee list" — exactly the membership/authority checks this
+    //    surface needs.
+    let digest = ctx.manager.generate_digest(&caller, now).await;
+
+    for v in digest.pending_votes {
+        cards.push(ActionCard {
+            id: format!("card-proposal-{}-vote", v.proposal_id),
+            source_kind: ActionCardSourceKind::Proposal,
+            action_kind: ActionCardActionKind::Vote,
+            scope: ActionCardScope::Entity,
+            title: format!("Vote on proposal: {}", v.title),
+            summary:
+                "An open proposal awaits your vote in a domain where you have voting standing."
+                    .to_string(),
+            authority_basis: "domain_membership".to_string(),
+            required_authority_scope: vec![format!("vote_in:{}", v.domain_id)],
+            deadline: v.closes_at,
+            risk_level: ActionCardRiskLevel::Normal,
+            accessibility_hint:
+                "Plain-language proposal summary available; alternate formats on request."
+                    .to_string(),
+            receipt_expected: true,
+            source_id: v.proposal_id,
+            domain_id: Some(v.domain_id),
+        });
+    }
+
+    for m in digest.upcoming_meetings {
+        cards.push(ActionCard {
+            id: format!("card-meeting-{}-attend", m.meeting_id),
+            source_kind: ActionCardSourceKind::Meeting,
+            action_kind: ActionCardActionKind::Attend,
+            scope: ActionCardScope::Structure,
+            title: format!("Attend meeting: {}", m.title),
+            summary: "A scheduled meeting includes you on the attendee list.".to_string(),
+            authority_basis: "meeting_attendee".to_string(),
+            required_authority_scope: Vec::new(),
+            deadline: Some(m.scheduled_at),
+            risk_level: ActionCardRiskLevel::Low,
+            accessibility_hint:
+                "Meeting accessibility provisions available on request from the host structure."
+                    .to_string(),
+            receipt_expected: false,
+            source_id: m.meeting_id,
+            domain_id: Some(m.domain_id),
+        });
+    }
+
+    // 2. Open assigned action items. `list_work_for_person` with the
+    //    `assigned_to` filter (which sets `open_only: true`) covers the
+    //    broader "any open assigned work" set — strictly larger than the
+    //    digest's `overdue_items` subset.
+    let work_filter = ActionItemFilter::assigned_to(caller.clone());
+    let items = ctx
+        .manager
+        .list_work_for_person(&caller, &work_filter)
+        .map_err(anyhow_to_api)?;
+
+    for item in items {
+        let item_id_str = item.id.to_string();
+        cards.push(ActionCard {
+            id: format!("card-action_item-{}-complete", item_id_str),
+            source_kind: ActionCardSourceKind::ActionItem,
+            action_kind: ActionCardActionKind::Complete,
+            scope: ActionCardScope::Individual,
+            title: format!("Complete: {}", item.title),
+            summary: item
+                .description
+                .clone()
+                .unwrap_or_else(|| "An assigned action item is awaiting your work.".to_string()),
+            authority_basis: "assigned_action_item".to_string(),
+            required_authority_scope: vec![format!("complete:{}", item_id_str)],
+            deadline: item.due_date,
+            risk_level: match item.priority {
+                ActionItemPriority::Critical | ActionItemPriority::High => {
+                    ActionCardRiskLevel::Elevated
+                }
+                ActionItemPriority::Medium => ActionCardRiskLevel::Normal,
+                ActionItemPriority::Low => ActionCardRiskLevel::Low,
+            },
+            accessibility_hint:
+                "Action items may be reassigned or accommodated; ask the owning structure."
+                    .to_string(),
+            receipt_expected: true,
+            source_id: item_id_str,
+            domain_id: Some(item.domain_id.0),
+        });
+    }
+
+    // Stable order: deadline ascending (cards without a deadline last), then
+    // id ascending. Deterministic so two identical requests return identical
+    // payloads — required for the derived-view contract in ADR-0027.
+    cards.sort_by(|a, b| match (a.deadline, b.deadline) {
+        (Some(da), Some(db)) => da.cmp(&db).then_with(|| a.id.cmp(&b.id)),
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => a.id.cmp(&b.id),
+    });
+
+    Ok(HttpResponse::Ok().json(ActionCardsResponse {
+        did: caller.to_string(),
+        cards,
+        generated_at: now,
+    }))
+}
+
 // ============================================================================
 // Tests — governance → execution bridge
 // ============================================================================

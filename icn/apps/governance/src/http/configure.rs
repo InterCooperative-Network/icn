@@ -536,5 +536,9 @@ where
         // ── Me (caller-scoped views) ─────────────────────────────────────
         .service(web::resource("/me/scopes").route(web::get().to(handlers::get_my_scopes::<E>)))
         .service(web::resource("/me/standing").route(web::get().to(handlers::get_my_standing::<E>)))
-        .service(web::resource("/me/work").route(web::get().to(handlers::get_my_work::<E>)));
+        .service(web::resource("/me/work").route(web::get().to(handlers::get_my_work::<E>)))
+        .service(
+            web::resource("/me/action-cards")
+                .route(web::get().to(handlers::get_my_action_cards::<E>)),
+        );
 }

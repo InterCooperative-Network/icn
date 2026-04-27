@@ -8,7 +8,7 @@ tags: ["bootstrap", "activation", "standing", "institution-package", "charter", 
 supersedes: []
 superseded_by: []
 amends: []
-implementation_status: "partially implemented (bootstrap → charter activation → standing path landed; action cards not yet)"
+implementation_status: "partially implemented (bootstrap → charter activation → standing → action cards vertical slice landed; signal-rule and obligation-lifecycle source paths still pending)"
 references:
   - "ADR-0011 (Canonical Truth Ownership)"
   - "ADR-0014 (Constitutional Object Model)"
@@ -75,7 +75,7 @@ Institution package activation follows a single reusable path. Each step has a w
 | 4 | Live charter activation endpoint | `POST /v1/charters/...` taking ratified charter content and binding it to a governance domain (`PR #1624`) | The charter document content (CCL YAML or equivalent) | implemented |
 | 5 | Entity / structure / role creation | `BootstrapEntityRecord` parsing, person-directory overlay for DID binding (`PR #1626`), `authority_scope` plumbed end-to-end through `assign_role` (`PR #1630`) | Per-package ids, per-package authority scope strings | implemented |
 | 6 | `/me/standing` read model | The endpoint shape, the standing schema, the smoke contract (`PR #1627`) | Smoke verifier on the package side that asserts each holder's expected standing matches the live response | implemented; NYCN ships `tools/verify-standing.py` against the contract |
-| 7 | Action cards | `GET /me/action-cards` (icn#1608, future) | Action-card template catalog, holder-side rendering | NOT YET IMPLEMENTED — icn#1608 is open. NYCN ships planned fixtures (`institution/action-card-templates.example.yaml`) marked `icn_target_status: planned`. |
+| 7 | Action cards | `GET /v1/gov/me/action-cards` returning a generic `ActionCard` shape (id, source_kind, action_kind, scope, title, summary, authority_basis, required_authority_scope, deadline, risk_level, accessibility_hint, receipt_expected, source_id, domain_id) | Action-card template catalog, holder-side rendering | partially implemented (icn#1646 vertical slice). `proposal`/`vote`, `meeting`/`attend`, and `action_item`/`complete` source paths emit cards. `signal_rule` and `obligation_lifecycle` are reserved enum variants (gating issues icn#1631 and icn#1634). NYCN's `institution/action-card-templates.example.yaml` remains the package-side template catalog. |
 
 ### Boundary rules
 
@@ -111,7 +111,7 @@ The schema is the runtime contract. NYCN's smoke verifier (`tools/verify-standin
 | 4. Live charter activation endpoint | implemented | `POST /v1/charters/...` (PR #1624) |
 | 5. Entity / structure / role creation, persistent | implemented | PR #1621 (persist domains across restart), PR #1626 (person-directory overlay), PR #1630 (authority_scope plumbing) |
 | 6. `/me/standing` read model | implemented | PR #1627; NYCN `tools/verify-standing.py` |
-| 7. Action cards | NOT YET IMPLEMENTED | icn#1608 open; NYCN ships planned fixtures only |
+| 7. Action cards | partially implemented (vertical slice) | `GET /v1/gov/me/action-cards` handler at `icn/apps/governance/src/http/handlers.rs::get_my_action_cards`; runtime types in `icn/apps/governance/src/http/models.rs::ActionCard*`; JSON schema at `docs/contracts/institution-package/action-card.schema.json` (`x-icn-status: rfc`); integration coverage at `icn/apps/governance/tests/me_action_cards.rs`. icn#1646 closes once the reserved `signal_rule` (icn#1631) and `obligation_lifecycle` (icn#1634) source paths land. |
 
 ## Consequences
 
