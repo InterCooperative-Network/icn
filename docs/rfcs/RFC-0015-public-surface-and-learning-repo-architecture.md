@@ -3,7 +3,7 @@ id: "0015"
 title: "Public Surface and Learning Repo Architecture"
 status: "draft"
 created: "2026-04-27"
-updated: "2026-04-27"
+updated: "2026-04-27"  # implementation status note added — icn-learn repo created (private)
 authors: ["Matt Faherty"]
 reviewers: []
 related_adr_candidates: ["0028", "0032", "0033", "0034"]
@@ -246,6 +246,14 @@ This RFC is doctrinal. "Proof" of acceptance is structural:
   - `cd website && npm run build && npm run lint`
   - `grep -RIE 'NYCN|New York Cooperative|reference federation|Summit|first institution package' website/src/` returns clean
 - ADR-0032 / ADR-0033 enforcement remains the truth gate for the canonical site; no exception is created here.
+
+---
+
+## Implementation status
+
+The repo `InterCooperative-Network/icn-learn` was created on 2026-04-27 as a private repo seeded with the role-based learning scaffold described under "Follow-up implementation issues" item 1. No deploy target, no `learn.icn.zone` DNS, and no public link from `intercooperative.network` exist yet — those remain follow-up work consistent with this RFC's non-goals. The repo's README carries the "teaches ICN; does not define ICN" guardrail and links back to canonical truth in this repo.
+
+This is a status note, not a change to RFC status; the RFC itself remains `draft` until reviewed.
 
 ---
 

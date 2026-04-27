@@ -803,6 +803,11 @@ candidates:
       - "docs/design/ACCESSIBILITY_BASELINE.md"
     related_future_repos:
       - "InterCooperative-Network/icn-learn"
+    repos_created:
+      - repo: "InterCooperative-Network/icn-learn"
+        created_on: "2026-04-27"
+        visibility: "private"
+        status: "scaffold-only; no deploy, no DNS, learn.icn.zone not configured"
     related_future_domains:
       - "learn.icn.zone"
       - "cooperative-systems.org"
