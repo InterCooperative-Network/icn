@@ -41,12 +41,11 @@ The analogy stops at "utility namespace." ICN is not a tenancy.
 
 | Surface | Use |
 |---|---|
-| `intercooperative.network` | Canonical public ICN truth. Authority over what ICN is. |
-| `icn.zone` | Utility routing. Default institutional bootstrap routes. **Not** canonical truth. |
+| `icn.zone` | **Primary public ICN surface.** Authority over what ICN is, plus the namespace under which institutional utility routes (e.g. `nycn.icn.zone`) and short-links (e.g. `icn.zone/n/nycn`) live. |
 | `learn.icn.zone` | Teaching surface (the icn-learn repo's eventual public face). Teaches ICN; does not define it. |
-| Custom institution domain | Each institution's own DNS, owned by the institution. |
+| Custom institution domain | Each institution's own DNS, owned by the institution. Bound to the institutional domain via a verified `DnsBinding`. |
 
-> `icn.zone` is utility routing, not canonical truth. Public canonical ICN truth lives at `intercooperative.network`. Learning surfaces live at `learn.icn.zone`.
+> `icn.zone` is the primary public ICN surface. Institutional sub-routes under it (`nycn.icn.zone`, `icn.zone/n/nycn`, etc.) are utility routes for finding institutions; they are not the institution's own authority. Learning surfaces live at `learn.icn.zone`.
 
 ## Future objects
 
@@ -146,13 +145,13 @@ For a custom public domain, the same flow applies — the difference is only the
 - The routing layer **never** owns institutional truth. It is a router, not a database.
 - A `DnsBinding` does not grant authority over the institutional domain. Authority is governed by charter / role / standing; the binding only routes.
 - `icn.zone` is **utility, not authority**. ICN as a project must not become a landlord of institutional names.
-- Custom domains never override the canonical truth surface (`intercooperative.network`). A cooperative's site can describe ICN; only canonical surfaces define ICN.
+- Custom domains never override the primary ICN public surface (`icn.zone`). A cooperative's site can describe ICN; only canonical surfaces under `icn.zone` define ICN.
 
 ## Existing repo support
 
 What exists today that this design will sit on:
 
-- [RFC-0015](../rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md) — public surface and learning repo architecture (defines `intercooperative.network`, `icn.zone`, `learn.icn.zone` roles)
+- [RFC-0015](../rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md) — public surface and learning repo architecture (governs `icn.zone`, `learn.icn.zone`, and any other ICN-managed surfaces; this design refers to it for canonical-surface roles)
 - Receipt envelope for binding receipts and publication receipts ([ADR-0026](../adr/ADR-0026-receipt-and-provenance-proof-envelope.md))
 - Charter/role/`authority_scope` plumbing for governance acts that approve bindings (existing)
 - Public ICN website source under `website/src` — **does not** carry NYCN/Summit nouns
