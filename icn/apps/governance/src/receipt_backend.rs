@@ -3,7 +3,7 @@
 
 use icn_governance::{
     ActionItemCompletionReceipt, AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt,
-    Grantee, Mandate, Timestamp,
+    Grantee, Mandate, MeetingAttendanceReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -372,6 +372,56 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         &self,
         _item_id: &str,
     ) -> Result<Vec<ActionItemCompletionReceipt>, String> {
+        Ok(vec![])
+    }
+
+    /// Persist a [`MeetingAttendanceReceipt`] emitted when an attendee
+    /// transitions into `Present` or `Remote` via an authenticated
+    /// caller.
+    ///
+    /// Append-only: implementations should treat a same-`record_hash`
+    /// re-write as idempotent and must not overwrite prior receipts on
+    /// repeated transitions for the same `(meeting_id, attendee_did)`
+    /// pair.
+    ///
+    /// Default impl is a no-op so backends that do not yet durably
+    /// persist these receipts inherit a truthful "attendance receipt not
+    /// persisted" behavior. Test backends and the sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
+    /// override.
+    fn put_meeting_attendance(&self, _receipt: &MeetingAttendanceReceipt) -> Result<(), String> {
+        Ok(())
+    }
+
+    /// Retrieve the latest [`MeetingAttendanceReceipt`] for a
+    /// `(meeting_id, attendee_did)` pair, or `None` when no attendance
+    /// has been recorded for that attendee in that meeting.
+    ///
+    /// Backends that store multiple receipts per pair (e.g. a
+    /// `Present → Remote` transition appending a fresh record) must
+    /// return the receipt with the largest `recorded_at`.
+    ///
+    /// Default impl returns `Ok(None)` so backends that do not implement
+    /// attendance-receipt storage are indistinguishable from "no
+    /// attendance recorded".
+    fn get_meeting_attendance(
+        &self,
+        _meeting_id: &str,
+        _attendee_did: &str,
+    ) -> Result<Option<MeetingAttendanceReceipt>, String> {
+        Ok(None)
+    }
+
+    /// List **all** [`MeetingAttendanceReceipt`]s persisted for a
+    /// meeting, oldest-first by `recorded_at`. Spans every attendee.
+    ///
+    /// Default impl returns an empty vector. Backends that override
+    /// [`Self::put_meeting_attendance`] should also override this method
+    /// to keep the per-meeting audit chain readable.
+    fn list_meeting_attendance_for_meeting(
+        &self,
+        _meeting_id: &str,
+    ) -> Result<Vec<MeetingAttendanceReceipt>, String> {
         Ok(vec![])
     }
 }

@@ -17,17 +17,17 @@ use icn_federation::BilateralClearingAgreement;
 use icn_governance::{
     scopes_overlap, ActionItem, ActionItemFilter, ActionItemId, ActionItemPriority,
     ActionItemStatus, ActionItemStoreBackend, Activity, ActivityId, ActivityKind,
-    ActivityStoreBackend, Comment, CommentId, Delegation, DelegationId, DelegationScope,
-    Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt, GovernanceDomain,
-    GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
-    InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore, InMemoryMeetingStore,
-    InMemoryMilestoneStore, InMemoryProgramStore, InMemoryStructureStore, Meeting, MeetingId,
-    MeetingStoreBackend, MembershipConfig, MembershipSource, Milestone, MilestoneId,
-    MilestoneStatus, MilestoneStoreBackend, PaginatedResult, Program, ProgramId, ProgramKind,
-    ProgramStatus, ProgramStoreBackend, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
-    ProposalPayload, ProposalScope, ProposalState, RoleAssignment, Structure, StructureId,
-    StructureKind, StructureStoreBackend, Timestamp, Vote, VoteChoice, VoteTally,
-    DEFAULT_MAX_DELEGATION_DEPTH,
+    ActivityStoreBackend, AttendanceStatus, Comment, CommentId, Delegation, DelegationId,
+    DelegationScope, Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt,
+    GovernanceDomain, GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams,
+    GovernanceProfileId, InMemoryActionItemStore, InMemoryActivityStore, InMemoryDiscussionStore,
+    InMemoryMeetingStore, InMemoryMilestoneStore, InMemoryProgramStore, InMemoryStructureStore,
+    Meeting, MeetingAttendanceTransition, MeetingId, MeetingStoreBackend, MembershipConfig,
+    MembershipSource, Milestone, MilestoneId, MilestoneStatus, MilestoneStoreBackend,
+    PaginatedResult, Program, ProgramId, ProgramKind, ProgramStatus, ProgramStoreBackend,
+    ProofOutcome, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload, ProposalScope,
+    ProposalState, RoleAssignment, Structure, StructureId, StructureKind, StructureStoreBackend,
+    Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
@@ -5409,6 +5409,99 @@ impl GovernanceManager {
         self.meeting_store
             .save(m)
             .map_err(|e| anyhow::anyhow!("Failed to update meeting: {e}"))
+    }
+
+    /// Mark an attendee's status on a meeting, emitting an
+    /// [`icn_governance::MeetingAttendanceReceipt`] when the transition is
+    /// receipt-bearing.
+    ///
+    /// Receipt-bearing transitions are exactly the attend-shaped ones:
+    /// `Present` and `Remote`. `Absent` and `Invited` mutate state but
+    /// emit no receipt — absence is not an attend event.
+    ///
+    /// Idempotence: re-marking an attendee with their current status is a
+    /// no-op for the receipt seam (no fresh receipt is appended). Real
+    /// transitions between distinct receipt-bearing states (e.g.
+    /// `Present` → `Remote`) DO append a fresh receipt so the audit chain
+    /// preserves the change.
+    ///
+    /// The receipt is persisted **before** the meeting state is committed
+    /// — same fail-closed discipline as `update_action_item_status`. If
+    /// the backend rejects the receipt, attendee state is not saved and
+    /// the caller observes the error rather than a silent commit-without-
+    /// receipt.
+    ///
+    /// `recorded_by` is the authenticated caller. It can differ from
+    /// `attendee_did` (steward-recorded attendance) and is bound into the
+    /// receipt's canonical hash.
+    pub fn update_meeting_attendance(
+        &self,
+        meeting_id: &MeetingId,
+        attendee_did: &str,
+        status: AttendanceStatus,
+        recorded_by: &Did,
+    ) -> Result<Meeting> {
+        let mut m = self
+            .meeting_store
+            .get(meeting_id)
+            .map_err(|e| anyhow::anyhow!("Failed to get meeting: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Meeting not found: {}", meeting_id.0))?;
+
+        let attendee = m
+            .attendees
+            .iter_mut()
+            .find(|a| a.did == attendee_did)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Attendee not found in meeting {}: {}",
+                    meeting_id.0,
+                    attendee_did
+                )
+            })?;
+
+        let prior_status = attendee.status;
+        let now = icn_time::current_timestamp_secs();
+
+        // Receipt seam: emit only on a real transition into Present/Remote.
+        // Same-status re-marks produce no fresh receipt; transitions
+        // between Present and Remote DO produce a fresh receipt because
+        // the documented attendance changed.
+        let transition = match status {
+            AttendanceStatus::Present if prior_status != AttendanceStatus::Present => {
+                Some(MeetingAttendanceTransition::Present)
+            }
+            AttendanceStatus::Remote if prior_status != AttendanceStatus::Remote => {
+                Some(MeetingAttendanceTransition::Remote)
+            }
+            _ => None,
+        };
+
+        if let Some(transition) = transition {
+            if let Some(ref store) = self.receipt_store {
+                let receipt = icn_governance::MeetingAttendanceReceipt::new(
+                    m.id.0.clone(),
+                    m.domain_id.clone(),
+                    attendee_did.to_string(),
+                    recorded_by.to_string(),
+                    transition,
+                    now,
+                );
+                store.put_meeting_attendance(&receipt).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to persist meeting attendance receipt for ({}, {}): {e}",
+                        m.id.0,
+                        attendee_did
+                    )
+                })?;
+            }
+        }
+
+        attendee.status = status;
+        self.meeting_store
+            .save(&m)
+            .map_err(|e| anyhow::anyhow!("Failed to update meeting: {e}"))?;
+
+        Ok(m)
     }
 
     /// Delete a meeting (hard delete).
