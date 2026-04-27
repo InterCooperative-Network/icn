@@ -48,7 +48,7 @@ tags: [&quot;bootstrap&quot;, &quot;activation&quot;, &quot;standing&quot;, &quo
 supersedes: []
 superseded_by: []
 amends: []
-implementation_status: &quot;partially implemented (bootstrap → charter activation → standing path landed; action cards not yet)&quot;
+implementation_status: &quot;partially implemented (bootstrap → charter activation → standing → action cards vertical slice landed; signal-rule and obligation-lifecycle source paths still pending)&quot;
 references:</p>
 <ul>
 <li>&quot;ADR-0011 (Canonical Truth Ownership)&quot;</li>
@@ -152,9 +152,9 @@ references:</p>
 <tr>
 <td>7</td>
 <td>Action cards</td>
-<td><code>GET /me/action-cards</code> (icn#1608, future)</td>
+<td><code>GET /v1/gov/me/action-cards</code> returning a generic <code>ActionCard</code> shape (id, source_kind, action_kind, scope, title, summary, authority_basis, required_authority_scope, deadline, risk_level, accessibility_hint, receipt_expected, source_id, domain_id)</td>
 <td>Action-card template catalog, holder-side rendering</td>
-<td>NOT YET IMPLEMENTED — icn#1608 is open. NYCN ships planned fixtures (<code>institution/action-card-templates.example.yaml</code>) marked <code>icn_target_status: planned</code>.</td>
+<td>partially implemented (icn#1646 vertical slice). <code>proposal</code>/<code>vote</code>, <code>meeting</code>/<code>attend</code>, and <code>action_item</code>/<code>complete</code> source paths emit cards. <code>signal_rule</code> and <code>obligation_lifecycle</code> are reserved enum variants (gating issues icn#1631 and icn#1634). NYCN&#39;s <code>institution/action-card-templates.example.yaml</code> remains the package-side template catalog.</td>
 </tr>
 </tbody></table>
 <h3>Boundary rules</h3>
@@ -220,8 +220,8 @@ references:</p>
 </tr>
 <tr>
 <td>7. Action cards</td>
-<td>NOT YET IMPLEMENTED</td>
-<td>icn#1608 open; NYCN ships planned fixtures only</td>
+<td>partially implemented (vertical slice)</td>
+<td><code>GET /v1/gov/me/action-cards</code> handler at <code>icn/apps/governance/src/http/handlers.rs::get_my_action_cards</code>; runtime types in <code>icn/apps/governance/src/http/models.rs::ActionCard*</code>; JSON schema at <code>docs/contracts/institution-package/action-card.schema.json</code> (<code>x-icn-status: rfc</code>); integration coverage at <code>icn/apps/governance/tests/me_action_cards.rs</code>. icn#1646 closes once the reserved <code>signal_rule</code> (icn#1631) and <code>obligation_lifecycle</code> (icn#1634) source paths land.</td>
 </tr>
 </tbody></table>
 <h2>Consequences</h2>
