@@ -145,6 +145,16 @@ import MaturityCard from '../components/MaturityCard.astro';
           expected to rely on digital systems controlled by outside owners, outside incentives, and outside priorities.
         </p>
       </div>
+
+      <div class="bridge-block">
+        <p class="bridge-lede">
+          Credit unions, fiscal sponsors, and CDFIs help cooperatives interface with the existing economy.
+          ICN is the machinery a cooperative economy needs on its own side of the bridge.
+        </p>
+        <p class="bridge-link-row">
+          <a href="/cooperative-economy" class="link-arrow">The cooperative economy needs its own machinery →</a>
+        </p>
+      </div>
     </div>
   </section>
 
@@ -610,6 +620,23 @@ import MaturityCard from '../components/MaturityCard.astro';
 .closure-footnote a:hover { border-bottom-color: var(--accent-teal); }
 
 /* Status grid styles moved to MaturityGrid/MaturityCard components. */
+
+/* Bridge / machinery framing block under "The Problem" */
+.bridge-block {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border-subtle);
+}
+.bridge-lede {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--text-body);
+  margin: 0 0 var(--space-sm);
+  max-width: 42rem;
+}
+.bridge-link-row {
+  margin: 0;
+}
 
 /* Link-arrow style for card CTAs */
 .link-arrow {
