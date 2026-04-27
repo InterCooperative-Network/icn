@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intercooperative.network/contracts/institution-package/action-card.schema.json",
+  "title": "ActionCard",
+  "description": "A single pending action card for a member, returned by GET /v1/gov/me/action-cards. Cards are derived views — computed at request time from the holder's standing plus open governance state — and are never stored entities. See ADR-0027.",
+  "x-icn-status": "rfc",
+  "x-icn-references": [
+    "ADR-0020",
+    "ADR-0027",
+    "ADR-0028",
+    "GitHub icn#1646",
+    "GitHub icn#1608"
+  ],
+  "type": "object",
+  "required": [
+    "id",
+    "source_kind",
+    "action_kind",
+    "scope",
+    "title",
+    "summary",
+    "authority_basis",
+    "required_authority_scope",
+    "risk_level",
+    "accessibility_hint",
+    "receipt_expected",
+    "source_id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable, deterministic id of the card. Format: card-<source_kind>-<source_id>(-<action_kind>). Two requests at the same moment from the same DID return identical card ids.",
+      "minLength": 1
+    },
+    "source_kind": {
+      "description": "Where this card was derived from. Closed taxonomy. Variants 'signal_rule' and 'obligation_lifecycle' are reserved by issue icn#1646 and not emitted by the runtime today; they will land alongside their source-path implementation.",
+      "type": "string",
+      "enum": [
+        "proposal",
+        "meeting",
+        "action_item",
+        "signal_rule",
+        "obligation_lifecycle"
+      ]
+    },
+    "action_kind": {
+      "description": "What the holder is being asked to do. Closed taxonomy. New variants land when their source path implementation lands.",
+      "type": "string",
+      "enum": [
+        "vote",
+        "attend",
+        "complete"
+      ]
+    },
+    "scope": {
+      "description": "What the card targets, mapped to ICN's constitutional axes. Institution packages bind their local taxonomy to these.",
+      "type": "string",
+      "enum": [
+        "entity",
+        "structure",
+        "individual"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "description": "Short, plain-language title suitable for a list row.",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "description": "One-line plain-language summary of what this card is asking the holder to do.",
+      "minLength": 1
+    },
+    "authority_basis": {
+      "type": "string",
+      "description": "Why the caller has the right to act here, in plain language. Examples: 'domain_membership', 'meeting_attendee', 'assigned_action_item'.",
+      "minLength": 1
+    },
+    "required_authority_scope": {
+      "type": "array",
+      "description": "Authority-scope strings the kernel would expect for this action. Generic; institution packages may use richer strings.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "deadline": {
+      "description": "Optional Unix-seconds deadline. Absent means no time pressure encoded by this card.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "risk_level": {
+      "description": "Coarse risk indicator surfaced to the holder. UI may sort or annotate but must not hide cards. Exact semantics are a policy concern.",
+      "type": "string",
+      "enum": [
+        "low",
+        "normal",
+        "elevated"
+      ]
+    },
+    "accessibility_hint": {
+      "type": "string",
+      "description": "Plain-language accessibility note for the rendering shell. Per ADR-0028, every card must carry one. Generic across institutions.",
+      "minLength": 1
+    },
+    "receipt_expected": {
+      "type": "boolean",
+      "description": "Whether successful completion of this action is expected to produce a receipt (governance receipt, attendance receipt, action-item completion receipt)."
+    },
+    "source_id": {
+      "type": "string",
+      "description": "Underlying object id (proposal id, meeting id, action item id). The holder acts on this object via its native endpoint; the card carries no mutation API.",
+      "minLength": 1
+    },
+    "domain_id": {
+      "description": "Governance domain this card lives under, when known.",
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

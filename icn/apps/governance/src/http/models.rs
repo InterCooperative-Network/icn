@@ -168,6 +168,122 @@ pub struct StandingRoleAssignment {
 }
 
 // ============================================================================
+// Action cards (read model for `GET /me/action-cards`)
+// ============================================================================
+
+/// Where a card is derived from. Closed taxonomy. Variants `SignalRule` and
+/// `ObligationLifecycle` are reserved by issue #1646 for future implementation;
+/// the runtime does not emit them today.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionCardSourceKind {
+    Proposal,
+    Meeting,
+    ActionItem,
+    SignalRule,
+    ObligationLifecycle,
+}
+
+/// What the holder is being asked to do. Closed taxonomy. New variants land
+/// when their source path implementation lands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionCardActionKind {
+    /// Cast a vote on a proposal.
+    Vote,
+    /// Attend a scheduled meeting.
+    Attend,
+    /// Complete an assigned action item.
+    Complete,
+}
+
+/// What the card targets. Maps to ICN's `entity / structure / individual`
+/// constitutional axes; institution packages bind their local taxonomy to
+/// these.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionCardScope {
+    Entity,
+    Structure,
+    Individual,
+}
+
+/// Coarse risk indicator surfaced to the holder. UI may sort or annotate but
+/// must not hide cards. Exact semantics are policy concerns; this enum carries
+/// a conservative three-level vocabulary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionCardRiskLevel {
+    Low,
+    Normal,
+    Elevated,
+}
+
+/// One pending action card for the authenticated caller.
+///
+/// Returned by `GET /v1/gov/me/action-cards`. Cards are **derived views** —
+/// computed at request time from the caller's standing plus open governance
+/// state — never stored entities. Two requests at the same moment from the
+/// same DID return identical cards. See ADR-0027.
+///
+/// ## Boundary
+///
+/// All fields are generic. No institution-specific vocabulary. Institution
+/// packages translate their local templates into these generic kinds; ICN
+/// does not learn package-specific nouns from this surface.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ActionCard {
+    /// Stable, deterministic id of the card. Format:
+    /// `card-<source_kind>-<source_id>` so the same underlying object yields
+    /// the same card id across requests.
+    pub id: String,
+    pub source_kind: ActionCardSourceKind,
+    pub action_kind: ActionCardActionKind,
+    pub scope: ActionCardScope,
+    /// Short, plain-language title. Suitable for a list row.
+    pub title: String,
+    /// One-line plain-language summary of what this card is asking the
+    /// holder to do.
+    pub summary: String,
+    /// Why the caller has the right to act here, in plain language. Examples:
+    /// `"role_assignment_in_domain"`, `"assigned_action_item"`,
+    /// `"meeting_attendee"`.
+    pub authority_basis: String,
+    /// Authority-scope strings the kernel would expect for this action.
+    /// Generic; institution packages may use richer strings.
+    pub required_authority_scope: Vec<String>,
+    /// Optional Unix-seconds deadline. `None` means no time pressure encoded
+    /// by this card.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deadline: Option<u64>,
+    pub risk_level: ActionCardRiskLevel,
+    /// Accessibility note for the rendering shell. Generic across institutions;
+    /// today the runtime emits the same baseline note for all cards.
+    pub accessibility_hint: String,
+    /// Whether successful completion of this action is expected to produce a
+    /// receipt (governance receipt, attendance receipt, action-item completion
+    /// receipt).
+    pub receipt_expected: bool,
+    /// Underlying object id (proposal id, meeting id, action item id).
+    pub source_id: String,
+    /// Governance domain this card lives under, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain_id: Option<String>,
+}
+
+/// Wrapper response for `GET /me/action-cards`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ActionCardsResponse {
+    /// The authenticated caller's DID.
+    pub did: String,
+    /// Pending cards for the caller, derived at request time. May be empty.
+    pub cards: Vec<ActionCard>,
+    /// Unix-seconds when this card set was computed. Snapshot only — nothing
+    /// is cached server-side.
+    pub generated_at: u64,
+}
+
+// ============================================================================
 // Proposals
 // ============================================================================
 
