@@ -489,3 +489,159 @@ ideas:
     next_transform: |
       Land in this PR alongside the refinery scaffold, since the
       hygiene rules are part of how the refinery actually works.
+
+  # --------------------------------------------------------------
+  # 12. CCL institutional process language — runtime details
+  # --------------------------------------------------------------
+  - id: idea-0012
+    title: CCL institutional process language — runtime framing
+    status: framed
+    kind: architecture_concept
+    source: "RFC/ADR readiness audit 2026-04-28; downgrade of ADR-0023 runtime details"
+    one_sentence: |
+      The runtime details proposed in ADR-0023 (Process DAG, step-kind taxonomy, deadline-as-data, escalation-as-step) need a framing brief before they should advance to accepted.
+    problem: |
+      ADR-0023 is `proposed / proposed` and names a CCL process layer with a specific runtime model. The principle (CCL grows a process surface) is reasonable, but the runtime model is speculative with no shipping evidence. Promoting the runtime details to accepted before a framing brief risks foreclosing alternatives prematurely.
+    belongs_to: icn
+    layer: substrate
+    current_artifact: "docs/adr/ADR-0023-ccl-institutional-process-language.md (proposed); ops/coordination/adr_candidates.yaml row 0023"
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects: []
+    requires_rfc: unknown
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: low
+    boundary_risk: low
+    risks:
+      - "Premature foreclosure of alternative process-execution models."
+      - "ADR appearing accepted before runtime is shippable."
+    next_transform: |
+      Write a framing brief that distinguishes the principle (CCL gains a process surface) from the runtime details. Identify the smallest plausible first step (e.g. AutoStep-only, no member input) and what evidence that first step would produce.
+
+  # --------------------------------------------------------------
+  # 13. Institution package manifest extensions
+  # --------------------------------------------------------------
+  - id: idea-0013
+    title: Institution package manifest extensions (per section)
+    status: framed
+    kind: architecture_concept
+    source: "RFC/ADR readiness audit 2026-04-28; downgrade of ADR-0024 speculative sections"
+    one_sentence: |
+      The proposed manifest sections in ADR-0024 (indicators, signal rules, allocation templates, locale and accessibility metadata, package operating intent) bundle several distinct design spaces and need separate framing briefs before any of them advances.
+    problem: |
+      ADR-0024 ships the seed-primitive part of the manifest (BootstrapSeedManifest) and proposes five additional sections. Each proposed section is its own design space. Treating them as one ADR-shaped decision over-bundles unrelated work and risks each section landing under-framed.
+    belongs_to: icn
+    layer: substrate
+    current_artifact: "docs/adr/ADR-0024-institution-package-manifest-schema.md (proposed/partial); ops/coordination/adr_candidates.yaml row 0024"
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects: []
+    requires_rfc: unknown
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: medium
+    boundary_risk: medium
+    risks:
+      - "Bundled ADR forecloses alternative shapes for sections that should be decided independently."
+      - "Locale/accessibility metadata is an accessibility-runtime concern (idea-0015), not a manifest-schema concern alone."
+    next_transform: |
+      Write per-section framing briefs (indicators, signal rules, allocation templates, locale metadata, package operating intent). Each may eventually become its own ADR or get parked. The seed-primitive part of ADR-0024 is settled and stays.
+
+  # --------------------------------------------------------------
+  # 14. Institutional EffectRecord canonical schema
+  # --------------------------------------------------------------
+  - id: idea-0014
+    title: Institutional EffectRecord canonical schema (framing)
+    status: framed
+    kind: architecture_concept
+    source: "RFC/ADR readiness audit 2026-04-28; downgrade of ADR-0025"
+    one_sentence: |
+      The EffectRecord schema proposed in ADR-0025 (closed kind taxonomy, plain-language summary, persistence model, reversal pointer, /me/standing visibility) needs a framing brief before it should advance — no EffectRecord ships today.
+    problem: |
+      ADR-0025 is `proposed / proposed`. The decision spine (proposal → mandate → grant) is in place, but the EffectRecord type is forward design without shipping evidence. Specifying the closed taxonomy and persistence model now risks foreclosing alternatives the kernel/dispatch work has not yet surfaced.
+    belongs_to: icn
+    layer: substrate
+    current_artifact: "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md (proposed); ops/coordination/adr_candidates.yaml row 0025"
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects:
+      - "EffectRecord (name candidate; under framing)"
+    requires_rfc: unknown
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: low
+    boundary_risk: low
+    risks:
+      - "Closed kind taxonomy locked in before kernel dispatch is built."
+      - "Persistence model decided before mandate-dispatch seam exists in code."
+    next_transform: |
+      Write a framing brief paired with the smallest concrete EffectRecord case (likely RoleAssigned). Build that case end-to-end (mandate dispatch → effect produced → /me/standing visible) before promoting the schema to an accepted ADR.
+
+  # --------------------------------------------------------------
+  # 15. Accessibility runtime details (per layer)
+  # --------------------------------------------------------------
+  - id: idea-0015
+    title: Accessibility runtime contracts (per layer)
+    status: framed
+    kind: architecture_concept
+    source: "RFC/ADR readiness audit 2026-04-28; split of ADR-0028 principle from runtime"
+    one_sentence: |
+      ADR-0028's accessibility principle is non-negotiable; the per-layer runtime contracts (sensory / cognitive / linguistic / economic / temporal) need separate framing briefs before they should advance to accepted.
+    problem: |
+      ADR-0028 is `proposed / proposed`. The principle (accessibility is a participation floor; five layers) is foundational and should stay. The per-layer runtime contracts (WCAG 2.2 AA bindings, glossary endpoint contract, mobile bandwidth model, plain-language rendering, reduced-motion semantics) are speculative and span very different surfaces.
+    belongs_to: icn
+    layer: institutional
+    current_artifact: "docs/adr/ADR-0028-accessibility-baseline-for-member-interfaces.md (proposed); docs/design-language/accessibility.md (descriptive); open #1610 / #1611 / #1366"
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects: []
+    requires_rfc: unknown
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: low
+    boundary_risk: low
+    risks:
+      - "Premature freezing of per-layer contracts before each layer has a real implementation surface."
+      - "Glossary / mobile / cards work could each surface a layer-specific tradeoff that the bundled ADR forecloses."
+    next_transform: |
+      Write per-layer framing briefs. Keep the principle paragraph from ADR-0028 as the load-bearing reference; treat each layer as its own framing/decision.
+
+  # --------------------------------------------------------------
+  # 16. Institutional conflict object model
+  # --------------------------------------------------------------
+  - id: idea-0016
+    title: Institutional conflict object model (framing)
+    status: framed
+    kind: architecture_concept
+    source: "RFC/ADR readiness audit 2026-04-28; split of ADR-0029 principle from runtime"
+    one_sentence: |
+      ADR-0029's principle (institutional care is first-class; three conflict shapes) is solid; the institutional-conflict object model details (EffectChallenge type, evidence model, remedy taxonomy, mediation roles) need a framing brief before they should advance.
+    problem: |
+      ADR-0029 is `proposed / partial`. The compute-disputes path ships in `icn-ccl/src/disputes.rs`. The institutional-conflict path is type sketches in `icn-governance/src/appeal.rs` only. Locking the object model before any institutional-conflict runtime exists risks foreclosing the actual remediation flows real institutions need.
+    belongs_to: icn
+    layer: institutional
+    current_artifact: "docs/adr/ADR-0029-conflict-resolution-object-model.md (proposed/partial); icn-ccl/src/disputes.rs (shipping for compute); icn-governance/src/appeal.rs (sketch only)"
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects: []
+    requires_rfc: unknown
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: high
+    boundary_risk: medium
+    risks:
+      - "Lock-in of object shapes before real grievance flows have run."
+      - "Privacy: conflict records carry the most sensitive institutional content; getting the schema wrong costs more than getting it right slowly."
+    next_transform: |
+      Write a framing brief that anchors on the three conflict shapes from ADR-0029 and then iterates one shape end-to-end (likely EffectChallenge against an existing EffectRecord, paired with idea-0014). Defer the other two shapes until the first has runtime.
