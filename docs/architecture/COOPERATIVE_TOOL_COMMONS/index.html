@@ -1,0 +1,416 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Cooperative Tool Commons | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>COOPERATIVE TOOL COMMONS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/COOPERATIVE_TOOL_COMMONS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: design-direction
+Authority: architecture (forward-direction; not yet normative)
+Canonical: no
+Last Reviewed: 2026-04-27</h2>
+<h1>Cooperative Tool Commons</h1>
+<blockquote>
+<p><strong>Status: draft / design direction / roadmap.</strong> Names a future tool ecosystem for ICN. Items marked <em>planned</em> are not in the repo today. Companion to <a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_DOMAIN_INFRASTRUCTURE">`COOPERATIVE_DOMAIN_INFRASTRUCTURE.md`</a>.</p>
+</blockquote>
+<h2>Summary</h2>
+<p>ICN should support a <strong>tool commons</strong>: a set of installable / forkable tools that run on institution-controlled nodes (or governed service nodes) and operate on <strong>institution-owned state</strong>. Tools render, edit, summarize, import, publish, or assist. They never own institutional truth.</p>
+<blockquote>
+<p><strong>Core principle:</strong> tools do not own institutional truth. The domain/node does.</p>
+</blockquote>
+<p>A tool acts through <strong>scoped capabilities</strong> granted by the domain, and emits <strong>receipts</strong> for meaningful institutional transitions. Tools are replaceable, forkable, and suspendable without trapping the data they operated on.</p>
+<h2>Core base tools</h2>
+<p>The base tools below are <strong>planned identifiers</strong>. They are framed in terms that match the existing ICN runtime (charters, governance, meetings, action items, receipts) and the future domain infrastructure (workspaces, scoped vaults, agreements, DNS bindings).</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn-domain-admin</code></td>
+<td>Manage domain policy, members, roles, devices, service identities, installed tools, DNS bindings, and security posture. The administrative surface for an <code>InstitutionalDomain</code>.</td>
+</tr>
+<tr>
+<td><code>icn-member-directory</code></td>
+<td>People, member organizations, roles, standing, delegates, contact visibility, member profiles. Reads from the existing person-directory overlay (PR #1626) and <code>/me/standing</code> (PR #1627).</td>
+</tr>
+<tr>
+<td><code>icn-governance</code></td>
+<td>Proposals, votes, consent, charters, decisions, receipts. Sits on top of <code>icn-governance</code> runtime (existing).</td>
+</tr>
+<tr>
+<td><code>icn-meetings</code></td>
+<td>Agendas, attendance, minutes, decisions, action items, meeting artifacts, meeting receipts. Sits on top of meeting management (PR #1543) and the meeting/attend receipt seam (PR #1663).</td>
+</tr>
+<tr>
+<td><code>icn-action-cards</code></td>
+<td>Member-facing &quot;what needs me?&quot; derived queue. Action cards are not stored tasks; they are views over proposals, meetings, action items, signals, obligations (per <a href="/docs/adr/ADR-0027-action-card-contract">ADR-0027</a>).</td>
+</tr>
+<tr>
+<td><code>icn-drive</code> (artifact vault)</td>
+<td>Files, folders, versioning, access policy, public/private vaults, external source references. Front-end to the future <code>ArtifactRegistry</code> + <code>ScopedVault</code>.</td>
+</tr>
+<tr>
+<td><code>icn-docs</code></td>
+<td>Collaborative institutional documents tied to meetings, proposals, policies, public pages, playbooks, drafts, reports, and receipts.</td>
+</tr>
+<tr>
+<td><code>icn-tables</code></td>
+<td>Human-editable views over typed institutional records. <strong>Not</strong> random spreadsheets as source of truth — typed records first, table view second.</td>
+</tr>
+<tr>
+<td><code>icn-forms</code></td>
+<td>Intake, applications, surveys, accessibility/care requests, evaluations, registration, member onboarding.</td>
+</tr>
+<tr>
+<td><code>icn-calendar</code></td>
+<td>Meetings, milestones, event schedules, deadlines, public event calendars.</td>
+</tr>
+<tr>
+<td><code>icn-publish</code> (CMS)</td>
+<td>Public web pages generated from approved records and artifacts. Emits a <code>PublicationReceipt</code> per publish.</td>
+</tr>
+<tr>
+<td><code>icn-search</code></td>
+<td>Permission-aware search across docs, records, meetings, receipts, artifacts, archives.</td>
+</tr>
+<tr>
+<td><code>icn-agreements</code></td>
+<td>Inter-org agreements, shared workspaces, service relationships, data-sharing agreements. UI for the eight <code>*Agreement</code> types named in the parent doc.</td>
+</tr>
+<tr>
+<td><code>icn-budget</code> (resources)</td>
+<td>Obligations, allocations, settlements, positions, resource commitments, public/internal reports. Uses regulatory-safe vocabulary throughout.</td>
+</tr>
+<tr>
+<td><code>icn-signals</code></td>
+<td>Feedback, concerns, institutional reflexes, escalation, indicators, challenge paths.</td>
+</tr>
+<tr>
+<td><code>icn-compute-jobs</code></td>
+<td>Imports, summaries, translation, transcription, indexing, report generation, model workloads. Sits on the existing compute substrate (<a href="/docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary">ADR-0030</a>, <a href="/docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy">ADR-0031</a>).</td>
+</tr>
+<tr>
+<td><code>icn-directory</code> (public directory)</td>
+<td>The institution&#39;s public-facing organizational directory.</td>
+</tr>
+</tbody></table>
+<p>These compose. A &quot;Summit operating dashboard&quot; is not a new app — it is <code>icn-meetings</code> + <code>icn-tables</code> + <code>icn-action-cards</code> + <code>icn-publish</code> + <code>icn-forms</code> bound to a package&#39;s templates.</p>
+<h2>Specialized tool suites</h2>
+<p>A specialized suite is <strong>mostly a bundle of base tools plus package schemas, templates, and workflows.</strong> Not a fork. Not an isolated app. The package boundary in <a href="https://github.com/InterCooperative-Network/icn/blob/main/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a> applies: generic shapes in ICN; institution-specific nouns in the package.</p>
+<h3>Cooperative suite</h3>
+<p>For worker co-ops, food co-ops, housing co-ops, service co-ops, platform co-ops:</p>
+<ul>
+<li>member CRM</li>
+<li>customer / client CRM</li>
+<li>service desk</li>
+<li>work scheduling</li>
+<li>contribution tracking</li>
+<li>inventory</li>
+<li>orders / service fulfillment</li>
+<li>patronage / surplus tools</li>
+<li>board portal</li>
+<li>compliance binder</li>
+<li>training / onboarding</li>
+</ul>
+<h3>Community suite</h3>
+<p>For civic communities, mutual aid networks, neighborhood assemblies, public associations:</p>
+<ul>
+<li>community CMS</li>
+<li>public forum / deliberation</li>
+<li>participatory budgeting</li>
+<li>issue reporting</li>
+<li>resource map</li>
+<li>mutual aid coordination</li>
+<li>events / assemblies</li>
+<li>surveys / feedback</li>
+<li>emergency response</li>
+<li>accessibility / care desk</li>
+<li>public archive</li>
+</ul>
+<h3>Federation suite</h3>
+<p>For networks of co-ops, communities, institutions:</p>
+<ul>
+<li>member-organization registry</li>
+<li>inter-org agreements</li>
+<li>service catalog</li>
+<li>support programs</li>
+<li>shared procurement</li>
+<li>commons resource pool</li>
+<li>clearing / settlement views (regulatory-safe vocabulary)</li>
+<li>grants / sponsorship pipeline</li>
+<li>convening suite (events at federation scale)</li>
+<li>standards review</li>
+<li>mediation / dispute resolution</li>
+<li>federation directory</li>
+</ul>
+<h3>Municipal suite</h3>
+<p>A specialized <strong>community suite at local scale</strong> plus a <strong>federation suite at regional scale</strong>:</p>
+<ul>
+<li>public issue reporting</li>
+<li>public records</li>
+<li>forms / permits</li>
+<li>service requests</li>
+<li>public meetings</li>
+<li>participatory budgeting</li>
+<li>public works dashboard</li>
+<li>local / regional resource maps</li>
+<li>inter-municipal agreements</li>
+</ul>
+<h3>NYCN / Summit suite (illustrative example)</h3>
+<p>The first specialized suite that ICN will run end-to-end as a proof body. NYCN-specific application docs live in the NYCN repo; this is a forward summary only, illustrating how a specialized suite would be composed from base tools. Per the Non-goals below, NYCN / Summit names appear here as an illustrative example, not as a core ICN tool ecosystem dependency.</p>
+<ul>
+<li>event CMS</li>
+<li>registration / intake forms</li>
+<li>sponsor pipeline</li>
+<li>speaker / session planning</li>
+<li>schedule builder</li>
+<li>food / logistics / tech tables</li>
+<li>accessibility / care intake</li>
+<li>meeting / action loop</li>
+<li>public publishing</li>
+<li>evaluation forms</li>
+<li>post-event report generation</li>
+<li>external bridge imports (Drive / Sheets)</li>
+<li>partner workspaces by agreement</li>
+</ul>
+<h2>Third-party tools</h2>
+<p>The architecture supports developers and cooperatives writing their own tools.</p>
+<h3>Tool install flow (planned)</h3>
+<pre><code>tool package submitted
+  ↓
+manifest declares capabilities
+  ↓
+institution reviews authority request
+  ↓
+governance / admin approves install
+  ↓
+tool receives ServiceIdentity
+  ↓
+tool accesses only granted scopes
+  ↓
+tool actions produce receipts
+  ↓
+tool can be suspended, upgraded, forked, removed
+</code></pre>
+<p>A <code>ToolManifest</code> declares what the tool needs; a <code>ToolBinding</code> records how a specific institution has chosen to use it. Both are future objects.</p>
+<h3>Tool runtime modes</h3>
+<ul>
+<li><strong>Local node service</strong> — runs on the institution&#39;s own ICN node</li>
+<li><strong>Frontend-only view</strong> — no service identity, just a client over signed APIs</li>
+<li><strong>Compute workload</strong> — runs as an <code>icn-compute-jobs</code> workload with workload-manifest constraints</li>
+<li><strong>Bridge adapter</strong> — moves data between ICN and an external system; emits <code>BridgeImportReceipt</code></li>
+<li><strong>Shared service run by another co-op / federation</strong> — under an explicit <code>ServiceAgreement</code></li>
+<li><strong>Workstation app</strong> — runs on an enrolled <code>DeviceIdentity</code></li>
+<li><strong>Mobile app</strong> — same enrollment story, smaller form factor</li>
+<li><strong>Package template</strong> — not a runtime, just shapes other tools instantiate</li>
+</ul>
+<h3>Anti-capture rule</h3>
+<p>A tool <strong>must never trap institutional state</strong>. The institution owns:</p>
+<ul>
+<li>records (typed institutional data)</li>
+<li>artifacts (files, media, exports)</li>
+<li>receipts (the proof envelope)</li>
+<li>vaults (encrypted scoped storage)</li>
+<li>permissions (charter / role / <code>authority_scope</code> data)</li>
+<li>export and migration path</li>
+</ul>
+<p>A tool that cannot answer &quot;how does the institution leave you cleanly?&quot; should not be installable.</p>
+<h2>Capability grants and service identities</h2>
+<p>Every tool runs as a <strong>service identity</strong>. Tools never receive blanket access. The granted capability set is bound to:</p>
+<ul>
+<li>a <code>DomainPolicy</code> (what kinds of actions the domain allows tools to take at all)</li>
+<li>a <code>ToolBinding</code> (what <em>this institution</em> allows <em>this tool</em> to do)</li>
+<li>per-action authority checks (existing <code>authority_scope</code> plumbing extended to service identities)</li>
+</ul>
+<p>This is the same authority discipline that members operate under, applied to non-human actors.</p>
+<h2>Receipts emitted by tools</h2>
+<p>A tool emits a receipt when it produces an institutional transition. Examples (planned):</p>
+<table>
+<thead>
+<tr>
+<th>Tool action</th>
+<th>Receipt class</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Publish a public page</td>
+<td><code>PublicationReceipt</code></td>
+</tr>
+<tr>
+<td>Import from Google Drive</td>
+<td><code>BridgeImportReceipt</code></td>
+</tr>
+<tr>
+<td>Settle an obligation against a position</td>
+<td>existing settlement-receipt path (regulatory-safe vocabulary)</td>
+</tr>
+<tr>
+<td>Mark a member as enrolled</td>
+<td>governance/onboarding receipt</td>
+</tr>
+<tr>
+<td>Run a deliberation summary model job</td>
+<td><code>icn-compute-jobs</code> workload receipt + advisory-class flag</td>
+</tr>
+</tbody></table>
+<p>Receipts are how tools prove they did what they claimed; the receipt envelope (<a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a>) is the contract.</p>
+<h2>Boundary discipline</h2>
+<ul>
+<li>Tools running outside ICN (e.g. an external CMS) <strong>may import</strong> but never <strong>export</strong> institutional truth back as canonical state. Imported data carries an explicit external-source marker on the bridge receipt.</li>
+<li>Tools never write to a vault scope they were not explicitly granted.</li>
+<li>Tools that fail or are suspended must leave the institution&#39;s records in a recoverable state. The institution&#39;s data is never in the tool&#39;s database — it is in domain-owned storage that the tool happens to operate on.</li>
+<li>Specialized suites do <strong>not</strong> fork ICN primitives. They bind generic tools.</li>
+</ul>
+<h2>Existing repo support</h2>
+<p>What is in the codebase today that this design builds on:</p>
+<ul>
+<li><code>/me/standing</code> (PR #1627) and <code>/me/action-cards</code> (PR #1659) — the member-facing surfaces a future Action Cards tool will render</li>
+<li>Charter / role / <code>authority_scope</code> plumbing — the policy substrate a <code>DomainPolicy</code> will sit on</li>
+<li>Meeting management (PR #1543), action items (PR #1532), notification digest (PR #1547) — the runtime an <code>icn-meetings</code> tool will render</li>
+<li>Receipt envelope (ADR-0026) — what tool-emitted transitions plug into</li>
+<li>Compute substrate (ADR-0030 / ADR-0031) — what <code>icn-compute-jobs</code> and model workloads run on</li>
+<li>Institution package boundary (<a href="https://github.com/InterCooperative-Network/icn/blob/main/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a>) — the rule specialized suites obey</li>
+</ul>
+<h2>Missing buildout</h2>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ToolManifest</code></td>
+<td>Declares capabilities, data touched, storage needs, privacy classes, UI surfaces, compute jobs, schemas, receipts emitted</td>
+</tr>
+<tr>
+<td><code>ToolBinding</code></td>
+<td>Per-institution configuration; &quot;how <code>nycn</code> uses generic <code>icn-tables</code> for sponsor pipeline&quot; lives in the NYCN package, not in ICN</td>
+</tr>
+<tr>
+<td><code>ToolInstall</code> lifecycle</td>
+<td>submit → review → approve → bind → run → suspend → upgrade → fork → remove</td>
+</tr>
+<tr>
+<td>Tool capability registry per <code>InstitutionalDomain</code></td>
+<td>What tools exist, what scopes they hold, what receipts they emit</td>
+</tr>
+<tr>
+<td>Service identity audit trail</td>
+<td>Per-tool history visible in the existing receipt query path</td>
+</tr>
+</tbody></table>
+<p>Each of these will land via its own ADR or RFC. This document does not pre-commit shapes.</p>
+<h2>Non-goals</h2>
+<ul>
+<li><strong>No</strong> runtime implementation in this PR.</li>
+<li><strong>No</strong> specific tool implementation.</li>
+<li><strong>No</strong> public website changes.</li>
+<li><strong>No</strong> institution-specific tool nouns introduced as normative ICN core concepts. Institution-specific names (for example, NYCN / Summit / partner names) may appear in this document only as illustrative examples of how a specialized suite would be composed, not as core tool ecosystem dependencies.</li>
+<li><strong>No</strong> &quot;ICN App Store&quot; framing — tool installation is a governance act, not a marketplace transaction.</li>
+</ul>
+<h2>References</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_DOMAIN_INFRASTRUCTURE">`COOPERATIVE_DOMAIN_INFRASTRUCTURE.md`</a> — parent design</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/MODEL_WORKLOADS_AND_DELIBERATION">`MODEL_WORKLOADS_AND_DELIBERATION.md`</a> — companion: model workloads as compute jobs</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/DOMAIN_ROUTING_AND_DNS_BINDINGS">`DOMAIN_ROUTING_AND_DNS_BINDINGS.md`</a> — companion: routing</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a> — what stays in ICN vs in a package</li>
+<li><a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a>, <a href="/docs/adr/ADR-0027-action-card-contract">ADR-0027</a>, <a href="/docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary">ADR-0030</a>, <a href="/docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy">ADR-0031</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

@@ -1,0 +1,318 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Model Workloads and Deliberation | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>MODEL WORKLOADS AND DELIBERATION</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/MODEL_WORKLOADS_AND_DELIBERATION.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: design-direction
+Authority: architecture (forward-direction; not yet normative)
+Canonical: no
+Last Reviewed: 2026-04-27</h2>
+<h1>Model Workloads and Deliberation</h1>
+<blockquote>
+<p><strong>Status: draft / design direction / roadmap.</strong> Names a future class of compute workloads inside ICN — model-driven advisory work that supports deliberation. Items marked <em>planned</em> are not in the repo today. Companion to <a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_DOMAIN_INFRASTRUCTURE">`COOPERATIVE_DOMAIN_INFRASTRUCTURE.md`</a> and <a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_TOOL_COMMONS">`COOPERATIVE_TOOL_COMMONS.md`</a>.</p>
+</blockquote>
+<h2>Summary</h2>
+<p>ICN treats compute as <strong>constrained execution with workload manifests, fuel/resource limits, privacy/determinism classes, scope, resource profile, and optional mandate reference</strong> (<a href="/docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary">ADR-0030</a>, <a href="/docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy">ADR-0031</a>). Models are one kind of compute workload.</p>
+<blockquote>
+<p><strong>Compute executes. Compute does not decide.</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>Models can assist institutions. They cannot govern institutions.</strong></p>
+</blockquote>
+<p>This document records what models are <em>for</em> in ICN, what they are explicitly <em>not for</em>, and how their outputs become institutional state — through governance review, never automatically.</p>
+<h2>What models are for</h2>
+<p>Allowed model uses (advisory, source-linked, receipted):</p>
+<ul>
+<li>summarize meeting notes</li>
+<li>transcribe meetings</li>
+<li>translate materials</li>
+<li>create source-linked proposal briefs</li>
+<li>map arguments in deliberation</li>
+<li>summarize prior decisions and receipts</li>
+<li>extract proposed action items</li>
+<li>classify survey or evaluation themes</li>
+<li>draft reports and public copy</li>
+<li>prepare grant or sponsor drafts</li>
+<li>search archives (permission-aware embeddings)</li>
+<li>create embeddings for permission-aware search</li>
+<li>detect missing context or unresolved questions</li>
+</ul>
+<p>In every case the model produces a <strong>draft, suggestion, summary, classification, or artifact</strong> — and that artifact remains advisory until an authorized human or governance act takes it up.</p>
+<h2>What models are not for</h2>
+<p>Forbidden model uses:</p>
+<ul>
+<li><strong>decide votes</strong> — a vote is a member act</li>
+<li><strong>approve budgets</strong> — allocation is a governance act</li>
+<li><strong>admit or reject members</strong> — a membership decision is a governance act</li>
+<li><strong>assign authority</strong> — <code>authority_scope</code> is constitutional, not advisory</li>
+<li><strong>resolve disputes</strong> — disputes go through institutional process, not model output</li>
+<li><strong>rank member worth</strong> — the institution does not have a worth ranking</li>
+<li><strong>profile political reliability</strong> — out of scope; not a thing ICN supports</li>
+<li><strong>auto-publish restricted data</strong> — publication requires authorization and a publication receipt</li>
+<li><strong>auto-settle obligations</strong> — settlement is a governance act with a settlement receipt</li>
+<li><strong>auto-sanction people</strong> — sanctions are governance acts with appeal paths</li>
+<li><strong>make binding governance decisions</strong> of any kind</li>
+</ul>
+<p>Phrasing rule: a model <strong>may</strong> produce a draft; an <strong>authorized institution</strong> turns that output into institutional state.</p>
+<h2>Model-assisted deliberation</h2>
+<p>The most valuable model use in cooperative infrastructure is <strong>getting everyone on the same page</strong>. A model can produce a neutral, source-linked deliberation packet:</p>
+<ul>
+<li>what are we deciding?</li>
+<li>why are we deciding it?</li>
+<li>what has already been said?</li>
+<li>what prior decisions and receipts matter?</li>
+<li>what are the options?</li>
+<li>what are the tradeoffs?</li>
+<li>what objections exist?</li>
+<li>what questions are unresolved?</li>
+<li>who is affected?</li>
+<li>what needs to happen next?</li>
+</ul>
+<p>The packet is a <strong>draft / advisory artifact</strong>. It enters institutional state only after an authorized review.</p>
+<p>This is not a robot deliberator. It is closer to a research librarian: it cites, it organizes, it does not vote.</p>
+<h2>Workload shape</h2>
+<p>A model workload is a compute workload (per ADR-0030/0031) with a few extra pieces:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>model_artifact_hash</code></td>
+<td>Content-addressed reference to the model artifact in a future model registry</td>
+</tr>
+<tr>
+<td><code>model_version</code></td>
+<td>Version metadata</td>
+</tr>
+<tr>
+<td><code>prompt_template_hash</code></td>
+<td>Hash of the prompt or generation template, so the workload is reproducible</td>
+</tr>
+<tr>
+<td><code>input_artifact_hashes</code></td>
+<td>Content-addressed references to inputs (meeting notes, prior receipts, source documents)</td>
+</tr>
+<tr>
+<td><code>output_artifact_hashes</code></td>
+<td>Content-addressed references to outputs (draft summary, packet, transcript, classification)</td>
+</tr>
+<tr>
+<td><code>privacy_class</code></td>
+<td>Inherits from compute substrate; bounds where the workload may run</td>
+</tr>
+<tr>
+<td><code>determinism_class</code></td>
+<td><code>advisory</code> (model output) vs <code>deterministic</code> (e.g. canonical hashing). Advisory is the default for model workloads.</td>
+</tr>
+<tr>
+<td><code>runner_did</code></td>
+<td>The service identity that executed the workload</td>
+</tr>
+<tr>
+<td><code>scope</code></td>
+<td>Scopes the workload to a domain / structure / activity</td>
+</tr>
+<tr>
+<td><code>output_receipt</code></td>
+<td>Receipt produced by the workload, advisory-classed</td>
+</tr>
+<tr>
+<td><code>external_model_bridge_policy</code></td>
+<td>Whether and how the workload may call out to an external model service</td>
+</tr>
+</tbody></table>
+<p>These are <strong>planned</strong>. Today the substrate has the workload manifest, fuel/resource limits, privacy/determinism classes, scope, resource profile, and optional mandate reference (ADR-0030). The model-specific fields are future additions.</p>
+<h2>Model registry (planned)</h2>
+<p>A <code>ModelRegistry</code> records:</p>
+<ul>
+<li>model artifact hash</li>
+<li>model version</li>
+<li>provenance (where it came from, who packaged it)</li>
+<li>license / use restrictions</li>
+<li>privacy class compatibility</li>
+<li>known evaluation results</li>
+<li>federation visibility (per-institution, federation-shared, public-commons)</li>
+</ul>
+<p>Without a registry, advisory workloads cannot pin a reproducible model — and a workload that cannot be re-run is not auditable.</p>
+<h2>External model bridges</h2>
+<p>Some institutions will want to call external model services. The bridge is a <strong>service identity</strong> with explicit policy:</p>
+<ul>
+<li>which institutional domain may use it</li>
+<li>what privacy classes may flow to it</li>
+<li>what request hashes are recorded</li>
+<li>what response hashes are recorded</li>
+<li>whether and how outputs return as artifacts</li>
+<li>a <code>BridgeImportReceipt</code>-style record per call</li>
+</ul>
+<p>External model bridges follow the <strong>anti-capture rule</strong>: institutional state never lives at the external service. Inputs and outputs flow back as artifacts under the institution&#39;s own <code>ArtifactRegistry</code>.</p>
+<h2>Receipts and audit</h2>
+<p>Every advisory workload produces an <code>output_receipt</code> carrying:</p>
+<ul>
+<li>workload identity (manifest hash + runner DID)</li>
+<li>input artifact hashes</li>
+<li>output artifact hashes</li>
+<li>prompt / template hash</li>
+<li>determinism class (advisory)</li>
+<li>timestamp</li>
+<li>scope</li>
+</ul>
+<p>This is the audit trail that lets an institution later answer &quot;what model produced this draft, against what inputs, on what date?&quot; — without that answer, the draft cannot meaningfully be reviewed or trusted.</p>
+<h2>Deliberation pattern (end-to-end, planned)</h2>
+<pre><code>member opens action card             ──► /me/action-cards (existing)
+&quot;deliberate proposal X&quot;
+       ↓
+governance tool requests deliberation packet
+       ↓
+icn-compute-jobs runs a model workload
+   inputs: proposal text, prior decisions/receipts, comments
+   determinism class: advisory
+       ↓
+output artifact: source-linked deliberation packet
+       ↓
+output receipt persisted in receipt envelope
+       ↓
+members read packet, comment, propose amendments
+       ↓
+governance vote (existing: GovernanceDecisionReceipt path)
+       ↓
+decision becomes institutional state
+       ↓
+action items emitted (existing: decision-to-action bridge, PR #1532)
+</code></pre>
+<p>Model output never short-circuits this loop. Every transition that becomes institutional state is a governance act with a receipt.</p>
+<h2>Boundary discipline</h2>
+<ul>
+<li>An advisory artifact becomes institutional state <strong>only</strong> after an authorized human or governance act takes it up. The act is what transitions; the artifact is what informed the act.</li>
+<li>Models do not see vault data they were not explicitly scoped to. Permission-aware embeddings honor scope.</li>
+<li>Model output never bypasses the receipt envelope. A model-produced public draft becomes a public artifact only after a <code>PublicationReceipt</code>.</li>
+<li>A model that cannot be reproduced (missing artifact hash, missing prompt hash) cannot be cited as a source for institutional state.</li>
+</ul>
+<h2>Existing repo support</h2>
+<ul>
+<li>Compute substrate: workload manifest, fuel/resource limits, privacy/determinism classes, scope, resource profile, optional mandate reference (<a href="/docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary">ADR-0030</a>)</li>
+<li>Commons compute admission and settlement policy (<a href="/docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy">ADR-0031</a>)</li>
+<li>Receipt envelope including the artifact-receipt layer (<a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a>)</li>
+</ul>
+<h2>Missing buildout</h2>
+<ul>
+<li><code>ModelArtifact</code> registry with content-addressed hashing</li>
+<li>explicit <code>advisory</code> vs <code>deterministic</code> workload classification surface</li>
+<li>prompt-template hashing convention</li>
+<li>output-receipt class extension carrying model-specific fields</li>
+<li>external model bridge service-identity pattern + per-call receipt</li>
+<li>deliberation-packet template (the source-linked summary shape)</li>
+</ul>
+<h2>Non-goals</h2>
+<ul>
+<li><strong>No</strong> automated decision-making on member, governance, allocation, or sanction questions.</li>
+<li><strong>No</strong> model-as-arbiter framing.</li>
+<li><strong>No</strong> runtime implementation in this PR.</li>
+<li><strong>No</strong> specific model vendor or hosting choice — design is bridge-friendly to multiple model runtimes.</li>
+<li><strong>No</strong> institution-specific deliberation rules in ICN core. Institution packages can constrain <em>which</em> model classes their domain allows, not the substrate&#39;s shape.</li>
+</ul>
+<h2>References</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_DOMAIN_INFRASTRUCTURE">`COOPERATIVE_DOMAIN_INFRASTRUCTURE.md`</a> — parent design</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_TOOL_COMMONS">`COOPERATIVE_TOOL_COMMONS.md`</a> — companion: tools</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/DOMAIN_ROUTING_AND_DNS_BINDINGS">`DOMAIN_ROUTING_AND_DNS_BINDINGS.md`</a> — companion: routing</li>
+<li><a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a>, <a href="/docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary">ADR-0030</a>, <a href="/docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy">ADR-0031</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
