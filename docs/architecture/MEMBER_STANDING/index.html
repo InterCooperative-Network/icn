@@ -1,0 +1,887 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Member Standing and Accessible Participation | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>MEMBER STANDING</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/MEMBER_STANDING.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: design contract
+Canonical: no
+Authority: architecture (complements THE_COMMONS.md and KERNEL_APP_SEPARATION.md)
+Last Reviewed: 2026-04-24
+Owner: Matt Faherty</h2>
+<h1>Member Standing and Accessible Participation</h1>
+<blockquote>
+<p><strong><code>/me/standing</code> is ICN&#39;s canonical answer to: who am I, where do I belong, what can I do, under whose authority, in which scope right now, with what duties waiting, and what do I need in order to understand any of this?</strong></p>
+<p>It is the substrate under the Commons Shell. It is the substrate under Action Cards. It is the substrate under accessible and assisted participation. It is not a convenience endpoint.</p>
+</blockquote>
+<p>This document is the design contract for <code>GET /me/standing</code>. It sits directly beneath <code>docs/architecture/THE_COMMONS.md</code> and inherits from it: The Commons doctrine says ordinary people must be able to participate in Commons institutions without becoming sysadmins; this document specifies the surface that makes that possible. It complements <code>docs/architecture/KERNEL_APP_SEPARATION.md</code> (the Meaning Firewall) and <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> (institution packaging), and takes the <code>[future design]</code> marker from <code>THE_COMMONS.md §9</code> and turns it into a concrete, implementation-ready contract.</p>
+<p><strong>This is design-only.</strong> No endpoint is authorized for implementation here. Implementation happens in subsequent phases, each with its own PR.</p>
+<hr>
+<h2>Purpose</h2>
+<p><code>GET /me/standing</code> is the canonical answer to a set of questions a member should be able to ask once and receive one coherent response to:</p>
+<ul>
+<li><strong>Who am I?</strong> What cryptographic identity is the caller, and what individual entity does that identity correspond to?</li>
+<li><strong>Where do I belong?</strong> Which entities (communities, cooperatives, federations) list me as a member, and in what role?</li>
+<li><strong>What can I do?</strong> What capabilities do I hold, broken down by the scope they apply in?</li>
+<li><strong>Under what authority?</strong> Which of my capabilities come from membership, which from role assignments in structures, which from explicit authority grants, which from mandates tied to specific decisions, which from delegations held from other individuals?</li>
+<li><strong>Which hat am I wearing right now?</strong> What is my currently selected active scope? What scopes could I select? What changes when I do?</li>
+<li><strong>What needs my attention?</strong> What action items, pending votes, upcoming meetings, expiring grants, or membership decisions are assigned to me or open in scopes where I can act?</li>
+<li><strong>Under which institution am I acting at this moment?</strong> The canonical id, human display label, any aliases in use, and the charter context.</li>
+<li><strong>What do I need in order to understand any of this?</strong> Plain-language summaries, glossary keys, translations, screen-reader structure, low-bandwidth fallbacks.</li>
+</ul>
+<p><code>/me/standing</code> exists so that every member-facing surface — the Commons Shell, Action Cards, the mobile wallet, the pilot PWA, a library-terminal session, a CLI summary, an assisted-participation kiosk — can draw from a single authoritative view of the caller&#39;s participatory position. It is not a dashboard feed, not an admin query, not an identity profile, and not a replacement for existing primitives. It is the join point.</p>
+<blockquote>
+<p><strong>If <code>/me/standing</code> fails, every accessible participation surface above it fails.</strong> This document treats it accordingly.</p>
+</blockquote>
+<hr>
+<h2>Relationship to The Commons</h2>
+<p><code>docs/architecture/THE_COMMONS.md</code> establishes the doctrine: ICN is infrastructure for The Commons; The Commons is plural; the kernel must not bake one social doctrine into its mechanics; the <strong>Meaning Firewall</strong> is how ICN remains usable by Commons institutions that disagree about meaning.</p>
+<p>That doctrine implies a specific obligation for the member-facing surface:</p>
+<ul>
+<li>A Commons Shell must give ordinary people — not operators, not developers, not trained admins — a legible way to act inside the institutions they belong to.</li>
+<li>Legibility requires a unified view of standing. Without it, every screen reconstructs authority ad hoc from <code>RoleAssignment</code>, <code>Membership</code>, <code>AuthorityGrant</code>, <code>Mandate</code>, and JWT scopes, and each reconstruction drifts.</li>
+<li>The unified view must be <strong>reporting</strong>, not <strong>defining</strong>. It must not invent institutional meaning; it must render what the charters, proposals, grants, and mandates already say.</li>
+</ul>
+<p><code>/me/standing</code> is that unified view. It is the bridge from kernel/governance/entity primitives to human-facing participation. It crosses the Meaning Firewall only in one direction: the endpoint computes from typed substrate data, hands the result to the shell, and the shell renders human meaning. The kernel still sees only <code>ConstraintSet</code>, <code>PolicyDecision</code>, <code>Capability</code>, and typed invariants; the endpoint adds no new semantic authority.</p>
+<blockquote>
+<p>A member should be able to see their standing without becoming literate in ICN&#39;s type system. The type system is the <em>source</em> of the answer, not the <em>shape</em> of the answer.</p>
+</blockquote>
+<hr>
+<h2>Relationship to NYCN Bootstrap Reality</h2>
+<p>The NYCN institutional bootstrap track is the first real pressure test of the entity / structure / program / activity / milestone model. Its lesson for <code>/me/standing</code> is concrete and non-negotiable:</p>
+<ol>
+<li><strong>Integration tests passing is not the same as live validation.</strong> The repo&#39;s integration tests for entities, structures, and proposals pass. Live validation against an actual gateway on port 8085 (after port 8080 conflict diagnosis) has already surfaced route/runtime drift — <code>apply</code> completed 5 operations and then 404&#39;d on <code>/v1/gov/entities/{entity_id}/structures</code>. That is not a kernel-level invariant violation. It is the gap between typed repo primitives and their routed, escaped, gateway-wired representation.</li>
+<li><strong>Member-facing standing must be grounded in live, routable, explicit institutional state.</strong> If <code>/me/standing</code> returns role assignments in structures whose routes are 404ing, the member cannot act on them. The endpoint must not paper over route/schema drift; it must surface it as a warning the Commons Shell can render.</li>
+<li><strong>Entity IDs contain colons by construction.</strong> The format <code>entity:icn:&lt;type&gt;:&lt;slug&gt;</code> (see <code>icn/crates/icn-entity/src/entity.rs</code>) means every live path segment containing an entity id must be URL-encoded correctly or the route must be designed to avoid raw-id embedding. This is the proximate class of failure behind PR #1591 (colon-safe proposal index keys) and likely behind the bootstrap 404. <code>/me/standing</code> must emit canonical ids <strong>and</strong> route-safe representations, and never trust display labels or aliases for authority decisions.</li>
+<li><strong>Aliases from bootstrap apply must be legible but non-authoritative.</strong> NYCN&#39;s bootstrap binds aliases like <code>nycn</code>, <code>nycn-organizers</code>, <code>summit-cycle-2026</code>, <code>summit-2026</code> to canonical entity ids. <code>/me/standing</code> must render the alias for humans and return the canonical id for actions. Aliases are UX; canonical ids are authority.</li>
+</ol>
+<p><code>/me/standing</code> is not responsible for fixing the live 404. That work belongs to the <code>feat/live-nycn-bootstrap-validation</code> track. But this design absorbs the lesson: a member-facing contract specified only at the type level is insufficient. The contract must include the distinction between canonical id, route-safe representation, alias, display label, and translated label, and it must include warnings for the ways those can drift.</p>
+<p>NYCN is used here only as the first concrete example. Identifiers like <code>nycn</code>, <code>nycn-organizers</code>, <code>summit-cycle-2026</code>, and <code>summit-2026</code> are illustrative. They are not baked into core semantics and must not be. The generic shape is <code>entity:icn:&lt;type&gt;:&lt;slug&gt;</code>; NYCN is one instance.</p>
+<hr>
+<h2>Non-Goals</h2>
+<p><code>/me/standing</code> is deliberately scoped. It does not:</p>
+<ul>
+<li><strong>Implement the endpoint.</strong> This document specifies the contract; implementation is a separate phase.</li>
+<li><strong>Fix the live NYCN bootstrap 404.</strong> That is a route / runtime concern for <code>feat/live-nycn-bootstrap-validation</code>.</li>
+<li><strong>Replace <code>/gov/me/scopes</code> or <code>/gov/me/work</code>.</strong> Those remain the authoritative feeds for role assignments and action items. <code>/me/standing</code> composes their outputs; it does not duplicate them.</li>
+<li><strong>Define the final UI.</strong> Rendering is the Commons Shell&#39;s job. <code>/me/standing</code> is the data contract that multiple renderings can consume.</li>
+<li><strong>Define the final Action Card ranking.</strong> That is <code>/me/action-cards</code> (<code>[future design]</code>), which consumes standing + open work + deadlines.</li>
+<li><strong>Create a global identity hierarchy.</strong> There is no top. <code>/me/standing</code> returns the caller&#39;s position in a plural, federated landscape, not a place in a global org chart.</li>
+<li><strong>Centralize membership meaning.</strong> Charters define what membership means. <code>/me/standing</code> reports what the charter-backed primitives say; it does not interpret them.</li>
+<li><strong>Bypass charters.</strong> Every capability returned by <code>/me/standing</code> traces to a charter-backed primitive: <code>Membership</code>, <code>RoleAssignment</code>, <code>AuthorityGrant</code>, <code>Mandate</code>, <code>Delegation</code>. If a capability is not grounded there, it must not appear.</li>
+<li><strong>Weaken capability checks.</strong> <code>/me/standing</code> reports what the caller <em>could</em> do at the authorization layer; the enforcement boundary remains unchanged. Reporting is not granting.</li>
+<li><strong>Make assisted participation unrestricted.</strong> Helpers don&#39;t gain authority by helping. The endpoint does not smuggle helper capability into the member&#39;s standing.</li>
+<li><strong>Make every private membership public.</strong> The response is caller-centered. Admin or third-party standing queries are explicitly out of scope and deferred.</li>
+<li><strong>Turn accessibility into cosmetic UI.</strong> Accessibility metadata is structural. It affects what the endpoint returns, not only how a downstream UI styles it.</li>
+<li><strong>Turn operator setup into a member-facing requirement.</strong> Bind ports, keystore passphrases, JWT secrets, sled lock files, and coop-id formats are operator concerns. <code>/me/standing</code> returns nothing that requires a member to understand any of them.</li>
+</ul>
+<hr>
+<h2>First Principles</h2>
+<p>Start from the human participation needs enumerated in <code>THE_COMMONS.md §First Principles</code> — belonging, agency, memory, recognition, access, voice, repair, continuity, bounded authority, transparent rules — and derive what they require from a standing surface.</p>
+<h3>Needs → Endpoint Requirements</h3>
+<table>
+<thead>
+<tr>
+<th>Human / institutional need</th>
+<th>Requirement on <code>/me/standing</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Belonging</td>
+<td>Identity is cryptographically anchored (<code>Did</code>) and human-readable at the surface (display label, individual entity id). Membership is queryable.</td>
+</tr>
+<tr>
+<td>Agency</td>
+<td>The endpoint is callable by the member themselves, from any device holding their key, without central-operator permission.</td>
+</tr>
+<tr>
+<td>Comprehension</td>
+<td>Every role, grant, mandate, and scope is explainable — not as raw ids, but as &quot;what authority this gives you, from whom, until when.&quot;</td>
+</tr>
+<tr>
+<td>Voice</td>
+<td>Pending votes, proposals, and amendments the caller can act on are either surfaced here (as pointers) or reachable via linked endpoints.</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>Receipts and provenance are pointed at, not inlined. The endpoint tells the member where to verify, not what to trust.</td>
+</tr>
+<tr>
+<td>Trust</td>
+<td>Every authority basis is named by primitive type and id so the member (or a third party later) can audit the claim.</td>
+</tr>
+<tr>
+<td>Repair</td>
+<td>Expired, revoked, or ambiguous authorities are surfaced as warnings, not silently dropped. Errors are legible, not swallowed.</td>
+</tr>
+<tr>
+<td>Continuity</td>
+<td>Mandates and grants approaching expiry are surfaced with lead time. Role handoffs are visible.</td>
+</tr>
+<tr>
+<td>Role clarity</td>
+<td>Each scope is explicitly labeled and distinguishable (self vs. member vs. role-holder vs. representative vs. operator).</td>
+</tr>
+<tr>
+<td>Decision clarity</td>
+<td>Active scope is explicit. The caller can see which scope an action would execute under before they act.</td>
+</tr>
+<tr>
+<td>Authority clarity</td>
+<td>Capability is broken down by source: membership, role, grant, mandate, delegation. No &quot;mystery admin&quot; capability.</td>
+</tr>
+<tr>
+<td>Language access</td>
+<td>Human labels are renderable per the caller&#39;s preferred language; canonical ids are stable.</td>
+</tr>
+<tr>
+<td>Disability access</td>
+<td>Structural metadata (screen-reader-safe summary, plain-language mode, glossary keys) is first-class, not a downstream skin.</td>
+</tr>
+<tr>
+<td>Device access</td>
+<td>The payload is small enough to render on a low-end phone; there is a text-only fallback shape.</td>
+</tr>
+<tr>
+<td>Low-bandwidth access</td>
+<td>A minimal mode omits optional fields; no field is required to exceed a modest size.</td>
+</tr>
+<tr>
+<td>Device-loss recovery</td>
+<td>The endpoint does not hold state on the member&#39;s device; standing is computed server-side and the member can re-enroll on any device with key recovery.</td>
+</tr>
+<tr>
+<td>Async participation</td>
+<td>Pending work includes deadlines; the endpoint can be polled or cached and used offline with clear sync states.</td>
+</tr>
+<tr>
+<td>Post-hoc verification</td>
+<td>Every authority claim points to a receipt or primitive id a third party could re-derive.</td>
+</tr>
+</tbody></table>
+<h3>Derived Requirements (blunt)</h3>
+<ol>
+<li>Identity must be both cryptographically anchored (<code>Did</code>) and human-legible (display label, canonical entity id).</li>
+<li>Memberships must be queryable with role, status, and capability breakdown.</li>
+<li>Roles must be explainable — not &quot;role:coordinator&quot; without a structure, not &quot;authority_scope&quot; strings without human translation.</li>
+<li>Authority must trace to one of: membership, role assignment, grant, mandate, delegation. No ambient authority.</li>
+<li>Active scope must be explicit in the response and reflected in every action the caller subsequently takes.</li>
+<li>Permissions must be derivable per scope and understandable without consulting external docs.</li>
+<li>Pending work must be visible here (pointers; details on linked endpoints).</li>
+<li>Every item must be renderable as an Action Card: it has a subject, a scope, an authority basis, a next-step, and a deadline or none.</li>
+<li>Plain-language summaries must exist for every authority concept.</li>
+<li>Translation and glossary hooks must be first-class.</li>
+<li>Offline / read-only fallback must be supported (the response must be cacheable and safely re-render without a live connection).</li>
+<li>Assisted participation must leave a receipt trail.</li>
+<li>Privacy boundaries must be explicit; the response is caller-centered.</li>
+<li>Canonical route-level identifiers must be distinct from human labels/aliases, and both must appear in the response.</li>
+</ol>
+<hr>
+<h2>Accessibility as Anti-Capture Infrastructure</h2>
+<blockquote>
+<p><strong>Accessibility is not charity. Accessibility is anti-capture infrastructure.</strong></p>
+</blockquote>
+<p>Every barrier to participation creates a ruling class. A technical barrier creates a sysadmin priesthood. An English-only barrier creates a linguistic priesthood. A laptop-only barrier creates a wealth priesthood. A synchronous-meeting-only barrier creates an availability priesthood. A legalese barrier creates a lawyer priesthood. An operator-shell barrier creates an operator priesthood. Each of these, over time, captures the institution by exclusion.</p>
+<p>The Commons cannot afford to reproduce those priesthoods inside its own substrate. That means <code>/me/standing</code> — and every member-facing surface above it — must be designed for:</p>
+<ul>
+<li><strong>Old phones.</strong> Three-to-five-year-old Android devices with modest RAM and slow flash.</li>
+<li><strong>Low bandwidth.</strong> 2G-class connections, metered data, shared tethering.</li>
+<li><strong>Intermittent connectivity.</strong> Rural, transit-based, disaster-recovery, outage-prone networks.</li>
+<li><strong>Shared devices.</strong> Library terminals, community-center kiosks, household tablets.</li>
+<li><strong>Second-language users.</strong> Members whose primary language is not the institution&#39;s working language.</li>
+<li><strong>Screen readers.</strong> Full semantic structure, no meaning conveyed only by visual layout.</li>
+<li><strong>Keyboard and switch navigation.</strong> Full interaction without pointer devices.</li>
+<li><strong>Cognitive-load reduction.</strong> Short sentences, one idea per paragraph, glossary on demand, no hidden state.</li>
+<li><strong>Large text, high contrast, reduced motion.</strong> Required by users with low vision, photosensitivity, or vestibular conditions.</li>
+<li><strong>Plain-language institutional explanations.</strong> &quot;What does it mean that you&#39;re a representative of GreenStar in NYCN?&quot; — answerable in one sentence without jargon.</li>
+<li><strong>Translated institutional concepts, not just UI labels.</strong> &quot;Proposal,&quot; &quot;quorum,&quot; &quot;mandate,&quot; &quot;delegation,&quot; &quot;charter&quot; each need a translated <em>definition</em>, not just a translated button.</li>
+<li><strong>Offline reading and later submission where safe.</strong> Members can read their standing, compose a vote, and submit on reconnect, with clear sync state at every step.</li>
+<li><strong>Assisted participation with receipts and anti-coercion protections.</strong> When someone helps, the help is visible in provenance, and the action is still the member&#39;s.</li>
+</ul>
+<p>Accessibility is therefore a <strong>contract-level concern</strong> for <code>/me/standing</code>, not a downstream styling concern. The endpoint must return the data that makes accessible rendering possible: language codes, translation availability, glossary keys, screen-reader-safe summaries, low-bandwidth hints. A downstream UI can choose how to render; it cannot retroactively add data the endpoint did not expose.</p>
+<hr>
+<h2>Operator Complexity Must Not Leak Into Member Participation</h2>
+<p>The live NYCN bootstrap validation exposed a legitimate operator surface: gateway bind ports (8080 vs. 8085), gateway JWT secret, <code>identity.age</code> keystore files, <code>ICN_KEYSTORE_PASSPHRASE</code>, <code>--coop-id</code> flags, daemon startup and shutdown, local data directories, sled lock files, route availability in a specific gateway build, gateway/auth wiring. Those are real operator concerns.</p>
+<p>They must not become member-facing requirements.</p>
+<p>A member should open the Commons Shell (PWA, mobile, terminal, CLI summary, kiosk) and see:</p>
+<ul>
+<li><strong>Identity</strong> — who they are, in human-readable form.</li>
+<li><strong>Belonging</strong> — which entities they are a member of.</li>
+<li><strong>Available actions</strong> — what they can do given their current scope.</li>
+<li><strong>Pending attention</strong> — what is waiting for them.</li>
+<li><strong>Why</strong> — the authority basis for each capability.</li>
+<li><strong>Next steps</strong> — what to click, who to contact, what to sign.</li>
+<li><strong>Verification</strong> — where to check the receipt.</li>
+</ul>
+<p>They must <strong>not</strong> see:</p>
+<ul>
+<li>Sled paths, sled locks, or storage-engine details.</li>
+<li>JWT secrets, signing-key material, or session internals.</li>
+<li>Route mount prefixes or gateway version strings.</li>
+<li>Raw <code>entity:icn:&lt;type&gt;:&lt;slug&gt;</code> colon-separated identifiers as the primary explanation of where they belong.</li>
+<li>URL escaping concerns.</li>
+<li>Coop-id flag formats.</li>
+<li>Daemon lifecycle or infrastructure state.</li>
+</ul>
+<p><code>/me/standing</code> is the firewall between the two audiences. It speaks typed substrate primitives on its input side and human-usable standing on its output side. Operator diagnostics (route drift warnings, schema-version mismatches, stale cache indicators) may appear in the response as typed warnings, but they must be framed for the member&#39;s downstream shell to render gracefully — &quot;some information may be out of date; try again later&quot; — not dumped as raw operator noise.</p>
+<hr>
+<h2>Endpoint Contract: <code>GET /me/standing</code></h2>
+<p>This section specifies the contract at the level needed to review and implement. It is deliberately restrained about routing and auth specifics; those are implementation choices constrained by what follows.</p>
+<h3>Method and Path</h3>
+<p><code>GET /me/standing</code></p>
+<p>Namespace options (pick in an implementation ADR, not here):</p>
+<ul>
+<li><strong>Option A — new member-facing namespace</strong>: <code>/me/standing</code> under a new <code>/me/*</code> root. Pros: clear member-facing boundary; easily extended to <code>/me/action-cards</code> and future member endpoints. Cons: introduces a new top-level namespace.</li>
+<li><strong>Option B — under existing governance namespace</strong>: <code>/gov/me/standing</code>. Pros: reuses the existing <code>/gov/me/*</code> convention used by <code>/gov/me/scopes</code> and <code>/gov/me/work</code>. Cons: conflates governance standing with broader participatory standing (memberships, representation mandates, operator scopes).</li>
+<li><strong>Option C — deferred</strong>: ship the data shape under whichever existing namespace is fastest, and rename in a later phase.</li>
+</ul>
+<p><strong>Recommendation</strong>: Option A. The response composes governance, entity, identity, and policy data, which is broader than <code>/gov/*</code>. A new <code>/me/*</code> namespace signals to the shell team that this is <em>the</em> doorway. However, the recommendation is non-binding; the final routing decision belongs to an implementation ADR that verifies there is no conflict with existing <code>/me/*</code> routes and that gateway mounts match.</p>
+<h3>Authentication</h3>
+<p>Standard gateway JWT-bearer auth, as used by <code>/gov/me/scopes</code> and <code>/gov/me/work</code> (<code>Authorization: Bearer &lt;token&gt;</code>, <code>require_scope</code> check). The caller&#39;s <code>Did</code> is parsed from the token subject.</p>
+<h3>Caller DID Resolution</h3>
+<p>The endpoint resolves the caller&#39;s <code>Did</code> from the verified JWT and treats that as the subject of the response. There is no query parameter to ask for another member&#39;s standing in the initial design. Admin-scoped third-party queries are explicitly out of scope here and deferred to a separate design with explicit capability checks and privacy review.</p>
+<h3>Default Behavior</h3>
+<p><code>GET /me/standing</code> returns the caller&#39;s full current standing: memberships, role assignments, authority grants held, mandates, delegations, currently selected active scope (if any), available active scopes, effective capabilities per scope, pointers to pending work, accessibility metadata, warnings.</p>
+<h3>Privacy Behavior</h3>
+<ul>
+<li>Caller-centered: only the caller&#39;s own standing is returned.</li>
+<li>Entities that list the caller as a member appear in the response with the caller&#39;s role inside them — <strong>not</strong> with the full roster of other members.</li>
+<li>Federation views show the caller&#39;s representational authority, not the federation&#39;s internal structure beyond what membership confers.</li>
+<li>Expired or revoked items are included <strong>if the caller had or holds them</strong>, because surfacing revocations matters for repair. They are clearly marked.</li>
+</ul>
+<h3>Error Behavior</h3>
+<ul>
+<li>Unauthenticated caller: <code>401</code>.</li>
+<li>Authenticated caller with no memberships and no role assignments: <code>200</code> with an empty standing shape (identity + empty lists + empty warnings). Empty standing is a legitimate state.</li>
+<li>Internal store errors: <code>500</code> with a typed error body; the shell renders &quot;standing temporarily unavailable&quot; and retries.</li>
+<li>Partial data (e.g., memberships resolved but mandates store unreachable): <code>200</code> with populated fields <strong>and</strong> an explicit warning entry indicating which subsystem is stale. The shell renders &quot;some information may be out of date&quot;; the caller is never silently misinformed.</li>
+</ul>
+<h3>Relationship to Current Active Scope</h3>
+<p>If the caller has an explicitly selected active scope (per the <code>[future design]</code> active-scope primitive — see §Active Scope), the response includes it. Otherwise, <code>active_scope</code> is either <code>null</code> or the <code>self</code> default, and the Commons Shell is expected to prompt the member to select one before authority-bearing actions.</p>
+<h3>Relationship to <code>/gov/me/scopes</code> and <code>/gov/me/work</code></h3>
+<ul>
+<li><code>/gov/me/scopes</code> — authoritative for role assignments. <code>/me/standing</code> composes its output in the <code>roles</code> field (see §Proposed JSON Shape) and does not duplicate its query semantics.</li>
+<li><code>/gov/me/work</code> — authoritative for assigned action items. <code>/me/standing</code> returns pointers and summary counts in the <code>pending_work</code> field; the shell fetches details from <code>/gov/me/work</code>.</li>
+</ul>
+<p>This separation is deliberate: <code>/me/standing</code> is the join view; the existing endpoints remain the authoritative feeds. A member-facing shell that wants live, filterable action items continues to call <code>/gov/me/work</code>; a shell that wants the one-shot standing snapshot calls <code>/me/standing</code>.</p>
+<h3>Relationship to Federation / Member Entities</h3>
+<p>If the caller represents another entity in a federation (via a <code>Mandate</code> or an <code>AuthorityGrant</code> of class <code>Representation</code>), the response enumerates the representable entities and the grants/mandates backing them. The caller can then select a <code>representative</code> active scope to act for the represented entity. The federation&#39;s own internal composition is <strong>not</strong> returned; only the caller&#39;s representational position within it.</p>
+<h3>Relationship to NYCN Bootstrap / Live Entities</h3>
+<p>NYCN entities (e.g., <code>entity:icn:federation:nycn</code>, <code>entity:icn:community:nycn-organizers</code>, <code>entity:icn:program:summit-cycle-2026</code>, <code>entity:icn:activity:summit-2026</code>) and their bootstrap-bound aliases (e.g., <code>nycn</code>, <code>nycn-organizers</code>, <code>summit-cycle-2026</code>, <code>summit-2026</code>) appear in the response like any other institutional entities. They carry both their canonical id and their display label/alias. The endpoint does not special-case NYCN, and NYCN must not appear in kernel constants. These examples are for illustration only.</p>
+<hr>
+<h2>Proposed JSON Shape</h2>
+<p>This is the target shape. Fields that current ICN primitives can populate today are annotated <code>[shipped]</code>; fields that require additional primitives are annotated <code>[future design]</code> with a brief note.</p>
+<pre><code class="language-jsonc">{
+  &quot;subject&quot;: {
+    &quot;did&quot;: &quot;did:icn:alice-pubkey&quot;,                                    // [shipped] icn-identity::Did
+    &quot;individual_entity_id&quot;: &quot;entity:icn:individual:alice-pubkey&quot;,     // [shipped] icn-entity::EntityId
+    &quot;display_label&quot;: &quot;Alice&quot;                                          // [future design] display-label resolution; fallback to did
+  },
+  &quot;active_scope&quot;: {                                                   // [future design] active-scope primitive
+    &quot;kind&quot;: &quot;representative&quot;,                                         // self | member | role | representative | operator
+    &quot;represented_entity_id&quot;: &quot;entity:icn:cooperative:greenstar&quot;,      // canonical id
+    &quot;entity_alias&quot;: &quot;greenstar&quot;,                                      // optional, non-authoritative
+    &quot;display_label&quot;: &quot;Representing GreenStar in NYCN&quot;,                // human label
+    &quot;via_grant&quot;: &quot;grant:0xabc...&quot;,                                    // [shipped] AuthorityGrant id
+    &quot;source&quot;: &quot;session_selected&quot;,                                     // session_selected | default_self | jwt_coop_id_fallback
+    &quot;fallback&quot;: false                                                 // true if the endpoint had to fall back to a default
+  },
+  &quot;memberships&quot;: [                                                    // [shipped] icn-entity::Membership
+    {
+      &quot;entity_id&quot;: &quot;entity:icn:cooperative:greenstar&quot;,                // canonical
+      &quot;entity_alias&quot;: &quot;greenstar&quot;,                                    // [future design] alias rendering
+      &quot;entity_display_label&quot;: &quot;GreenStar Cooperative&quot;,                // [future design] display-label resolution
+      &quot;entity_type&quot;: &quot;cooperative&quot;,                                   // [shipped] Entity discriminant
+      &quot;role&quot;: &quot;Worker&quot;,                                               // [shipped] MembershipRole
+      &quot;status&quot;: &quot;Active&quot;,                                             // [shipped] MembershipStatus
+      &quot;shares&quot;: 1,                                                    // [shipped]
+      &quot;capabilities&quot;: [&quot;Vote&quot;, &quot;Propose&quot;],                            // [shipped] MembershipCapability
+      &quot;joined_at&quot;: &quot;2025-06-01T00:00:00Z&quot;,                            // [shipped]
+      &quot;source&quot;: &quot;charter_approved_proposal&quot;                           // [future design] provenance hint
+    }
+  ],
+  &quot;roles&quot;: [                                                          // [future design] `/me/standing` projection over governance role assignments. Current `/gov/me/scopes` (`RoleAssignmentResponse`) returns only `{id, structure_id, person_did, role, start_date, end_date}` and uses raw `StructureId` strings (e.g. `struct-&lt;uuid&gt;`); the richer shape below requires endpoint extension or secondary resolution before it can be composed.
+    {
+      &quot;structure_id&quot;: &quot;structure:icn:committee:nycn-finance&quot;,         // [future design] normalized/canonical structure identifier; current `/gov/me/scopes` returns raw `StructureId`
+      &quot;parent_entity_id&quot;: &quot;entity:icn:federation:nycn&quot;,               // [future design] not present in current `/gov/me/scopes`
+      &quot;structure_display_label&quot;: &quot;NYCN Finance Committee&quot;,            // [future design] display-label resolution
+      &quot;role&quot;: &quot;coordinator&quot;,                                          // [shipped] role value is available via `/gov/me/scopes`
+      &quot;authority_scope&quot;: [&quot;approve-budget-&lt;=5000&quot;],                   // [future design] not present in current `/gov/me/scopes`; requires endpoint extension or secondary resolution
+      &quot;authority_scope_plain_language&quot;: [                             // [future design] plain-language rendering
+        &quot;Approve budget proposals up to 5000 units&quot;
+      ],
+      &quot;valid_from&quot;: &quot;2026-02-01T00:00:00Z&quot;,                           // [future design] normalized field name; underlying `RoleAssignment.start_date: Timestamp`
+      &quot;valid_until&quot;: &quot;2026-12-31T23:59:59Z&quot;                           // [future design] normalized field name; underlying `RoleAssignment.end_date: Option&lt;Timestamp&gt;`
+    }
+  ],
+  &quot;grants&quot;: [                                                         // [future design] `/me/standing` projection over `icn-governance::AuthorityGrant` (ADR-0014). The shape below is an API view; stored types differ — see notes below.
+    {
+      &quot;grant_id&quot;: &quot;550e8400-e29b-41d4-a716-446655440000&quot;,              // [shipped] underlying `AuthorityGrantId(Uuid)`; bare UUID, no `grant:0x…` prefix
+      &quot;class&quot;: &quot;Representation&quot;,                                      // [shipped] `AuthorityClass`: Representation | Execution | Attestation
+      &quot;grantor_entity_id&quot;: &quot;entity:icn:cooperative:greenstar&quot;,        // [shipped] `GrantorEntityId`
+      &quot;grantor_display_label&quot;: &quot;GreenStar Cooperative&quot;,               // [future design] display-label resolution
+      &quot;grantee_did&quot;: &quot;did:icn:alice-pubkey&quot;,                          // [shipped] `Grantee`
+      &quot;scope&quot;: {                                                      // [shipped] `TypedScope` — actual fields are `domain`, `proposal_class`, `action_kind`, `amount_ceiling`, `time_window`
+        &quot;domain&quot;: &quot;nycn-federation-gov&quot;,                              // [shipped] `TypedScope.domain`
+        &quot;proposal_class&quot;: [&quot;Treasury&quot;, &quot;Membership&quot;],                 // [shipped] `TypedScope.proposal_class` (proposal-payload-variant labels)
+        &quot;action_kind&quot;: []                                             // [shipped] `TypedScope.action_kind` (Execution-class only); empty for Representation
+      },
+      &quot;scope_plain_language&quot;: &quot;Represent GreenStar when voting or proposing in NYCN federation governance&quot;, // [future design] plain-language rendering
+      &quot;valid_from&quot;: &quot;2026-01-01T00:00:00Z&quot;,                           // [shipped] `AuthorityGrant.valid_from: Timestamp`
+      &quot;valid_until&quot;: &quot;2026-12-31T23:59:59Z&quot;,                          // [shipped] `AuthorityGrant.valid_until: Option&lt;Timestamp&gt;`
+      &quot;revoked_at&quot;: null,                                             // [shipped] `AuthorityGrant.revoked_at: Option&lt;Timestamp&gt;`
+      &quot;capability_set&quot;: [&quot;Vote&quot;, &quot;Propose&quot;]                           // [future design] derived rendering for the standing surface; not stored on `AuthorityGrant`
+    }
+  ],
+  &quot;mandates&quot;: [                                                       // [shipped] icn-governance::Mandate
+    {
+      &quot;mandate_id&quot;: &quot;mandate:0xdef...&quot;,
+      &quot;represented_entity_id&quot;: &quot;entity:icn:cooperative:greenstar&quot;,
+      &quot;decision&quot;: {                                                   // DecisionProvenance
+        &quot;proposal_id&quot;: &quot;prop:0x123...&quot;,
+        &quot;governance_domain&quot;: &quot;greenstar-internal&quot;
+      },
+      &quot;payload_hash&quot;: &quot;0xdeadbeef&quot;,
+      &quot;grants&quot;: [&quot;grant:0xabc...&quot;],                                   // links to AuthorityGrant ids above
+      &quot;executor_did&quot;: &quot;did:icn:alice-pubkey&quot;,
+      &quot;deadline&quot;: &quot;2026-06-30T23:59:59Z&quot;,
+      &quot;status&quot;: &quot;Active&quot;,                                             // Active | Completed | Expired | Revoked
+      &quot;issued_at&quot;: &quot;2026-04-01T00:00:00Z&quot;,
+      &quot;summary_plain_language&quot;: &quot;Cast GreenStar&#39;s vote on the NYCN 2026 summit budget&quot;
+    }
+  ],
+  &quot;delegations&quot;: {                                                    // [shipped] icn-governance::Delegation (1717 LOC)
+    &quot;held_from&quot;: [                                                    // delegations where caller is the delegate
+      {
+        &quot;delegation_id&quot;: &quot;del:0x111...&quot;,
+        &quot;delegator_did&quot;: &quot;did:icn:bob-pubkey&quot;,
+        &quot;domain&quot;: &quot;greenstar-internal&quot;,
+        &quot;kind&quot;: &quot;domain_scoped&quot;,
+        &quot;valid_until&quot;: &quot;2026-12-31T23:59:59Z&quot;
+      }
+    ],
+    &quot;held_to&quot;: [                                                      // delegations where caller is the delegator
+      {
+        &quot;delegation_id&quot;: &quot;del:0x222...&quot;,
+        &quot;delegatee_did&quot;: &quot;did:icn:carol-pubkey&quot;,
+        &quot;domain&quot;: &quot;nycn-federation-gov&quot;,
+        &quot;kind&quot;: &quot;proposal_scoped&quot;,
+        &quot;proposal_id&quot;: &quot;prop:0x456...&quot;,
+        &quot;valid_until&quot;: &quot;2026-05-15T23:59:59Z&quot;
+      }
+    ]
+  },
+  &quot;available_active_scopes&quot;: [                                        // [future design] active-scope primitive
+    { &quot;kind&quot;: &quot;self&quot;, &quot;label&quot;: &quot;Acting as yourself&quot;,
+      &quot;source_primitive&quot;: &quot;identity&quot; },
+    { &quot;kind&quot;: &quot;member&quot;, &quot;entity_id&quot;: &quot;entity:icn:cooperative:greenstar&quot;,
+      &quot;label&quot;: &quot;Member of GreenStar&quot;,
+      &quot;source_primitive&quot;: &quot;Membership&quot; },
+    { &quot;kind&quot;: &quot;role&quot;, &quot;structure_id&quot;: &quot;structure:icn:committee:nycn-finance&quot;,
+      &quot;label&quot;: &quot;Finance Coordinator, NYCN&quot;,
+      &quot;source_primitive&quot;: &quot;RoleAssignment&quot; },
+    { &quot;kind&quot;: &quot;representative&quot;, &quot;represented_entity_id&quot;: &quot;entity:icn:cooperative:greenstar&quot;,
+      &quot;via_grant&quot;: &quot;grant:0xabc...&quot;,
+      &quot;label&quot;: &quot;Representing GreenStar in NYCN&quot;,
+      &quot;source_primitive&quot;: &quot;AuthorityGrant&quot; },
+    { &quot;kind&quot;: &quot;operator&quot;, &quot;node_id&quot;: &quot;node:home-01&quot;,
+      &quot;label&quot;: &quot;Node operator: home-01&quot;,
+      &quot;source_primitive&quot;: &quot;operator_layer&quot; }                          // [future design] operator scope model
+  ],
+  &quot;effective_scopes&quot;: [                                               // derived: scope strings the kernel would see
+    {
+      &quot;scope_key&quot;: &quot;member:entity:icn:cooperative:greenstar&quot;,
+      &quot;capabilities&quot;: [&quot;Vote&quot;, &quot;Propose&quot;],
+      &quot;derived_from&quot;: [&quot;membership:entity:icn:cooperative:greenstar&quot;]
+    }
+  ],
+  &quot;pending_work&quot;: {                                                   // pointers; details via /gov/me/work
+    &quot;total&quot;: 3,
+    &quot;by_urgency&quot;: { &quot;overdue&quot;: 1, &quot;due_soon&quot;: 1, &quot;later&quot;: 1 },        // [future design] urgency bucketing
+    &quot;feed&quot;: &quot;/gov/me/work&quot;                                            // canonical feed
+  },
+  &quot;action_card_hints&quot;: {                                              // [future design] /me/action-cards
+    &quot;feed&quot;: &quot;/me/action-cards&quot;,
+    &quot;count_by_scope&quot;: {
+      &quot;member:entity:icn:cooperative:greenstar&quot;: 2,
+      &quot;representative:entity:icn:cooperative:greenstar&quot;: 1
+    }
+  },
+  &quot;accessibility&quot;: {                                                  // [future design] language/glossary model
+    &quot;preferred_language&quot;: &quot;en&quot;,
+    &quot;available_translations&quot;: [&quot;en&quot;, &quot;es&quot;],
+    &quot;plain_language_mode&quot;: true,
+    &quot;glossary_keys&quot;: [
+      &quot;mandate&quot;, &quot;delegation&quot;, &quot;representation&quot;, &quot;authority_grant&quot;,
+      &quot;governance_domain&quot;, &quot;proposal&quot;, &quot;structure&quot;
+    ],
+    &quot;screen_reader_summary&quot;: &quot;You are Alice. You are a Worker member of GreenStar Cooperative and a coordinator on the NYCN Finance Committee. You have one representation mandate for GreenStar in NYCN, valid through December 31, 2026. You have three items pending your attention, one of which is overdue.&quot;,
+    &quot;low_bandwidth_hints&quot;: {
+      &quot;omit_optional&quot;: true,                                          // shell signals preference
+      &quot;text_only_fallback_available&quot;: true
+    }
+  },
+  &quot;receipts&quot;: {                                                       // [shipped] where verifiable
+    &quot;memberships_provenance&quot;: &quot;see charter store and accepted membership proposals&quot;,
+    &quot;grants_provenance&quot;: &quot;see AuthorityGrant store&quot;,
+    &quot;mandates_provenance&quot;: &quot;see Mandate store and decision proposals&quot;
+  },
+  &quot;warnings&quot;: [                                                       // typed warning envelope
+    { &quot;kind&quot;: &quot;expired_grant&quot;,    &quot;id&quot;: &quot;grant:0x789...&quot;, &quot;expired_at&quot;: &quot;2026-03-01T00:00:00Z&quot; },
+    { &quot;kind&quot;: &quot;ambiguous_scope&quot;,  &quot;note&quot;: &quot;Two representational grants for entity:icn:cooperative:greenstar overlap in domain nycn-federation-gov.&quot; },
+    { &quot;kind&quot;: &quot;missing_translation&quot;, &quot;language&quot;: &quot;es&quot;, &quot;term_keys&quot;: [&quot;mandate&quot;] },
+    { &quot;kind&quot;: &quot;stale_cache&quot;,      &quot;subsystem&quot;: &quot;mandates&quot;, &quot;last_fresh_at&quot;: &quot;2026-04-23T18:00:00Z&quot; },
+    { &quot;kind&quot;: &quot;route_drift&quot;,      &quot;note&quot;: &quot;Structures index for entity:icn:federation:nycn returned 404 on last probe; capabilities may be stale.&quot; },
+    { &quot;kind&quot;: &quot;reauth_required&quot;,  &quot;reason&quot;: &quot;token_near_expiry&quot; }
+  ]
+}
+</code></pre>
+<p>Fields carrying <code>[shipped]</code> map to present primitives. Fields carrying <code>[future design]</code> are called out and enumerated in §Gaps.</p>
+<hr>
+<h2>Join Plan</h2>
+<p>How <code>/me/standing</code> assembles its response from current repo modules. Real paths are cited. Items requiring new storage or indexing are marked.</p>
+<ol>
+<li><strong>Identity lookup</strong> — resolve caller <code>Did</code> from JWT subject.<ul>
+<li>Source: <code>icn-http-kit::auth::BasicClaims</code> + <code>icn-identity::Did</code> (see <code>icn/apps/governance/src/http/handlers.rs</code> pattern).</li>
+</ul>
+</li>
+<li><strong>Individual entity lookup</strong> — compute <code>EntityId::from_did(did)</code> → <code>entity:icn:individual:&lt;identifier&gt;</code>.<ul>
+<li>Source: <code>icn/crates/icn-entity/src/entity.rs</code>.</li>
+</ul>
+</li>
+<li><strong>Memberships</strong> — list all <code>Membership</code> records where <code>member_id</code> matches the caller&#39;s individual entity id.<ul>
+<li>Source: <code>icn/crates/icn-entity/src/membership.rs</code>.</li>
+<li>Today: requires a <code>list_memberships_for_member(member_id)</code> query on the membership store. If that index does not exist, it is the first <code>[future design]</code> storage addition.</li>
+</ul>
+</li>
+<li><strong>Bootstrap-created entities and aliases</strong> — for each membership, resolve the parent entity&#39;s canonical id, display label, and bootstrap alias (if any).<ul>
+<li>Source: entity store; institution-bootstrap alias binding (<code>icn/bins/icnctl/src/institution_bootstrap.rs</code>, bootstrap apply path around the structures-creation loop at <code>format!(&quot;/v1/gov/entities/{parent}/structures&quot;)</code> — which is also the site of the current live 404).</li>
+<li>Today: alias binding exists at bootstrap time; a read-side &quot;alias for canonical id&quot; lookup must be exposed to the endpoint. <code>[future design]</code> if not already query-able.</li>
+</ul>
+</li>
+<li><strong>Role assignments</strong> — reuse the existing <code>/gov/me/scopes</code> implementation: <code>ctx.manager.list_roles_for_person(&amp;caller)</code> (<code>icn/apps/governance/src/http/handlers.rs</code>).<ul>
+<li>Source: shipped.</li>
+</ul>
+</li>
+<li><strong>Authority grants held by caller</strong> — list <code>AuthorityGrant</code> where <code>grantee == caller_did</code> and <code>revoked_at is null</code> and <code>valid_until &gt; now</code>.<ul>
+<li>Source: <code>icn/crates/icn-governance/src/authority.rs</code>.</li>
+<li>Today: requires a <code>list_grants_for_grantee(did)</code> query. <code>[future design]</code> if not already indexed.</li>
+</ul>
+</li>
+<li><strong>Mandates where caller is executor</strong> — list <code>Mandate</code> where <code>executor == caller_did</code> and <code>status != Completed|Expired|Revoked</code>.<ul>
+<li>Source: <code>icn/crates/icn-governance/src/mandate.rs</code>.</li>
+<li>Today: similar index requirement; <code>[future design]</code> if not already indexed.</li>
+</ul>
+</li>
+<li><strong>Delegations held by caller (as delegate)</strong> — list <code>Delegation</code> where <code>delegatee == caller_did</code> and not expired/revoked.<ul>
+<li>Source: <code>icn/crates/icn-governance/src/delegation.rs</code>.</li>
+</ul>
+</li>
+<li><strong>Delegations held from caller (as delegator)</strong> — list <code>Delegation</code> where <code>delegator == caller_did</code> and not expired/revoked.<ul>
+<li>Source: same as above.</li>
+</ul>
+</li>
+<li><strong>Capability derivation</strong> — for each membership, role assignment, grant, and mandate, emit derived capabilities scoped by the source primitive.<ul>
+<li>Deterministic transform; no new storage.</li>
+</ul>
+</li>
+<li><strong>Active scope / session-selected scope</strong> — read the caller&#39;s current selection from a session-scope store.<ul>
+<li><code>[future design]</code>: no session-selected-scope primitive exists today. Today&#39;s approximation is JWT <code>coop_id</code> + <code>scopes</code>. The endpoint must not invent a selection; it must report &quot;no active scope selected&quot; (or default to <code>self</code>) when the primitive is absent.</li>
+</ul>
+</li>
+<li><strong><code>/gov/me/scopes</code> + <code>/gov/me/work</code> composition</strong> — the existing outputs populate the <code>roles</code> and <code>pending_work</code> fields. The endpoint calls the same manager methods (<code>list_roles_for_person</code>, <code>list_work_for_person</code>) rather than round-tripping HTTP.<ul>
+<li>Source: shipped.</li>
+</ul>
+</li>
+<li><strong>Receipt / provenance pointers</strong> — produce references to the stores where the caller (or a third party with authorization) can verify. Not inlined receipts.<ul>
+<li>Source: existing governance receipt/proof surface (<code>icn-governance::proof</code>).</li>
+</ul>
+</li>
+<li><strong>Accessibility metadata</strong> — read the caller&#39;s language preference and plain-language mode from identity metadata (or default).<ul>
+<li><code>[future design]</code>: accessibility-preference storage is not yet a first-class primitive; default values are returned until it ships.</li>
+</ul>
+</li>
+<li><strong>Glossary keys</strong> — emit the set of terms present in the response that a downstream shell would need definitions for.<ul>
+<li>Deterministic, based on which fields are populated.</li>
+</ul>
+</li>
+<li><strong>Warnings</strong> — collect from: expired grants, revoked grants still referenced by active role assignments, overlapping representational grants, translation gaps, subsystem staleness indicators, route-drift probes, near-expiry tokens.</li>
+</ol>
+<h3>Items That Cannot Be Joined Today Without New Storage / Indexing</h3>
+<ul>
+<li>By-grantee / by-delegate / by-executor reverse indexes on <code>AuthorityGrant</code>, <code>Mandate</code>, and <code>Delegation</code>, if not already maintained.</li>
+<li>Member-centered membership index (<code>list_memberships_for_member</code>), if not already maintained.</li>
+<li>Session-selected active-scope primitive.</li>
+<li>Display-label resolution (entity + structure + role labels for human rendering).</li>
+<li>Alias-binding read API (bootstrap-apply alias → canonical id lookup from read paths).</li>
+<li>Accessibility preference storage (language, plain-language mode, low-bandwidth hint).</li>
+<li>Route-drift probe (the endpoint can surface what it observes, but a first-class probe is out of scope here).</li>
+</ul>
+<p>Each of these is <code>[future design]</code> and is enumerated in §Gaps.</p>
+<hr>
+<h2>Active Scope / Session-Selected Scope</h2>
+<p>The <strong>active scope</strong> is the hat the member is currently wearing. The problem: a member may belong to multiple entities and act in multiple distinct contexts — individual community member, NYCN organizer, structure delegate, cooperative representative in a federation, node operator, summit organizer inside <code>summit-cycle-2026</code>, participant inside <code>summit-2026</code>. Every action must be bound to one of those hats, and every receipt must record which hat it was taken under.</p>
+<h3>Why Implicit <code>coop_id</code> Scope Is Insufficient</h3>
+<p>Today&#39;s gateway JWT carries a <code>coop_id</code> claim and a <code>scopes</code> array. That approximation fails in several ways:</p>
+<ol>
+<li><strong>One <code>coop_id</code> cannot express representational action.</strong> A member acting as a representative of GreenStar in NYCN is not &quot;in the GreenStar coop context&quot;; the <em>subject</em> of the action is GreenStar, not the member.</li>
+<li><strong>One <code>coop_id</code> cannot express nested context.</strong> A member operating inside <code>summit-cycle-2026</code> (a Program under NYCN) acting as a summit organizer is not fully described by <code>coop_id = nycn</code>.</li>
+<li><strong>A single JWT claim is not visible in the UI.</strong> Members do not see which hat they are wearing; it is implicit in the token they happened to receive from login.</li>
+<li><strong>A single JWT claim is not visible in receipts.</strong> Receipts must say <em>which scope</em> the action was taken under, not just who signed.</li>
+<li><strong>A single JWT claim is not switchable mid-session in a legible way.</strong> Switching scopes requires re-auth or a token refresh the user does not understand; the gesture is invisible.</li>
+<li><strong>A single JWT claim cannot express &quot;self.&quot;</strong> Personal actions (own ledger, own trust attestations, own key operations) are the base case, not a degenerate value of <code>coop_id</code>.</li>
+</ol>
+<h3>Requirements on the Active-Scope Primitive</h3>
+<ol>
+<li><strong>Explicit.</strong> The selected scope is a typed object, not a string claim fished out of a token.</li>
+<li><strong>Visible.</strong> Every member-facing screen renders the active scope prominently. Scope-switching is a first-class gesture.</li>
+<li><strong>Included in dangerous confirmations.</strong> Authority-bearing actions show &quot;You are about to cast a vote as GreenStar in NYCN&quot; before the member signs.</li>
+<li><strong>Switchable.</strong> Switching requires one gesture and does not require re-login unless the new scope has additional security requirements.</li>
+<li><strong>Auditable where it affects authority.</strong> Receipts record the active scope. The substrate keeps provenance.</li>
+<li><strong>Never silently changes votes or actions.</strong> A background scope change cannot retroactively reinterpret a pending action.</li>
+<li><strong>Representable in low-bandwidth / plain text.</strong> Active scope is one line in a text-only fallback.</li>
+<li><strong>Distinguishes canonical ids from aliases / display labels.</strong> The scope key uses canonical ids; the rendering uses human labels.</li>
+</ol>
+<h3>Surface in <code>/me/standing</code></h3>
+<p><code>/me/standing</code> returns both:</p>
+<ul>
+<li>The current <code>active_scope</code> object if the session has one selected.</li>
+<li>The list of <code>available_active_scopes</code> the caller could switch to.</li>
+</ul>
+<p>The endpoint does not decide the scope; it reports and enumerates. Selection lives in a session primitive that is explicitly <code>[future design]</code> and must be specified in its own design doc.</p>
+<hr>
+<h2>Canonical IDs, Aliases, Labels, and URL Safety</h2>
+<p>The live NYCN bootstrap validation produced a 404 on <code>/v1/gov/entities/{entity_id}/structures</code> after successfully creating upstream entities. The proximate cause is most likely route-level handling of colon-containing canonical ids (<code>entity:icn:federation:nycn</code>) — the same class of hazard that PR #1591 addressed for proposal index keys. This design absorbs that lesson.</p>
+<h3>Definitions</h3>
+<ul>
+<li><strong>Canonical id</strong> — the authoritative typed identifier for an entity or structure: <code>entity:icn:federation:nycn</code>, <code>entity:icn:community:nycn-organizers</code>, <code>entity:icn:program:summit-cycle-2026</code>, <code>entity:icn:activity:summit-2026</code>, <code>structure:icn:committee:nycn-finance</code>. These are stable, comparable, and carry provenance. They are the only form used for authority checks.</li>
+<li><strong>Route-safe representation</strong> — whatever encoding makes the canonical id safe to embed in URL path segments (percent-encoding, or an alternate key schema that avoids colons at the route layer entirely). This is a transport concern, not an identity concern.</li>
+<li><strong>Alias</strong> — a short, human-typeable shortcut bound to a canonical id at bootstrap time or by later admin action. <code>nycn</code> → <code>entity:icn:federation:nycn</code>. Aliases are UX conveniences. They are <strong>not</strong> authoritative.</li>
+<li><strong>Display label</strong> — a human-readable name for an entity, structure, role, or scope: &quot;NYCN Federation&quot;, &quot;Finance Committee&quot;, &quot;Summit 2026&quot;. Display labels are rendered; they are never parsed into authority.</li>
+<li><strong>Translated label</strong> — a display label rendered in the caller&#39;s preferred language.</li>
+<li><strong>Human explanation</strong> — a one-sentence plain-language description of what a primitive <em>means</em> to the caller: &quot;You represent GreenStar when casting votes in NYCN federation governance.&quot;</li>
+</ul>
+<h3>Requirements</h3>
+<ol>
+<li><strong>Member-facing UI must not expose raw canonical ids as primary explanation.</strong> Canonical ids appear as diagnostic / deep-link values, not as &quot;where you belong&quot; prose.</li>
+<li><strong>Action execution must not rely on translated or display labels.</strong> Labels can diverge across languages and renderings; only canonical ids bind authority.</li>
+<li><strong>Route paths must use safe encoded ids or route designs that cannot be broken by colon-containing ids.</strong> This is a gateway contract, not a member-facing concern; <code>/me/standing</code> surfaces it as a warning when drift is detected.</li>
+<li><strong>Alias bindings from bootstrap apply must be visible in diagnostics but not in authority decisions.</strong> <code>/me/standing</code> returns <code>entity_alias</code> alongside <code>entity_id</code>; the Commons Shell may render the alias; every subsequent action submitted by the shell uses the canonical id.</li>
+<li><strong><code>/me/standing</code> returns both canonical ids and human labels.</strong> Every entity / structure / scope entry carries its canonical id and its display label. Aliases are included when present.</li>
+<li><strong>Warnings surface ambiguous or unresolved aliases.</strong> If an alias fails to resolve to a canonical id, the warning envelope carries the reason; the field falls back to the canonical id alone.</li>
+</ol>
+<p>This design does not fix the 404. Routing fixes are the responsibility of the live-validation track. This design requires that <code>/me/standing</code> be <strong>robust to</strong> routing fragility: if a downstream route is 404ing, the endpoint returns the best-available standing with a <code>route_drift</code> warning, not an empty response or a 500.</p>
+<hr>
+<h2>Relationship to Action Cards</h2>
+<p><code>/me/standing</code> is not <code>/me/action-cards</code>, but it supplies the standing context an action-card generator needs to produce cards for this member, in this scope, with this authority.</p>
+<h3>Action Card Defined</h3>
+<p>An <strong>action card</strong> is a human-facing rendering of an institutional action. Every card carries:</p>
+<ul>
+<li><strong>What</strong> — the proposed action, in plain language.</li>
+<li><strong>Who</strong> — the subject of the action (the member as self, or an entity represented by the member).</li>
+<li><strong>Authority</strong> — the primitive(s) that authorize this action: membership capability, role assignment scope, grant, mandate.</li>
+<li><strong>Why</strong> — the charter clause, proposal, mandate, or request that triggered the card.</li>
+<li><strong>Choices</strong> — the set of valid responses (Yes / No / Abstain / Delegate / Dismiss / etc., per the action type).</li>
+<li><strong>Consequences</strong> — what happens if the member acts vs. if they do not.</li>
+<li><strong>Deadline</strong> — the time bound, if any.</li>
+<li><strong>Supporting records</strong> — links to the proposal, meeting minutes, charter clauses, related receipts.</li>
+<li><strong>Receipts</strong> — pointers to the provenance of the authority under which the action would execute.</li>
+<li><strong>Language and glossary</strong> — preferred language, glossary keys for any jargon.</li>
+<li><strong>Accessibility hints</strong> — screen-reader summary, plain-language mode, low-bandwidth alternative.</li>
+<li><strong>Risk</strong> — low / medium / high, tied to the action type and the authority basis.</li>
+<li><strong>Confirmation</strong> — whether this action requires a confirmation step before signing.</li>
+<li><strong>Active scope</strong> — which of the member&#39;s scopes this card belongs to.</li>
+<li><strong>Canonical target</strong> — canonical ids for every entity, structure, proposal involved (never labels).</li>
+</ul>
+<h3>Semantic Action Is the Source of Truth</h3>
+<p>The card is a <strong>rendering</strong> of the underlying action, not the action itself. The same semantic action (e.g., &quot;vote Yes on proposal X as representative of GreenStar&quot;) must be renderable as:</p>
+<ul>
+<li>A rich mobile card (CoopWallet class).</li>
+<li>A plain web page (pilot-ui PWA).</li>
+<li>A screen-reader-safe document.</li>
+<li>A low-bandwidth text view.</li>
+<li>A printed notice (for members without devices, routed via stewards).</li>
+<li>A translated message (institutional glossary included).</li>
+<li>A kiosk / facilitator flow (public terminal, library, community center).</li>
+<li>A CLI summary (<code>icnctl me action-cards</code>, future).</li>
+</ul>
+<p><code>/me/standing</code> does not produce cards. It returns the standing context — memberships, roles, grants, mandates, available scopes, effective capabilities — that a card generator consumes. The generator (the <code>/me/action-cards</code> endpoint, <code>[future design]</code>) joins standing with open proposals, assigned work, upcoming meetings, expiring authorities, and care requests to produce the ranked list.</p>
+<hr>
+<h2>Accessibility Requirements</h2>
+<p>Accessibility is a legitimacy requirement, not a UI polish concern. <code>/me/standing</code> is the contract under every accessible participation surface; the data it returns determines what accessible rendering is possible.</p>
+<h3>Requirements</h3>
+<ol>
+<li><strong>Plain-language summaries.</strong> Every authority concept (membership, role, grant, mandate, delegation, representation) has a one-sentence plain-language rendering in the response (<code>authority_scope_plain_language</code>, <code>scope_plain_language</code>, <code>summary_plain_language</code>).</li>
+<li><strong>Glossary-backed concepts.</strong> The response enumerates the glossary keys present. A downstream shell can fetch definitions and attach them to terms.</li>
+<li><strong>Multilingual rendering.</strong> The response declares the caller&#39;s preferred language and the languages in which translations are available. Missing translations produce a typed warning, not a silent English fallback.</li>
+<li><strong>RTL readiness.</strong> Text fields must not assume left-to-right order; display labels and plain-language strings are stored in a form that supports RTL scripts.</li>
+<li><strong>Non-English-first participation.</strong> Members whose first language is not the institution&#39;s working language receive translated labels and translated plain-language summaries; canonical ids are unaffected.</li>
+<li><strong>Screen-reader semantic structure.</strong> The response includes a <code>screen_reader_summary</code>: a single-paragraph standing summary specifically composed for linear reading. Not all shells will use it, but it must be available.</li>
+<li><strong>Keyboard / switch navigation.</strong> Not a server-side concern directly, but the endpoint must not return data that requires pointer interaction to understand (no &quot;hover for details&quot; semantics baked into the contract).</li>
+<li><strong>No color-only meaning.</strong> Urgency buckets, statuses, and warnings are all labeled by typed enum values, never by hex color. Color is a rendering choice.</li>
+<li><strong>High contrast, large text, reduced motion.</strong> Rendering-side concerns; the endpoint supports them by returning plain text, structural enums, and no animation-dependent flags.</li>
+<li><strong>Low-bandwidth text fallback.</strong> The endpoint honors a low-bandwidth hint from the caller, omitting optional fields (display labels, extended summaries, repeated provenance pointers) and returning a compact form.</li>
+<li><strong>Old Android / low-end mobile assumptions.</strong> The payload is bounded in size; the endpoint does not assume client-side computation beyond simple rendering.</li>
+<li><strong>No mandatory app-store install for core participation.</strong> The same data is consumable from a browser, a terminal, and a CLI. A member denied access to an app store can still participate.</li>
+<li><strong>No mandatory video / audio for core governance.</strong> Every action card derived from standing must have a text-only rendering path.</li>
+<li><strong>Async participation.</strong> The response is cacheable and safely re-renderable offline. Pending work items include deadlines for asynchronous planning.</li>
+<li><strong>Offline read / draft / later-submit where safe.</strong> The shell can cache <code>/me/standing</code>, draft a vote, and submit on reconnect. The sync state machine at the shell level — saved locally / not submitted / submitted / accepted by node / receipt issued / finalized — must be legible to the member.</li>
+<li><strong>Clear sync states.</strong> The response includes indicators (<code>stale_cache</code>, <code>reauth_required</code>, <code>route_drift</code>) that a shell translates into sync-state messaging without inventing meaning.</li>
+<li><strong>High-risk action confirmations.</strong> Risk is a typed field on cards derived from standing; shells render confirmations proportionate to risk.</li>
+<li><strong>Deadlines and reminders that don&#39;t punish disability or bad connectivity.</strong> Institutions may define grace policies in their charters; <code>/me/standing</code> surfaces the charter-backed deadline and any grace window, not a wall-clock fact.</li>
+</ol>
+<hr>
+<h2>Language and Glossary Model</h2>
+<p>Translating ICN is not just translating buttons. The hard part is translating <strong>institutional meaning</strong>. Ordinary governance terms — proposal, quorum, mandate, delegation, representation, charter, structure, program, milestone — carry very different weights across languages, legal systems, and cooperative traditions. A Spanish rendering of &quot;mandate&quot; that reads as &quot;mandato&quot; may be legally stronger than the English original intended; a rendering that reads as &quot;encargo&quot; may be too weak.</p>
+<h3>Requirements</h3>
+<ol>
+<li><strong>UI string translation.</strong> Standard localization of labels, buttons, status words. Table stakes.</li>
+<li><strong>Institution-specific glossary packs.</strong> Each institution can ship a glossary pack with its package (e.g., NYCN&#39;s glossary defines what &quot;organizer&quot; means inside NYCN). Glossary packs are namespaced; they do not override core ICN terminology.</li>
+<li><strong>Plain-language definitions.</strong> Every glossary entry includes a plain-language definition aimed at a reader with no prior governance exposure.</li>
+<li><strong>Examples attached to terms.</strong> &quot;Mandate — example: Alice holds a mandate to cast GreenStar&#39;s vote on the NYCN 2026 summit budget, valid until June 30, 2026.&quot;</li>
+<li><strong>Translator notes.</strong> Where a term has translation nuance (e.g., &quot;representation&quot; vs. &quot;delegation&quot;), translator notes explain what to preserve and what to adapt.</li>
+<li><strong>Charter-specific terms.</strong> An institution&#39;s charter may coin or redefine terms. Those definitions are charter-backed and surface in the glossary alongside core ICN terms, with the charter id as provenance.</li>
+<li><strong>Governance primitive terms.</strong> <code>role</code>, <code>proposal</code>, <code>vote</code>, <code>abstain</code>, <code>delegation</code>, <code>mandate</code>, <code>grant</code>, <code>federation</code>, <code>bootstrap</code>, <code>entity</code>, <code>structure</code>, <code>program</code>, <code>milestone</code> all require institution-neutral definitions in every supported language.</li>
+<li><strong>Fallback if translation missing.</strong> The response includes a typed <code>missing_translation</code> warning rather than silently returning English. The shell renders the English form with a visible &quot;translation unavailable&quot; marker.</li>
+<li><strong>Warning when formal record and translated summary diverge.</strong> If the plain-language summary could be read as materially different from the canonical (e.g., a mandate&#39;s scope is narrower than the summary suggests), the warning surface makes that visible.</li>
+<li><strong>Preserving formal canonical record.</strong> The canonical primitive (the <code>Mandate</code>, the <code>AuthorityGrant</code>, the <code>Charter</code> clause) is the record. Translations are renderings of the record. The record does not change because a translation does.</li>
+</ol>
+<blockquote>
+<p><strong>The system must translate governance meaning, not just interface labels.</strong> If the glossary layer is skipped, accessibility layered on top collapses into cosmetic styling, and the institution is captured by whoever controls the terminology.</p>
+</blockquote>
+<hr>
+<h2>Assisted Participation</h2>
+<p>Shared devices, public library computers, community kiosks, meeting facilitators, translators, stewards, printed packets, phone and in-person support — these are how most real Commons institutions actually work. Designing as though every member is a solitary power user on a dedicated device reproduces the laptop priesthood.</p>
+<h3>Requirements</h3>
+<ol>
+<li><strong>Assistance must be explicit when it affects an action.</strong> If a helper operates the device on behalf of a member, the action&#39;s provenance records the helper&#39;s role. Silent help is prohibited for authority-bearing actions.</li>
+<li><strong>Member confirmation remains central.</strong> The member — not the helper — is the authority. For authority-bearing actions, confirmation is a member gesture (a key touch, a spoken confirmation recorded via witness protocol, a written sign-off co-signed by a second member, per charter policy).</li>
+<li><strong>Helper must not silently gain authority.</strong> Operating the device does not confer capability. A helper with zero membership cannot invoke actions on their own standing; they are channeling the member&#39;s standing, with provenance.</li>
+<li><strong>Assisted action produces a receipt or audit marker.</strong> The receipt for an assisted action carries a typed <code>assisted_by</code> field where applicable, anchored to charter-backed assistance policy. Charters that do not recognize assistance as a distinct category produce receipts without that field.</li>
+<li><strong>Privacy preserved.</strong> The helper sees only what the charter permits them to see. A translator is not thereby a reader of the member&#39;s ledger; a facilitator is not thereby a viewer of the member&#39;s private memberships.</li>
+<li><strong>Coercion risk acknowledged.</strong> Assisted participation raises the coercion floor — especially for members in vulnerable positions. Charters may require anti-coercion protections (witnesses, cool-off periods, private revocation paths). <code>/me/standing</code> surfaces charter-backed assistance policy as a member-visible field so members know what protections apply.</li>
+<li><strong>Institutions may define assistance policy in charters / packages.</strong> The kernel enforces the constraints the charter produces. The kernel does not define what &quot;assistance&quot; means; it enforces what the charter says.</li>
+<li><strong>Kernel enforces constraints, not social doctrine.</strong> <code>/me/standing</code> reports assistance policy as data; it does not prescribe what assistance must look like.</li>
+</ol>
+<hr>
+<h2>Privacy and Safety</h2>
+<p><code>/me/standing</code> is a caller-centered surface. Privacy properties are enforced at the contract level, not left to downstream shells.</p>
+<ol>
+<li><strong>Standing must not expose unnecessary private memberships.</strong> The response lists entities the caller is a member of; it does not list other members of those entities. Roster disclosure is the responsibility of entity-scoped endpoints with their own authorization.</li>
+<li><strong>Admin queries are future design, requiring explicit capability.</strong> &quot;Show me Alice&#39;s standing&quot; is not an authorized operation under this design. It requires a separate endpoint with charter-backed admin capability and privacy review.</li>
+<li><strong>Member-facing standing is caller-centered.</strong> The response talks about the caller. It does not talk about third parties beyond what the caller&#39;s own role requires (e.g., a representational grant names the grantor entity).</li>
+<li><strong>Federation views don&#39;t leak unrelated internal roles.</strong> If the caller represents GreenStar in NYCN, the response says so. It does not list the other GreenStar representatives, the other NYCN members, or the internal committee composition of either entity.</li>
+<li><strong>Receipts prove authority without oversharing.</strong> Receipt pointers name the primitive ids (grant id, mandate id, proposal id) the caller can use to verify. They do not inline third-party payloads.</li>
+<li><strong>Assisted participation must not become surveillance.</strong> Helper attribution is provenance for authority-bearing actions; it is not a general watcher log of everything a member does.</li>
+<li><strong>Accessibility metadata must not become disability profiling.</strong> A preferred-language value, a plain-language-mode flag, and a low-bandwidth hint are rendering preferences, not protected-class indicators. They are not emitted to third parties and not used for sorting or filtering.</li>
+<li><strong>Language preference must not be exclusion proxy.</strong> An institution cannot use preferred-language values to gate membership or capabilities. If it tries to, the charter would have to explicitly state it, which makes the exclusion visible; kernel enforcement remains language-agnostic.</li>
+<li><strong>Operator diagnostics must not leak into member-facing standing unless relevant and safe.</strong> The <code>warnings</code> envelope carries typed, member-safe operator-layer signals (<code>stale_cache</code>, <code>route_drift</code>, <code>reauth_required</code>). It does not carry secrets, internal addresses, sled paths, or route mount prefixes.</li>
+</ol>
+<hr>
+<h2>Readiness Ladder: From Docs to Tests to Live Proof</h2>
+<p><code>/me/standing</code> is not pilot-ready until it has crossed each of the following rungs. Passing a lower rung does not substitute for a higher one.</p>
+<ol>
+<li><strong>Design / documented contract.</strong> This document. The contract specifies the shape, the privacy model, the accessibility model, the warning envelope, and the join plan.</li>
+<li><strong>Unit tests.</strong> Core data transformations (capability derivation, scope enumeration, warning generation) are unit-tested against typed fixtures.</li>
+<li><strong>Integration tests.</strong> Multi-node, cross-crate tests with <code>icn-testkit</code>, including cases for expired grants, revoked mandates, ambiguous scopes, and missing translations.</li>
+<li><strong>Live local gateway validation.</strong> A local <code>icnd</code> + gateway running against a bootstrap-applied institution (NYCN or an equivalent generic package). The endpoint returns standing, the Commons Shell renders it, the member can select an active scope, and the selected scope appears in subsequent receipts.</li>
+<li><strong>Repeatable operator runbook.</strong> An operator can, from a clean machine, bring up the stack, apply a bootstrap package, authenticate as a member, call <code>/me/standing</code>, and see standing that matches the package definition. The runbook is tested, not theoretical.</li>
+<li><strong>Pilot institution validation.</strong> A real institution (NYCN is the first candidate) runs a session where its members authenticate, check standing, act under an explicit active scope, and the resulting receipts match the charter. Pilot validation is the final rung.</li>
+</ol>
+<p><strong><code>/me/standing</code> is not pilot-ready merely because integration tests pass.</strong> The NYCN bootstrap track has already demonstrated that integration-passing code can still 404 live. Each rung is independently necessary. This design connects to the active <code>feat/live-nycn-bootstrap-validation</code> track without taking it over: that track owns rungs 4 through 6 for the bootstrap surface; <code>/me/standing</code> inherits rungs 1 through 3 first and then joins the live-validation track at rung 4.</p>
+<hr>
+<h2>Acceptance Criteria</h2>
+<p>This design is ready to implement when:</p>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Real repo primitives are mapped to response fields (identity, entity, membership, structure, role assignment, authority grant, mandate, delegation, governance domain, proposal pointer, action-item pointer).</li>
+<li><input checked="" disabled="" type="checkbox"> Unavailable pieces are marked <code>[future design]</code> with the required addition named (by-X reverse indexes, session-scope primitive, display-label resolution, alias-read API, accessibility-preference storage).</li>
+<li><input checked="" disabled="" type="checkbox"> JSON shape is concrete enough for an implementer to produce an OpenAPI schema and a handler skeleton without inventing fields.</li>
+<li><input checked="" disabled="" type="checkbox"> Explicit relationship to <code>/gov/me/scopes</code> and <code>/gov/me/work</code> is specified (they remain authoritative; <code>/me/standing</code> composes).</li>
+<li><input checked="" disabled="" type="checkbox"> NYCN bootstrap / live-validation reality is acknowledged and its lessons are absorbed (route drift warnings, canonical-id vs. alias discipline, live-proof rung in the readiness ladder).</li>
+<li><input checked="" disabled="" type="checkbox"> The active-scope problem is clearly specified with requirements and surface, without authorizing its implementation.</li>
+<li><input checked="" disabled="" type="checkbox"> Canonical ids vs. aliases vs. display labels vs. translated labels are distinguished at the contract level and mirrored in the response shape.</li>
+<li><input checked="" disabled="" type="checkbox"> Accessibility is first-class in the contract, not a downstream UI concern.</li>
+<li><input checked="" disabled="" type="checkbox"> Language and glossary model is first-class.</li>
+<li><input checked="" disabled="" type="checkbox"> Assisted participation is included with coercion-awareness and charter-deferral.</li>
+<li><input checked="" disabled="" type="checkbox"> Meaning Firewall and kernel/app separation are preserved (no domain semantics in the kernel; reporting, not defining).</li>
+<li><input checked="" disabled="" type="checkbox"> Commons Shell relationship is clear (standing is the data contract; cards and shells are downstream).</li>
+<li><input checked="" disabled="" type="checkbox"> No implementation is authorized beyond this design unless explicitly scoped in a subsequent doc or phase.</li>
+</ul>
+<hr>
+<h2>Implementation Slices</h2>
+<p>Suggested order for future phases. Each slice is a separately reviewable PR.</p>
+<ol>
+<li><strong>Design-only doc</strong> (this PR).</li>
+<li><strong>Minimal <code>/me/standing</code></strong> returning identity + memberships + current <code>/gov/me/scopes</code> output, nothing more. Empty <code>mandates</code>, <code>grants</code>, <code>delegations</code>, <code>active_scope</code>, <code>accessibility</code>. A warning envelope exists but is empty.</li>
+<li><strong>Join role assignments / authority grants / mandates</strong> with the necessary reverse indexes. Warnings surface expired and revoked items.</li>
+<li><strong>Active-scope selector primitive</strong> — server-side session store for the caller&#39;s currently selected scope, with switch, audit trail, and inclusion in subsequent action receipts.</li>
+<li><strong>Standing-derived pending work references</strong> — the <code>pending_work</code> field is populated by direct <code>manager.list_work_for_person</code> + urgency bucketing.</li>
+<li><strong>Action Card design doc</strong> — a separate document specifying card generation, ranking, dismissal, expiry, cross-scope deduplication.</li>
+<li><strong><code>GET /me/action-cards</code></strong> — implementation of the card generator, consuming <code>/me/standing</code>.</li>
+<li><strong>Language and glossary packs</strong> — per-institution glossary packs, translated plain-language summaries, translator notes, <code>missing_translation</code> warnings.</li>
+<li><strong>Low-bandwidth / text renderer</strong> — text-only fallback shape; a CLI summary (<code>icnctl me standing</code>, future); a screen-reader-first HTML rendering in pilot-ui.</li>
+<li><strong>Assisted participation receipt model</strong> — typed <code>assisted_by</code> provenance, charter-backed assistance policy surfaced in <code>/me/standing</code>, anti-coercion protections per charter.</li>
+<li><strong>Validate against NYCN bootstrap-created institution state</strong> — standing queries resolve correctly against entities, structures, aliases, and grants produced by <code>icnctl institution apply</code>.</li>
+<li><strong>Live-gateway validation and runbook</strong> — the final rung before any pilot-facing release. The runbook is tested, not theoretical.</li>
+</ol>
+<p>Each slice has its own readiness ladder: design, unit, integration, live-local, runbook, pilot. No slice skips rungs.</p>
+<hr>
+<h2>Gaps Identified <code>[future design]</code></h2>
+<p>Enumerated here so later docs and issues can pick them up without re-deriving.</p>
+<ol>
+<li><strong>Member-centered membership index.</strong> <code>list_memberships_for_member(member_id)</code> or equivalent query.</li>
+<li><strong>Reverse indexes on authority primitives.</strong> <code>list_grants_for_grantee(did)</code>, <code>list_mandates_for_executor(did)</code>, <code>list_delegations_for_delegate(did)</code>, <code>list_delegations_for_delegator(did)</code> — ideally maintained incrementally, not scanned.</li>
+<li><strong>Session-selected active-scope primitive.</strong> Typed object, server-side selection, switchable, auditable, included in subsequent receipts. Successor to JWT <code>coop_id</code> approximation.</li>
+<li><strong>Display-label resolution.</strong> A stable way to resolve entity / structure / role canonical ids to human display labels, with fallback when labels are missing.</li>
+<li><strong>Alias read API.</strong> A first-class lookup from alias to canonical id and back, exposed to the standing endpoint (not only to bootstrap apply).</li>
+<li><strong>Accessibility preference storage.</strong> Language preference, plain-language mode, low-bandwidth hint — stored per-member, surfaced in <code>/me/standing</code>, respected by Commons Shell.</li>
+<li><strong>Glossary packs and translation infrastructure.</strong> Per-institution glossary packs, translator notes, <code>missing_translation</code> warnings, charter-backed term definitions.</li>
+<li><strong>Plain-language rendering of authority scopes.</strong> Converting <code>authority_scope</code> strings and <code>TypedScope</code> values into plain-language sentences.</li>
+<li><strong>Assisted-participation provenance.</strong> Typed <code>assisted_by</code> field on receipts where charter policy recognizes assistance; anti-coercion protections per charter.</li>
+<li><strong>Route-drift probe.</strong> A first-class health probe for the routes <code>/me/standing</code> depends on, so warnings are grounded in active observation, not passive inference.</li>
+<li><strong>Representative / entity-vote primitive.</strong> A <code>RepresentativeVote</code> / <code>EntityAction</code> wrapper that binds <code>(represented_entity, human_signer, authority_source, action_payload, scope, provenance, receipt)</code> — referenced by <code>THE_COMMONS.md §14</code> and required for clean representational semantics in federations.</li>
+<li><strong>Federation tally semantics.</strong> When entity members vote in a federation, how are weights resolved, how do multiple representatives of the same entity interact, what happens on conflicting signatures. Not strictly a <code>/me/standing</code> concern, but necessary before representational action cards can be produced correctly.</li>
+<li><strong>Mandate expiry UX.</strong> Member-facing view of a held mandate approaching expiry, a revoked grant, a superseded representational role.</li>
+<li><strong>Operator-scope primitive for member-facing standing.</strong> Node operators are members of their communities. How does their operator scope appear in <code>/me/standing</code> alongside their member scope without leaking operator diagnostics into the member view.</li>
+<li><strong>Commons OS / kiosk-mode derivations.</strong> How <code>/me/standing</code> serves a public-terminal short-session flow with safe defaults (no residue, explicit sign-out, assisted participation where applicable).</li>
+</ol>
+<hr>
+<h2>References</h2>
+<p><strong>Canonical anchors (consulted while drafting):</strong></p>
+<ul>
+<li><code>docs/architecture/THE_COMMONS.md</code> — sibling doctrine, direct parent of this design.</li>
+<li><code>docs/ARCHITECTURE.md</code> — ICN architecture reference.</li>
+<li><code>docs/architecture/KERNEL_APP_SEPARATION.md</code> — Meaning Firewall, PolicyOracle pattern.</li>
+<li><code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> — authoritative routing between ICN platform and institution packages.</li>
+<li><code>docs/architecture/CELLS_AND_SCOPES.md</code> — scope primitives at the substrate layer.</li>
+<li><code>docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md</code> — identity and membership model.</li>
+<li><code>docs/design/ICN_VISUAL_SYSTEM.md</code> — visual doctrine, scope-aware membership, proof-backed coordination.</li>
+<li><code>docs/mobile/icn-mobile-ux-spec-v1.md</code> — current mobile UX spec.</li>
+<li><code>docs/archive/2026/plans-scratch/human-interface.md</code> — archived raw material for the Commons Shell concept.</li>
+<li><code>docs/reference/institution-package-bootstrap.md</code> — institution-package bootstrap reference.</li>
+<li><code>institutions/nycn/docs/bootstrap-runbook.md</code> — NYCN bootstrap runbook (live-validation track; this design references but does not modify it).</li>
+<li><code>docs/adr/ADR-0014-constitutional-object-model.md</code> — typed authority model (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>).</li>
+<li><code>docs/STATE.md</code> — current project state.</li>
+<li><code>AGENTS.md</code> — agent coding instructions and app topology rule.</li>
+</ul>
+<p><strong>Code anchors (types and endpoints referenced by name):</strong></p>
+<ul>
+<li><code>icn/crates/icn-identity/src/lib.rs</code> — <code>Did</code>.</li>
+<li><code>icn/crates/icn-entity/src/entity.rs</code> — <code>EntityId</code>, <code>Individual</code>, <code>Cooperative(CooperativeProfile)</code>, <code>Community(CommunityProfile)</code>, <code>Federation(FederationProfile)</code>.</li>
+<li><code>icn/crates/icn-entity/src/membership.rs</code> — <code>Membership</code>, <code>MembershipRole</code>, <code>MembershipStatus</code>, <code>MembershipCapability</code>.</li>
+<li><code>icn/crates/icn-governance/src/structure.rs</code> — <code>Structure</code>, <code>RoleAssignment</code>.</li>
+<li><code>icn/crates/icn-governance/src/activity.rs</code> — <code>Activity</code>.</li>
+<li><code>icn/crates/icn-governance/src/program.rs</code> — <code>Program</code>, <code>Milestone</code>.</li>
+<li><code>icn/crates/icn-governance/src/parent.rs</code> — <code>InstitutionalParent</code>.</li>
+<li><code>icn/crates/icn-governance/src/domain.rs</code> — <code>GovernanceDomain</code>.</li>
+<li><code>icn/crates/icn-governance/src/proposal.rs</code> — <code>Proposal</code>, <code>ProposalPayload</code>.</li>
+<li><code>icn/crates/icn-governance/src/vote.rs</code> — <code>Vote</code>.</li>
+<li><code>icn/crates/icn-governance/src/delegation.rs</code> — <code>Delegation</code>.</li>
+<li><code>icn/crates/icn-governance/src/authority.rs</code> — <code>AuthorityGrant</code>.</li>
+<li><code>icn/crates/icn-governance/src/mandate.rs</code> — <code>Mandate</code>.</li>
+<li><code>icn/crates/icn-governance/src/meeting.rs</code> — <code>Meeting</code>.</li>
+<li><code>icn/crates/icn-governance/src/action_item.rs</code> — <code>ActionItem</code>, <code>ActionItemSpec</code>.</li>
+<li><code>icn/crates/icn-governance/src/charter.rs</code> — <code>Charter</code>.</li>
+<li><code>icn/crates/icn-governance/src/proof.rs</code> — governance receipts / proof.</li>
+<li><code>icn/crates/icn-kernel-api/src/invariants.rs</code> — frozen-core invariants.</li>
+<li><code>icn/crates/icn-kernel-api/src/bootstrap.rs</code> — <code>Capability</code>, <code>CapabilitySet</code>.</li>
+<li><code>icn/apps/governance/src/http/handlers.rs</code> — <code>GET /gov/me/scopes</code> (<code>get_my_scopes</code>), <code>GET /gov/me/work</code> (<code>get_my_work</code>).</li>
+<li><code>icn/bins/icnctl/src/institution_bootstrap.rs</code> — institution bootstrap apply; the <code>format!(&quot;/v1/gov/entities/{parent}/structures&quot;)</code> call site is the current live-validation 404 target and the proximate motivation for the canonical-id-vs-route-safe discipline in this doc.</li>
+</ul>
+<hr>
+<p><em>This doc is a design contract, not a plan. No endpoint is authorized for implementation on the basis of this document alone. Each implementation slice requires its own design doc, issue, and review. <code>[future design]</code> items require their own design docs before code lands.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

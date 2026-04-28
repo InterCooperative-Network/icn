@@ -1,0 +1,956 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>The Commons | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>THE COMMONS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/THE_COMMONS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: doctrine
+Canonical: no
+Authority: architecture (complements KERNEL_APP_SEPARATION.md and INSTITUTION_PACKAGE_BOUNDARY.md)
+Last Reviewed: 2026-04-24
+Owner: Matt Faherty</h2>
+<h1>The Commons</h1>
+<blockquote>
+<p><strong>ICN is infrastructure for The Commons. ICN is not The Commons.</strong></p>
+<p>The Commons is what communities, cooperatives, and federations build and live inside. ICN is the substrate that makes The Commons executable, verifiable, portable, federated, and resilient against capture.</p>
+</blockquote>
+<p>This document is the canonical doctrine on what the Capital-C <strong>Commons</strong> means in the context of ICN. It sits above <code>ARCHITECTURE.md</code> (which describes the substrate) and above <code>KERNEL_APP_SEPARATION.md</code> / <code>INSTITUTION_PACKAGE_BOUNDARY.md</code> (which describe the meaning firewall and institution packaging). It is the north star those docs serve. It is consulted when deciding whether a proposed feature belongs in:</p>
+<ul>
+<li>the <strong>ICN kernel</strong> (generic primitive mechanics),</li>
+<li>an <strong>ICN platform crate</strong> (generic institutional shapes), or</li>
+<li>an <strong>institution package</strong> (institution-specific vocabulary), or</li>
+<li>a <strong>Commons shell</strong> (member-facing surface), or</li>
+<li>nowhere in ICN at all.</li>
+</ul>
+<p>It does not specify any new kernel behavior. It names the thing ICN exists to enable so that future design choices do not drift.</p>
+<hr>
+<h2>Purpose</h2>
+<p>ICN exists to make The Commons operable.</p>
+<p><strong>The Commons</strong> is the shared substrate of social, economic, institutional, cultural, and civic life that a community holds and tends in common. It is older than ICN by centuries — the shared grazing land, the mutual aid society, the credit union, the cooperative, the church, the school, the library, the neighborhood assembly, the volunteer fire brigade, the commons of knowledge, the commons of language. These are Commons institutions. They are not platforms. They are not products. They are not one-way services. They are organized forms of people choosing to hold something together.</p>
+<p>The Commons is plural and nested. A household is a Commons. A cooperative is a Commons. A federation of cooperatives is a Commons. A regional coordination network is a Commons. A global Commons of practice (a discipline, a language, a body of shared knowledge) is a Commons. Capital-C <strong>The Commons</strong> is the overarching word for all of them — the shared human substrate that modern platforms, corporations, and states have systematically enclosed, privatized, or neglected.</p>
+<p>ICN&#39;s purpose is <strong>not</strong> to be The Commons. The Commons is made of people, their relationships, their agreements, their labor, and their memory. ICN is digital public infrastructure that makes those forms:</p>
+<ul>
+<li><strong>Executable</strong> — agreements, decisions, and roles are enforceable by mechanism, not only by goodwill.</li>
+<li><strong>Verifiable</strong> — every state change leaves a receipt; every authority has a provenance.</li>
+<li><strong>Portable</strong> — members own their keys and their data; they can always exit and take what is theirs.</li>
+<li><strong>Federated</strong> — entities retain sovereignty; coordination happens between them, not above them.</li>
+<li><strong>Resilient</strong> — no central operator, no platform landlord, no single point of capture or removal.</li>
+</ul>
+<p>ICN is the <em>substrate</em> layer. The Commons is what <strong>lives on it</strong>.</p>
+<p>Everything ICN does — identity, membership, governance, ledger, gossip, receipts, federation, compute — exists to give Commons institutions real operational capacity without making them tenants of someone else&#39;s platform.</p>
+<hr>
+<h2>Non-Goals</h2>
+<p>To keep doctrine precise, The Commons is <strong>not</strong> any of the following. ICN must never be designed as if it were.</p>
+<ul>
+<li><strong>Not a marketplace.</strong> ICN has no matching engine, no price discovery, no auction layer. Communities may build marketplaces as apps, but the substrate never becomes an extractive intermediary. See <code>ARCHITECTURE.md §2</code>.</li>
+<li><strong>Not a platform.</strong> A platform owns its users; The Commons belongs to its members. ICN has no operator who can deplatform, throttle, monetize attention, or sell behavior data.</li>
+<li><strong>Not a state.</strong> The Commons is not a replacement for public institutions, and ICN has no monopoly on legitimate force, taxation, or judicial finality. Some Commons institutions may coexist with, petition, or contract with states; ICN does not pretend to be one.</li>
+<li><strong>Not a church.</strong> ICN encodes no ethical, religious, or spiritual doctrine. Different Commons institutions carry different traditions of meaning, care, and ritual; ICN must not bake any single tradition into kernel mechanics.</li>
+<li><strong>Not a charity layer.</strong> ICN is not a donation platform, nonprofit administration tool, or grant-making rail. Mutual aid is a first-class Commons pattern, but &quot;charity&quot; (one-way giving from rich to poor mediated by a platform) is not the model.</li>
+<li><strong>Not a blockchain or token economy.</strong> No global ledger, no native token, no speculative instruments, no tokenomic incentives. Mutual credit is bilateral; receipts are evidentiary, not tradable assets. See <code>docs/genesis.md</code> and <code>ARCHITECTURE.md §2</code>.</li>
+<li><strong>Not one global admin hierarchy.</strong> The Commons is plural. There is no top. There is no single federation that governs all federations. ICN must never contain a privileged operator, root key, or &quot;platform&quot; that other participants serve.</li>
+<li><strong>Not one social doctrine in the kernel.</strong> This is the hardest non-goal to hold. Different Commons traditions disagree — about consensus vs. majority, about one-member-one-vote vs. weighted stakes, about property, about membership criteria, about governance scope. Those disagreements belong in apps, CCL charters, and institution packages. The kernel must remain semantically blind.</li>
+</ul>
+<p>This last point ties The Commons doctrine directly to the <strong>Meaning Firewall</strong>. See <code>docs/architecture/KERNEL_APP_SEPARATION.md</code> (Invariants 1–5) and <code>docs/genesis.md</code> (&quot;The Meaning Firewall Boundary&quot;). The firewall is not only an architecture discipline — it is how ICN stays usable by Commons institutions with different values.</p>
+<blockquote>
+<p>If ICN encoded one social ideology in its kernel, it would cease to be infrastructure and become a platform for that ideology. The kernel enforces <em>that agreements exist and are kept</em>. Apps decide <em>what agreements mean</em>.</p>
+</blockquote>
+<hr>
+<h2>First Principles</h2>
+<p>Before naming primitives, name needs. ICN&#39;s primitives exist because Commons institutions need them. Start from humans and institutions; derive the technical shape from there.</p>
+<h3>Human and Institutional Needs</h3>
+<p>Any durable Commons institution has to make room for:</p>
+<ol>
+<li><strong>Belonging</strong> — knowing who is in, on what terms, and under what obligations.</li>
+<li><strong>Agency</strong> — a member can act, propose, object, vote, contribute, withdraw.</li>
+<li><strong>Care</strong> — mutual aid, sickness, hardship, welcoming, conflict repair.</li>
+<li><strong>Memory</strong> — decisions, agreements, promises, debts, and gratitude survive turnover.</li>
+<li><strong>Recognition</strong> — labor, contribution, and expertise are visible and accountable.</li>
+<li><strong>Purpose</strong> — the institution has stated reasons for existing and can be held to them.</li>
+<li><strong>Access</strong> — participation does not require elite credentials, expensive hardware, or secret knowledge.</li>
+<li><strong>Voice</strong> — members can speak, dissent, amend, and publicly record objections.</li>
+<li><strong>Repair</strong> — wrongs can be named, addressed, and durably corrected.</li>
+<li><strong>Continuity</strong> — the institution survives individuals; roles, records, and authority transfer cleanly.</li>
+<li><strong>Shared resources</strong> — land, tools, funds, knowledge, infrastructure, labor pools.</li>
+<li><strong>Transparent rules</strong> — everyone can see what is allowed, what is required, what is forbidden.</li>
+<li><strong>Bounded authority</strong> — power is scoped, time-limited, revocable, and answerable to those it governs.</li>
+<li><strong>Conflict handling</strong> — disputes have legitimate channels that do not rely on the patience of the wronged.</li>
+<li><strong>Knowledge transfer</strong> — elders, coordinators, and stewards can pass on institutional know-how.</li>
+<li><strong>Economic coordination</strong> — labor, credit, surplus, and obligation flow without external financialization.</li>
+<li><strong>Intergenerational memory</strong> — institutions remember across decades, not just sprints.</li>
+</ol>
+<h3>Translation to ICN Requirements</h3>
+<p>These needs translate into concrete substrate requirements:</p>
+<table>
+<thead>
+<tr>
+<th>Human/Institutional Need</th>
+<th>ICN Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Belonging</td>
+<td>Know who belongs to what entity, in what role, with what capabilities.</td>
+</tr>
+<tr>
+<td>Agency</td>
+<td>A member can act under cryptographic identity without asking a central server.</td>
+</tr>
+<tr>
+<td>Care</td>
+<td>Mutual aid, dispute, and care flows are first-class, not grafted onto finance.</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>Every state transition emits an immutable receipt (<code>docs/genesis.md</code> invariant 10).</td>
+</tr>
+<tr>
+<td>Recognition</td>
+<td>Contributions (labor, decisions, stewardship) are attributable and durable.</td>
+</tr>
+<tr>
+<td>Purpose</td>
+<td>Each entity has a charter; charters are the constitutional layer (CCL).</td>
+</tr>
+<tr>
+<td>Access</td>
+<td>Works on ordinary phones, browsers, cheap Linux boxes, and public terminals.</td>
+</tr>
+<tr>
+<td>Voice</td>
+<td>Proposals, votes, discussion, amendment, and appeal are primitives.</td>
+</tr>
+<tr>
+<td>Repair</td>
+<td>Disputes, amendments, and appeals are typed — not reduced to &quot;file a ticket&quot;.</td>
+</tr>
+<tr>
+<td>Continuity</td>
+<td>Roles, mandates, and authority grants have provenance, scope, and expiry.</td>
+</tr>
+<tr>
+<td>Shared resources</td>
+<td>Treasury, mutual credit, commons pools are entity-held, not platform-held.</td>
+</tr>
+<tr>
+<td>Transparent rules</td>
+<td>Constraints are published and enforced mechanically by the kernel.</td>
+</tr>
+<tr>
+<td>Bounded authority</td>
+<td>Capabilities are typed, scoped, delegable, revocable (see <code>AuthorityGrant</code>, ADR-0014).</td>
+</tr>
+<tr>
+<td>Conflict handling</td>
+<td>Appeal, amendment, veto, and force-close are proposal variants.</td>
+</tr>
+<tr>
+<td>Knowledge transfer</td>
+<td>Institutional documents, meeting minutes, and program cycles persist.</td>
+</tr>
+<tr>
+<td>Economic coordination</td>
+<td>Mutual credit, double-entry ledger, zero-sum invariant.</td>
+</tr>
+<tr>
+<td>Intergenerational memory</td>
+<td>Signed receipts, content-addressed history, portable by member export.</td>
+</tr>
+</tbody></table>
+<p><strong>None of this requires ICN to hold opinions about what a cooperative, community, or federation <em>should</em> be.</strong> ICN requires only that authority, membership, decisions, resources, and receipts exist as typed, verifiable, portable objects.</p>
+<hr>
+<h2>ICN Primitive Mapping</h2>
+<p>This section maps Commons concepts to the real crates, modules, and types in the ICN repo as of 2026-04-24. Types that exist are cited with their actual paths. Types that are planned or spec-only are explicitly marked <code>[future design]</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Commons Concept</th>
+<th>ICN Primitive</th>
+<th>Status</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Person / human participant</td>
+<td><code>Did</code> (newtype around <code>String</code>; 32-byte identifier encoded in DID form, representing either an Ed25519 public key or an SDIS anchor id)</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-identity/src/lib.rs</code> (Ed25519 path) and <code>icn/crates/icn-identity/src/anchor.rs</code> (<code>Did::from_anchor_id</code>)</td>
+</tr>
+<tr>
+<td>Cryptographic identity bundle</td>
+<td><code>IdentityBundle</code> (Ed25519 + X25519, age-encrypted keystore)</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-identity/src/bundle.rs</code></td>
+</tr>
+<tr>
+<td>Unified entity handle</td>
+<td><code>EntityId</code> (format <code>entity:icn:&lt;type&gt;:&lt;slug&gt;</code>)</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-entity/src/entity.rs</code></td>
+</tr>
+<tr>
+<td>Sovereign entity kinds</td>
+<td><code>Individual</code>, <code>Cooperative(CooperativeProfile)</code>, <code>Community(CommunityProfile)</code>, <code>Federation(FederationProfile)</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-entity/src/entity.rs</code></td>
+</tr>
+<tr>
+<td>Membership</td>
+<td><code>Membership { member_id, parent_id, role, status, shares, capabilities }</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-entity/src/membership.rs</code></td>
+</tr>
+<tr>
+<td>Membership role</td>
+<td><code>MembershipRole</code> enum (<code>Founder</code>, <code>Member</code>, <code>Worker</code>, <code>Consumer</code>, <code>Producer</code>, <code>BoardMember</code>, <code>Officer{title}</code>, <code>FederatedMember</code>, <code>AssociateMember</code>, <code>ObserverMember</code>, <code>ProvisionalMember</code>, <code>Custom{name}</code>)</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-entity/src/membership.rs</code></td>
+</tr>
+<tr>
+<td>Per-membership capability grants</td>
+<td><code>MembershipCapability</code> enum (<code>Vote</code>, <code>Propose</code>, <code>TreasuryAccess</code>, <code>Invite</code>, <code>ManageSubEntities</code>, <code>Sign</code>, <code>Configure</code>, <code>ViewSensitive</code>, <code>Custom(String)</code>)</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-entity/src/membership.rs</code></td>
+</tr>
+<tr>
+<td>Non-sovereign internal unit</td>
+<td>`Structure { kind: Committee</td>
+<td>WorkingGroup</td>
+<td>Team</td>
+</tr>
+<tr>
+<td>Role inside a structure</td>
+<td><code>RoleAssignment { id, structure_id, person_did, role, authority_scope: Vec&lt;String&gt;, start_date: Timestamp, end_date: Option&lt;Timestamp&gt;, assigned_by_decision }</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-governance/src/structure.rs</code></td>
+</tr>
+<tr>
+<td>Time-bounded work</td>
+<td>`Activity { kind: Event</td>
+<td>Program</td>
+<td>Project</td>
+</tr>
+<tr>
+<td>Program / cycle container</td>
+<td><code>Program { ... }</code>, <code>Milestone { ... }</code></td>
+<td>✅ shipped (PR #1548)</td>
+<td><code>icn/crates/icn-governance/src/program.rs</code></td>
+</tr>
+<tr>
+<td>Polymorphic parent attachment for operational objects</td>
+<td><code>InstitutionalParent</code> enum</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-governance/src/parent.rs</code></td>
+</tr>
+<tr>
+<td>Governance domain (scope of proposals/votes)</td>
+<td><code>GovernanceDomain</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-governance/src/domain.rs</code></td>
+</tr>
+<tr>
+<td>Proposal</td>
+<td><code>Proposal</code>, <code>ProposalPayload</code> (<code>Text</code>, <code>Budget</code>, <code>Allocation</code>, <code>Membership</code>, <code>ConfigChange</code>, <code>FreezeMember</code>, <code>VetoProposal</code>, <code>ForceCloseProposal</code>)</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-governance/src/proposal.rs</code></td>
+</tr>
+<tr>
+<td>Vote</td>
+<td><code>Vote</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-governance/src/vote.rs</code></td>
+</tr>
+<tr>
+<td>Delegation (individual → individual)</td>
+<td><code>Delegation</code> (1717 LOC; domain-scoped, expiring, revocable)</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-governance/src/delegation.rs</code></td>
+</tr>
+<tr>
+<td>Typed authority grant (entity → grantee, scoped, time-bounded, revocable)</td>
+<td><code>AuthorityGrant { class, grantor, grantee, scope: TypedScope, valid_from, valid_until, revoked_at }</code></td>
+<td>✅ type landed; typed-scope enforcement is additive migration per ADR-0014</td>
+<td><code>icn/crates/icn-governance/src/authority.rs</code></td>
+</tr>
+<tr>
+<td>Mandate (execution obligation linked to a decision)</td>
+<td><code>Mandate { id, decision: DecisionProvenance, payload_hash, grants, executor, deadline, status, issued_at }</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-governance/src/mandate.rs</code></td>
+</tr>
+<tr>
+<td>Meeting</td>
+<td><code>Meeting</code> (schedule, agenda, attendance, minutes)</td>
+<td>✅ shipped (PR #1543)</td>
+<td><code>icn/crates/icn-governance/src/meeting.rs</code></td>
+</tr>
+<tr>
+<td>Action item</td>
+<td><code>ActionItem</code>, <code>ActionItemSpec</code> (decision-to-action bridge, provenance-linked to proposals)</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-governance/src/action_item.rs</code></td>
+</tr>
+<tr>
+<td>Charter (constitutional doc for an entity)</td>
+<td><code>Charter</code>, <code>CharterStore</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-governance/src/charter.rs</code>, <code>charter_store.rs</code></td>
+</tr>
+<tr>
+<td>Cooperative contract language</td>
+<td>CCL — AST, interpreter, fuel-metered</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-ccl/</code></td>
+</tr>
+<tr>
+<td>Governance receipts / proof</td>
+<td><code>icn-governance::proof</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-governance/src/proof.rs</code></td>
+</tr>
+<tr>
+<td>Treasury + mutual credit + receipts</td>
+<td>Double-entry journal, zero-sum invariant, <code>LedgerPolicyOracle</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-ledger/</code></td>
+</tr>
+<tr>
+<td>Trust graph + trust-gated rate limits</td>
+<td><code>TrustGraph</code>, <code>TrustPolicyOracle</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-trust/</code>, <code>icn/apps/governance/</code> (oracle)</td>
+</tr>
+<tr>
+<td>PolicyOracle (meaning firewall)</td>
+<td><code>PolicyOracle</code> trait, <code>ConstraintSet</code>, <code>PolicyDecision</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-kernel-api/</code></td>
+</tr>
+<tr>
+<td>Capability token / bearer</td>
+<td><code>Capability</code>, <code>CapabilitySet</code> (genesis bootstrap)</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-kernel-api/src/bootstrap.rs</code></td>
+</tr>
+<tr>
+<td>Frozen-core invariants</td>
+<td>10 invariants defined as <code>InvariantId</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-kernel-api/src/invariants.rs</code></td>
+</tr>
+<tr>
+<td>Federation membership list</td>
+<td><code>FederationProfile.member_entities</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-entity/src/entity.rs</code></td>
+</tr>
+<tr>
+<td>Naming / DID resolution</td>
+<td><code>icn-naming</code></td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-naming/</code></td>
+</tr>
+<tr>
+<td>Scope-aware identity across devices</td>
+<td><code>MultiDevice</code>, <code>Capability</code> enum</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-identity/src/multi_device.rs</code></td>
+</tr>
+<tr>
+<td>Node / daemon</td>
+<td><code>icnd</code></td>
+<td>✅ shipped</td>
+<td><code>icn/bins/icnd/</code></td>
+</tr>
+<tr>
+<td>Gateway (REST + WebSocket, JWT, per-DID rate limit)</td>
+<td><code>icn-gateway</code>, pilot-ui surfaces</td>
+<td>✅ shipped</td>
+<td><code>icn/crates/icn-gateway/</code>, <code>web/pilot-ui/</code></td>
+</tr>
+<tr>
+<td>Institution package (e.g., NYCN)</td>
+<td>in-monorepo staging at <code>institutions/nycn/</code>; target: external <code>nycn-icn</code> repo</td>
+<td>⚠️ boundary doc pinned; package thin</td>
+<td><code>institutions/nycn/</code>, <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code></td>
+</tr>
+<tr>
+<td>&quot;My scopes&quot; surface</td>
+<td><code>GET /gov/me/scopes</code> (role assignments for caller DID)</td>
+<td>✅ shipped (PR #1552)</td>
+<td><code>icn/apps/governance/src/http/handlers.rs</code></td>
+</tr>
+<tr>
+<td>&quot;My work&quot; surface</td>
+<td><code>GET /gov/me/work</code> (assigned action items for caller DID)</td>
+<td>✅ shipped (PR #1552)</td>
+<td><code>icn/apps/governance/src/http/handlers.rs</code></td>
+</tr>
+<tr>
+<td><strong>Commons Shell</strong> (unified member-facing doorway across entities)</td>
+<td>concept; partial predecessors in <code>web/pilot-ui/</code> and <code>sdk/react-native/examples/CoopWallet/</code></td>
+<td><code>[future design]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>GET /me/standing</code> (roles + memberships + mandates + active scopes)</td>
+<td>does not exist as a single query</td>
+<td><code>[future design]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>GET /me/action-cards</code> (unified call-to-action surface)</td>
+<td>does not exist</td>
+<td><code>[future design]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>RepresentativeVote</code> / <code>EntityAction</code> (action whose subject is the represented entity, not the signer)</td>
+<td><code>AuthorityClass::Representation</code> exists in ADR-0014; no dedicated vote-wrapper type yet</td>
+<td><code>[future design]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Active-scope / session-selected-scope model (every action bound to an explicit chosen scope)</td>
+<td>scope is currently inferred from JWT <code>coop_id</code> + scopes; no explicit active-scope primitive</td>
+<td><code>[future design]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Commons OS / node appliance / kiosk mode</td>
+<td>aspirational; see §11</td>
+<td><code>[future design]</code></td>
+<td>—</td>
+</tr>
+</tbody></table>
+<p>Where this doc says <code>[future design]</code>, it means: <em>the concept is named here, it has not been built, and this doc does not authorize its implementation.</em> A dedicated design doc and issue are required before code lands.</p>
+<hr>
+<h2>Entity and Membership Model</h2>
+<p>A member&#39;s DID is the cryptographic root of their participation. It is <strong>not</strong> a login, <strong>not</strong> a wallet address in the crypto sense, and <strong>not</strong> a platform account. It is a key pair the member holds, under their control, from which all participation derives.</p>
+<h3>Layers</h3>
+<ol>
+<li><p><strong>Individual DID → Individual Entity.</strong> Every person in the system starts as a <code>did:icn:&lt;base58-ed25519-public-key&gt;</code>. <code>EntityId::from_did(did)</code> produces the matching individual entity (format <code>entity:icn:individual:&lt;identifier&gt;</code>). There is no &quot;user account&quot; between the key pair and the entity.</p>
+</li>
+<li><p><strong>Membership</strong> is the typed link between a member entity and a parent entity. Individuals hold membership in communities and cooperatives. Entities (cooperatives, communities, other federations) hold membership in federations. Membership is recursive: a cooperative&#39;s members can themselves be cooperatives.</p>
+</li>
+<li><p><strong>Membership confers standing.</strong> A <code>Membership</code> record carries:</p>
+<ul>
+<li><code>role: MembershipRole</code> — what kind of member (<code>Founder</code>, <code>Member</code>, <code>Worker</code>, <code>BoardMember</code>, <code>Officer{title}</code>, <code>FederatedMember</code>, <code>AssociateMember</code>, <code>ObserverMember</code>, <code>ProvisionalMember</code>, <code>Custom{name}</code>, …).</li>
+<li><code>status: MembershipStatus</code> — whether the role is currently active.</li>
+<li><code>shares: u64</code> — voting weight per charter (0 means observer).</li>
+<li><code>capabilities: Vec&lt;MembershipCapability&gt;</code> — default grants (<code>Vote</code>, <code>Propose</code>, <code>TreasuryAccess</code>, <code>Invite</code>, <code>ManageSubEntities</code>, <code>Sign</code>, <code>Configure</code>).</li>
+</ul>
+</li>
+<li><p><strong>RoleAssignment</strong> layers further capability onto structures. A member of <code>nycn-organizers</code> may also hold a <code>RoleAssignment</code> in the <code>nycn-finance</code> structure with <code>authority_scope</code> strings like <code>&quot;approve-budget-&lt;=5000&quot;</code>. The role inside a structure is bounded by the structure&#39;s delegated authority.</p>
+</li>
+<li><p><strong>AuthorityGrant / Mandate</strong> (ADR-0014) is the typed, scoped, revocable layer of authority above capability strings. A <code>Mandate</code> binds an executor to a specific decision&#39;s obligation. An <code>AuthorityGrant</code> binds a grantee to a typed scope, time-bounded, with explicit grantor provenance.</p>
+</li>
+</ol>
+<h3>Illustrative Flow</h3>
+<pre><code>did:icn:alice
+  → Individual Entity               (entity:icn:individual:alice-pubkey)
+  → Membership in greenstar-coop    (role: Worker, capabilities: [Vote, Propose])
+  → Membership in brooklyn-coop-net (role: Member via greenstar delegate)
+  → RoleAssignment in               (structure: nycn-finance,
+    nycn-finance committee             role: &quot;coordinator&quot;,
+                                       authority_scope: [&quot;approve-budget-&lt;=5000&quot;])
+  → Mandate to represent            (class: Representation,
+    greenstar in NYCN federation       grantor: greenstar,
+                                       grantee: did:icn:alice,
+                                       scope: nycn-federation-gov proposals)
+</code></pre>
+<p><strong>This illustrative layering is not a single primitive today.</strong> Each layer exists in the repo; they compose. Alice&#39;s action surface at any given moment is the <em>union</em> of:</p>
+<ul>
+<li>capabilities from her direct memberships,</li>
+<li>capabilities from her role assignments in structures,</li>
+<li>representation mandates granted to her by other entities,</li>
+<li>operator-level rights on any node she runs.</li>
+</ul>
+<p>What does <strong>not</strong> yet exist as a single API is a query that returns &quot;everything Alice is standing in right now&quot;. That is the <code>[future design]</code> <code>GET /me/standing</code> surface (see §9).</p>
+<blockquote>
+<p><strong>Illustrative only.</strong> The flow above composes real types but is pseudocode. Do not treat it as a single struct or a committed API contract.</p>
+</blockquote>
+<hr>
+<h2>Communities, Cooperatives, and Federations</h2>
+<p>The three non-individual sovereign entity kinds each embody a different Commons function. They share a substrate but not a purpose.</p>
+<h3>Community</h3>
+<p>A <strong>community</strong> (<code>Entity::Community(CommunityProfile)</code>) is a civic/social Commons. Its primary function is collective life: care, ritual, learning, mutual aid, local memory, public life, conflict repair, welcoming. Communities may have treasury and governance, but their economic function is secondary to their social one. A neighborhood assembly, a care circle, a faith community, a study group, a maker-space circle, a regional potluck network — these are communities.</p>
+<p>Communities tend to operate at human scale, with low formality relative to their depth. Their membership criteria are often affiliative rather than contractual.</p>
+<h3>Cooperative</h3>
+<p>A <strong>cooperative</strong> (<code>Entity::Cooperative(CooperativeProfile)</code>) is an economic Commons. Its primary function is production, labor, services, treasury, mutual credit, and surplus allocation. A worker co-op, a housing co-op, a consumer co-op, a multi-stakeholder co-op, a producer co-op — these are cooperatives.</p>
+<p>Cooperatives carry more formal governance than most communities because they coordinate around shared economic risk. Their membership criteria are contractual: a member accepts the charter and the corresponding economic obligations.</p>
+<p>Communities and cooperatives are <strong>not hierarchical</strong> relative to each other. A community does not &quot;become&quot; a cooperative when it matures; a cooperative is not a &quot;more serious&quot; community. They are different kinds of Commons optimized for different kinds of holding-in-common.</p>
+<h3>Federation</h3>
+<p>A <strong>federation</strong> (<code>Entity::Federation(FederationProfile)</code>) is a coordination layer between sovereign entities. Federations do not govern their members&#39; internal affairs. Federations coordinate shared initiatives, maintain shared infrastructure, admit new member entities, and express joint positions. Members join federations voluntarily and retain their sovereignty.</p>
+<blockquote>
+<p><strong>Crucial rule</strong>: a federation must not govern the internals of a member entity unless the member entity&#39;s own charter explicitly grants the federation scoped authority over that internal matter. The default is subsidiarity.</p>
+</blockquote>
+<p>NYCN is a federation (see <code>docs/strategy/NYCN-Repo-Architecture-Spec.md</code>). GreenStar Cooperative is one of its sovereign members. NYCN does not decide how GreenStar organizes labor; GreenStar decides how it participates in NYCN.</p>
+<h3>Subsidiarity as Doctrine</h3>
+<blockquote>
+<p><strong>Decisions happen at the smallest competent scope.</strong></p>
+</blockquote>
+<p>A decision that affects only a working group should be made by the working group, not escalated to the committee. A decision that affects only a cooperative should be made by the cooperative, not escalated to the federation. Authority moves <em>upward</em> only when the smaller scope is structurally incompetent to decide — for example, admitting a new federation member, or amending a shared charter.</p>
+<p>Subsidiarity is not a runtime check. It is a design discipline for charters and for CCL rules. ICN enforces the charter; the charter decides where each class of decision lives.</p>
+<hr>
+<h2>Delegation vs Representation</h2>
+<p>These two concepts are often conflated and are <em>not</em> the same. Keeping them separate matters for every feature that touches voting, authority, and receipts.</p>
+<h3>Delegation (individual → individual)</h3>
+<p><strong>Delegation</strong> is an individual DID handing their own voting power to another individual DID, inside a governance domain. The represented party is still <em>themselves</em> — they have chosen to let someone else cast their vote. Delegation is the repo&#39;s existing <code>icn-governance::delegation</code> primitive (1717 LOC, mature).</p>
+<p>Current delegation semantics (as shipped — see <code>icn/crates/icn-governance/src/delegation.rs</code>):</p>
+<ul>
+<li>Delegation is <strong>domain-scoped</strong> — a delegation in one governance domain does not apply to another.</li>
+<li>Delegation can be <strong>blanket, domain-scoped, proposal-scoped, or topic-scoped</strong>, per the delegation type.</li>
+<li>Delegation is <strong>revocable</strong> by the delegator at any time.</li>
+<li>Delegation carries an <strong>expiry</strong>.</li>
+<li>Delegation cycles and self-delegation are rejected by the validation path.</li>
+<li><strong>Direct vote overrides delegated vote</strong>: if Alice delegates to Bob on proposal P, and then Alice casts her own vote on P, Alice&#39;s direct vote wins.</li>
+</ul>
+<p>Delegation does <strong>not</strong> change who is voting&#39;s <em>subject</em>. Alice has not become Bob. Bob is casting Alice&#39;s vote as her delegate. The receipt shows: voter = Alice, signed by = Bob (as delegate), authority = delegation record <code>D</code>.</p>
+<h3>Representation (entity → human)</h3>
+<p><strong>Representation</strong> is categorically different. A cooperative, a community, or a federation is an entity. Entities do not have fingers. They cannot literally sign. When a federation casts a vote, some human has to actually press the button with their key. That human is a <strong>representative</strong>, not a delegate.</p>
+<p>The human&#39;s signature is the cryptographic vehicle. The entity is the subject of the action. The receipt must reflect both.</p>
+<p>Authority for representation comes from:</p>
+<ul>
+<li>a <code>RoleAssignment</code> with <code>authority_scope</code> strings (the shipped capability-string surface),</li>
+<li>an <code>AuthorityGrant { class: AuthorityClass::Representation, grantor: &lt;entity&gt;, grantee: &lt;person DID&gt;, scope: TypedScope, … }</code> (the ADR-0014 typed layer),</li>
+<li>a specific <code>Mandate</code> tied to a named decision (the execution-obligation layer), or</li>
+<li>a charter clause that directly appoints a role holder.</li>
+</ul>
+<p>Every representative action must be <strong>receipt-backed</strong>: the receipt records the represented entity, the human signer, the authority source, the decision or action, the scope / domain, the timestamp, and the resulting state change. Without this provenance, entity-level authority is indistinguishable from personal preference.</p>
+<blockquote>
+<p>A <code>RepresentativeVote</code> / <code>EntityAction</code> type — a single object that binds <em>(represented entity, human signer, authority source, action payload, scope, provenance, resulting receipt)</em> — does not yet exist as a first-class primitive. Today, the relationship is reconstructed from a combination of JWT <code>coop_id</code> scope, <code>RoleAssignment</code>, and the proposal/vote record. Formalizing this is <code>[future design]</code>. See §14.</p>
+</blockquote>
+<h3>Worked example: GreenStar votes in NYCN</h3>
+<blockquote>
+<p>GreenStar Cooperative is a member of NYCN Federation. Alice DID is authorized by GreenStar to cast GreenStar&#39;s NYCN federation vote. Alice is not voting as Alice. Alice is voting as GreenStar.</p>
+<p>The receipt must show:</p>
+<ul>
+<li><strong>represented entity</strong>: <code>entity:icn:cooperative:greenstar</code></li>
+<li><strong>human signer</strong>: <code>did:icn:alice-pubkey</code></li>
+<li><strong>authority source</strong>: <code>AuthorityGrant{ id, class: Representation, grantor: greenstar, grantee: alice, scope: nycn-federation-gov, valid_from, valid_until }</code> — plus optionally a specific <code>Mandate</code> if the vote was decided in a GreenStar internal proposal</li>
+<li><strong>action</strong>: <code>CastVote { proposal: &lt;id&gt;, choice: &lt;…&gt; }</code></li>
+<li><strong>scope / domain</strong>: <code>nycn-federation-gov</code></li>
+<li><strong>timestamp</strong>: issued at</li>
+<li><strong>resulting state change</strong>: vote tallied; <code>Vote</code> record with <code>voter: greenstar</code>, <code>signed_by: alice</code>, <code>authority: &lt;grant_id&gt;</code></li>
+</ul>
+<p>If Alice ceases to be a GreenStar delegate, a <em>future</em> Alice-signed vote on NYCN proposals must no longer tally for GreenStar. The <code>valid_until</code> and <code>revoked_at</code> fields on <code>AuthorityGrant</code> are the enforcement surface.</p>
+</blockquote>
+<p>The doctrine carried by this example: <strong>a person can be authorized to act for an entity, but the identity of the acting subject is the entity</strong>. UX must reflect that. Receipts must reflect that. Tally semantics must reflect that.</p>
+<hr>
+<h2>The Commons Shell</h2>
+<p>A <strong>Commons Shell</strong> is the member-facing doorway into The Commons. It is not a dashboard. It is not a wallet. It is not an admin panel. It is not a social feed. It is the piece of software a person opens to participate in the institutions they belong to.</p>
+<p>Today, ICN&#39;s member-facing surfaces are split across:</p>
+<ul>
+<li><code>web/pilot-ui/</code> (browser PWA served by the gateway),</li>
+<li><code>sdk/react-native/examples/CoopWallet/</code> (mobile wallet, 21 screens),</li>
+<li><code>icnctl</code> CLI (power user + operator),</li>
+<li><code>icn-console</code> (TUI),</li>
+<li>a variety of SDIS / steward / anchor pages.</li>
+</ul>
+<p>None of these are a full Commons Shell today. The pilot UI is cooperative-scoped and auth-centric. CoopWallet leans toward payment/identity primitives. <code>icnctl</code> assumes operator fluency. A Commons Shell is the member-facing thing these could converge toward.</p>
+<p>The Commons Shell answers:</p>
+<ul>
+<li><strong>Where do I belong?</strong> Which entities list me as a member? Which structures have me assigned? Which federations list entities I represent?</li>
+<li><strong>What scope am I acting in right now?</strong> Self? Member of community X? Officer of cooperative Y? Representative of federation Z? Operator of node N?</li>
+<li><strong>What can I do here?</strong> Given my active scope, what capabilities do I hold, and therefore what actions are available?</li>
+<li><strong>What needs my attention?</strong> Open votes, pending action items, overdue obligations, membership requests, expiring mandates, meeting attendance, budget approvals.</li>
+<li><strong>What decisions are open?</strong> Proposals under deliberation in domains I vote in.</li>
+<li><strong>What work is assigned or available?</strong> Action items assigned to me; action items unassigned but in scopes I can claim.</li>
+<li><strong>What help is needed, requested, or offered?</strong> Care requests, mutual aid, coordination needs.</li>
+<li><strong>What resources are shared?</strong> Treasury positions, commons pools, shared tools.</li>
+<li><strong>What meetings, events, or rituals are coming?</strong> Calendar view across my scopes.</li>
+<li><strong>What knowledge is being passed on?</strong> Institutional documents, meeting minutes, program milestone handoffs.</li>
+<li><strong>What was decided?</strong> History of accepted proposals, with receipts, in scopes I belong to.</li>
+<li><strong>What receipts prove it?</strong> Direct receipt viewing for any decision, action, settlement, or mandate.</li>
+<li><strong>What mandates do I hold?</strong> Active representation authority: which entities, which domains, which expirations.</li>
+<li><strong>What can I verify?</strong> Steward proofs, trust edges, identity proofs for others.</li>
+</ul>
+<h3>Design Obligations</h3>
+<p>A Commons Shell must respect:</p>
+<ul>
+<li><strong>Accessibility is not optional.</strong> Screen reader, high-contrast, low-literacy, non-English — these are first-class. See the Visual System (<code>docs/design/ICN_VISUAL_SYSTEM.md</code>).</li>
+<li><strong>Low-end device reach.</strong> A Commons Shell must run on inexpensive phones, shared devices, kiosk terminals, library workstations, and older laptops. If it requires a flagship device, it is not a Commons tool.</li>
+<li><strong>Offline-first member flows.</strong> Vote queues, payment queues, trust attestations, and receipt views work without connectivity and sync on reconnect. The CoopWallet offline queue is the existing pattern.</li>
+<li><strong>Public-terminal / library / community-center access.</strong> Short sessions, no persistent state on the device beyond what the member explicitly saves, explicit sign-out, no silent lingering.</li>
+<li><strong>Scope-aware UX.</strong> Every screen knows which scope the member is currently acting in. Scope-switching is a first-class gesture, not a hidden flag. Mis-scoping is the most common form of institutional confusion; the UI must make it visible.</li>
+<li><strong>Receipt visibility.</strong> A member can ask &quot;why did this happen?&quot; on any entry and reach the signed provenance in at most a few taps. Receipts are not admin-only.</li>
+<li><strong>Action cards as the primary surface.</strong> Home is a list of things that need this person&#39;s attention, ranked by urgency and scope (see §10).</li>
+</ul>
+<blockquote>
+<p>A capitalist app asks how to keep you scrolling. A Commons shell asks how to help you participate in shared life.</p>
+</blockquote>
+<p>The mobile spec (<code>docs/mobile/icn-mobile-ux-spec-v1.md</code>) and the archived human-interface notes (<code>docs/archive/2026/plans-scratch/human-interface.md</code>) contain raw material for promoting this concept into current design docs. That promotion is <code>[future design]</code>.</p>
+<hr>
+<h2>Standing and Active Scope</h2>
+<p>Two <code>[future design]</code> surfaces are named here because they shape every member flow that follows.</p>
+<h3><code>GET /me/standing</code> <code>[future design]</code></h3>
+<p>A single authenticated query that returns a member&#39;s full participatory position across ICN. Suggested shape (non-binding):</p>
+<pre><code class="language-text">GET /me/standing
+Authorization: Bearer &lt;JWT&gt;
+
+→ {
+    self: {
+      did: &quot;did:icn:alice-pubkey&quot;,
+      individual_entity_id: &quot;entity:icn:individual:alice-pubkey&quot;,
+      devices: [...],
+    },
+    memberships: [
+      { entity_id: &quot;entity:icn:cooperative:greenstar&quot;, role, status, shares, capabilities, joined_at },
+      ...
+    ],
+    role_assignments: [
+      { structure_id, parent_entity_id, role, authority_scope: [...], valid_from, valid_until },
+      ...
+    ],
+    mandates: [
+      { mandate_id, represented_entity, decision: &lt;provenance&gt;, grants: [...], deadline, status },
+      ...
+    ],
+    authority_grants_held: [
+      { grant_id, class: Representation | Execution | Attestation, grantor, scope, valid_until, revoked_at },
+      ...
+    ],
+    representable_entities: [
+      { entity_id, via_grant: &lt;grant_id&gt;, domain_scopes: [...] },
+      ...
+    ],
+    available_active_scopes: [
+      { kind: &quot;self&quot;, label: &quot;Acting as self&quot; },
+      { kind: &quot;member&quot;, entity_id: &quot;...&quot;, label: &quot;Member of GreenStar&quot; },
+      { kind: &quot;role&quot;,   structure_id: &quot;...&quot;, label: &quot;Finance Coordinator, NYCN&quot; },
+      { kind: &quot;representative&quot;, represented_entity: &quot;...&quot;, via_grant: &quot;...&quot;, label: &quot;Representing GreenStar in NYCN&quot; },
+      { kind: &quot;operator&quot;, node_id: &quot;...&quot;, label: &quot;Node operator: home-01&quot; },
+    ],
+    capabilities_by_scope: { &lt;scope_key&gt;: [capability, ...], ... },
+    pending_expirations: [
+      { kind: &quot;role_assignment&quot; | &quot;mandate&quot; | &quot;grant&quot;, id, expires_at },
+      ...
+    ],
+    pending_revocations: [ ... ],
+  }
+</code></pre>
+<p>This does <strong>not</strong> authorize any implementation. It names the target so that when the pieces exist (<code>/gov/me/scopes</code> already does; memberships and authority grants can be joined) the unified query has a shape to aim at.</p>
+<h3>Active Scope</h3>
+<p>Every action a member takes should be bound to an <strong>explicitly selected active scope</strong>. Scope options include:</p>
+<ul>
+<li><strong>Self</strong> — <code>scope: { kind: &quot;self&quot; }</code>. Actions are the member&#39;s own (personal trust attestations, their own ledger position, their own key operations).</li>
+<li><strong>Member</strong> — <code>scope: { kind: &quot;member&quot;, entity_id: &lt;id&gt; }</code>. Actions taken as an ordinary member of an entity (vote in a community proposal, propose in a cooperative, log hours).</li>
+<li><strong>Role</strong> — <code>scope: { kind: &quot;role&quot;, structure_id: &lt;id&gt; }</code>. Actions taken as a role-holder inside a structure (officer, coordinator, committee member).</li>
+<li><strong>Representative</strong> — <code>scope: { kind: &quot;representative&quot;, represented_entity: &lt;id&gt;, via_grant: &lt;grant_id&gt; }</code>. Actions whose subject is a represented entity, not the signer.</li>
+<li><strong>Operator</strong> — <code>scope: { kind: &quot;operator&quot;, node_id: &lt;id&gt; }</code>. Actions taken as a node operator (maintenance, federation peering, trust seeding).</li>
+</ul>
+<p><strong>Hidden authority is capture.</strong> If a member can take an action and there is no way to answer &quot;under what scope?&quot;, the Commons Shell has failed and the receipt has failed. Every receipt must name the active scope used. Every authority check must evaluate capability against the <em>selected</em> scope, not the union of all scopes the member could have chosen.</p>
+<p>An explicit active-scope / session-selected-scope primitive does not yet exist in the codebase. Today the approximation lives in JWT <code>coop_id</code> + <code>scopes</code> claims and is not uniformly applied across the ledger, governance, and trust surfaces. Formalizing this is <code>[future design]</code> (see §14).</p>
+<hr>
+<h2>Action Cards</h2>
+<p>An <strong>action card</strong> is a generated call-to-action item surfaced in the Commons Shell. It is not a notification, not a feed post, not a marketing message. It is a scoped, typed, dismissible prompt that says: <em>&quot;This is a thing in the Commons that needs you.&quot;</em></p>
+<p><code>GET /me/action-cards</code> <code>[future design]</code> — a unified query that returns the ranked list of action cards for the authenticated member across all their scopes.</p>
+<h3>Sources</h3>
+<p>An action card may be generated from:</p>
+<ul>
+<li><strong>Open proposals</strong> in a governance domain where the member has <code>Vote</code> capability.</li>
+<li><strong>Pending votes</strong> (the member has not yet cast on a proposal they can vote on).</li>
+<li><strong>Assigned action items</strong> (<code>ActionItem</code> records where <code>assignee == caller</code>, as already surfaced by <code>/gov/me/work</code>).</li>
+<li><strong>Upcoming meetings</strong> the member is invited to.</li>
+<li><strong>Role or mandate expirations</strong> (a <code>RoleAssignment.valid_until</code> or <code>AuthorityGrant.valid_until</code> approaching).</li>
+<li><strong>Membership requests</strong> where the member has <code>Invite</code> or <code>ManageSubEntities</code> capability in the inviting entity.</li>
+<li><strong>Budget approvals</strong> where the member is in the approval chain.</li>
+<li><strong>Care requests</strong> (mutual aid, dispute support, accessibility help).</li>
+<li><strong>Program milestone prompts</strong> (a program cycle entering a new phase, a check the member is accountable for).</li>
+<li><strong>Receipt verification requests</strong> (another member has asked the member to verify an identity proof, a trust attestation, a steward enrollment).</li>
+<li><strong>Node maintenance items</strong> (if the member is also a node operator).</li>
+<li><strong>Appeals or amendments</strong> the member is qualified to respond to.</li>
+</ul>
+<h3>Doctrine</h3>
+<blockquote>
+<p>A capitalist app asks how to keep you scrolling. A Commons shell asks how to help you participate in shared life.</p>
+</blockquote>
+<p>Action cards are designed for closure, not engagement. A card that stays open forever is a failure. A card that gets dismissed, acted on, delegated, or timed out and archived is working.</p>
+<p>Action cards are <strong>scoped</strong>. Each card is generated in the context of one of the member&#39;s active scopes; rendering must show which scope the card belongs to so the member never acts in the wrong hat.</p>
+<p>A card generation model — predicates, ranking, dismissal, expiry, cross-scope deduplication — does not exist in the codebase today. The existing <code>/gov/me/work</code> and the notification digest work (PR #1547) are partial predecessors.</p>
+<hr>
+<h2>Physical Commons and Nodes</h2>
+<p>ICN runs on existing, ordinary technology first. The first operational target is never a custom appliance. The first operational target is whatever the community already has.</p>
+<h3>Current Reach</h3>
+<ul>
+<li>Modest <strong>phones</strong> (iOS + Android) via <code>sdk/react-native/examples/CoopWallet/</code>.</li>
+<li><strong>Browsers</strong> (desktop + mobile) via <code>web/pilot-ui/</code> served by the gateway.</li>
+<li>Ordinary <strong>Linux boxes</strong> (home servers, office workstations) running <code>icnd</code>.</li>
+<li><strong>Raspberry Pi / single-board computers</strong> for community nodes.</li>
+<li><strong>Library and community-center terminals</strong> (browser-based access, no install).</li>
+<li><strong>Homelab servers</strong> running containerized <code>icnd</code> under K3s or Docker Compose (see <code>deploy/README.md</code>, <code>docs/HOMELAB_DEPLOYMENT.md</code>).</li>
+<li><strong>Community nodes</strong> run by volunteer operators — the current live K3s cluster is the canonical example.</li>
+<li><strong>Cheap laptops</strong> for organizers and stewards.</li>
+<li><strong>Event kiosks</strong> (forthcoming, via the Commons Shell concept).</li>
+<li><strong>Offline-first local networks</strong> — mDNS discovery and gossip already work on isolated LANs.</li>
+</ul>
+<p><strong>ICN turns existing hardware into Commons infrastructure.</strong> The binary target is unremarkable hardware in the hands of cooperatives, communities, and federations.</p>
+<h3>Commons OS <code>[future design]</code></h3>
+<p>A longer-horizon concept: a <strong>Commons OS</strong> distribution — a node appliance, kiosk mode, mobile shell, desktop environment, or app runtime tuned specifically for Commons participation. Possible shapes include:</p>
+<ul>
+<li>An <code>icnd</code>-first Linux image for community nodes (plug in, enroll, peer).</li>
+<li>A kiosk-mode browser build of the Commons Shell for libraries and community centers.</li>
+<li>A mobile-first shell distribution where the phone itself is the primary member device.</li>
+<li>A local-first archive and content-addressed shared-memory layer across community nodes.</li>
+<li>A distributed storage/compute pool across homelab operators.</li>
+<li>A package manager for Commons apps and institution packages (CCL templates, oracles, UI overlays).</li>
+</ul>
+<p>None of these are on any roadmap as of 2026-04-24. Naming them here is a hedge against feature creep into the current ICN kernel: Commons OS ambitions live <strong>outside</strong> the kernel/app boundary, not inside it.</p>
+<blockquote>
+<p><strong>First, ICN turns existing hardware into Commons infrastructure. Only later — if ever — does a dedicated Commons OS make sense.</strong></p>
+</blockquote>
+<hr>
+<h2>Institution Transformation Examples</h2>
+<p>The Commons transforms inherited institutions by decomposing them into human functions and rebuilding from primitives. The list below is illustrative, not exhaustive. Each transformation names the existing ICN primitives that would compose it. None of these is an endorsement of a specific institution design; each is a <em>sketch</em> of how the primitives carry the weight.</p>
+<p>Use the composition shorthand: <strong>E</strong> = Entity, <strong>S</strong> = Structure, <strong>A</strong> = Activity, <strong>P</strong> = Program, <strong>M</strong> = Meeting, <strong>Pr</strong> = Proposal, <strong>R</strong> = Role / RoleAssignment, <strong>C</strong> = Charter, <strong>L</strong> = Ledger / Treasury, <strong>Rc</strong> = Receipt / Provenance, <strong>F</strong> = Federation relationship, <strong>N</strong> = Node / operator layer.</p>
+<table>
+<thead>
+<tr>
+<th>Inherited institution</th>
+<th>Commons transformation</th>
+<th>Primitive composition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Church</strong></td>
+<td>Ritual / Care / Meaning Commons — a community holds a tradition of ritual, care, and meaning without a corporate hierarchy above it. Elders are role-holders, not owners.</td>
+<td>E (community) + C (charter of tradition) + S (care circle, liturgy working group) + A (annual cycle of observances) + M (gatherings) + R (elder, steward, care coordinator) + Rc (minutes, commitments).</td>
+</tr>
+<tr>
+<td><strong>Corporation</strong></td>
+<td>Production Commons — a worker-owned cooperative holds productive capacity directly, with federated coordination across similar cooperatives.</td>
+<td>E (cooperative) + C (charter) + S (committees: finance, operations, stewarding) + A (annual plan) + P (campaigns, product cycles) + Pr (budget, hiring, strategy proposals) + L (treasury, mutual credit) + F (industry or regional federation) + Rc (decision &amp; settlement receipts).</td>
+</tr>
+<tr>
+<td><strong>Bank</strong></td>
+<td>Mutual Credit Commons — credit is bilateral and cooperative, not extracted. No custodial float. No external settlement rail.</td>
+<td>E (cooperative or federation) + C (credit charter) + L (double-entry ledger, zero-sum invariant) + Pr (credit-policy changes, credit-ceiling adjustments) + Rc (every settlement). Regulatory framing: units, positions, settlement — never currency, balance, payment.</td>
+</tr>
+<tr>
+<td><strong>School / University</strong></td>
+<td>Learning / Knowledge Commons — curriculum, stewardship of knowledge, peer recognition, intergenerational memory held by a community rather than sold by a platform.</td>
+<td>E (community or federation of learning circles) + C (learning charter) + S (subject circles) + A (cohorts) + P (multi-year programs with milestones) + M (seminars, defenses) + R (teacher, steward, peer) + Rc (recognition receipts, credential provenance).</td>
+</tr>
+<tr>
+<td><strong>Social media</strong></td>
+<td>Communication Commons — topic-scoped federated gossip, no engagement engine, no algorithmic feed, moderation is local and accountable.</td>
+<td>ICN gossip primitives + E (community) + C (community norms charter) + S (moderation circle) + Pr (norms amendments) + Rc (moderation receipts). The kernel already provides the gossip; what is missing is member-facing shells.</td>
+</tr>
+<tr>
+<td><strong>Insurance</strong></td>
+<td>Risk Commons — mutual insurance pool, not investor-owned. Claims are governed by members.</td>
+<td>E (cooperative) + C (pool charter) + L (pool treasury + contribution flow) + Pr (claim decisions, pool parameter changes) + Rc (claim settlement receipts).</td>
+</tr>
+<tr>
+<td><strong>Hospital / clinic network</strong></td>
+<td>Care Commons — patient-owned or practitioner-owned cooperative care network, federated regionally.</td>
+<td>E (cooperative of clinics) + S (specialty circles, ethics committee) + A (service cycles) + R (practitioner, patient-representative, steward) + L (solidarity fund, contribution flow) + F (regional care federation) + Rc (care provenance; never medical-record oversharing).</td>
+</tr>
+<tr>
+<td><strong>Local government functions</strong></td>
+<td>Civic Commons — participatory budgeting, neighborhood assembly, dispute resolution at the smallest competent scope.</td>
+<td>E (community) + C (civic charter) + Pr (Allocation for participatory budgeting, Text for resolutions) + M (assembly meetings) + R (rotating coordinator roles) + Rc (decisions published and verifiable).</td>
+</tr>
+<tr>
+<td><strong>Supply chain</strong></td>
+<td>Federated Production / Distribution Commons — producer, processor, distributor cooperatives federated with published terms and mutual credit clearing.</td>
+<td>Multiple E (each coop) + F (federation) + L (inter-coop mutual credit, settlement) + Pr (shared-initiative proposals) + Rc (cross-coop settlement receipts).</td>
+</tr>
+<tr>
+<td><strong>Public library</strong></td>
+<td>Physical Commons node — the library is itself a community node: a place with terminals, stewards, shared knowledge, access for members who have no other point of entry.</td>
+<td>E (community) + N (library node running <code>icnd</code>) + R (librarian-steward) + Commons Shell on local terminals + Rc (lending, access, membership receipts).</td>
+</tr>
+</tbody></table>
+<p>These transformations are not &quot;apps&quot; to be built by the ICN core team. They are the <em>use-cases</em> Commons institutions — with their own apps, charters, and institution packages — build on top of ICN. The core team&#39;s obligation is to keep the substrate general enough that none of these requires bespoke kernel support.</p>
+<hr>
+<h2>Boundary Rules</h2>
+<p>The Commons doctrine above is worthless unless it constrains engineering decisions. The following rules are binding.</p>
+<ol>
+<li><p><strong>Generic institutional shapes live in ICN core crates.</strong> <code>Entity</code>, <code>Membership</code>, <code>Structure</code>, <code>RoleAssignment</code>, <code>Activity</code>, <code>Program</code>, <code>Milestone</code>, <code>Meeting</code>, <code>Proposal</code>, <code>Vote</code>, <code>Delegation</code>, <code>Mandate</code>, <code>AuthorityGrant</code>, <code>ActionItem</code>, <code>InstitutionalParent</code>, <code>Charter</code>, ledger entries, receipts, invariants — these are generic and belong in <code>icn-governance</code>, <code>icn-entity</code>, <code>icn-identity</code>, <code>icn-ledger</code>, <code>icn-kernel-api</code>.</p>
+</li>
+<li><p><strong>Institution-specific vocabulary lives in institution packages.</strong> Sponsor tiers, conference sessions, summit tracks, committee nickname conventions, jurisdiction-specific registration fields, donor levels, volunteer shift patterns — these belong in <code>institutions/&lt;name&gt;/</code> (currently <code>institutions/nycn/</code>, to be split out as an external repo). See <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code>.</p>
+</li>
+<li><p><strong>NYCN- and Summit-specific semantics must not leak into core.</strong> No <code>ProgramKind::AnnualSummit</code>, no <code>MilestoneType::VenueLocked</code> in <code>icn-governance</code>. Named institution milestones live in CCL contract bodies; institution-kind escapes use <code>Custom(String)</code> on generic enums. The authoritative routing correction in <code>INSTITUTION_PACKAGE_BOUNDARY.md</code> is the enforcement surface.</p>
+</li>
+<li><p><strong>Commons doctrine must not weaken the Meaning Firewall.</strong> Everything in this doc that sounds like social meaning (trust, care, standing, representation, scope) is app-layer and/or shell-layer. The kernel continues to see only <code>ConstraintSet</code>, <code>PolicyDecision</code>, <code>Capability</code>, <code>Did</code>, <code>Timestamp</code>, <code>Hash</code>, and the typed invariant attestations. See <code>docs/architecture/KERNEL_APP_SEPARATION.md</code> (Invariants 1–5).</p>
+</li>
+<li><p><strong>The Commons Shell may render social meaning; the kernel must enforce constraints without knowing that meaning.</strong> A shell may show &quot;Alice is voting as GreenStar&#39;s representative in NYCN&quot;. The kernel sees a signed vote message whose constraints passed a <code>PolicyOracle</code> check; it does not know that &quot;NYCN&quot; is a federation or that &quot;GreenStar&quot; is a worker cooperative.</p>
+</li>
+<li><p><strong>Receipts and provenance remain central.</strong> Every state transition — vote, settlement, role assignment, grant, mandate, admission, expulsion, amendment — emits a receipt. Commons legitimacy rests on verifiable memory. This is frozen-core invariant 10 (Universal Receipt Generation). See <code>docs/genesis.md</code>.</p>
+</li>
+<li><p><strong>Accessibility is not optional.</strong> Any member-facing surface that does not work on a screen reader, on a low-end phone, in a second language, or from a public terminal fails the Commons Shell design test. This is a blocker-level concern, not a polish concern.</p>
+</li>
+<li><p><strong>Mobile / member interface is the main interaction point.</strong> For most Commons members, <code>CoopWallet</code>-class mobile and browser PWA surfaces are the <em>primary</em> ICN experience. <code>icnctl</code> and <code>icn-console</code> are operator surfaces. Architectural decisions that assume the member is an operator are a category error.</p>
+</li>
+<li><p><strong>Bounded authority.</strong> No wildcard capabilities, no unbounded grants, no eternal mandates (frozen-core invariants 5 and 7). Every authority has scope and time bounds; every grant has a revocation path.</p>
+</li>
+<li><p><strong>Exit is non-negotiable.</strong> A member can always leave an entity and export their keys, their receipts, and their authored state (frozen-core invariant 1; <code>icnctl id export</code>, <code>icnctl backup</code>). This is what makes The Commons a Commons and not a platform.</p>
+</li>
+</ol>
+<hr>
+<h2>Open Questions / Future Work</h2>
+<p>The following items are <em>not</em> authorized for implementation here. They are explicitly enumerated so that future design docs, issues, and PRs can pick them up without re-deriving the gap analysis.</p>
+<ol>
+<li><p><strong>Define <code>GET /me/standing</code> query surface.</strong> Unified standing query (memberships + role assignments + mandates + authority grants + available active scopes + capabilities per scope + pending expirations). Successor to, not replacement for, <code>/gov/me/scopes</code> and <code>/gov/me/work</code>. Needs a dedicated design doc.</p>
+</li>
+<li><p><strong>Define the active-scope / session model.</strong> Every member action should carry an explicitly selected scope; the scope must appear in receipts. Today&#39;s JWT <code>coop_id</code>-based approximation is not uniform across the surfaces. Needs a model doc and a migration plan.</p>
+</li>
+<li><p><strong>Define the representative / entity-vote model.</strong> A first-class type that binds <code>(represented_entity, human_signer, authority_source, action_payload, scope, provenance, receipt)</code>. <code>AuthorityClass::Representation</code> in ADR-0014 is the anchor; the vote-wrapper and the tally semantics need a spec. Tally semantics in federations is a pre-requisite.</p>
+</li>
+<li><p><strong>Define the Action Card generation model.</strong> Predicates, ranking, dismissal, expiry, cross-scope deduplication, scope rendering. The existing notification digest and <code>/gov/me/work</code> are partial predecessors.</p>
+</li>
+<li><p><strong>Promote or rewrite <code>docs/archive/2026/plans-scratch/human-interface.md</code>.</strong> Move it into current design docs (<code>docs/design/</code> or <code>docs/mobile/</code>) as the Commons Shell specification, aligned with <code>docs/mobile/icn-mobile-ux-spec-v1.md</code> and the pilot-ui / CoopWallet inventories.</p>
+</li>
+<li><p><strong>Connect Commons Shell concepts to pilot-ui / mobile / wallet surfaces.</strong> Define the convergence path from today&#39;s split surfaces (pilot-ui PWA + CoopWallet + icnctl) to a single Commons Shell concept with shared scope semantics and shared action-card generation.</p>
+</li>
+<li><p><strong>Add NYCN worked examples.</strong> Show the full person-community-cooperative-federation relationship graph in the NYCN topology, including representation flows and receipt shapes. The <code>docs/strategy/NYCN-*</code> docs are close but do not yet render the member-level standing and representation flows.</p>
+</li>
+<li><p><strong>Clarify how mandates expire, revoke, and appear in receipts.</strong> <code>Mandate.status</code>, <code>Mandate.deadline</code>, and the decision-bridge path already exist; the member-facing view (what do I see when a mandate I hold approaches expiry? what do I see when an entity revokes my grant?) is not specified.</p>
+</li>
+<li><p><strong>Clarify entity-level voting eligibility and tally semantics in federations.</strong> When GreenStar votes in NYCN, what weight does GreenStar carry? How do shares work at the entity-member level vs. the individual level? What happens when two humans authorized by GreenStar both attempt to vote on the same federation proposal? Needs a tally-semantics spec.</p>
+</li>
+<li><p><strong>Clarify node operator civic role and ordinary-operator dashboard needs.</strong> Operators run infrastructure; they are also members of their communities. What does an operator-scope surface look like separate from, but integrated with, their member-scope surfaces? Should node operation itself be a charterable responsibility?</p>
+</li>
+</ol>
+<hr>
+<h2>References</h2>
+<p><strong>Canonical anchors (consulted while drafting):</strong></p>
+<ul>
+<li><code>docs/genesis.md</code> — Constitutional Genesis: frozen-core invariants, bootstrap phases, hard invariants.</li>
+<li><code>docs/ARCHITECTURE.md</code> — ICN Architecture Reference: what ICN is, what it isn&#39;t, terminology discipline.</li>
+<li><code>docs/architecture/KERNEL_APP_SEPARATION.md</code> — Meaning Firewall, PolicyOracle pattern, kernel/app invariants.</li>
+<li><code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> — Authoritative routing between ICN platform and institution packages.</li>
+<li><code>docs/architecture/CELLS_AND_SCOPES.md</code> — Scope primitives at the substrate layer.</li>
+<li><code>docs/design/ICN_VISUAL_SYSTEM.md</code> — Visual doctrine; human participation, scope-aware membership, proof-backed coordination.</li>
+<li><code>docs/strategy/NYCN-Repo-Architecture-Spec.md</code> — Repo-shaped NYCN institutional spec.</li>
+<li><code>docs/strategy/NYCN-Institutional-Design.md</code> — NYCN-as-native-institution design (with 2026-04-15 correction to layered ontology).</li>
+<li><code>docs/strategy/ADR-001-What-ICN-Is.md</code> — ADR on ICN&#39;s definition.</li>
+<li><code>docs/adr/ADR-0014-constitutional-object-model.md</code> — Typed authority model (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>).</li>
+<li><code>docs/mobile/icn-mobile-ux-spec-v1.md</code> — Current mobile UX spec.</li>
+<li><code>docs/archive/2026/plans-scratch/human-interface.md</code> — Raw material for the Commons Shell concept (archived; pending promotion).</li>
+<li><code>docs/STATE.md</code> — Current project state.</li>
+<li><code>AGENTS.md</code> — Agent coding instructions and app topology rule.</li>
+</ul>
+<p><strong>Code anchors (types referenced by name):</strong></p>
+<ul>
+<li><code>icn/crates/icn-identity/src/lib.rs</code> — <code>Did</code>.</li>
+<li><code>icn/crates/icn-identity/src/bundle.rs</code> — <code>IdentityBundle</code>.</li>
+<li><code>icn/crates/icn-identity/src/multi_device.rs</code> — <code>Capability</code>.</li>
+<li><code>icn/crates/icn-entity/src/entity.rs</code> — <code>EntityId</code>, <code>Individual</code>, <code>Cooperative(CooperativeProfile)</code>, <code>Community(CommunityProfile)</code>, <code>Federation(FederationProfile)</code>.</li>
+<li><code>icn/crates/icn-entity/src/membership.rs</code> — <code>Membership</code>, <code>MembershipRole</code>, <code>MembershipCapability</code>.</li>
+<li><code>icn/crates/icn-governance/src/structure.rs</code> — <code>Structure</code>, <code>RoleAssignment</code>.</li>
+<li><code>icn/crates/icn-governance/src/activity.rs</code> — <code>Activity</code>.</li>
+<li><code>icn/crates/icn-governance/src/program.rs</code> — <code>Program</code>, <code>Milestone</code>.</li>
+<li><code>icn/crates/icn-governance/src/parent.rs</code> — <code>InstitutionalParent</code>.</li>
+<li><code>icn/crates/icn-governance/src/domain.rs</code> — <code>GovernanceDomain</code>.</li>
+<li><code>icn/crates/icn-governance/src/proposal.rs</code> — <code>Proposal</code>.</li>
+<li><code>icn/crates/icn-governance/src/vote.rs</code> — <code>Vote</code>.</li>
+<li><code>icn/crates/icn-governance/src/delegation.rs</code> — <code>Delegation</code>.</li>
+<li><code>icn/crates/icn-governance/src/authority.rs</code> — <code>AuthorityGrant</code>.</li>
+<li><code>icn/crates/icn-governance/src/mandate.rs</code> — <code>Mandate</code>.</li>
+<li><code>icn/crates/icn-governance/src/meeting.rs</code> — <code>Meeting</code>.</li>
+<li><code>icn/crates/icn-governance/src/action_item.rs</code> — <code>ActionItem</code>, <code>ActionItemSpec</code>.</li>
+<li><code>icn/crates/icn-governance/src/charter.rs</code> — <code>Charter</code>.</li>
+<li><code>icn/crates/icn-kernel-api/src/invariants.rs</code> — <code>InvariantId</code> (10 frozen-core invariants).</li>
+<li><code>icn/crates/icn-kernel-api/src/bootstrap.rs</code> — <code>Capability</code>, <code>CapabilitySet</code>.</li>
+<li><code>icn/apps/governance/src/http/handlers.rs</code> — <code>GET /gov/me/scopes</code>, <code>GET /gov/me/work</code>.</li>
+</ul>
+<hr>
+<p><em>This doc is canonical doctrine, not a plan. No feature in this document is authorized for implementation on the basis of this document alone. Each <code>[future design]</code> item requires its own design doc, issue, and review.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
