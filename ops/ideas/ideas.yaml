@@ -1,0 +1,491 @@
+# Idea Refinery — pre-RFC intake.
+#
+# Schema and discipline live in ops/ideas/README.md. Each row is a
+# captured idea, NOT a decision and NOT a backlog commitment.
+#
+# Promotion has thresholds (see ops/ideas/templates/promotion-review.md).
+# Most ideas should NOT promote to RFC.
+#
+# Hard rules (see ops/ideas/README.md):
+#   1. No idea enters the build backlog without scope, boundary, and
+#      proof path.
+#   2. Accepted RFC does not mean implemented.
+#   3. Accepted ADR does not mean implemented.
+#   4. Future map does not mean backlog commitment.
+#   5. Public claim requires evidence.
+#   6. NYCN/Summit-specific meaning does not go into ICN core.
+#   7. Private operational data does not go into Git.
+#   8. Drive is bootstrap source material; promotion requires review.
+
+version: 0.1.0-draft
+
+ideas:
+
+  # --------------------------------------------------------------
+  # 1. Cooperative Relationship Infrastructure / MRM
+  # --------------------------------------------------------------
+  - id: idea-0001
+    title: Cooperative Relationship Infrastructure (MRM frame)
+    status: framed
+    kind: product_frame
+    source: "session 2026-04-28; conversation about whether ICN should be 'Salesforce for co-ops'"
+    one_sentence: |
+      ICN should be framed as Cooperative Relationship Infrastructure
+      (or Federated MRM) where the relationship belongs to the
+      person/member, not to the platform or organization.
+    problem: |
+      Treating ICN as a SaaS-CRM clone (Salesforce-for-co-ops) imports
+      the wrong ownership model: the platform owns the relationship,
+      the institution rents it, the member is the product. The
+      cooperative version is the inverse — the member owns identity,
+      memberships, standing, consent, participation history,
+      obligations, receipts, and the relationship graph; institutions
+      authorize and verify; ICN is the substrate that makes that
+      legible across institutions.
+    belongs_to: icn
+    layer: substrate
+    current_artifact: "session conversation only"
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects:
+      - "MemberRelationship (name candidate; not committed)"
+      - "ParticipationHistory (name candidate)"
+      - "ConsentRecord (name candidate)"
+    requires_rfc: unknown
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: high
+    boundary_risk: medium
+    risks:
+      - "Premature naming as 'MRM' invites SaaS-clone framing."
+      - "Premature RFC creates objects before the boundary is clear."
+      - "Confusion with NYCN-specific outreach work (idea-0002)."
+    next_transform: |
+      Write a framing brief that distinguishes (a) the substrate-level
+      identity/standing/consent primitives ICN already has from (b)
+      the cooperative-relationship layer this idea proposes, before
+      any RFC.
+
+  # --------------------------------------------------------------
+  # 2. Consent-based outreach / anti-spam relationship commons
+  # --------------------------------------------------------------
+  - id: idea-0002
+    title: Consent-based outreach / relationship commons
+    status: framed
+    kind: institutional_need
+    source: "session 2026-04-28; NYCN outreach surface"
+    one_sentence: |
+      Outreach (marketing, organizing, partner contact) becomes
+      consented relationship management with verifiable sender,
+      topic-scoped consent, duration, revocation, abuse reporting,
+      and consent receipts.
+    problem: |
+      External SaaS treats outreach as bulk send with opt-out.
+      Cooperatives need the inverse: opt-in, scoped, verifiable,
+      revocable, and receipted. Without this, cooperatives either
+      tolerate spam-style tooling or build ad-hoc consent in
+      spreadsheets that leak and drift.
+    belongs_to: icn
+    layer: institutional
+    current_artifact: "ad-hoc Drive-based outreach plans in NYCN"
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects:
+      - "OutreachConsent (name candidate)"
+      - "ConsentReceipt (name candidate)"
+    requires_rfc: unknown
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: high
+    boundary_risk: medium
+    risks:
+      - "Easy to accidentally absorb NYCN-specific outreach flows into ICN core."
+      - "Privacy-sensitive: contact data must stay in private overlay."
+    next_transform: |
+      Write a framing brief that bounds ICN's role to the consent
+      object + receipt class only; outreach campaigns themselves
+      remain institution-package work. Pair with a NYCN source
+      review of current outreach data.
+
+  # --------------------------------------------------------------
+  # 3. Regional cooperative ecosystem / economic cognition
+  # --------------------------------------------------------------
+  - id: idea-0003
+    title: Regional cooperative ecosystem (economic cognition frame)
+    status: framed
+    kind: product_frame
+    source: "session 2026-04-28; macro framing conversation"
+    one_sentence: |
+      ICN should make a region legible to itself, not to capital —
+      scaling from member → group → institution → community/place →
+      federation → inter-federation network.
+    problem: |
+      Most platforms make regions legible to capital (markets,
+      investors, regulators). Cooperatives need the inverse: a
+      region that can see its own members, institutions, agreements,
+      flows, and obligations without surrendering that view to a
+      vendor. This is a long-horizon framing, not an
+      implementation issue.
+    belongs_to: icn
+    layer: institutional
+    current_artifact: "scattered language in pitch / strategy docs"
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects: []
+    requires_rfc: false
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: low
+    boundary_risk: low
+    risks:
+      - "If promoted to RFC prematurely, becomes vaporware with many named-but-empty objects."
+      - "Scope is large; must decompose before any concrete work."
+    next_transform: |
+      Write a framing brief that names the scale path explicitly and
+      distinguishes long-horizon framing from any near-term build.
+      Do not promote to RFC unless a specific bounded sub-question
+      emerges with enumerated options.
+
+  # --------------------------------------------------------------
+  # 4. Cooperative directory / resource map (NYCN dogfood candidate)
+  # --------------------------------------------------------------
+  - id: idea-0004
+    title: Cooperative directory / resource map
+    status: needs_dogfood
+    kind: institutional_need
+    source: "Summit feedback (2024/2025) — attendees wanted to know who's who"
+    one_sentence: |
+      A directory / resource map of cooperatives, organizers, and
+      services — surfaced first as a NYCN dogfood slice, before any
+      generic ICN primitive.
+    problem: |
+      Attendees and organizers repeatedly ask for a way to see the
+      cooperative ecosystem they are part of. Building this as a
+      generic ICN primitive first risks inventing objects that don't
+      match real use; running it as a NYCN slice first surfaces what
+      the generic primitive actually needs to be.
+    belongs_to: nycn
+    layer: package
+    current_artifact: "Summit feedback notes; informal directory in Drive"
+    proposed_next_artifact: dogfood_slice
+    promoted_target: null
+    proposed_objects:
+      - "DirectoryEntry (name candidate, NYCN-scoped)"
+      - "ResourceMap (name candidate, NYCN-scoped)"
+    requires_rfc: false
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required:
+      - "NYCN directory dogfood slice with at least one action_item / complete + receipt cycle"
+    privacy_risk: medium
+    boundary_risk: medium
+    risks:
+      - "Easy to invent ICN core primitives prematurely; keep in NYCN until the slice produces real signal."
+      - "Privacy: real organizer/sponsor identities stay in private overlay."
+    next_transform: |
+      Write a dogfood slice scoped to NYCN. Decide whether the
+      directory record is public-archive or *-internal. Do not
+      promote to ICN core until the slice has run end-to-end with
+      receipts.
+
+  # --------------------------------------------------------------
+  # 5. Drive import map / source review
+  # --------------------------------------------------------------
+  - id: idea-0005
+    title: Drive import map for NYCN bootstrap material
+    status: needs_source_review
+    kind: source_review
+    source: "session 2026-04-28; review of NYCN Drive folders"
+    one_sentence: |
+      Drive material (planning, budget, fundraising, attendees,
+      evaluations, marketing, secrets) needs an explicit source
+      review that maps each folder to a typed record, privacy
+      class, and action — not a blind import.
+    problem: |
+      Drive is bootstrap source material. Bridge-importing it
+      without classification leaks PII and pins stale Drive shape
+      as architecture. The fix is an explicit source review that
+      categorizes each item into keep-public, summarize-only,
+      private-overlay, or never-Git.
+    belongs_to: nycn
+    layer: package
+    current_artifact: "Drive folders + ad-hoc notes"
+    proposed_next_artifact: source_review
+    promoted_target: null
+    proposed_objects: []
+    requires_rfc: false
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required:
+      - "source-review document landed in NYCN repo with per-item action and privacy class"
+    privacy_risk: high
+    boundary_risk: medium
+    risks:
+      - "PII leak if an attendee list or evaluation row is committed."
+      - "Premature pinning: Drive shape != target ICN typed records."
+      - "Sponsor contact data must split from public commitment data."
+    next_transform: |
+      Open `ops/ideas/templates/source-review.md` against the
+      NYCN Drive root. Promote the resulting NYCN repo file as a
+      `promoted_package_task` row.
+
+  # --------------------------------------------------------------
+  # 6. Summit 2026 canonical facts
+  # --------------------------------------------------------------
+  - id: idea-0006
+    title: Summit 2026 canonical facts (Schenectady, 2026-10-17)
+    status: classified
+    kind: package_pattern
+    source: "session 2026-04-28; correction of stale spreadsheet sync language"
+    one_sentence: |
+      Add a small repo-safe NYCN doc pinning Summit 2026 canonical
+      facts (October 17, 2026, Schenectady, NY); deprecate stale
+      spreadsheet-sync language that was experimental, not
+      architectural.
+    problem: |
+      Earlier docs/conversations described a "spreadsheet sync"
+      pattern that was a test artifact, not a settled architecture.
+      Without a canonical-facts doc, downstream contributors
+      (and agents) re-derive the wrong shape from stale notes.
+    belongs_to: nycn
+    layer: package
+    current_artifact: "scattered references; stale spreadsheet-sync wording"
+    proposed_next_artifact: promotion_review
+    promoted_target: null
+    proposed_objects: []
+    requires_rfc: false
+    likely_adr: false
+    implementation_ready: true
+    public_claim_ready: false
+    evidence_required:
+      - "summit/2026/CANONICAL_FACTS.md committed to NYCN repo"
+    privacy_risk: low
+    boundary_risk: low
+    risks:
+      - "Do not expose private venue/contract details."
+    next_transform: |
+      Promotion review → NYCN package task. Target file:
+      `summit/2026/CANONICAL_FACTS.md`. Body: date + city + repo
+      role; explicit note that Drive/Sheets are bootstrap material
+      and the prior spreadsheet-sync wording is stale.
+
+  # --------------------------------------------------------------
+  # 7. Feedback-to-2026 design response
+  # --------------------------------------------------------------
+  - id: idea-0007
+    title: Feedback-to-2026 design response (no PII)
+    status: framed
+    kind: package_pattern
+    source: "Summit 2024 / 2025 evaluation themes"
+    one_sentence: |
+      Convert 2024/2025 evaluation feedback into a repo-safe NYCN
+      design response covering venue/accessibility, networking,
+      closing, session load, cross-sector representation, language
+      justice, resource map, organizer burnout, art/music/movement,
+      childcare/wayfinding/mics — without raw rows or PII.
+    problem: |
+      Evaluation rows include PII and free-text identifying
+      attendees. They cannot enter the public repo. But the
+      themes can: a design response document captures what the
+      organization heard and what it commits to in 2026.
+    belongs_to: nycn
+    layer: package
+    current_artifact: "raw evaluation rows in Drive (private)"
+    proposed_next_artifact: promotion_review
+    promoted_target: null
+    proposed_objects: []
+    requires_rfc: false
+    likely_adr: false
+    implementation_ready: true
+    public_claim_ready: false
+    evidence_required:
+      - "summit/2026/FEEDBACK_DESIGN_RESPONSE.md (or equivalent) in NYCN repo with no raw rows and no PII"
+    privacy_risk: high
+    boundary_risk: low
+    risks:
+      - "PII leak from raw rows."
+      - "Re-identification via small-N quotes."
+    next_transform: |
+      Promotion review → NYCN package task. Source review feeds
+      this; raw rows stay private.
+
+  # --------------------------------------------------------------
+  # 8. Content / RFP dogfood slice
+  # --------------------------------------------------------------
+  - id: idea-0008
+    title: Content/RFP dogfood slice (NYCN, action-card path)
+    status: needs_dogfood
+    kind: dogfood_slice
+    source: "session 2026-04-28; first NYCN dogfood candidate"
+    one_sentence: |
+      Use a Content/RFP workflow (RFP draft → publish → review →
+      schedule fill → speaker bios → finalize) as the first real
+      NYCN dogfood path on the existing action-card proof loop.
+    problem: |
+      ICN's action-card runtime is real for proposal/vote,
+      action_item/complete, meeting/attend. NYCN needs a real
+      institutional flow to exercise these paths end-to-end without
+      inventing new ICN primitives. Content/RFP is the right
+      candidate: low private-data risk, multiple action-card steps,
+      receipt-bearing throughout.
+    belongs_to: nycn
+    layer: package
+    current_artifact: "informal RFP process; no package fixture"
+    proposed_next_artifact: dogfood_slice
+    promoted_target: null
+    proposed_objects:
+      - "summit/2026/content-rfp.example.yaml (NYCN repo)"
+      - "action-card templates: draft RFP, publish RFP, review proposals, fill program gaps, collect speaker bios, finalize schedule"
+    requires_rfc: false
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required:
+      - "Dogfood slice runs against existing ICN action-card runtime and emits at least one ActionItemCompletionReceipt."
+    privacy_risk: low
+    boundary_risk: low
+    risks:
+      - "Real speaker contact info must NOT enter the package fixture."
+    next_transform: |
+      Write a dogfood slice using the dogfood-slice template.
+      Outputs: NYCN repo example yaml + playbook section + action-card
+      templates. No ICN core change required.
+
+  # --------------------------------------------------------------
+  # 9. First live ICN smoke against NYCN package
+  # --------------------------------------------------------------
+  - id: idea-0009
+    title: First live ICN smoke against NYCN package
+    status: framed
+    kind: runtime_gap
+    source: "session 2026-04-28; proof-path hardening priority"
+    one_sentence: |
+      Run the NYCN package against a live ICN node end-to-end:
+      bootstrap → /me/standing → /me/action-cards → complete one
+      action item → verify receipt → document exact commands.
+    problem: |
+      The action-card proof loop landed at the doc/code level, but
+      no published end-to-end run against a real package fixture
+      exists. Without that, the public claim "the proof loop works"
+      is unevidenced.
+    belongs_to: icn
+    layer: runtime
+    current_artifact: "action-card runtime exists; receipt classes
+      exist; no end-to-end smoke against NYCN package documented"
+    proposed_next_artifact: promotion_review
+    promoted_target: null
+    proposed_objects: []
+    requires_rfc: false
+    likely_adr: false
+    implementation_ready: true
+    public_claim_ready: false
+    evidence_required:
+      - "Documented command sequence: bootstrap, GET /me/standing, GET /me/action-cards, action completion, GET /me/receipts."
+      - "Recorded receipts (transcript or fixture)."
+    privacy_risk: low
+    boundary_risk: low
+    risks:
+      - "Runtime gap discovered mid-smoke (non-blocking; promotes to a focused issue)."
+    next_transform: |
+      Promotion review → GitHub issue. Acceptance criteria:
+      command sequence + recorded receipts + audit export. Outranks
+      speculative expansion of the design-direction docs.
+
+  # --------------------------------------------------------------
+  # 10. Cooperative Domain Infrastructure cluster
+  # --------------------------------------------------------------
+  - id: idea-0010
+    title: Cooperative Domain Infrastructure (parent cluster)
+    status: framed
+    kind: architecture_concept
+    source: "merged ICN PR #1664 (design-direction docs)"
+    one_sentence: |
+      The parent cluster of future objects (InstitutionalDomain,
+      DomainPolicy, DomainSession, DeviceIdentity, DeviceEnrollment,
+      ServiceIdentity, Workspace, ArtifactRegistry, ScopedVault,
+      ToolManifest, ToolBinding, AgreementGrant, DnsBinding,
+      PublicationReceipt, ResourceOffer, LocalReservePolicy,
+      WorkloadPlacementPolicy, UsageReceipt, CommonsSettlementReceipt,
+      ChallengePath) — a design direction, not a backlog
+      commitment.
+    problem: |
+      The design-direction docs name many future objects. Promoting
+      each one to an RFC now would produce architecture sprawl
+      and premature doctrine. The right pattern is per-cluster
+      promotion review when there is real signal (a NYCN dogfood
+      slice, a pilot need, or a substrate gap).
+    belongs_to: icn
+    layer: substrate
+    current_artifact: |
+      docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md and
+      companions (merged via #1664).
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects:
+      - "see one_sentence — names only, not commitments"
+    requires_rfc: false
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: low
+    boundary_risk: medium
+    risks:
+      - "Auto-promotion of every named object into RFC candidates — the exact sprawl this refinery exists to prevent."
+    next_transform: |
+      Decompose the cluster: each sub-cluster (identity/sessions,
+      devices/services, workspaces/vaults, tools, agreements,
+      routing/publication, hybrid commons) becomes its own idea
+      card, framed independently. RFC promotion happens per
+      sub-cluster only when a dogfood slice or substrate gap
+      surfaces real design questions.
+
+  # --------------------------------------------------------------
+  # 11. PR / issue hygiene
+  # --------------------------------------------------------------
+  - id: idea-0011
+    title: PR / issue hygiene (auto-close avoidance + cross-repo stack)
+    status: classified
+    kind: repo_hygiene
+    source: "session 2026-04-28; recurring PR-body drift across the cooperative-domain-infrastructure stack"
+    one_sentence: |
+      Add a PR template with hygiene sections (boundary check,
+      review-thread status, cross-repo dependency status, explicit
+      Refs vs close-keyword warning) and codify the cross-repo
+      stack merge order in PR_STACK_PROTOCOL.md.
+    problem: |
+      The cooperative-domain-infrastructure stack drifted across
+      three repos: stale PR bodies, accidental close keywords, and
+      missing review-thread status. The fix is process: a PR
+      template that asks the right questions and a protocol doc
+      that codifies the merge order.
+    belongs_to: icn
+    layer: package
+    current_artifact: |
+      .github/pull_request_template.md (existing) — does not yet
+      include cross-repo dep status or close-keyword warning.
+      No ops/coordination/PR_STACK_PROTOCOL.md.
+    proposed_next_artifact: promotion_review
+    promoted_target: null
+    proposed_objects: []
+    requires_rfc: false
+    likely_adr: false
+    implementation_ready: true
+    public_claim_ready: false
+    evidence_required:
+      - "Updated .github/pull_request_template.md and ops/coordination/PR_STACK_PROTOCOL.md committed in this PR."
+    privacy_risk: low
+    boundary_risk: low
+    risks:
+      - "Template bloat — keep sections short and skippable."
+    next_transform: |
+      Land in this PR alongside the refinery scaffold, since the
+      hygiene rules are part of how the refinery actually works.
