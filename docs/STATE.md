@@ -172,6 +172,8 @@ Infrastructure:
 ## References
 
 - docs/PHASE_PROGRESS.md — phase tracking
+- docs/architecture/THE_COMMONS.md — Capital-C Commons doctrine (what ICN exists to enable)
+- docs/architecture/MEMBER_STANDING.md — `/me/standing` design contract (member-facing standing + accessibility)
 - docs/architecture/KERNEL_APP_SEPARATION.md — kernel/app boundary
 - docs/strategy/NYCN-Repo-Architecture-Spec.md — NYCN institutional architecture
 - docs/strategy/NYCN-Execution-Tranches.md — NYCN 7-tranche execution plan
