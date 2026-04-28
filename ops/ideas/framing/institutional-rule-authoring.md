@@ -1,23 +1,38 @@
 # Institutional rule authoring through CCL — framing brief
 
-**Idea cards:** [idea-0017](../ideas.yaml), [idea-0018](../ideas.yaml)
+**Idea cards:** `ops/ideas/ideas.yaml` (`idea-0017`, `idea-0018`)
+**Author / session:** 2026-04-28 session
 **Date:** 2026-04-28
 **Status:** pre-RFC / pre-ADR framing. Not a design doc. Not a decision.
 Not a schema commitment.
+
+> **Seed-brief discipline.** This is a seed framing brief. If future
+> passes add detailed primitive inventories, cross-institution research
+> findings, or rule-language capability maps, split those into separate
+> source-review or framing artifacts rather than letting this brief
+> become a design doc.
 
 ## What this is
 
 ICN should allow cooperatives, communities, federations, and other
 democratic institutions to encode customized structures, processes,
 and needs through CCL. CCL composes ICN primitives into
-institution-specific bylaws, policies, workflows, constraints, and
-receipt requirements.
+institution-specific bylaws, charters, constitutions, policies,
+agreements, workflows, constraints, and receipt requirements.
 
-This brief uses an anonymized bylaws specimen reviewed out-of-repo
-only as primitive-discovery input. It does not name the cooperative,
-does not commit the source document, and does not treat the specimen
-as a universal cooperative model. A later multi-source research pass
-is the right venue for generalization across cooperative types.
+> **Co-ops are one specimen class. ICN is for institutions.** CCL is
+> the rule-authoring layer for whatever governing text that institution
+> actually uses: bylaws, charters, constitutions, policies, compacts,
+> rules, governance manuals, or federation agreements.
+
+This brief uses an anonymized cooperative bylaws specimen reviewed
+out-of-repo as **one early primitive-discovery input**. It does not
+imply that cooperatives are the only target institution type, and it
+does not treat bylaws as the only governing-document form. Later
+research should compare public bylaws, charters, constitutions, rules,
+policies, agreements, compacts, and governance manuals across
+cooperatives, communities, federations, land trusts, associations,
+mutual-aid networks, and other democratic institutions.
 
 ## Why this matters
 
@@ -62,60 +77,125 @@ runtime state + receipts
 ```
 
 A bylaws specimen feeds the top of this stack as source material; it
-does not define any layer below it.
+does not define any layer below it. The same is true for charters,
+constitutions, compacts, federation agreements, and any other
+governing-document form.
 
-## Primitive families surfaced by the specimen
+## Governing-document forms
 
-The specimen surfaced recurring institutional dimensions. Categories
-only — no clauses quoted, no source named:
+Different institutions express their rules through different
+documents. ICN's rule-authoring layer should not care what the human
+document is called; it should identify the institutional rules,
+boundaries, authority, evidence requirements, and state transitions
+that the document enacts.
 
-- **Membership / standing.** Eligibility, admission, classes, lapse,
-  reinstatement, termination. ICN may need to represent membership
-  state with auditable transitions and standing predicates.
-- **Member classes / tiers.** Voting members, non-voting members,
-  affiliate or associate members, candidate / probationary members,
-  honorary members. ICN may need to represent typed member classes
+Forms encountered in practice include:
+
+- bylaws
+- charters
+- constitutions
+- rules
+- policies
+- member agreements
+- operating agreements
+- community compacts / covenants
+- federation agreements
+- inter-institutional agreements
+- governance manuals
+- assembly procedures
+- stewardship rules
+- shared-resource rules
+
+Mapped to institution type:
+
+- **Cooperatives** often present this as bylaws, rules, policies, and
+  member agreements.
+- **Communities** may present this as charters, compacts, assembly
+  rules, access rules, shared-resource rules, care obligations, or
+  local governance procedures.
+- **Federations** may present this as constitution-level governance:
+  member institutions, delegates, councils or chambers, recognition
+  rules, dues, jurisdiction, amendments, exit, and dissolution.
+
+The rule-authoring layer must accept that the source text is
+heterogeneous and must avoid privileging any single form.
+
+## Primitive families surfaced by the specimen and broader institution frame
+
+The cooperative bylaws specimen surfaced recurring institutional
+dimensions. The categories below merge those with dimensions visible
+in community charters and federation constitutions, so the family list
+does not collapse to one institution type. Categories only — no
+clauses quoted, no source named:
+
+- **Membership / participation / standing.** Eligibility, admission,
+  classes, lapse, reinstatement, termination. ICN may need to
+  represent membership and participation state with auditable
+  transitions and standing predicates.
+- **Member or participant classes.** Voting / non-voting members,
+  affiliate or associate members, candidate or probationary members,
+  honorary members, member institutions (federation case), residents
+  vs guests (community case). ICN may need to represent typed classes
   with per-class rights and obligations.
 - **Governance rights.** Voting, nomination, recall, candidacy,
-  petition. ICN may need to represent rights as composable predicates
-  attached to membership classes, not hardcoded.
-- **Notice / quorum / proxy.** Notice periods, quorum thresholds,
-  proxy rules, virtual-meeting rules. ICN may need to represent these
-  as parameterized rules per meeting type, not as global constants.
-- **Board / council structure.** Seat counts, term lengths, election
-  cadence, vacancies, classes of seats. ICN may need to represent seat
-  inventories with election windows and succession rules.
-- **Role / officer authority.** Authority granted to officers,
-  scope-limits, signing authority, delegation. ICN may need to
-  represent authority grants as scoped, time-bounded, revocable
-  capabilities.
-- **Due process / removal / termination.** Notice, hearing, appeal,
-  remedy. ICN may need to represent process flows where
-  human-discretion steps are first-class, not approximated as if-else.
-- **Cooperative economics.** Member equity, share classes, dues,
-  fees, surplus rules, dividends. ICN may need to represent economic
-  positions distinctly from generic ledger balances.
-- **Equity lifecycle.** Issuance, holding rules, redemption,
-  transferability, forfeiture. ICN may need to represent equity-class
-  state machines with redemption windows and waterfall rules.
-- **Patronage / allocation / reserves.** Patronage measurement,
-  allocation rules, retained vs distributed shares, reserves. ICN may
-  need to represent patronage as a separate accounting class with its
-  own policy parameters.
-- **Amendment lifecycle.** Proposal, notice, deliberation, vote,
-  ratification, effective date. ICN may need to represent the
-  bylaws-amending-themselves loop with explicit version transitions.
-- **Dissolution / liquidation waterfall.** Trigger, asset
-  resolution, member-equity treatment, residual disposition. ICN may
-  need to represent dissolution paths even though they are rarely
-  exercised.
+  petition, delegate selection. ICN may need to represent rights as
+  composable predicates attached to classes, not hardcoded.
+- **Notice / quorum / proxy / remote participation.** Notice periods,
+  quorum thresholds, proxy rules, virtual / hybrid participation
+  rules. ICN may need to represent these as parameterized rules per
+  meeting type, not as global constants.
+- **Assemblies / meetings / councils / chambers.** Convening rules,
+  agendas, decision modes (consensus / majority / supermajority),
+  delegate vs direct chambers. ICN may need to represent multiple
+  decision-making bodies under one institution.
+- **Board / council / committee / circle structure.** Seat counts,
+  term lengths, election cadence, vacancies, classes of seats. ICN
+  may need to represent seat inventories with election windows and
+  succession rules.
+- **Role / officer / delegate authority.** Authority granted to
+  officers, delegates, or stewards; scope-limits; signing authority;
+  delegation. ICN may need to represent authority grants as scoped,
+  time-bounded, revocable capabilities.
+- **Due process / removal / termination / remedy.** Notice, hearing,
+  appeal, remedy. ICN may need to represent process flows where
+  human-discretion steps are first-class, not approximated as
+  if-else.
+- **Shared-resource rules.** Access, allocation, stewardship,
+  maintenance obligations, depletion limits. Especially relevant to
+  communities, land trusts, and commons-managing institutions.
+- **Cooperative or institutional economics.** Member equity, share
+  classes, dues, fees, surplus rules, dividends, federation dues. ICN
+  may need to represent economic positions distinctly from generic
+  ledger balances.
+- **Dues / allocations / reserves / obligations.** Recurring
+  obligations on members or member institutions, allocations of
+  surplus, mandatory reserves.
+- **Equity / patronage where applicable.** Issuance, holding rules,
+  redemption, transferability, forfeiture; patronage measurement and
+  allocation. Communities may not need this family at all; producer
+  and consumer co-ops need it strongly; federations may instead use
+  dues and capital contributions from member institutions.
+- **Amendment / ratification lifecycle.** Proposal, notice,
+  deliberation, vote, ratification, effective date. ICN may need to
+  represent the rules-amending-themselves loop with explicit version
+  transitions.
+- **Exit / withdrawal / dissolution.** Trigger, asset resolution,
+  member-equity treatment, residual disposition; member-institution
+  withdrawal in federations. ICN may need to represent these paths
+  even though they are rarely exercised.
 - **Records / minutes / notices / receipts.** What must be kept,
   who may inspect, what must be produced on demand. ICN may need to
   represent record-only obligations distinctly from enforceable
   rules.
+- **Federation / inter-institutional agreements.** Recognition,
+  membership in a federation, treaties between cooperatives or
+  federations, shared services, cost-sharing.
+- **Jurisdiction / recognition / dispute routing.** Which body decides
+  which question; which institution recognizes which other; how
+  disputes traverse institutional boundaries.
 
 These are primitive families, not commitments. None of them is a
-schema yet.
+schema yet, and not every institution needs every family.
 
 ## Variation across institutions
 
@@ -128,30 +208,43 @@ institution types bind the primitive families differently:
 - producer cooperatives
 - platform cooperatives
 - purchasing cooperatives
-- communities / mutual aid networks
-- land trusts
-- federations
 - multi-stakeholder cooperatives
+- communities / neighborhood assemblies / mutual-aid networks
+- land trusts / community land institutions
+- associations / clubs with democratic governance
+- federations / secondary cooperatives / networks of organizations
 
 Examples of variation, kept generic:
 
 - A consumer co-op may use purchase-based patronage measurement.
 - A worker co-op may use labor contribution and worker-member
   candidacy with probationary periods.
-- A housing co-op may use occupancy rights and maintenance
+- A housing co-op may care about occupancy rights and maintenance
   obligations as governance-relevant standing inputs.
 - A producer co-op may use supply commitments and quality grades as
   membership obligations.
 - A platform co-op may bind member status to platform participation
   and revenue share rather than equity.
 - A purchasing co-op may bind voting weight to volume bands.
-- A federation may use member organizations, delegate voting, dues,
-  and inter-coop agreements rather than individual members.
 - A multi-stakeholder cooperative may use multiple member classes
   with different rights composed into a single governance body.
+- A community might not need patronage or equity primitives at all;
+  it may instead need assembly rules, access rules, shared-resource
+  rules, care obligations, and local governance procedures.
+- A land trust may bind decision rights to stewardship obligations
+  rather than membership tenure.
+- An association or club with democratic governance may need only a
+  thin slice (membership, meetings, officers, dues, amendments).
+- A federation might not need individual consumer-member rules; it
+  may instead need member institutions, delegates, councils or
+  chambers, recognition, dues, jurisdiction, and inter-institutional
+  agreements at constitution-level complexity.
 
-A useful institutional-rule layer must accommodate all of these
-without forcing one shape.
+The takeaway: ICN should provide primitive families. CCL should let
+each institution compose only what it needs. A useful
+institutional-rule layer must accommodate all of these without
+forcing one shape and without requiring institutions to adopt
+primitives that do not apply to them.
 
 ## Encoding classes
 
@@ -250,8 +343,12 @@ Pick exactly one (this brief picks one):
 
 - [ ] another framing brief (decompose first)
 - [x] later multi-source research / source-review pass across public
-      cooperative bylaws, feeding back into this brief and into
-      `idea-0017`
+      institutional governing documents — bylaws, charters,
+      constitutions, rules, policies, agreements, compacts, governance
+      manuals, federation agreements — covering cooperatives,
+      communities, federations, land trusts, associations, mutual-aid
+      networks, and other democratic institutions, feeding back into
+      this brief and into `idea-0017`
 - [ ] dogfood slice
 - [ ] promotion review → RFC candidate
 - [ ] promotion review → ADR candidate
@@ -262,8 +359,9 @@ Pick exactly one (this brief picks one):
 - [ ] park
 - [ ] reject
 
-A source-review template instance covering multiple bylaws specimens
-(public and license-clean only) is acceptable as the next artifact
+A source-review template instance covering multiple public,
+license-clean institutional governing documents — including but not
+limited to cooperative bylaws — is acceptable as the next artifact
 shape.
 
 Do not promote to RFC yet.
