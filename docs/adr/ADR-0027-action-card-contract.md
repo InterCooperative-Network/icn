@@ -8,7 +8,7 @@ tags: ["action-cards", "member-shell", "standing", "derived-views", "forward-dir
 supersedes: []
 superseded_by: []
 amends: []
-implementation_status: "partially implemented (vertical slice; proof-loop verified for proposal/vote source path)"
+implementation_status: "partially implemented (vertical slice; proof-loop verified for all three currently-emitted source paths: proposal/vote, action_item/complete, meeting/attend; signal_rule and obligation_lifecycle remain RFC-gated on icn#1631 and icn#1634)"
 references:
   - "ADR-0020 (Bootstrap Activation and Standing Read Model)"
   - "ADR-0025 (Institutional Effect Record Canonical Schema)"
