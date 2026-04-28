@@ -3,9 +3,44 @@
 ## Summary
 What changed and why?
 
+## Layer classification
+Mark one (see [`ops/coordination/PR_STACK_PROTOCOL.md`](../ops/coordination/PR_STACK_PROTOCOL.md)):
+- [ ] ICN core (generic primitive, kernel, runtime)
+- [ ] ICN app (PolicyOracle / state model)
+- [ ] NYCN package (institution-specific application)
+- [ ] icn-learn (teaching)
+- [ ] Public website (claim)
+- [ ] ops/coordination (process, refinery, hygiene)
+
+## Boundary check
+What this PR intentionally avoids — explicit non-goals:
+- Institution-specific meaning out of ICN core.
+- Private operational data out of any repo.
+- Public website claim without evidence (per ADR-0033).
+- New ICN primitives invented by an institution package.
+
+## What changed
+Files touched and one-line reason per file (or per cluster of files).
+
+## What did not change
+Adjacent surfaces a reader might expect to change but should not.
+
 ## Related
-- Issues: <!-- Fixes # / Closes # -->
+- Issues: <!-- USE `Refs #NNNN`. NEVER use Fixes/Closes/Resolves near issue numbers unless intentionally closing. See PR_STACK_PROTOCOL.md. -->
 - Specs / ADRs / RFCs: <!-- paths under docs/ -->
+- Idea card (if from refinery): <!-- ops/ideas/ideas.yaml#idea-NNNN -->
+
+## Cross-repo dependency status
+If this PR is part of a multi-repo stack, name the upstream/downstream PRs and their state. Cross-repo merge order is **ICN canonical first → NYCN application → ICN Academy teaching** (per [`PR_STACK_PROTOCOL.md`](../ops/coordination/PR_STACK_PROTOCOL.md)).
+
+- Upstream PR(s): <!-- e.g. InterCooperative-Network/icn#NNNN — merged / open / blocked -->
+- Downstream PR(s): <!-- e.g. InterCooperative-Network/nycn#NN — open / queued -->
+- This PR depends on upstream merging first: yes / no
+
+## Review-thread status
+Before requesting merge:
+- [ ] Prior review threads resolved or marked outdated, with reason.
+- [ ] PR body matches the current diff (no stale "in flight" wording).
 
 ## Work mode
 - [ ] Discovery output
