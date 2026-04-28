@@ -282,10 +282,13 @@ conflict-coercion unit tests: each create operation maps a
 `HTTP 409 Conflict` from the gateway to `ApplyOutcome::Completed`,
 so a repeated apply is safe.
 
-**Cleanup** — there is no `icnctl institution bootstrap teardown` or
-generic delete-entity command (see `target/debug/icnctl entity
---help` for the exposed surface). Smoke records persist in the
-daemon's Sled store until that store is cleared manually:
+**Cleanup** — there is no `icnctl institution bootstrap teardown`
+or generic delete-entity command. The `icnctl institution` surface
+exposes only `bootstrap {validate,plan,apply}` (verify with
+`target/debug/icnctl institution bootstrap --help`); no top-level
+`entity` subcommand exists in `icnctl --help`. Smoke records
+therefore persist in the daemon's Sled store until that store is
+cleared manually:
 
 - For local: `rm -rf /tmp/icn-bootstrap-test` after stopping `icnd`.
 - For K3s: a record is written into the persistent volume backing
