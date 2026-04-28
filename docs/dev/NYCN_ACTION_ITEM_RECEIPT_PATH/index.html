@@ -1,0 +1,473 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>NYCN action-item receipt proof path | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>NYCN ACTION ITEM RECEIPT PATH</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><p>Status: discovery runbook
+Authority: dev runbook
+Audience: ICN developers + NYCN package operators
+Cluster: local gateway (<code>start-gateway-test.sh</code>); K3s deferred until receipt-retrieval gap is closed</p>
+<h1>NYCN action-item receipt proof path</h1>
+<p>This runbook closes the gap left open by
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/NYCN_K3S_PROOF_PATH">`NYCN_K3S_PROOF_PATH.md`</a>: driving one
+action item from creation to completion against a real ICN gateway,
+with the smoke fixture&#39;s governance domain as the host, and showing
+that the gateway emits an <code>ActionItemCompletionReceipt</code>. It also
+documents the remaining narrow gap: there is no HTTP endpoint that
+exposes the persisted receipt back to a caller.</p>
+<p>It is a <strong>discovery runbook</strong>: every transcript below is verbatim
+output from the steps as executed against <code>icnd 2f732176</code> (post
+#1673 merge). It does not document what the system is supposed to
+do; it documents what the system did.</p>
+<h2>Relationship to <code>NYCN_K3S_PROOF_PATH.md</code></h2>
+<p><code>NYCN_K3S_PROOF_PATH.md</code> proved the package-loading half of the
+loop:</p>
+<blockquote>
+<p>NYCN smoke fixture → <code>icnctl institution bootstrap apply</code> → empty
+<code>/me/standing</code> projection → empty <code>/me/action-cards</code> projection.</p>
+</blockquote>
+<p>This runbook takes that as given, then proves the action-producing
+half:</p>
+<blockquote>
+<p>bootstrap-already-applied →
+<code>POST /v1/gov/domains/{id}/action-items</code> →
+non-empty <code>/me/action-cards</code> (one <code>action_item / complete</code> card) →
+<code>PUT /v1/gov/domains/{id}/action-items/{id}/status</code> to <code>completed</code> →
+card removed → <code>ActionItemCompletionReceipt</code> emitted server-side.</p>
+</blockquote>
+<p>It deliberately does <strong>not</strong> target K3s in this iteration — the
+receipt-retrieval HTTP gap (see &quot;Remaining gap&quot;) is the next thing
+to close. Once a retrieval endpoint exists, the same loop can be
+exercised against K3s and verified end-to-end without on-disk
+inspection.</p>
+<h2>Prerequisites</h2>
+<p>Same as <code>NYCN_K3S_PROOF_PATH.md</code> Path A:</p>
+<ul>
+<li>Built <code>icnd</code> and <code>icnctl</code> (<code>cargo build -p icnd -p icnctl</code> from
+<code>&lt;icn-repo-root&gt;/icn</code>).</li>
+<li>Smoke icnctl identity at <code>/tmp/icnctl-bootstrap-test</code>
+(<code>ICN_KEYSTORE_PASSPHRASE=&#39;smoke-test-passphrase&#39; icnctl ... id init</code>).</li>
+<li>Local gateway via <code>&lt;icn-repo-root&gt;/start-gateway-test.sh</code>
+(binds <code>127.0.0.1:8085</code>, ephemeral data dir
+<code>/tmp/icn-bootstrap-test</code>).</li>
+<li>NYCN smoke fixture at
+<code>&lt;nycn-repo-root&gt;/institution/smoke/icnctl/</code>.</li>
+</ul>
+<h2>Verified loop</h2>
+<p>All commands run from <code>&lt;icn-repo-root&gt;/icn</code> unless noted. Bearer
+tokens are abbreviated <code>${TOKEN}</code> in the transcript; the actual
+token is fetched via <code>icnctl auth token</code> once per shell session.</p>
+<h3>1. Apply the smoke fixture</h3>
+<pre><code class="language-sh">ICN_KEYSTORE_PASSPHRASE=&#39;smoke-test-passphrase&#39; \
+  target/debug/icnctl \
+  --data-dir /tmp/icnctl-bootstrap-test \
+  institution bootstrap apply \
+  --package &lt;nycn-repo-root&gt;/institution/smoke/icnctl \
+  --gateway http://127.0.0.1:8085 \
+  --coop-id smoke-test-coop
+</code></pre>
+<p>Verbatim:</p>
+<pre><code>Completed:       3
+Deferred:        0
+Unsupported:     1
+Failed:          no
+
+Completed steps:
+  - validate charter ...
+  - create Federation entity nycn-icnctl-smoke-federation: created
+    entity as entity:icn:federation:nycn-icnctl-smoke-federation;
+    governance domain alias nycn-icnctl-smoke-federation-gov
+    recorded for subsequent provisioning
+  - provision governance domain nycn-icnctl-smoke-federation-gov:
+    provisioned governance domain as
+    nycn-icnctl-smoke-federation-gov
+
+Unsupported steps:
+  - store charter: ...
+
+Alias bindings:
+  - nycn-icnctl-smoke-federation -&gt;
+    entity:icn:federation:nycn-icnctl-smoke-federation
+</code></pre>
+<h3>2. Get a JWT and read standing</h3>
+<p>The bootstrap subject DID is now a <code>static_list</code> member of the
+governance domain seeded by the fixture:</p>
+<pre><code class="language-sh">TOKEN=$(ICN_KEYSTORE_PASSPHRASE=&#39;smoke-test-passphrase&#39; \
+  target/debug/icnctl \
+  --data-dir /tmp/icnctl-bootstrap-test \
+  auth token \
+  --gateway http://127.0.0.1:8085 \
+  --coop-id smoke-test-coop \
+  --scopes &quot;governance:read,governance:write,entity:read&quot; \
+  | grep -E &quot;^eyJ&quot; | head -1)
+
+curl -sS http://127.0.0.1:8085/v1/gov/me/standing \
+  -H &quot;Authorization: Bearer $TOKEN&quot;
+</code></pre>
+<p>Verbatim:</p>
+<pre><code class="language-json">{
+  &quot;did&quot;: &quot;did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk&quot;,
+  &quot;domains&quot;: [
+    {
+      &quot;domain_id&quot;: &quot;nycn-icnctl-smoke-federation-gov&quot;,
+      &quot;domain_name&quot;: &quot;NYCN icnctl Smoke Federation Governance&quot;,
+      &quot;membership_source&quot;: &quot;static_list&quot;,
+      &quot;status&quot;: &quot;member&quot;
+    }
+  ],
+  &quot;roles&quot;: [],
+  &quot;authority_scopes&quot;: [],
+  &quot;generated_at&quot;: 1777417387
+}
+</code></pre>
+<h3>3. Action-card queue is initially empty</h3>
+<pre><code class="language-sh">curl -sS http://127.0.0.1:8085/v1/gov/me/action-cards \
+  -H &quot;Authorization: Bearer $TOKEN&quot;
+</code></pre>
+<p>Verbatim:</p>
+<pre><code class="language-json">{
+  &quot;did&quot;: &quot;did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk&quot;,
+  &quot;cards&quot;: [],
+  &quot;generated_at&quot;: 1777417387
+}
+</code></pre>
+<h3>4. Create one action item assigned to the bootstrap subject</h3>
+<pre><code class="language-sh">DID=&quot;did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk&quot;
+
+curl -sS -X POST \
+  http://127.0.0.1:8085/v1/gov/domains/nycn-icnctl-smoke-federation-gov/action-items \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &#39;Content-Type: application/json&#39; \
+  -d &quot;{\&quot;title\&quot;:\&quot;Smoke fixture proof item\&quot;,\
+      \&quot;description\&quot;:\&quot;Repo-safe placeholder action item to drive the proof loop.\&quot;,\
+      \&quot;assignee\&quot;:\&quot;$DID\&quot;,\
+      \&quot;priority\&quot;:\&quot;medium\&quot;}&quot;
+</code></pre>
+<p>Note: <code>priority</code> accepts <code>low | medium | high | critical</code>. <code>normal</code>
+is rejected. The response carries the new <code>id</code>:</p>
+<pre><code class="language-json">{
+  &quot;id&quot;: &quot;005782cf-d8ad-4d64-b848-ec12d6a6afa1&quot;,
+  &quot;domain_id&quot;: &quot;nycn-icnctl-smoke-federation-gov&quot;,
+  &quot;title&quot;: &quot;Smoke fixture proof item&quot;,
+  &quot;description&quot;: &quot;Repo-safe placeholder action item to drive the proof loop.&quot;,
+  &quot;assignee&quot;: &quot;did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk&quot;,
+  &quot;status&quot;: &quot;pending&quot;,
+  &quot;priority&quot;: &quot;medium&quot;,
+  &quot;created_by&quot;: &quot;did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk&quot;,
+  &quot;created_at&quot;: 1777417409,
+  &quot;updated_at&quot;: 1777417409,
+  &quot;tags&quot;: [],
+  &quot;notes&quot;: [],
+  &quot;is_overdue&quot;: false
+}
+</code></pre>
+<p>The handler enforces <code>governance:write</code> scope and domain
+membership; both are satisfied because the bootstrap apply seeded
+the caller as a <code>$bootstrap_subject_did</code> member of the smoke
+domain (see step 2 standing).</p>
+<h3>5. Action card derives from the new item</h3>
+<pre><code class="language-sh">curl -sS http://127.0.0.1:8085/v1/gov/me/action-cards \
+  -H &quot;Authorization: Bearer $TOKEN&quot;
+</code></pre>
+<p>Verbatim:</p>
+<pre><code class="language-json">{
+  &quot;did&quot;: &quot;did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk&quot;,
+  &quot;cards&quot;: [
+    {
+      &quot;id&quot;: &quot;card-action_item-005782cf-d8ad-4d64-b848-ec12d6a6afa1-complete&quot;,
+      &quot;source_kind&quot;: &quot;action_item&quot;,
+      &quot;action_kind&quot;: &quot;complete&quot;,
+      &quot;scope&quot;: &quot;individual&quot;,
+      &quot;title&quot;: &quot;Complete: Smoke fixture proof item&quot;,
+      &quot;summary&quot;: &quot;Repo-safe placeholder action item to drive the proof loop.&quot;,
+      &quot;authority_basis&quot;: &quot;assigned_action_item&quot;,
+      &quot;required_authority_scope&quot;: [
+        &quot;complete:005782cf-d8ad-4d64-b848-ec12d6a6afa1&quot;
+      ],
+      &quot;risk_level&quot;: &quot;normal&quot;,
+      &quot;accessibility_hint&quot;: &quot;Action items may be reassigned or accommodated; ask the owning structure.&quot;,
+      &quot;receipt_expected&quot;: true,
+      &quot;source_id&quot;: &quot;005782cf-d8ad-4d64-b848-ec12d6a6afa1&quot;,
+      &quot;domain_id&quot;: &quot;nycn-icnctl-smoke-federation-gov&quot;
+    }
+  ],
+  &quot;generated_at&quot;: 1777417409
+}
+</code></pre>
+<p><code>receipt_expected: true</code> and <code>authority_basis: assigned_action_item</code> confirm the card derives from the action-item
+assignment.</p>
+<h3>6. Complete the action item</h3>
+<p>The status update path requires <code>governance:write</code> and creator-or-
+assignee identity:</p>
+<pre><code class="language-sh">ITEM_ID=&quot;005782cf-d8ad-4d64-b848-ec12d6a6afa1&quot;
+
+curl -sS -X PUT \
+  &quot;http://127.0.0.1:8085/v1/gov/domains/nycn-icnctl-smoke-federation-gov/action-items/$ITEM_ID/status&quot; \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &#39;Content-Type: application/json&#39; \
+  -d &#39;{&quot;status&quot;:&quot;completed&quot;}&#39;
+</code></pre>
+<p>Verbatim:</p>
+<pre><code class="language-json">{
+  &quot;id&quot;: &quot;005782cf-d8ad-4d64-b848-ec12d6a6afa1&quot;,
+  &quot;domain_id&quot;: &quot;nycn-icnctl-smoke-federation-gov&quot;,
+  &quot;title&quot;: &quot;Smoke fixture proof item&quot;,
+  ...
+  &quot;status&quot;: &quot;completed&quot;,
+  ...
+  &quot;updated_at&quot;: 1777417420
+}
+</code></pre>
+<p>The handler&#39;s manager call is the receipt-emission seam:
+<code>apps/governance/src/manager.rs:4870–4890</code> — when the transition
+crosses into <code>ActionItemStatus::Completed</code> from a non-completed
+prior state and a receipt store is wired,
+<code>store.put_action_item_completion(&amp;receipt)</code> is invoked with a
+freshly-constructed <code>ActionItemCompletionReceipt</code>. The save fails
+the entire transition (rather than logging-and-continuing) so the
+receipt and state-change are atomic.</p>
+<h3>7. Action card disappears after completion</h3>
+<pre><code class="language-sh">curl -sS http://127.0.0.1:8085/v1/gov/me/action-cards \
+  -H &quot;Authorization: Bearer $TOKEN&quot;
+</code></pre>
+<p>Verbatim:</p>
+<pre><code class="language-json">{
+  &quot;did&quot;: &quot;did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk&quot;,
+  &quot;cards&quot;: [],
+  &quot;generated_at&quot;: 1777417420
+}
+</code></pre>
+<p>The card derivation drops cards whose underlying action items are
+no longer pending, as expected.</p>
+<h2>Idempotency confirmation</h2>
+<p>Re-running <code>icnctl institution bootstrap apply</code> against the same
+gateway / data dir reports the per-operation 409 → <code>Completed</code>
+coercion implemented in
+<code>bins/icnctl/src/institution_bootstrap.rs</code>:</p>
+<pre><code>Completed:       3
+Deferred:        0
+Unsupported:     1
+Failed:          no
+
+Completed steps:
+  - validate charter ...
+  - create Federation entity nycn-icnctl-smoke-federation:
+    entity entity:icn:federation:nycn-icnctl-smoke-federation
+    already exists
+  - provision governance domain nycn-icnctl-smoke-federation-gov:
+    governance domain nycn-icnctl-smoke-federation-gov already
+    exists
+</code></pre>
+<p>Same completed count, same alias bindings, no failures. This
+matches the unit-test assertion in
+<code>nycn_bootstrap_apply_idempotent</code> and the per-create-op 409 stub
+tests in the same file.</p>
+<h2>Where the receipt actually lives in this mode</h2>
+<p><code>start-gateway-test.sh</code> runs <code>icnd</code> with <code>--data-dir /tmp/icn-bootstrap-test</code>, but the gateway&#39;s primary Sled DB falls
+back to in-memory storage in this mode. From the daemon log:</p>
+<pre><code>icn_gateway::server: Using temporary in-memory storage for gateway
+icn_gateway::server: Receipt store initialized
+icn_gateway::server: Governance manager running standalone with
+  persistent action items
+</code></pre>
+<p>In the standalone gateway/HTTP path shown by that log, the
+governance manager is backed by the <strong>same gateway Sled DB</strong>
+(<code>crates/icn-gateway/src/server.rs:773</code> —
+<code>GovernanceManager::new_with_sled(sled_db_arc)</code> over the same
+<code>sled_db_arc</code> that the gateway just initialized as temporary).
+Because that DB is temporary here, both the HTTP-created action
+items and the <code>ActionItemCompletionReceipt</code> records live only in
+the temporary gateway store and are lost when the daemon stops.</p>
+<p>The separate governance-actor action-item store opened by
+<code>apps/governance/src/init.rs:108</code> at
+<code>&lt;data_dir&gt;/governance_action_items</code> applies only to the
+<strong>actor-backed</strong> governance path (<code>Governance manager connected to daemon with persistent action items</code> in the log), not to this
+standalone run.</p>
+<p>If the gateway is started with a persistent gateway store instead
+of the temporary one, the same standalone HTTP path keeps both
+action items and receipts in that persistent gateway DB. In that
+configuration, receipts are stored under the
+<code>receipt:action_item_completion:rec:</code> and
+<code>receipt:action_item_completion:by_item:</code> Sled prefixes (see
+<code>crates/icn-gateway/src/receipt_store.rs:38–46</code>), retrievable by
+the <code>get_action_item_completion_by_item</code> /
+<code>list_action_item_completions_by_item</code> backend methods.</p>
+<p>The presence of either the persistent or temporary gateway store
+is enough to satisfy the manager&#39;s <code>put_action_item_completion</code>
+invocation; the runtime contract is the same.</p>
+<h2>Remaining gap: HTTP retrieval of <code>ActionItemCompletionReceipt</code></h2>
+<p>This is the only gate between the runbook and a fully self-checking
+HTTP loop:</p>
+<blockquote>
+<p>the gateway has no HTTP endpoint that exposes
+<code>get_action_item_completion_by_item</code> (or its <code>list_*</code> sibling).</p>
+</blockquote>
+<p>Confirmed:</p>
+<pre><code>$ grep -RIn &quot;get_action_item_completion\|list_action_item_completion&quot; \
+    apps/governance/src/http
+# (empty — handlers do not expose these)
+</code></pre>
+<p><code>icnctl receipts</code> covers economic-chain receipts (allocations,
+intents, decision hashes — see <code>bins/icnctl/src/...</code> and
+<code>crates/icn-gateway/src/api/receipts.rs</code>). It does not cover
+action-item completion receipts.</p>
+<p>Until that gap is closed, an operator running this runbook can
+prove steps 1–7 from HTTP responses but must rely on either:</p>
+<ul>
+<li><code>cargo test -p icn-governance-actor --test me_action_item_receipt_chain</code>
+(in-process; passes 6/6 on <code>2f732176</code>), or</li>
+<li>a daemon configured with a persistent gateway DB, stopped after
+the loop, with the on-disk Sled prefix inspected by a small Rust
+helper that opens the DB read-only and lists the
+<code>receipt:action_item_completion:*</code> prefix.</li>
+</ul>
+<p>Neither is a clean HTTP-only operator workflow.</p>
+<h2>Three narrow next steps</h2>
+<p>Pick one. All keep this runbook valid; (a) is the smallest:</p>
+<p>(a) <strong>Expose a single HTTP endpoint</strong> —
+<code>GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt</code>
+— that wraps <code>get_action_item_completion_by_item</code> from the receipt
+backend, requires <code>governance:read</code>, and 404s if no receipt exists.
+~50 lines + a targeted handler test. No new primitives. Closes the
+loop and does not change the bootstrap surface.</p>
+<p>(b) <strong>Add <code>completion_receipt_id</code> to the <code>ActionItemResponse</code>
+JSON</strong> when the item&#39;s status is <code>completed</code>. The receipt id is
+already available on the receipt the manager just persisted; surface
+it on the existing
+<code>PUT .../status</code> response and on <code>GET .../action-items/{id}</code>. This
+makes the receipt id visible without adding a new endpoint, but
+still requires (a) to fetch the receipt body itself.</p>
+<p>(c) <strong>Add a tiny <code>icnctl gov action-item completion-receipt --domain &lt;id&gt; --item &lt;id&gt;</code></strong> subcommand wrapping (a). Useful for the
+operator runbook but a no-op without (a).</p>
+<p>Default recommendation: do (a). It is the smallest unit of work
+that makes the proof loop self-checking over HTTP and will allow a
+later runbook to verify the receipt against the deployed K3s
+gateway without on-disk inspection. (b) and (c) are nice but
+strictly follow-ons.</p>
+<h2>Cleanup</h2>
+<p>After the loop:</p>
+<pre><code class="language-sh"># Stop the daemon (SIGINT, the script execs icnd in foreground)
+pkill -INT -f &quot;target/debug/icnd --data-dir /tmp/icn-bootstrap-test&quot;
+
+# Wipe ephemeral state
+rm -rf /tmp/icn-bootstrap-test
+# Identity keystore can stay for re-runs:
+# rm -rf /tmp/icnctl-bootstrap-test
+</code></pre>
+<h2>References</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/NYCN_K3S_PROOF_PATH">`NYCN_K3S_PROOF_PATH.md`</a> — package-
+loading half of the loop and K3s read-only verification.</li>
+<li><code>bins/icnctl/src/institution_bootstrap.rs</code> — apply, idempotency
+tests.</li>
+<li><code>apps/governance/src/http/configure.rs</code> — action-item routes.</li>
+<li><code>apps/governance/src/http/handlers.rs</code> — <code>create_action_item</code>
+(l. 2550), <code>update_action_item_status</code> (l. 2767),
+<code>get_my_action_cards</code> (~l. 5078).</li>
+<li><code>apps/governance/src/manager.rs</code> — receipt emission seam
+(l. 4870–4890).</li>
+<li><code>crates/icn-gateway/src/receipt_store.rs</code> — Sled prefixes for
+action-item completion receipts (l. 38–46) and the
+<code>get/list_action_item_completion_by_item</code> methods (l. 1622–1660).</li>
+<li><code>apps/governance/src/receipt_backend.rs</code> — backend trait surface
+for the same methods.</li>
+<li><code>apps/governance/tests/me_action_item_receipt_chain.rs</code> — full
+in-process proof loop with a recording receipt backend.</li>
+<li>NYCN repo <code>institution/smoke/icnctl/README.md</code> — fixture intent
+and limits.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
