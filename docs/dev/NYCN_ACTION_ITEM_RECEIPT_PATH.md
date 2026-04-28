@@ -334,21 +334,35 @@ icn_gateway::server: Governance manager running standalone with
   persistent action items
 ```
 
-So in this mode, action items are persisted (separate
-`SledActionItemStore` opened by `apps/governance/src/init.rs:108`
-at `<data_dir>/governance_action_items`) but the
-`ActionItemCompletionReceipt` lives in the in-memory gateway DB and
-is lost when the daemon stops. A daemon configured with a
-persistent gateway store puts the receipt under the
+In the standalone gateway/HTTP path shown by that log, the
+governance manager is backed by the **same gateway Sled DB**
+(`crates/icn-gateway/src/server.rs:773` —
+`GovernanceManager::new_with_sled(sled_db_arc)` over the same
+`sled_db_arc` that the gateway just initialized as temporary).
+Because that DB is temporary here, both the HTTP-created action
+items and the `ActionItemCompletionReceipt` records live only in
+the temporary gateway store and are lost when the daemon stops.
+
+The separate governance-actor action-item store opened by
+`apps/governance/src/init.rs:108` at
+`<data_dir>/governance_action_items` applies only to the
+**actor-backed** governance path (`Governance manager connected to
+daemon with persistent action items` in the log), not to this
+standalone run.
+
+If the gateway is started with a persistent gateway store instead
+of the temporary one, the same standalone HTTP path keeps both
+action items and receipts in that persistent gateway DB. In that
+configuration, receipts are stored under the
 `receipt:action_item_completion:rec:` and
 `receipt:action_item_completion:by_item:` Sled prefixes (see
 `crates/icn-gateway/src/receipt_store.rs:38–46`), retrievable by
 the `get_action_item_completion_by_item` /
 `list_action_item_completions_by_item` backend methods.
 
-The presence of either the persistent or in-memory store is enough
-to satisfy the manager's `put_action_item_completion` invocation;
-the runtime contract is the same.
+The presence of either the persistent or temporary gateway store
+is enough to satisfy the manager's `put_action_item_completion`
+invocation; the runtime contract is the same.
 
 ## Remaining gap: HTTP retrieval of `ActionItemCompletionReceipt`
 
