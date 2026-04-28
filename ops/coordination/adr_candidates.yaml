@@ -43,6 +43,14 @@
 #   depends_on: ADR ids that must land first
 #   priority: now | soon | later
 #   tranche: 1 | 2 | 3 | 4
+#   readiness: ready | needs_framing_brief | needs_split | needs_source_review |
+#              needs_dogfood | needs_implementation_evidence | blocked
+#     (optional; set per ops/coordination/RFC_ADR_READINESS_AUDIT.md when an ADR's
+#      institutional gravity exceeds its evidence — the ADR is preserved, but the
+#      registry signals that further framing/splitting/evidence is required before
+#      the decision should advance from `proposed` to `accepted`.)
+#   readiness_notes: free-form sentence explaining the readiness annotation
+#     (cite the audit doc and the linked idea card)
 
 candidates:
 
@@ -109,6 +117,8 @@ candidates:
     depends_on: ["0021", "0022"]
     priority: soon
     tranche: 1
+    readiness: needs_framing_brief
+    readiness_notes: "ADR is `proposed / proposed`. Principle is reasonable; runtime details (Process DAG, step kinds, deadline-as-data, escalation-as-step) are speculative without shipping evidence. Framing work tracked at ops/ideas/ideas.yaml#idea-0012. See ops/coordination/RFC_ADR_READINESS_AUDIT.md."
 
   - id: "0024"
     title: "Institution Package Manifest Schema"
@@ -128,6 +138,8 @@ candidates:
     depends_on: []
     priority: now
     tranche: 1
+    readiness: needs_framing_brief
+    readiness_notes: "Seed-primitive part is settled (BootstrapSeedManifest ships). Proposed sections (indicators, signal rules, allocation templates, locale metadata, package operating intent) bundle distinct design spaces and need separate framing briefs. Tracked at ops/ideas/ideas.yaml#idea-0013. See ops/coordination/RFC_ADR_READINESS_AUDIT.md."
 
   - id: "0025"
     title: "Institutional Effect Record Canonical Schema"
@@ -147,6 +159,8 @@ candidates:
     depends_on: ["0024"]
     priority: soon
     tranche: 1
+    readiness: needs_framing_brief
+    readiness_notes: "ADR is `proposed / proposed`. No EffectRecord ships today — the dispatch seam from mandate to effect does not yet exist in code. Schema details (closed kind taxonomy, persistence model, reversal pointer) are speculative. Tracked at ops/ideas/ideas.yaml#idea-0014. See ops/coordination/RFC_ADR_READINESS_AUDIT.md."
 
   - id: "0026"
     title: "Receipt and Provenance Proof Envelope"
@@ -204,6 +218,8 @@ candidates:
     depends_on: []
     priority: now
     tranche: 1
+    readiness: needs_split
+    readiness_notes: "Principle (accessibility is a participation floor; five layers) is foundational and stays. Per-layer runtime contracts (sensory/cognitive/linguistic/economic/temporal) are speculative and span very different surfaces; each needs a separate framing brief. Tracked at ops/ideas/ideas.yaml#idea-0015. See ops/coordination/RFC_ADR_READINESS_AUDIT.md."
 
   - id: "0029"
     title: "Conflict Resolution Object Model"
@@ -223,6 +239,8 @@ candidates:
     depends_on: ["0023", "0025"]
     priority: soon
     tranche: 1
+    readiness: needs_split
+    readiness_notes: "Principle (institutional care first-class; three conflict shapes) is solid. Compute-disputes path ships. Institutional-conflict object model details (EffectChallenge type, evidence model, remedy taxonomy, mediation roles) are speculative and depend on idea-0014 (EffectRecord). Tracked at ops/ideas/ideas.yaml#idea-0016. See ops/coordination/RFC_ADR_READINESS_AUDIT.md."
 
   - id: "0030"
     title: "Compute Workload Manifest and Authority Boundary"
@@ -299,6 +317,8 @@ candidates:
     depends_on: ["0032"]
     priority: soon
     tranche: 1
+    readiness: needs_implementation_evidence
+    readiness_notes: "Decision direction is clear (every banded claim cites evidence). Linter is unbuilt. Lower the gravity until the linter exists; do not pretend the convention is enforced. See ops/coordination/RFC_ADR_READINESS_AUDIT.md."
 
   - id: "0034"
     title: "ADR Candidate Registry as Architectural Memory"
