@@ -178,6 +178,12 @@ exists for each promotion. Thresholds:
   implemented` or `verified`, or shipped runtime.
 - The maturity band is honest (per ADR-0033).
 
+## Framing briefs
+
+Concrete framing briefs (instances of the framing-brief template) live
+under [`framing/`](framing/). Each brief is anchored to one or more
+idea cards in `ideas.yaml` and is descriptive, not normative.
+
 ## Templates
 
 - [`templates/idea-card.md`](templates/idea-card.md) — minimal capture.

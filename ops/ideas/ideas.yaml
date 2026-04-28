@@ -645,3 +645,126 @@ ideas:
       - "Privacy: conflict records carry the most sensitive institutional content; getting the schema wrong costs more than getting it right slowly."
     next_transform: |
       Write a framing brief that anchors on the three conflict shapes from ADR-0029 and then iterates one shape end-to-end (likely EffectChallenge against an existing EffectRecord, paired with idea-0014). Defer the other two shapes until the first has runtime.
+
+  # --------------------------------------------------------------
+  # 17. Cooperative bylaws primitive scan
+  # --------------------------------------------------------------
+  - id: idea-0017
+    title: Cooperative bylaws primitive scan
+    status: needs_source_review
+    kind: source_review
+    source: "anonymized cooperative bylaws specimen reviewed out-of-repo; source not committed"
+    one_sentence: |
+      ICN needs a reusable way to identify institutional rule
+      primitives from cooperative bylaws without treating any single
+      cooperative's bylaws as a universal schema.
+    problem: |
+      Cooperative bylaws contain recurring institutional dimensions —
+      membership, standing, authority, voting, notice, quorum, equity,
+      patronage, amendment, dissolution, and due process — but co-ops
+      vary widely in how those dimensions are bound. ICN needs
+      primitive families and encoding classes, not hardcoded co-op
+      templates.
+    belongs_to: icn
+    layer: institutional
+    current_artifact: "anonymized bylaws specimen reviewed out-of-repo (not committed); session 2026-04-28 framing"
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects: []
+    requires_rfc: unknown
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: medium
+    boundary_risk: medium
+    risks:
+      - "Naming the source cooperative or implying endorsement."
+      - "Treating one bylaws specimen as the universal cooperative model."
+      - "Promoting clause observations directly into RFC/ADR doctrine."
+      - "Pretending all legal/human-discretion clauses can be executable code."
+    next_transform: |
+      Write/maintain the framing brief in
+      ops/ideas/framing/institutional-rule-authoring.md. Defer broader
+      generalization to a later multi-source research pass across
+      public institutional governing documents — including cooperative
+      bylaws, community charters, federation constitutions, rules,
+      policies, agreements, compacts, and governance manuals — not
+      cooperative bylaws alone. idea-0017 itself remains a
+      cooperative-bylaws specimen scan; the broader research pass is a
+      separate downstream artifact.
+
+  # --------------------------------------------------------------
+  # 18. CCL institutional rule authoring layer
+  # --------------------------------------------------------------
+  - id: idea-0018
+    title: CCL institutional rule authoring layer
+    status: framed
+    kind: architecture_concept
+    source: "session 2026-04-28; bylaws-to-CCL discussion"
+    one_sentence: |
+      CCL should become the institutional rule authoring layer that
+      lets cooperatives, communities, and federations encode their
+      customized structures, processes, economic rules, authority
+      paths, and receipt requirements using ICN primitives.
+    problem: |
+      ICN should not ship fixed cooperative templates, and it should
+      not assume cooperatives are the only target institution type.
+      Democratic institutions of many kinds — cooperatives,
+      communities, federations, land trusts, associations, mutual-aid
+      networks — need to encode their own structure and processes:
+      membership or participation classes, standing rules, meeting and
+      assembly procedures, voting thresholds, board or council or
+      circle structures, authority grants, obligations, allocations,
+      reserves, shared-resource rules, amendment paths, withdrawal,
+      and dissolution rules. For communities and federations, the
+      relevant source text may be a charter, constitution, compact,
+      federation agreement, policy manual, governance rulebook, or
+      inter-institutional agreement rather than bylaws alone. CCL
+      should compose ICN primitives into customized institutional
+      packages, while preserving human judgment and external
+      legal/accounting review where code should not decide.
+    belongs_to: icn
+    layer: institutional
+    current_artifact: "scattered CCL/charter direction in docs/architecture and ADR-0023/0024 (proposed); no rule authoring surface shipped"
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects:
+      - "MembershipClass (name candidate; not committed)"
+      - "StandingRule (name candidate)"
+      - "AuthorityGrant (name candidate)"
+      - "GovernanceProcess (name candidate)"
+      - "MeetingRule (name candidate)"
+      - "NoticeRequirement (name candidate)"
+      - "QuorumRule (name candidate)"
+      - "VoteThreshold (name candidate)"
+      - "ProxyRule (name candidate)"
+      - "PetitionRule (name candidate)"
+      - "BoardSeat (name candidate)"
+      - "OfficerRole (name candidate)"
+      - "EconomicPosition (name candidate)"
+      - "PatronageAllocation (name candidate)"
+      - "ReserveRequirement (name candidate)"
+      - "RedemptionRule (name candidate)"
+      - "AmendmentProcess (name candidate)"
+      - "DissolutionWaterfall (name candidate)"
+      - "ReceiptRequirement (name candidate)"
+      - "EncodingClass (name candidate)"
+    requires_rfc: unknown
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: medium
+    boundary_risk: medium
+    risks:
+      - "Turning CCL into a vague 'smart contract' bucket instead of institutional rule authoring."
+      - "Freezing syntax before multiple institution types have been reviewed."
+      - "Confusing one cooperative's bylaws specimen with a universal model."
+      - "Failing to distinguish enforceable rules from human/legal judgment."
+    next_transform: |
+      Use the framing brief
+      (ops/ideas/framing/institutional-rule-authoring.md) to define the
+      variation space and encoding classes. Do not promote to RFC until
+      a later multi-source research pass compares bylaws across
+      multiple cooperative types.
