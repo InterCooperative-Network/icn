@@ -736,3 +736,238 @@ async fn reopen_and_recomplete_preserves_completion_history() {
         .expect("latest receipt");
     assert_eq!(latest.record_hash, chain[1].record_hash);
 }
+
+// ============================================================================
+// HTTP endpoint: GET .../action-items/{item_id}/completion-receipt
+// ============================================================================
+
+/// Builds an actix-web app with the full governance routing surface and a
+/// fixed `BasicClaims` injected for the supplied DID + scope. Used by the
+/// completion-receipt HTTP tests below so they exercise the same handler
+/// path a real gateway would route to.
+macro_rules! gov_app_with_scope {
+    ($ctx:expr, $caller_did:expr, $scope:expr) => {{
+        let caller = $caller_did.to_string();
+        let scope = $scope.to_string();
+        test::init_service(
+            App::new()
+                .wrap_fn(move |req, srv| {
+                    req.extensions_mut().insert(BasicClaims {
+                        sub: caller.clone(),
+                        scope: Some(scope.clone()),
+                    });
+                    srv.call(req)
+                })
+                .configure(|cfg| http::configure(cfg, $ctx)),
+        )
+        .await
+    }};
+}
+
+#[actix_web::test]
+async fn completion_receipt_endpoint_returns_persisted_receipt() {
+    let h = make_harness();
+    let caller = fresh_did();
+    let domain = seed_domain_with_member(&h.ctx.manager, &caller, "test-coop").await;
+
+    // Create + complete the item via the manager (same code path the
+    // status-update HTTP handler exercises).
+    let item = h
+        .ctx
+        .manager
+        .create_action_item(
+            domain.clone(),
+            "Endpoint smoke item".to_string(),
+            Some("Repo-safe placeholder for the completion-receipt endpoint.".to_string()),
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec![],
+        )
+        .expect("create_action_item");
+    let item_id = item.id.to_string();
+
+    let updated = h
+        .ctx
+        .manager
+        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .expect("update_action_item_status -> Completed");
+
+    // GET the new endpoint as the same caller (governance:read). The
+    // receipt body must round-trip the persisted `ActionItemCompletionReceipt`.
+    let app = gov_app_with_scope!(h.ctx.clone(), &caller, "governance:read");
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/domains/{}/action-items/{}/completion-receipt",
+            domain.0, item_id
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body()).await.unwrap();
+    let body: Value = serde_json::from_slice(&bytes).expect("response is valid JSON");
+
+    // Field-level assertions: every field that survives the manager →
+    // backend → handler → wire roundtrip must match the persisted record.
+    assert_eq!(body["item_id"], item_id);
+    assert_eq!(body["domain_id"], domain.0);
+    assert_eq!(body["actor_did"], caller.to_string());
+    assert_eq!(body["transition"], "completed");
+    assert_eq!(body["completed_at"], updated.updated_at);
+    let record_hash_hex = body["record_hash"]
+        .as_str()
+        .or_else(|| body["record_hash"].as_array().map(|_| "array"))
+        .unwrap_or("");
+    assert!(
+        !record_hash_hex.is_empty() || body["record_hash"].is_array(),
+        "record_hash must serialize as a non-empty hex string or byte array, not omitted"
+    );
+}
+
+#[actix_web::test]
+async fn completion_receipt_endpoint_404_when_no_receipt_yet() {
+    let h = make_harness();
+    let caller = fresh_did();
+    let domain = seed_domain_with_member(&h.ctx.manager, &caller, "test-coop").await;
+
+    // Create but do NOT complete: no receipt should exist.
+    let item = h
+        .ctx
+        .manager
+        .create_action_item(
+            domain.clone(),
+            "Endpoint 404 item".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            ActionItemPriority::Low,
+            None,
+            None,
+            vec![],
+        )
+        .expect("create_action_item");
+
+    let app = gov_app_with_scope!(h.ctx.clone(), &caller, "governance:read");
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/domains/{}/action-items/{}/completion-receipt",
+            domain.0, item.id
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::NOT_FOUND,
+        "an item without a completed transition has no receipt; endpoint must 404"
+    );
+}
+
+#[actix_web::test]
+async fn completion_receipt_endpoint_does_not_leak_across_domains() {
+    let h = make_harness();
+    let caller = fresh_did();
+    let dom_a = seed_domain_with_member(&h.ctx.manager, &caller, "domain-a").await;
+    let dom_b = seed_domain_with_member(&h.ctx.manager, &caller, "domain-b").await;
+
+    // Create + complete in domain A only.
+    let item = h
+        .ctx
+        .manager
+        .create_action_item(
+            dom_a.clone(),
+            "Domain-A item".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec![],
+        )
+        .expect("create_action_item");
+    h.ctx
+        .manager
+        .update_action_item_status(&dom_a, &item.id, ActionItemStatus::Completed, &caller)
+        .expect("complete in dom_a");
+    let item_id = item.id.to_string();
+
+    // GET via dom_b's path — must not surface dom_a's receipt.
+    let app = gov_app_with_scope!(h.ctx.clone(), &caller, "governance:read");
+    let req_wrong_domain = test::TestRequest::get()
+        .uri(&format!(
+            "/domains/{}/action-items/{}/completion-receipt",
+            dom_b.0, item_id
+        ))
+        .to_request();
+    let resp_wrong = test::call_service(&app, req_wrong_domain).await;
+    assert_eq!(
+        resp_wrong.status(),
+        StatusCode::NOT_FOUND,
+        "completion receipts must not be visible across governance domains"
+    );
+
+    // Sanity: same item id under the correct domain still resolves.
+    let req_right_domain = test::TestRequest::get()
+        .uri(&format!(
+            "/domains/{}/action-items/{}/completion-receipt",
+            dom_a.0, item_id
+        ))
+        .to_request();
+    let resp_right = test::call_service(&app, req_right_domain).await;
+    assert_eq!(resp_right.status(), StatusCode::OK);
+}
+
+#[actix_web::test]
+async fn completion_receipt_endpoint_response_uses_regulatory_safe_vocabulary() {
+    let h = make_harness();
+    let caller = fresh_did();
+    let domain = seed_domain_with_member(&h.ctx.manager, &caller, "test-coop").await;
+
+    let item = h
+        .ctx
+        .manager
+        .create_action_item(
+            domain.clone(),
+            "Vocabulary smoke item".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec![],
+        )
+        .expect("create_action_item");
+    h.ctx
+        .manager
+        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .expect("complete");
+
+    let app = gov_app_with_scope!(h.ctx.clone(), &caller, "governance:read");
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/domains/{}/action-items/{}/completion-receipt",
+            domain.0, item.id
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body()).await.unwrap();
+    let raw = std::str::from_utf8(&bytes)
+        .expect("response bytes are valid UTF-8")
+        .to_lowercase();
+    for forbidden in [
+        "payment", "currency", "wallet", "balance", "deposit", "withdraw",
+    ] {
+        assert!(
+            !raw.contains(forbidden),
+            "completion receipt response must not contain forbidden term '{forbidden}': {raw}"
+        );
+    }
+}

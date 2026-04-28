@@ -4287,6 +4287,56 @@ impl GovernanceManager {
         Ok(None)
     }
 
+    /// Get the latest [`ActionItemCompletionReceipt`] for an action item id.
+    ///
+    /// Reads from the wired receipt store backend. Returns `Ok(None)`
+    /// when no receipt has been emitted for the item, when the manager
+    /// has no receipt store configured, or when the backend's query
+    /// fails (failures are logged so the caller does not have to
+    /// distinguish absence from query error).
+    pub fn get_action_item_completion_by_item(
+        &self,
+        item_id: &str,
+    ) -> Result<Option<icn_governance::ActionItemCompletionReceipt>> {
+        if let Some(ref store) = self.receipt_store {
+            match store.get_action_item_completion_by_item(item_id) {
+                Ok(receipt) => return Ok(receipt),
+                Err(e) => {
+                    tracing::warn!(
+                        item_id = %item_id,
+                        error = %e,
+                        "Failed to query receipt store for action item completion"
+                    );
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// List all [`ActionItemCompletionReceipt`]s ever persisted for an
+    /// action item id, oldest-first by `completed_at`.
+    ///
+    /// Useful for surfaces that need the full reopen/re-complete chain
+    /// rather than just the latest receipt.
+    pub fn list_action_item_completions_by_item(
+        &self,
+        item_id: &str,
+    ) -> Result<Vec<icn_governance::ActionItemCompletionReceipt>> {
+        if let Some(ref store) = self.receipt_store {
+            match store.list_action_item_completions_by_item(item_id) {
+                Ok(receipts) => return Ok(receipts),
+                Err(e) => {
+                    tracing::warn!(
+                        item_id = %item_id,
+                        error = %e,
+                        "Failed to list receipt-store action item completions"
+                    );
+                }
+            }
+        }
+        Ok(Vec::new())
+    }
+
     /// Cast a vote on a proposal
     pub async fn cast_vote(
         &self,

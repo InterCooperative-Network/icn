@@ -2826,6 +2826,66 @@ pub async fn add_action_item_note<E: GovernanceEventEmitter + Clone + 'static>(
     Ok(HttpResponse::Ok().json(action_item_to_response(&item)))
 }
 
+/// GET /gov/domains/{domain_id}/action-items/{item_id}/completion-receipt
+/// — Retrieve the latest [`ActionItemCompletionReceipt`] persisted for an
+/// action item, if any.
+///
+/// Closes the proof loop documented in `docs/dev/NYCN_K3S_PROOF_PATH.md`
+/// and `docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md`: a holder shell that
+/// completed an `action_item / complete` action card can read the
+/// `ActionItemCompletionReceipt` back via HTTP, instead of relying on
+/// in-process tests or on-disk Sled inspection.
+///
+/// Authorization mirrors the rest of the action-item read surface:
+/// `governance:read` scope plus domain membership for the caller. The
+/// receipt's bound `domain_id` is also asserted to match the path
+/// parameter so a holder cannot probe across domain boundaries.
+///
+/// Returns:
+/// - 200 with the receipt JSON when a completion receipt has been
+///   persisted for the item under this domain.
+/// - 404 when no receipt exists, when the item id does not match the
+///   stored receipt's `domain_id`, or when the manager has no receipt
+///   store wired (the receipt simply does not exist from the caller's
+///   point of view).
+pub async fn get_action_item_completion_receipt<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let caller_did = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    let (domain_id, item_id) = path.into_inner();
+    let domain = GovernanceDomainId(domain_id);
+    // Validate the item id format before any DB lookup so a malformed
+    // path returns 400, not a missing-record 404.
+    let _ = parse_action_item_id(&item_id)?;
+
+    check_domain_membership(&ctx.manager, &domain, &caller_did).await?;
+
+    let receipt = ctx
+        .manager
+        .get_action_item_completion_by_item(&item_id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| {
+            err_not_found(format!(
+                "No completion receipt found for action item: {item_id}"
+            ))
+        })?;
+
+    if receipt.domain_id != domain.0 {
+        // Receipt exists for the item id, but under a different
+        // governance domain. From this caller's perspective the receipt
+        // does not exist; do not leak cross-domain existence.
+        return Err(err_not_found(format!(
+            "No completion receipt found for action item: {item_id}"
+        )));
+    }
+
+    Ok(HttpResponse::Ok().json(receipt))
+}
+
 // ============================================================================
 // Notification digest handler
 // ============================================================================
