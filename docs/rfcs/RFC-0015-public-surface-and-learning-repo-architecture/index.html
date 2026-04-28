@@ -43,7 +43,7 @@ View source on GitHub →
 title: &quot;Public Surface and Learning Repo Architecture&quot;
 status: &quot;draft&quot;
 created: &quot;2026-04-27&quot;
-updated: &quot;2026-04-27&quot;  # implementation status note added — icn-learn repo created (private)
+updated: &quot;2026-04-28&quot;  # ADR-0032 alignment note added — defers to ADR-0032 on canonical truth surface
 authors: [&quot;Matt Faherty&quot;]
 reviewers: []
 related_adr_candidates: [&quot;0028&quot;, &quot;0032&quot;, &quot;0033&quot;, &quot;0034&quot;]
@@ -55,6 +55,16 @@ superseded_by: []</h2>
 <p><code>draft</code> — being written, not yet ready for review.</p>
 <p>This RFC clarifies how ICN&#39;s public-facing identity is split across multiple domains and across multiple repos, and defines a future learning/onboarding repo (deploying to <code>learn.icn.zone</code>) without creating it in this RFC.</p>
 <p><strong>Accepted RFC does not mean implemented.</strong> This RFC is doctrinal coordination; the follow-up work is repo creation and content authoring, both of which happen outside this RFC.</p>
+<h3>Relationship to ADR-0032 (accepted)</h3>
+<p>The <strong>canonical public truth-boundary policy</strong> is owned by <a href="/docs/adr/ADR-0032-website-truth-boundary">ADR-0032 — Website Truth Boundary</a> (status: accepted; implementation_status: implemented). This RFC defers to ADR-0032 on the truth-boundary decision and does <strong>not</strong> present competing canonical-surface options:</p>
+<ul>
+<li><code>intercooperative.network</code> is the canonical ICN public truth surface (per ADR-0032).</li>
+<li><code>icn.zone</code> is utility routing (short links, QR, redirects, cluster subdomains). Not a truth surface.</li>
+<li><code>learn.icn.zone</code> is a future teaching surface; the icn-learn repo teaches ICN, it does not define ICN.</li>
+<li>Institutional authority lives in <code>InstitutionalDomain</code>, not in DNS.</li>
+</ul>
+<p>This RFC remains <strong>exploratory</strong> for the surface architecture beyond the canonical truth-boundary policy: learning-repo structure, role-based onboarding paths, future adjacent surfaces (<code>cooperative-systems.org</code>, <code>thesync.net</code>), deployment path for <code>learn.icn.zone</code>, and cross-repo content discipline. Where this RFC and ADR-0032 disagree, ADR-0032 wins. Where this RFC discusses surfaces that ADR-0032 does not address, the RFC remains exploratory framing — not accepted policy.</p>
+<p><a href="/docs/adr/ADR-0033-public-maturity-claims-and-evidence-links">ADR-0033 — Public Maturity Claims and Evidence Links</a> further constrains how claims on the canonical site cite evidence. That ADR is <code>proposed</code> (linter unbuilt; see <code>ops/coordination/RFC_ADR_READINESS_AUDIT.md</code>); this RFC does not relitigate its scope.</p>
 <h2>Summary</h2>
 <p>ICN currently confuses three things into one surface: the canonical public truth about ICN (intercooperative.network), utility routing for cluster endpoints and short links (icn.zone and its subdomains), and the future role-based learning/onboarding material that should not pollute the canonical site (a future <code>learn.icn.zone</code>). This RFC names six domains, assigns each a single role, and defines a future learning repo that teaches ICN without claiming the authority to define ICN. It explicitly does <strong>not</strong> create that repo, build that site, or change DNS — those are follow-up tasks.</p>
 <h2>Problem statement</h2>
