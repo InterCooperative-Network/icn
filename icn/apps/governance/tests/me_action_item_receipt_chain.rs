@@ -971,3 +971,69 @@ async fn completion_receipt_endpoint_response_uses_regulatory_safe_vocabulary() 
         );
     }
 }
+
+#[actix_web::test]
+async fn completion_receipt_endpoint_canonicalizes_non_canonical_uuids() {
+    // Pins the fix for the reviewer-flagged issue on #1675: the receipt
+    // store indexes by the canonical lowercase-hyphenated UUID string
+    // the manager wrote at emission time, so the handler must canonicalize
+    // the parsed id back to a string before looking it up. Without this,
+    // a caller passing uppercase hex or URN-form UUIDs would parse OK
+    // and then miss the index entry and receive a spurious 404.
+    let h = make_harness();
+    let caller = fresh_did();
+    let domain = seed_domain_with_member(&h.ctx.manager, &caller, "test-coop").await;
+
+    let item = h
+        .ctx
+        .manager
+        .create_action_item(
+            domain.clone(),
+            "Canonical UUID smoke item".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec![],
+        )
+        .expect("create_action_item");
+    h.ctx
+        .manager
+        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .expect("complete");
+
+    let item_id_lower = item.id.to_string();
+    let item_id_upper = item_id_lower.to_uppercase();
+    let item_id_urn = format!("urn:uuid:{item_id_lower}");
+
+    assert_ne!(
+        item_id_upper, item_id_lower,
+        "uppercase form must differ byte-wise from canonical form for this test to be meaningful"
+    );
+
+    let app = gov_app_with_scope!(h.ctx.clone(), &caller, "governance:read");
+
+    for variant in [&item_id_lower, &item_id_upper, &item_id_urn] {
+        let req = test::TestRequest::get()
+            .uri(&format!(
+                "/domains/{}/action-items/{}/completion-receipt",
+                domain.0, variant
+            ))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "non-canonical UUID variant {variant} must resolve to the same persisted receipt"
+        );
+        let bytes = to_bytes(resp.into_body()).await.unwrap();
+        let body: Value = serde_json::from_slice(&bytes).expect("response is valid JSON");
+        assert_eq!(
+            body["item_id"], item_id_lower,
+            "response item_id must be the canonical lowercase form regardless of input casing"
+        );
+    }
+}

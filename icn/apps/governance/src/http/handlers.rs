@@ -2859,18 +2859,26 @@ pub async fn get_action_item_completion_receipt<E: GovernanceEventEmitter + Clon
     let (domain_id, item_id) = path.into_inner();
     let domain = GovernanceDomainId(domain_id);
     // Validate the item id format before any DB lookup so a malformed
-    // path returns 400, not a missing-record 404.
-    let _ = parse_action_item_id(&item_id)?;
+    // path returns 400, not a missing-record 404. The receipt store
+    // indexes by the canonical lowercase-hyphenated UUID string that
+    // the manager wrote at receipt-emission time
+    // (`ActionItemCompletionReceipt::new(item.id.to_string(), ...)`),
+    // so we canonicalize the parsed id back to a string here. Without
+    // this normalization, a caller passing the same UUID in
+    // alternative-but-valid forms (uppercase hex, URN form,
+    // braces-wrapped) would parse OK but miss the index entry and
+    // receive a spurious 404.
+    let canonical_item_id = parse_action_item_id(&item_id)?.to_string();
 
     check_domain_membership(&ctx.manager, &domain, &caller_did).await?;
 
     let receipt = ctx
         .manager
-        .get_action_item_completion_by_item(&item_id)
+        .get_action_item_completion_by_item(&canonical_item_id)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| {
             err_not_found(format!(
-                "No completion receipt found for action item: {item_id}"
+                "No completion receipt found for action item: {canonical_item_id}"
             ))
         })?;
 
@@ -2879,7 +2887,7 @@ pub async fn get_action_item_completion_receipt<E: GovernanceEventEmitter + Clon
         // governance domain. From this caller's perspective the receipt
         // does not exist; do not leak cross-domain existence.
         return Err(err_not_found(format!(
-            "No completion receipt found for action item: {item_id}"
+            "No completion receipt found for action item: {canonical_item_id}"
         )));
     }
 
