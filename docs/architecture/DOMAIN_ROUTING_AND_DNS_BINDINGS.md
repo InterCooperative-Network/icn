@@ -39,13 +39,16 @@ The analogy stops at "utility namespace." ICN is not a tenancy.
 
 ## Surfaces
 
-| Surface | Use |
+Per accepted [ADR-0032 — Website Truth Boundary](../adr/ADR-0032-website-truth-boundary.md), public ICN surfaces split into three roles. None of these is institutional authority — institutional authority lives in the `InstitutionalDomain` object, not in DNS.
+
+| Surface | Role |
 |---|---|
-| `icn.zone` | **Primary public ICN surface.** Authority over what ICN is, plus the namespace under which institutional utility routes (e.g. `nycn.icn.zone`) and short-links (e.g. `icn.zone/n/nycn`) live. |
-| `learn.icn.zone` | Teaching surface (the icn-learn repo's eventual public face). Teaches ICN; does not define it. |
+| `intercooperative.network` | **Canonical ICN public truth surface** (ADR-0032). Source of truth for what ICN is, what is real now, and what is planned. |
+| `icn.zone` | **Utility routing namespace.** Short links, QR links, cluster subdomains (`api.icn.zone`, `pilot.icn.zone`, etc.), and institutional utility sub-routes (e.g. `nycn.icn.zone`, `icn.zone/n/nycn`). Root redirects to `intercooperative.network`. Not a truth surface. |
+| `learn.icn.zone` | Future teaching surface (the icn-learn repo's eventual public face). Teaches ICN; does not define it. |
 | Custom institution domain | Each institution's own DNS, owned by the institution. Bound to the institutional domain via a verified `DnsBinding`. |
 
-> `icn.zone` is the primary public ICN surface. Institutional sub-routes under it (`nycn.icn.zone`, `icn.zone/n/nycn`, etc.) are utility routes for finding institutions; they are not the institution's own authority. Learning surfaces live at `learn.icn.zone`.
+> Institutional sub-routes under `icn.zone` (`nycn.icn.zone`, `icn.zone/n/nycn`, etc.) are utility routes for finding/entering institutions. They are not the institution's authority and they are not the canonical public ICN surface. Authority lives in `InstitutionalDomain`; canonical ICN truth lives at `intercooperative.network`.
 
 ## Future objects
 
@@ -144,14 +147,15 @@ For a custom public domain, the same flow applies — the difference is only the
 
 - The routing layer **never** owns institutional truth. It is a router, not a database.
 - A `DnsBinding` does not grant authority over the institutional domain. Authority is governed by charter / role / standing; the binding only routes.
-- `icn.zone` is the ICN-owned public namespace and surface. Institutional sub-routes under it (e.g. `nycn.icn.zone`, `icn.zone/n/nycn`) are **utility routes, not institutional authority**. The institution's authority lives in its `InstitutionalDomain`; DNS never equals institutional authority. ICN as a project must not become a landlord of institutional names.
-- Custom domains never override the primary ICN public surface (`icn.zone`). A cooperative's site can describe ICN; only canonical surfaces under `icn.zone` define ICN.
+- `icn.zone` is an ICN-owned utility-routing namespace. Institutional sub-routes under it (e.g. `nycn.icn.zone`, `icn.zone/n/nycn`) are **utility routes, not institutional authority**. The institution's authority lives in its `InstitutionalDomain`; DNS never equals institutional authority. ICN as a project must not become a landlord of institutional names.
+- Canonical public truth about ICN lives at `intercooperative.network`, per ADR-0032. Custom institution domains and ICN utility routes can describe or link to ICN, but they do not define ICN.
 
 ## Existing repo support
 
 What exists today that this design will sit on:
 
-- [RFC-0015](../rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md) — public surface and learning repo architecture (governs `icn.zone`, `learn.icn.zone`, and any other ICN-managed surfaces; this design refers to it for canonical-surface roles). RFC-0015 frames `icn.zone` as utility routing only; this design's framing of `icn.zone` as the primary ICN-owned public namespace will require a follow-up RFC-0015 amendment to keep the two docs aligned. This PR does not rewrite RFC-0015.
+- [ADR-0032 — Website Truth Boundary](../adr/ADR-0032-website-truth-boundary.md) — accepted; `intercooperative.network` is the canonical public truth surface.
+- [RFC-0015 — Public Surface and Learning Repo Architecture](../rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md) — draft; explores how `intercooperative.network`, `icn.zone`, `learn.icn.zone`, and adjacent surfaces split roles. Cited here as exploratory framing only; the accepted policy is ADR-0032.
 - Receipt envelope for binding receipts and publication receipts ([ADR-0026](../adr/ADR-0026-receipt-and-provenance-proof-envelope.md))
 - Charter/role/`authority_scope` plumbing for governance acts that approve bindings (existing)
 - Public ICN website source under `website/src` — **does not** carry NYCN/Summit nouns
@@ -170,9 +174,10 @@ What exists today that this design will sit on:
 - **No** runtime implementation in this PR.
 - **No** public website changes.
 - **No** new NYCN-specific text in `website/src`.
-- **No** `learn.icn.zone` link on the public ICN website (RFC-0015 governs the public surface; this doc does not change it).
+- **No** `learn.icn.zone` link on the public ICN website. ADR-0032 governs the canonical public surface; RFC-0015 explores the future split. This doc does not change either.
 - **No** treatment of an institutional sub-route (e.g. `nycn.icn.zone`) as the institution's authority — authority lives in the `InstitutionalDomain`, not in DNS.
 - **No** vendor lock-in to a specific DNS provider, certificate authority, or routing stack — the design is provider-agnostic.
+- **No** treatment of `icn.zone` as the canonical public truth surface. ADR-0032 makes `intercooperative.network` the truth boundary; `icn.zone` is utility routing.
 
 ## References
 

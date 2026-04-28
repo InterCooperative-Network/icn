@@ -252,9 +252,9 @@ Workstation modes (future): member workstation, organizer workstation, finance w
 
 **Warning:** do not start by building "ICN Linux." Start by making ICN work well on ordinary devices. Then package. Then image. Then maybe distro.
 
-## NYCN / Summit proof path
+## NYCN / Summit proof path (illustrative example)
 
-NYCN is the first institution ecosystem package and the first proof body. The 2026 New York Cooperative Summit (Schenectady, NY, 2026-10-17) is the first pressure test.
+NYCN is the first institution ecosystem package planned as a proof body for this architecture. The 2026 New York Cooperative Summit (Schenectady, NY, 2026-10-17) is the first pressure test. Per the Non-goals below, NYCN / Summit names appear in this section as an illustrative example of how the generic shapes will be used by a real institution package — not as a normative ICN core concept.
 
 NYCN-correct facts (preserve these — they replace prior placeholder text):
 
@@ -319,7 +319,7 @@ Each item should land via its own ADR or RFC. This document does not pre-commit 
 
 - **No** runtime implementation in this PR. This is documentation only.
 - **No** public website changes from this PR.
-- **No** institution-specific nouns (NYCN / Summit / partner names) introduced into ICN core.
+- **No** institution-specific operating details or branded nouns introduced as normative ICN core concepts. Institution-specific names (for example, NYCN / Summit / partner names) may appear in this document only as illustrative examples of how generic shapes will be used, not as core protocol or governance dependencies.
 - **No** model governance authority. Models assist; governance authorizes.
 - **No** external tool as source of truth. Tools operate on institution-owned state.
 - **No** ICN-as-platform-landlord. `icn.zone` is utility routing, not authority.

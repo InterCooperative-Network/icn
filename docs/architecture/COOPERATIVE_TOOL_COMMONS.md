@@ -110,9 +110,9 @@ A specialized **community suite at local scale** plus a **federation suite at re
 - local / regional resource maps
 - inter-municipal agreements
 
-### NYCN / Summit suite
+### NYCN / Summit suite (illustrative example)
 
-The first specialized suite that ICN will run end-to-end as a proof body. NYCN-specific application docs live in the NYCN repo; this is a forward summary only.
+The first specialized suite that ICN will run end-to-end as a proof body. NYCN-specific application docs live in the NYCN repo; this is a forward summary only, illustrating how a specialized suite would be composed from base tools. Per the Non-goals below, NYCN / Summit names appear here as an illustrative example, not as a core ICN tool ecosystem dependency.
 
 - event CMS
 - registration / intake forms
@@ -237,7 +237,7 @@ Each of these will land via its own ADR or RFC. This document does not pre-commi
 - **No** runtime implementation in this PR.
 - **No** specific tool implementation.
 - **No** public website changes.
-- **No** institution-specific tool nouns in ICN core.
+- **No** institution-specific tool nouns introduced as normative ICN core concepts. Institution-specific names (for example, NYCN / Summit / partner names) may appear in this document only as illustrative examples of how a specialized suite would be composed, not as core tool ecosystem dependencies.
 - **No** "ICN App Store" framing — tool installation is a governance act, not a marketplace transaction.
 
 ## References
