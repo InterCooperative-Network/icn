@@ -1,6 +1,6 @@
 ---
 Status: doctrine
-Canonical: yes
+Canonical: no
 Authority: architecture (complements KERNEL_APP_SEPARATION.md and INSTITUTION_PACKAGE_BOUNDARY.md)
 Last Reviewed: 2026-04-24
 Owner: Matt Faherty
@@ -125,15 +125,15 @@ This section maps Commons concepts to the real crates, modules, and types in the
 
 | Commons Concept | ICN Primitive | Status | Location |
 |-----------------|---------------|--------|----------|
-| Person / human participant | `Did` (newtype around `String`, Ed25519-backed) | ✅ shipped | `icn/crates/icn-identity/src/lib.rs` |
+| Person / human participant | `Did` (newtype around `String`; 32-byte identifier encoded in DID form, representing either an Ed25519 public key or an SDIS anchor id) | ✅ shipped | `icn/crates/icn-identity/src/lib.rs` (Ed25519 path) and `icn/crates/icn-identity/src/anchor.rs` (`Did::from_anchor_id`) |
 | Cryptographic identity bundle | `IdentityBundle` (Ed25519 + X25519, age-encrypted keystore) | ✅ shipped | `icn/crates/icn-identity/src/bundle.rs` |
 | Unified entity handle | `EntityId` (format `entity:icn:<type>:<slug>`) | ✅ shipped | `icn/crates/icn-entity/src/entity.rs` |
 | Sovereign entity kinds | `Individual`, `Cooperative(CooperativeProfile)`, `Community(CommunityProfile)`, `Federation(FederationProfile)` | ✅ shipped | `icn/crates/icn-entity/src/entity.rs` |
 | Membership | `Membership { member_id, parent_id, role, status, shares, capabilities }` | ✅ shipped | `icn/crates/icn-entity/src/membership.rs` |
 | Membership role | `MembershipRole` enum (`Founder`, `Member`, `Worker`, `Consumer`, `Producer`, `BoardMember`, `Officer{title}`, `FederatedMember`, `AssociateMember`, `ObserverMember`, `ProvisionalMember`, `Custom{name}`) | ✅ shipped | `icn/crates/icn-entity/src/membership.rs` |
-| Per-membership capability grants | `MembershipCapability` enum (`Vote`, `Propose`, `TreasuryAccess`, `Invite`, `ManageSubEntities`, `Sign`, `Configure`) | ✅ shipped | `icn/crates/icn-entity/src/membership.rs` |
+| Per-membership capability grants | `MembershipCapability` enum (`Vote`, `Propose`, `TreasuryAccess`, `Invite`, `ManageSubEntities`, `Sign`, `Configure`, `ViewSensitive`, `Custom(String)`) | ✅ shipped | `icn/crates/icn-entity/src/membership.rs` |
 | Non-sovereign internal unit | `Structure { kind: Committee | WorkingGroup | Team | Office }` | ✅ shipped | `icn/crates/icn-governance/src/structure.rs` |
-| Role inside a structure | `RoleAssignment { structure_id, person_did, role, authority_scope: Vec<String>, valid_from, valid_until }` | ✅ shipped | `icn/crates/icn-governance/src/structure.rs` |
+| Role inside a structure | `RoleAssignment { id, structure_id, person_did, role, authority_scope: Vec<String>, start_date: Timestamp, end_date: Option<Timestamp>, assigned_by_decision }` | ✅ shipped | `icn/crates/icn-governance/src/structure.rs` |
 | Time-bounded work | `Activity { kind: Event | Program | Project | Initiative }` | ✅ shipped | `icn/crates/icn-governance/src/activity.rs` |
 | Program / cycle container | `Program { ... }`, `Milestone { ... }` | ✅ shipped (PR #1548) | `icn/crates/icn-governance/src/program.rs` |
 | Polymorphic parent attachment for operational objects | `InstitutionalParent` enum | ✅ shipped | `icn/crates/icn-governance/src/parent.rs` |

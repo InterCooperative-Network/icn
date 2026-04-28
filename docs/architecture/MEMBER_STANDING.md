@@ -1,6 +1,6 @@
 ---
 Status: design contract
-Canonical: yes
+Canonical: no
 Authority: architecture (complements THE_COMMONS.md and KERNEL_APP_SEPARATION.md)
 Last Reviewed: 2026-04-24
 Owner: Matt Faherty
@@ -287,36 +287,37 @@ This is the target shape. Fields that current ICN primitives can populate today 
       "source": "charter_approved_proposal"                           // [future design] provenance hint
     }
   ],
-  "roles": [                                                          // [shipped] icn-governance::RoleAssignment (via /gov/me/scopes)
+  "roles": [                                                          // [future design] `/me/standing` projection over governance role assignments. Current `/gov/me/scopes` (`RoleAssignmentResponse`) returns only `{id, structure_id, person_did, role, start_date, end_date}` and uses raw `StructureId` strings (e.g. `struct-<uuid>`); the richer shape below requires endpoint extension or secondary resolution before it can be composed.
     {
-      "structure_id": "structure:icn:committee:nycn-finance",         // canonical id
-      "parent_entity_id": "entity:icn:federation:nycn",               // canonical id
+      "structure_id": "structure:icn:committee:nycn-finance",         // [future design] normalized/canonical structure identifier; current `/gov/me/scopes` returns raw `StructureId`
+      "parent_entity_id": "entity:icn:federation:nycn",               // [future design] not present in current `/gov/me/scopes`
       "structure_display_label": "NYCN Finance Committee",            // [future design] display-label resolution
-      "role": "coordinator",                                          // [shipped]
-      "authority_scope": ["approve-budget-<=5000"],                   // [shipped] raw strings; see Plain-Language Summaries
+      "role": "coordinator",                                          // [shipped] role value is available via `/gov/me/scopes`
+      "authority_scope": ["approve-budget-<=5000"],                   // [future design] not present in current `/gov/me/scopes`; requires endpoint extension or secondary resolution
       "authority_scope_plain_language": [                             // [future design] plain-language rendering
         "Approve budget proposals up to 5000 units"
       ],
-      "valid_from": "2026-02-01T00:00:00Z",
-      "valid_until": "2026-12-31T23:59:59Z"
+      "valid_from": "2026-02-01T00:00:00Z",                           // [future design] normalized field name; underlying `RoleAssignment.start_date: Timestamp`
+      "valid_until": "2026-12-31T23:59:59Z"                           // [future design] normalized field name; underlying `RoleAssignment.end_date: Option<Timestamp>`
     }
   ],
-  "grants": [                                                         // [shipped] icn-governance::AuthorityGrant (ADR-0014)
+  "grants": [                                                         // [future design] `/me/standing` projection over `icn-governance::AuthorityGrant` (ADR-0014). The shape below is an API view; stored types differ — see notes below.
     {
-      "grant_id": "grant:0xabc...",
-      "class": "Representation",                                      // Representation | Execution | Attestation
-      "grantor_entity_id": "entity:icn:cooperative:greenstar",
-      "grantor_display_label": "GreenStar Cooperative",
-      "grantee_did": "did:icn:alice-pubkey",
-      "scope": {                                                      // [shipped] TypedScope
-        "domain": "nycn-federation-gov",
-        "kinds": ["CastVote", "SubmitProposal"]
+      "grant_id": "550e8400-e29b-41d4-a716-446655440000",              // [shipped] underlying `AuthorityGrantId(Uuid)`; bare UUID, no `grant:0x…` prefix
+      "class": "Representation",                                      // [shipped] `AuthorityClass`: Representation | Execution | Attestation
+      "grantor_entity_id": "entity:icn:cooperative:greenstar",        // [shipped] `GrantorEntityId`
+      "grantor_display_label": "GreenStar Cooperative",               // [future design] display-label resolution
+      "grantee_did": "did:icn:alice-pubkey",                          // [shipped] `Grantee`
+      "scope": {                                                      // [shipped] `TypedScope` — actual fields are `domain`, `proposal_class`, `action_kind`, `amount_ceiling`, `time_window`
+        "domain": "nycn-federation-gov",                              // [shipped] `TypedScope.domain`
+        "proposal_class": ["Treasury", "Membership"],                 // [shipped] `TypedScope.proposal_class` (proposal-payload-variant labels)
+        "action_kind": []                                             // [shipped] `TypedScope.action_kind` (Execution-class only); empty for Representation
       },
-      "scope_plain_language": "Represent GreenStar when voting or proposing in NYCN federation governance",
-      "valid_from": "2026-01-01T00:00:00Z",
-      "valid_until": "2026-12-31T23:59:59Z",
-      "revoked_at": null,
-      "capability_set": ["Vote", "Propose"]                           // derived
+      "scope_plain_language": "Represent GreenStar when voting or proposing in NYCN federation governance", // [future design] plain-language rendering
+      "valid_from": "2026-01-01T00:00:00Z",                           // [shipped] `AuthorityGrant.valid_from: Timestamp`
+      "valid_until": "2026-12-31T23:59:59Z",                          // [shipped] `AuthorityGrant.valid_until: Option<Timestamp>`
+      "revoked_at": null,                                             // [shipped] `AuthorityGrant.revoked_at: Option<Timestamp>`
+      "capability_set": ["Vote", "Propose"]                           // [future design] derived rendering for the standing surface; not stored on `AuthorityGrant`
     }
   ],
   "mandates": [                                                       // [shipped] icn-governance::Mandate
