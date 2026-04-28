@@ -1,0 +1,414 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>NYCN smoke fixture → ICN gateway proof path | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>NYCN K3S PROOF PATH</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/NYCN_K3S_PROOF_PATH.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><p>Status: discovery runbook
+Authority: dev runbook
+Audience: ICN developers + NYCN package operators
+Cluster: K3s on Hyperion (<code>10.8.30.40</code>); local fallback documented</p>
+<h1>NYCN smoke fixture → ICN gateway proof path</h1>
+<p>This runbook documents the verified path for driving the NYCN
+icnctl-loadable smoke fixture (<code>InterCooperative-Network/nycn</code>,
+<code>institution/smoke/icnctl/</code>, landed via <a href="https://github.com/InterCooperative-Network/nycn/pull/18" target="_blank" rel="noopener">nycn#18</a>)
+into an ICN gateway, obtaining a member-standing projection and
+action-card queue, and the remaining gap to the full
+package-driven action-item completion receipt path.</p>
+<p>It is a <strong>discovery runbook</strong>: the steps it documents have been
+executed against a real local gateway and read-only against the K3s
+deployment. The K3s <code>apply</code> step is documented but deliberately left
+for an explicit operator decision — this runbook does not perform
+cluster mutation.</p>
+<h2>Scope</h2>
+<p>Proves end-to-end:</p>
+<ul>
+<li>An NYCN-repo package directory loads cleanly into a real <code>icnd</code>
+gateway via <code>icnctl institution bootstrap apply</code>.</li>
+<li>The gateway then accepts JWT-authenticated requests for
+<code>/v1/gov/me/standing</code> and <code>/v1/gov/me/action-cards</code> and returns
+well-formed responses.</li>
+<li>The deployed K3s image carries the required loader, auth flow, and
+governance routes.</li>
+</ul>
+<p>Does <strong>not</strong> prove (intentional gap, see &quot;Remaining gap&quot;):</p>
+<ul>
+<li>That <code>icnctl institution bootstrap apply</code> produces an action item,
+open proposal, or meeting attendance state. The current
+<code>BootstrapPlan</code> operations are entity / governance-domain /
+structure / activity / program / milestone / role-assignment only.</li>
+<li>That a member can complete an action item through the gateway and
+retrieve <code>ActionItemCompletionReceipt</code> from a package-driven
+bootstrap. ICN-side integration tests cover this in-process
+(<code>apps/governance/tests/me_action_item_receipt_chain.rs</code> —
+6/6 passing on <code>2438a362</code>); a package-driven seed step does not
+yet exist.</li>
+</ul>
+<h2>Repo state used</h2>
+<ul>
+<li>ICN: <code>2438a362</code> (main).</li>
+<li>NYCN: <code>8d70068f</code> (main, after #18 merge).</li>
+<li>NYCN smoke fixture: <code>institution/smoke/icnctl/</code> — single federation
+(<code>nycn-icnctl-smoke-federation</code>) and single governance domain
+(<code>nycn-icnctl-smoke-federation-gov</code>), <code>package_id: nycn-icnctl-smoke</code>. Distinct ids avoid collision with ICN&#39;s
+canonical NYCN test fixture (<code>institutions/nycn/</code>,
+<code>package_id: nycn</code>).</li>
+</ul>
+<p>All <code>&lt;icn-repo-root&gt;</code> references below resolve to the directory
+containing this file&#39;s repo (<code>git rev-parse --show-toplevel</code> from
+<code>/home/&lt;user&gt;/projects/icn</code>). All <code>&lt;nycn-repo-root&gt;</code> references
+resolve to the parallel NYCN checkout
+(<code>/home/&lt;user&gt;/projects/nycn</code>).</p>
+<h2>Prerequisites</h2>
+<ol>
+<li><p><strong>Built <code>icnd</code> and <code>icnctl</code></strong> in the ICN Rust workspace
+(<code>&lt;icn-repo-root&gt;/icn</code>):</p>
+<pre><code class="language-sh">cargo build -p icnd -p icnctl
+</code></pre>
+<p>First-build wall time on this machine: ~1m 45s for <code>icnd</code>;
+<code>icnctl</code> was already built. Output binaries land at
+<code>&lt;icn-repo-root&gt;/icn/target/debug/{icnd,icnctl}</code>.</p>
+</li>
+<li><p><strong>An icnctl identity in a temporary data directory.</strong> Use a
+distinct passphrase and a path that is not the operator&#39;s primary
+<code>~/.icn</code> so the smoke run cannot collide with real keys:</p>
+<pre><code class="language-sh">ICN_KEYSTORE_PASSPHRASE=&#39;smoke-test-passphrase&#39; \
+  &lt;icn-repo-root&gt;/icn/target/debug/icnctl \
+  --data-dir /tmp/icnctl-bootstrap-test \
+  id init
+</code></pre>
+<p>Records the DID under <code>/tmp/icnctl-bootstrap-test/identity.age</code>
+(v4 keystore, age-encrypted). The passphrase here is for a
+throwaway smoke identity only; do not reuse for real deployments.</p>
+</li>
+</ol>
+<h2>Path A — local gateway (verified against <code>icnd 2438a362</code>)</h2>
+<p>This path runs an ephemeral local daemon. It is the safest option
+when K3s is unavailable, when validating image-side changes, or
+when developing on top of unmerged ICN changes.</p>
+<h3>A.1 Start a local gateway</h3>
+<p><code>start-gateway-test.sh</code> at the ICN repo root is the canonical
+launcher for &quot;local NYCN bootstrap live validation&quot; and binds
+<code>127.0.0.1:8085</code> against ephemeral data dir <code>/tmp/icn-bootstrap-test</code>:</p>
+<pre><code class="language-sh">cd &lt;icn-repo-root&gt;
+./start-gateway-test.sh
+</code></pre>
+<p>The script generates a fresh JWT secret on first run and execs
+<code>icnd</code> in the foreground. Run it under <code>nohup</code>, in a separate
+terminal, or via a background job; subsequent commands assume the
+gateway is bound.</p>
+<p><strong>Verify:</strong></p>
+<pre><code class="language-sh">curl -sS http://127.0.0.1:8085/v1/health
+# {&quot;status&quot;:&quot;ok&quot;,...}
+</code></pre>
+<h3>A.2 Apply the smoke fixture against the local gateway</h3>
+<pre><code class="language-sh">cd &lt;icn-repo-root&gt;/icn
+ICN_KEYSTORE_PASSPHRASE=&#39;smoke-test-passphrase&#39; \
+  target/debug/icnctl \
+  --data-dir /tmp/icnctl-bootstrap-test \
+  institution bootstrap apply \
+  --package &lt;nycn-repo-root&gt;/institution/smoke/icnctl \
+  --gateway http://127.0.0.1:8085 \
+  --coop-id smoke-test-coop
+</code></pre>
+<p><strong>Observed output (verbatim, this session, 2026-04-28):</strong></p>
+<pre><code>Charter status:  valid
+Completed:       3
+Deferred:        0
+Unsupported:     1
+Failed:          no
+
+Completed steps:
+  - validate charter charter/nycn-icnctl-smoke.charter.yaml: ...
+  - create Federation entity nycn-icnctl-smoke-federation: created entity as
+    entity:icn:federation:nycn-icnctl-smoke-federation; governance domain
+    alias nycn-icnctl-smoke-federation-gov recorded for subsequent provisioning
+  - provision governance domain nycn-icnctl-smoke-federation-gov:
+    provisioned governance domain as nycn-icnctl-smoke-federation-gov
+
+Unsupported steps:
+  - store charter: package-owned CCL charters validate locally today, but
+    there is no generic live CCL charter registration/activation sink yet
+
+Alias bindings:
+  - nycn-icnctl-smoke-federation -&gt; entity:icn:federation:nycn-icnctl-smoke-federation
+</code></pre>
+<p>The &quot;Unsupported&quot; step is expected and constant for every package:
+<code>run_apply_plan</code> always emits it. It is not a failure.</p>
+<h3>A.3 Auth + read endpoints (local)</h3>
+<pre><code class="language-sh">TOKEN=$(ICN_KEYSTORE_PASSPHRASE=&#39;smoke-test-passphrase&#39; \
+  &lt;icn-repo-root&gt;/icn/target/debug/icnctl \
+  --data-dir /tmp/icnctl-bootstrap-test \
+  auth token \
+  --gateway http://127.0.0.1:8085 \
+  --coop-id smoke-test-coop \
+  --scopes &quot;governance:read,entity:read&quot; \
+  | grep -E &quot;^eyJ&quot; | head -1)
+
+curl -sS -H &quot;Authorization: Bearer $TOKEN&quot; \
+  http://127.0.0.1:8085/v1/gov/me/standing
+
+curl -sS -H &quot;Authorization: Bearer $TOKEN&quot; \
+  http://127.0.0.1:8085/v1/gov/me/action-cards
+</code></pre>
+<p>Note: <code>gov:read</code> is <strong>not</strong> an accepted scope name. The deployed
+verifier accepts the long forms only. The full set is:
+<code>ledger:{read,write}</code>, <code>coop:{read,write,admin}</code>,
+<code>governance:{read,write}</code>, <code>settlements:{read,write}</code>,
+<code>federation:{read,write,admin}</code>, <code>compute:{read,write}</code>,
+<code>constitutional:{read,write,admin}</code>, <code>entity:{read,write,audit}</code>,
+<code>treasury:{read,write}</code>, <code>admin</code>.</p>
+<h2>Path B — K3s deployment (read-only verified; apply pending)</h2>
+<p>Use this when the cluster image is current enough and the operator
+has accepted that smoke entities will persist in cluster state until
+manually cleared.</p>
+<h3>B.1 Confirm cluster reachability and image freshness</h3>
+<pre><code class="language-sh">curl -sS http://10.8.30.40:30080/v1/health
+# {&quot;status&quot;:&quot;ok&quot;,&quot;version&quot;:&quot;0.1.0&quot;,...}
+
+ssh ubuntu@10.8.30.40 \
+  &quot;sudo kubectl -n icn get pods,svc -o wide&quot;
+
+ssh ubuntu@10.8.30.40 \
+  &quot;sudo kubectl -n icn get deployment icn-daemon \
+   -o jsonpath=&#39;{.spec.template.spec.containers[0].image}&#39;&quot;
+</code></pre>
+<p><strong>Observed (this session, 2026-04-28):</strong></p>
+<ul>
+<li>Pod <code>icn-daemon-7544dc7bfc-lkrkt</code> Running 23h on <code>k3s-worker-2</code>.</li>
+<li>Service <code>icn-nodeport</code> exposes 8080 → 30080 and 7777 → 30777.</li>
+<li>Deployed image: <code>10.8.30.40:30500/icn:44fc2043409a6437ae74a35e823b74446c2789c8</code>.</li>
+</ul>
+<h3>B.2 Verify the deployed image carries the API surface</h3>
+<p>The deployed image is built from ICN commit <code>44fc2043</code> (PR #1663,
+&quot;feat(governance): add meeting attendance receipts&quot;). NYCN main was
+8 commits ahead at the time of writing; none of those commits
+touched runtime code:</p>
+<pre><code class="language-sh">git log --oneline 44fc20434..2438a362 \
+  -- icn/bins/icnctl icn/apps/governance \
+     icn/crates/icn-governance icn/crates/icn-gateway
+# (empty)
+</code></pre>
+<p>All eight commits between are docs/ops/RFC. The deployed image
+therefore exposes the full <code>icnctl institution bootstrap</code> surface
+plus the <code>/v1/gov/me/{standing,action-cards}</code> routes used below.</p>
+<h3>B.3 Confirm endpoints exist and accept auth (read-only)</h3>
+<pre><code class="language-sh">TOKEN=$(ICN_KEYSTORE_PASSPHRASE=&#39;smoke-test-passphrase&#39; \
+  &lt;icn-repo-root&gt;/icn/target/debug/icnctl \
+  --data-dir /tmp/icnctl-bootstrap-test \
+  auth token \
+  --gateway http://10.8.30.40:30080 \
+  --coop-id smoke-test-coop \
+  --scopes &quot;governance:read,entity:read&quot; \
+  | grep -E &quot;^eyJ&quot; | head -1)
+
+curl -sS -H &quot;Authorization: Bearer $TOKEN&quot; \
+  http://10.8.30.40:30080/v1/gov/me/standing
+# {&quot;did&quot;:&quot;did:icn:...&quot;,&quot;domains&quot;:[],&quot;roles&quot;:[],&quot;authority_scopes&quot;:[],&quot;generated_at&quot;:...}
+
+curl -sS -H &quot;Authorization: Bearer $TOKEN&quot; \
+  http://10.8.30.40:30080/v1/gov/me/action-cards
+# {&quot;did&quot;:&quot;did:icn:...&quot;,&quot;cards&quot;:[],&quot;generated_at&quot;:...}
+</code></pre>
+<p>Both responses are well-formed empty projections — the expected
+output for a DID with no standing or assigned cards on the cluster.
+This proves the routes are live and JWT-bound on K3s.</p>
+<h3>B.4 Apply against K3s (operator decision required)</h3>
+<p>The apply command for K3s mirrors the local one with a different
+gateway:</p>
+<pre><code class="language-sh">ICN_KEYSTORE_PASSPHRASE=&#39;smoke-test-passphrase&#39; \
+  &lt;icn-repo-root&gt;/icn/target/debug/icnctl \
+  --data-dir /tmp/icnctl-bootstrap-test \
+  institution bootstrap apply \
+  --package &lt;nycn-repo-root&gt;/institution/smoke/icnctl \
+  --gateway http://10.8.30.40:30080 \
+  --coop-id smoke-test-coop
+</code></pre>
+<p>Before running this command, the operator must accept the
+constraints in §B.5 below. This runbook does not execute it; the
+local apply at §A.2 produces equivalent code-path coverage with no
+cluster persistence.</p>
+<h3>B.5 Idempotency, cleanup, persistence</h3>
+<p><strong>Idempotency</strong> — <code>bins/icnctl/src/institution_bootstrap.rs</code> carries
+the test <code>nycn_bootstrap_apply_idempotent</code> plus per-operation 409
+conflict-coercion unit tests: each create operation maps a
+<code>HTTP 409 Conflict</code> from the gateway to <code>ApplyOutcome::Completed</code>,
+so a repeated apply is safe.</p>
+<p><strong>Cleanup</strong> — there is no <code>icnctl institution bootstrap teardown</code>
+or generic delete-entity command. The <code>icnctl institution</code> surface
+exposes only <code>bootstrap {validate,plan,apply}</code> (verify with
+<code>target/debug/icnctl institution bootstrap --help</code>); no top-level
+<code>entity</code> subcommand exists in <code>icnctl --help</code>. Smoke records
+therefore persist in the daemon&#39;s Sled store until that store is
+cleared manually:</p>
+<ul>
+<li>For local: <code>rm -rf /tmp/icn-bootstrap-test</code> after stopping <code>icnd</code>.</li>
+<li>For K3s: a record is written into the persistent volume backing
+<code>icn-daemon</code>. Removing it requires either a targeted entity-delete
+endpoint (does not currently exist as part of the public surface)
+or PV reset.</li>
+</ul>
+<p><strong>Naming hygiene</strong> — the smoke fixture&#39;s <code>package_id</code>
+(<code>nycn-icnctl-smoke</code>), entity id
+(<code>nycn-icnctl-smoke-federation</code>), and governance-domain id
+(<code>nycn-icnctl-smoke-federation-gov</code>) are namespaced specifically so
+operators can identify smoke records when reviewing cluster state.</p>
+<h2>Remaining gap to full pilot loop</h2>
+<p>The full target loop is</p>
+<blockquote>
+<p>NYCN package → bootstrap → standing → action card → action_item
+complete → <code>ActionItemCompletionReceipt</code></p>
+</blockquote>
+<p>The gap between this runbook and that loop is the absence of an
+<strong>action-producing seed step</strong>. <code>icnctl institution bootstrap apply</code>
+operates on the seed kinds enumerated in
+<code>crates/icn-governance/src/bootstrap.rs</code>:</p>
+<pre><code>EntitySeed | GovernanceDomainSeed | StructureSeed |
+ActivityProgramSeed | MilestoneTemplateSeed |
+RoleAssignmentSeed | PersonDirectorySeed
+</code></pre>
+<p>None of these creates an action item, open proposal, or meeting
+attendance state. Verified via the canonical fixture&#39;s plan:
+22 ops, no action_item / proposal / meeting operation among them.</p>
+<p>Two viable paths forward, both narrow:</p>
+<ol>
+<li><p><strong>Post-bootstrap HTTP step</strong>: a runbook (NYCN-side) that drives an
+action_item create + complete via the existing gateway HTTP
+surface after this fixture has been applied. The gateway already
+exposes those endpoints — this is a runbook, not new ICN
+primitives.</p>
+</li>
+<li><p><strong>New seed kind</strong>: a generic <code>ActionItemSeed</code> that the bootstrap
+loader maps to a <code>POST /domains/{id}/action-items</code> (or whatever
+the canonical create endpoint is) during apply. This is an
+ICN-side extension and warrants its own narrow PR; do not
+conflate with the smoke fixture.</p>
+</li>
+</ol>
+<p>The ICN-side proof that the proof loop itself is wired correctly
+already exists, in-process and not via the package surface, in
+<code>apps/governance/tests/me_action_item_receipt_chain.rs</code> — verified
+6/6 passing this session against <code>2438a362</code>.</p>
+<h2>Quick spot-check (NYCN smoke fixture loadability)</h2>
+<p>If only validating that the fixture remains shape-compatible with
+the loader, no gateway is required:</p>
+<pre><code class="language-sh">cd &lt;icn-repo-root&gt;/icn
+target/debug/icnctl institution bootstrap validate \
+  --package &lt;nycn-repo-root&gt;/institution/smoke/icnctl
+target/debug/icnctl institution bootstrap plan \
+  --package &lt;nycn-repo-root&gt;/institution/smoke/icnctl
+</code></pre>
+<p>Expected plan: 3 ops (validate-charter, create-federation,
+provision-domain), <code>Live apply supported: yes</code>, no warnings or
+blockers.</p>
+<h2>References</h2>
+<ul>
+<li><code>bins/icnctl/src/institution_bootstrap.rs</code> — loader, plan, apply,
+auth flow, idempotency tests.</li>
+<li><code>crates/icn-governance/src/bootstrap.rs</code> —
+<code>InstitutionBootstrapManifest</code> + seed-kind schema.</li>
+<li><code>apps/governance/src/http/configure.rs</code> — <code>/v1/gov/me/*</code> routes.</li>
+<li><code>apps/governance/src/http/handlers.rs</code> — handler implementations.</li>
+<li><code>apps/governance/tests/me_action_item_receipt_chain.rs</code> — full
+proof loop, in-process.</li>
+<li><code>start-gateway-test.sh</code> — local gateway launcher.</li>
+<li><code>deploy/k8s/WORKFLOW.md</code>, <code>deploy/k8s/Makefile</code> — K3s deploy
+workflow.</li>
+<li>NYCN repo <code>institution/smoke/icnctl/README.md</code> — fixture intent
+and limits.</li>
+<li>NYCN repo <code>docs/sync/PACKAGE_PROOF_MATRIX.md</code> — proof-path matrix.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
