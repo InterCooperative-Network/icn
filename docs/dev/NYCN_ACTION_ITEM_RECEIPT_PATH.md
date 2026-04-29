@@ -1,22 +1,26 @@
 Status: discovery runbook
 Authority: dev runbook
 Audience: ICN developers + NYCN package operators
-Cluster: local gateway (`start-gateway-test.sh`); K3s deferred until receipt-retrieval gap is closed
+Cluster: local gateway (`start-gateway-test.sh`); K3s mutation deferred to explicit operator decision
 
 # NYCN action-item receipt proof path
 
 This runbook closes the gap left open by
 [`NYCN_K3S_PROOF_PATH.md`](./NYCN_K3S_PROOF_PATH.md): driving one
 action item from creation to completion against a real ICN gateway,
-with the smoke fixture's governance domain as the host, and showing
-that the gateway emits an `ActionItemCompletionReceipt`. It also
-documents the remaining narrow gap: there is no HTTP endpoint that
-exposes the persisted receipt back to a caller.
+with the smoke fixture's governance domain as the host, and the
+HTTP retrieval of the resulting `ActionItemCompletionReceipt`. The
+retrieval endpoint
+(`GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt`)
+landed in [ICN #1675](https://github.com/InterCooperative-Network/icn/pull/1675)
+(`91a63eec` on `main`). The runbook is therefore self-checking
+end-to-end over HTTP, with no on-disk Sled inspection.
 
 It is a **discovery runbook**: every transcript below is verbatim
-output from the steps as executed against `icnd 2f732176` (post
-#1673 merge). It does not document what the system is supposed to
-do; it documents what the system did.
+output from the steps as executed (transcripts captured against
+`icnd 2f732176` for steps 1–7; transcripts for the new step 8
+captured against `icnd 91a63eec`). It does not document what the
+system is supposed to do; it documents what the system did.
 
 ## Relationship to `NYCN_K3S_PROOF_PATH.md`
 
@@ -384,7 +388,10 @@ curl -sS \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-Verbatim against `icnd 91a63eec`:
+Verbatim against `icnd 91a63eec` (single line wrapped for
+display; `record_hash` is the full 32-byte
+`Hash`-as-`Vec<u8>` array — `serde_bytes` is not in play, so the
+field serializes as a JSON array of integers):
 
 ```json
 {
@@ -393,7 +400,7 @@ Verbatim against `icnd 91a63eec`:
   "actor_did": "did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk",
   "transition": "completed",
   "completed_at": 1777420018,
-  "record_hash": [250, 211, 103, 51, 11, 119, 225, 7, ...]
+  "record_hash": [250,211,103,51,11,119,225,7,91,248,200,27,79,110,213,227,12,194,218,168,5,8,186,84,115,121,120,123,18,216,151,48]
 }
 ```
 
@@ -403,11 +410,19 @@ check the rest of the action-item read surface uses.
 Negative paths (each verified live against the same daemon):
 
 - Missing/invalid token → `HTTP 401`.
-- Malformed UUID in path → `HTTP 400` (parse error).
-- No receipt persisted for the item → `HTTP 404`.
-- Same `item_id` but the path's `domain_id` does not match the
-  receipt's stored domain → `HTTP 404` (does not leak existence
-  across governance domains).
+- Malformed UUID in path → `HTTP 400` (parse error from
+  `parse_action_item_id`, before any DB lookup).
+- Caller has a valid token but is not a member of the requested
+  domain → `HTTP 403` (`Only domain members can perform this
+  action ...`). Surfaced by `check_domain_membership` before any
+  receipt-store lookup.
+- Caller asks about a domain that does not exist at all → `HTTP
+  404` (`Domain not found: ...`). Same precondition path as 403,
+  different branch.
+- No receipt persisted for the item, caller is a member → `HTTP 404`.
+- Caller is a member, item id is canonical, but the receipt's
+  stored `domain_id` does not match the path's `domain_id` →
+  `HTTP 404` (does not leak existence across governance domains).
 - Non-canonical UUID variants in the path (uppercase hex, URN form
   `urn:uuid:...`) — the handler canonicalizes via
   `parse_action_item_id(&item_id)?.to_string()` before the
