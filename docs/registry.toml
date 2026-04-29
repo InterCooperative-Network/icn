@@ -1299,6 +1299,22 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["stakeholders", "public"]
 
+[docs."docs/strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md"]
+category = "strategy"
+status = "living"
+title = "Cooperative-developer discovery brief"
+description = "Internal prep doc for discovery conversations with cooperative developers (e.g. launch.coop / comp.coop). Listening + language calibration; not a sales pitch, not a technical demo, not a partnership commitment."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["internal", "matt"]
+truth_class = "descriptive"
+role = "strategy"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["strategy", "partner-discovery"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
 [docs."docs/strategy/ICN-Evolution-Arc.md"]
 category = "strategy"
 status = "living"
