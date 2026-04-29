@@ -389,6 +389,10 @@ where
             web::resource("/domains/{domain_id}/action-items/{item_id}/notes")
                 .route(web::post().to(handlers::add_action_item_note::<E>)),
         )
+        .service(
+            web::resource("/domains/{domain_id}/action-items/{item_id}/completion-receipt")
+                .route(web::get().to(handlers::get_action_item_completion_receipt::<E>)),
+        )
         // ── Structure endpoints ──────────────────────────────────────────
         .service(
             web::resource("/entities/{entity_id}/structures")
