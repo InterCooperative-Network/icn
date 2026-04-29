@@ -1355,10 +1355,11 @@ audiences = ["architects", "stakeholders", "grant-reviewers"]
 category = "strategy"
 status = "living"
 title = "ICN Live Roadmap"
-description = "Current sprint and quarterly priorities, immediate milestones, and dependencies"
-last_updated = "2026-03-21"
+description = "Long-arc roadmap and rationale companion that points at STATE.md / PHASE_PROGRESS.md as canonical current-state truth. Not a per-PR changelog."
+last_updated = "2026-04-29"
 owner = "matt"
 audiences = ["team", "stakeholders"]
+last_reviewed = "2026-04-29"
 
 [docs."docs/strategy/ICN-Sprint-March17.md"]
 category = "strategy"
