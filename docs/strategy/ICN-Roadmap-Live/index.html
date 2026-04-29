@@ -39,30 +39,74 @@
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>strategy</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN Roadmap Live</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/ICN-Roadmap-Live.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Roadmap — Live</h1>
-<p><em>Last updated: 2026-04-08 (Post-Sprint 28 — Governance Dispatch Tranches)</em></p>
+<p><em>Last updated: 2026-04-29 (post-#1680, post-NYCN-#34)</em></p>
 <blockquote>
-<p>This document tracks sprint-level progress against the ICN development roadmap.
-For architecture and phase history, see <code>docs/ARCHITECTURE.md</code> and <code>docs/PHASE_HISTORY.md</code>.</p>
+<p>This document tracks long-arc planning context for ICN development.
+For <strong>canonical current state and recently-merged work</strong>, read
+<code>docs/STATE.md</code> and <code>docs/PHASE_PROGRESS.md</code> — those are
+truth-synced and re-bumped with every state-changing PR.
+This file is a roadmap-and-rationale companion that points at
+them; it is not a per-PR changelog.
+For architecture and phase history, see <code>docs/ARCHITECTURE.md</code>
+and <code>docs/PHASE_HISTORY.md</code>.</p>
 </blockquote>
 <hr>
-<h2>Current state (2026-04-08)</h2>
-<p><strong>Active workstream:</strong> Post-Sprint-28 governance dispatch tranches. The sprint-numbered planning cadence ended with Sprint 28; active work is now organized as sequential &quot;Tranches&quot; against the executor-wiring and ADR-0016 closure epics.</p>
-<p><strong>What landed between Sprint 23 and the current work (summarized; see git log for detail):</strong></p>
+<h2>Current state (2026-04-29 snapshot)</h2>
+<p><strong>Active workstream:</strong> Phase 2 — Pilot Launch. NYCN is the
+intended first cooperative partner (active partnership track,
+not yet a formally committed pilot). The Phase 2 <em>machinery</em> is
+in place end-to-end; what remains is the human procedure —
+present the merged ladder + ICN proof-loop machinery to NYCN
+organizers, formalize, rehearse — and recording each step.</p>
+<p><strong>Canonical source of truth:</strong> <code>docs/STATE.md</code> and
+<code>docs/PHASE_PROGRESS.md</code>. Those docs name every recently-merged
+PR with its date and effect. This file does not duplicate
+their tables.</p>
+<p><strong>What changed between this doc&#39;s prior 2026-04-08 sync and the
+current 2026-04-29 sync</strong> (high-level only; see <code>STATE.md</code> for
+the per-PR record):</p>
 <ul>
-<li><strong>Sprint 24</strong> — Commons-compute spine. Two-tier trust threshold for pool admission, stale participant expiry, V1 scheduling-time credit enforcement floor. Closed 2026-03-23. See <code>docs/strategy/sprint-24-close.md</code>.</li>
-<li><strong>Sprint 25</strong> — ADR-0016 Phase 2 work. Closed via <code>chore(ops): close sprint 25, open sprint 26</code> (commit <code>92de849e</code>).</li>
-<li><strong>Sprint 26</strong> — Interim tranche; see commits between <code>92de849e</code> and Sprint 27 opening.</li>
-<li><strong>Sprint 27</strong> — Demo-Ready + Compute Story. Flow 5 commons compute trust-gated admission, demo polish, website five-flow update, summit proposal. Key commits: <code>1600a1fb</code>, <code>b1ba40c7</code>, <code>cb22e1e5</code>, <code>8ab59cff</code>.</li>
-<li><strong>Sprint 28</strong> — Gossip fan-out fix (compute task delivery restored). Commit <code>4ae8401f</code> (PR #1419).</li>
+<li><strong>Institutional-operability runtime</strong> landed across 2026-04-22 → 2026-04-26: live charter activation endpoint (#1624), person-directory overlay for bootstrap role assignment (#1626), <code>GET /me/standing</code> read model (#1627), <code>authority_scope</code> plumbed end-to-end through <code>assign_role</code> (#1630), generic institution bootstrap package path (#1586), bootstrap-apply 409 idempotency (#1617), persistent governance domains across gateway restart (#1621), feedback/support doctrine + ADR canonicalization (#1637).</li>
+<li><strong>Action-card runtime</strong> landed 2026-04-27 with proof-bearing receipt loops for all currently emitted source paths: <code>GET /v1/gov/me/action-cards</code> (#1659), proposal/vote → <code>GovernanceDecisionReceipt</code> (#1660), <code>action_item</code>/<code>complete</code> → <code>ActionItemCompletionReceipt</code> (#1661), <code>meeting</code>/<code>attend</code> → <code>MeetingAttendanceReceipt</code> (#1663). Issue #1646 remains open for the two RFC-gated paths (<code>signal_rule</code>, <code>obligation_lifecycle</code>).</li>
+<li><strong>Action-item completion-receipt retrieval</strong> shipped 2026-04-29: <code>GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt</code> (#1675). Local HTTP proof loop closure documented in #1676. Operator-authorized K3s NYCN smoke proof closure against deployed image <code>91a63eec</code> recorded in #1677.</li>
+<li><strong>Truth-sync docs</strong> updated in #1678 and #1680 to reflect every landing above plus the new cooperator-developer prep doc at <code>docs/strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md</code>.</li>
+<li><strong>NYCN side</strong>: the drive-ingest operator ladder shipped end-to-end in <code>fahertym/nycn</code> PRs #21–#34 (parser → review → decisions YAML → publish dry-run → assignee binding → local publisher → local proof runner → federation surface bridge → operator pilot runbook + ladder checker → organizer briefing + simple summit demo → start-here onboarding pass → one-command local preflight runner → whole-NYCN operating-surfaces inventory + Google-Groups boundary policy → communication-groups directory tool → operating-surfaces directory tool). The ladder defends a hard mutation boundary: every layer is either pure (no network) or localhost-only operator-gated. K3s mutation is never allowed by NYCN-side tools; ICN-side K3s exercise lives under <code>docs/dev/NYCN_K3S_PROOF_PATH.md</code> (#1677).</li>
+<li><strong>Issue #1679</strong> filed 2026-04-29 for K3s/devnet smoke artifact cleanup / teardown semantics. Inventory-only as the suggested first concrete step.</li>
 </ul>
-<p><strong>Governance Dispatch Tranches (post-Sprint 28, active):</strong></p>
-<p>The canonical source of truth for tranche status is <code>docs/architecture/agent-handoff-current.md</code> and git commit messages tagged <code>Tranche N</code>. At time of writing:</p>
+<p><strong>Phase 2 framing:</strong> NYCN is the intended first cooperative
+partner. The next concrete step is presenting the merged ladder</p>
+<ul>
+<li>ICN proof-loop machinery to NYCN organizers to formalize the
+pilot. Subsequent gates: partnership formalization, then first
+operator pilot rehearsal against real (or fixture-equivalent)
+organizer material. Phase 2 stays ⏳ until those happen and are
+recorded.</li>
+</ul>
+<p>The cadence formerly tracked here as &quot;Governance Dispatch
+Tranches&quot; continues to advance through executor-wiring work;
+its per-tranche status is reflected in <code>docs/STATE.md</code>,
+<code>docs/PHASE_PROGRESS.md</code>, and the git log, and is no longer
+re-published in this file. The 2026-04-08 tranche table that
+was here previously is preserved below in the &quot;Historical&quot;
+section for continuity.</p>
+<blockquote>
+<p><strong>Rule:</strong> Do not treat the per-sprint sections below as
+current status. They are historical only. For current state,
+read <code>docs/STATE.md</code>, <code>docs/PHASE_PROGRESS.md</code>, and the git
+log.</p>
+</blockquote>
+<hr>
+<h2>Historical: 2026-04-08 tranche snapshot</h2>
+<p>The Governance Dispatch Tranche table as it stood at the prior
+2026-04-08 sync, retained for continuity. Current tranche
+status is reflected in <code>docs/STATE.md</code>, <code>docs/PHASE_PROGRESS.md</code>,
+and the git log.</p>
 <table>
 <thead>
 <tr>
 <th>Tranche</th>
 <th>Scope</th>
-<th>Status</th>
+<th>Status (as of 2026-04-08)</th>
 </tr>
 </thead>
 <tbody><tr>
@@ -116,10 +160,24 @@ For architecture and phase history, see <code>docs/ARCHITECTURE.md</code> and <c
 <td>⏳ Next</td>
 </tr>
 </tbody></table>
-<p>An overlaid &quot;Agent Handoff Tranche&quot; track (<code>I</code>, <code>II</code>, <code>III</code>, ...) in <code>docs/architecture/agent-handoff-current.md</code> covers ADR-0016 closures (surplus reserves consumption, charter view persistence, etc.) and advances on its own cadence. Tranches I, II, and III all closed 2026-04-08.</p>
-<blockquote>
-<p><strong>Rule:</strong> Do not treat the per-sprint sections below as current status. They are historical only. For current state, read this block, git log, and <code>docs/architecture/agent-handoff-current.md</code>.</p>
-</blockquote>
+<p>The overlaid &quot;Agent Handoff Tranche&quot; track (<code>I</code>, <code>II</code>, <code>III</code>,
+...) covers ADR-0016 closures (surplus reserves consumption,
+charter view persistence, etc.) and advances on its own
+cadence. Tranches I, II, and III closed 2026-04-08.</p>
+<hr>
+<h2>Pre-2026-04-08: completed sprints</h2>
+<p>The per-sprint summary that historically lived in this file
+covers sprints 22 through 28 (Meaning Firewall completion
+through Gossip fan-out fix). Retained below for continuity but
+<strong>not authoritative</strong> — the canonical record of completed work
+is <code>docs/PHASE_HISTORY.md</code> plus git log.</p>
+<ul>
+<li><strong>Sprint 24</strong> — Commons-compute spine. Two-tier trust threshold for pool admission, stale participant expiry, V1 scheduling-time credit enforcement floor. Closed 2026-03-23. See <code>docs/strategy/sprint-24-close.md</code>.</li>
+<li><strong>Sprint 25</strong> — ADR-0016 Phase 2 work. Closed via <code>chore(ops): close sprint 25, open sprint 26</code> (commit <code>92de849e</code>).</li>
+<li><strong>Sprint 26</strong> — Interim tranche; see commits between <code>92de849e</code> and Sprint 27 opening.</li>
+<li><strong>Sprint 27</strong> — Demo-Ready + Compute Story. Flow 5 commons compute trust-gated admission, demo polish, website five-flow update, summit proposal. Key commits: <code>1600a1fb</code>, <code>b1ba40c7</code>, <code>cb22e1e5</code>, <code>8ab59cff</code>.</li>
+<li><strong>Sprint 28</strong> — Gossip fan-out fix (compute task delivery restored). Commit <code>4ae8401f</code> (PR #1419).</li>
+</ul>
 <hr>
 <h2>Completed Sprints</h2>
 <h3>Sprint 22 — Meaning Firewall Completion</h3>
