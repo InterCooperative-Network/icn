@@ -3032,6 +3032,54 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["team"]
 
+[docs."docs/pilots/nycn-boundary-brief.md"]
+category = "reference"
+status = "living"
+title = "NYCN Boundary Brief"
+description = "Honest scope-of-now brief for NYCN organizers and ICN-side preparers: what ICN can demonstrate today, what it cannot honestly claim yet, what NYCN organizers would need to validate, and what is explicitly not being asked. Defers to STATE.md and PHASE_PROGRESS.md for current truth."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["team", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "nycn", "boundary", "communications"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
+[docs."docs/pilots/nycn-demo-script.md"]
+category = "reference"
+status = "living"
+title = "NYCN Demo Script"
+description = "Step-by-step organizer-facing demo flow against a localhost ICN gateway: action cards, proof loop, receipts, provenance, and explicit limit-naming. Not a pitch."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["team"]
+truth_class = "operational"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "nycn", "demo", "communications"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
+[docs."docs/pilots/nycn-organizer-asks.md"]
+category = "reference"
+status = "living"
+title = "NYCN Organizer Asks"
+description = "Bounded set of questions to ask NYCN organizers — workflow validation, source/data validation, pilot-readiness — without assuming any partnership commitment. Includes explicit non-asks."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["team", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "nycn", "discovery", "communications"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
 # ============================================================================
 # PLANNING AND STRATEGY (Additional)
 # ============================================================================
