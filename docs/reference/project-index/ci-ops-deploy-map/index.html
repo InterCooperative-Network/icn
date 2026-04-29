@@ -1,0 +1,394 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>CI / Ops / Deploy Map | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>project index</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ci ops deploy map</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/project-index/ci-ops-deploy-map.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: operational
+Canonical: no
+Last Reviewed: 2026-04-29</h2>
+<h1>CI / Ops / Deploy Map</h1>
+<blockquote>
+<p>For current project truth, defer to <a href="/docs/STATE">`docs/STATE.md`</a> and <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>. This map is a routing layer. Substantive runbooks live under <code>docs/guides/operations/</code> and <code>deploy/</code>.</p>
+</blockquote>
+<h2>GitHub Actions workflows (<code>.github/workflows/</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>Workflow file</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ci.yml</code></td>
+<td>The main Rust CI. Format check, Clippy, Test, Build Release, TypeScript SDK, Web UI, Accessibility Tests, Kernel Forbidden Dependencies, Firewall Contract Enforcement, Meaning Firewall Check, Regulatory Compliance Linter, Secrets Placeholder Check, Change Scope, Pilot Provenance Invariant, Backup Validation, Test Coverage, Security Audit.</td>
+</tr>
+<tr>
+<td><code>docs-freshness.yml</code></td>
+<td>&quot;Documentation Maintenance&quot; suite: Documentation Control Plane, Generate Documentation Index, Lint Architecture Doc, Check Documentation Freshness, Documentation CI Summary.</td>
+</tr>
+<tr>
+<td><code>agent-drift-check.yml</code></td>
+<td>Verifies agent tooling and configuration are not drifting against expectations.</td>
+</tr>
+<tr>
+<td><code>api-types.yml</code></td>
+<td>Checks TypeScript API types are regenerated when the gateway API changes.</td>
+</tr>
+<tr>
+<td><code>claude-code-review.yml</code></td>
+<td>Posts a Claude review comment on PRs. <strong>15-minute timeout; failures here are infra flakes and never block merge.</strong></td>
+</tr>
+<tr>
+<td><code>claude.yml</code></td>
+<td>Auxiliary Claude integration.</td>
+</tr>
+<tr>
+<td><code>opencode.yml</code></td>
+<td>OpenCode integration workflow.</td>
+</tr>
+<tr>
+<td><code>docker-build-deploy.yml</code></td>
+<td>Builds and deploys Docker images for the daemon and gateway.</td>
+</tr>
+<tr>
+<td><code>release.yml</code></td>
+<td>Release tagging and artifact publishing.</td>
+</tr>
+<tr>
+<td><code>npm-publish.yml</code></td>
+<td>Publishes the TypeScript SDK to npm.</td>
+</tr>
+<tr>
+<td><code>website-deploy.yml</code></td>
+<td>Deploys <a href="https://intercooperative.network" target="_blank" rel="noopener">`intercooperative.network`</a>.</td>
+</tr>
+<tr>
+<td><code>security-audit.yml</code></td>
+<td>Cargo / npm dependency audit.</td>
+</tr>
+<tr>
+<td><code>benchmark.yml</code></td>
+<td>Criterion benchmarks. CI runs on <code>ubuntu-latest</code>; absolute numbers compare to CI baselines, not local runs.</td>
+</tr>
+<tr>
+<td><code>fuzz.yml</code></td>
+<td>Fuzz harnesses.</td>
+</tr>
+<tr>
+<td><code>sync-stats.yml</code></td>
+<td>Repo statistics sync.</td>
+</tr>
+<tr>
+<td><code>issue-label-enforcer.yml</code></td>
+<td>Enforces the issue label policy in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/.github/ISSUE_POLICY">`.github/ISSUE_POLICY.md`</a>.</td>
+</tr>
+</tbody></table>
+<h3>CI failure index (compressed)</h3>
+<p>For most CI failures, fix the smallest thing CI is asking for. The full table lives in <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE">`CLAUDE.md`</a> under &quot;CI Failure Index&quot;; the gist:</p>
+<ul>
+<li><strong>Check API Types Drift</strong> → regenerate TS types (<code>cd sdk/typescript &amp;&amp; npm ci &amp;&amp; npm run generate-types</code>). Commit only <code>sdk/typescript/src/generated/api-types.ts</code>.</li>
+<li><strong>Clippy</strong> → fix the warning in changed code. Don&#39;t <code>#[allow]</code> unless pre-existing.</li>
+<li><strong>claude-review</strong> → 15-min infra flake. Never blocks merge.</li>
+<li><strong>Test Coverage at <code>pending / 0s</code></strong> → queue-stalled, not running. Safe to <code>--admin</code> merge when other required gates are green.</li>
+</ul>
+<h2>Deploy paths</h2>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Where</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Native / systemd</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/icnd.service">`deploy/icnd.service`</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/install.sh">`deploy/install.sh`</a></td>
+<td>Single-node systemd unit.</td>
+</tr>
+<tr>
+<td>Docker Compose</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/compose/">`deploy/compose/`</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/docker-compose.yml">`deploy/docker-compose.yml`</a></td>
+<td>Local multi-node deployment.</td>
+</tr>
+<tr>
+<td>Local devnet</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/devnet/">`deploy/devnet/`</a></td>
+<td>Local 3-node Docker Compose cluster. See the <code>devnet</code> skill at <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/.claude/skills/devnet/SKILL">`.claude/skills/devnet/SKILL.md`</a>.</td>
+</tr>
+<tr>
+<td>Kubernetes</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/k8s/">`deploy/k8s/`</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/kubernetes/">`deploy/kubernetes/`</a></td>
+<td>Plain manifests.</td>
+</tr>
+<tr>
+<td>Helm</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/helm/">`deploy/helm/`</a></td>
+<td>Helm chart for ICN.</td>
+</tr>
+<tr>
+<td><strong>Live K3s cluster</strong></td>
+<td>(homelab)</td>
+<td>Deployed since 2025-12-03. See <a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`</a>.</td>
+</tr>
+</tbody></table>
+<pre><code class="language-bash">cd deploy/k8s &amp;&amp; make full-deploy-dev   # deploy a new image
+make status                              # check pod status
+make logs                                # tail logs
+</code></pre>
+<h2>K3s smoke and proof-path runbooks</h2>
+<table>
+<thead>
+<tr>
+<th>Runbook</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Local HTTP proof loop (action-item completion receipt)</td>
+<td><a href="/docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH">`docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md`</a></td>
+</tr>
+<tr>
+<td>K3s smoke proof closure (operator-authorized)</td>
+<td><a href="/docs/dev/NYCN_K3S_PROOF_PATH">`docs/dev/NYCN_K3S_PROOF_PATH.md`</a></td>
+</tr>
+<tr>
+<td>Pilot smoke runbook</td>
+<td><a href="/docs/guides/operations/pilot-smoke">`docs/guides/operations/pilot-smoke.md`</a></td>
+</tr>
+<tr>
+<td>Backup and recovery</td>
+<td><a href="/docs/guides/operations/backup-and-recovery">`docs/guides/operations/backup-and-recovery.md`</a></td>
+</tr>
+<tr>
+<td>Replication operations</td>
+<td><a href="/docs/guides/operations/replication-operations">`docs/guides/operations/replication-operations.md`</a></td>
+</tr>
+<tr>
+<td>Operations general</td>
+<td><a href="/docs/guides/operations/operations-guide">`docs/guides/operations/operations-guide.md`</a></td>
+</tr>
+<tr>
+<td>Troubleshooting</td>
+<td><a href="/docs/guides/operations/troubleshooting">`docs/guides/operations/troubleshooting.md`</a></td>
+</tr>
+</tbody></table>
+<h2>Monitoring</h2>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Prometheus configuration</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/monitoring/">`monitoring/`</a></td>
+</tr>
+<tr>
+<td>Atlas-backed Prometheus persistent storage</td>
+<td>Configured 2026-04-22 (#1614). See <code>STATE.md</code>.</td>
+</tr>
+<tr>
+<td>Atlas-backed sccache for ci-runner</td>
+<td>Configured 2026-04-23 (#1618).</td>
+</tr>
+<tr>
+<td>Soft pod anti-affinity for ICN daemons</td>
+<td>Configured 2026-04-23 (#1619).</td>
+</tr>
+</tbody></table>
+<h2>Verification by area touched</h2>
+<p>Per <a href="https://github.com/InterCooperative-Network/icn/blob/main/AGENTS">`AGENTS.md`</a>:</p>
+<table>
+<thead>
+<tr>
+<th>If you touched...</th>
+<th>Run from <code>icn/</code>...</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rust crates (<code>icn/crates/**</code>)</td>
+<td><code>cargo fmt --all --check</code>, <code>cargo clippy --workspace --all-targets --all-features -- -D warnings</code>, <code>cargo test</code> (scoped to crate or <code>--workspace --lib</code>)</td>
+</tr>
+<tr>
+<td>Gateway API (<code>icn-gateway</code>)</td>
+<td><code>cargo test -p icn-gateway --features sled-storage</code>; if API changed, regenerate OpenAPI + TS types</td>
+</tr>
+<tr>
+<td>TypeScript SDK</td>
+<td><code>cd sdk/typescript &amp;&amp; npm ci &amp;&amp; npm run build &amp;&amp; npm test &amp;&amp; npm run lint</code></td>
+</tr>
+<tr>
+<td>React Native SDK</td>
+<td><code>cd sdk/react-native &amp;&amp; npm test &amp;&amp; npm run build</code></td>
+</tr>
+<tr>
+<td>Pilot UI</td>
+<td><code>cd web/pilot-ui &amp;&amp; npm run test &amp;&amp; npm run test:e2e &amp;&amp; npm run test:a11y</code></td>
+</tr>
+<tr>
+<td>Deploy manifests</td>
+<td>Manual: ensure no secrets committed; keep placeholders.</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td><code>python3 docs/scripts/doc_control_check.py --strict</code>; vocabulary scan; <code>git diff --check</code>.</td>
+</tr>
+</tbody></table>
+<h2>Port reference</h2>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Port</th>
+<th>Protocol</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Peer transport</td>
+<td>7777</td>
+<td>QUIC/UDP</td>
+<td>P2P</td>
+</tr>
+<tr>
+<td>RPC API</td>
+<td>5601</td>
+<td>HTTP</td>
+<td><code>icnctl</code> control</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>9100</td>
+<td>HTTP</td>
+<td>Prometheus exporter</td>
+</tr>
+<tr>
+<td>Gateway / health</td>
+<td><strong>8080</strong></td>
+<td>HTTP</td>
+<td>Member-facing REST + WebSocket. <strong>Never 8000.</strong></td>
+</tr>
+</tbody></table>
+<h2>Where to read deeper</h2>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Doc</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Live deployment overview</td>
+<td><a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`</a></td>
+</tr>
+<tr>
+<td>Production hardening</td>
+<td><a href="/docs/security/production-hardening">`docs/security/production-hardening.md`</a></td>
+</tr>
+<tr>
+<td>Issue and label policy</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/.github/ISSUE_POLICY">`.github/ISSUE_POLICY.md`</a></td>
+</tr>
+<tr>
+<td>Per-area verification routing (full table)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/AGENTS">`AGENTS.md`</a> §&quot;Change routing&quot;</td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

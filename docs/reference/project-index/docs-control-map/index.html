@@ -1,0 +1,304 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Docs Control Map | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>project index</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>docs control map</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/project-index/docs-control-map.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: operational
+Canonical: no
+Last Reviewed: 2026-04-29</h2>
+<h1>Docs Control Map</h1>
+<blockquote>
+<p>For current project truth, defer to <a href="/docs/STATE">`docs/STATE.md`</a> and <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>. This map is a routing guide for the documentation control plane.</p>
+</blockquote>
+<p>ICN&#39;s documentation has a real control plane: a hand-maintained navigation file, a machine-readable registry, a generated human summary, and a validator that runs in CI. Confusing one for another is a common drift source.</p>
+<h2>The four control-plane artifacts</h2>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Path</th>
+<th>What it is</th>
+<th>Hand-maintained?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><code>docs/INDEX.md</code></strong></td>
+<td><a href="/docs/INDEX">`docs/INDEX.md`</a></td>
+<td>Authoritative hand-maintained navigation. The &quot;where do I look for X?&quot; map.</td>
+<td><strong>Yes — edit directly.</strong></td>
+</tr>
+<tr>
+<td><strong><code>docs/registry.toml</code></strong></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/registry.toml">`docs/registry.toml`</a></td>
+<td>Machine-readable registry. <code>[control]</code> defaults, <code>[[doc_path_defaults]]</code> prefix-based fallbacks, <code>[docs.&quot;path&quot;]</code> per-doc overlays. Drives validators and the human summary.</td>
+<td><strong>Yes — edit directly.</strong></td>
+</tr>
+<tr>
+<td><strong><code>docs/DOCUMENT_REGISTRY.md</code></strong></td>
+<td><a href="/docs/DOCUMENT_REGISTRY">`docs/DOCUMENT_REGISTRY.md`</a></td>
+<td>Human-readable summary of the registry. <strong>Generated.</strong></td>
+<td>No — regenerate via <code>python3 docs/scripts/doc_control_check.py --write-document-registry</code>.</td>
+</tr>
+<tr>
+<td><strong><code>docs/scripts/doc_control_check.py</code></strong></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/scripts/doc_control_check.py">`docs/scripts/doc_control_check.py`</a></td>
+<td>Validator. Runs in CI; can be run locally.</td>
+<td>Yes (Python).</td>
+</tr>
+</tbody></table>
+<p>There is also a generated <strong><code>docs/INDEX.generated.md</code></strong> for drift detection in CI; if it disagrees with <code>docs/INDEX.md</code>, reconcile in <code>INDEX.md</code> intentionally.</p>
+<h2>Canonical paths</h2>
+<p>The control-plane &quot;canonical&quot; set is exactly the files listed in <code>[control].canonical_doc_paths</code> in <code>docs/registry.toml</code>:</p>
+<pre><code>docs/INDEX.md
+docs/STATE.md
+docs/ARCHITECTURE.md
+docs/DOCUMENTATION_CONTROL_SYSTEM.md
+</code></pre>
+<p>These four paths are the only ones machine-checked for required headers (<code>Status</code>, <code>Canonical</code>, <code>Last Reviewed</code>) and merged-registry alignment. Other docs may carry <code>Canonical: yes</code> in their YAML for emphasis, but they are not in the control-plane set unless <code>canonical_doc_paths</code> is updated. Do not add to that list casually.</p>
+<h2>Truth classes</h2>
+<p>Per <code>[[doc_path_defaults]]</code> and <code>[docs.&quot;path&quot;]</code> rows, every doc lands in one of:</p>
+<table>
+<thead>
+<tr>
+<th>Truth class</th>
+<th>What it means</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><code>normative</code></strong></td>
+<td>Defines a rule, contract, or invariant the system commits to.</td>
+<td><a href="/docs/genesis">`docs/genesis.md`</a>, <a href="/docs/ai/ICN_CONSTITUTIONAL_CORE">`docs/ai/ICN_CONSTITUTIONAL_CORE.md`</a></td>
+</tr>
+<tr>
+<td><strong><code>descriptive</code></strong></td>
+<td>Describes how something currently behaves. Authoritative for &quot;what is,&quot; not &quot;what must be.&quot;</td>
+<td><a href="/docs/STATE">`docs/STATE.md`</a></td>
+</tr>
+<tr>
+<td><strong><code>operational</code></strong></td>
+<td>A how-to / runbook / navigation surface. Used to act, not to decide.</td>
+<td><a href="/docs/INDEX">`docs/INDEX.md`</a>, this directory</td>
+</tr>
+<tr>
+<td><strong><code>historical</code></strong></td>
+<td>Archive material. Not current truth.</td>
+<td>Anything under <code>docs/archive/</code></td>
+</tr>
+<tr>
+<td><strong><code>draft</code></strong></td>
+<td>In flight. Do not treat as current.</td>
+<td>RFCs, <code>docs/rfcs/</code>, design proposals not yet ratified</td>
+</tr>
+</tbody></table>
+<p>The <code>Status:</code> YAML key on a doc must match <code>truth_class</code> in the registry. Mismatches show up as <code>[yaml-mismatch]</code> warnings from the validator.</p>
+<h2>How to read drift signals</h2>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>What it means</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Doc says &quot;current&quot; but it&#39;s under <code>docs/archive/</code> or <code>docs/dev-journal/snapshots/</code></td>
+<td><strong>Historical, not current.</strong></td>
+<td>Look up the canonical path in <code>STATE.md</code> or <code>INDEX.md</code>.</td>
+</tr>
+<tr>
+<td>Doc has YAML <code>Last Reviewed: &lt;90+ days ago&gt;</code> and is in <code>canonical_doc_paths</code></td>
+<td><strong>Stale canonical.</strong></td>
+<td>Re-review and bump the date, or fix the substance.</td>
+</tr>
+<tr>
+<td>Two docs have the same H1 in different directories</td>
+<td>Duplicate identity (<code>warn_duplicate_h1_across_dirs</code>)</td>
+<td>Pick one canonical home; archive the other.</td>
+</tr>
+<tr>
+<td>Doc references a path that no longer exists</td>
+<td>Broken link</td>
+<td>Fix or remove the reference.</td>
+</tr>
+<tr>
+<td><code>[yaml-mismatch]</code> warning</td>
+<td>YAML and registry disagree</td>
+<td>Update one to match the other.</td>
+</tr>
+</tbody></table>
+<h2>How not to confuse strategy / planning / status with current truth</h2>
+<ul>
+<li><strong><code>docs/strategy/</code></strong> — long-arc planning context. Each doc carries its own framing about &quot;what we will do&quot; or &quot;what we are doing.&quot; It is <strong>not</strong> the current-state record. The exception is documents that explicitly state they are truth-synced (e.g., <code>docs/strategy/ICN-Roadmap-Live.md</code>, which now points at <code>STATE.md</code> and <code>PHASE_PROGRESS.md</code> as canonical).</li>
+<li><strong><code>docs/planning/</code></strong> — design and forward plans. Often partial, often draft.</li>
+<li><strong><code>docs/internal/</code></strong> — internal pilot and program planning. Not externally-facing truth.</li>
+<li><strong><code>docs/status/</code></strong> — point-in-time status reports. Always check the date.</li>
+<li><strong><code>docs/dev/</code></strong> — session handoffs (<code>handoff-YYYY-MM-DD.md</code>) and proof-path records. The latest handoff is a session capture; <code>STATE.md</code> absorbs its conclusions.</li>
+<li><strong>Current truth lives in:</strong> <code>docs/STATE.md</code> (descriptive snapshot, refreshed every state-changing PR) and <code>docs/PHASE_PROGRESS.md</code> (phase model).</li>
+</ul>
+<h2>Adding a new doc</h2>
+<ol>
+<li><strong>Write the doc</strong> under the right <code>docs/</code> subdirectory. Never at the repo root. (See <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-tree-map">`source-tree-map.md`</a> for which subdirectories are allowlisted.)</li>
+<li><strong>Add YAML frontmatter</strong> with <code>Status</code>, <code>Canonical</code>, <code>Last Reviewed</code>.</li>
+<li><strong>Register it</strong> in <code>docs/registry.toml</code> with at least:<ul>
+<li><code>category</code> (architecture, design, strategy, guide, reference, operations, security, archive, status, …)</li>
+<li><code>status</code> (canonical, living, draft, archived, superseded, missing)</li>
+<li><code>title</code>, <code>description</code>, <code>last_updated</code>, <code>owner</code>, <code>audiences</code></li>
+<li>For control-plane alignment, also <code>truth_class</code>, <code>role</code>, <code>canonical</code>, <code>freshness</code>, <code>domain_tags</code>, <code>recommended_action</code>, <code>last_reviewed</code>.</li>
+</ul>
+</li>
+<li><strong>Link it from <code>docs/INDEX.md</code></strong> under the right section.</li>
+<li><strong>Validate</strong> locally before committing: <code>python3 docs/scripts/doc_control_check.py --strict</code>. CI runs the same check.</li>
+<li><strong>Vocabulary scan</strong>: avoid <code>payment</code>, <code>currency</code>, <code>wallet</code>, <code>balance</code>. Prefer <code>settlement</code>, <code>unit</code>, <code>identity</code>, <code>position</code>, <code>obligation</code>, <code>allocation</code>. The Regulatory Compliance Linter in CI enforces this on key paths.</li>
+</ol>
+<h2>Validators in CI</h2>
+<table>
+<thead>
+<tr>
+<th>Workflow / job</th>
+<th>What it enforces</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Documentation Control Plane</code> (in <code>docs-freshness.yml</code>)</td>
+<td>Runs <code>doc_control_check.py</code>; fails on critical drift.</td>
+</tr>
+<tr>
+<td><code>Documentation Freshness</code></td>
+<td>Section ages and subsystem verification dates. Posts a freshness report comment on PRs.</td>
+</tr>
+<tr>
+<td><code>Generate Documentation Index</code></td>
+<td>Regenerates <code>INDEX.generated.md</code>; flags drift vs hand-maintained <code>INDEX.md</code>.</td>
+</tr>
+<tr>
+<td><code>Lint Architecture Doc</code></td>
+<td>Checks <code>docs/ARCHITECTURE.md</code> for structural integrity.</td>
+</tr>
+<tr>
+<td><code>Regulatory Compliance Linter</code></td>
+<td>Vocabulary check against the avoid list.</td>
+</tr>
+<tr>
+<td><code>Meaning Firewall Check</code></td>
+<td>Crate-import boundary check (kernel vs apps). Not a doc check, but it lives next to docs in the workflow.</td>
+</tr>
+</tbody></table>
+<h2>Where to read deeper</h2>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Doc</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Doc control system doctrine</td>
+<td><a href="/docs/DOCUMENTATION_CONTROL_SYSTEM">`docs/DOCUMENTATION_CONTROL_SYSTEM.md`</a></td>
+</tr>
+<tr>
+<td>Doc maintenance and where to put new docs</td>
+<td><a href="/docs/DOCUMENTATION_MAINTENANCE">`docs/DOCUMENTATION_MAINTENANCE.md`</a></td>
+</tr>
+<tr>
+<td>Documentation style</td>
+<td><a href="/docs/guides/developer/DOCUMENTATION_STYLE">`docs/guides/developer/DOCUMENTATION_STYLE.md`</a></td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
