@@ -1,10 +1,33 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-04-27
+Last Reviewed: 2026-04-29
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-04-29 (post-#1675/#1677, post-NYCN-#28):
+     Action-item completion-receipt retrieval endpoint is now live
+     (`GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt`,
+     #1675). Local HTTP proof loop closure for the action-item path
+     is recorded in #1676; the operator-authorized K3s NYCN smoke
+     proof closure against deployed image 91a63eec is recorded in
+     #1677. NYCN's drive-ingest operator ladder (#21–#28 in
+     fahertym/nycn) is now merged: parser → review → decisions →
+     publish dry-run → assignee binding → local publisher → local
+     proof runner → federation surface bridge → operator pilot
+     runbook + ladder checker. The procedural spine that walks
+     organizer material into ICN action-item proofs is real.
+     Phase 2 framing change: NYCN is the intended first
+     cooperative partner; not yet a formally committed pilot.
+     The next concrete step is **presenting the merged ladder
+     + ICN proof-loop machinery to NYCN organizers** to
+     formalize the pilot partnership. Subsequent gates are
+     partnership formalization and the first operator pilot
+     rehearsal against real (or fixture-equivalent) organizer
+     material. Phase 2 remains ⏳ until those happen and are
+     recorded. Issue #1646 still open; signal_rule and
+     obligation_lifecycle source paths remain RFC-gated. -->
 
 <!-- [sync edit] 2026-04-27 (post-#1663): Action-card runtime now has
      proof-bearing receipt loops for all three currently emitted source
@@ -30,15 +53,18 @@ Last Reviewed: 2026-04-27
      Aligned crate list, merged PRs, and metrics to verified repo state.
      Phase model unchanged — phase classification is governance territory (PR C). -->
 
-## Current status (2026-04-27 snapshot)
+## Current status (2026-04-29 snapshot)
 
-**Current phase:** Phase 2 — Pilot Launch (blocked on cooperative partners).
-Active execution: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). NYCN package side dogfoods these via the institution-package boundary. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
+**Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers to formalize the pilot. Subsequent gates: partnership formalization, then first operator pilot rehearsal against real (or fixture-equivalent) organizer material. The Phase 2 *machinery* is in place end-to-end; what remains is the human procedure — pitch, formalize, rehearse — and recording each step.
+Active execution: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN's drive-ingest operator ladder (#21–#28 in `fahertym/nycn`) is now merged end-to-end, providing the procedural spine that walks organizer material into ICN action-item proofs. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
 
 ### Recently merged (since 2026-04-15)
 
 | PR | Title | Merged |
 |----|-------|--------|
+| #1677 | docs(dev): record K3s NYCN action-item receipt proof path | 2026-04-29 |
+| #1676 | docs(dev): record action-item completion receipt endpoint | 2026-04-29 |
+| #1675 | feat(governance): add completion-receipt endpoint for action items | 2026-04-29 |
 | #1663 | feat(governance): add meeting attendance receipts | 2026-04-27 |
 | #1662 | docs(state): record action-card runtime landing (#1659/#1660/#1661) | 2026-04-27 |
 | #1661 | feat(governance): add action item completion receipts | 2026-04-27 |
@@ -90,18 +116,32 @@ Active execution: institutional-operability runtime (live charter activation, pe
 
 | PR | Title | Branch | Status |
 |----|-------|--------|--------|
-| #1636 | chore(toolchain): upgrade Rust 1.88.0 → 1.95.0 | copilot/upgrade-rust-1-88-to-1-95 | Open — fmt fix pushed; tests running |
+| #1665 | deps(ts-sdk): bump the dev-dependencies group in /sdk/typescript with 2 updates | dependabot/npm_and_yarn/sdk/typescript/dev-dependencies-ea513a49e7 | Open — required CI green; `claude-review` 15-min timeout (never blocks merge); `mergeStateStatus: BEHIND` (sync against main before merge) |
 
 ### What landed since Phase 1 (Charter Engine)
 
-Action-card runtime (added 2026-04-27, all currently emitted source paths now proof-bearing — issue #1646 remains open for the two RFC-gated paths):
+Action-card runtime (added 2026-04-27 → 2026-04-29, all currently emitted source paths now proof-bearing — issue #1646 remains open for the two RFC-gated paths):
 - `GET /v1/gov/me/action-cards` member endpoint with closed source/action enums — #1659
 - Proposal/vote action card → `GovernanceDecisionReceipt` proof linkage, end-to-end test — #1660
 - `action_item`/`complete` source path emits append-only `ActionItemCompletionReceipt` (ADR-0026 Layer 2); persist-before-commit semantics; full-update handler routes status changes through receipt-bearing path — #1661
 - `meeting`/`attend` source path emits append-only `MeetingAttendanceReceipt` (ADR-0026 Layer 2) keyed by `(meeting_id, attendee_did)`; `Present` and `Remote` are receipt-bearing transitions, `Absent` is not; `recorded_by` is the authenticated caller (distinct from `attendee_did` for steward-recorded attendance); persist-before-commit semantics — #1663
+- `GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt` retrieval endpoint — #1675; closes the proof loop on the read side so a holder shell that completed an `action_item`/`complete` action card can fetch the persisted `ActionItemCompletionReceipt` over HTTP instead of relying on in-process tests or on-disk Sled inspection. Authorization mirrors the rest of the action-item read surface (`governance:read` scope plus domain membership; the receipt's bound `domain_id` is asserted to match the path parameter so cross-domain probes are rejected).
+- Local HTTP proof loop closure recorded in `docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md` — #1676.
+- K3s smoke proof closure (operator-authorized, against deployed image `91a63eec`) recorded in `docs/dev/NYCN_K3S_PROOF_PATH.md` — #1677. K3s smoke records remain durable devnet proof artifacts; full namespaced teardown semantics are not yet specified (tracking issue planned).
 - Source paths currently emitted by `/me/action-cards`: `proposal`/`vote`, `meeting`/`attend`, `action_item`/`complete`
-- **Proof loop verified end-to-end for all three currently emitted source paths.**
+- **Proof loop verified end-to-end for all three currently emitted source paths, both locally and on K3s.**
 - Pending under #1646 (RFC-gated): `signal_rule` source path (gated on #1631); `obligation_lifecycle` source path (gated on #1634)
+
+NYCN drive-ingest operator ladder (added 2026-04-29; lives in `fahertym/nycn`):
+- Parser → review artifact (`drive-ingest-review/v1`) — NYCN #21, #22
+- Review decisions YAML (organizer-authored)
+- Publish dry-run (`drive-ingest-action-item-publish-dry-run/v1`) — NYCN #23
+- Assignee binding (`drive-ingest-action-item-publish-dry-run-bound/v1`) — NYCN #24
+- Local publisher (`drive-ingest-local-publish-plan/v1`; preflight default, execute fenced behind two operator flags + localhost-only `--gateway`) — NYCN #25
+- Local proof runner (`drive-ingest-local-proof/v1`; walks `/me/action-cards` → `PUT .../status` → `GET .../completion-receipt`) — NYCN #26
+- Federation surface bridge (`drive-ingest-federation-surface/v1`; pure file-in/file-out summary records keyed on the cross-node deterministic blake3 `record_hash` from `ActionItemCompletionReceipt`) — NYCN #27
+- Operator pilot runbook + no-network ladder checker — NYCN #28
+- The ladder defends a hard mutation boundary: every layer is either pure (no network) or localhost-only operator-gated. K3s mutation is never allowed by NYCN-side tools. ICN-side K3s exercise lives in `docs/dev/NYCN_K3S_PROOF_PATH.md` (#1677), not in the NYCN repo.
 
 Institutional-operability runtime (added 2026-04-22 → 2026-04-26):
 - Generic institution bootstrap package path — #1586

@@ -1,6 +1,28 @@
 # ICN Phase Progress
-**Last Updated:** 2026-04-27
-**Current Phase:** Phase 2 — Pilot Launch (still blocked on cooperative partners; institutional-operability infrastructure and the action-card runtime are now in place — all currently emitted source paths are proof-bearing)
+**Last Updated:** 2026-04-29
+**Current Phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot); the next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers to formalize the pilot. Subsequent gates: partnership formalization, then first operator pilot rehearsal. Institutional-operability infrastructure, the action-card runtime, the action-item completion-receipt retrieval endpoint, and the NYCN drive-ingest operator ladder are all in place; all currently emitted source paths are proof-bearing both locally and on K3s.
+
+<!-- [sync edit] 2026-04-29 (post-#1675/#1677, post-NYCN-#28):
+     Phase 2 framing change. NYCN is the intended first
+     cooperative partner; not yet a formally committed pilot.
+     We are no longer blocked on partner identification — the
+     active partnership track is NYCN — but the next concrete
+     step is presenting the merged drive-ingest ladder + ICN
+     proof-loop machinery to NYCN organizers to formalize the
+     pilot. Subsequent gates: partnership formalization, then
+     first operator pilot rehearsal against real (or fixture-
+     equivalent) organizer material. Phase 2 deliverables list
+     extended to record: completion-receipt retrieval endpoint
+     (GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt)
+     shipped as #1675; local HTTP proof loop closure documented
+     in #1676; K3s smoke proof closure against deployed image
+     91a63eec recorded in #1677; NYCN drive-ingest operator
+     ladder merged end-to-end (NYCN #21–#28 in fahertym/nycn):
+     parser → review → decisions → publish dry-run → assignee
+     binding → local publisher → local proof runner → federation
+     surface bridge → operator pilot runbook + ladder checker.
+     These landings do not flip Phase 2 to ✅ on their own. -->
+
 
 <!-- [sync edit] 2026-04-27 (post-#1663): Phase 2 status unchanged (still
      blocked on cooperative partners). Action-card runtime now has
@@ -126,12 +148,12 @@
 ---
 
 ### Phase 2: Pilot Launch
-**Status:** ⏳ Blocked (awaiting cooperative partners)
+**Status:** ⏳ In progress (NYCN is the intended first cooperative partner — active partnership track, not yet a formally committed pilot; next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers to formalize the pilot)
 **Started:** —
 **Completed:** —
 **Sprint(s):** S19–S20
 
-**Objective:** 3–5 real cooperatives operating on ICN for governance and/or time-credit tracking.
+**Objective:** 3–5 real cooperatives operating on ICN for governance and/or time-credit tracking. NYCN is the intended first; additional cooperatives are downstream of a successful first-partner rehearsal.
 
 **Deliverables:**
 - [x] Pilot runbook (#1222 ✅ closed)
@@ -147,6 +169,10 @@
 - [x] Action card → `GovernanceDecisionReceipt` proof linkage for proposal/vote (#1660) — proof loop verified
 - [x] `action_item`/`complete` source path emits append-only `ActionItemCompletionReceipt` (#1661) — proof loop verified
 - [x] `meeting`/`attend` source path emits append-only `MeetingAttendanceReceipt` (#1663) — proof loop verified; `Present`/`Remote` are receipt-bearing transitions; `Absent` is not; steward-recorded attendance distinguished by `recorded_by` vs `attendee_did`
+- [x] `GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt` retrieval endpoint (#1675) — closes the proof loop on the read side so a holder shell can fetch the persisted receipt over HTTP; `governance:read` scope + domain membership; cross-domain probes rejected
+- [x] Local HTTP proof loop closure documented in `docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md` (#1676)
+- [x] K3s smoke proof closure (operator-authorized, deployed image 91a63eec) recorded in `docs/dev/NYCN_K3S_PROOF_PATH.md` (#1677)
+- [x] NYCN drive-ingest operator ladder merged end-to-end in `fahertym/nycn` (NYCN #21–#28): parser → review → decisions → publish dry-run → assignee binding → local publisher → local proof runner → federation surface bridge → operator pilot runbook + ladder checker. Procedural spine for walking organizer material into ICN action-item proofs without an agent in the loop. **Note:** the ladder runs against a localhost ICN gateway only; K3s exercise lives ICN-side under #1677, not in the NYCN repo.
 - [ ] Action-card runtime — remaining gates under #1646 (RFC-gated): `signal_rule` source path (gated on #1631); `obligation_lifecycle` source path (gated on #1634)
 - [ ] One-command deployment script per cooperative
 - [ ] Charter customization workflow documented (charter activation endpoint exists; non-technical workflow doc still missing)
@@ -158,9 +184,12 @@
 **Blockers:**
 - ~~Requires Phase 1 complete~~ ✅ Charter Engine is live
 - ~~Requires bootstrap activation runtime~~ ✅ live charter activation + person-directory + standing read model landed 2026-04-22 → 2026-04-26
-- Requires cooperative partners identified and committed (primary blocker)
+- ~~Requires cooperative partners identified~~ ✅ NYCN is the intended first cooperative partner (active partnership track)
+- Next concrete step: present the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers to formalize the pilot
+- Subsequent gate: partnership formalization, then first operator pilot rehearsal against real (or fixture-equivalent) organizer material
 
 **Decisions Made:**
+- (2026-04-29, post-#1675/#1677, post-NYCN-#28) The Phase 2 *machinery* is now in place end-to-end: (a) action-card runtime is proof-bearing for all currently emitted source paths, (b) the completion-receipt retrieval endpoint exists so a holder shell can read receipts over HTTP, (c) the local HTTP proof loop is closed and documented, (d) the K3s smoke proof loop is closed against deployed image `91a63eec` and documented, and (e) the NYCN drive-ingest operator ladder is merged end-to-end as a procedural spine. NYCN is the intended first cooperative partner (active partnership track); the next concrete step is **presenting the merged ladder + ICN proof-loop machinery to NYCN organizers** to formalize the pilot. Phase 2 remains ⏳ until that presentation, the partnership formalization that follows, and the first operator pilot rehearsal happen and are recorded. The two RFC-gated action-card source paths (`signal_rule`, `obligation_lifecycle`) remain open under #1646 and are independent of the partner gate.
 - (2026-04-27, post-#1663) Action-card runtime is now proof-bearing for **all three currently emitted source paths**: `proposal`/`vote` (#1660), `action_item`/`complete` (#1661), and `meeting`/`attend` (#1663). Issue #1646 remains open for the two RFC-gated paths: `signal_rule` (#1631) and `obligation_lifecycle` (#1634). Phase 2 status is unaffected (still partner-bound).
 - (2026-04-27) Action-card runtime is partial: `/me/action-cards` exists, `proposal`/`vote` and `action_item`/`complete` source paths have verified end-to-end receipt proof loops, and `meeting`/`attend`, `signal_rule`, `obligation_lifecycle` paths remain pending under #1646. Phase 2 status is unaffected.
 - (2026-04-26) Pilot enablement infrastructure (bootstrap, charter activation, role binding, standing) is in place; Phase 2 remains ⏳ until partners run it for real.
