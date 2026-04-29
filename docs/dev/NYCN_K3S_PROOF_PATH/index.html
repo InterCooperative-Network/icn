@@ -50,10 +50,21 @@ into an ICN gateway, obtaining a member-standing projection and
 action-card queue, and the remaining gap to the full
 package-driven action-item completion receipt path.</p>
 <p>It is a <strong>discovery runbook</strong>: the steps it documents have been
-executed against a real local gateway and read-only against the K3s
-deployment. The K3s <code>apply</code> step is documented but deliberately left
-for an explicit operator decision — this runbook does not perform
-cluster mutation.</p>
+executed against a real local gateway (Path A) and against the
+deployed K3s gateway under explicit operator authorization
+(Path B, exercised end-to-end on 2026-04-29 against deployed image
+<code>91a63eec</code> = ICN #1675).</p>
+<p>Path A in this document covers <code>start-gateway-test.sh</code> startup,
+the smoke-fixture apply, and the
+<code>/v1/gov/me/{standing,action-cards}</code> reads. The action-item
+HTTP loop (POST → derived card → PUT → completion-receipt) is
+documented in the sibling
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/NYCN_ACTION_ITEM_RECEIPT_PATH">`NYCN_ACTION_ITEM_RECEIPT_PATH.md`</a>;
+Path B (§B.4) inlines that loop against K3s rather than pointing
+at the sibling, so an operator running Path B end-to-end has a
+single document to follow. The two paths produce the same
+observed behaviour for the steps each documents; persistence and
+cleanup posture differ between them (§B.5).</p>
 <h2>Scope</h2>
 <p>Proves end-to-end:</p>
 <ul>
@@ -192,10 +203,13 @@ verifier accepts the long forms only. The full set is:
 <code>federation:{read,write,admin}</code>, <code>compute:{read,write}</code>,
 <code>constitutional:{read,write,admin}</code>, <code>entity:{read,write,audit}</code>,
 <code>treasury:{read,write}</code>, <code>admin</code>.</p>
-<h2>Path B — K3s deployment (read-only verified; apply pending)</h2>
+<h2>Path B — K3s deployment (operator-confirmed proof loop)</h2>
 <p>Use this when the cluster image is current enough and the operator
-has accepted that smoke entities will persist in cluster state until
-manually cleared.</p>
+has accepted that smoke entities will persist in cluster state
+until manually cleared. Path B has been <strong>exercised end-to-end</strong>
+against the deployed K3s gateway as of 2026-04-29; the transcripts
+below are verbatim. K3s mutation occurred under explicit operator
+authorization recorded in this session.</p>
 <h3>B.1 Confirm cluster reachability and image freshness</h3>
 <pre><code class="language-sh">curl -sS http://10.8.30.40:30080/v1/health
 # {&quot;status&quot;:&quot;ok&quot;,&quot;version&quot;:&quot;0.1.0&quot;,...}
@@ -207,25 +221,42 @@ ssh ubuntu@10.8.30.40 \
   &quot;sudo kubectl -n icn get deployment icn-daemon \
    -o jsonpath=&#39;{.spec.template.spec.containers[0].image}&#39;&quot;
 </code></pre>
-<p><strong>Observed (this session, 2026-04-28):</strong></p>
+<p><strong>Observed (preflight for the operator-authorized proof pass,
+2026-04-29):</strong></p>
 <ul>
-<li>Pod <code>icn-daemon-7544dc7bfc-lkrkt</code> Running 23h on <code>k3s-worker-2</code>.</li>
+<li>Pod <code>icn-daemon-7fb8dd89fb-957bt</code> Running on <code>k3s-worker-2</code>,
+16 minutes since rollout at probe time.</li>
 <li>Service <code>icn-nodeport</code> exposes 8080 → 30080 and 7777 → 30777.</li>
-<li>Deployed image: <code>10.8.30.40:30500/icn:44fc2043409a6437ae74a35e823b74446c2789c8</code>.</li>
+<li>Deployed image:
+<code>10.8.30.40:30500/icn:91a63eec9e86beb06e8bf2aa0251bc38708ac2c0</code>.</li>
+<li>PVCs <code>icn-data</code> (10Gi, <code>atlas-nfs</code>), <code>icn-backups</code> (20Gi),
+<code>etcd-snapshot-backups</code> (5Gi) all <code>Bound</code>.</li>
 </ul>
 <h3>B.2 Verify the deployed image carries the API surface</h3>
-<p>The deployed image is built from ICN commit <code>44fc2043</code> (PR #1663,
-&quot;feat(governance): add meeting attendance receipts&quot;). NYCN main was
-8 commits ahead at the time of writing; none of those commits
-touched runtime code:</p>
-<pre><code class="language-sh">git log --oneline 44fc20434..2438a362 \
-  -- icn/bins/icnctl icn/apps/governance \
-     icn/crates/icn-governance icn/crates/icn-gateway
-# (empty)
-</code></pre>
-<p>All eight commits between are docs/ops/RFC. The deployed image
-therefore exposes the full <code>icnctl institution bootstrap</code> surface
-plus the <code>/v1/gov/me/{standing,action-cards}</code> routes used below.</p>
+<p>The deployed image is built from ICN commit <code>91a63eec</code>, exactly
+PR #1675 (&quot;feat(governance): add completion-receipt endpoint for
+action items&quot;). The image therefore carries:</p>
+<ul>
+<li>the <code>icnctl institution bootstrap</code> surface (apply / validate /
+plan, since pre-#1675),</li>
+<li><code>/v1/gov/me/{standing,action-cards}</code> (since #1659),</li>
+<li><code>/v1/gov/domains/{domain_id}/action-items[/{item_id}[/status|/notes|/completion-receipt]]</code>
+(the new completion-receipt route landed in #1675), and</li>
+<li>the per-handler 409→<code>Completed</code> idempotency coercion verified
+by <code>nycn_bootstrap_apply_idempotent</code> and the per-create-op stub
+tests in <code>bins/icnctl/src/institution_bootstrap.rs</code>.</li>
+</ul>
+<p>A bare-no-auth probe on this route is <strong>not</strong> a route-existence
+check: the entire <code>/v1/gov</code> scope is wrapped in auth middleware
+(see <code>crates/icn-gateway/src/server.rs</code> around the <code>/gov</code> scope
+configuration), so any path under it returns <code>401</code> to a
+no-auth call regardless of whether the specific route is
+mounted. The honest route-existence probe is authenticated and
+relies on the handler&#39;s specific 404 message — see §B.4.4 below,
+where a <code>GET .../completion-receipt</code> with a valid JWT and a
+random UUID returns <code>HTTP 404 — No completion receipt found for action item: ...</code> (handler-emitted) rather than a generic
+actix not-found. That distinguishes a mounted route from a
+missing one on a hypothetical pre-#1675 image.</p>
 <h3>B.3 Confirm endpoints exist and accept auth (read-only)</h3>
 <pre><code class="language-sh">TOKEN=$(ICN_KEYSTORE_PASSPHRASE=&#39;smoke-test-passphrase&#39; \
   &lt;icn-repo-root&gt;/icn/target/debug/icnctl \
@@ -247,9 +278,14 @@ curl -sS -H &quot;Authorization: Bearer $TOKEN&quot; \
 <p>Both responses are well-formed empty projections — the expected
 output for a DID with no standing or assigned cards on the cluster.
 This proves the routes are live and JWT-bound on K3s.</p>
-<h3>B.4 Apply against K3s (operator decision required)</h3>
-<p>The apply command for K3s mirrors the local one with a different
-gateway:</p>
+<h3>B.4 Apply, drive, and retrieve against K3s</h3>
+<p>Operator authorization recorded for the 2026-04-29 pass. The
+sequence below mirrors Path A §§A.2–A.3 and the local action-item
+loop in <a href="https://github.com/InterCooperative-Network/icn/blob/main/NYCN_ACTION_ITEM_RECEIPT_PATH">`NYCN_ACTION_ITEM_RECEIPT_PATH.md`</a>,
+with <code>--gateway http://10.8.30.40:30080</code> instead of localhost.
+Smoke ids stay namespaced (<code>nycn-icnctl-smoke-*</code>) so the
+persistent records are identifiable.</p>
+<p><strong>B.4.1 Apply.</strong></p>
 <pre><code class="language-sh">ICN_KEYSTORE_PASSPHRASE=&#39;smoke-test-passphrase&#39; \
   &lt;icn-repo-root&gt;/icn/target/debug/icnctl \
   --data-dir /tmp/icnctl-bootstrap-test \
@@ -258,10 +294,139 @@ gateway:</p>
   --gateway http://10.8.30.40:30080 \
   --coop-id smoke-test-coop
 </code></pre>
-<p>Before running this command, the operator must accept the
-constraints in §B.5 below. This runbook does not execute it; the
-local apply at §A.2 produces equivalent code-path coverage with no
-cluster persistence.</p>
+<p>Verbatim:</p>
+<pre><code>Charter status:  valid
+Completed:       3
+Deferred:        0
+Unsupported:     1
+Failed:          no
+
+Completed steps:
+  - validate charter ...
+  - create Federation entity nycn-icnctl-smoke-federation:
+    created entity as
+    entity:icn:federation:nycn-icnctl-smoke-federation;
+    governance domain alias nycn-icnctl-smoke-federation-gov
+    recorded for subsequent provisioning
+  - provision governance domain nycn-icnctl-smoke-federation-gov:
+    provisioned governance domain as
+    nycn-icnctl-smoke-federation-gov
+
+Unsupported steps:
+  - store charter: ...
+
+Alias bindings:
+  - nycn-icnctl-smoke-federation -&gt;
+    entity:icn:federation:nycn-icnctl-smoke-federation
+</code></pre>
+<p><strong>B.4.2 JWT + standing + cards-before.</strong></p>
+<pre><code class="language-sh">TOKEN=$(ICN_KEYSTORE_PASSPHRASE=&#39;smoke-test-passphrase&#39; \
+  &lt;icn-repo-root&gt;/icn/target/debug/icnctl \
+  --data-dir /tmp/icnctl-bootstrap-test \
+  auth token \
+  --gateway http://10.8.30.40:30080 \
+  --coop-id smoke-test-coop \
+  --scopes &quot;governance:read,governance:write,entity:read&quot; \
+  | grep -E &quot;^eyJ&quot; | head -1)
+
+curl -sS http://10.8.30.40:30080/v1/gov/me/standing \
+  -H &quot;Authorization: Bearer $TOKEN&quot;
+</code></pre>
+<p>Verbatim:</p>
+<pre><code class="language-json">{
+  &quot;did&quot;: &quot;did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk&quot;,
+  &quot;domains&quot;: [
+    {
+      &quot;domain_id&quot;: &quot;nycn-icnctl-smoke-federation-gov&quot;,
+      &quot;domain_name&quot;: &quot;NYCN icnctl Smoke Federation Governance&quot;,
+      &quot;membership_source&quot;: &quot;static_list&quot;,
+      &quot;status&quot;: &quot;member&quot;
+    }
+  ],
+  &quot;roles&quot;: [],
+  &quot;authority_scopes&quot;: [],
+  &quot;generated_at&quot;: 1777424370
+}
+</code></pre>
+<p><code>/me/action-cards</code> before any action-item creation returns the
+expected empty projection (<code>{&quot;did&quot;: &quot;...&quot;, &quot;cards&quot;: [], ...}</code>).</p>
+<p><strong>B.4.3 Create + complete + retrieve.</strong></p>
+<pre><code class="language-sh">DID=&quot;did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk&quot;
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+
+# Create
+curl -sS -X POST \
+  http://10.8.30.40:30080/v1/gov/domains/nycn-icnctl-smoke-federation-gov/action-items \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &#39;Content-Type: application/json&#39; \
+  -d &quot;{\&quot;title\&quot;:\&quot;k3s-smoke proof item $TS\&quot;,
+       \&quot;description\&quot;:\&quot;Repo-safe placeholder action item driving the K3s proof loop.\&quot;,
+       \&quot;assignee\&quot;:\&quot;$DID\&quot;,
+       \&quot;priority\&quot;:\&quot;medium\&quot;,
+       \&quot;tags\&quot;:[\&quot;k3s-smoke\&quot;,\&quot;icnctl-smoke\&quot;]}&quot;
+</code></pre>
+<p>Returned <code>id</code>: <code>6aa137e4-004c-4902-b011-583e123336f8</code>. The
+post-create <code>/me/action-cards</code> query returns one
+<code>source_kind: action_item, action_kind: complete, authority_basis: assigned_action_item, receipt_expected: true</code>
+card with <code>source_id</code> matching the new item.</p>
+<pre><code class="language-sh">ITEM_ID=&quot;6aa137e4-004c-4902-b011-583e123336f8&quot;
+
+# Complete
+curl -sS -X PUT \
+  &quot;http://10.8.30.40:30080/v1/gov/domains/nycn-icnctl-smoke-federation-gov/action-items/$ITEM_ID/status&quot; \
+  -H &quot;Authorization: Bearer $TOKEN&quot; \
+  -H &#39;Content-Type: application/json&#39; \
+  -d &#39;{&quot;status&quot;:&quot;completed&quot;}&#39;
+# 200 + status:completed in the body
+
+# /me/action-cards now empty (card derivation drops completed items)
+
+# Retrieve receipt
+curl -sS \
+  &quot;http://10.8.30.40:30080/v1/gov/domains/nycn-icnctl-smoke-federation-gov/action-items/$ITEM_ID/completion-receipt&quot; \
+  -H &quot;Authorization: Bearer $TOKEN&quot;
+</code></pre>
+<p>Verbatim:</p>
+<pre><code class="language-json">{
+  &quot;item_id&quot;: &quot;6aa137e4-004c-4902-b011-583e123336f8&quot;,
+  &quot;domain_id&quot;: &quot;nycn-icnctl-smoke-federation-gov&quot;,
+  &quot;actor_did&quot;: &quot;did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk&quot;,
+  &quot;transition&quot;: &quot;completed&quot;,
+  &quot;completed_at&quot;: 1777424395,
+  &quot;record_hash&quot;: [93,71,129,141,33,247,155,144,241,70,254,206,98,90,118,170,220,75,44,4,230,138,233,197,194,162,255,188,197,26,246,183]
+}
+</code></pre>
+<p>Every persisted field round-trips on the wire.</p>
+<p><strong>B.4.4 Negative-path spot checks (each verified live against
+this same K3s deployment).</strong></p>
+<ul>
+<li>No auth → <code>HTTP 401</code> (route present, JWT required).</li>
+<li>Random UUID with no completed transition →
+<code>HTTP 404 — No completion receipt found for action item: 00000000-0000-0000-0000-000000000000</code>.</li>
+<li>Malformed UUID in path →
+<code>HTTP 400 — Invalid action item ID: ...</code> (parse error from
+<code>parse_action_item_id</code>, before any DB lookup).</li>
+<li>Same item id under a non-existent domain →
+<code>HTTP 404 — Domain not found: some-other-domain</code> (precondition
+branch; cross-domain existence is not leaked).</li>
+</ul>
+<p><strong>B.4.5 Idempotent re-apply.</strong></p>
+<p>A second <code>icnctl institution bootstrap apply</code> against the same
+gateway with the same data-dir / coop-id returns the same
+<code>Completed: 3, Failed: 0</code> shape, with the create steps reporting
+&quot;already exists&quot;:</p>
+<pre><code>Completed steps:
+  - validate charter ...
+  - create Federation entity nycn-icnctl-smoke-federation:
+    entity entity:icn:federation:nycn-icnctl-smoke-federation
+    already exists
+  - provision governance domain nycn-icnctl-smoke-federation-gov:
+    governance domain nycn-icnctl-smoke-federation-gov already
+    exists
+</code></pre>
+<p>This matches the local Path A §A.2 idempotency confirmation and
+the unit-test guarantees in
+<code>bins/icnctl/src/institution_bootstrap.rs</code>.</p>
 <h3>B.5 Idempotency, cleanup, persistence</h3>
 <p><strong>Idempotency</strong> — <code>bins/icnctl/src/institution_bootstrap.rs</code> carries
 the test <code>nycn_bootstrap_apply_idempotent</code> plus per-operation 409
@@ -272,15 +437,26 @@ so a repeated apply is safe.</p>
 or generic delete-entity command. The <code>icnctl institution</code> surface
 exposes only <code>bootstrap {validate,plan,apply}</code> (verify with
 <code>target/debug/icnctl institution bootstrap --help</code>); no top-level
-<code>entity</code> subcommand exists in <code>icnctl --help</code>. Smoke records
-therefore persist in the daemon&#39;s Sled store until that store is
-cleared manually:</p>
+<code>entity</code> subcommand exists in <code>icnctl --help</code>. The action-item
+HTTP surface does include <code>DELETE /v1/gov/domains/{domain_id}/action-items/{item_id}</code>
+(creator-only), but no equivalent for the federation entity or
+governance domain seeded by bootstrap apply.</p>
+<p>Smoke records therefore persist in the daemon&#39;s Sled store until
+that store is cleared manually:</p>
 <ul>
 <li>For local: <code>rm -rf /tmp/icn-bootstrap-test</code> after stopping <code>icnd</code>.</li>
-<li>For K3s: a record is written into the persistent volume backing
-<code>icn-daemon</code>. Removing it requires either a targeted entity-delete
-endpoint (does not currently exist as part of the public surface)
-or PV reset.</li>
+<li><strong>For K3s (after the 2026-04-29 pass)</strong>: one federation entity
+(<code>entity:icn:federation:nycn-icnctl-smoke-federation</code>), one
+governance domain (<code>nycn-icnctl-smoke-federation-gov</code>), and one
+completed action item (<code>6aa137e4-004c-4902-b011-583e123336f8</code>,
+with its persisted <code>ActionItemCompletionReceipt</code> under the
+<code>receipt:action_item_completion:rec:</code> / <code>:by_item:</code> Sled
+prefixes) live in the cluster&#39;s persistent gateway store
+(PVC <code>icn-data</code>, <code>atlas-nfs</code>-backed). Removing them requires
+either a targeted entity-delete endpoint (does not currently
+exist as part of the public surface) or a PV reset. These
+records are devnet proof artifacts; the namespaced ids make
+them identifiable when reviewing cluster state.</li>
 </ul>
 <p><strong>Naming hygiene</strong> — the smoke fixture&#39;s <code>package_id</code>
 (<code>nycn-icnctl-smoke</code>), entity id
