@@ -6,6 +6,30 @@ Last Reviewed: 2026-04-29
 
 # ICN State (living doc)
 
+<!-- [sync edit] 2026-04-29 (post-NYCN-#32, ICN PR queue clean):
+     NYCN drive-ingest work has continued past the operator
+     ladder + runbook landed in #28. Now also merged on the
+     NYCN side: organizer briefing + simple summit demo (#29);
+     start-here onboarding pass with quickstarts and glossary
+     (#30); one-command local preflight runner (#31); whole-
+     NYCN operating-surfaces inventory + Google-Groups boundary
+     policy + repo-safe communication-groups fixture (#32). A
+     small steward-facing communication-groups directory tool
+     was open as NYCN #33 at last sync and may have merged
+     since — verify before reading. ICN PR #1665 (Dependabot
+     TS SDK dev-deps) merged 2026-04-29; ICN open-PR queue is
+     empty as of this sync. The cooperator-developer prep
+     brief landed alongside this sync at
+     docs/strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md.
+     Phase 2 framing unchanged from the prior sync: NYCN is
+     the intended first cooperative partner (not yet formally
+     committed); the next concrete step is presenting the
+     merged ladder + ICN proof-loop machinery to NYCN
+     organizers; partnership formalization and first operator
+     pilot rehearsal remain. Issue #1646 still open;
+     signal_rule and obligation_lifecycle source paths remain
+     RFC-gated. -->
+
 <!-- [sync edit] 2026-04-29 (post-#1675/#1677, post-NYCN-#28):
      Action-item completion-receipt retrieval endpoint is now live
      (`GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt`,
@@ -56,12 +80,14 @@ Last Reviewed: 2026-04-29
 ## Current status (2026-04-29 snapshot)
 
 **Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers to formalize the pilot. Subsequent gates: partnership formalization, then first operator pilot rehearsal against real (or fixture-equivalent) organizer material. The Phase 2 *machinery* is in place end-to-end; what remains is the human procedure — pitch, formalize, rehearse — and recording each step.
-Active execution: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN's drive-ingest operator ladder (#21–#28 in `fahertym/nycn`) is now merged end-to-end, providing the procedural spine that walks organizer material into ICN action-item proofs. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
+Active execution: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN's drive-ingest operator ladder (NYCN #21–#28 in `fahertym/nycn`) is merged end-to-end, with subsequent NYCN #29–#32 also merged: organizer briefing + summit demo, start-here onboarding pass, one-command local preflight runner, and whole-NYCN operating-surfaces inventory plus Google-Groups boundary policy. NYCN #33 (steward-facing communication-groups directory tool) was open at last sync and may have merged since. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
 
 ### Recently merged (since 2026-04-15)
 
 | PR | Title | Merged |
 |----|-------|--------|
+| #1678 | docs(state): sync to post-#1675/#1677 and post-NYCN-#28 reality | 2026-04-29 |
+| #1665 | deps(ts-sdk): bump the dev-dependencies group in /sdk/typescript with 2 updates | 2026-04-29 |
 | #1677 | docs(dev): record K3s NYCN action-item receipt proof path | 2026-04-29 |
 | #1676 | docs(dev): record action-item completion receipt endpoint | 2026-04-29 |
 | #1675 | feat(governance): add completion-receipt endpoint for action items | 2026-04-29 |
@@ -114,9 +140,7 @@ Active execution: institutional-operability runtime (live charter activation, pe
 
 ### Open PRs
 
-| PR | Title | Branch | Status |
-|----|-------|--------|--------|
-| #1665 | deps(ts-sdk): bump the dev-dependencies group in /sdk/typescript with 2 updates | dependabot/npm_and_yarn/sdk/typescript/dev-dependencies-ea513a49e7 | Open — required CI green; `claude-review` 15-min timeout (never blocks merge); `mergeStateStatus: BEHIND` (sync against main before merge) |
+_(none — ICN PR queue is empty as of this sync. All recent activity is on the NYCN side.)_
 
 ### What landed since Phase 1 (Charter Engine)
 
@@ -141,6 +165,11 @@ NYCN drive-ingest operator ladder (added 2026-04-29; lives in `fahertym/nycn`):
 - Local proof runner (`drive-ingest-local-proof/v1`; walks `/me/action-cards` → `PUT .../status` → `GET .../completion-receipt`) — NYCN #26
 - Federation surface bridge (`drive-ingest-federation-surface/v1`; pure file-in/file-out summary records keyed on the cross-node deterministic blake3 `record_hash` from `ActionItemCompletionReceipt`) — NYCN #27
 - Operator pilot runbook + no-network ladder checker — NYCN #28
+- Organizer briefing + simple summit demo (partner-facing, civic tone, anti-pitch) — NYCN #29
+- Start-here onboarding pass (`START_HERE.md`, `ORGANIZER_QUICKSTART.md`, `STEWARD_QUICKSTART.md`, `GLOSSARY.md`) — NYCN #30
+- One-command local preflight runner (`local_preflight_runner` orchestrating the full chain in a single deterministic, no-network run; preserves both human-review boundaries) — NYCN #31
+- Whole-NYCN operating-surfaces inventory + Google-Groups boundary policy + repo-safe communication-groups fixture (no live sync, no private data committed) — NYCN #32
+- Steward-facing communication-groups directory tool (`tools/nycn-ops`; pure file-in / file-out validator + renderer) — NYCN #33 (open at last sync; verify status before reading)
 - The ladder defends a hard mutation boundary: every layer is either pure (no network) or localhost-only operator-gated. K3s mutation is never allowed by NYCN-side tools. ICN-side K3s exercise lives in `docs/dev/NYCN_K3S_PROOF_PATH.md` (#1677), not in the NYCN repo.
 
 Institutional-operability runtime (added 2026-04-22 → 2026-04-26):
