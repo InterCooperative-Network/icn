@@ -178,6 +178,20 @@ Configuration files and environment settings:
 - [glossary.md](glossary.md) - Terminology and definitions
 - [examples/policies/README.md](examples/policies/README.md) - Policy examples
 
+### Project Index (`reference/project-index/`)
+
+Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to [STATE.md](STATE.md) and [PHASE_PROGRESS.md](PHASE_PROGRESS.md) for current truth.
+
+- [README.md](reference/project-index/README.md) - Project-index orientation and "Start here by role"
+- [current-truth-map.md](reference/project-index/current-truth-map.md) - What is real now, what is not, open gates and risks
+- [source-tree-map.md](reference/project-index/source-tree-map.md) - Top-level repo surfaces and what each is for
+- [rust-workspace-map.md](reference/project-index/rust-workspace-map.md) - The `icn/` Rust workspace grouped by rough layer
+- [docs-control-map.md](reference/project-index/docs-control-map.md) - INDEX, registry, validator, truth classes, how to add a doc
+- [runtime-surface-map.md](reference/project-index/runtime-surface-map.md) - Real runtime surfaces (member standing, action cards, completion-receipt retrieval)
+- [pilot-and-nycn-map.md](reference/project-index/pilot-and-nycn-map.md) - The ICN ↔ NYCN boundary; intended-first-partner framing
+- [ci-ops-deploy-map.md](reference/project-index/ci-ops-deploy-map.md) - Workflows, deploy paths, K3s smoke runbooks
+- [show-readiness-map.md](reference/project-index/show-readiness-map.md) - What can be shown now, what should not be shown as finished, red lines
+
 ---
 
 ## 📚 User & Developer Guides
