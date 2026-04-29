@@ -302,46 +302,44 @@ cleared manually:
 (`nycn-icnctl-smoke-federation-gov`) are namespaced specifically so
 operators can identify smoke records when reviewing cluster state.
 
-## Remaining gap to full pilot loop
+## Action-producing follow-on (now closed locally)
 
 The full target loop is
 
 > NYCN package → bootstrap → standing → action card → action_item
 > complete → `ActionItemCompletionReceipt`
 
-The gap between this runbook and that loop is the absence of an
-**action-producing seed step**. `icnctl institution bootstrap apply`
-operates on the seed kinds enumerated in
-`crates/icn-governance/src/bootstrap.rs`:
+`icnctl institution bootstrap apply` itself only operates on the
+seed kinds enumerated in `crates/icn-governance/src/bootstrap.rs`
+(`EntitySeed | GovernanceDomainSeed | StructureSeed |
+ActivityProgramSeed | MilestoneTemplateSeed | RoleAssignmentSeed |
+PersonDirectorySeed`); none of these creates an action item, open
+proposal, or meeting-attendance state, so a freshly bootstrapped
+node has an empty action-card queue.
 
-```
-EntitySeed | GovernanceDomainSeed | StructureSeed |
-ActivityProgramSeed | MilestoneTemplateSeed |
-RoleAssignmentSeed | PersonDirectorySeed
-```
+The chosen bridge — option 1 below — was the post-bootstrap HTTP
+runbook, and is now landed:
 
-None of these creates an action item, open proposal, or meeting
-attendance state. Verified via the canonical fixture's plan:
-22 ops, no action_item / proposal / meeting operation among them.
+1. **Post-bootstrap HTTP runbook**: see
+   [`NYCN_ACTION_ITEM_RECEIPT_PATH.md`](./NYCN_ACTION_ITEM_RECEIPT_PATH.md).
+   Drives `POST /v1/gov/domains/{id}/action-items` →
+   `PUT .../status` → `GET .../completion-receipt` against a
+   bootstrapped local gateway. The receipt-retrieval endpoint
+   landed in [ICN #1675](https://github.com/InterCooperative-Network/icn/pull/1675)
+   (`91a63eec` on `main`). The local HTTP proof loop is therefore
+   complete end-to-end.
 
-Two viable paths forward, both narrow:
+2. **(Not pursued.) New seed kind**: a generic `ActionItemSeed`
+   that the bootstrap loader maps to `POST /domains/{id}/action-items`
+   during apply. Still a viable future option if a package-driven
+   bootstrap should produce action items without an explicit
+   post-bootstrap HTTP step. Not a blocker for the loop today.
 
-1. **Post-bootstrap HTTP step**: a runbook (NYCN-side) that drives an
-   action_item create + complete via the existing gateway HTTP
-   surface after this fixture has been applied. The gateway already
-   exposes those endpoints — this is a runbook, not new ICN
-   primitives.
-
-2. **New seed kind**: a generic `ActionItemSeed` that the bootstrap
-   loader maps to a `POST /domains/{id}/action-items` (or whatever
-   the canonical create endpoint is) during apply. This is an
-   ICN-side extension and warrants its own narrow PR; do not
-   conflate with the smoke fixture.
-
-The ICN-side proof that the proof loop itself is wired correctly
-already exists, in-process and not via the package surface, in
-`apps/governance/tests/me_action_item_receipt_chain.rs` — verified
-6/6 passing this session against `2438a362`.
+The ICN-side in-process integration tests
+(`apps/governance/tests/me_action_item_receipt_chain.rs`) cover the
+same loop — 11 tests passing on `91a63eec` (extends the original
+6 with 4 endpoint tests from #1675 and one canonicalization test
+added during #1675 review).
 
 ## Quick spot-check (NYCN smoke fixture loadability)
 
