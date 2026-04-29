@@ -38,8 +38,30 @@
 </script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>PHASE PROGRESS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/PHASE_PROGRESS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Phase Progress</h1>
-<p><strong>Last Updated:</strong> 2026-04-27
-<strong>Current Phase:</strong> Phase 2 — Pilot Launch (still blocked on cooperative partners; institutional-operability infrastructure and the action-card runtime are now in place — all currently emitted source paths are proof-bearing)</p>
+<p><strong>Last Updated:</strong> 2026-04-29
+<strong>Current Phase:</strong> Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot); the next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers to formalize the pilot. Subsequent gates: partnership formalization, then first operator pilot rehearsal. Institutional-operability infrastructure, the action-card runtime, the action-item completion-receipt retrieval endpoint, and the NYCN drive-ingest operator ladder are all in place; all currently emitted source paths are proof-bearing both locally and on K3s.</p>
+<!-- [sync edit] 2026-04-29 (post-#1675/#1677, post-NYCN-#28):
+     Phase 2 framing change. NYCN is the intended first
+     cooperative partner; not yet a formally committed pilot.
+     We are no longer blocked on partner identification — the
+     active partnership track is NYCN — but the next concrete
+     step is presenting the merged drive-ingest ladder + ICN
+     proof-loop machinery to NYCN organizers to formalize the
+     pilot. Subsequent gates: partnership formalization, then
+     first operator pilot rehearsal against real (or fixture-
+     equivalent) organizer material. Phase 2 deliverables list
+     extended to record: completion-receipt retrieval endpoint
+     (GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt)
+     shipped as #1675; local HTTP proof loop closure documented
+     in #1676; K3s smoke proof closure against deployed image
+     91a63eec recorded in #1677; NYCN drive-ingest operator
+     ladder merged end-to-end (NYCN #21–#28 in fahertym/nycn):
+     parser → review → decisions → publish dry-run → assignee
+     binding → local publisher → local proof runner → federation
+     surface bridge → operator pilot runbook + ladder checker.
+     These landings do not flip Phase 2 to ✅ on their own. -->
+
+
 <!-- [sync edit] 2026-04-27 (post-#1663): Phase 2 status unchanged (still
      blocked on cooperative partners). Action-card runtime now has
      proof-bearing receipt loops for all three currently emitted source
@@ -226,11 +248,11 @@ View source on GitHub →
 </tbody></table>
 <hr>
 <h3>Phase 2: Pilot Launch</h3>
-<p><strong>Status:</strong> ⏳ Blocked (awaiting cooperative partners)
+<p><strong>Status:</strong> ⏳ In progress (NYCN is the intended first cooperative partner — active partnership track, not yet a formally committed pilot; next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers to formalize the pilot)
 <strong>Started:</strong> —
 <strong>Completed:</strong> —
 <strong>Sprint(s):</strong> S19–S20</p>
-<p><strong>Objective:</strong> 3–5 real cooperatives operating on ICN for governance and/or time-credit tracking.</p>
+<p><strong>Objective:</strong> 3–5 real cooperatives operating on ICN for governance and/or time-credit tracking. NYCN is the intended first; additional cooperatives are downstream of a successful first-partner rehearsal.</p>
 <p><strong>Deliverables:</strong></p>
 <ul>
 <li><input checked="" disabled="" type="checkbox"> Pilot runbook (#1222 ✅ closed)</li>
@@ -246,6 +268,10 @@ View source on GitHub →
 <li><input checked="" disabled="" type="checkbox"> Action card → <code>GovernanceDecisionReceipt</code> proof linkage for proposal/vote (#1660) — proof loop verified</li>
 <li><input checked="" disabled="" type="checkbox"> <code>action_item</code>/<code>complete</code> source path emits append-only <code>ActionItemCompletionReceipt</code> (#1661) — proof loop verified</li>
 <li><input checked="" disabled="" type="checkbox"> <code>meeting</code>/<code>attend</code> source path emits append-only <code>MeetingAttendanceReceipt</code> (#1663) — proof loop verified; <code>Present</code>/<code>Remote</code> are receipt-bearing transitions; <code>Absent</code> is not; steward-recorded attendance distinguished by <code>recorded_by</code> vs <code>attendee_did</code></li>
+<li><input checked="" disabled="" type="checkbox"> <code>GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt</code> retrieval endpoint (#1675) — closes the proof loop on the read side so a holder shell can fetch the persisted receipt over HTTP; <code>governance:read</code> scope + domain membership; cross-domain probes rejected</li>
+<li><input checked="" disabled="" type="checkbox"> Local HTTP proof loop closure documented in <code>docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md</code> (#1676)</li>
+<li><input checked="" disabled="" type="checkbox"> K3s smoke proof closure (operator-authorized, deployed image 91a63eec) recorded in <code>docs/dev/NYCN_K3S_PROOF_PATH.md</code> (#1677)</li>
+<li><input checked="" disabled="" type="checkbox"> NYCN drive-ingest operator ladder merged end-to-end in <code>fahertym/nycn</code> (NYCN #21–#28): parser → review → decisions → publish dry-run → assignee binding → local publisher → local proof runner → federation surface bridge → operator pilot runbook + ladder checker. Procedural spine for walking organizer material into ICN action-item proofs without an agent in the loop. <strong>Note:</strong> the ladder runs against a localhost ICN gateway only; K3s exercise lives ICN-side under #1677, not in the NYCN repo.</li>
 <li><input disabled="" type="checkbox"> Action-card runtime — remaining gates under #1646 (RFC-gated): <code>signal_rule</code> source path (gated on #1631); <code>obligation_lifecycle</code> source path (gated on #1634)</li>
 <li><input disabled="" type="checkbox"> One-command deployment script per cooperative</li>
 <li><input disabled="" type="checkbox"> Charter customization workflow documented (charter activation endpoint exists; non-technical workflow doc still missing)</li>
@@ -258,10 +284,13 @@ View source on GitHub →
 <ul>
 <li><del>Requires Phase 1 complete</del> ✅ Charter Engine is live</li>
 <li><del>Requires bootstrap activation runtime</del> ✅ live charter activation + person-directory + standing read model landed 2026-04-22 → 2026-04-26</li>
-<li>Requires cooperative partners identified and committed (primary blocker)</li>
+<li><del>Requires cooperative partners identified</del> ✅ NYCN is the intended first cooperative partner (active partnership track)</li>
+<li>Next concrete step: present the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers to formalize the pilot</li>
+<li>Subsequent gate: partnership formalization, then first operator pilot rehearsal against real (or fixture-equivalent) organizer material</li>
 </ul>
 <p><strong>Decisions Made:</strong></p>
 <ul>
+<li>(2026-04-29, post-#1675/#1677, post-NYCN-#28) The Phase 2 <em>machinery</em> is now in place end-to-end: (a) action-card runtime is proof-bearing for all currently emitted source paths, (b) the completion-receipt retrieval endpoint exists so a holder shell can read receipts over HTTP, (c) the local HTTP proof loop is closed and documented, (d) the K3s smoke proof loop is closed against deployed image <code>91a63eec</code> and documented, and (e) the NYCN drive-ingest operator ladder is merged end-to-end as a procedural spine. NYCN is the intended first cooperative partner (active partnership track); the next concrete step is <strong>presenting the merged ladder + ICN proof-loop machinery to NYCN organizers</strong> to formalize the pilot. Phase 2 remains ⏳ until that presentation, the partnership formalization that follows, and the first operator pilot rehearsal happen and are recorded. The two RFC-gated action-card source paths (<code>signal_rule</code>, <code>obligation_lifecycle</code>) remain open under #1646 and are independent of the partner gate.</li>
 <li>(2026-04-27, post-#1663) Action-card runtime is now proof-bearing for <strong>all three currently emitted source paths</strong>: <code>proposal</code>/<code>vote</code> (#1660), <code>action_item</code>/<code>complete</code> (#1661), and <code>meeting</code>/<code>attend</code> (#1663). Issue #1646 remains open for the two RFC-gated paths: <code>signal_rule</code> (#1631) and <code>obligation_lifecycle</code> (#1634). Phase 2 status is unaffected (still partner-bound).</li>
 <li>(2026-04-27) Action-card runtime is partial: <code>/me/action-cards</code> exists, <code>proposal</code>/<code>vote</code> and <code>action_item</code>/<code>complete</code> source paths have verified end-to-end receipt proof loops, and <code>meeting</code>/<code>attend</code>, <code>signal_rule</code>, <code>obligation_lifecycle</code> paths remain pending under #1646. Phase 2 status is unaffected.</li>
 <li>(2026-04-26) Pilot enablement infrastructure (bootstrap, charter activation, role binding, standing) is in place; Phase 2 remains ⏳ until partners run it for real.</li>
