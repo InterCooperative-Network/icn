@@ -42,11 +42,12 @@ For most CI failures, fix the smallest thing CI is asking for. The full table li
 
 | Target | Where | Notes |
 |---|---|---|
-| Native / systemd | [`deploy/native/`](../../../deploy/native/) | Single-node systemd unit. |
-| Docker Compose | [`deploy/docker/`](../../../deploy/docker/), [`docker/`](../../../docker/) | Local 3-node devnet. See [`devnet`](../../../) skill. |
-| Kubernetes | [`deploy/k8s/`](../../../deploy/k8s/) | Plain manifests. |
+| Native / systemd | [`deploy/icnd.service`](../../../deploy/icnd.service), [`deploy/install.sh`](../../../deploy/install.sh) | Single-node systemd unit. |
+| Docker Compose | [`deploy/compose/`](../../../deploy/compose/), [`deploy/docker-compose.yml`](../../../deploy/docker-compose.yml) | Local multi-node deployment. |
+| Local devnet | [`deploy/devnet/`](../../../deploy/devnet/) | Local 3-node Docker Compose cluster. See the `devnet` skill at [`.claude/skills/devnet/SKILL.md`](../../../.claude/skills/devnet/SKILL.md). |
+| Kubernetes | [`deploy/k8s/`](../../../deploy/k8s/), [`deploy/kubernetes/`](../../../deploy/kubernetes/) | Plain manifests. |
 | Helm | [`deploy/helm/`](../../../deploy/helm/) | Helm chart for ICN. |
-| **Live K3s cluster** | (homelab) | Deployed since 2025-12-03. See [`docs/HOMELAB_DEPLOYMENT.md`](../../HOMELAB_DEPLOYMENT.md). |
+| **Live K3s cluster** | (homelab) | Deployed since 2025-12-03. See [`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`](../../operations/deployment/HOMELAB_DEPLOYMENT.md). |
 
 ```bash
 cd deploy/k8s && make full-deploy-dev   # deploy a new image
@@ -102,7 +103,7 @@ Per [`AGENTS.md`](../../../AGENTS.md):
 
 | Topic | Doc |
 |---|---|
-| Live deployment overview | [`docs/HOMELAB_DEPLOYMENT.md`](../../HOMELAB_DEPLOYMENT.md) |
-| Production hardening | [`docs/production-hardening.md`](../../production-hardening.md) |
+| Live deployment overview | [`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`](../../operations/deployment/HOMELAB_DEPLOYMENT.md) |
+| Production hardening | [`docs/security/production-hardening.md`](../../security/production-hardening.md) |
 | Issue and label policy | [`.github/ISSUE_POLICY.md`](../../../.github/ISSUE_POLICY.md) |
 | Per-area verification routing (full table) | [`AGENTS.md`](../../../AGENTS.md) §"Change routing" |

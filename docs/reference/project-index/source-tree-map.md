@@ -50,7 +50,7 @@ test -f Cargo.toml && echo "Rust root" || echo "Not Rust root"
 |---|---|---|
 | `deploy/` | Deployment manifests: native/systemd, Docker Compose, Kubernetes, Helm. | [`deploy/README.md`](../../../deploy/README.md) |
 | `ops/` | Operations tooling, including `ops/mcp` (the MCP server used by Claude Code sessions). | [`ci-ops-deploy-map.md`](ci-ops-deploy-map.md) |
-| `monitoring/` | Prometheus / Grafana configuration. | [`docs/HOMELAB_DEPLOYMENT.md`](../../HOMELAB_DEPLOYMENT.md), [`monitoring/`](../../../monitoring/) |
+| `monitoring/` | Prometheus / Grafana configuration. | [`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`](../../operations/deployment/HOMELAB_DEPLOYMENT.md), [`monitoring/`](../../../monitoring/) |
 | `docker/` | Dockerfiles and image build context. | `docker/README.md` if present, or `Dockerfile.fast` |
 | `scripts/` | Repo-wide shell scripts (multi-agent worktree helper, demo helpers, sync utilities). | `scripts/` listing |
 | `config/` | Sample/runtime configuration. | `config/` listing |

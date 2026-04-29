@@ -21,7 +21,7 @@ These are real and may be presented honestly:
 - **NYCN as the intended first cooperative partner.** Active partnership track. Drive-ingest operator ladder is merged end-to-end on the NYCN side; ICN-side proof paths are documented. The next step is presenting the merged ladder + proof-loop machinery to NYCN organizers.
 - **Member-facing standing / action-card / receipt concept.** The shapes are real and exercised. Show the surfaces ([`runtime-surface-map.md`](runtime-surface-map.md)) and the proof-path docs.
 - **Documentation control plane.** Honest, auditable, versioned: hand-maintained `INDEX.md`, machine-readable `registry.toml`, generated `DOCUMENT_REGISTRY.md`, validator in CI, regulatory-compliance linter on the avoid list. ([`docs-control-map.md`](docs-control-map.md).)
-- **Substrate maturity claims.** ~75% implementation, 6,400+ tests, 35 library crates + 4 runtime apps + 3 binaries, K3s deployment running since 2025-12-03. State these as written; do not extrapolate.
+- **Substrate maturity claims.** ~75% implementation, current test counts as reported in [`docs/STATE.md`](../../STATE.md), 35 library crates + 4 runtime apps + 3 binaries, K3s deployment running since 2025-12-03. State these as written; do not extrapolate.
 
 ## What should not be shown as finished
 

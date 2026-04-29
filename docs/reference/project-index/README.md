@@ -32,7 +32,7 @@ This directory is a **show-ready orientation layer** for the ICN repository. Its
 | **Technical contributor** (writing code) | [`source-tree-map.md`](source-tree-map.md) | [`rust-workspace-map.md`](rust-workspace-map.md), [`AGENTS.md`](../../../AGENTS.md), [`docs/GETTING_STARTED.md`](../../GETTING_STARTED.md) |
 | **Documentation contributor** | [`docs-control-map.md`](docs-control-map.md) | [`docs/INDEX.md`](../../INDEX.md), [`docs/DOCUMENTATION_CONTROL_SYSTEM.md`](../../DOCUMENTATION_CONTROL_SYSTEM.md) |
 | **Designer / accessibility reviewer** | [`runtime-surface-map.md`](runtime-surface-map.md) | [`docs/design-language/brief-v0.md`](../../design-language/brief-v0.md), [`docs/architecture/MEMBER_STANDING.md`](../../architecture/MEMBER_STANDING.md) |
-| **Operator / infra person** | [`ci-ops-deploy-map.md`](ci-ops-deploy-map.md) | [`docs/HOMELAB_DEPLOYMENT.md`](../../HOMELAB_DEPLOYMENT.md), [`deploy/README.md`](../../../deploy/README.md) |
+| **Operator / infra person** | [`ci-ops-deploy-map.md`](ci-ops-deploy-map.md) | [`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`](../../operations/deployment/HOMELAB_DEPLOYMENT.md), [`deploy/README.md`](../../../deploy/README.md) |
 | **Agent / Claude Code session** | [`current-truth-map.md`](current-truth-map.md) | [`docs/ai/ICN_CONSTITUTIONAL_CORE.md`](../../ai/ICN_CONSTITUTIONAL_CORE.md), [`AGENTS.md`](../../../AGENTS.md), [`CLAUDE.md`](../../../CLAUDE.md) |
 
 ## All maps

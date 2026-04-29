@@ -46,7 +46,7 @@ These live in this repo:
 
 ## NYCN-side ladder (in `fahertym/nycn`, summary only)
 
-The NYCN drive-ingest operator ladder is merged end-to-end as NYCN PRs #21–#34 (see `STATE.md` for the per-PR enumeration). Conceptually, it is a procedural spine:
+The NYCN drive-ingest operator ladder is recorded in [`docs/STATE.md`](../../STATE.md) as merged through NYCN #21–#32; NYCN #33 was open at last sync — verify against the latest `STATE.md` sync. See `STATE.md` for the per-PR enumeration. Conceptually, the ladder is a procedural spine:
 
 1. Parser → review artifact
 2. Review decisions YAML (organizer-authored)
