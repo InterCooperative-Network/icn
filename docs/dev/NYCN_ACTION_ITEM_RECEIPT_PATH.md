@@ -1,22 +1,26 @@
 Status: discovery runbook
 Authority: dev runbook
 Audience: ICN developers + NYCN package operators
-Cluster: local gateway (`start-gateway-test.sh`); K3s deferred until receipt-retrieval gap is closed
+Cluster: local gateway (`start-gateway-test.sh`); K3s mutation deferred to explicit operator decision
 
 # NYCN action-item receipt proof path
 
 This runbook closes the gap left open by
 [`NYCN_K3S_PROOF_PATH.md`](./NYCN_K3S_PROOF_PATH.md): driving one
 action item from creation to completion against a real ICN gateway,
-with the smoke fixture's governance domain as the host, and showing
-that the gateway emits an `ActionItemCompletionReceipt`. It also
-documents the remaining narrow gap: there is no HTTP endpoint that
-exposes the persisted receipt back to a caller.
+with the smoke fixture's governance domain as the host, and the
+HTTP retrieval of the resulting `ActionItemCompletionReceipt`. The
+retrieval endpoint
+(`GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt`)
+landed in [ICN #1675](https://github.com/InterCooperative-Network/icn/pull/1675)
+(`91a63eec` on `main`). The runbook is therefore self-checking
+end-to-end over HTTP, with no on-disk Sled inspection.
 
 It is a **discovery runbook**: every transcript below is verbatim
-output from the steps as executed against `icnd 2f732176` (post
-#1673 merge). It does not document what the system is supposed to
-do; it documents what the system did.
+output from the steps as executed (transcripts captured against
+`icnd 2f732176` for steps 1–7; transcripts for the new step 8
+captured against `icnd 91a63eec`). It does not document what the
+system is supposed to do; it documents what the system did.
 
 ## Relationship to `NYCN_K3S_PROOF_PATH.md`
 
@@ -35,11 +39,17 @@ half:
 > `PUT /v1/gov/domains/{id}/action-items/{id}/status` to `completed` →
 > card removed → `ActionItemCompletionReceipt` emitted server-side.
 
-It deliberately does **not** target K3s in this iteration — the
-receipt-retrieval HTTP gap (see "Remaining gap") is the next thing
-to close. Once a retrieval endpoint exists, the same loop can be
-exercised against K3s and verified end-to-end without on-disk
-inspection.
+As originally written this runbook left the receipt-retrieval
+half open and recommended a single GET endpoint. That endpoint
+shipped in [ICN #1675](https://github.com/InterCooperative-Network/icn/pull/1675)
+(merged into `main` at `91a63eec`) and is now part of this runbook
+as Step 8 below. The local HTTP proof loop is therefore complete
+end-to-end without on-disk inspection.
+
+K3s mutation remains an explicit operator decision. This runbook
+does not target K3s end-to-end; once an operator chooses to
+exercise the loop on K3s, the same Step 8 GET applies unchanged
+against `10.8.30.40:30080`.
 
 ## Prerequisites
 
@@ -364,68 +374,86 @@ The presence of either the persistent or temporary gateway store
 is enough to satisfy the manager's `put_action_item_completion`
 invocation; the runtime contract is the same.
 
-## Remaining gap: HTTP retrieval of `ActionItemCompletionReceipt`
+### 8. Retrieve the completion receipt over HTTP
 
-This is the only gate between the runbook and a fully self-checking
-HTTP loop:
+Closed by [ICN #1675](https://github.com/InterCooperative-Network/icn/pull/1675),
+landed on `main` at `91a63eec`. The default recommendation from
+the original "Three narrow next steps" section below — option
+(a), a single read endpoint — shipped. The operator command is
+now part of the runbook proper:
 
-> the gateway has no HTTP endpoint that exposes
-> `get_action_item_completion_by_item` (or its `list_*` sibling).
-
-Confirmed:
-
-```
-$ grep -RIn "get_action_item_completion\|list_action_item_completion" \
-    apps/governance/src/http
-# (empty — handlers do not expose these)
+```sh
+curl -sS \
+  http://127.0.0.1:8085/v1/gov/domains/nycn-icnctl-smoke-federation-gov/action-items/$ITEM_ID/completion-receipt \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
-`icnctl receipts` covers economic-chain receipts (allocations,
-intents, decision hashes — see `bins/icnctl/src/...` and
-`crates/icn-gateway/src/api/receipts.rs`). It does not cover
-action-item completion receipts.
+Verbatim against `icnd 91a63eec` (single line wrapped for
+display; `record_hash` is the full 32-byte
+`Hash`-as-`Vec<u8>` array — `serde_bytes` is not in play, so the
+field serializes as a JSON array of integers):
 
-Until that gap is closed, an operator running this runbook can
-prove steps 1–7 from HTTP responses but must rely on either:
+```json
+{
+  "item_id": "6ef7a6b8-1752-42cc-8a1a-1d9cc0f27d7f",
+  "domain_id": "nycn-icnctl-smoke-federation-gov",
+  "actor_did": "did:icn:zFLjfYPgF2BEg7NMFcxsM498Zd4VPUTvKh7K3XQrD93Tk",
+  "transition": "completed",
+  "completed_at": 1777420018,
+  "record_hash": [250,211,103,51,11,119,225,7,91,248,200,27,79,110,213,227,12,194,218,168,5,8,186,84,115,121,120,123,18,216,151,48]
+}
+```
 
-- `cargo test -p icn-governance-actor --test
-  me_action_item_receipt_chain`
-  (in-process; passes 6/6 on `2f732176`), or
-- a daemon configured with a persistent gateway DB, stopped after
-  the loop, with the on-disk Sled prefix inspected by a small Rust
-  helper that opens the DB read-only and lists the
-  `receipt:action_item_completion:*` prefix.
+Authorization: `governance:read` plus the same domain-membership
+check the rest of the action-item read surface uses.
 
-Neither is a clean HTTP-only operator workflow.
+Negative paths (each verified live against the same daemon):
 
-## Three narrow next steps
+- Missing/invalid token → `HTTP 401`.
+- Malformed UUID in path → `HTTP 400` (parse error from
+  `parse_action_item_id`, before any DB lookup).
+- Caller has a valid token but is not a member of the requested
+  domain → `HTTP 403` (`Only domain members can perform this
+  action ...`). Surfaced by `check_domain_membership` before any
+  receipt-store lookup.
+- Caller asks about a domain that does not exist at all → `HTTP
+  404` (`Domain not found: ...`). Same precondition path as 403,
+  different branch.
+- No receipt persisted for the item, caller is a member → `HTTP 404`.
+- Caller is a member, item id is canonical, but the receipt's
+  stored `domain_id` does not match the path's `domain_id` →
+  `HTTP 404` (does not leak existence across governance domains).
+- Non-canonical UUID variants in the path (uppercase hex, URN form
+  `urn:uuid:...`) — the handler canonicalizes via
+  `parse_action_item_id(&item_id)?.to_string()` before the
+  receipt-store lookup, so all variants resolve to the same
+  persisted record. Pinned by
+  `apps/governance/tests/me_action_item_receipt_chain.rs::completion_receipt_endpoint_canonicalizes_non_canonical_uuids`.
 
-Pick one. All keep this runbook valid; (a) is the smallest:
+This step closes the **local HTTP proof loop**:
 
-(a) **Expose a single HTTP endpoint** —
-`GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt`
-— that wraps `get_action_item_completion_by_item` from the receipt
-backend, requires `governance:read`, and 404s if no receipt exists.
-~50 lines + a targeted handler test. No new primitives. Closes the
-loop and does not change the bootstrap surface.
+> NYCN smoke fixture → bootstrap apply → standing → action card →
+> action_item complete → `ActionItemCompletionReceipt` over HTTP.
 
-(b) **Add `completion_receipt_id` to the `ActionItemResponse`
-JSON** when the item's status is `completed`. The receipt id is
-already available on the receipt the manager just persisted; surface
-it on the existing
-`PUT .../status` response and on `GET .../action-items/{id}`. This
-makes the receipt id visible without adding a new endpoint, but
-still requires (a) to fetch the receipt body itself.
+K3s mutation remains an explicit operator decision. This runbook
+does not prove K3s end-to-end and does not claim Phase 2 is
+complete.
 
-(c) **Add a tiny `icnctl gov action-item completion-receipt --domain
-<id> --item <id>`** subcommand wrapping (a). Useful for the
-operator runbook but a no-op without (a).
+## Future follow-ons (not blocking this runbook)
 
-Default recommendation: do (a). It is the smallest unit of work
-that makes the proof loop self-checking over HTTP and will allow a
-later runbook to verify the receipt against the deployed K3s
-gateway without on-disk inspection. (b) and (c) are nice but
-strictly follow-ons.
+The other two narrow next steps from the original "Three narrow
+next steps" section remain optional, post-#1675 follow-ons:
+
+- **Surface `completion_receipt_id` on the `ActionItemResponse`
+  JSON** when status is `completed`. Saves one round-trip for
+  callers that already know they just completed an item.
+- **Add a tiny `icnctl gov action-item completion-receipt
+  --domain <id> --item <id>`** subcommand wrapping the new
+  endpoint. Useful for operator runbooks but the raw `curl` form
+  documented above is sufficient.
+
+Neither is required for the local HTTP proof loop. Pick them up
+only if a concrete operator workflow demands them.
 
 ## Cleanup
 
