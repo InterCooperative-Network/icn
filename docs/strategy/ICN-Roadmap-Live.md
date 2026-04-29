@@ -48,24 +48,25 @@ recorded.
 
 The cadence formerly tracked here as "Governance Dispatch
 Tranches" continues to advance through executor-wiring work;
-its per-tranche status now lives in
-`docs/architecture/agent-handoff-current.md` and is no longer
+its per-tranche status is reflected in `docs/STATE.md`,
+`docs/PHASE_PROGRESS.md`, and the git log, and is no longer
 re-published in this file. The 2026-04-08 tranche table that
 was here previously is preserved below in the "Historical"
 section for continuity.
 
 > **Rule:** Do not treat the per-sprint sections below as
 > current status. They are historical only. For current state,
-> read `docs/STATE.md`, `docs/PHASE_PROGRESS.md`, git log, and
-> `docs/architecture/agent-handoff-current.md`.
+> read `docs/STATE.md`, `docs/PHASE_PROGRESS.md`, and the git
+> log.
 
 ---
 
 ## Historical: 2026-04-08 tranche snapshot
 
 The Governance Dispatch Tranche table as it stood at the prior
-2026-04-08 sync, retained for continuity. Current tranche status
-lives in `docs/architecture/agent-handoff-current.md`.
+2026-04-08 sync, retained for continuity. Current tranche
+status is reflected in `docs/STATE.md`, `docs/PHASE_PROGRESS.md`,
+and the git log.
 
 | Tranche | Scope | Status (as of 2026-04-08) |
 |---|---|---|
