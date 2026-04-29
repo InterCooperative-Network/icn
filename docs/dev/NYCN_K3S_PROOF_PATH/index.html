@@ -287,42 +287,41 @@ or PV reset.</li>
 (<code>nycn-icnctl-smoke-federation</code>), and governance-domain id
 (<code>nycn-icnctl-smoke-federation-gov</code>) are namespaced specifically so
 operators can identify smoke records when reviewing cluster state.</p>
-<h2>Remaining gap to full pilot loop</h2>
+<h2>Action-producing follow-on (now closed locally)</h2>
 <p>The full target loop is</p>
 <blockquote>
 <p>NYCN package → bootstrap → standing → action card → action_item
 complete → <code>ActionItemCompletionReceipt</code></p>
 </blockquote>
-<p>The gap between this runbook and that loop is the absence of an
-<strong>action-producing seed step</strong>. <code>icnctl institution bootstrap apply</code>
-operates on the seed kinds enumerated in
-<code>crates/icn-governance/src/bootstrap.rs</code>:</p>
-<pre><code>EntitySeed | GovernanceDomainSeed | StructureSeed |
-ActivityProgramSeed | MilestoneTemplateSeed |
-RoleAssignmentSeed | PersonDirectorySeed
-</code></pre>
-<p>None of these creates an action item, open proposal, or meeting
-attendance state. Verified via the canonical fixture&#39;s plan:
-22 ops, no action_item / proposal / meeting operation among them.</p>
-<p>Two viable paths forward, both narrow:</p>
+<p><code>icnctl institution bootstrap apply</code> itself only operates on the
+seed kinds enumerated in <code>crates/icn-governance/src/bootstrap.rs</code>
+(<code>EntitySeed | GovernanceDomainSeed | StructureSeed | ActivityProgramSeed | MilestoneTemplateSeed | RoleAssignmentSeed | PersonDirectorySeed</code>); none of these creates an action item, open
+proposal, or meeting-attendance state, so a freshly bootstrapped
+node has an empty action-card queue.</p>
+<p>The chosen bridge — option 1 below — was the post-bootstrap HTTP
+runbook, and is now landed:</p>
 <ol>
-<li><p><strong>Post-bootstrap HTTP step</strong>: a runbook (NYCN-side) that drives an
-action_item create + complete via the existing gateway HTTP
-surface after this fixture has been applied. The gateway already
-exposes those endpoints — this is a runbook, not new ICN
-primitives.</p>
+<li><p><strong>Post-bootstrap HTTP runbook</strong>: see
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/NYCN_ACTION_ITEM_RECEIPT_PATH">`NYCN_ACTION_ITEM_RECEIPT_PATH.md`</a>.
+Drives <code>POST /v1/gov/domains/{id}/action-items</code> →
+<code>PUT .../status</code> → <code>GET .../completion-receipt</code> against a
+bootstrapped local gateway. The receipt-retrieval endpoint
+landed in <a href="https://github.com/InterCooperative-Network/icn/pull/1675" target="_blank" rel="noopener">ICN #1675</a>
+(<code>91a63eec</code> on <code>main</code>). The local HTTP proof loop is therefore
+complete end-to-end.</p>
 </li>
-<li><p><strong>New seed kind</strong>: a generic <code>ActionItemSeed</code> that the bootstrap
-loader maps to a <code>POST /domains/{id}/action-items</code> (or whatever
-the canonical create endpoint is) during apply. This is an
-ICN-side extension and warrants its own narrow PR; do not
-conflate with the smoke fixture.</p>
+<li><p><strong>(Not pursued.) New seed kind</strong>: a generic <code>ActionItemSeed</code>
+that the bootstrap loader maps to <code>POST /domains/{id}/action-items</code>
+during apply. Still a viable future option if a package-driven
+bootstrap should produce action items without an explicit
+post-bootstrap HTTP step. Not a blocker for the loop today.</p>
 </li>
 </ol>
-<p>The ICN-side proof that the proof loop itself is wired correctly
-already exists, in-process and not via the package surface, in
-<code>apps/governance/tests/me_action_item_receipt_chain.rs</code> — verified
-6/6 passing this session against <code>2438a362</code>.</p>
+<p>The ICN-side in-process integration tests
+(<code>apps/governance/tests/me_action_item_receipt_chain.rs</code>) cover the
+same loop — 11 tests passing on <code>91a63eec</code> (extends the original
+6 with 4 endpoint tests from #1675 and one canonicalization test
+added during #1675 review).</p>
 <h2>Quick spot-check (NYCN smoke fixture loadability)</h2>
 <p>If only validating that the fixture remains shape-compatible with
 the loader, no gateway is required:</p>
