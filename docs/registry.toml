@@ -1940,6 +1940,154 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["operators"]
 
+# ============================================================================
+# REFERENCE — Project Index (show-ready orientation layer)
+# ============================================================================
+
+[docs."docs/reference/project-index/README.md"]
+category = "reference"
+status = "living"
+title = "ICN Project Index"
+description = "Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to STATE.md and PHASE_PROGRESS.md for current truth."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["all"]
+truth_class = "operational"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
+[docs."docs/reference/project-index/current-truth-map.md"]
+category = "reference"
+status = "living"
+title = "Current Truth Map"
+description = "One-screen routing for what is real now, what is not, what gates remain — pointing at STATE.md and PHASE_PROGRESS.md for the per-PR record."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["all"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "phase"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
+[docs."docs/reference/project-index/source-tree-map.md"]
+category = "reference"
+status = "living"
+title = "Source Tree Map"
+description = "Top-level repo surfaces and what each is for; monorepo root vs Rust workspace at icn/."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["contributors", "developers"]
+truth_class = "operational"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "source-tree"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
+[docs."docs/reference/project-index/rust-workspace-map.md"]
+category = "reference"
+status = "living"
+title = "Rust Workspace Map"
+description = "The icn/ Rust workspace grouped by rough layer (kernel, identity, networking, ledger, governance, etc.) plus app crates and binaries. Authority over kernel/app boundaries lives in KERNEL_APP_SEPARATION.md."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["developers", "contributors"]
+truth_class = "operational"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "rust", "workspace"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
+[docs."docs/reference/project-index/docs-control-map.md"]
+category = "reference"
+status = "living"
+title = "Docs Control Map"
+description = "How INDEX.md, registry.toml, DOCUMENT_REGISTRY.md, and doc_control_check.py relate; truth classes; how to add a doc."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["contributors", "agents"]
+truth_class = "operational"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "documentation-control"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
+[docs."docs/reference/project-index/runtime-surface-map.md"]
+category = "reference"
+status = "living"
+title = "Runtime Surface Map"
+description = "Real runtime surfaces a member or app actually touches today (/me/standing, /me/action-cards, completion-receipt retrieval, governance primitives, identity/trust/ledger surfaces)."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "runtime", "api"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
+[docs."docs/reference/project-index/pilot-and-nycn-map.md"]
+category = "reference"
+status = "living"
+title = "Pilot and NYCN Map"
+description = "The ICN ↔ NYCN boundary — what lives in this repo, what lives in the separate fahertym/nycn repo, the mutation boundary, and what the next gates are."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["all"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "pilot", "nycn"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
+[docs."docs/reference/project-index/ci-ops-deploy-map.md"]
+category = "reference"
+status = "living"
+title = "CI / Ops / Deploy Map"
+description = "GitHub Actions workflows, deploy paths, K3s smoke runbooks, monitoring; routing layer to substantive runbooks under guides/operations/."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["operators", "contributors"]
+truth_class = "operational"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "ci", "operations", "deployment"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
+[docs."docs/reference/project-index/show-readiness-map.md"]
+category = "reference"
+status = "living"
+title = "Show-Readiness Map"
+description = "What can be shown now, what should not be shown as finished, suggested first-demo narrative, and red lines for outside-facing material."
+last_updated = "2026-04-29"
+owner = "matt"
+audiences = ["all", "team"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "show-readiness", "communications"]
+recommended_action = "keep"
+last_reviewed = "2026-04-29"
+
 [docs."docs/glossary.md"]
 category = "reference"
 status = "living"
