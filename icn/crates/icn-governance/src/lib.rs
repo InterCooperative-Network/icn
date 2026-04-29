@@ -137,7 +137,8 @@ pub use message::{GovernanceMessage, ProposalOutcome, TallySnapshot};
 pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, GovernanceRule};
 pub use proof::{
     ActionItemCompletionReceipt, ActionItemTransition, GovernanceDecisionAttestation,
-    GovernanceDecisionReceipt, GovernanceProof, GovernanceProofV2, ProofOutcome,
+    GovernanceDecisionReceipt, GovernanceProof, GovernanceProofV2, MeetingAttendanceReceipt,
+    MeetingAttendanceTransition, ProofOutcome,
 };
 pub use proposal::{
     AllocationOption, DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome,

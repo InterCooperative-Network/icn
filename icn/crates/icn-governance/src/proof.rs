@@ -592,6 +592,131 @@ impl ActionItemCompletionReceipt {
     }
 }
 
+// ============================================================================
+// Meeting attendance receipts (ADR-0026 Layer 2 — non-proposal source)
+// ============================================================================
+
+/// Closed taxonomy of attendance transitions that produce a
+/// [`MeetingAttendanceReceipt`].
+///
+/// Only attend-shaped transitions emit a receipt. `AttendanceStatus::Absent`
+/// is intentionally not represented here: absence is recorded as state on
+/// the meeting object but is not a receipt-bearing event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MeetingAttendanceTransition {
+    /// The attendee was present in person.
+    Present,
+    /// The attendee was present remotely (e.g. video).
+    Remote,
+}
+
+/// Cross-node deterministic attendance receipt for a governance meeting.
+///
+/// Sits alongside [`GovernanceDecisionReceipt`] and
+/// [`ActionItemCompletionReceipt`] in ADR-0026 Layer 2. Records the *fact*
+/// of an attendance transition the runtime can attest to, keyed so a
+/// holder shell can locate it via the action card's `source_id`
+/// (`meeting_id`) plus the holder's own DID.
+///
+/// Meeting attendance is steward-recorded: the authenticated caller
+/// (`recorded_by`) and the subject of the record (`attendee_did`) can
+/// differ. Both are bound into the canonical hash.
+///
+/// Equality is anchored to `record_hash`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MeetingAttendanceReceipt {
+    /// Meeting id (string form of `MeetingId`). This is the same string
+    /// the holder's `ActionCard.source_id` carries — it is the link
+    /// between the card and the receipt.
+    pub meeting_id: String,
+    /// Governance domain the meeting lives under.
+    pub domain_id: String,
+    /// DID of the attendee whose attendance this receipt records.
+    pub attendee_did: String,
+    /// DID of the authenticated caller who recorded the attendance. May
+    /// differ from `attendee_did` (steward-recorded attendance).
+    pub recorded_by: String,
+    /// Transition this receipt records. Closed enum; see
+    /// [`MeetingAttendanceTransition`].
+    pub transition: MeetingAttendanceTransition,
+    /// Unix-seconds the transition was recorded.
+    pub recorded_at: u64,
+    /// blake3 canonical record hash binding the fields above.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for MeetingAttendanceReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for MeetingAttendanceReceipt {}
+
+impl MeetingAttendanceReceipt {
+    /// Domain separation tag for canonical meeting-attendance record
+    /// hashes. Distinct from proposal-decision and action-item-completion
+    /// tags so a record can never collide across receipt types.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:meeting_attendance:v1";
+
+    /// Build a new receipt and compute its canonical `record_hash`.
+    pub fn new(
+        meeting_id: String,
+        domain_id: String,
+        attendee_did: String,
+        recorded_by: String,
+        transition: MeetingAttendanceTransition,
+        recorded_at: u64,
+    ) -> Self {
+        let record_hash = Self::compute_record_hash(
+            &meeting_id,
+            &domain_id,
+            &attendee_did,
+            &recorded_by,
+            transition,
+            recorded_at,
+        );
+        Self {
+            meeting_id,
+            domain_id,
+            attendee_did,
+            recorded_by,
+            transition,
+            recorded_at,
+            record_hash,
+        }
+    }
+
+    /// Compute the canonical record hash from the input fields. Inputs
+    /// are length-prefixed under the [`Self::DOMAIN_TAG`] so no two
+    /// distinct field bindings can produce the same hash.
+    pub fn compute_record_hash(
+        meeting_id: &str,
+        domain_id: &str,
+        attendee_did: &str,
+        recorded_by: &str,
+        transition: MeetingAttendanceTransition,
+        recorded_at: u64,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        for field in [meeting_id, domain_id, attendee_did, recorded_by] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        let transition_byte: u8 = match transition {
+            MeetingAttendanceTransition::Present => 0,
+            MeetingAttendanceTransition::Remote => 1,
+        };
+        hasher.update(&[transition_byte]);
+        hasher.update(&recorded_at.to_le_bytes());
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -4,9 +4,19 @@ Coordination artifacts that span RFCs, ADRs, issues, and doc surfaces. These fil
 
 ## The pipeline
 
+> **Ideas enter. The refinery decides what they must become next.**
 > **RFCs explore. ADRs decide. Issues build. Tests prove. The website claims only what the proof supports.**
 
+The refinery layer (pre-RFC intake) lives in [`ops/ideas/`](../ideas/README.md). Most ideas should not become RFCs; they become NYCN package tasks, icn-learn packets, GitHub issues, source reviews, dogfood slices, or get parked. Promotion has thresholds — see [`ops/ideas/templates/promotion-review.md`](../ideas/templates/promotion-review.md).
+
+Cross-repo merge order is fixed by [`PR_STACK_PROTOCOL.md`](PR_STACK_PROTOCOL.md): ICN canonical first, NYCN application second, ICN Academy teaching third.
+
 ```text
+   ops/ideas/ideas.yaml     raw ideas, framing briefs, source reviews,
+                            dogfood slices — pre-RFC intake
+              │
+              │  promotion review (per ops/ideas/templates/)
+              ▼
    rfc_candidates.yaml      unresolved design spaces, no decision yet
               │
               │  promote

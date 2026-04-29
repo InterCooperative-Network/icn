@@ -8,7 +8,7 @@ tags: ["action-cards", "member-shell", "standing", "derived-views", "forward-dir
 supersedes: []
 superseded_by: []
 amends: []
-implementation_status: "partially implemented (vertical slice; proof-loop verified for proposal/vote source path)"
+implementation_status: "partially implemented (vertical slice; proof-loop verified for all three currently-emitted source paths: proposal/vote, action_item/complete, meeting/attend; signal_rule and obligation_lifecycle remain RFC-gated on icn#1631 and icn#1634)"
 references:
   - "ADR-0020 (Bootstrap Activation and Standing Read Model)"
   - "ADR-0025 (Institutional Effect Record Canonical Schema)"
@@ -98,7 +98,7 @@ Derivation is **stateless from the gateway's perspective.** A card is what falls
 
 ## Implementation status
 
-Partially implemented (vertical slice; icn#1646). The handler `GET /v1/gov/me/action-cards` is live; cards derive from `/me/standing` + open governance state for the `proposal`/`vote`, `meeting`/`attend`, and `action_item`/`complete` source paths. The full proof loop `standing → action card → authorized action → receipt` is verified end-to-end for **two** source paths: `proposal`/`vote` (`GovernanceDecisionReceipt` keyed by `proposal_id`, see `icn/apps/governance/tests/me_action_card_receipt_chain.rs`) and `action_item`/`complete` (`ActionItemCompletionReceipt` keyed by `item_id`, see `icn/apps/governance/tests/me_action_item_receipt_chain.rs`). Both pin that the card's `source_id` equals the receipt's primary key string. Issue [#1608](https://github.com/InterCooperative-Network/icn/issues/1608) and the implementation issue [#1646](https://github.com/InterCooperative-Network/icn/issues/1646) remain open — `meeting`/`attend` receipt seam, `signal_rule`, and `obligation_lifecycle` still gate closure.
+Partially implemented (vertical slice; icn#1646). The handler `GET /v1/gov/me/action-cards` is live; cards derive from `/me/standing` + open governance state for the `proposal`/`vote`, `meeting`/`attend`, and `action_item`/`complete` source paths. The full proof loop `standing → action card → authorized action → receipt` is verified end-to-end for **all three currently emitted source paths**: `proposal`/`vote` (`GovernanceDecisionReceipt` keyed by `proposal_id`, see `icn/apps/governance/tests/me_action_card_receipt_chain.rs`); `action_item`/`complete` (`ActionItemCompletionReceipt` keyed by `item_id`, see `icn/apps/governance/tests/me_action_item_receipt_chain.rs`); and `meeting`/`attend` (`MeetingAttendanceReceipt` keyed by `(meeting_id, attendee_did)`, see `icn/apps/governance/tests/me_meeting_attendance_receipt_chain.rs`). For the first two the card's `source_id` equals the receipt's primary key string; for `meeting`/`attend` the card's `source_id` is `meeting_id` and the documented receipt lookup is the `(source_id, caller_did)` pair, since one meeting carries many attendees. Issue [#1608](https://github.com/InterCooperative-Network/icn/issues/1608) and the implementation issue [#1646](https://github.com/InterCooperative-Network/icn/issues/1646) remain open — `signal_rule` (gated on icn#1631) and `obligation_lifecycle` (gated on icn#1634) source paths still gate closure.
 
 To call this `implemented` would require:
 - `GET /me/action-cards` handler in `icn-gateway`.

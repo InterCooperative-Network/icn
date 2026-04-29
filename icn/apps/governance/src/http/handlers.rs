@@ -2826,6 +2826,74 @@ pub async fn add_action_item_note<E: GovernanceEventEmitter + Clone + 'static>(
     Ok(HttpResponse::Ok().json(action_item_to_response(&item)))
 }
 
+/// GET /gov/domains/{domain_id}/action-items/{item_id}/completion-receipt
+/// — Retrieve the latest [`ActionItemCompletionReceipt`] persisted for an
+/// action item, if any.
+///
+/// Closes the proof loop documented in `docs/dev/NYCN_K3S_PROOF_PATH.md`
+/// and `docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md`: a holder shell that
+/// completed an `action_item / complete` action card can read the
+/// `ActionItemCompletionReceipt` back via HTTP, instead of relying on
+/// in-process tests or on-disk Sled inspection.
+///
+/// Authorization mirrors the rest of the action-item read surface:
+/// `governance:read` scope plus domain membership for the caller. The
+/// receipt's bound `domain_id` is also asserted to match the path
+/// parameter so a holder cannot probe across domain boundaries.
+///
+/// Returns:
+/// - 200 with the receipt JSON when a completion receipt has been
+///   persisted for the item under this domain.
+/// - 404 when no receipt exists, when the item id does not match the
+///   stored receipt's `domain_id`, or when the manager has no receipt
+///   store wired (the receipt simply does not exist from the caller's
+///   point of view).
+pub async fn get_action_item_completion_receipt<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let caller_did = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    let (domain_id, item_id) = path.into_inner();
+    let domain = GovernanceDomainId(domain_id);
+    // Validate the item id format before any DB lookup so a malformed
+    // path returns 400, not a missing-record 404. The receipt store
+    // indexes by the canonical lowercase-hyphenated UUID string that
+    // the manager wrote at receipt-emission time
+    // (`ActionItemCompletionReceipt::new(item.id.to_string(), ...)`),
+    // so we canonicalize the parsed id back to a string here. Without
+    // this normalization, a caller passing the same UUID in
+    // alternative-but-valid forms (uppercase hex, URN form,
+    // braces-wrapped) would parse OK but miss the index entry and
+    // receive a spurious 404.
+    let canonical_item_id = parse_action_item_id(&item_id)?.to_string();
+
+    check_domain_membership(&ctx.manager, &domain, &caller_did).await?;
+
+    let receipt = ctx
+        .manager
+        .get_action_item_completion_by_item(&canonical_item_id)
+        .map_err(anyhow_to_api)?
+        .ok_or_else(|| {
+            err_not_found(format!(
+                "No completion receipt found for action item: {canonical_item_id}"
+            ))
+        })?;
+
+    if receipt.domain_id != domain.0 {
+        // Receipt exists for the item id, but under a different
+        // governance domain. From this caller's perspective the receipt
+        // does not exist; do not leak cross-domain existence.
+        return Err(err_not_found(format!(
+            "No completion receipt found for action item: {canonical_item_id}"
+        )));
+    }
+
+    Ok(HttpResponse::Ok().json(receipt))
+}
+
 // ============================================================================
 // Notification digest handler
 // ============================================================================
@@ -3826,6 +3894,13 @@ pub async fn add_attendee<E: GovernanceEventEmitter + Clone + 'static>(
 }
 
 /// PUT /gov/meetings/{meeting_id}/attendance — Mark attendance for a participant.
+///
+/// Routes through `GovernanceManager::update_meeting_attendance` so a
+/// transition into `Present` / `Remote` emits an
+/// `icn_governance::MeetingAttendanceReceipt` (ADR-0026 Layer 2). The
+/// authenticated caller is recorded as `recorded_by`; the request's
+/// `did` is recorded as `attendee_did`. The two may differ —
+/// attendance is steward-recorded, not self-attestation only.
 pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
@@ -3835,8 +3910,9 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
     let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
     let id = MeetingId(meeting_id.into_inner());
     let status = parse_attendance_status(&req.status)?;
+    let recorded_by = parse_did(&claims.sub, "Invalid DID in token")?;
 
-    let mut m = ctx
+    let m = ctx
         .manager
         .get_meeting(&id)
         .map_err(anyhow_to_api)?
@@ -3847,7 +3923,7 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
     check_domain_membership(
         &ctx.manager,
         &GovernanceDomainId(m.domain_id.clone()),
-        &parse_did(&claims.sub, "Invalid DID in token")?,
+        &recorded_by,
     )
     .await?;
 
@@ -3859,15 +3935,15 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
             .json(serde_json::json!({"error": "Cannot modify a completed or cancelled meeting"})));
     }
 
-    let attendee = m
-        .attendees
-        .iter_mut()
-        .find(|a| a.did == req.did)
-        .ok_or_else(|| err_not_found("Attendee not found in this meeting"))?;
+    if !m.attendees.iter().any(|a| a.did == req.did) {
+        return Err(err_not_found("Attendee not found in this meeting"));
+    }
 
-    attendee.status = status;
-    ctx.manager.update_meeting(&m).map_err(anyhow_to_api)?;
-    Ok(HttpResponse::Ok().json(meeting_to_response(&m)))
+    let updated = ctx
+        .manager
+        .update_meeting_attendance(&id, &req.did, status, &recorded_by)
+        .map_err(anyhow_to_api)?;
+    Ok(HttpResponse::Ok().json(meeting_to_response(&updated)))
 }
 
 /// POST /gov/meetings/{meeting_id}/agenda — Add an agenda item.
@@ -5149,7 +5225,11 @@ pub async fn get_my_action_cards<E: GovernanceEventEmitter + Clone + 'static>(
             accessibility_hint:
                 "Meeting accessibility provisions available on request from the host structure."
                     .to_string(),
-            receipt_expected: false,
+            // Attending the meeting emits an `icn_governance::MeetingAttendanceReceipt`
+            // (ADR-0026 Layer 2) keyed by `(meeting_id, caller_did)`. The card's
+            // `source_id` is `meeting_id`; the `(source_id, caller)` pair is the
+            // documented receipt lookup.
+            receipt_expected: true,
             source_id: m.meeting_id,
             domain_id: Some(m.domain_id),
         });

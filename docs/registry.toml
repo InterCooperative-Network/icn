@@ -801,6 +801,62 @@ depends_on = ["docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/archite
 recommended_action = "keep"
 freshness = "current"
 
+[docs."docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md"]
+category = "architecture"
+status = "draft"
+truth_class = "descriptive"
+title = "Cooperative Domain Infrastructure"
+description = "Forward-direction architecture for cooperative institutional infrastructure: institutional domains, sessions, devices, services, workspaces, artifacts, vaults, agreements, DNS bindings, hybrid commons cloud, workstations. Names what is implemented today vs what is future buildout."
+last_updated = "2026-04-27"
+last_reviewed = "2026-04-27"
+owner = "matt"
+audiences = ["developers", "architects"]
+depends_on = ["docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0027-action-card-contract.md", "docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md", "docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md", "docs/rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md"]
+recommended_action = "keep"
+freshness = "current"
+
+[docs."docs/architecture/COOPERATIVE_TOOL_COMMONS.md"]
+category = "architecture"
+status = "draft"
+truth_class = "descriptive"
+title = "Cooperative Tool Commons"
+description = "Forward-direction tool ecosystem: core base tools, specialized suites, third-party tools, manifests, service identities, capability grants, anti-capture rules. Companion to Cooperative Domain Infrastructure."
+last_updated = "2026-04-27"
+last_reviewed = "2026-04-27"
+owner = "matt"
+audiences = ["developers", "architects"]
+depends_on = ["docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0027-action-card-contract.md", "docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md"]
+recommended_action = "keep"
+freshness = "current"
+
+[docs."docs/architecture/MODEL_WORKLOADS_AND_DELIBERATION.md"]
+category = "architecture"
+status = "draft"
+truth_class = "descriptive"
+title = "Model Workloads and Deliberation"
+description = "Forward-direction design for model-driven advisory compute workloads, deliberation packets, model registry, advisory vs deterministic classification, and the rule that compute assists but does not govern."
+last_updated = "2026-04-27"
+last_reviewed = "2026-04-27"
+owner = "matt"
+audiences = ["developers", "architects"]
+depends_on = ["docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md", "docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md"]
+recommended_action = "keep"
+freshness = "current"
+
+[docs."docs/architecture/DOMAIN_ROUTING_AND_DNS_BINDINGS.md"]
+category = "architecture"
+status = "draft"
+truth_class = "descriptive"
+title = "Domain Routing and DNS Bindings"
+description = "Forward-direction design distinguishing institutional domains, icn.zone utility routes, custom public domains, short routes, and binding verification receipts. Companion to Cooperative Domain Infrastructure."
+last_updated = "2026-04-27"
+last_reviewed = "2026-04-27"
+owner = "matt"
+audiences = ["developers", "architects"]
+depends_on = ["docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md", "docs/rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md"]
+recommended_action = "keep"
+freshness = "current"
+
 [docs."docs/architecture/KERNEL_APP_SEPARATION.md"]
 category = "architecture"
 status = "living"

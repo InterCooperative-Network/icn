@@ -3,7 +3,7 @@ id: "0015"
 title: "Public Surface and Learning Repo Architecture"
 status: "draft"
 created: "2026-04-27"
-updated: "2026-04-27"  # implementation status note added — icn-learn repo created (private)
+updated: "2026-04-28"  # ADR-0032 alignment note added — defers to ADR-0032 on canonical truth surface
 authors: ["Matt Faherty"]
 reviewers: []
 related_adr_candidates: ["0028", "0032", "0033", "0034"]
@@ -21,6 +21,19 @@ superseded_by: []
 This RFC clarifies how ICN's public-facing identity is split across multiple domains and across multiple repos, and defines a future learning/onboarding repo (deploying to `learn.icn.zone`) without creating it in this RFC.
 
 **Accepted RFC does not mean implemented.** This RFC is doctrinal coordination; the follow-up work is repo creation and content authoring, both of which happen outside this RFC.
+
+### Relationship to ADR-0032 (accepted)
+
+The **canonical public truth-boundary policy** is owned by [ADR-0032 — Website Truth Boundary](../adr/ADR-0032-website-truth-boundary.md) (status: accepted; implementation_status: implemented). This RFC defers to ADR-0032 on the truth-boundary decision and does **not** present competing canonical-surface options:
+
+- `intercooperative.network` is the canonical ICN public truth surface (per ADR-0032).
+- `icn.zone` is utility routing (short links, QR, redirects, cluster subdomains). Not a truth surface.
+- `learn.icn.zone` is a future teaching surface; the icn-learn repo teaches ICN, it does not define ICN.
+- Institutional authority lives in `InstitutionalDomain`, not in DNS.
+
+This RFC remains **exploratory** for the surface architecture beyond the canonical truth-boundary policy: learning-repo structure, role-based onboarding paths, future adjacent surfaces (`cooperative-systems.org`, `thesync.net`), deployment path for `learn.icn.zone`, and cross-repo content discipline. Where this RFC and ADR-0032 disagree, ADR-0032 wins. Where this RFC discusses surfaces that ADR-0032 does not address, the RFC remains exploratory framing — not accepted policy.
+
+[ADR-0033 — Public Maturity Claims and Evidence Links](../adr/ADR-0033-public-maturity-claims-and-evidence-links.md) further constrains how claims on the canonical site cite evidence. That ADR is `proposed` (linter unbuilt; see `ops/coordination/RFC_ADR_READINESS_AUDIT.md`); this RFC does not relitigate its scope.
 
 ## Summary
 
