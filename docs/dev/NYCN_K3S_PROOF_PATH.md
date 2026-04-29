@@ -16,9 +16,19 @@ It is a **discovery runbook**: the steps it documents have been
 executed against a real local gateway (Path A) and against the
 deployed K3s gateway under explicit operator authorization
 (Path B, exercised end-to-end on 2026-04-29 against deployed image
-`91a63eec` = ICN #1675). Both paths produce the same observed
-behaviour; the divergence is in persistence and cleanup posture
-(see §B.5).
+`91a63eec` = ICN #1675).
+
+Path A in this document covers `start-gateway-test.sh` startup,
+the smoke-fixture apply, and the
+`/v1/gov/me/{standing,action-cards}` reads. The action-item
+HTTP loop (POST → derived card → PUT → completion-receipt) is
+documented in the sibling
+[`NYCN_ACTION_ITEM_RECEIPT_PATH.md`](./NYCN_ACTION_ITEM_RECEIPT_PATH.md);
+Path B (§B.4) inlines that loop against K3s rather than pointing
+at the sibling, so an operator running Path B end-to-end has a
+single document to follow. The two paths produce the same
+observed behaviour for the steps each documents; persistence and
+cleanup posture differ between them (§B.5).
 
 ## Scope
 
@@ -236,15 +246,18 @@ action items"). The image therefore carries:
   by `nycn_bootstrap_apply_idempotent` and the per-create-op stub
   tests in `bins/icnctl/src/institution_bootstrap.rs`.
 
-Confirm the new route is wired by hitting it without auth — a
-bare `401` indicates the route is mounted (vs `404` if the image
-predated #1675):
-
-```sh
-curl -sS -w "\n[%{http_code}]\n" \
-  http://10.8.30.40:30080/v1/gov/domains/nycn-icnctl-smoke-federation-gov/action-items/00000000-0000-0000-0000-000000000000/completion-receipt
-# [401]
-```
+A bare-no-auth probe on this route is **not** a route-existence
+check: the entire `/v1/gov` scope is wrapped in auth middleware
+(see `crates/icn-gateway/src/server.rs` around the `/gov` scope
+configuration), so any path under it returns `401` to a
+no-auth call regardless of whether the specific route is
+mounted. The honest route-existence probe is authenticated and
+relies on the handler's specific 404 message — see §B.4.4 below,
+where a `GET .../completion-receipt` with a valid JWT and a
+random UUID returns `HTTP 404 — No completion receipt found for
+action item: ...` (handler-emitted) rather than a generic
+actix not-found. That distinguishes a mounted route from a
+missing one on a hypothetical pre-#1675 image.
 
 ### B.3 Confirm endpoints exist and accept auth (read-only)
 
@@ -465,7 +478,7 @@ or generic delete-entity command. The `icnctl institution` surface
 exposes only `bootstrap {validate,plan,apply}` (verify with
 `target/debug/icnctl institution bootstrap --help`); no top-level
 `entity` subcommand exists in `icnctl --help`. The action-item
-HTTP surface does include `DELETE /v1/gov/domains/{id}/action-items/{id}`
+HTTP surface does include `DELETE /v1/gov/domains/{domain_id}/action-items/{item_id}`
 (creator-only), but no equivalent for the federation entity or
 governance domain seeded by bootstrap apply.
 
