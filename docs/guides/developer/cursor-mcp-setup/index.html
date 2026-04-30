@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Cursor MCP Setup | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Cursor and Claude MCP Setup | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
@@ -39,24 +39,30 @@
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>developer</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>cursor mcp setup</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/developer/cursor-mcp-setup.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Cursor MCP Setup</h1>
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Cursor and Claude MCP Setup</h1>
 <p>This repo ships a local <code>icn-ops</code> MCP server in <code>ops/mcp</code>.</p>
-<p>The Cursor-specific MCP registration lives in <code>.cursor/mcp.json</code> at the repo root.</p>
+<p>Both Claude Code and Cursor should launch that server from the current checkout, not from a developer-specific absolute path. The project configs therefore use repo-relative paths / commands so the same checkout works on any contributor machine.</p>
 <h2>Config Surfaces</h2>
 <ul>
 <li><code>./.mcp.json</code><ul>
 <li>Repo-local MCP registration used by Claude-oriented workflows in this repo.</li>
-<li>Do not repurpose this file for Cursor-specific worktree setup.</li>
+<li>Starts <code>icn-ops</code> through <code>npm --prefix ./ops/mcp run start:stdio</code>.</li>
+<li>Do not hard-code <code>/home/...</code>, <code>/Users/...</code>, WSL paths, VM names, or homelab host paths here.</li>
 </ul>
 </li>
 <li><code>./.claude/settings.json</code><ul>
 <li>Claude-specific permissions, hooks, and session behavior.</li>
-<li>This file is not the place to register Cursor MCP servers.</li>
+<li>This file is not the place to register MCP servers.</li>
 </ul>
 </li>
 <li><code>./.cursor/mcp.json</code><ul>
 <li>Project-local Cursor MCP registration for the currently opened workspace.</li>
 <li>This is the correct place to wire Cursor to the repo-local <code>icn-ops</code> server.</li>
+</ul>
+</li>
+<li><code>~/.mcp.json</code><ul>
+<li>User-level Claude MCP config.</li>
+<li>Use this only for personal/global servers you want in every workspace.</li>
 </ul>
 </li>
 <li><code>~/.cursor/mcp.json</code><ul>
@@ -65,38 +71,55 @@ View source on GitHub →
 </ul>
 </li>
 </ul>
-<h2>Build The Server</h2>
-<p>The Cursor config points at the built runtime entrypoint:</p>
+<h2>Install Dependencies</h2>
+<p>The checked-in Claude config builds and starts the MCP server automatically, but dependencies must be installed once per checkout:</p>
 <pre><code class="language-bash">cd ops/mcp
 npm ci
-npm run build
 </code></pre>
-<p>Expected output path:</p>
+<h2>Build The Server Manually</h2>
+<p>The runtime entrypoint is:</p>
 <pre><code class="language-text">ops/mcp/dist/index.js
 </code></pre>
-<p>The checked-in Cursor config uses a repo-relative path (<code>./ops/mcp/dist/index.js</code>).
-Cursor resolves this relative to the workspace root (the directory you open in Cursor),
-so it works for any local checkout without modification.</p>
+<p>Build it manually with:</p>
+<pre><code class="language-bash">cd ops/mcp
+npm run build
+</code></pre>
+<p>Claude&#39;s <code>./.mcp.json</code> uses <code>npm --prefix ./ops/mcp run start:stdio</code>, which runs the build before starting the server. Cursor currently points at the built runtime entrypoint directly, so Cursor users should ensure the build exists before reloading the Cursor MCP config.</p>
 <h2>Validate The Runtime</h2>
 <p>You can verify the server manually from the repo root:</p>
-<pre><code class="language-bash">printf &#39;%s\n&#39; &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;initialize&quot;,&quot;params&quot;:{&quot;protocolVersion&quot;:&quot;2024-11-05&quot;,&quot;capabilities&quot;:{},&quot;clientInfo&quot;:{&quot;name&quot;:&quot;cursor-mcp-check&quot;,&quot;version&quot;:&quot;1.0&quot;}}}&#39; \
+<pre><code class="language-bash">printf &#39;%s\n&#39; &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;initialize&quot;,&quot;params&quot;:{&quot;protocolVersion&quot;:&quot;2024-11-05&quot;,&quot;capabilities&quot;:{},&quot;clientInfo&quot;:{&quot;name&quot;:&quot;icn-mcp-check&quot;,&quot;version&quot;:&quot;1.0&quot;}}}&#39; \
   | node ./ops/mcp/dist/index.js
 </code></pre>
 <p>Expected result: a JSON-RPC response containing <code>&quot;serverInfo&quot;:{&quot;name&quot;:&quot;icn-ops&quot;,&quot;version&quot;:&quot;0.1.0&quot;}</code>.</p>
+<h2>Claude Workflow</h2>
+<ol>
+<li><p>Clone the repo anywhere.</p>
+</li>
+<li><p>Install dependencies once:</p>
+<pre><code class="language-bash">cd ops/mcp
+npm ci
+</code></pre>
+</li>
+<li><p>Start Claude Code from the repo root or a parent workspace that loads this repo&#39;s <code>.mcp.json</code>.</p>
+</li>
+<li><p>Confirm the <code>icn-ops</code> server appears in Claude&#39;s MCP UI/tools list.</p>
+</li>
+</ol>
 <h2>Cursor Workflow</h2>
 <ol>
-<li>Open the repo root in Cursor (any local checkout path works).</li>
+<li>Open the repo root in Cursor. Any local checkout path works.</li>
 <li>Ensure <code>ops/mcp/dist/index.js</code> exists. If not, build it.</li>
-<li>Reload the Cursor window so it re-reads <code>.cursor/mcp.json</code></li>
-<li>Confirm the <code>icn-ops</code> server appears in Cursor&#39;s MCP UI/tools list</li>
+<li>Reload the Cursor window so it re-reads <code>.cursor/mcp.json</code>.</li>
+<li>Confirm the <code>icn-ops</code> server appears in Cursor&#39;s MCP UI/tools list.</li>
 </ol>
-<h2>Claude Coexistence</h2>
+<h2>Claude / Cursor Coexistence</h2>
 <ul>
-<li>Claude-side repo MCP wiring is preserved in <code>./.mcp.json</code></li>
-<li>Claude lifecycle and hook configuration stays in <code>./.claude/settings.json</code></li>
-<li>Cursor-side worktree MCP wiring is isolated in <code>./.cursor/mcp.json</code></li>
-<li>This keeps Cursor setup work from mutating user-global config or breaking existing Claude flows</li>
+<li>Claude-side repo MCP wiring lives in <code>./.mcp.json</code>.</li>
+<li>Claude lifecycle and hook configuration stays in <code>./.claude/settings.json</code>.</li>
+<li>Cursor-side worktree MCP wiring is isolated in <code>./.cursor/mcp.json</code>.</li>
+<li>User-global MCP files should remain for personal/global tools only.</li>
 </ul>
+<p>This keeps contributor setup portable and prevents one developer&#39;s machine path from becoming everyone else&#39;s broken default.</p>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
