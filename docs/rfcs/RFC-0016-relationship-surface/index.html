@@ -1,0 +1,258 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>RFC 0016: Generic Relationship Surface (RelationshipRecord primitive) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>rfcs</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>RFC 0016 relationship surface</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/rfcs/RFC-0016-relationship-surface.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>id: &quot;0016&quot;
+title: &quot;Generic Relationship Surface (RelationshipRecord primitive)&quot;
+status: &quot;draft&quot;
+created: &quot;2026-04-30&quot;
+updated: &quot;2026-04-30&quot;
+authors: [&quot;Matt Faherty&quot;]
+reviewers: []
+related_adr_candidates: []
+related_issues: []
+supersedes: []
+superseded_by: []</h2>
+<h1>RFC 0016: Generic Relationship Surface (RelationshipRecord primitive)</h1>
+<h2>Status</h2>
+<p><code>draft</code> — being written, not yet ready for review. This RFC explores adding a generic relationship/contact substrate primitive (<code>RelationshipRecord</code>) to the ICN reusable primitive set, and is a stated prerequisite of the <code>icn-member-directory</code> base tool named in <a href="/docs/architecture/COOPERATIVE_TOOL_COMMONS">`docs/architecture/COOPERATIVE_TOOL_COMMONS.md`</a>.</p>
+<p><strong>Accepted RFC does not mean implemented.</strong> Implementation lands under follow-up ADR(s) and issues with code/test evidence.</p>
+<h2>Summary</h2>
+<p>ICN today models <em>authority</em> relationships through <code>RoleAssignment</code> (DID + structure + capability strings) and <em>entity participation</em> through <code>Federation.member_entities</code>. It does not model the much larger surface of <strong>non-authority relationships</strong>: who is the relationship owner for a partner co-op, when was an organization last contacted, who is the next follow-up due from, what consent boundaries apply to a contact.</p>
+<p>This RFC explores a single generic substrate primitive, <code>RelationshipRecord</code>, that captures non-authority relationships between any two DIDs (subject and counterparty), with an opaque <code>relationship_kind: String</code> so institutions can carry their own taxonomy without leaking institution-specific vocabulary into ICN core. The recommended direction is to add <code>RelationshipRecord</code> to the <em>Reusable Primitive Set</em> table in <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a> and implement it with the same anti-ontology-laundering discipline already used by <code>ProgramKind::Custom(String)</code> and <code>Milestone::completion_criteria: Vec&lt;String&gt;</code>.</p>
+<h2>Problem statement</h2>
+<p>Multiple cooperative-tool surfaces currently in the design pipeline need to point at a non-authority relationship between DIDs:</p>
+<ul>
+<li>The <code>icn-member-directory</code> base tool (planned per <code>COOPERATIVE_TOOL_COMMONS.md</code>) renders contact directories, relationship pipeline views, and follow-up queues for organizers. None of these surfaces are pure authority assertions; they are relational state.</li>
+<li>Specialized suites composed at L2/L3 (sponsor / fundraising, organizer recruitment, partner workspace) all need to track <em>who owns the relationship</em>, <em>when did we last touch it</em>, and <em>when is the next action due</em>. These are not <code>RoleAssignment</code> data — they are observation/intention records.</li>
+<li><code>INSTITUTION_PACKAGE_BOUNDARY.md</code> § <em>Stays Out of ICN Core</em> explicitly puts CRM out of bounds: &quot;CRM shape and field semantics vary too much across institutions.&quot; That is correct as a boundary on <strong>CRM</strong>. But the underlying primitive (a generic relationship record between DIDs) is institution-agnostic if it carries no institution-specific enum variants.</li>
+</ul>
+<p>Without a generic primitive, every consumer (every base tool, every specialized suite) reinvents a relationship surface in its own crate, drifting toward institution-specific shapes. With a generic primitive, the L2 tools point at one type and the L3 institution-specific vocabulary stays in package fields and CCL semantics.</p>
+<h2>Goals</h2>
+<ul>
+<li>Define a <code>RelationshipRecord</code> primitive that lives in ICN core and is consumable by base tools without leaking institution semantics.</li>
+<li>Preserve the firewall: no institution-specific enum variants. <code>relationship_kind</code> is <code>String</code> (or equivalent free-form opaque tag).</li>
+<li>Carry only the fields that are universal across institutions: subject DID, counterparty DID, owner DID, lifecycle state, last-contact timestamp, next-followup timestamp, consent scopes.</li>
+<li>Emit receipts on lifecycle-state-change events through the existing receipt envelope (ADR-0026).</li>
+<li>Be consumable by <code>icn-member-directory</code> and by future base tools (<code>icn-tables</code>, <code>icn-action-cards</code>) without each tool re-deriving relationship state.</li>
+</ul>
+<h2>Non-goals</h2>
+<ul>
+<li><strong>No CRM logic in ICN.</strong> Pipeline stages, contact-history rendering, follow-up cadence rules, and any field whose meaning is institution-specific belong at L3 in the institution package.</li>
+<li><strong>No participation taxonomy in ICN core.</strong> <code>kind: Speaker | Sponsor | Attendee</code> would import institution vocabulary into the kernel; that is forbidden per <code>INSTITUTION_PACKAGE_BOUNDARY.md</code>.</li>
+<li><strong>No private contact data in core records.</strong> Real contact info lives in the institution&#39;s private overlay or future ScopedVault. The primitive carries DIDs and references, not phone numbers, emails, or notes.</li>
+<li><strong>No replacement for <code>RoleAssignment</code>.</strong> Authority grants stay in the existing <code>RoleAssignment</code> shape; this primitive does not overlap.</li>
+</ul>
+<h2>Background / current state</h2>
+<ul>
+<li><strong>Relevant existing primitives:</strong> <code>RoleAssignment</code> (<code>icn-governance::structure</code>); <code>BootstrapEntityRecord</code> and <code>EntityKind</code> (<code>icn-governance::bootstrap</code>, <code>icn-entity</code>); person-directory overlay (PR #1626); <code>/me/standing</code> (PR #1627).</li>
+<li><strong>Relevant boundary docs:</strong> <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a> § Reusable Primitive Set (lists existing primitives) and § Stays Out (explicitly excludes CRM).</li>
+<li><strong>Relevant tool catalog:</strong> <a href="/docs/architecture/COOPERATIVE_TOOL_COMMONS">`COOPERATIVE_TOOL_COMMONS.md`</a> names <code>icn-member-directory</code> as a planned base tool that reads from the person-directory overlay and <code>/me/standing</code> and renders member profiles.</li>
+<li><strong>Relevant kernel discipline:</strong> <a href="/docs/architecture/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a> — kernel reads pure data types; semantic interpretation is confined to apps. <code>RelationshipRecord</code> must not require kernel pattern-matching on <code>relationship_kind</code>.</li>
+</ul>
+<h2>Design options</h2>
+<h3>Option A — New substrate crate <code>icn-relationships</code></h3>
+<p>Create a new substrate crate that defines <code>RelationshipRecord</code>, persistence, and receipt emission. Apps consume it through a service trait analogous to <code>TrustService</code>. Stays out of <code>icn-governance</code> to avoid coupling relationship state to governance state.</p>
+<h3>Option B — New module under <code>icn-governance</code></h3>
+<p>Add <code>icn-governance::relationship</code> alongside <code>::structure</code>, <code>::activity</code>, <code>::program</code>. Reuses existing storage, governance receipt machinery, and HTTP plumbing in <code>apps/governance</code>. Risk: blurs the line between governance state and relational state; could invite future drift.</p>
+<h3>Option C — Defer; keep relationship state at L3 only</h3>
+<p>Do nothing in core; require each L3 institution package to carry its own relationship records. Tools at L2 receive relationship data through package config rather than a typed primitive. Lower architectural cost; higher per-tool reinvention cost.</p>
+<h2>Tradeoffs</h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Easier</th>
+<th>Harder</th>
+<th>Invariants preserved</th>
+<th>Invariants stressed</th>
+<th>New failure modes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A — new crate</td>
+<td>clean isolation, easier to evolve, easier kernel-discipline review</td>
+<td>new crate to maintain, new receipt path to wire, more places to look for &quot;where does relationship state live&quot;</td>
+<td>meaning firewall, kernel/app separation</td>
+<td>none new</td>
+<td>crate proliferation; service-injection complexity</td>
+</tr>
+<tr>
+<td>B — module under <code>icn-governance</code></td>
+<td>reuses governance machinery, no new crate</td>
+<td>governance state and relationship state co-located; review burden on every governance change</td>
+<td>reuses existing patterns</td>
+<td>meaning firewall (relationship semantics are not governance semantics)</td>
+<td>governance receipts and relationship receipts could be confused; cleanup later is costly</td>
+</tr>
+<tr>
+<td>C — defer</td>
+<td>zero substrate work</td>
+<td>every L2 tool reinvents relationship records; second-adopter story breaks (&quot;you have to write a relationship type yourself&quot;)</td>
+<td>none new</td>
+<td>reusable-primitive principle (ICN has the generic shape institutions need)</td>
+<td>per-tool drift; relationship state never receipt-bearing</td>
+</tr>
+</tbody></table>
+<h2>Core/package boundary</h2>
+<p>Per <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a>:</p>
+<ul>
+<li><strong>What lives in ICN core</strong> under this RFC: the generic <code>RelationshipRecord</code> type with opaque-string <code>relationship_kind</code>. Storage. Receipt emission on lifecycle-state-change. Service trait for app consumption.</li>
+<li><strong>What stays in institution packages</strong>: the actual taxonomy (which <code>relationship_kind</code> values exist for <em>this</em> institution), the lifecycle rules (when does a sponsor relationship close), the rendering vocabulary (do we call them sponsors, funders, partners, member co-ops), the consent enforcement specifics.</li>
+<li><strong>What stays opaque to the kernel</strong>: every value of <code>relationship_kind</code>. Kernel must not pattern-match on it. The pattern follows <code>ProgramKind::Custom(String)</code> and <code>Milestone::completion_criteria: Vec&lt;String&gt;</code>, both of which the program module already demonstrates.</li>
+</ul>
+<h2>Accessibility implications</h2>
+<p><code>RelationshipRecord</code> is a substrate primitive with no member-facing surface of its own. Accessibility lands in the consumer tool surfaces (<code>icn-member-directory</code>, future suite UIs). The primitive must not block low-bandwidth operation: lifecycle-state-change receipts should be small enough that a member shell can render the relationship history without paginating large auxiliary data.</p>
+<h2>Conflict / dispute path</h2>
+<p>Disputes about a <code>RelationshipRecord</code>:</p>
+<ul>
+<li><strong>Wrong owner_did asserted.</strong> Same path as governance disputes — challenge the record through the institution&#39;s existing dispute surface (ADR-0029 candidate).</li>
+<li><strong>Disputed lifecycle-state-change.</strong> The receipt envelope (ADR-0026) is the authoritative log; reverting requires a new state-change receipt referencing the prior one.</li>
+<li><strong>Consent scope dispute.</strong> The institution&#39;s privacy/redaction policy governs (ADR candidate for ScopedVault).</li>
+</ul>
+<h2>Security / privacy implications</h2>
+<ul>
+<li>DIDs are public; <code>RelationshipRecord</code> linking two DIDs is itself public unless scoped under a vault.</li>
+<li>Real contact info never appears in the primitive. Phone, email, and free-text notes live in the institution&#39;s private overlay or future ScopedVault.</li>
+<li><code>consent_scopes: Vec&lt;String&gt;</code> lets institutions tag a relationship with consent boundaries (e.g. <code>public_listing</code>, <code>action_card_delivery</code>, <code>photography</code>); the kernel does not interpret these strings, but tools can refuse to act outside declared scopes.</li>
+</ul>
+<h2>Compute / automation boundary</h2>
+<p>Tools may compute over <code>RelationshipRecord</code> (rendering pipelines, follow-up queue derivations, search). Compute may not mutate a record without producing a lifecycle-state-change receipt. Determinism and fuel bounds apply where compute jobs are invoked (per ADR-0030).</p>
+<h2>Website / public truth implications</h2>
+<p>Once accepted and implemented, the maturity band for the relationship surface goes from &quot;missing&quot; to &quot;early&quot;; the canonical site can claim that ICN supports a generic relationship primitive that institutional packages compose specialized contact / partner / sponsor surfaces from. The site does <strong>not</strong> claim ICN provides a CRM.</p>
+<h2>Migration / compatibility</h2>
+<p>Greenfield primitive. No migration cost for existing deployments, governance proposals, CCL contracts, API consumers, or test surfaces. The first consumer (<code>icn-member-directory</code>) is itself unbuilt at the time of this RFC.</p>
+<h2>Open questions</h2>
+<ol>
+<li><strong>Crate placement</strong> — Option A (new <code>icn-relationships</code> crate) vs Option B (module under <code>icn-governance</code>). Architecture review per <code>INSTITUTION_PACKAGE_BOUNDARY.md</code> <em>Reusable Primitive Set</em> discipline should decide.</li>
+<li><strong>Service trait shape</strong> — Should <code>RelationshipService</code> mirror <code>TrustService</code> (per <code>KERNEL_APP_SEPARATION.md</code>)? Or is direct consumption from a store handle sufficient at the tool layer?</li>
+<li><strong>Lifecycle states</strong> — Is the lifecycle a fixed enum (<code>active | dormant | closed</code>) or an opaque string per the anti-ontology-laundering rule? Recommended: opaque string with a documented set of common states, but the kernel does not branch on them.</li>
+<li><strong>Consent scope vocabulary</strong> — Should ICN ship a starter set of consent scopes (<code>public_listing</code>, <code>photography</code>, etc.) as documentation only, or leave the field entirely free?</li>
+<li><strong>Subject vs counterparty asymmetry</strong> — Are relationships directional (subject → counterparty) or symmetric? Implications for query patterns and receipt routing.</li>
+<li><strong>Receipt class</strong> — Does <code>RelationshipReceipt</code> need to be a new receipt class in the ADR-0026 envelope, or does an existing class suffice with a new <code>kind</code> discriminator?</li>
+</ol>
+<h2>Decision criteria</h2>
+<ul>
+<li>Pick <strong>A (new crate)</strong> if the architecture review concludes that relationship state and governance state should evolve independently (likely outcome — relationship surface will grow features that have nothing to do with governance).</li>
+<li>Pick <strong>B (under <code>icn-governance</code>)</strong> if the architecture review concludes that the maintenance cost of a new crate outweighs the conceptual cleanup of separating concerns.</li>
+<li>Pick <strong>C (defer)</strong> if the build plan slows enough that no L2 tool consumer materializes within the next implementation window. (Unlikely given the build plan.)</li>
+</ul>
+<h2>Outcome</h2>
+<p>To be filled when the RFC moves to <code>accepted</code> or <code>rejected</code>.</p>
+<h2>Follow-up ADRs</h2>
+<p>If accepted: at least one new ADR recording the crate-placement decision and the type contract. Possibly a second ADR for the service trait if Option A wins.</p>
+<h2>Follow-up implementation issues</h2>
+<p>If accepted:</p>
+<ul>
+<li>New issue: implement <code>RelationshipRecord</code> per chosen option.</li>
+<li>New issue: integrate with ADR-0026 receipt envelope for lifecycle-state-change receipts.</li>
+<li>New issue: add to <code>INSTITUTION_PACKAGE_BOUNDARY.md</code> <em>Reusable Primitive Set</em> table.</li>
+<li>New issue: prerequisite for <code>icn-member-directory</code> tool implementation.</li>
+</ul>
+<h2>Validation / proof plan</h2>
+<ul>
+<li>Unit tests in the new crate (or new module) covering: record creation, lifecycle-state-change emit, receipt formation, opaque <code>relationship_kind</code> round-trip, opaque <code>consent_scopes</code> round-trip.</li>
+<li>Integration test: a fictional relationship goes from <code>created</code> → <code>active</code> → <code>dormant</code> → <code>closed</code>, each transition produces a receipt, the receipt envelope can replay the history.</li>
+<li>CI check: kernel crates do not import the relationship crate (firewall preserved).</li>
+<li>Documentation update: <code>INSTITUTION_PACKAGE_BOUNDARY.md</code> <em>Reusable Primitive Set</em> table extended.</li>
+</ul>
+<hr>
+<h2>Notes</h2>
+<p>This RFC is a stub. The design space is sketched; the recommended option is named (Option A — new substrate crate) but not committed. Drafting will deepen Options A and B in particular, and may add a sketch of the type contract in Rust pseudocode once architecture review converges.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
