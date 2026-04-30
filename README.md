@@ -125,4 +125,4 @@ ICN is real, active, and uneven in maturity. The strongest parts today are prove
 
 ## License
 
-[AGPL-3.0](LICENSE)
+[AGPL-3.0](LICENSE) governs the project as a whole. Selected Rust crates declare `MIT OR Apache-2.0` in their own `Cargo.toml` for reusable technical primitives. See [LICENSING.md](LICENSING.md) for the relationship between the repository-level license and per-crate metadata.
