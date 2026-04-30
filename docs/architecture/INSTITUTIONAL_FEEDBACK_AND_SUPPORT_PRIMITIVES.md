@@ -11,7 +11,7 @@ Companions: `INSTITUTION_PACKAGE_BOUNDARY.md`, `KERNEL_APP_SEPARATION.md`, `IDEN
 This document defines the foundation for the next generation of generic primitives ICN core will eventually model:
 
 - **Institutional feedback primitives** — `InstitutionalSignal`, `SignalRule`, `EscalationPolicy`, `MemberSignal`, `SignalPolarity`.
-- **Member-facing read primitives** — `/me/standing` (landed), `/me/action-cards` (future).
+- **Member-facing read primitives** — `/me/standing` (landed, #1627), `/me/action-cards` (landed, #1659; three of five source paths proof-bearing — `signal_rule` and `obligation_lifecycle` remain RFC-gated under #1646).
 - **Authority primitives** — `RoleAssignment.authority_scope` (landed), `TemporaryAuthorityGrant` (future).
 - **Governed indicator primitive** — `Indicator` with definition, owner, caveats, review interval, challenge path.
 - **Resource governance primitives** — `Obligation`, `Allocation`, `Settlement`, `Position`, `Unit`, `SettlementAsset`.
@@ -165,7 +165,7 @@ An `EscalationPolicy` is a generic CCL-or-data routing table: *"a signal of this
 
 ### How signals become action cards
 
-A signal at the appropriate severity, scoped to a body the caller belongs to, surfaces in that caller's `/me/action-cards` (future) as something they're being asked to attend to. The signal record itself is the unit of institutional truth; the action card is the member-facing rendering.
+A signal at the appropriate severity, scoped to a body the caller belongs to, surfaces in that caller's `/me/action-cards` (endpoint shipped in #1659; the `signal_rule` source path that emits these is RFC-gated under #1631, tracked by umbrella #1646) as something they're being asked to attend to. The signal record itself is the unit of institutional truth; the action card is the member-facing rendering.
 
 ### Anti-patterns this primitive must refuse
 
@@ -216,7 +216,7 @@ Polarity in parentheses; vocabulary is illustrative.
 
 > Action cards are not a new ontology. They are a **rendering of institutional need that the caller can act on**.
 
-`/v1/gov/me/standing` (#1604) tells you *who you are*. `/v1/gov/me/action-cards` (future, #1608) tells you *what needs you*.
+`/v1/gov/me/standing` (shipped, #1627) tells you *who you are*. `/v1/gov/me/action-cards` (shipped, #1659; signal_rule/obligation_lifecycle source paths still RFC-gated under #1646) tells you *what needs you*.
 
 An action card is not a stored entity. It is a derived view computed from:
 

@@ -24,7 +24,7 @@ These surfaces exist in the codebase, are exercised in tests, and have been walk
 - **Charter activation against a running gateway.** A charter (CCL YAML) can be ratified through governance and become live constraint that the kernel enforces — without touching the kernel's source or restarting the daemon.
 - **The local proof loop runs against a localhost gateway.** Documented in [`docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md`](../dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md). No remote cluster is involved.
 - **The same loop has been exercised once on K3s** under operator authorization, against deployed image `91a63eec`. Documented in [`docs/dev/NYCN_K3S_PROOF_PATH.md`](../dev/NYCN_K3S_PROOF_PATH.md).
-- **The NYCN drive-ingest operator ladder, in the separate `fahertym/nycn` repo,** walks organizer drive content through parser → review → decisions → publish dry-run → assignee binding → local publisher → local proof runner → federation surface bridge → operator pilot runbook + ladder checker, and adjacent operator-facing tools. Per [`docs/STATE.md`](../STATE.md), NYCN #21–#32 are merged; NYCN #33 was open at last sync. The ladder is pure file-in / file-out or localhost-only operator-gated.
+- **The NYCN drive-ingest operator ladder, in the separate `InterCooperative-Network/nycn` repo,** walks organizer drive content through parser → review → decisions → publish dry-run → assignee binding → local publisher → local proof runner → federation surface bridge → operator pilot runbook + ladder checker, and adjacent operator-facing tools. Per [`docs/STATE.md`](../STATE.md), NYCN #21–#32 are merged; NYCN #33 was open at last sync. The ladder is pure file-in / file-out or localhost-only operator-gated.
 - **A documented mutation boundary.** No NYCN-side tool ever mutates a remote ICN cluster. K3s mutation is only ever performed ICN-side, under operator authorization, and is recorded in the proof-path runbooks above.
 
 ## What ICN cannot honestly claim yet
@@ -68,7 +68,7 @@ These are explicit non-asks. If they come up in conversation, the answer is "we 
 If the conversation goes well, the next step is **another conversation**, not a deal. A reasonable second-conversation outcome looks like:
 
 - An NYCN organizer tries the local preflight runner on their own machine, against their own (or fixture-equivalent) drive content, and tells us what they see.
-- Or an organizer reads `START_HERE.md` / `ORGANIZER_QUICKSTART.md` from `fahertym/nycn` and tells us where the language lands and where it doesn't.
+- Or an organizer reads `START_HERE.md` / `ORGANIZER_QUICKSTART.md` from `InterCooperative-Network/nycn` and tells us where the language lands and where it doesn't.
 - Or an organizer points at one specific NYCN workflow and asks "would the ladder make sense here?" and we work through that one workflow honestly.
 - Or an organizer says "this is not a fit for NYCN right now, but here is what would have to be true," which is also useful.
 

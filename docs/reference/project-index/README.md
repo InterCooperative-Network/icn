@@ -44,7 +44,7 @@ This directory is a **show-ready orientation layer** for the ICN repository. Its
 | [`rust-workspace-map.md`](rust-workspace-map.md) | The Rust workspace under `icn/` grouped by rough layer (kernel/identity/networking/ledger/governance/etc.). |
 | [`docs-control-map.md`](docs-control-map.md) | How `docs/INDEX.md`, `docs/registry.toml`, `DOCUMENT_REGISTRY.md`, and `doc_control_check.py` relate; truth classes; how to add a doc. |
 | [`runtime-surface-map.md`](runtime-surface-map.md) | Real runtime surfaces a member or app actually touches today (`/me/standing`, `/me/action-cards`, completion-receipt retrieval, etc.). |
-| [`pilot-and-nycn-map.md`](pilot-and-nycn-map.md) | The ICN ↔ NYCN boundary — what lives in this repo, what lives in the separate `fahertym/nycn` repo, and what the next gates are. |
+| [`pilot-and-nycn-map.md`](pilot-and-nycn-map.md) | The ICN ↔ NYCN boundary — what lives in this repo, what lives in the separate `InterCooperative-Network/nycn` repo, and what the next gates are. |
 | [`ci-ops-deploy-map.md`](ci-ops-deploy-map.md) | CI workflows, deploy paths, K3s smoke runbooks — routing only. |
 | [`show-readiness-map.md`](show-readiness-map.md) | What can be shown now, what should not be shown as finished, the suggested demo narrative, and red lines. |
 

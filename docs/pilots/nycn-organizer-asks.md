@@ -18,7 +18,7 @@ Last Reviewed: 2026-04-29
 
 ## Why we are asking these
 
-NYCN is the intended first cooperative partner for ICN's Phase 2 — active partnership track, not a formal pilot. The drive-ingest operator ladder in `fahertym/nycn` is a procedural spine for walking organizer material into ICN action-item proofs. Before that spine is exercised against real organizer work, organizers need to validate that the spine matches the work.
+NYCN is the intended first cooperative partner for ICN's Phase 2 — active partnership track, not a formal pilot. The drive-ingest operator ladder in `InterCooperative-Network/nycn` is a procedural spine for walking organizer material into ICN action-item proofs. Before that spine is exercised against real organizer work, organizers need to validate that the spine matches the work.
 
 Only NYCN organizers can answer most of these questions. ICN-side cannot pre-answer them.
 
