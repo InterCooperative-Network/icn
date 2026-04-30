@@ -864,7 +864,7 @@ candidates:
       organizer recruitment, partner workspaces) need to point at a
       generic non-authority relationship between DIDs (subject,
       counterparty, owner, lifecycle state, last contact, next
-      followup, consent scopes). INSTITUTION_PACKAGE_BOUNDARY.md
+      follow-up, consent scopes). INSTITUTION_PACKAGE_BOUNDARY.md
       correctly excludes CRM from ICN core; the underlying generic
       relationship primitive is institution-agnostic if it carries no
       institution-specific enum variants. Without a generic primitive

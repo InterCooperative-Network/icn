@@ -34,11 +34,11 @@ This RFC explores how to land those five infrastructure objects coherently, inte
 
 ## Problem statement
 
-ICN today has no mechanism for an institution to declare which cooperative tools it has installed, what scopes those tools hold, or how those tools' actions are audited. Every base tool named in `COOPERATIVE_TOOL_COMMONS.md` (none of which exist as deployed code today) will need this infrastructure to exist *before* it can ship.
+ICN today has no mechanism for an institution to declare which cooperative tools it has installed, what scopes those tools hold, or how those tools' actions are audited. Every base tool named in `COOPERATIVE_TOOL_COMMONS.md` will need this infrastructure to exist *before* it can ship as an installable tool package with institution-specific bindings for downstream deployment. (Some of the named surfaces — e.g. the governance runtime under `icn-governance` and the HTTP app under `apps/governance` — already exist as in-repo runtime capability; what does not yet exist is the install / binding / audit packaging that lets a coop *declare and govern* their use as installable tools.)
 
 The downstream consequence is that the second-adopter narrative — "RegionalCoopNet spins up an ICN node and installs `icn-member-directory` + `icn-tables`" — has no install verb today. Without `ToolManifest`/`ToolBinding`/`ToolInstall`, the only adoption path is "fork the entire NYCN repo and run it," which is exactly the failure mode the cooperative-tool architecture is meant to avoid.
 
-The five infrastructure objects above were named in the parent doc explicitly: *"Each of these will land via its own ADR or RFC. This document does not pre-commit shapes."* This RFC takes that pre-commitment.
+The five infrastructure objects above were named in the parent doc explicitly: *"Each of these will land via its own ADR or RFC. This document does not pre-commit shapes."* This RFC takes up that work by advancing the missing-buildout list into a structured design exploration.
 
 ## Goals
 

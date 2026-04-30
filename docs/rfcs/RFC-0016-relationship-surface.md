@@ -24,7 +24,7 @@ superseded_by: []
 
 ICN today models *authority* relationships through `RoleAssignment` (DID + structure + capability strings) and *entity participation* through `Federation.member_entities`. It does not model the much larger surface of **non-authority relationships**: who is the relationship owner for a partner co-op, when was an organization last contacted, who is the next follow-up due from, what consent boundaries apply to a contact.
 
-This RFC explores a single generic substrate primitive, `RelationshipRecord`, that captures non-authority relationships between any two DIDs (subject and counterparty), with an opaque `relationship_kind: String` so institutions can carry their own taxonomy without leaking institution-specific vocabulary into ICN core. The recommended direction is to add `RelationshipRecord` to the *Reusable Primitive Set* table in [`INSTITUTION_PACKAGE_BOUNDARY.md`](../architecture/INSTITUTION_PACKAGE_BOUNDARY.md) and implement it with the same anti-ontology-laundering discipline already used by `Program::ProgramKind::Custom(String)` and `Milestone::completion_criteria: Vec<String>`.
+This RFC explores a single generic substrate primitive, `RelationshipRecord`, that captures non-authority relationships between any two DIDs (subject and counterparty), with an opaque `relationship_kind: String` so institutions can carry their own taxonomy without leaking institution-specific vocabulary into ICN core. The recommended direction is to add `RelationshipRecord` to the *Reusable Primitive Set* table in [`INSTITUTION_PACKAGE_BOUNDARY.md`](../architecture/INSTITUTION_PACKAGE_BOUNDARY.md) and implement it with the same anti-ontology-laundering discipline already used by `ProgramKind::Custom(String)` and `Milestone::completion_criteria: Vec<String>`.
 
 ## Problem statement
 
@@ -86,7 +86,7 @@ Per [`INSTITUTION_PACKAGE_BOUNDARY.md`](../architecture/INSTITUTION_PACKAGE_BOUN
 
 - **What lives in ICN core** under this RFC: the generic `RelationshipRecord` type with opaque-string `relationship_kind`. Storage. Receipt emission on lifecycle-state-change. Service trait for app consumption.
 - **What stays in institution packages**: the actual taxonomy (which `relationship_kind` values exist for *this* institution), the lifecycle rules (when does a sponsor relationship close), the rendering vocabulary (do we call them sponsors, funders, partners, member co-ops), the consent enforcement specifics.
-- **What stays opaque to the kernel**: every value of `relationship_kind`. Kernel must not pattern-match on it. The pattern follows `Program::ProgramKind::Custom(String)` and `Milestone::completion_criteria: Vec<String>`, both of which the program module already demonstrates.
+- **What stays opaque to the kernel**: every value of `relationship_kind`. Kernel must not pattern-match on it. The pattern follows `ProgramKind::Custom(String)` and `Milestone::completion_criteria: Vec<String>`, both of which the program module already demonstrates.
 
 ## Accessibility implications
 
