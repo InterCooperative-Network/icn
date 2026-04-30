@@ -350,6 +350,17 @@ Contributor onboarding materials:
 **Observability (`observability/`):**
 - Metrics, logging, and tracing
 
+### Pilot Outreach (`pilots/`)
+
+Organizer-facing pilot materials. Honest scope-of-now framing; not pitch decks. Defer to [STATE.md](STATE.md) and [PHASE_PROGRESS.md](PHASE_PROGRESS.md) for current truth.
+
+- [nycn-boundary-brief.md](pilots/nycn-boundary-brief.md) - What ICN can demonstrate now, what it cannot honestly claim yet, what NYCN organizers would need to validate, what is explicitly not being asked
+- [nycn-demo-script.md](pilots/nycn-demo-script.md) - Step-by-step organizer-facing demo flow against a localhost ICN gateway
+- [nycn-organizer-asks.md](pilots/nycn-organizer-asks.md) - Bounded set of validation questions for NYCN organizers; includes explicit non-asks
+- [pilot-proposal-template.md](pilots/pilot-proposal-template.md) - Template for approaching potential pilot communities
+- [hosted-approach.md](pilots/hosted-approach.md) - Approach for hosted cooperative pilot deployments
+- [decision_registry_treasury_vote.md](pilots/decision_registry_treasury_vote.md) - Economic receipt chain implementation in pilot
+
 ### Pilot Programs (`internal/pilots/`)
 
 Real-world pilot deployment documentation:
