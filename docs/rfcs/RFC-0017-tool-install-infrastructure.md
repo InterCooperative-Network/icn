@@ -94,7 +94,7 @@ Single RFC for coherent design; implementation split across two or three crates 
 ## Core/package boundary
 
 - **What lives in ICN core** under this RFC: the five infrastructure objects (manifest, binding, lifecycle, registry, audit trail). All five are generic shapes, not institution-specific.
-- **What lives in institution packages**: the binding *content* — NYCN's specific schemas for the bound tools, the institution's specific capability requests, the institution's specific approval-flow values per its charter. NYCN's `tool_bindings` block in `institution/package.yaml` is exactly this.
+- **What lives in institution packages**: the binding *content* — NYCN's specific schemas for the bound tools, the institution's specific capability requests, the institution's specific approval-flow values per its charter. The eventual `tool_bindings` block in NYCN's `institution/package.yaml` (planned follow-up work; see *Follow-up implementation issues* below) will be the first concrete example of this pattern.
 - **What stays opaque to the kernel**: the contents of capability declarations beyond their type-safe shape. Tools may declare `custom_capability: "review-sponsor-recognition"` and the kernel must not branch on the string.
 
 ## Accessibility implications
