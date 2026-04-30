@@ -1,0 +1,38 @@
+name: MCP portability
+
+on:
+  pull_request:
+    paths:
+      - '.mcp.json'
+      - '.cursor/mcp.json'
+      - 'ops/mcp/**'
+      - 'scripts/check-mcp-portability.py'
+      - '.github/workflows/mcp-portability.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '.mcp.json'
+      - '.cursor/mcp.json'
+      - 'ops/mcp/**'
+      - 'scripts/check-mcp-portability.py'
+      - '.github/workflows/mcp-portability.yml'
+
+jobs:
+  mcp-portability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check MCP config portability
+        run: python3 scripts/check-mcp-portability.py
+      - name: Install MCP dependencies
+        working-directory: ops/mcp
+        run: npm ci
+      - name: Build MCP server
+        working-directory: ops/mcp
+        run: npm run build
+      - name: Validate MCP package entrypoint
+        run: test -f ops/mcp/dist/index.js
