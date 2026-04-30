@@ -21,15 +21,15 @@ It is **not yet a formally committed pilot**. The next concrete step is presenti
 | Repo | What it is | Where |
 |---|---|---|
 | **This repo** (`InterCooperative-Network/icn`) | The ICN substrate. Contains the in-monorepo NYCN institution package at `institutions/nycn/` (boundary-clean, suitable for later extraction). | This file lives here. |
-| **`fahertym/nycn`** | The separate NYCN operator repo where the drive-ingest operator ladder lives. Pure file-in / file-out tooling and localhost-only operator-gated runners. | External; references in `STATE.md` and below. |
+| **`InterCooperative-Network/nycn`** | The separate NYCN operator repo where the drive-ingest operator ladder lives. Pure file-in / file-out tooling and localhost-only operator-gated runners. | External; references in `STATE.md` and below. |
 
-`institutions/nycn/` (here) is the institution package — the structures, charter material, and configuration that describes NYCN as an ICN entity. `fahertym/nycn` (external) is the day-to-day operator workflow — the procedural spine that walks organizer material into ICN action-item proofs.
+`institutions/nycn/` (here) is the institution package — the structures, charter material, and configuration that describes NYCN as an ICN entity. `InterCooperative-Network/nycn` (external) is the day-to-day operator workflow — the procedural spine that walks organizer material into ICN action-item proofs.
 
 ## The mutation boundary
 
 This is the load-bearing safety property of the NYCN partnership track:
 
-- **NYCN-side tools are pure (no network) or localhost-only operator-gated.** No tool in `fahertym/nycn` ever mutates a remote ICN cluster.
+- **NYCN-side tools are pure (no network) or localhost-only operator-gated.** No tool in `InterCooperative-Network/nycn` ever mutates a remote ICN cluster.
 - **K3s mutation is ICN-side and operator-authorized.** It happens in the proof-path runbooks documented in this repo, not in NYCN-side tooling.
 - **Two-flag operator gate.** The local publisher (NYCN ladder layer 5) requires two operator flags plus a localhost-only `--gateway` to actually publish. Default is preflight (no execution).
 
@@ -44,7 +44,7 @@ These live in this repo:
 | Local HTTP proof loop | [`docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md`](../../dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md) | A holder-shell session walking `/me/action-cards` → `PUT .../status` → `GET .../completion-receipt` against a localhost gateway. Closes the proof loop end-to-end without any cluster involvement. |
 | K3s smoke proof closure | [`docs/dev/NYCN_K3S_PROOF_PATH.md`](../../dev/NYCN_K3S_PROOF_PATH.md) | Operator-authorized exercise of the same proof loop against the deployed K3s cluster, image `91a63eec`. |
 
-## NYCN-side ladder (in `fahertym/nycn`, summary only)
+## NYCN-side ladder (in `InterCooperative-Network/nycn`, summary only)
 
 The NYCN drive-ingest operator ladder is recorded in [`docs/STATE.md`](../../STATE.md) as merged through NYCN #21–#32; NYCN #33 was open at last sync — verify against the latest `STATE.md` sync. See `STATE.md` for the per-PR enumeration. Conceptually, the ladder is a procedural spine:
 

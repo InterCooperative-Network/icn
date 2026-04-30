@@ -162,8 +162,8 @@ This section maps Commons concepts to the real crates, modules, and types in the
 | "My scopes" surface | `GET /gov/me/scopes` (role assignments for caller DID) | ✅ shipped (PR #1552) | `icn/apps/governance/src/http/handlers.rs` |
 | "My work" surface | `GET /gov/me/work` (assigned action items for caller DID) | ✅ shipped (PR #1552) | `icn/apps/governance/src/http/handlers.rs` |
 | **Commons Shell** (unified member-facing doorway across entities) | concept; partial predecessors in `web/pilot-ui/` and `sdk/react-native/examples/CoopWallet/` | `[future design]` | — |
-| `GET /me/standing` (roles + memberships + mandates + active scopes) | does not exist as a single query | `[future design]` | — |
-| `GET /me/action-cards` (unified call-to-action surface) | does not exist | `[future design]` | — |
+| `GET /me/standing` (roles + memberships + mandates + active scopes) | shipped — `icn-gateway` member-standing read model | `[shipped, #1627]` | — |
+| `GET /me/action-cards` (unified call-to-action surface) | shipped — three of five source paths emit proof-bearing receipts (proposal/vote, action_item/complete, meeting/attend); two RFC-gated under #1646 (signal_rule on #1631, obligation_lifecycle on #1634) | `[shipped, #1659]` | — |
 | `RepresentativeVote` / `EntityAction` (action whose subject is the represented entity, not the signer) | `AuthorityClass::Representation` exists in ADR-0014; no dedicated vote-wrapper type yet | `[future design]` | — |
 | Active-scope / session-selected-scope model (every action bound to an explicit chosen scope) | scope is currently inferred from JWT `coop_id` + scopes; no explicit active-scope primitive | `[future design]` | — |
 | Commons OS / node appliance / kiosk mode | aspirational; see §11 | `[future design]` | — |
@@ -215,7 +215,7 @@ did:icn:alice
 - representation mandates granted to her by other entities,
 - operator-level rights on any node she runs.
 
-What does **not** yet exist as a single API is a query that returns "everything Alice is standing in right now". That is the `[future design]` `GET /me/standing` surface (see §9).
+A single API returns "everything Alice is standing in right now" — the `GET /me/standing` surface, shipped in #1627 (see §9).
 
 > **Illustrative only.** The flow above composes real types but is pseudocode. Do not treat it as a single struct or a committed API contract.
 
@@ -364,9 +364,9 @@ The mobile spec (`docs/mobile/icn-mobile-ux-spec-v1.md`) and the archived human-
 
 ## Standing and Active Scope
 
-Two `[future design]` surfaces are named here because they shape every member flow that follows.
+Two surfaces are named here because they shape every member flow that follows. The first two below are shipped; the active-scope primitive remains `[future design]`.
 
-### `GET /me/standing` `[future design]`
+### `GET /me/standing` `[shipped, #1627]`
 
 A single authenticated query that returns a member's full participatory position across ICN. Suggested shape (non-binding):
 
@@ -438,7 +438,7 @@ An explicit active-scope / session-selected-scope primitive does not yet exist i
 
 An **action card** is a generated call-to-action item surfaced in the Commons Shell. It is not a notification, not a feed post, not a marketing message. It is a scoped, typed, dismissible prompt that says: *"This is a thing in the Commons that needs you."*
 
-`GET /me/action-cards` `[future design]` — a unified query that returns the ranked list of action cards for the authenticated member across all their scopes.
+`GET /me/action-cards` `[shipped, #1659]` — a unified query that returns the ranked list of action cards for the authenticated member across all their scopes. Three of five source paths currently emit proof-bearing receipts (`proposal/vote` → `GovernanceDecisionReceipt`; `action_item/complete` → `ActionItemCompletionReceipt`; `meeting/attend` → `MeetingAttendanceReceipt`). Two source paths remain RFC-gated under umbrella issue #1646: `signal_rule` (gated on #1631) and `obligation_lifecycle` (gated on #1634). Completion-receipt retrieval (`GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt`) shipped in #1675.
 
 ### Sources
 
