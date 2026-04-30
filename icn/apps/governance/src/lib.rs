@@ -268,7 +268,10 @@ mod tests {
     }
 
     #[test]
-    fn test_unsupported_accepted_payload_emits_classified_noop() {
+    fn test_charter_accepted_payload_routes_to_set_governance_config() {
+        // Charter ratification is now wired (Sprint 26 CCL tranche). A ratified charter
+        // produces a Protocol(SetGovernanceConfig) effect so the CharterPolicyOracle can
+        // deploy it. This replaces the old "Charter == unhandled" assertion.
         let captured: CapturedEffects = Arc::new(Mutex::new(vec![]));
         let sink = captured.clone();
         let subscription = create_effect_subscription(move |effects, decision_receipt_id| {
@@ -277,14 +280,13 @@ mod tests {
                 .push((effects, decision_receipt_id));
         });
 
-        // Charter is a still-unsupported payload; ShareRedemption is wired as of Tranche 11.
         let payload = ProposalPayload::Charter {
             charter_id: "test-coop-charter".to_string(),
             charter_yaml: "schema_version: v0\nentity: coop\n".to_string(),
         };
 
         let event = SystemEvent::ProposalAccepted {
-            proposal_id: "pr-unsupported-1".to_string(),
+            proposal_id: "pr-charter-1".to_string(),
             domain_id: "domain-pilot".to_string(),
             payload: serde_json::to_value(payload).expect("serialize payload"),
             decided_at: 1_700_000_001,
@@ -296,25 +298,21 @@ mod tests {
 
         let got = captured.lock().expect("capture lock");
         assert_eq!(got.len(), 1, "effect callback should fire exactly once");
-        assert_eq!(got[0].1, "gov:domain-pilot:pr-unsupported-1:receipt");
-        assert_eq!(
-            got[0].0.len(),
-            1,
-            "classified fallback should be single effect"
+        assert_eq!(got[0].1, "gov:domain-pilot:pr-charter-1:receipt");
+        assert_eq!(got[0].0.len(), 1, "Charter produces exactly one effect");
+        assert!(
+            matches!(
+                &got[0].0[0],
+                KernelEffect::Protocol(
+                    icn_kernel_api::effects::ProtocolEffect::SetGovernanceConfig {
+                        domain_id,
+                        ..
+                    }
+                ) if domain_id == "test-coop-charter"
+            ),
+            "Charter must route to SetGovernanceConfig, got {:?}",
+            got[0].0[0]
         );
-        match &got[0].0[0] {
-            KernelEffect::NoOp { reason } => {
-                assert!(
-                    reason.starts_with(NON_EXECUTABLE_ACCEPTED_PREFIX),
-                    "NoOp reason must be classified and stable, got: {reason}"
-                );
-                assert!(
-                    reason.contains("[payload]"),
-                    "NoOp reason must include error kind, got: {reason}"
-                );
-            }
-            other => panic!("expected classified NoOp fallback, got {other:?}"),
-        }
     }
 
     /// Prove forced-accept provenance: the governance_decision_hash produced by the

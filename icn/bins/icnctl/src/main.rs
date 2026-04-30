@@ -1405,9 +1405,6 @@ enum StewardCommands {
         /// Term duration in days (30-730)
         #[arg(long, default_value = "365")]
         term_days: u64,
-        /// Bond amount in credits
-        #[arg(long, default_value = "1000")]
-        bond: u64,
         /// Governance proposal ID that approved this registration
         #[arg(long)]
         governance_approval: String,
@@ -7894,10 +7891,6 @@ async fn handle_steward_command(
                             data["disputes_against"].as_u64().unwrap_or(0),
                             data["disputes_won"].as_u64().unwrap_or(0)
                         );
-                        println!(
-                            "Bond:           {} credits",
-                            data["bond_amount"].as_u64().unwrap_or(0)
-                        );
                         if let Some(jurisdiction) = data["jurisdiction"].as_str() {
                             println!("Jurisdiction:   {jurisdiction}");
                         }
@@ -8039,7 +8032,6 @@ async fn handle_steward_command(
 
         StewardCommands::Register {
             term_days,
-            bond,
             governance_approval,
             jurisdiction,
             specializations,
@@ -8066,7 +8058,6 @@ async fn handle_steward_command(
 
             let body = serde_json::json!({
                 "term_duration_days": term_days,
-                "bond_amount": bond,
                 "governance_approval": governance_approval,
                 "jurisdiction": jurisdiction,
                 "specializations": specs,
@@ -8086,7 +8077,6 @@ async fn handle_steward_command(
                             data["steward_id"].as_str().unwrap_or("unknown")
                         );
                         println!("  Term: {term_days} days");
-                        println!("  Bond: {bond} credits");
                     } else {
                         let text = resp.text().await.unwrap_or_default();
                         println!("Registration failed: {status} - {text}");

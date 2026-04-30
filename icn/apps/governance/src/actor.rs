@@ -257,6 +257,14 @@ pub struct GovernanceHandle {
     /// Stored so `shutdown()` can await task completion deterministically instead
     /// of relying on a fixed sleep. Taken (set to None) on first shutdown call.
     scheduler_task: Arc<std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
+    /// Optional charter oracle for CCL-derived vote threshold consumption.
+    ///
+    /// When set, the actor consults this oracle during `CloseProposal` to derive
+    /// approval ratio and quorum count from the cooperative's ratified charter,
+    /// instead of using hardcoded domain config defaults.
+    ///
+    /// See `GovernanceActor::get_thresholds_from_charter()` for the consumption logic.
+    charter_oracle: Option<Arc<dyn icn_kernel_api::authz::PolicyOracle>>,
 }
 
 impl GovernanceHandle {
@@ -313,6 +321,35 @@ impl GovernanceHandle {
     /// List all proposals
     pub async fn list_proposals(&self) -> Result<Vec<Proposal>> {
         self.inner.read().await.list_proposals()
+    }
+
+    /// Return `(charter_id, charter_yaml)` for every proposal that is
+    /// `Accepted` with payload `Charter`.
+    ///
+    /// Called by the supervisor during daemon startup to rehydrate the
+    /// `CharterPolicyOracle` and rebind the ledger's policy views without
+    /// waiting for a new ratification event (ADR-0016 Tranche II).
+    ///
+    /// The return type is intentionally stripped of `icn_governance` types
+    /// so callers in `icn-core` (which must keep `icn_governance::` refs at
+    /// zero per the governance ratchet) can call this cleanly.
+    pub async fn list_accepted_charter_proposals(&self) -> Result<Vec<(String, String)>> {
+        let proposals = self.list_proposals().await?;
+        Ok(proposals
+            .into_iter()
+            .filter_map(|p| {
+                if let icn_governance::ProposalState::Accepted { .. } = &p.state {
+                    if let icn_governance::ProposalPayload::Charter {
+                        charter_id,
+                        charter_yaml,
+                    } = p.payload
+                    {
+                        return Some((charter_id, charter_yaml));
+                    }
+                }
+                None
+            })
+            .collect())
     }
 
     /// Get a specific domain
@@ -518,6 +555,34 @@ impl GovernanceHandle {
     /// treasury and protocol executors for delegated proposal execution.
     pub fn executor(&self) -> Option<&Arc<dyn icn_kernel_api::governance::GovernanceExecutor>> {
         self.executor.as_ref()
+    }
+
+    /// Set the charter oracle for CCL-derived vote threshold consumption.
+    ///
+    /// When configured, `CloseProposal` will consult the charter oracle to
+    /// derive `approval_ratio` and `quorum_count` from the cooperative's
+    /// ratified CCL charter document, instead of falling back directly to
+    /// `domain.config.thresholds_for_proposal()`.
+    ///
+    /// The oracle is queried via `PolicyOracle::evaluate()` with:
+    /// - `metadata["charter_id"]` = cooperative DID or charter name
+    /// - `metadata["member_count"]` = current eligible member count (string)
+    ///
+    /// The returned `ConstraintSet` is read for:
+    /// - `min_votes_{decision_type}` → approval ratio
+    /// - `min_quorum_{decision_type}` → quorum count
+    ///
+    /// **Note**: This method consumes self and returns a new handle.  Call
+    /// before cloning.
+    pub fn with_charter_oracle(
+        mut self,
+        oracle: Arc<dyn icn_kernel_api::authz::PolicyOracle>,
+    ) -> Self {
+        self.charter_oracle = Some(oracle.clone());
+        if let Ok(mut actor) = self.inner.try_write() {
+            actor.charter_oracle = Some(oracle);
+        }
+        self
     }
 
     /// List all protocol parameters
@@ -1108,6 +1173,16 @@ pub struct GovernanceActor {
     signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
     /// Optional kernel governance executor for delegated proposal execution
     executor: Option<Arc<dyn icn_kernel_api::governance::GovernanceExecutor>>,
+    /// Optional charter oracle for deriving vote thresholds from CCL documents.
+    ///
+    /// When present, `get_thresholds_from_charter()` consults this oracle before
+    /// falling back to `domain.config.thresholds_for_proposal()`.  This closes
+    /// the CCL consumption gap: charter-derived thresholds actually govern votes.
+    ///
+    /// The oracle is queried via `PolicyOracle::evaluate()` with `charter_id`
+    /// and `member_count` in the request metadata.  The returned ConstraintSet
+    /// is read for `min_votes_{decision_type}` and `min_quorum_{decision_type}`.
+    charter_oracle: Option<Arc<dyn icn_kernel_api::authz::PolicyOracle>>,
 }
 
 impl GovernanceActor {
@@ -1183,6 +1258,7 @@ impl GovernanceActor {
             protocol_params: None,
             signing_key,
             executor: None,
+            charter_oracle: None,
         };
 
         // Slot for the scheduler task JoinHandle; filled in after spawn.
@@ -1195,6 +1271,7 @@ impl GovernanceActor {
             protocol_params: None,
             entity_registry: None,
             executor: None,
+            charter_oracle: None,
             scheduler_shutdown: Arc::new(std::sync::Mutex::new(Some(shutdown_tx))),
             scheduler_task: scheduler_task_slot.clone(),
         };
@@ -1379,6 +1456,91 @@ impl GovernanceActor {
             })?;
 
         Some(icn_governance::ProposalThresholds::new(quorum, approval))
+    }
+
+    /// Get proposal thresholds from the CCL charter oracle.
+    ///
+    /// Queries the charter oracle for `min_votes_ordinary` and
+    /// `min_quorum_ordinary` — the governance thresholds for "ordinary"
+    /// cooperative decisions as defined in the cooperative's ratified charter.
+    ///
+    /// This is the **CCL consumption path** for governance thresholds.  Before
+    /// this method was wired, charter-derived thresholds were computed by
+    /// `CharterPolicyOracle` but never read, causing votes to always use
+    /// hardcoded domain config defaults regardless of the cooperative's charter.
+    ///
+    /// # Returns
+    ///
+    /// `Some(thresholds)` if the charter oracle is configured and the charter
+    /// defines thresholds for the "ordinary" decision type.
+    ///
+    /// `None` if the charter oracle is not configured, the charter is not
+    /// deployed, or the charter does not define an "ordinary" decision type.
+    fn get_thresholds_from_charter(
+        &self,
+        charter_id: &str,
+        member_count: usize,
+    ) -> Option<icn_governance::ProposalThresholds> {
+        use icn_kernel_api::authz::{
+            ActionKind, ConstraintValue, Domain, PolicyContext, PolicyRequest, PolicyRequestCore,
+        };
+
+        let oracle = self.charter_oracle.as_ref()?;
+
+        // Build a PolicyRequest with charter_id and live member_count in metadata.
+        // The oracle uses member_count to evaluate quorum expressions like
+        // "0.25 * members" with the actual cooperative size.
+        let core = PolicyRequestCore::new(
+            self.did.to_string(),
+            ActionKind::Read,
+            Domain::new("charter"),
+        );
+        let ctx = PolicyContext::new()
+            .with_metadata("charter_id", charter_id)
+            .with_metadata("member_count", member_count.to_string());
+        let request = PolicyRequest::with_context(core, ctx);
+
+        let decision = oracle.evaluate(&request);
+        if !decision.is_allowed() {
+            tracing::debug!(
+                charter_id = %charter_id,
+                "Charter oracle denied threshold query — no charter-derived thresholds"
+            );
+            return None;
+        }
+
+        let cs = decision.constraints()?;
+
+        // Extract approval ratio (min_votes_ordinary) and convert to integer percentage.
+        let approval_pct = match cs.custom.get("min_votes_ordinary")? {
+            ConstraintValue::Float(f) => ((**f) * 100.0).round() as u8,
+            ConstraintValue::Int(i) => *i as u8,
+            _ => return None,
+        };
+
+        // Extract quorum count (min_quorum_ordinary) and convert to % of member_count.
+        let quorum_pct = match cs.custom.get("min_quorum_ordinary") {
+            Some(ConstraintValue::Float(quorum_count)) if member_count > 0 => {
+                (((**quorum_count) / member_count as f64) * 100.0).round() as u8
+            }
+            Some(ConstraintValue::Int(i)) if member_count > 0 => {
+                ((*i as f64 / member_count as f64) * 100.0).round() as u8
+            }
+            _ => 0,
+        };
+
+        tracing::debug!(
+            charter_id = %charter_id,
+            approval_pct,
+            quorum_pct,
+            member_count,
+            "Charter oracle provided thresholds for 'ordinary' decision type"
+        );
+
+        Some(icn_governance::ProposalThresholds::new(
+            quorum_pct,
+            approval_pct,
+        ))
     }
 
     /// Handle a governance command
@@ -1752,13 +1914,26 @@ impl GovernanceActor {
                 );
 
                 // Get proposal-type-specific thresholds (Issue #477)
-                // Emergency proposals (freeze, veto, rollback) require higher quorum/approval
-                // to prevent low-turnout manipulation attacks.
-                // First try protocol parameters (runtime programmable via ProtocolChange proposals),
-                // fall back to domain config. Currently uses global scope; cooperative-specific
-                // overrides come from domain config until domain<->entity mapping is established.
+                //
+                // Priority order (highest to lowest):
+                //   1. Protocol parameter store (runtime-programmable via ProtocolChange)
+                //   2. Charter oracle (CCL-derived thresholds from ratified charter)
+                //   3. Domain config defaults (hardcoded at domain creation time)
+                //
+                // The charter oracle consultation is the CCL consumption path: this is
+                // where charter-derived thresholds (min_votes_ordinary, min_quorum_ordinary)
+                // are actually read and applied to vote outcomes.  Without this call,
+                // charter-derived thresholds were computed but never consumed.
+                //
+                // charter_id = domain DID (cooperatives identify their charter by DID).
                 let thresholds = self
                     .get_thresholds_from_params(&proposal.payload, None)
+                    .or_else(|| {
+                        self.get_thresholds_from_charter(
+                            proposal.domain_id.0.as_str(),
+                            eligible_count,
+                        )
+                    })
                     .unwrap_or_else(|| domain.config.thresholds_for_proposal(&proposal.payload));
 
                 // Evaluate outcome with proposal-type-specific thresholds

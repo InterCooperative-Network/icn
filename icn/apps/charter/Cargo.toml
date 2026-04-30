@@ -13,6 +13,10 @@ icn-kernel-api = { path = "../../crates/icn-kernel-api" }
 # CCL schema + bridge (charter_to_constraints, CharterContext, CclDocument)
 icn-ccl = { path = "../../crates/icn-ccl" }
 
+# Ledger trait `EconomicPolicyView` — typed adapter that lets the ledger
+# consume charter-derived credit limits without coupling to charter internals.
+icn-ledger = { path = "../../crates/icn-ledger" }
+
 # Sync primitives (PolicyOracle::evaluate() is synchronous)
 parking_lot = "0.12"
 

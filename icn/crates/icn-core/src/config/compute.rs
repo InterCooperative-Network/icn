@@ -171,7 +171,11 @@ pub struct VerificationConfig {
     #[serde(default = "default_high_value_quorum")]
     pub high_value_quorum: usize,
 
-    /// Minimum consensus percentage (0.0-1.0) for accepting results
+    /// Minimum fraction of executors that must agree on the result (0.0–1.0).
+    ///
+    /// "Agreement" here means independent compute nodes returning identical output.
+    /// This is NOT blockchain/BFT consensus — it is trust-gated executor quorum.
+    /// Arbiter selection uses `TrustPolicyOracle`. Default: 0.67 (two-thirds majority).
     #[serde(default = "default_consensus_threshold")]
     pub consensus_threshold: f64,
 

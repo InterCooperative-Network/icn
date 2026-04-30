@@ -1188,7 +1188,6 @@ pub struct StewardDetailResponse {
     pub jurisdiction: Option<String>,
     pub term_start: u64,
     pub term_end: u64,
-    pub bond_amount: u64,
     pub reputation_score: f64,
     pub effectiveness_score: f64,
     pub attestations_issued: u64,

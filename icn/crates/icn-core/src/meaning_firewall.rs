@@ -393,7 +393,9 @@ mod tests {
     #[test]
     fn strict_core_ledger_reference_ratchet() {
         // actors.rs: 3 refs (LedgerHandle, DisputeManagerHandle, TreasuryManagerHandle type aliases).
-        // ledger_service.rs: 1 ref — composition root.
+        // ledger_service.rs: 2 refs — production composition root + test-module import of
+        //   SurplusPolicyView (trait import for surplus reserves enforcement tests; test
+        //   code respects the firewall by using a local mock instead of icn-charter-app).
         // bin/ledger_restart_helper.rs: 1 ref — test infrastructure.
         //
         // init_compute.rs: 0 refs — factory functions (balance/payment/commons settlement) and
@@ -402,7 +404,7 @@ mod tests {
         //   icn_compute callback types, keeping the kernel/app boundary intact.
         // Passthrough structs (GatewayActorHandles, GatewayHandles, ComputeServices)
         //   use Arc<dyn SettlementQueryService> — concrete SettlementEngine fully removed.
-        let expected: usize = 5;
+        let expected: usize = 6;
         let actual = count_imports_in_crate("icn-core", "icn_ledger::");
 
         assert!(

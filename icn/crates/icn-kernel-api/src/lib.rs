@@ -121,7 +121,8 @@ pub use services::{
     SecurityViolation, ServiceRegistry, SettlementQueryResult, SettlementQueryService,
     SettlementReceiptResult, SuspendStewardRequest, SuspendStewardResult, TreasuryEntryRequest,
     TreasuryEntryResult, TreasuryOperationType as ServicesTreasuryOperationType, TrustClass,
-    TrustEvent, TrustService, UnfreezeMemberRequest, UnfreezeMemberResult, UpdateMemberRequest,
+    TrustEvent, TrustService, UnfreezeMemberRequest, UnfreezeMemberResult,
+    UpdateJurisdictionTierRequest, UpdateJurisdictionTierResult, UpdateMemberRequest,
     UpdateMemberResult, VetoProposalRequest, VetoProposalResult, TRUST_THRESHOLD_FEDERATED,
     TRUST_THRESHOLD_KNOWN, TRUST_THRESHOLD_PARTNER,
 };

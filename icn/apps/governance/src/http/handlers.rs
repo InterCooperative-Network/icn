@@ -1212,7 +1212,6 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                 match sdis_proposal {
                     icn_governance::sdis::SdisProposal::AppointSteward {
                         candidate,
-                        bond_amount,
                         term_length,
                         ..
                     } => {
@@ -1220,7 +1219,6 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
                             steward_did: candidate.to_string(),
                             jurisdiction_id: proposal.domain_id.0.clone(),
                             term_length_seconds: *term_length as i64,
-                            bond_amount: *bond_amount,
                             region: None,
                             proposal_id: proposal.id.0.clone(),
                         };
@@ -2415,7 +2413,6 @@ pub async fn create_appoint_steward_proposal<E: GovernanceEventEmitter + Clone +
             candidate,
             sponsors,
             region: req.region.clone(),
-            bond_amount: req.bond_amount,
             term_length: req.term_length_seconds,
         },
     };
@@ -2489,7 +2486,6 @@ pub async fn create_remove_steward_proposal<E: GovernanceEventEmitter + Clone + 
         proposal: icn_governance::sdis::SdisProposal::RemoveSteward {
             steward: steward_did,
             reason: req.reason.clone(),
-            return_bond: req.return_bond,
         },
     };
 

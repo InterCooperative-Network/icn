@@ -1169,7 +1169,6 @@ impl GatewayServer {
                         domain_id,
                         candidate,
                         region: _,
-                        bond_amount,
                         term_length_seconds,
                     } => {
                         // Register the candidate as a steward in commons, scoped to the
@@ -1181,13 +1180,11 @@ impl GatewayServer {
                         let commons_mgr = commons_mgr_for_gov.clone();
                         tokio::spawn(async move {
                             let term_days = term_length_seconds / 86_400;
-                            let bond = bond_amount.max(0) as u64;
                             match commons_mgr
                                 .register_steward(
                                     &candidate,
                                     &candidate,
                                     term_days,
-                                    bond,
                                     proposal_id,
                                     Some(domain_id.clone()),
                                     vec![],

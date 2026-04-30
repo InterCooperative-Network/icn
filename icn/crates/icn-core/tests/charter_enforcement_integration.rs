@@ -202,7 +202,13 @@ async fn test_charter_validator_detailed_results() -> Result<()> {
         println!(
             "Rule '{}': {} {}",
             result.rule_name,
-            if result.passed { "✓" } else { "✗" },
+            if result.passed() {
+                "✓"
+            } else if result.is_deferred() {
+                "?"
+            } else {
+                "✗"
+            },
             result.reason.as_deref().unwrap_or("")
         );
     }

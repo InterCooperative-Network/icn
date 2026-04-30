@@ -100,7 +100,6 @@ pub enum GovernanceEffect {
         domain_id: String,
         candidate: Did,
         region: String,
-        bond_amount: i64,
         term_length_seconds: u64,
     },
     /// A steward's appointment should be revoked for cause.

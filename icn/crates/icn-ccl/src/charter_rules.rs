@@ -71,10 +71,30 @@ impl CharterRule {
     }
 }
 
+/// Evaluation status of a charter rule.
+///
+/// `Deferred` distinguishes "not yet evaluated" from "evaluated and failed".
+/// A deferred rule is NOT a failure — the system is permissive about rules it
+/// cannot yet enforce — but it is NOT a pass either.  Callers should surface
+/// deferred rules via warnings so they are visible in audit trails.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuleStatus {
+    /// Rule was evaluated and the entry satisfies it.
+    Pass,
+    /// Rule was evaluated and the entry violates it.
+    Fail,
+    /// Rule evaluation is deferred — the validator does not yet support full
+    /// CCL interpreter integration for this rule kind.
+    ///
+    /// Deferred ≠ Pass.  The rule is not enforced, but it is not silently
+    /// approved.  Callers should log or surface this.
+    Deferred,
+}
+
 /// Charter rule validation result
 #[derive(Debug, Clone)]
 pub struct ValidationResult {
-    pub passed: bool,
+    pub status: RuleStatus,
     pub rule_name: String,
     pub reason: Option<String>,
 }
@@ -82,7 +102,7 @@ pub struct ValidationResult {
 impl ValidationResult {
     pub fn pass(rule_name: impl Into<String>) -> Self {
         Self {
-            passed: true,
+            status: RuleStatus::Pass,
             rule_name: rule_name.into(),
             reason: None,
         }
@@ -90,10 +110,37 @@ impl ValidationResult {
 
     pub fn fail(rule_name: impl Into<String>, reason: impl Into<String>) -> Self {
         Self {
-            passed: false,
+            status: RuleStatus::Fail,
             rule_name: rule_name.into(),
             reason: Some(reason.into()),
         }
+    }
+
+    /// Rule evaluation is deferred — not enforced, but not silently approved.
+    pub fn deferred(rule_name: impl Into<String>) -> Self {
+        Self {
+            status: RuleStatus::Deferred,
+            rule_name: rule_name.into(),
+            reason: Some(
+                "evaluation deferred: full CCL interpreter not yet wired to this validator"
+                    .to_string(),
+            ),
+        }
+    }
+
+    /// True only for `RuleStatus::Pass`.  Deferred is not a pass.
+    pub fn passed(&self) -> bool {
+        self.status == RuleStatus::Pass
+    }
+
+    /// True only for `RuleStatus::Fail`.
+    pub fn failed(&self) -> bool {
+        self.status == RuleStatus::Fail
+    }
+
+    /// True only for `RuleStatus::Deferred`.
+    pub fn is_deferred(&self) -> bool {
+        self.status == RuleStatus::Deferred
     }
 }
 
@@ -163,10 +210,30 @@ mod tests {
     }
 
     #[test]
-    fn test_validation_result() {
+    fn test_validation_result_pass() {
         let pass = ValidationResult::pass("test_rule");
-        assert!(pass.passed);
-        let fail = ValidationResult::fail("test_rule", "failed");
-        assert!(!fail.passed);
+        assert!(pass.passed());
+        assert!(!pass.failed());
+        assert!(!pass.is_deferred());
+    }
+
+    #[test]
+    fn test_validation_result_fail() {
+        let fail = ValidationResult::fail("test_rule", "limit exceeded");
+        assert!(!fail.passed());
+        assert!(fail.failed());
+        assert!(!fail.is_deferred());
+        assert_eq!(fail.reason.as_deref(), Some("limit exceeded"));
+    }
+
+    #[test]
+    fn test_validation_result_deferred_is_not_pass() {
+        let deferred = ValidationResult::deferred("test_rule");
+        // Deferred must not be treated as passing — it's unenforced, not approved.
+        assert!(!deferred.passed());
+        assert!(!deferred.failed());
+        assert!(deferred.is_deferred());
+        // Reason must be present so callers can surface why enforcement was skipped.
+        assert!(deferred.reason.is_some());
     }
 }

@@ -2856,6 +2856,7 @@ dependencies = [
  "anyhow",
  "icn-ccl",
  "icn-kernel-api",
+ "icn-ledger",
  "parking_lot 0.12.5",
  "tracing",
 ]

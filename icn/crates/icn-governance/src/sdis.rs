@@ -22,6 +22,12 @@ pub enum SdisProposal {
     ///
     /// Requires sponsors and goes through normal voting.
     /// The candidate must meet steward requirements.
+    ///
+    /// # Stewardship is an elected office, not a staking position
+    ///
+    /// Stewards hold a mandate of trust and delegated institutional authority.
+    /// Appointment does not require posting financial collateral; the governance
+    /// vote itself is the legitimating act. See ADR-0014 for the full rationale.
     AppointSteward {
         /// DID of the candidate
         candidate: Did,
@@ -29,8 +35,6 @@ pub enum SdisProposal {
         sponsors: Vec<Did>,
         /// Region the steward will serve
         region: String,
-        /// Proposed bond amount
-        bond_amount: i64,
         /// Proposed term length in seconds
         term_length: u64,
     },
@@ -43,8 +47,6 @@ pub enum SdisProposal {
         steward: Did,
         /// Reason for removal
         reason: String,
-        /// Whether to return bond
-        return_bond: bool,
     },
 
     /// Sanction a steward for misconduct
@@ -162,22 +164,35 @@ pub enum SdisProposal {
     },
 }
 
-/// Penalties that can be applied to stewards
+/// Penalties that can be applied to stewards via governance sanction.
+///
+/// # Semantic boundary
+///
+/// All steward sanctions are **status, authority, and scope changes** — not
+/// financial punishments. Stewardship is an elected/permissioned institutional
+/// office backed by trust and mandate, not by posted financial collateral.
+///
+/// If an economic consequence is ever needed for a specific economic role (e.g.,
+/// a task-runner who posts escrow), that must be modeled separately and explicitly,
+/// tied to the economic function rather than the steward office itself.
+///
+/// See ADR-0014: Stewardship Semantics.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StewardPenalty {
-    /// Formal warning, no other action
+    /// Formal warning — recorded in the governance audit trail, no state change.
     Warning,
+
+    /// Formal censure — a stronger institutional rebuke than a warning.
+    ///
+    /// Censure is a matter of public record in the governance history but does
+    /// not alter the steward's operational status or authority. Use `Suspension`
+    /// if operational impact is required.
+    Censure,
 
     /// Temporary suspension
     Suspension {
         /// Duration in seconds
         duration: u64,
-    },
-
-    /// Bond reduction
-    BondSlash {
-        /// Amount to slash from bond
-        amount: i64,
     },
 
     /// Tier demotion
@@ -187,10 +202,7 @@ pub enum StewardPenalty {
     },
 
     /// Permanent removal
-    Removal {
-        /// Whether to return remaining bond
-        return_bond: bool,
-    },
+    Removal,
 
     /// Probation period with enhanced monitoring
     Probation {
@@ -401,20 +413,18 @@ impl SdisProposal {
 
             // Sanctions depend on severity
             SdisProposal::SanctionSteward { penalty, .. } => match penalty {
-                StewardPenalty::Removal { .. } => SdisVotingRequirements {
+                StewardPenalty::Removal => SdisVotingRequirements {
                     quorum_percentage: 40,
                     approval_percentage: 67,
                     min_voting_period: 7 * 24 * 3600,
                     execution_delay: 24 * 3600,
                 },
-                StewardPenalty::BondSlash { .. } | StewardPenalty::TierDemotion { .. } => {
-                    SdisVotingRequirements {
-                        quorum_percentage: 30,
-                        approval_percentage: 60,
-                        min_voting_period: 5 * 24 * 3600,
-                        execution_delay: 12 * 3600,
-                    }
-                }
+                StewardPenalty::TierDemotion { .. } => SdisVotingRequirements {
+                    quorum_percentage: 30,
+                    approval_percentage: 60,
+                    min_voting_period: 5 * 24 * 3600,
+                    execution_delay: 12 * 3600,
+                },
                 _ => SdisVotingRequirements {
                     quorum_percentage: 25,
                     approval_percentage: 51,
@@ -526,16 +536,17 @@ mod tests {
     #[test]
     fn test_steward_penalty_variants() {
         let warning = StewardPenalty::Warning;
+        let censure = StewardPenalty::Censure;
         let suspension = StewardPenalty::Suspension { duration: 86400 };
-        let slash = StewardPenalty::BondSlash { amount: 1000 };
         let demotion = StewardPenalty::TierDemotion {
             new_tier: JurisdictionTier::Tier2,
         };
-        let removal = StewardPenalty::Removal { return_bond: false };
+        let removal = StewardPenalty::Removal;
 
-        // Just verify they can be created and compared
-        assert_ne!(warning, suspension);
-        assert_ne!(slash, demotion);
+        // All variants are status/authority changes — none carry financial amounts
+        assert_ne!(warning, censure);
+        assert_ne!(censure, suspension);
+        assert_ne!(censure, demotion);
         assert_ne!(warning, removal);
     }
 
@@ -572,7 +583,6 @@ mod tests {
         let removal = SdisProposal::RemoveSteward {
             steward: did.clone(),
             reason: "test".to_string(),
-            return_bond: true,
         };
         let reqs = removal.voting_requirements();
         assert_eq!(reqs.approval_percentage, 67);
@@ -605,7 +615,6 @@ mod tests {
             candidate: did.clone(),
             sponsors: vec![],
             region: "US-CA".to_string(),
-            bond_amount: 10000,
             term_length: 365 * 24 * 3600,
         };
         assert!(appoint.description().contains("US-CA"));
@@ -613,7 +622,6 @@ mod tests {
         let remove = SdisProposal::RemoveSteward {
             steward: did.clone(),
             reason: "misconduct".to_string(),
-            return_bond: false,
         };
         assert!(remove.description().contains("misconduct"));
     }

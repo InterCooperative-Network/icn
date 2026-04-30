@@ -788,6 +788,84 @@ impl LedgerService for LedgerServiceImpl {
         let append_result = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 let mut ledger = self.ledger.write().await;
+
+                // Surplus reserves policy check (DistributeSurplus only).
+                //
+                // Enforces the charter's `surplus_reserves_pct` constraint before
+                // writing the journal entry. The check reads the current treasury
+                // balance (pre-distribution) and verifies that the requested
+                // distribution amount does not leave the treasury below the
+                // charter-mandated reserves floor.
+                //
+                // Truth states:
+                //   ENFORCED        — charter has reserves_pct; check passed or failed
+                //   FALLBACK_APPLIED — charter deployed but no reserves_pct key
+                //   UNSUPPORTED     — no surplus policy view configured
+                if req.operation_type == TreasuryOperationType::DistributeSurplus {
+                    if let Some((charter_id, view)) = ledger.charter_surplus_view_and_id() {
+                        match view.reserves_pct_for(charter_id) {
+                            Some(reserves_pct) if reserves_pct > 0.0 && reserves_pct < 1.0 => {
+                                // ICN mutual-credit accounting: the treasury's balance is
+                                // NEGATIVE when it holds surplus obligations owed to members.
+                                // DistributeSurplus debits the treasury (makes it less negative).
+                                // Negate to get the "distributable pool" (how much surplus exists).
+                                let raw_balance =
+                                    ledger.get_balance(&self.treasury_did, &req.currency);
+                                let distributable_pool = (-raw_balance).max(0i64);
+                                let max_distributable =
+                                    (distributable_pool as f64 * (1.0 - reserves_pct)).floor()
+                                        as i64;
+                                if req.amount > max_distributable {
+                                    tracing::warn!(
+                                        truth_state = "ENFORCED",
+                                        charter_id = %charter_id,
+                                        reserves_pct = reserves_pct,
+                                        distributable_pool = distributable_pool,
+                                        max_distributable = max_distributable,
+                                        requested = req.amount,
+                                        currency = %req.currency,
+                                        "Charter surplus reserves policy: distribution exceeds maximum"
+                                    );
+                                    return Err(format!(
+                                        "Charter surplus reserves policy (reserves_pct={reserves_pct:.4}) \
+                                         requires at least {} {} in treasury after distribution; \
+                                         requested {} {} but max distributable is {}. \
+                                         truth_state=ENFORCED",
+                                        (distributable_pool as f64 * reserves_pct).ceil() as i64,
+                                        req.currency,
+                                        req.amount,
+                                        req.currency,
+                                        max_distributable,
+                                    ));
+                                }
+                                tracing::info!(
+                                    truth_state = "ENFORCED",
+                                    charter_id = %charter_id,
+                                    reserves_pct = reserves_pct,
+                                    distributable_pool = distributable_pool,
+                                    max_distributable = max_distributable,
+                                    distribution_amount = req.amount,
+                                    currency = %req.currency,
+                                    "Charter surplus reserves policy: distribution within limit"
+                                );
+                            }
+                            Some(_) | None => {
+                                // Charter deployed but no reserves_pct constraint — allow freely.
+                                tracing::debug!(
+                                    truth_state = "FALLBACK_APPLIED",
+                                    charter_id = %charter_id,
+                                    "No surplus_reserves_pct in charter; distribution proceeds without reserves check"
+                                );
+                            }
+                        }
+                    } else {
+                        tracing::debug!(
+                            truth_state = "UNSUPPORTED",
+                            "No surplus policy view configured; distribution proceeds without reserves check"
+                        );
+                    }
+                }
+
                 self.check_spend_nonce(&req)?;
                 let entry_hash = ledger
                     .append_entry(entry)
@@ -835,6 +913,7 @@ mod tests {
     use super::*;
     use icn_identity::KeyPair;
     use icn_kernel_api::AllowAllOracle;
+    use icn_ledger::credit_policy::SurplusPolicyView;
     use icn_store::SledStore;
     use tempfile::TempDir;
 
@@ -1123,5 +1202,221 @@ mod tests {
 
         let after = service.get_treasury_nonce(treasury_id).unwrap();
         assert_eq!(after, baseline + 1);
+    }
+
+    // ── Surplus reserves policy enforcement tests ─────────────────────────────
+
+    /// Minimal mock implementing `SurplusPolicyView` for use in kernel-layer tests.
+    ///
+    /// Kernel tests must NOT import app crates — the meaning firewall applies to
+    /// test code as much as production code. `SurplusPolicyView` is imported once
+    /// at the top of the test module so individual tests can reference the short name.
+    struct FixedSurplusView {
+        reserves_pct: Option<f64>,
+    }
+
+    impl SurplusPolicyView for FixedSurplusView {
+        fn reserves_pct_for(&self, _charter_id: &str) -> Option<f64> {
+            self.reserves_pct
+        }
+    }
+
+    /// Helper: create a ledger whose treasury account has `balance` units of surplus.
+    ///
+    /// In ICN mutual-credit accounting, the treasury has a NEGATIVE balance when it
+    /// holds obligations owed to members (surplus available to distribute). A `credit`
+    /// delta makes the treasury balance negative — `(-treasury_balance)` is the
+    /// distributable pool. The balancing `debit` goes to a synthetic genesis account.
+    async fn setup_ledger_with_treasury_balance(
+        treasury_did: &icn_identity::Did,
+        balance: i64,
+        currency: &str,
+    ) -> Arc<RwLock<Ledger>> {
+        let ledger_arc = Arc::new(RwLock::new(
+            Ledger::new(Arc::new(SledStore::temporary().unwrap())).unwrap(),
+        ));
+
+        let genesis_did = KeyPair::generate().unwrap().did().clone();
+        let entry = JournalEntryBuilder::new(treasury_did.clone())
+            .add_delta(AccountDelta::debit(
+                genesis_did,
+                currency.to_string(),
+                balance,
+            ))
+            .add_delta(AccountDelta::credit(
+                treasury_did.clone(),
+                currency.to_string(),
+                balance,
+            ))
+            .with_governance_provenance("seed-receipt", "seed-hash")
+            .build()
+            .unwrap();
+
+        ledger_arc.write().await.append_entry(entry).await.unwrap();
+        ledger_arc
+    }
+
+    /// Charter `surplus_reserves_pct = 0.10` blocks distributions that leave
+    /// less than 10% of the distributable pool as reserves.
+    ///
+    /// truth_state=ENFORCED when the charter constraint is active.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_surplus_reserves_policy_enforced_blocks_excess_distribution() {
+        // Treasury distributable pool = 1000 (treasury.balance = -1000); reserves_pct = 0.10
+        // max_distributable = 1000 * (1 - 0.10) = 900
+        // So distributing 950 must be REJECTED; distributing 900 must be ALLOWED.
+
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+        let member_did = KeyPair::generate().unwrap().did().clone();
+        let currency = "HOURS";
+        let treasury_balance = 1000_i64;
+
+        let ledger_arc =
+            setup_ledger_with_treasury_balance(&treasury_did, treasury_balance, currency).await;
+
+        let surplus_view: Arc<dyn SurplusPolicyView> = Arc::new(FixedSurplusView {
+            reserves_pct: Some(0.10),
+        });
+        ledger_arc
+            .write()
+            .await
+            .set_charter_surplus_view("coop-test".to_string(), surplus_view);
+
+        let service = LedgerServiceImpl::new(
+            ledger_arc.clone(),
+            Arc::new(AllowAllOracle::wildcard()),
+            treasury_did.clone(),
+        );
+
+        // --- Test 1: distribution of 950 exceeds max (900) → REJECTED ---
+        let req_too_large = TreasuryEntryRequest {
+            treasury_id: treasury_did.to_string(),
+            operation_type: TreasuryOperationType::DistributeSurplus,
+            amount: 950,
+            currency: currency.to_string(),
+            recipient: None,
+            memo: "patronage distribution".to_string(),
+            expected_nonce: None,
+            decision_receipt_id: "receipt-reject-1".to_string(),
+            decision_hash: "hash-reject-1".to_string(),
+            distributions: vec![(member_did.to_string(), 950)],
+        };
+        let result = service.submit_treasury_entry(req_too_large);
+        assert!(
+            result.is_err(),
+            "Distribution exceeding reserves policy must be rejected"
+        );
+        let err_msg = result.unwrap_err();
+        assert!(
+            err_msg.contains("truth_state=ENFORCED"),
+            "Error must include truth_state=ENFORCED, got: {err_msg}"
+        );
+        assert!(
+            err_msg.contains("reserves_pct"),
+            "Error must mention reserves_pct, got: {err_msg}"
+        );
+
+        // --- Test 2: distribution of 900 = max → ALLOWED ---
+        let req_within_limit = TreasuryEntryRequest {
+            treasury_id: treasury_did.to_string(),
+            operation_type: TreasuryOperationType::DistributeSurplus,
+            amount: 900,
+            currency: currency.to_string(),
+            recipient: None,
+            memo: "patronage distribution".to_string(),
+            expected_nonce: None,
+            decision_receipt_id: "receipt-allow-1".to_string(),
+            decision_hash: "hash-allow-1".to_string(),
+            distributions: vec![(member_did.to_string(), 900)],
+        };
+        let result = service.submit_treasury_entry(req_within_limit);
+        assert!(
+            result.is_ok(),
+            "Distribution within reserves policy must succeed, got: {:?}",
+            result.err()
+        );
+    }
+
+    /// Without a surplus view configured, distributions proceed with
+    /// truth_state=UNSUPPORTED (no enforcement).
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_surplus_reserves_policy_unsupported_allows_any_distribution() {
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+        let member_did = KeyPair::generate().unwrap().did().clone();
+        let currency = "HOURS";
+
+        let ledger_arc = setup_ledger_with_treasury_balance(&treasury_did, 1000, currency).await;
+
+        // No surplus view configured.
+        let service = LedgerServiceImpl::new(
+            ledger_arc.clone(),
+            Arc::new(AllowAllOracle::wildcard()),
+            treasury_did.clone(),
+        );
+
+        // Distribution of 999 (far over any hypothetical reserves floor) must succeed.
+        let req = TreasuryEntryRequest {
+            treasury_id: treasury_did.to_string(),
+            operation_type: TreasuryOperationType::DistributeSurplus,
+            amount: 999,
+            currency: currency.to_string(),
+            recipient: None,
+            memo: "distribution — no charter".to_string(),
+            expected_nonce: None,
+            decision_receipt_id: "receipt-unsupported-1".to_string(),
+            decision_hash: "hash-unsupported-1".to_string(),
+            distributions: vec![(member_did.to_string(), 999)],
+        };
+        let result = service.submit_treasury_entry(req);
+        assert!(
+            result.is_ok(),
+            "Without surplus view, any distribution must proceed (truth_state=UNSUPPORTED): {:?}",
+            result.err()
+        );
+    }
+
+    /// Charter deployed but `reserves_pct_for` returns `None` → FALLBACK_APPLIED,
+    /// distribution proceeds without constraint.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_surplus_reserves_policy_fallback_applied_when_charter_has_no_surplus() {
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+        let member_did = KeyPair::generate().unwrap().did().clone();
+        let currency = "HOURS";
+
+        let ledger_arc = setup_ledger_with_treasury_balance(&treasury_did, 1000, currency).await;
+
+        // View returns None — simulates a governance-only charter with no surplus section.
+        let surplus_view: Arc<dyn SurplusPolicyView> =
+            Arc::new(FixedSurplusView { reserves_pct: None });
+        ledger_arc
+            .write()
+            .await
+            .set_charter_surplus_view("coop-gov-only".to_string(), surplus_view);
+
+        let service = LedgerServiceImpl::new(
+            ledger_arc.clone(),
+            Arc::new(AllowAllOracle::wildcard()),
+            treasury_did.clone(),
+        );
+
+        // Distribution of 999 — no reserves constraint in charter → must SUCCEED.
+        let req = TreasuryEntryRequest {
+            treasury_id: treasury_did.to_string(),
+            operation_type: TreasuryOperationType::DistributeSurplus,
+            amount: 999,
+            currency: currency.to_string(),
+            recipient: None,
+            memo: "distribution — gov-only charter".to_string(),
+            expected_nonce: None,
+            decision_receipt_id: "receipt-fallback-1".to_string(),
+            decision_hash: "hash-fallback-1".to_string(),
+            distributions: vec![(member_did.to_string(), 999)],
+        };
+        let result = service.submit_treasury_entry(req);
+        assert!(
+            result.is_ok(),
+            "Charter with no surplus policy → FALLBACK_APPLIED, must allow: {:?}",
+            result.err()
+        );
     }
 }

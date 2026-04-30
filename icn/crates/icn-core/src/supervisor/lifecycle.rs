@@ -369,6 +369,7 @@ async fn spawn_actors_with_identity(
     let compute_payment_callback = handles.payment_callback;
     let compute_commons_settlement_callback = handles.commons_settlement_callback;
     let compute_settlement_query_engine = handles.settlement_query_engine;
+    let charter_oracle_for_governance = handles.charter_oracle;
 
     // Wire runtime handles into the pre-initialized Ledger.
     // These depend on gossip/trust which are only available after gossip init.
@@ -673,6 +674,7 @@ async fn spawn_actors_with_identity(
             protocol_parameter_store: protocol_parameter_store_from_daemon,
             signing_key: governance_signing_key,
             trust_service: trust_service_from_registry.clone(),
+            charter_oracle: charter_oracle_for_governance,
         },
     )
     .await?;
@@ -686,6 +688,55 @@ async fn spawn_actors_with_identity(
     gateway_handles.governance = Some(Arc::new(governance_handle.clone()));
     gateway_handles.treasury = Some(treasury_manager_handle.clone());
     gateway_handles.ledger = Some(ledger_handle.clone());
+
+    // ── Charter policy view startup recovery (ADR-0016 Tranche II) ─────────────
+    //
+    // After a daemon restart the CharterPolicyOracle is empty even though the
+    // governance Sled store retains accepted Charter proposals. Re-deploy each
+    // accepted charter and rebind the ledger's economic and surplus policy views
+    // so enforcement is ENFORCED from the first transaction, not only after the
+    // next ratification event.
+    //
+    // truth_state semantics:
+    //   ENFORCED         — ≥1 accepted charter recovered and views rebound
+    //   UNSUPPORTED      — no accepted charters found, or governance store unreadable
+    //
+    // Caveat: the rebinding is still in-memory only (the oracle and ledger hold
+    // `Arc` references). If the daemon restarts again, recovery runs again.
+    // This is correct behaviour: recovery is idempotent.
+    if let Some(ref hook) = gateway_handles.charter_accepted_hook {
+        match governance_handle.list_accepted_charter_proposals().await {
+            Ok(charters) if !charters.is_empty() => {
+                let count = charters.len();
+                for (charter_id, charter_yaml) in charters {
+                    info!(
+                        truth_state = "ENFORCED",
+                        charter_id = %charter_id,
+                        "Startup: redeploying accepted charter from governance store"
+                    );
+                    hook(charter_id, charter_yaml);
+                }
+                info!(
+                    "Startup charter recovery complete: {} charter(s) redeployed \
+                     (truth_state=ENFORCED for all rebound charters)",
+                    count
+                );
+            }
+            Ok(_) => {
+                debug!(
+                    "Startup charter recovery: no accepted charters in governance store \
+                     (truth_state=UNSUPPORTED — charter enforcement not active)"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "Startup charter recovery failed: {} \
+                     (truth_state=UNSUPPORTED — charter enforcement inactive until next ratification)",
+                    e
+                );
+            }
+        }
+    }
 
     // Subscribe to governance events via the effect path
     // The effect path is now the default - legacy governance_handlers have been removed.

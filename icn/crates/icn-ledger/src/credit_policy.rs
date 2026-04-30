@@ -12,6 +12,104 @@ use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+/// Typed adapter for institutionally-ratified economic policy.
+///
+/// `EconomicPolicyView` is the **typed bridge** between policy artifacts
+/// (CCL charters, treaties, etc.) and the economic decision boundary inside
+/// the ledger.  Implementations live in app crates (`apps/charter`,
+/// future `apps/treasury`, etc.) and are injected into the `Ledger` so that
+/// `process_entry()` can consult ratified institutional policy *before* it
+/// falls back to the hardcoded `CreditPolicyManager`.
+///
+/// # Design notes
+///
+/// - The trait surface uses **plain types** (`&str`, `f64`, `i64`).  This
+///   keeps `icn-ledger` free of any policy-source imports (no `icn-ccl`,
+///   no `icn-charter-app`).  The meaning firewall is preserved: the ledger
+///   never learns *why* a limit is what it is, only that an institutionally
+///   ratified value exists.
+/// - Implementations are responsible for evaluating policy expressions in
+///   the correct runtime context.  The ledger passes per-member economic
+///   inputs (`member_patronage`, `member_trust_score`); the implementation
+///   evaluates the charter expression with those bindings.
+/// - Returning `None` is the explicit "no charter policy applies" signal.
+///   Callers must fall back to their default credit policy chain
+///   (dynamic → static → unbounded) and surface the truth state.
+///
+/// # Truth states
+///
+/// At the call site, the ledger classifies each credit decision into one of:
+///
+/// | State | Meaning |
+/// |---|---|
+/// | `ENFORCED` | View returned `Some(limit)`; charter governed the decision |
+/// | `FALLBACK_APPLIED` | View returned `None`; static/dynamic policy used |
+/// | `DEFERRED` | View returned `None` because charter has no economic policy |
+/// | `UNSUPPORTED` | No view configured at all (legacy / unconfigured nodes) |
+pub trait EconomicPolicyView: Send + Sync {
+    /// Compute the charter-derived credit limit for a member, if any.
+    ///
+    /// # Parameters
+    /// - `charter_id`: identifier of the charter to consult (typically the
+    ///   cooperative's DID or human-readable name).
+    /// - `member_patronage`: the member's patronage value to bind into the
+    ///   `patronage` variable when the charter expression references it.
+    ///   Callers commonly pass `cleared_volume` as a proxy.
+    /// - `member_trust_score`: the member's trust score (clamped 0.0–1.0) to
+    ///   bind into the `trust_score` variable.
+    ///
+    /// # Returns
+    /// `Some(limit)` when the charter is deployed, defines a `credit_limit`
+    /// expression, and the expression evaluates to a finite value.
+    /// `None` otherwise — the caller must fall back to its default policy.
+    fn credit_limit_for(
+        &self,
+        charter_id: &str,
+        member_patronage: f64,
+        member_trust_score: f64,
+    ) -> Option<i64>;
+}
+
+/// Typed adapter for institutionally-ratified surplus distribution policy.
+///
+/// `SurplusPolicyView` is the typed bridge between policy artifacts (CCL
+/// charters) and the surplus distribution decision boundary inside the ledger.
+/// Implementations live in app crates (`apps/charter`) and are injected into
+/// the `Ledger` so that `submit_treasury_entry()` can enforce charter-derived
+/// reserves constraints *before* the distribution journal entry is written.
+///
+/// # Design notes
+///
+/// - The trait surface uses plain types (`&str`, `f64`). This keeps
+///   `icn-ledger` free of any policy-source imports. The meaning firewall is
+///   preserved: the ledger never learns *why* a reserves fraction was chosen.
+/// - Returning `None` means "charter does not define a reserves constraint."
+///   The caller must allow the distribution to proceed (with `FALLBACK_APPLIED`
+///   truth state logged) rather than silently blocking it.
+///
+/// # Truth states at the call site
+///
+/// | State | Condition |
+/// |---|---|
+/// | `ENFORCED` | View returned `Some(pct)`; charter governs the maximum distribution |
+/// | `FALLBACK_APPLIED` | View returned `None`; charter has no `surplus_reserves_pct` key |
+/// | `UNSUPPORTED` | No view configured (legacy / unconfigured node) |
+pub trait SurplusPolicyView: Send + Sync {
+    /// Return the minimum fraction of the treasury balance that must remain
+    /// after a surplus distribution, if the charter defines such a constraint.
+    ///
+    /// # Parameters
+    /// - `charter_id`: the cooperative's charter identifier (usually its DID).
+    ///
+    /// # Returns
+    /// `Some(pct)` (clamped 0.0–1.0) when the charter defines a
+    /// `surplus_reserves_pct` constraint. `None` when the charter is not
+    /// deployed, or the charter has no such constraint. A `None` return does
+    /// NOT block the distribution — the caller logs `FALLBACK_APPLIED` and
+    /// proceeds.
+    fn reserves_pct_for(&self, charter_id: &str) -> Option<f64>;
+}
+
 /// Seconds in one day (24 * 60 * 60)
 pub const SECONDS_PER_DAY: u64 = 86_400;
 

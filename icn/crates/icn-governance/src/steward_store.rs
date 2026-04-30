@@ -548,7 +548,6 @@ mod tests {
             test_holder_did(),
             now,
             now + 365 * 24 * 60 * 60,
-            1000,
             "proposal-001".to_string(),
         )
     }
@@ -604,7 +603,6 @@ mod tests {
             Did::from_anchor_id(&[45u8; 32]),
             1000,
             2000,
-            500,
             "proposal-002".to_string(),
         );
         record2.jurisdiction = Some("federation:pacific-nw".to_string());
@@ -761,7 +759,6 @@ mod tests {
             TEST_DID_4.parse().expect("valid test DID"),
             1000,
             2000,
-            500,
             "proposal-002".to_string(),
         );
         let record3 = StewardRecord::new(
@@ -769,7 +766,6 @@ mod tests {
             TEST_DID_6.parse().expect("valid test DID"),
             1000,
             2000,
-            500,
             "proposal-003".to_string(),
         );
 

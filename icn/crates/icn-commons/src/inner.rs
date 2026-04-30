@@ -817,7 +817,6 @@ impl CommonsInner {
         holder_did: &Did,
         steward_did: &Did,
         term_duration_days: u64,
-        bond_amount: u64,
         governance_approval: String,
         jurisdiction: Option<String>,
         specializations: Vec<String>,
@@ -852,7 +851,6 @@ impl CommonsInner {
             holder_did.clone(),
             now,
             term_end,
-            bond_amount,
             governance_approval,
         );
 
@@ -884,7 +882,6 @@ impl CommonsInner {
             steward_did = %steward_did.to_string(),
             holder_did = %holder_did.to_string(),
             jurisdiction = ?jurisdiction,
-            bond_amount = bond_amount,
             "Steward registered"
         );
 
@@ -1105,28 +1102,42 @@ impl CommonsInner {
         Ok(())
     }
 
-    /// Add to a steward's bond
-    pub async fn add_steward_bond(&self, steward_id: &str, amount: u64) -> Result<()> {
+    /// Update a steward's jurisdiction tier via a governance-ratified proposal.
+    ///
+    /// Parses `new_tier` string ("Tier1" / "Tier2" / "Tier3"), reads the current
+    /// `StewardRecord`, sets the tier, and writes it back to Sled.
+    /// Returns an error if the steward is not found or the tier string is invalid.
+    pub async fn update_jurisdiction_tier(&self, steward_id: &str, new_tier: &str) -> Result<()> {
+        use icn_governance::sdis::JurisdictionTier;
+        let tier = match new_tier {
+            "Tier1" => JurisdictionTier::Tier1,
+            "Tier2" => JurisdictionTier::Tier2,
+            "Tier3" => JurisdictionTier::Tier3,
+            other => {
+                return Err(anyhow::anyhow!(
+                    "Unknown jurisdiction tier '{}'; expected Tier1/Tier2/Tier3",
+                    other
+                ));
+            }
+        };
+
         let mut steward = self
             .store
             .get_steward(steward_id)?
             .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        steward.add_bond(amount);
+        steward.set_jurisdiction_tier(tier);
         self.store.put_steward(&steward)?;
+
+        info!(
+            target: "commons_audit",
+            action = "steward_tier_updated",
+            steward_id = %steward_id,
+            new_tier = %new_tier,
+            "Steward jurisdiction tier updated via governance dispatch"
+        );
+
         Ok(())
-    }
-
-    /// Slash a steward's bond
-    pub async fn slash_steward_bond(&self, steward_id: &str, amount: u64) -> Result<u64> {
-        let mut steward = self
-            .store
-            .get_steward(steward_id)?
-            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
-
-        let result = steward.slash_bond(amount);
-        self.store.put_steward(&steward)?;
-        Ok(result)
     }
 
     // ========== Revocation Operations ==========

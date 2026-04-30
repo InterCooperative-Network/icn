@@ -232,7 +232,6 @@ async fn enroll_as_steward(commons_mgr: &CommonsManager, actor_did: &Did) -> Str
             actor_did,
             actor_did,
             365, // term_days
-            100, // bond
             proposal_id,
             Some(DOMAIN_ID.to_string()),
             vec![],
@@ -275,7 +274,6 @@ async fn test_active_steward_can_submit_appoint_proposal() {
                 "description": "Alice meets all requirements for the northeast region.",
                 "candidate": candidate_did.to_string(),
                 "region": "northeast",
-                "bond_amount": 100,
                 "term_length_seconds": 31_536_000,
                 "sponsors": []
             }))
@@ -317,7 +315,6 @@ async fn test_plain_member_cannot_submit_appoint_proposal() {
                 "description": "Plain members should not be able to do this.",
                 "candidate": candidate_did.to_string(),
                 "region": "northeast",
-                "bond_amount": 100,
                 "term_length_seconds": 31_536_000,
                 "sponsors": []
             }))
@@ -357,7 +354,6 @@ async fn test_non_member_cannot_submit_appoint_proposal() {
                 "description": "No commons standing at all.",
                 "candidate": candidate_did.to_string(),
                 "region": "northeast",
-                "bond_amount": 100,
                 "term_length_seconds": 31_536_000,
                 "sponsors": []
             }))
@@ -397,8 +393,7 @@ async fn test_plain_member_cannot_submit_remove_proposal() {
                 "title": "Unauthorized removal attempt",
                 "description": "Plain members should not be able to remove stewards.",
                 "steward": target_did.to_string(),
-                "reason": "Unauthorized test",
-                "return_bond": false
+                "reason": "Unauthorized test"
             }))
             .to_request(),
     )

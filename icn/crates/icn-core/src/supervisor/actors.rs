@@ -134,4 +134,9 @@ pub struct BootstrapHandles {
     /// The concrete `SettlementEngine` (from `icn-ledger`) is built in the daemon and
     /// injected here as a trait object so `icn-core` never imports `icn-ledger`.
     pub settlement_query_engine: Option<Arc<dyn icn_kernel_api::services::SettlementQueryService>>,
+    /// Charter policy oracle for charter-derived threshold evaluation.
+    /// Built by the daemon from `Arc<CharterPolicyOracle>` and injected as a trait object
+    /// so `icn-core` never imports `icn-charter-app`.  Wired into the governance actor
+    /// so that `CloseProposal` can consult charter thresholds when protocol params are absent.
+    pub charter_oracle: Option<Arc<dyn icn_kernel_api::authz::PolicyOracle>>,
 }

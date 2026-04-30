@@ -43,7 +43,16 @@ pub enum KernelEffect {
     Resource(ResourceEffect),
     /// SDIS effects
     Sdis(SdisEffect),
-    /// No-op effect (e.g., for text proposals)
+    /// No-op effect — governance intent is the institutional act; no state mutation.
+    ///
+    /// Used for proposals whose value lies entirely in the governance record:
+    /// - Text resolutions (the vote IS the decision)
+    /// - Censure / Warning sanctions (institutional rebuke; audit-trail only)
+    /// - Probation recordings (status tracked at CCL/policy layer, not kernel)
+    /// - Deferred effects not yet wired to a CommonsHandle implementation
+    ///
+    /// The proposal receipt and accepted-vote record remain in the governance audit
+    /// trail regardless. `reason` explains which case applies.
     NoOp { reason: String },
 }
 
@@ -339,6 +348,39 @@ pub enum FederationEffect {
         vouchee_did: String,
         attestation_hash: String,
     },
+    /// Terminate an existing bilateral clearing agreement.
+    ///
+    /// Removes the clearing agreement between two cooperatives. Any pending
+    /// positions should be settled before termination; this effect records
+    /// the governance-authorized termination.
+    ///
+    /// # Status (2026-04-07)
+    ///
+    /// Deferred: `FederationService` does not yet expose `terminate_clearing`.
+    /// This effect is recognized by the executor but produces `not_executed: true`
+    /// pending FederationService implementation.
+    TerminateClearing {
+        coop_a_did: String,
+        coop_b_did: String,
+        /// Governance decision receipt for audit linkage.
+        decision_receipt_id: String,
+    },
+    /// Revoke a cooperative voucher.
+    ///
+    /// Withdraws a previously issued vouch from one cooperative to another.
+    /// This reduces the vouchee's trust score in the voucher's federation context.
+    ///
+    /// # Status (2026-04-07)
+    ///
+    /// Deferred: `FederationService` does not yet expose `revoke_vouch`.
+    /// This effect is recognized by the executor but produces `not_executed: true`
+    /// pending FederationService implementation.
+    RevokeVouch {
+        revoker_did: String,
+        revokee_did: String,
+        /// Governance decision receipt for audit linkage.
+        decision_receipt_id: String,
+    },
     /// Trigger settlement for an established bilateral clearing agreement.
     /// Nets all confirmed cross-coop transfers and emits a ledger transfer
     /// entry for the net position.  The agreement_id references an agreement
@@ -406,15 +448,17 @@ pub enum ResourceEffect {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "sdis_action", rename_all = "snake_case")]
 pub enum SdisEffect {
-    /// Approve steward for enrollment ceremonies
+    /// Approve steward appointment via governance ratification.
+    ///
+    /// Stewardship is an elected/permissioned institutional office backed by trust
+    /// and mandate. No financial collateral is required at appointment time.
+    /// The governance vote is the legitimating act. See ADR-0014.
     ApproveSteward {
         steward_did: String,
         /// Domain / jurisdiction that approved the appointment (governance domain_id)
         jurisdiction_id: String,
         /// Steward term length in seconds
         term_length_seconds: i64,
-        /// Bond posted by the steward candidate
-        bond_amount: i64,
         /// Geographic region the steward will serve (optional)
         region: Option<String>,
         /// Proposal receipt ID for governance audit linkage
@@ -458,6 +502,31 @@ pub enum SdisEffect {
         reason: String,
         /// Advisory duration from the governance proposal (not enforced by CommonsHandle).
         duration_seconds: u64,
+        /// Proposal receipt ID for audit linkage.
+        proposal_id: String,
+    },
+    /// Update a steward's jurisdiction tier.
+    ///
+    /// Tier changes affect operational scope and monitoring requirements.
+    /// - Tier 1: Standard operations
+    /// - Tier 2: Enhanced monitoring required
+    /// - Tier 3: Requires co-signing for all operations
+    ///
+    /// The `new_tier` is a string ("Tier1", "Tier2", "Tier3") to keep the kernel
+    /// effect free of domain-level enum types. The SDIS policy layer interprets
+    /// the tier value.
+    ///
+    /// # Status (2026-04-08)
+    ///
+    /// Implemented: `CommonsHandle::update_jurisdiction_tier` persists the tier change
+    /// durably. The executor calls `SdisService::update_jurisdiction_tier` which reads
+    /// the steward by DID, sets `StewardRecord::jurisdiction_tier`, and writes back.
+    UpdateJurisdictionTier {
+        steward_did: String,
+        /// Tier string: "Tier1", "Tier2", or "Tier3".
+        new_tier: String,
+        /// Reason for the tier change.
+        reason: String,
         /// Proposal receipt ID for audit linkage.
         proposal_id: String,
     },

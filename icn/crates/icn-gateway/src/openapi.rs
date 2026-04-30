@@ -39,8 +39,8 @@ use crate::api::notifications::{
     RegisterDeviceRequest as NotifRegisterDeviceRequest, RegisterDeviceResponse,
 };
 use crate::api::steward::{
-    BondOperationRequest, ExtendTermRequest, RegisterStewardRequest, StewardDetailResponse,
-    StewardSummaryResponse, UpdateStatusRequest,
+    ExtendTermRequest, RegisterStewardRequest, StewardDetailResponse, StewardSummaryResponse,
+    UpdateStatusRequest,
 };
 use crate::identity_mgr::DeviceInfo;
 use crate::notification_store::{InAppNotification, Platform};
@@ -107,7 +107,7 @@ use crate::notification_store::{InAppNotification, Platform};
             TimelineEvent, TimelineResponse,
             // Steward
             StewardSummaryResponse, StewardDetailResponse, RegisterStewardRequest, UpdateStatusRequest,
-            ExtendTermRequest, BondOperationRequest,
+            ExtendTermRequest,
             // Governance Dashboard
             GovernanceDashboard, AmendmentsBreakdown, AppealsBreakdown, ActivityEvent,
             // Devices

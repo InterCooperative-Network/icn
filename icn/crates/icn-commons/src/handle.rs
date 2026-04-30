@@ -334,7 +334,6 @@ impl CommonsHandle {
         holder_did: &Did,
         steward_did: &Did,
         term_duration_days: u64,
-        bond_amount: u64,
         governance_approval: String,
         jurisdiction: Option<String>,
         specializations: Vec<String>,
@@ -346,7 +345,6 @@ impl CommonsHandle {
                 holder_did,
                 steward_did,
                 term_duration_days,
-                bond_amount,
                 governance_approval,
                 jurisdiction,
                 specializations,
@@ -461,21 +459,15 @@ impl CommonsHandle {
             .await
     }
 
-    /// Add to a steward's bond.
-    pub async fn add_steward_bond(&self, steward_id: &str, amount: u64) -> Result<()> {
+    /// Update a steward's jurisdiction tier via a governance-ratified proposal.
+    ///
+    /// `new_tier` must be one of "Tier1", "Tier2", "Tier3".
+    /// Parsing and validation happen inside `icn-commons` (where `icn-governance` is available).
+    pub async fn update_jurisdiction_tier(&self, steward_id: &str, new_tier: &str) -> Result<()> {
         self.inner
             .write()
             .await
-            .add_steward_bond(steward_id, amount)
-            .await
-    }
-
-    /// Slash a steward's bond.
-    pub async fn slash_steward_bond(&self, steward_id: &str, amount: u64) -> Result<u64> {
-        self.inner
-            .write()
-            .await
-            .slash_steward_bond(steward_id, amount)
+            .update_jurisdiction_tier(steward_id, new_tier)
             .await
     }
 }

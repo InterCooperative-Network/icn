@@ -1368,6 +1368,45 @@ impl FederationExecutor for KernelFederationExecutor {
                         })
                     }
                 }
+
+                // TerminateClearing and RevokeVouch: governance-ratified operations
+                // that are recognized and explicitly deferred pending FederationService
+                // method additions. The governance receipt is recorded; no durable state
+                // change occurs yet. This is honest non-execution (not_executed = true).
+                FederationOperationType::TerminateClearing => {
+                    tracing::info!(
+                        coop_a = %operation.coop_did,
+                        coop_b = ?operation.target_id,
+                        "TerminateClearing: deferred — FederationService.terminate_clearing not yet implemented"
+                    );
+                    Ok(ExecutionOutcome::Deferred {
+                        receipt_id: receipt_id.clone(),
+                        reason: format!(
+                            "TerminateClearing between {} and {} is governance-ratified but \
+                             FederationService does not yet expose terminate_clearing. \
+                             The governance receipt is recorded.",
+                            operation.coop_did,
+                            operation.target_id.unwrap_or_default(),
+                        ),
+                    })
+                }
+                FederationOperationType::RevokeVouch => {
+                    tracing::info!(
+                        revoker = %operation.coop_did,
+                        revokee = ?operation.target_id,
+                        "RevokeVouch: deferred — FederationService.revoke_vouch not yet implemented"
+                    );
+                    Ok(ExecutionOutcome::Deferred {
+                        receipt_id: receipt_id.clone(),
+                        reason: format!(
+                            "RevokeVouch from {} to {} is governance-ratified but \
+                             FederationService does not yet expose revoke_vouch. \
+                             The governance receipt is recorded.",
+                            operation.coop_did,
+                            operation.target_id.unwrap_or_default(),
+                        ),
+                    })
+                }
             }
         } else {
             // No service configured - return failure instead of lying
@@ -2074,7 +2113,6 @@ impl KernelSdisExecutor {
                 steward_did,
                 jurisdiction_id,
                 term_length_seconds,
-                bond_amount,
                 region,
                 proposal_id,
                 ..
@@ -2083,7 +2121,6 @@ impl KernelSdisExecutor {
                     steward_did: steward_did.clone(),
                     jurisdiction_id: jurisdiction_id.clone(),
                     term_length_seconds: *term_length_seconds,
-                    bond_amount: *bond_amount,
                     region: region.clone(),
                     proposal_id: proposal_id.clone(),
                 };
@@ -2291,6 +2328,50 @@ impl KernelSdisExecutor {
                         message: result
                             .error
                             .unwrap_or_else(|| "Suspension failed".to_string()),
+                        state_change_hash: None,
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                }
+            }
+            SdisEffect::UpdateJurisdictionTier {
+                steward_did,
+                new_tier,
+                reason,
+                proposal_id,
+            } => {
+                let request = icn_kernel_api::UpdateJurisdictionTierRequest {
+                    steward_did: steward_did.clone(),
+                    new_tier: new_tier.clone(),
+                    reason: reason.clone(),
+                    proposal_id: proposal_id.clone(),
+                };
+                let result = service.update_jurisdiction_tier(request)?;
+                if result.success {
+                    info!(
+                        steward_did = %steward_did,
+                        new_tier = %new_tier,
+                        state_change_hash = %result.state_change_hash,
+                        "Steward jurisdiction tier updated via governance dispatch"
+                    );
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: true,
+                        message: format!(
+                            "Steward {} tier → {} state_hash={}",
+                            steward_did, new_tier, result.state_change_hash
+                        ),
+                        state_change_hash: Some(result.state_change_hash),
+                        ledger_entry_id: None,
+                        not_executed: false,
+                    })
+                } else {
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: false,
+                        message: result
+                            .error
+                            .unwrap_or_else(|| "Tier update failed".to_string()),
                         state_change_hash: None,
                         ledger_entry_id: None,
                         not_executed: false,
@@ -2965,7 +3046,6 @@ mod tests {
             steward_did: "did:icn:steward".to_string(),
             jurisdiction_id: "test-domain".to_string(),
             term_length_seconds: 86400,
-            bond_amount: 0,
             region: None,
             proposal_id: "test-proposal".to_string(),
             capabilities_hash: "capabilities-hash".to_string(),

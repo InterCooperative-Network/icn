@@ -10,10 +10,16 @@ use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-/// Enrollment token for SDIS enrollment
+/// Enrollment token for SDIS enrollment.
 ///
-/// This token proves a person passed verification without revealing
-/// which steward verified them or when (unlinkability via blind signatures).
+/// This is a **cryptographic proof of verification**, not an economic or
+/// financial token. It proves a person passed steward-verified enrollment
+/// without revealing which steward verified them or when (unlinkability
+/// via blind signatures).
+///
+/// The token carries no economic value and confers no transferable rights.
+/// Its authority derives from the steward's governance-ratified mandate,
+/// not from any capital deposit or stake. See ADR-0014.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnrollmentToken {
     /// Unique token identifier

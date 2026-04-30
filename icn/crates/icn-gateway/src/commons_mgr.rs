@@ -295,7 +295,6 @@ impl CommonsManager {
         holder_did: &Did,
         steward_did: &Did,
         term_duration_days: u64,
-        bond_amount: u64,
         governance_approval: String,
         jurisdiction: Option<String>,
         specializations: Vec<String>,
@@ -305,7 +304,6 @@ impl CommonsManager {
                 holder_did,
                 steward_did,
                 term_duration_days,
-                bond_amount,
                 governance_approval,
                 jurisdiction,
                 specializations,
@@ -394,16 +392,6 @@ impl CommonsManager {
         self.handle
             .extend_steward_term(steward_id, new_term_end)
             .await
-    }
-
-    /// Add bond to a steward.
-    pub async fn add_steward_bond(&self, steward_id: &str, amount: u64) -> Result<()> {
-        self.handle.add_steward_bond(steward_id, amount).await
-    }
-
-    /// Slash a steward's bond.
-    pub async fn slash_steward_bond(&self, steward_id: &str, amount: u64) -> Result<u64> {
-        self.handle.slash_steward_bond(steward_id, amount).await
     }
 }
 
@@ -1012,7 +1000,6 @@ pub fn steward_to_detail(s: &StewardRecord) -> StewardDetailResponse {
         jurisdiction: s.jurisdiction.clone(),
         term_start: s.term_start,
         term_end: s.term_end,
-        bond_amount: s.bond_amount,
         reputation_score: s.reputation_score,
         effectiveness_score: s.effectiveness_score(),
         attestations_issued: s.attestations_issued,

@@ -32,11 +32,17 @@ pub enum VerificationMode {
     #[default]
     SingleExecutor,
 
-    /// Multiple executors with majority consensus
+    /// Multiple executors with majority agreement on the correct result
     MultiExecutor {
         /// Number of executors to use
         count: usize,
-        /// Minimum percentage for consensus (0.0-1.0)
+        /// Minimum fraction of executors that must produce the same result for
+        /// the output to be accepted (0.0–1.0, default 0.67 = two-thirds).
+        ///
+        /// This is **executor agreement** — how many independent compute nodes
+        /// must return identical output before the result is trusted. It is NOT
+        /// Byzantine-fault-tolerance consensus or blockchain finality.
+        /// Dispute arbiter selection is trust-gated (see `TrustPolicyOracle`).
         #[serde(default = "default_consensus_threshold")]
         consensus_threshold: f64,
     },

@@ -24,9 +24,6 @@ pub struct StewardProfile {
     /// Jurisdiction tier determining verification requirements
     pub jurisdiction_tier: JurisdictionTier,
 
-    /// Bond amount in credits (stake for honest behavior)
-    pub bond_amount: i64,
-
     /// Geographic region (ISO 3166-1 alpha-2 or custom)
     pub region: String,
 
@@ -148,7 +145,6 @@ impl StewardProfile {
             citizen_did,
             status: StewardStatus::Pending { applied_at: now },
             jurisdiction_tier: JurisdictionTier::Tier1,
-            bond_amount: 0,
             region,
             term_start: 0,
             term_end: None,
@@ -178,12 +174,11 @@ impl StewardProfile {
         }
     }
 
-    /// Activate the steward (called after bond is posted)
-    pub fn activate(&mut self, bond_amount: i64, term_duration_secs: Option<u64>) {
+    /// Activate the steward (called after governance approval)
+    pub fn activate(&mut self, term_duration_secs: Option<u64>) {
         let now = icn_time::current_timestamp_secs();
 
         self.status = StewardStatus::Active;
-        self.bond_amount = bond_amount;
         self.term_start = now;
         self.term_end = term_duration_secs.map(|d| now + d);
     }
@@ -313,11 +308,10 @@ mod tests {
             [42u8; 32],
         );
 
-        profile.activate(1000, Some(86400 * 365)); // 1 year term
+        profile.activate(Some(86400 * 365)); // 1 year term
 
         assert!(profile.is_active());
         assert!(profile.can_issue_tokens());
-        assert_eq!(profile.bond_amount, 1000);
         assert!(profile.term_end.is_some());
     }
 
@@ -334,7 +328,7 @@ mod tests {
             [42u8; 32],
         );
 
-        profile.activate(1000, None);
+        profile.activate(None);
         assert!(profile.is_active());
 
         profile.suspend("Investigation pending".to_string(), Some(86400));
@@ -357,7 +351,7 @@ mod tests {
             [42u8; 32],
         );
 
-        profile.activate(1000, None);
+        profile.activate(None);
         profile.revoke("Fraud detected".to_string());
 
         assert!(!profile.is_active());
@@ -377,7 +371,7 @@ mod tests {
             [42u8; 32],
         );
 
-        profile.activate(1000, None);
+        profile.activate(None);
         profile.record_pop_issued();
         profile.record_pop_issued();
         profile.record_vui_check();
@@ -414,7 +408,7 @@ mod tests {
             [42u8; 32],
         );
 
-        profile.activate(1000, None);
+        profile.activate(None);
 
         let max_per_day = 3;
 
@@ -451,7 +445,7 @@ mod tests {
             [42u8; 32],
         );
 
-        profile.activate(1000, None);
+        profile.activate(None);
 
         // Simulate yesterday's vouches
         let yesterday = icn_time::current_timestamp_secs() - StewardProfile::SECONDS_PER_DAY;

@@ -8,7 +8,8 @@ use anyhow::Result;
 use icn_kernel_api::{
     AppointStewardRequest, AppointStewardResult, ReconfirmStewardRequest, ReconfirmStewardResult,
     ReinstateStewardRequest, ReinstateStewardResult, RevokeStewardRequest, RevokeStewardResult,
-    SdisService, SuspendStewardRequest, SuspendStewardResult,
+    SdisService, SuspendStewardRequest, SuspendStewardResult, UpdateJurisdictionTierRequest,
+    UpdateJurisdictionTierResult,
 };
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
@@ -71,6 +72,17 @@ impl SdisServiceImpl {
         hasher.update(request.proposal_id.as_bytes());
         format!("{:x}", hasher.finalize())
     }
+
+    fn compute_tier_update_hash(request: &UpdateJurisdictionTierRequest) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"sdis:tier_update:");
+        hasher.update(request.steward_did.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.new_tier.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.proposal_id.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
 }
 
 impl SdisService for SdisServiceImpl {
@@ -79,13 +91,11 @@ impl SdisService for SdisServiceImpl {
             steward_did = %request.steward_did,
             jurisdiction_id = %request.jurisdiction_id,
             term_length_seconds = %request.term_length_seconds,
-            bond_amount = %request.bond_amount,
             proposal_id = %request.proposal_id,
             "Appointing steward via governance dispatch"
         );
 
         let term_days = (request.term_length_seconds / 86_400) as u64;
-        let bond = request.bond_amount.max(0) as u64;
         let steward_did = icn_identity::Did::from_str(&request.steward_did)
             .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
         // Empty jurisdiction_id means no scoped jurisdiction — treated as None (global steward).
@@ -102,7 +112,6 @@ impl SdisService for SdisServiceImpl {
                         &steward_did,
                         &steward_did,
                         term_days,
-                        bond,
                         request.proposal_id.clone(),
                         jurisdiction,
                         vec![],
@@ -402,6 +411,74 @@ impl SdisService for SdisServiceImpl {
             }
         }
     }
+
+    fn update_jurisdiction_tier(
+        &self,
+        request: UpdateJurisdictionTierRequest,
+    ) -> Result<UpdateJurisdictionTierResult> {
+        info!(
+            steward_did = %request.steward_did,
+            new_tier = %request.new_tier,
+            reason = %request.reason,
+            proposal_id = %request.proposal_id,
+            "Updating steward jurisdiction tier via governance dispatch"
+        );
+
+        // Tier string validation and JurisdictionTier parsing happen inside
+        // CommonsHandle::update_jurisdiction_tier (which is in icn-commons, where
+        // icn-governance is available). This service layer passes the raw string.
+        let steward_did = icn_identity::Did::from_str(&request.steward_did)
+            .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
+
+        let new_tier = request.new_tier.clone();
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                match self.commons.get_steward_by_did(&steward_did).await {
+                    Ok(Some(record)) => {
+                        let steward_id = record.id().to_hex();
+                        self.commons
+                            .update_jurisdiction_tier(&steward_id, &new_tier)
+                            .await
+                    }
+                    Ok(None) => Err(anyhow::anyhow!(
+                        "Steward '{}' not found — cannot update tier",
+                        request.steward_did
+                    )),
+                    Err(e) => Err(e),
+                }
+            })
+        });
+
+        match result {
+            Ok(()) => {
+                let hash = Self::compute_tier_update_hash(&request);
+                info!(
+                    steward_did = %request.steward_did,
+                    new_tier = %request.new_tier,
+                    state_change_hash = %hash,
+                    "Steward jurisdiction tier updated in commons"
+                );
+                Ok(UpdateJurisdictionTierResult {
+                    success: true,
+                    state_change_hash: hash,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                warn!(
+                    steward_did = %request.steward_did,
+                    new_tier = %request.new_tier,
+                    error = %e,
+                    "Failed to update steward jurisdiction tier in commons"
+                );
+                Ok(UpdateJurisdictionTierResult {
+                    success: false,
+                    state_change_hash: String::new(),
+                    error: Some(e.to_string()),
+                })
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -451,7 +528,6 @@ mod tests {
             steward_did: holder.to_string(),
             jurisdiction_id: String::new(),
             term_length_seconds: 86400 * 365,
-            bond_amount: 1000,
             region: Some("northeast".to_string()),
             proposal_id: "gov:coop-alpha:prop-001:receipt".to_string(),
         };
@@ -492,7 +568,6 @@ mod tests {
             steward_did: steward_did_str.clone(),
             jurisdiction_id: String::new(), // empty → None in adapter
             term_length_seconds: 86400 * 180,
-            bond_amount: 500,
             region: None,
             proposal_id: "gov:coop-beta:prop-002:receipt".to_string(),
         };
@@ -546,7 +621,6 @@ mod tests {
             steward_did: holder.to_string(),
             jurisdiction_id: String::new(), // global steward (no charter required)
             term_length_seconds: initial_term_end_secs as i64,
-            bond_amount: 500,
             region: None,
             proposal_id: "gov:coop-gamma:prop-010:receipt".to_string(),
         };
@@ -631,7 +705,6 @@ mod tests {
             steward_did: holder.to_string(),
             jurisdiction_id: String::new(),
             term_length_seconds: 86400 * 365,
-            bond_amount: 500,
             region: None,
             proposal_id: "gov:coop-delta:prop-020:receipt".to_string(),
         };
@@ -699,7 +772,6 @@ mod tests {
             steward_did: holder.to_string(),
             jurisdiction_id: String::new(),
             term_length_seconds: 86400 * 180,
-            bond_amount: 200,
             region: None,
             proposal_id: "gov:coop-epsilon:prop-030:receipt".to_string(),
         };
@@ -775,7 +847,6 @@ mod tests {
             steward_did: holder.to_string(),
             jurisdiction_id: String::new(),
             term_length_seconds: 86_400,
-            bond_amount: 100,
             region: None,
             proposal_id: "gov:coop:prop-030:receipt".to_string(),
         };
@@ -845,7 +916,6 @@ mod tests {
             steward_did: holder.to_string(),
             jurisdiction_id: String::new(),
             term_length_seconds: 86_400,
-            bond_amount: 100,
             region: None,
             proposal_id: "gov:coop:prop-032:receipt".to_string(),
         };
@@ -911,6 +981,183 @@ mod tests {
         assert!(
             result.state_change_hash.is_empty(),
             "state_change_hash must be empty on failure"
+        );
+    }
+
+    // ─── UpdateJurisdictionTier proof tests ────────────────────────────────────
+
+    /// UpdateJurisdictionTier → tier field persisted durably in commons.
+    ///
+    /// Proves the full dispatch chain:
+    /// `SdisService::update_jurisdiction_tier` → `CommonsHandle::update_jurisdiction_tier`
+    /// → `StewardRecord::jurisdiction_tier` durable change visible via `get_steward_by_did`.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_update_jurisdiction_tier_persists_durably() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(30);
+        let sponsor = test_did(31);
+
+        // Appoint the steward first.
+        create_strong_holder(&commons, &holder, &sponsor).await;
+        let appoint_req = AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86_400 * 365,
+            region: None,
+            proposal_id: "gov:coop:prop-040:receipt".to_string(),
+        };
+        let appoint = svc.appoint_steward(appoint_req).unwrap();
+        assert!(appoint.success, "appointment must succeed");
+
+        // Verify tier is None before the update.
+        let before = commons
+            .get_steward_by_did(&holder)
+            .await
+            .expect("lookup must not error")
+            .expect("steward must exist");
+        assert!(
+            before.jurisdiction_tier.is_none(),
+            "tier must be None before governance update"
+        );
+
+        // Update tier to Tier2.
+        let update_req = icn_kernel_api::UpdateJurisdictionTierRequest {
+            steward_did: holder.to_string(),
+            new_tier: "Tier2".to_string(),
+            reason: "Enhanced monitoring required per governance vote".to_string(),
+            proposal_id: "gov:coop:prop-041:receipt".to_string(),
+        };
+        let result = svc.update_jurisdiction_tier(update_req).unwrap();
+        assert!(result.success, "update_jurisdiction_tier must succeed");
+        assert!(
+            !result.state_change_hash.is_empty(),
+            "state_change_hash must be non-empty on success"
+        );
+        assert!(result.error.is_none());
+
+        // Read back — tier must now be Tier2.
+        // Compare via Debug rather than importing icn_governance types (meaning firewall).
+        let after = commons
+            .get_steward_by_did(&holder)
+            .await
+            .expect("lookup must not error after update")
+            .expect("steward must still exist after tier update");
+        assert!(
+            after.jurisdiction_tier.is_some(),
+            "jurisdiction_tier must be set after governance update"
+        );
+        assert!(
+            format!("{:?}", after.jurisdiction_tier).contains("Tier2"),
+            "jurisdiction_tier must be Tier2 after governance update, got {:?}",
+            after.jurisdiction_tier
+        );
+    }
+
+    /// UpdateJurisdictionTier is idempotent — re-applying the same tier succeeds.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_update_jurisdiction_tier_idempotent() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(32);
+        let sponsor = test_did(33);
+
+        create_strong_holder(&commons, &holder, &sponsor).await;
+        let appoint_req = AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86_400 * 365,
+            region: None,
+            proposal_id: "gov:coop:prop-042:receipt".to_string(),
+        };
+        svc.appoint_steward(appoint_req).unwrap();
+
+        let req = icn_kernel_api::UpdateJurisdictionTierRequest {
+            steward_did: holder.to_string(),
+            new_tier: "Tier3".to_string(),
+            reason: "Cosigning required".to_string(),
+            proposal_id: "gov:coop:prop-043:receipt".to_string(),
+        };
+        let r1 = svc.update_jurisdiction_tier(req.clone()).unwrap();
+        assert!(r1.success, "first tier update must succeed");
+
+        let r2 = svc.update_jurisdiction_tier(req).unwrap();
+        assert!(
+            r2.success,
+            "re-applying same tier must succeed (idempotent)"
+        );
+
+        let record = commons
+            .get_steward_by_did(&holder)
+            .await
+            .unwrap()
+            .expect("steward must exist");
+        assert!(
+            record.jurisdiction_tier.is_some(),
+            "tier must be set after both updates"
+        );
+        assert!(
+            format!("{:?}", record.jurisdiction_tier).contains("Tier3"),
+            "tier must be Tier3 after both updates, got {:?}",
+            record.jurisdiction_tier
+        );
+    }
+
+    /// UpdateJurisdictionTier fails for an unknown DID.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_update_jurisdiction_tier_unknown_did_fails() {
+        let (svc, _commons) = make_service_with_commons();
+        let unknown_did = test_did(96);
+        let req = icn_kernel_api::UpdateJurisdictionTierRequest {
+            steward_did: unknown_did.to_string(),
+            new_tier: "Tier2".to_string(),
+            reason: "test".to_string(),
+            proposal_id: "gov:unknown:prop-000:receipt".to_string(),
+        };
+        let result = svc.update_jurisdiction_tier(req).unwrap();
+        assert!(
+            !result.success,
+            "update_jurisdiction_tier for unknown DID must return success=false"
+        );
+        assert!(
+            result.error.is_some(),
+            "error field must be populated on failure"
+        );
+        assert!(
+            result.state_change_hash.is_empty(),
+            "state_change_hash must be empty on failure"
+        );
+    }
+
+    /// UpdateJurisdictionTier with an invalid tier string fails gracefully.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_update_jurisdiction_tier_invalid_tier_string_fails() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(34);
+        let sponsor = test_did(35);
+
+        create_strong_holder(&commons, &holder, &sponsor).await;
+        let appoint_req = AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86_400 * 365,
+            region: None,
+            proposal_id: "gov:coop:prop-044:receipt".to_string(),
+        };
+        svc.appoint_steward(appoint_req).unwrap();
+
+        let req = icn_kernel_api::UpdateJurisdictionTierRequest {
+            steward_did: holder.to_string(),
+            new_tier: "InvalidTier".to_string(),
+            reason: "test invalid".to_string(),
+            proposal_id: "gov:coop:prop-045:receipt".to_string(),
+        };
+        let result = svc.update_jurisdiction_tier(req).unwrap();
+        assert!(
+            !result.success,
+            "invalid tier string must return success=false"
+        );
+        assert!(
+            result.error.is_some(),
+            "error must describe the invalid tier"
         );
     }
 }

@@ -223,14 +223,12 @@ pub fn translate_payload_to_effects(
             icn_governance::sdis::SdisProposal::AppointSteward {
                 candidate,
                 region,
-                bond_amount,
                 term_length,
                 ..
             } => Ok(vec![KernelEffect::Sdis(SdisEffect::ApproveSteward {
                 steward_did: candidate.to_string(),
                 jurisdiction_id: domain_id.to_string(),
                 term_length_seconds: *term_length as i64,
-                bond_amount: *bond_amount,
                 region: if region.is_empty() {
                     None
                 } else {
@@ -271,13 +269,144 @@ pub fn translate_payload_to_effects(
                 duration_seconds: *duration,
                 proposal_id: decision_receipt_id.to_string(),
             })]),
-            _ => Err(TranslationError::unsupported(
-                "sdis",
-                format!(
-                    "SDIS proposal type not yet translated: {:?}",
-                    std::mem::discriminant(proposal)
-                ),
-            )),
+
+            // SanctionSteward fans out to different kernel effects based on the
+            // penalty type.
+            //
+            // - Warning / Censure / Probation: record-only sanctions. The governance
+            //   vote itself is the institutional act; no CommonsHandle state changes.
+            //   These resolve to KernelEffect::NoOp so the receipt/audit chain still
+            //   records the accepted proposal. Policy/CCL may add downstream trust or
+            //   reputation consequences. See ADR-0014.
+            //
+            // - Suspension: delegates to SdisEffect::SuspendSteward (existing path).
+            //
+            // - TierDemotion / Removal: delegates to appropriate Sdis effects.
+            //   TierDemotion is Deferred pending UpdateJurisdictionTier kernel support.
+            icn_governance::sdis::SdisProposal::SanctionSteward {
+                steward,
+                penalty,
+                reason,
+                ..
+            } => match penalty {
+                icn_governance::sdis::StewardPenalty::Warning => {
+                    Ok(vec![KernelEffect::NoOp {
+                        reason: format!(
+                            "SanctionSteward(Warning): governance warning recorded for {steward}: {reason}"
+                        ),
+                    }])
+                }
+                icn_governance::sdis::StewardPenalty::Censure => {
+                    Ok(vec![KernelEffect::NoOp {
+                        reason: format!(
+                            "SanctionSteward(Censure): institutional censure recorded for {steward}: {reason}"
+                        ),
+                    }])
+                }
+                icn_governance::sdis::StewardPenalty::Probation { duration, .. } => {
+                    Ok(vec![KernelEffect::NoOp {
+                        reason: format!(
+                            "SanctionSteward(Probation): {duration}s probation recorded for {steward}: {reason}"
+                        ),
+                    }])
+                }
+                icn_governance::sdis::StewardPenalty::Suspension { duration } => {
+                    Ok(vec![KernelEffect::Sdis(SdisEffect::SuspendSteward {
+                        steward_did: steward.to_string(),
+                        reason: reason.clone(),
+                        duration_seconds: *duration,
+                        proposal_id: decision_receipt_id.to_string(),
+                    })])
+                }
+                icn_governance::sdis::StewardPenalty::Removal => {
+                    Ok(vec![KernelEffect::Sdis(SdisEffect::RevokeSteward {
+                        steward_did: steward.to_string(),
+                        reason: reason.clone(),
+                    })])
+                }
+                icn_governance::sdis::StewardPenalty::TierDemotion { new_tier } => {
+                    use icn_governance::sdis::JurisdictionTier;
+                    // TierDemotion → UpdateJurisdictionTier kernel effect.
+                    // The executor records this as deferred (not_executed=true) pending
+                    // CommonsHandle.update_jurisdiction_tier implementation. See ADR-0015.
+                    let tier_str = match new_tier {
+                        JurisdictionTier::Tier1 => "Tier1",
+                        JurisdictionTier::Tier2 => "Tier2",
+                        JurisdictionTier::Tier3 => "Tier3",
+                    };
+                    Ok(vec![KernelEffect::Sdis(SdisEffect::UpdateJurisdictionTier {
+                        steward_did: steward.to_string(),
+                        new_tier: tier_str.to_string(),
+                        reason: reason.clone(),
+                        proposal_id: decision_receipt_id.to_string(),
+                    })])
+                }
+            },
+
+            // UpdateJurisdictionTier proposal: governance-ratified tier change.
+            // The executor records this as deferred pending CommonsHandle support.
+            icn_governance::sdis::SdisProposal::UpdateJurisdictionTier {
+                steward,
+                new_tier,
+                reason,
+            } => {
+                use icn_governance::sdis::JurisdictionTier;
+                let tier_str = match new_tier {
+                    JurisdictionTier::Tier1 => "Tier1",
+                    JurisdictionTier::Tier2 => "Tier2",
+                    JurisdictionTier::Tier3 => "Tier3",
+                };
+                Ok(vec![KernelEffect::Sdis(SdisEffect::UpdateJurisdictionTier {
+                    steward_did: steward.to_string(),
+                    new_tier: tier_str.to_string(),
+                    reason: reason.clone(),
+                    proposal_id: decision_receipt_id.to_string(),
+                })])
+            }
+
+            // Explicitly deferred SDIS proposals.
+            //
+            // These are recognized proposal types that require infrastructure not yet
+            // present in the kernel execution path. Each fails fast with a named error
+            // so the gap is visible (not silently swallowed). The governance receipt IS
+            // recorded; only execution is deferred.
+            //
+            // See ADR-0015 Invariant C: "Where governance gaps exist, they must be named."
+            icn_governance::sdis::SdisProposal::ModifyThreshold { .. } => {
+                Err(TranslationError::unsupported(
+                    "sdis:ModifyThreshold",
+                    "Deferred: no kernel threshold-registry effect. \
+                     Threshold values are currently policy-layer constants.",
+                ))
+            }
+            icn_governance::sdis::SdisProposal::ApproveAuthority { .. } => {
+                Err(TranslationError::unsupported(
+                    "sdis:ApproveAuthority",
+                    "Deferred: no kernel authority-registry effect. \
+                     Institutional authority approval requires a dedicated registry.",
+                ))
+            }
+            icn_governance::sdis::SdisProposal::RevokeAuthority { .. } => {
+                Err(TranslationError::unsupported(
+                    "sdis:RevokeAuthority",
+                    "Deferred: no kernel authority-registry effect. \
+                     Revoking institutional authority requires a dedicated registry.",
+                ))
+            }
+            icn_governance::sdis::SdisProposal::RevocationAppeal { .. } => {
+                Err(TranslationError::unsupported(
+                    "sdis:RevocationAppeal",
+                    "Deferred: revocation appeal is a multi-step adjudication flow \
+                     without a single kernel effect. Requires arbitration infrastructure.",
+                ))
+            }
+            icn_governance::sdis::SdisProposal::ForceKeyRotation { .. } => {
+                Err(TranslationError::unsupported(
+                    "sdis:ForceKeyRotation",
+                    "Deferred: forced key rotation requires a DID rotation flow \
+                     across identity, network, and steward layers. No single kernel effect.",
+                ))
+            }
         },
 
         // Federation proposals
@@ -390,14 +519,22 @@ pub fn translate_payload_to_effects(
             })])
         }
 
-        // Fallback for unhandled types
-        _ => Err(TranslationError::unsupported(
-            "payload",
-            format!(
-                "Unhandled proposal type: {:?}",
-                std::mem::discriminant(payload)
-            ),
-        )),
+        // Charter ratification: deploy a CCL charter document to the policy layer.
+        //
+        // When members ratify a charter, the charter YAML is stored as a governance
+        // config (SetGovernanceConfig effect). The CharterPolicyOracle reads this config
+        // and enforces it via ConstraintSet. The charter_id is stored as the domain_id.
+        ProposalPayload::Charter {
+            charter_id,
+            charter_yaml,
+        } => Ok(vec![KernelEffect::Protocol(
+            icn_kernel_api::effects::ProtocolEffect::SetGovernanceConfig {
+                domain_id: charter_id.clone(),
+                config_hash: blake3::hash(charter_yaml.as_bytes()).to_hex().to_string(),
+                config_json: charter_yaml.clone(),
+            },
+        )]),
+
     }
 }
 
@@ -467,14 +604,55 @@ fn translate_treasury_operation(
             decision_hash: decision_hash.to_string(),
         })]),
 
-        // Fallback for other treasury operations
-        _ => Err(TranslationError::unsupported(
-            "treasury_operation",
-            format!(
-                "Treasury operation not yet translated: {:?}",
-                std::mem::discriminant(operation)
+        // TransferBetweenBudgets: moves funds from one budget to another.
+        // Maps to TreasuryEffect::Transfer between the two budget internal accounts.
+        // The budget_ids are used as the from/to identifiers in the transfer.
+        TreasuryProposalOperation::TransferBetweenBudgets {
+            treasury_did,
+            from_budget,
+            to_budget,
+            amount,
+            currency,
+            reason,
+        } => Ok(vec![KernelEffect::Treasury(TreasuryEffect::Transfer {
+            from_did: format!("{}:budget:{}", treasury_did, from_budget),
+            to_did: format!("{}:budget:{}", treasury_did, to_budget),
+            amount: *amount,
+            currency: currency.clone(),
+            memo: reason.clone(),
+            decision_hash: decision_hash.to_string(),
+        })]),
+
+        // CancelBudget: no kernel effect exists for cancellation.
+        // The governance vote is the cancellation record; the budget becomes
+        // inactive at the CCL/policy layer. Future: add TreasuryEffect::CancelBudget.
+        TreasuryProposalOperation::CancelBudget {
+            budget_id, reason, ..
+        } => Ok(vec![KernelEffect::NoOp {
+            reason: format!(
+                "CancelBudget({budget_id}): governance record is the cancellation act. \
+                     Deferred: no TreasuryEffect::CancelBudget in kernel. Reason: {reason}"
             ),
-        )),
+        }]),
+
+        // ReclaimBudget: no kernel effect exists for reclamation.
+        // Deferred: requires a TreasuryEffect that returns unspent funds to unallocated pool.
+        TreasuryProposalOperation::ReclaimBudget {
+            budget_id, reason, ..
+        } => Ok(vec![KernelEffect::NoOp {
+            reason: format!(
+                "ReclaimBudget({budget_id}): deferred — no TreasuryEffect::ReclaimBudget. \
+                     Reason: {reason}"
+            ),
+        }]),
+
+        // ModifySpendingRule: no kernel effect. Spending rules are CCL/policy-layer
+        // governance documents. The ratified rule is the operative change.
+        TreasuryProposalOperation::ModifySpendingRule { .. } => Ok(vec![KernelEffect::NoOp {
+            reason: "ModifySpendingRule: spending rules are CCL/policy-layer governance. \
+                     No kernel effect — the ratified rule is the operative change."
+                .to_string(),
+        }]),
     }
 }
 
@@ -564,14 +742,39 @@ fn translate_federation_proposal(
                 attestation_hash: String::new(),
             },
         )]),
-        // Fallback for other federation proposals
-        _ => Err(TranslationError::unsupported(
-            "federation_proposal",
-            format!(
-                "Federation proposal not yet translated: {:?}",
-                std::mem::discriminant(proposal)
-            ),
-        )),
+
+        // TerminateClearing and RevokeVouch: governance-ratified federation lifecycle
+        // operations. The kernel effects exist; the FederationService execution path is
+        // deferred (executor handles with not_executed=true). See ADR-0015.
+        FederationProposal::TerminateClearing {
+            partner_coop_id, ..
+        } => {
+            Ok(vec![KernelEffect::Federation(
+                FederationEffect::TerminateClearing {
+                    coop_a_did: String::new(), // filled by executor from session context
+                    coop_b_did: partner_coop_id.clone(),
+                    decision_receipt_id: String::new(), // filled by executor
+                },
+            )])
+        }
+        FederationProposal::RevokeVouch { target_coop_id, .. } => {
+            Ok(vec![KernelEffect::Federation(
+                FederationEffect::RevokeVouch {
+                    revoker_did: String::new(), // filled by executor from session context
+                    revokee_did: target_coop_id.clone(),
+                    decision_receipt_id: String::new(), // filled by executor
+                },
+            )])
+        }
+
+        // UpdateFederationPolicy: no kernel effect. Federation policy is a governance
+        // document whose terms are enforced by the CCL/policy layer, not the kernel.
+        // This is intentionally record-only — the accepted proposal IS the policy change.
+        FederationProposal::UpdateFederationPolicy { .. } => Ok(vec![KernelEffect::NoOp {
+            reason: "UpdateFederationPolicy: governance record is the policy update. \
+                         Federation policy terms are enforced by CCL/policy layer, not kernel."
+                .to_string(),
+        }]),
     }
 }
 
@@ -685,21 +888,37 @@ mod tests {
     }
 
     #[test]
-    fn test_translate_unhandled_payload_returns_explicit_error() {
-        // Charter is an example of a still-unsupported payload (falls to `_ => Err(...)`).
-        // ShareRedemption was previously used here but is now wired (Tranche 11).
+    fn test_translate_charter_produces_set_governance_config() {
+        // Charter ratification is now wired: it produces a SetGovernanceConfig effect
+        // so the CharterPolicyOracle can deploy the charter at runtime.
+        let charter_yaml = "schema_version: v0\nentity: coop\n";
         let payload = icn_governance::ProposalPayload::Charter {
             charter_id: "test-coop-charter".to_string(),
-            charter_yaml: "schema_version: v0\nentity: coop\n".to_string(),
+            charter_yaml: charter_yaml.to_string(),
         };
         let effects = translate_payload_to_effects(
             &payload,
             "receipt-abc",
             "decision-hash-abc",
             "domain-translation-test",
+        )
+        .expect("Charter payload must produce effects");
+        assert_eq!(effects.len(), 1, "Charter must produce exactly one effect");
+        let expected_hash = blake3::hash(charter_yaml.as_bytes()).to_hex().to_string();
+        assert!(
+            matches!(
+                &effects[0],
+                KernelEffect::Protocol(
+                    icn_kernel_api::effects::ProtocolEffect::SetGovernanceConfig {
+                        domain_id,
+                        config_hash,
+                        ..
+                    }
+                ) if domain_id == "test-coop-charter" && config_hash == &expected_hash
+            ),
+            "Charter must translate to SetGovernanceConfig, got {:?}",
+            effects
         );
-        let err = effects.expect_err("unsupported payload must be explicit");
-        assert_eq!(err.kind, "payload");
     }
 
     #[test]

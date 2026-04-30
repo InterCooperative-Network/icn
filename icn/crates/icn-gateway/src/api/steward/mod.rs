@@ -31,8 +31,6 @@ pub struct RegisterStewardRequest {
     pub steward_did: Option<String>,
     /// Term duration in days (e.g., 365 for 1 year)
     pub term_duration_days: u64,
-    /// Bond amount in network credits
-    pub bond_amount: u64,
     /// Governance proposal ID that approved this steward
     pub governance_approval: String,
     /// Optional jurisdiction scope
@@ -56,12 +54,6 @@ pub struct UpdateStatusRequest {
 pub struct ExtendTermRequest {
     /// Additional days to extend
     pub additional_days: u64,
-}
-
-/// Bond operation request
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct BondOperationRequest {
-    pub amount: u64,
 }
 
 // ============================================================================
@@ -105,20 +97,12 @@ pub async fn register_steward(
         ));
     }
 
-    // Validate bond amount
-    if body.bond_amount < 100 {
-        return Err(GatewayError::BadRequest(
-            "Minimum bond amount is 100 credits".to_string(),
-        ));
-    }
-
     // Register steward
     let steward = commons_manager
         .register_steward(
             &holder_did,
             &steward_did,
             body.term_duration_days,
-            body.bond_amount,
             body.governance_approval.clone(),
             body.jurisdiction.clone(),
             body.specializations.clone(),
@@ -422,144 +406,6 @@ pub async fn extend_steward_term(
 }
 
 // ============================================================================
-// Bond Management Endpoints
-// ============================================================================
-
-/// POST /v1/steward/{id}/bond/add - Add to steward's bond (self-service)
-///
-/// Only the steward's own holder may add to their bond. Increasing a bond is a
-/// self-service economic commitment — governance (HoldOffice) is not required.
-#[post("/{steward_id}/bond/add")]
-pub async fn add_bond(
-    http_req: HttpRequest,
-    path: web::Path<String>,
-    body: web::Json<BondOperationRequest>,
-    commons_manager: web::Data<Arc<CommonsManager>>,
-) -> Result<HttpResponse> {
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
-
-    let caller_did: Did = claims
-        .sub
-        .parse()
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
-
-    let steward_id = path.into_inner();
-
-    // Verify steward exists and enforce self-service: caller must be this steward
-    let steward = commons_manager
-        .get_steward(&steward_id)
-        .await
-        .map_err(|e| GatewayError::InternalError(e.to_string()))?
-        .ok_or_else(|| GatewayError::NotFound("Steward not found".to_string()))?;
-
-    if steward.holder_did != caller_did && steward.steward_did != caller_did {
-        return Err(GatewayError::AuthorizationFailed(
-            "Can only add bond to your own stewardship".to_string(),
-        ));
-    }
-
-    let _steward = steward;
-
-    commons_manager
-        .add_steward_bond(&steward_id, body.amount)
-        .await
-        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
-
-    // Return updated steward
-    let updated = commons_manager
-        .get_steward(&steward_id)
-        .await
-        .map_err(|e| GatewayError::InternalError(e.to_string()))?
-        .ok_or_else(|| GatewayError::NotFound("Steward not found".to_string()))?;
-
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "status": "bond_added",
-        "steward_id": steward_id,
-        "new_bond_amount": updated.bond_amount,
-    })))
-}
-
-/// POST /v1/steward/{id}/bond/slash - Slash steward's bond (governance action)
-#[post("/{steward_id}/bond/slash")]
-pub async fn slash_bond(
-    http_req: HttpRequest,
-    path: web::Path<String>,
-    body: web::Json<BondOperationRequest>,
-    commons_manager: web::Data<Arc<CommonsManager>>,
-) -> Result<HttpResponse> {
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
-
-    let caller_did: Did = claims
-        .sub
-        .parse()
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
-
-    let steward_id = path.into_inner();
-
-    // Verify steward exists and get their jurisdiction
-    let steward = commons_manager
-        .get_steward(&steward_id)
-        .await
-        .map_err(|e| GatewayError::InternalError(e.to_string()))?
-        .ok_or_else(|| GatewayError::NotFound("Steward not found".to_string()))?;
-
-    // Authorization: Caller must have HoldOffice capability in steward's jurisdiction
-    let jurisdiction_id = steward
-        .jurisdiction
-        .as_ref()
-        .map(|j| icn_identity::JurisdictionId(j.clone()))
-        .ok_or_else(|| GatewayError::InternalError("Steward has no jurisdiction".to_string()))?;
-
-    // Get caller's holder record
-    let caller_holder = commons_manager
-        .get_holder_by_did(&caller_did)
-        .await
-        .map_err(|e| GatewayError::InternalError(e.to_string()))?
-        .ok_or_else(|| {
-            GatewayError::AuthorizationFailed("Caller is not a commons holder".to_string())
-        })?;
-
-    // Check if caller has HoldOffice capability in the jurisdiction
-    let holder_id_hex = hex::encode(caller_holder.holder_id);
-    let has_authority = commons_manager
-        .member_has_capability(
-            &holder_id_hex,
-            &jurisdiction_id,
-            icn_identity::MembershipCapability::HoldOffice,
-        )
-        .await
-        .unwrap_or(false);
-
-    if !has_authority {
-        return Err(GatewayError::AuthorizationFailed(
-            "Caller does not have governance authority (HoldOffice capability required)"
-                .to_string(),
-        ));
-    }
-
-    let slashed = commons_manager
-        .slash_steward_bond(&steward_id, body.amount)
-        .await
-        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
-
-    // Return updated steward
-    let updated = commons_manager
-        .get_steward(&steward_id)
-        .await
-        .map_err(|e| GatewayError::InternalError(e.to_string()))?
-        .ok_or_else(|| GatewayError::NotFound("Steward not found".to_string()))?;
-
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "status": "bond_slashed",
-        "steward_id": steward_id,
-        "amount_slashed": slashed,
-        "remaining_bond": updated.bond_amount,
-    })))
-}
-
-// ============================================================================
 // Attestation Tracking Endpoints
 // ============================================================================
 
@@ -752,8 +598,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(update_steward_status)
         .service(retire_steward)
         .service(extend_steward_term)
-        .service(add_bond)
-        .service(slash_bond)
         .service(record_attestation)
         .service(record_dispute)
         .service(record_dispute_won);

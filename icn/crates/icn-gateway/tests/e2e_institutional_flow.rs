@@ -709,7 +709,6 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
                         &did,
                         &did,
                         (req.term_length_seconds / 86_400) as u64,
-                        req.bond_amount.max(0) as u64,
                         req.proposal_id.clone(),
                         jurisdiction,
                         vec![],
@@ -766,6 +765,19 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
             // Stub: this test covers AppointSteward only.
             // SuspendSteward is proven in sdis_service unit tests.
             Ok(SuspendStewardResult {
+                success: true,
+                state_change_hash: String::new(),
+                error: None,
+            })
+        }
+
+        fn update_jurisdiction_tier(
+            &self,
+            _req: icn_kernel_api::UpdateJurisdictionTierRequest,
+        ) -> Result<icn_kernel_api::UpdateJurisdictionTierResult, anyhow::Error> {
+            // Stub: this test covers AppointSteward only.
+            // UpdateJurisdictionTier is proven in sdis_service unit tests.
+            Ok(icn_kernel_api::UpdateJurisdictionTierResult {
                 success: true,
                 state_change_hash: String::new(),
                 error: None,
@@ -913,7 +925,6 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
                     candidate: candidate_did.clone(),
                     sponsors: vec![],
                     region: "northeast".to_string(),
-                    bond_amount: 100,
                     term_length: 365 * 86_400, // 1 year
                 },
             },

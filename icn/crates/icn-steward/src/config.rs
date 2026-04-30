@@ -35,9 +35,6 @@ pub struct StewardConfig {
     /// Stale heartbeat threshold in seconds (consider offline after this)
     pub stale_heartbeat_secs: u64,
 
-    /// Minimum bond amount in credits
-    pub min_bond_amount: i64,
-
     /// Rate limit: token requests per hour per VUI commitment
     pub rate_limit_per_vui_hour: u32,
 
@@ -76,9 +73,6 @@ impl Default for StewardConfig {
             // Health monitoring
             heartbeat_interval_secs: 30,
             stale_heartbeat_secs: 120,
-
-            // Economic parameters
-            min_bond_amount: 1000,
 
             // Rate limiting (10 per hour per VUI)
             rate_limit_per_vui_hour: 10,

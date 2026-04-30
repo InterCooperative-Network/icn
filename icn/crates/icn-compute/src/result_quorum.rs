@@ -25,8 +25,14 @@
 //! low_value_threshold = 100      # Below: single executor
 //! medium_value_threshold = 1000  # Below: 2 executors
 //! high_value_quorum = 3          # Above medium: 3+ executors
-//! consensus_threshold = 0.67     # 2/3 majority for consensus
+//! consensus_threshold = 0.67     # 2/3 executor agreement required
 //! ```
+//!
+//! # Semantic Note
+//!
+//! `consensus_threshold` is **executor result agreement**, not BFT/blockchain consensus.
+//! Arbiter selection for dispute resolution is trust-gated (via `TrustPolicyOracle`),
+//! not capital-weighted. See ADR-0014 for the stewardship/trust governance model.
 
 use crate::error::{ComputeError, Result};
 use crate::types::{ComputeResult, TaskHash};

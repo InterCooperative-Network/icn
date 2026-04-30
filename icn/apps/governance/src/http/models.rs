@@ -106,8 +106,6 @@ pub struct AppointStewardProposalRequest {
     pub candidate: String,
     /// Geographic or operational region the steward will serve.
     pub region: String,
-    /// Bond amount (in commons credits) the steward must post.
-    pub bond_amount: i64,
     /// Proposed term length in seconds.
     pub term_length_seconds: u64,
     /// DIDs of stewards sponsoring this candidate. May be empty.
@@ -127,9 +125,6 @@ pub struct RemoveStewardProposalRequest {
     pub steward: String,
     /// Reason for removal.
     pub reason: String,
-    /// Whether the steward's bond should be returned on removal.
-    #[serde(default)]
-    pub return_bond: bool,
 }
 
 /// Open a proposal for voting

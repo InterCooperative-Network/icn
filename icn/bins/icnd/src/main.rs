@@ -267,13 +267,66 @@ async fn build_services(
     // Build charter ratification hook: when a Charter proposal is accepted the governance
     // handler calls this closure with (charter_id, charter_yaml).  We parse the YAML here
     // and deploy into the oracle so subsequent CCL evaluations use the new charter.
+    //
+    // The hook also wires the ledger's `charter_economic_view` so that
+    // `Ledger::process_entry()` consults the just-deployed charter for credit
+    // limits before falling back to the static credit policy chain. This is
+    // the daemon-side end of the **CCL → economics consumption bridge**.
     let oracle_for_hook = charter_oracle.clone();
+    let ledger_for_hook = ledger_handle.clone();
     let charter_accepted_hook: Arc<dyn Fn(String, String) + Send + Sync> = Arc::new(
         move |charter_id, yaml| match icn_ccl::schema::CclDocument::from_yaml(&yaml) {
             Ok(doc) => {
                 let ctx = icn_ccl::schema::bridge::CharterContext::new().with_members(100);
                 oracle_for_hook.deploy_charter(charter_id.clone(), doc, ctx);
-                tracing::info!("Charter '{}' deployed via ratification", charter_id);
+
+                // Wire the ledger's economic policy view to this charter.
+                // From this point on, `Ledger::process_entry()` will query the
+                // charter for `credit_limit` before falling back to the static
+                // credit policy. The view is the same `Arc<CharterPolicyOracle>`
+                // — only the typed-trait perspective changes.
+                //
+                // The hook is synchronous but the ledger uses
+                // `tokio::sync::RwLock`, so we spawn the binding write into the
+                // current Tokio runtime. Charter ratifications are rare, so the
+                // brief eventual-consistency window between "charter deployed in
+                // oracle" and "ledger view bound" is acceptable: any entries
+                // landing in that window will simply use the static credit
+                // policy fallback and emit `truth_state=FALLBACK_APPLIED`.
+                let view: Arc<dyn icn_ledger::credit_policy::EconomicPolicyView> =
+                    oracle_for_hook.clone();
+                let ledger_for_bind = ledger_for_hook.clone();
+                let charter_id_for_bind = charter_id.clone();
+                tokio::spawn(async move {
+                    ledger_for_bind
+                        .write()
+                        .await
+                        .set_charter_economic_view(charter_id_for_bind, view);
+                });
+
+                // Wire surplus-reserves enforcement view.
+                // From this point on, `submit_treasury_entry()` for
+                // `DistributeSurplus` will query the charter for
+                // `surplus_reserves_pct` before writing the distribution journal
+                // entry. Distributions that would leave less than
+                // `reserves_pct * treasury_balance` in the treasury are rejected
+                // with `truth_state=ENFORCED`. This is the daemon-side end of the
+                // **CCL → surplus consumption bridge** (ADR-0016 Gap 1 closure).
+                let surplus_view: Arc<dyn icn_ledger::credit_policy::SurplusPolicyView> =
+                    oracle_for_hook.clone();
+                let ledger_for_surplus = ledger_for_hook.clone();
+                let charter_id_for_surplus = charter_id.clone();
+                tokio::spawn(async move {
+                    ledger_for_surplus
+                        .write()
+                        .await
+                        .set_charter_surplus_view(charter_id_for_surplus, surplus_view);
+                });
+
+                tracing::info!(
+                    "Charter '{}' deployed via ratification; ledger economic and surplus view bindings scheduled",
+                    charter_id
+                );
             }
             Err(e) => {
                 tracing::warn!(
@@ -314,6 +367,7 @@ async fn build_services(
             })
         })),
         charter_accepted_hook: Some(charter_accepted_hook),
+        charter_oracle: Some(charter_oracle.clone() as Arc<dyn icn_kernel_api::authz::PolicyOracle>),
         balance_callback: Some(balance_callback),
         payment_callback: Some(payment_callback),
         commons_settlement_callback: Some(commons_settlement_callback),

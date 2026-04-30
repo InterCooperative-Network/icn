@@ -10,6 +10,7 @@
 //! - Bonded (stake against misbehavior)
 //! - Subject to governance oversight
 
+use crate::sdis::JurisdictionTier;
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -71,14 +72,15 @@ pub struct StewardRecord {
     /// Geographic or sectoral scope (None = global)
     pub jurisdiction: Option<String>,
 
+    /// Jurisdiction tier assigned by governance (None = not yet tiered)
+    #[serde(default)]
+    pub jurisdiction_tier: Option<JurisdictionTier>,
+
     /// Term start (Unix timestamp)
     pub term_start: u64,
 
     /// Term end (Unix timestamp) - stewards have limited terms
     pub term_end: u64,
-
-    /// Bond posted (stake against misbehavior, in network credits)
-    pub bond_amount: u64,
 
     /// Computed reputation from attestation outcomes (0.0 to 1.0)
     pub reputation_score: f64,
@@ -113,12 +115,15 @@ pub struct StewardRecord {
 
 impl StewardRecord {
     /// Create a new StewardRecord
+    ///
+    /// Stewardship is an elected or permissioned institutional office backed by
+    /// trust and mandate. No financial collateral is required at appointment.
+    /// See ADR-0014: Stewardship Semantics.
     pub fn new(
         steward_did: Did,
         holder_did: Did,
         term_start: u64,
         term_end: u64,
-        bond_amount: u64,
         governance_approval: String,
     ) -> Self {
         let steward_id = StewardId::from_did(&steward_did);
@@ -130,9 +135,9 @@ impl StewardRecord {
             holder_did,
             status: StewardStatus::Active,
             jurisdiction: None,
+            jurisdiction_tier: None,
             term_start,
             term_end,
-            bond_amount,
             reputation_score: 1.0, // Start with full reputation
             attestations_issued: 0,
             attestations_disputed: 0,
@@ -272,18 +277,13 @@ impl StewardRecord {
         }
     }
 
-    /// Add to the bond
-    pub fn add_bond(&mut self, amount: u64) {
-        self.bond_amount += amount;
+    /// Update the steward's jurisdiction tier.
+    ///
+    /// Called when a governance-ratified `UpdateJurisdictionTier` or `TierDemotion`
+    /// proposal is executed. The previous tier (if any) is overwritten.
+    pub fn set_jurisdiction_tier(&mut self, tier: JurisdictionTier) {
+        self.jurisdiction_tier = Some(tier);
         self.updated_at = icn_time::current_timestamp_secs();
-    }
-
-    /// Slash the bond (for misbehavior)
-    pub fn slash_bond(&mut self, amount: u64) -> u64 {
-        let slashed = amount.min(self.bond_amount);
-        self.bond_amount -= slashed;
-        self.updated_at = icn_time::current_timestamp_secs();
-        slashed
     }
 
     /// Get effectiveness score (combination of activity and reputation)
@@ -469,7 +469,6 @@ mod tests {
             test_holder_did(),
             now,
             now + 365 * 24 * 60 * 60, // 1 year term
-            1000,
             "proposal-001".to_string(),
         )
     }
@@ -483,7 +482,6 @@ mod tests {
         assert!(!steward.is_term_expired());
         assert!(steward.can_attest());
         assert_eq!(steward.reputation_score, 1.0);
-        assert_eq!(steward.bond_amount, 1000);
     }
 
     #[test]
@@ -593,26 +591,6 @@ mod tests {
     }
 
     #[test]
-    fn test_bond_management() {
-        let mut steward = create_test_steward();
-        assert_eq!(steward.bond_amount, 1000);
-
-        // Add bond
-        steward.add_bond(500);
-        assert_eq!(steward.bond_amount, 1500);
-
-        // Slash bond
-        let slashed = steward.slash_bond(300);
-        assert_eq!(slashed, 300);
-        assert_eq!(steward.bond_amount, 1200);
-
-        // Slash more than available
-        let slashed = steward.slash_bond(2000);
-        assert_eq!(slashed, 1200);
-        assert_eq!(steward.bond_amount, 0);
-    }
-
-    #[test]
     fn test_term_extension() {
         let mut steward = create_test_steward();
         let original_end = steward.term_end;
@@ -712,6 +690,6 @@ mod tests {
         let deserialized: StewardRecord = serde_json::from_str(&json).unwrap();
 
         assert_eq!(deserialized.steward_id.0, steward.steward_id.0);
-        assert_eq!(deserialized.bond_amount, steward.bond_amount);
+        assert_eq!(deserialized.reputation_score, steward.reputation_score);
     }
 }

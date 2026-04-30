@@ -57,6 +57,14 @@ fn approved_emitted_effects() -> BTreeSet<&'static str> {
         "Federation::LeaveFederation",
         "Federation::EstablishClearing",
         "Federation::VouchForCoop",
+        // Federation lifecycle effects (ADR-0015 Phase 1 closure)
+        // Executor: governance_executor.rs — returns ExecutionOutcome::Deferred
+        // (FederationService does not yet expose terminate_clearing/revoke_vouch)
+        "Federation::TerminateClearing",
+        "Federation::RevokeVouch",
+        // Treasury inter-budget transfer
+        // Executor: existing TreasuryEffect::Transfer path
+        "Treasury::Transfer",
         // Dispute effects
         "Dispute::ResolveDispute",
         "Dispute::RollbackLedger",
@@ -69,6 +77,10 @@ fn approved_emitted_effects() -> BTreeSet<&'static str> {
         "Sdis::ReconfirmSteward",
         "Sdis::ReinstateSteward",
         "Sdis::SuspendSteward",
+        // Steward tier change (ADR-0015 Phase 1 closure)
+        // Executor: governance_executor.rs — returns not_executed=true
+        // (CommonsHandle.update_jurisdiction_tier not yet implemented)
+        "Sdis::UpdateJurisdictionTier",
         // Fallback (always allowed)
         "NoOp",
     ]

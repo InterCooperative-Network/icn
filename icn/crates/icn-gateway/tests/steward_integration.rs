@@ -70,8 +70,7 @@ async fn test_steward_registration() {
         .register_steward(
             &member_did,
             &member_did,
-            365,  // 1 year term
-            1000, // bond amount
+            365, // 1 year term
             "governance-proposal-123".to_string(),
             Some("coop:test-coop".to_string()),
             vec!["enrollment".to_string(), "dispute-resolution".to_string()],
@@ -81,7 +80,6 @@ async fn test_steward_registration() {
 
     assert!(steward.is_active());
     assert!(steward.can_attest());
-    assert_eq!(steward.bond_amount, 1000);
     assert_eq!(steward.jurisdiction, Some("coop:test-coop".to_string()));
     assert!(steward.specializations.contains(&"enrollment".to_string()));
     assert!(steward
@@ -116,7 +114,6 @@ async fn test_weak_pop_cannot_become_steward() {
             &member_did,
             &member_did,
             365,
-            1000,
             "gov-123".to_string(),
             None,
             vec![],
@@ -143,7 +140,6 @@ async fn test_steward_lookup() {
             &member_did,
             &member_did,
             365,
-            1000,
             "gov-123".to_string(),
             None,
             vec![],
@@ -183,7 +179,6 @@ async fn test_steward_suspend_reinstate() {
             &member_did,
             &member_did,
             365,
-            1000,
             "gov-123".to_string(),
             None,
             vec![],
@@ -232,7 +227,6 @@ async fn test_steward_retirement() {
             &member_did,
             &member_did,
             365,
-            1000,
             "gov-123".to_string(),
             None,
             vec![],
@@ -266,7 +260,6 @@ async fn test_steward_revocation() {
             &member_did,
             &member_did,
             365,
-            1000,
             "gov-123".to_string(),
             None,
             vec![],
@@ -304,7 +297,6 @@ async fn test_attestation_tracking() {
             &member_did,
             &member_did,
             365,
-            1000,
             "gov-123".to_string(),
             None,
             vec![],
@@ -349,7 +341,6 @@ async fn test_dispute_tracking() {
             &member_did,
             &member_did,
             365,
-            1000,
             "gov-123".to_string(),
             None,
             vec![],
@@ -382,63 +373,6 @@ async fn test_dispute_tracking() {
     assert_eq!(updated.disputes_won, 1);
 }
 
-/// Test bond management
-#[actix_web::test]
-async fn test_bond_management() {
-    let commons_mgr = CommonsManager::new();
-
-    let member_keypair = KeyPair::generate().unwrap();
-    let voucher_keypair = KeyPair::generate().unwrap();
-    let member_did = member_keypair.did().clone();
-
-    create_holder_with_strong_pop(&commons_mgr, &member_keypair, &voucher_keypair).await;
-
-    let steward = commons_mgr
-        .register_steward(
-            &member_did,
-            &member_did,
-            365,
-            1000,
-            "gov-123".to_string(),
-            None,
-            vec![],
-        )
-        .await
-        .unwrap();
-
-    let steward_id = steward.steward_id.to_hex();
-    assert_eq!(steward.bond_amount, 1000);
-
-    // Add bond
-    commons_mgr
-        .add_steward_bond(&steward_id, 500)
-        .await
-        .unwrap();
-
-    let updated = commons_mgr.get_steward(&steward_id).await.unwrap().unwrap();
-    assert_eq!(updated.bond_amount, 1500);
-
-    // Slash bond - returns the amount slashed, not remaining
-    let slashed = commons_mgr
-        .slash_steward_bond(&steward_id, 300)
-        .await
-        .unwrap();
-    assert_eq!(slashed, 300);
-
-    let updated = commons_mgr.get_steward(&steward_id).await.unwrap().unwrap();
-    assert_eq!(updated.bond_amount, 1200);
-
-    // Slash more than available - only slashes what's available
-    let slashed = commons_mgr
-        .slash_steward_bond(&steward_id, 2000)
-        .await
-        .unwrap();
-    assert_eq!(slashed, 1200); // Only 1200 was available
-
-    let updated = commons_mgr.get_steward(&steward_id).await.unwrap().unwrap();
-    assert_eq!(updated.bond_amount, 0);
-}
-
 /// Test term extension
 #[actix_web::test]
 async fn test_term_extension() {
@@ -455,7 +389,6 @@ async fn test_term_extension() {
             &member_did,
             &member_did,
             365,
-            1000,
             "gov-123".to_string(),
             None,
             vec![],
@@ -497,7 +430,6 @@ async fn test_list_stewards() {
             member1.did(),
             member1.did(),
             365,
-            1000,
             "gov-123".to_string(),
             Some("coop:alpha".to_string()),
             vec![],
@@ -510,7 +442,6 @@ async fn test_list_stewards() {
             member2.did(),
             member2.did(),
             365,
-            2000,
             "gov-456".to_string(),
             Some("coop:beta".to_string()),
             vec![],
@@ -559,7 +490,6 @@ async fn test_list_attesters() {
             member1.did(),
             member1.did(),
             365,
-            1000,
             "gov-123".to_string(),
             None,
             vec![],
@@ -572,7 +502,6 @@ async fn test_list_attesters() {
             member2.did(),
             member2.did(),
             365,
-            1000,
             "gov-456".to_string(),
             None,
             vec![],
@@ -616,7 +545,6 @@ async fn test_duplicate_steward_prevention() {
             &member_did,
             &member_did,
             365,
-            1000,
             "gov-123".to_string(),
             None,
             vec![],
@@ -630,7 +558,6 @@ async fn test_duplicate_steward_prevention() {
             &member_did,
             &member_did,
             365,
-            1000,
             "gov-456".to_string(),
             None,
             vec![],
@@ -658,7 +585,6 @@ async fn test_steward_without_holder_fails() {
             &member_did,
             &member_did,
             365,
-            1000,
             "gov-123".to_string(),
             None,
             vec![],

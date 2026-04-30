@@ -133,6 +133,12 @@ pub enum FederationOperationType {
     /// Settle net positions for a bilateral clearing agreement and emit a
     /// ledger transfer entry for the net amount.
     SettleClearing,
+    /// Terminate an existing bilateral clearing agreement (governance-ratified).
+    /// Deferred: FederationService does not yet implement this operation.
+    TerminateClearing,
+    /// Revoke a vouch from one cooperative to another (governance-ratified).
+    /// Deferred: FederationService does not yet implement this operation.
+    RevokeVouch,
 }
 
 /// Federation operation request from governance
@@ -637,6 +643,42 @@ pub fn federation_effect_to_operation(effect: &FederationEffect) -> FederationOp
                 None
             } else {
                 Some(decision_hash.clone())
+            },
+            settlement_interval: None,
+            max_imbalance: None,
+            source_agreement_id: None,
+        },
+        FederationEffect::TerminateClearing {
+            coop_a_did,
+            coop_b_did,
+            decision_receipt_id,
+        } => FederationOperation {
+            operation_type: FederationOperationType::TerminateClearing,
+            coop_did: coop_a_did.clone(),
+            target_id: Some(coop_b_did.clone()),
+            agreement_hash: None,
+            decision_hash: if decision_receipt_id.is_empty() {
+                None
+            } else {
+                Some(decision_receipt_id.clone())
+            },
+            settlement_interval: None,
+            max_imbalance: None,
+            source_agreement_id: None,
+        },
+        FederationEffect::RevokeVouch {
+            revoker_did,
+            revokee_did,
+            decision_receipt_id,
+        } => FederationOperation {
+            operation_type: FederationOperationType::RevokeVouch,
+            coop_did: revoker_did.clone(),
+            target_id: Some(revokee_did.clone()),
+            agreement_hash: None,
+            decision_hash: if decision_receipt_id.is_empty() {
+                None
+            } else {
+                Some(decision_receipt_id.clone())
             },
             settlement_interval: None,
             max_imbalance: None,

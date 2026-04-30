@@ -2050,8 +2050,6 @@ pub struct AppointStewardRequest {
     pub jurisdiction_id: String,
     /// Term length in seconds
     pub term_length_seconds: i64,
-    /// Bond posted by the candidate
-    pub bond_amount: i64,
     /// Geographic region (optional)
     pub region: Option<String>,
     /// Proposal receipt ID for audit linkage
@@ -2143,6 +2141,15 @@ pub trait SdisService: Send + Sync {
         &self,
         request: SuspendStewardRequest,
     ) -> Result<SuspendStewardResult, anyhow::Error>;
+
+    /// Update the jurisdiction tier of an existing steward.
+    ///
+    /// Called for both `UpdateJurisdictionTier` proposals and `TierDemotion` sanctions.
+    /// The `new_tier` string must be one of "Tier1", "Tier2", "Tier3".
+    fn update_jurisdiction_tier(
+        &self,
+        request: UpdateJurisdictionTierRequest,
+    ) -> Result<UpdateJurisdictionTierResult, anyhow::Error>;
 }
 
 /// Request to suspend a steward via governance dispatch.
@@ -2184,6 +2191,28 @@ pub struct ReinstateStewardResult {
     /// False if the steward was not suspended (no-op path).
     pub was_suspended: bool,
     /// Stable hash of the state change (for audit); empty on no-op path.
+    pub state_change_hash: String,
+    pub error: Option<String>,
+}
+
+/// Request to update a steward's jurisdiction tier via governance dispatch.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UpdateJurisdictionTierRequest {
+    /// DID of the steward whose tier is being updated
+    pub steward_did: String,
+    /// Target tier: one of "Tier1", "Tier2", "Tier3"
+    pub new_tier: String,
+    /// Human-readable reason from the governance proposal
+    pub reason: String,
+    /// Proposal receipt ID for audit linkage
+    pub proposal_id: String,
+}
+
+/// Result of an update-jurisdiction-tier operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UpdateJurisdictionTierResult {
+    pub success: bool,
+    /// Stable hash of the state change (for audit); empty on failure.
     pub state_change_hash: String,
     pub error: Option<String>,
 }

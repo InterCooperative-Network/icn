@@ -42,6 +42,10 @@ pub struct GovernanceDeps {
     /// fallback `StaticMembershipResolver`.  Without this, TrustThreshold
     /// domains cannot be closed (actor's quorum calculation errors).
     pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
+    /// Charter policy oracle for charter-derived threshold evaluation.
+    /// When present, wired into the governance actor so that `CloseProposal`
+    /// can consult charter thresholds as a fallback when protocol params absent.
+    pub charter_oracle: Option<Arc<dyn icn_kernel_api::authz::PolicyOracle>>,
 }
 
 /// Services returned from governance initialization
@@ -138,11 +142,18 @@ pub async fn init_governance_services(
     );
     info!("✓ Governance executor created");
 
-    // Attach protocol parameter store and executor to governance handle
-    let governance_handle = actor_services
+    // Attach protocol parameter store, executor, and charter oracle to governance handle.
+    // The charter oracle is optional (not available in test environments or early bootstrap);
+    // the governance actor falls back to protocol params / domain config when absent.
+    let governance_handle_base = actor_services
         .governance_handle
         .with_protocol_params(protocol_parameter_store.clone())
         .with_executor(governance_executor);
+    let governance_handle = if let Some(oracle) = deps.charter_oracle {
+        governance_handle_base.with_charter_oracle(oracle)
+    } else {
+        governance_handle_base
+    };
 
     Ok(GovernanceServices {
         governance_handle,

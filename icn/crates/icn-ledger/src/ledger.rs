@@ -353,6 +353,45 @@ pub struct Ledger {
     /// Witness configuration for requiring co-signatures on entries
     /// When set, entries above threshold require witness signatures (Issue #676)
     pub(crate) witness_config: Option<crate::types::WitnessConfig>,
+
+    /// Optional charter identifier paired with `charter_economic_view`.
+    ///
+    /// When `set_charter_economic_view()` is called, both the id and the view
+    /// are stored together so `process_entry()` can query the institutionally
+    /// ratified credit limit before falling back to the static credit policy.
+    /// `None` means no charter is currently governing this ledger's economics.
+    charter_id_for_economics: Option<String>,
+
+    /// Optional charter-derived economic policy view.
+    ///
+    /// When set, `process_entry()` calls
+    /// `view.credit_limit_for(charter_id, member_patronage, member_trust_score)`
+    /// before computing the dynamic/static credit limit. A `Some(limit)`
+    /// return value **overrides** the static fallback chain — the charter
+    /// is the institutionally ratified policy and takes precedence.
+    /// `None` returned from the view means the charter does not define a
+    /// credit policy and the ledger falls back to its default chain.
+    charter_economic_view: Option<Arc<dyn crate::credit_policy::EconomicPolicyView>>,
+
+    /// Optional charter identifier paired with `charter_surplus_view`.
+    ///
+    /// When `set_charter_surplus_view()` is called, both the id and the view
+    /// are stored together so surplus distributions can be validated against
+    /// the institutionally ratified `surplus_reserves_pct` before the journal
+    /// entry is written. `None` means no charter is governing surplus policy.
+    charter_id_for_surplus: Option<String>,
+
+    /// Optional charter-derived surplus distribution policy view.
+    ///
+    /// When set, `submit_treasury_entry()` for `DistributeSurplus` calls
+    /// `view.reserves_pct_for(charter_id)` before appending the entry. If the
+    /// charter defines a minimum reserves fraction, distributions that would
+    /// leave less than `reserves_pct * treasury_balance` in the treasury are
+    /// rejected with `truth_state="ENFORCED"`.
+    ///
+    /// `None` view → all distributions proceed with `truth_state="UNSUPPORTED"`.
+    /// View returns `None` → no charter constraint; `truth_state="FALLBACK_APPLIED"`.
+    charter_surplus_view: Option<Arc<dyn crate::credit_policy::SurplusPolicyView>>,
 }
 
 impl Ledger {
@@ -391,6 +430,10 @@ impl Ledger {
             oracle_manager: None,            // Set via set_oracle_manager()
             fx_config: None,                 // Set via set_fx_config()
             witness_config: None,            // Set via set_witness_config()
+            charter_id_for_economics: None,  // Set via set_charter_economic_view()
+            charter_economic_view: None,     // Set via set_charter_economic_view()
+            charter_id_for_surplus: None,    // Set via set_charter_surplus_view()
+            charter_surplus_view: None,      // Set via set_charter_surplus_view()
         };
 
         // Set store on fork resolver for witness signature lookups (Issue #688)
@@ -563,6 +606,80 @@ impl Ledger {
     /// Get the credit policy manager (if set)
     pub fn credit_policy_manager(&self) -> Option<&CreditPolicyManager> {
         self.credit_policy_manager.as_ref()
+    }
+
+    /// Set the charter-derived economic policy view.
+    ///
+    /// When configured, `process_entry()` consults this view *before* falling
+    /// back to the dynamic/static credit policy chain. The view returns the
+    /// institutionally ratified credit limit for a member based on the
+    /// charter's `credit_limit` expression evaluated with per-member context.
+    ///
+    /// This is the typed adapter that closes the **CCL → economics
+    /// consumption gap**. Without it, charter `credit_limit` expressions are
+    /// computed by `charter_to_constraints()` but never read by the ledger,
+    /// leaving the institutionally ratified policy as inert text.
+    ///
+    /// # Arguments
+    /// * `charter_id` — identifier of the charter governing this ledger.
+    /// * `view` — implementation injected from `apps/charter` (typically
+    ///   `Arc<CharterPolicyOracle>`).
+    ///
+    /// # Truth state
+    ///
+    /// When this is set:
+    /// - Charter returns `Some(limit)` → `ENFORCED` (charter governs)
+    /// - Charter returns `None` → `FALLBACK_APPLIED` (static policy used)
+    ///
+    /// When this is NOT set:
+    /// - All entries use the static policy chain → `UNSUPPORTED` (legacy)
+    pub fn set_charter_economic_view(
+        &mut self,
+        charter_id: String,
+        view: Arc<dyn crate::credit_policy::EconomicPolicyView>,
+    ) {
+        self.charter_id_for_economics = Some(charter_id);
+        self.charter_economic_view = Some(view);
+    }
+
+    /// Get the configured charter id (if any) for economic policy.
+    pub fn charter_id_for_economics(&self) -> Option<&str> {
+        self.charter_id_for_economics.as_deref()
+    }
+
+    /// Set the charter-derived surplus distribution policy view.
+    ///
+    /// When configured, `submit_treasury_entry()` for `DistributeSurplus`
+    /// consults this view to enforce the charter's `surplus_reserves_pct`
+    /// constraint before writing the journal entry.
+    ///
+    /// Direction of dependency: `apps/charter` implements the trait; the
+    /// ledger only knows about the trait (defined in `icn-ledger`). The
+    /// meaning firewall is preserved — the ledger never imports `apps/charter`.
+    ///
+    /// # Truth states
+    ///
+    /// - View returns `Some(pct)` and check passes → `ENFORCED`
+    /// - View returns `Some(pct)` and check fails → `ENFORCED` + distribution rejected
+    /// - View returns `None` (no charter constraint) → `FALLBACK_APPLIED`
+    /// - No view configured → `UNSUPPORTED`
+    pub fn set_charter_surplus_view(
+        &mut self,
+        charter_id: String,
+        view: Arc<dyn crate::credit_policy::SurplusPolicyView>,
+    ) {
+        self.charter_id_for_surplus = Some(charter_id);
+        self.charter_surplus_view = Some(view);
+    }
+
+    /// Return the (charter_id, view) pair for surplus policy, if configured.
+    pub fn charter_surplus_view_and_id(
+        &self,
+    ) -> Option<(&str, &Arc<dyn crate::credit_policy::SurplusPolicyView>)> {
+        match (&self.charter_id_for_surplus, &self.charter_surplus_view) {
+            (Some(id), Some(view)) => Some((id.as_str(), view)),
+            _ => None,
+        }
     }
 
     /// Set the membership store for tracking when members joined
@@ -2795,9 +2912,15 @@ impl Ledger {
 
         // Enforce credit limits (Issue #164, #326)
         // Check that no account would exceed its credit limit after this entry.
-        // Priority: dynamic_limit_manager > credit_policy_manager
-        let has_credit_limits =
-            self.dynamic_limit_manager.is_some() || self.credit_policy_manager.is_some();
+        // Priority: charter_economic_view (ENFORCED) > dynamic_limit_manager > credit_policy_manager (FALLBACK_APPLIED)
+        //
+        // The charter_economic_view, when present, is the institutionally
+        // ratified policy from CCL — it overrides the static fallback chain.
+        // The static chain remains as `FALLBACK_APPLIED` when the charter has
+        // no credit policy, and as `UNSUPPORTED` when no view is configured.
+        let has_credit_limits = self.dynamic_limit_manager.is_some()
+            || self.credit_policy_manager.is_some()
+            || self.charter_economic_view.is_some();
 
         if has_credit_limits {
             // PERFORMANCE: Calculate current time once for all deltas in this entry.
@@ -2832,9 +2955,54 @@ impl Ledger {
                     .copied()
                     .unwrap_or(0);
 
-                // Calculate credit limit - use dynamic manager if available
-                let calculated_limit = if let Some(ref dynamic_manager) = self.dynamic_limit_manager
-                {
+                // Calculate credit limit.
+                //
+                // Three-level cascade:
+                //   1. Charter-derived limit (ENFORCED) — institutionally ratified
+                //      via CCL, takes precedence when the charter defines a
+                //      `credit_limit` expression and the view returns Some.
+                //   2. Dynamic limit manager (FALLBACK_APPLIED) — adaptive limits
+                //      with decay/recovery, used when no charter limit exists.
+                //   3. Static credit policy manager (FALLBACK_APPLIED) — last
+                //      resort hardcoded baseline + trust + history formula.
+                //
+                // The truth state for each decision is logged so operators can
+                // audit which policy actually governed an account's credit cap.
+                let charter_limit_opt = match (
+                    self.charter_id_for_economics.as_deref(),
+                    self.charter_economic_view.as_ref(),
+                ) {
+                    (Some(charter_id), Some(view)) => {
+                        // `cleared_volume` is the closest in-ledger proxy for
+                        // the charter expression's `patronage` variable.
+                        let view_limit =
+                            view.credit_limit_for(charter_id, cleared_volume as f64, trust_score);
+                        if let Some(limit) = view_limit {
+                            tracing::debug!(
+                                account = %account,
+                                currency = currency,
+                                charter_id = charter_id,
+                                charter_limit = limit,
+                                truth_state = "ENFORCED",
+                                "Charter credit_limit governs account"
+                            );
+                        } else {
+                            tracing::debug!(
+                                account = %account,
+                                currency = currency,
+                                charter_id = charter_id,
+                                truth_state = "FALLBACK_APPLIED",
+                                "Charter has no credit_limit; falling back to static policy"
+                            );
+                        }
+                        view_limit
+                    }
+                    _ => None,
+                };
+
+                let calculated_limit = if let Some(charter_limit) = charter_limit_opt {
+                    charter_limit
+                } else if let Some(ref dynamic_manager) = self.dynamic_limit_manager {
                     // Use dynamic limit manager (includes decay/recovery)
                     match dynamic_manager.get_effective_limit(
                         account,
@@ -3659,6 +3827,131 @@ mod tests {
         );
         assert_eq!(ledger.get_balance(&alice, "hours"), 10); // 40 - 30 = 10
         assert_eq!(ledger.get_balance(&charlie, "hours"), 30);
+    }
+
+    /// Stub `EconomicPolicyView` for testing the charter consumption path.
+    /// Returns a fixed credit limit (or None) regardless of inputs — the ledger
+    /// must not care about the policy *source*, only that the trait was called.
+    struct StubEconomicView {
+        limit: Option<i64>,
+    }
+
+    impl crate::credit_policy::EconomicPolicyView for StubEconomicView {
+        fn credit_limit_for(
+            &self,
+            _charter_id: &str,
+            _member_patronage: f64,
+            _member_trust_score: f64,
+        ) -> Option<i64> {
+            self.limit
+        }
+    }
+
+    fn test_credit_policy_manager() -> CreditPolicyManager {
+        CreditPolicyManager::conservative("hours".to_string())
+    }
+
+    /// When the charter view returns Some(limit), the ledger ENFORCES it as the
+    /// credit limit — overriding the static credit policy chain. An entry that
+    /// would put a member's balance below `-charter_limit` must be rejected.
+    #[tokio::test]
+    async fn test_charter_credit_limit_enforced_overrides_static() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        // Configure the static fallback to be very permissive (would otherwise allow).
+        ledger.set_credit_policy_manager(test_credit_policy_manager());
+
+        // Charter view returns a very tight limit: 50.
+        let view: Arc<dyn crate::credit_policy::EconomicPolicyView> =
+            Arc::new(StubEconomicView { limit: Some(50) });
+        ledger.set_charter_economic_view("test-charter".to_string(), view);
+
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Bob spends 100 → balance becomes -100, which exceeds charter limit of 50.
+        let entry = JournalEntryBuilder::new(bob.clone())
+            .debit(bob.clone(), "hours".to_string(), 100)
+            .credit(alice.clone(), "hours".to_string(), 100)
+            .with_system_provenance("test")
+            .build()
+            .unwrap();
+
+        let result = ledger.append_entry(entry).await;
+        assert!(
+            result.is_err(),
+            "Charter limit of 50 must reject 100-credit overdraw, got: {result:?}"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("credit limit"),
+            "Error must mention credit limit, got: {err_msg}"
+        );
+    }
+
+    /// When the charter view returns None, the ledger FALLBACK_APPLIED to the
+    /// static credit policy. This proves the truth state taxonomy: an absent
+    /// charter constraint does not silently allow unconstrained credit.
+    #[tokio::test]
+    async fn test_charter_view_none_falls_back_to_static_policy() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        // Static policy: conservative (baseline 10000 = 100 hours).
+        ledger.set_credit_policy_manager(test_credit_policy_manager());
+
+        // Charter view returns None (no charter credit policy).
+        let view: Arc<dyn crate::credit_policy::EconomicPolicyView> =
+            Arc::new(StubEconomicView { limit: None });
+        ledger.set_charter_economic_view("test-charter".to_string(), view);
+
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Bob spends 50 → well within static baseline of 10000.
+        let entry = JournalEntryBuilder::new(bob.clone())
+            .debit(bob.clone(), "hours".to_string(), 50)
+            .credit(alice.clone(), "hours".to_string(), 50)
+            .with_system_provenance("test")
+            .build()
+            .unwrap();
+
+        let result = ledger.append_entry(entry).await;
+        assert!(
+            result.is_ok(),
+            "Static fallback must allow 50-credit when baseline is 10000, got: {result:?}"
+        );
+    }
+
+    /// When the charter view is configured but the static policy is NOT, and
+    /// the view returns Some, the charter limit alone governs. This verifies
+    /// the charter view is sufficient on its own to gate the credit-limit
+    /// enforcement block.
+    #[tokio::test]
+    async fn test_charter_view_alone_gates_credit_enforcement() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        // No static credit policy manager set.
+        // Only the charter view is configured.
+        let view: Arc<dyn crate::credit_policy::EconomicPolicyView> =
+            Arc::new(StubEconomicView { limit: Some(20) });
+        ledger.set_charter_economic_view("test-charter".to_string(), view);
+
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Bob spends 30 → exceeds charter limit of 20.
+        let entry = JournalEntryBuilder::new(bob.clone())
+            .debit(bob.clone(), "hours".to_string(), 30)
+            .credit(alice.clone(), "hours".to_string(), 30)
+            .with_system_provenance("test")
+            .build()
+            .unwrap();
+
+        let result = ledger.append_entry(entry).await;
+        assert!(
+            result.is_err(),
+            "Charter limit of 20 must reject 30-credit even without static policy, got: {result:?}"
+        );
     }
 
     #[tokio::test]
