@@ -852,3 +852,132 @@ candidates:
       - "Future PR linking canonical site Get-Involved into learn.icn.zone once the site is live"
       - "Possible small ADR recording cross-surface deployment / truth-boundary policy"
     priority: soon
+
+  - id: "0016"
+    title: "Generic Relationship Surface (RelationshipRecord primitive)"
+    status: drafted
+    rfc_path: "docs/rfcs/RFC-0016-relationship-surface.md"
+    domain: governance
+    why_it_matters: |
+      Multiple cooperative-tool surfaces in the design pipeline
+      (icn-member-directory, sponsor / fundraising specialized suite,
+      organizer recruitment, partner workspaces) need to point at a
+      generic non-authority relationship between DIDs (subject,
+      counterparty, owner, lifecycle state, last contact, next
+      followup, consent scopes). INSTITUTION_PACKAGE_BOUNDARY.md
+      correctly excludes CRM from ICN core; the underlying generic
+      relationship primitive is institution-agnostic if it carries no
+      institution-specific enum variants. Without a generic primitive
+      every consumer reinvents one and the second-adopter story
+      breaks.
+    related_adr_candidates: []
+    related_issues: []
+    design_questions:
+      - "Crate placement: new icn-relationships crate vs new module under icn-governance?"
+      - "Service trait shape: mirror TrustService, or direct store consumption sufficient?"
+      - "Lifecycle states: fixed enum or opaque string per anti-ontology-laundering rule?"
+      - "Consent scope vocabulary: ship a starter set as documentation only, or leave entirely free?"
+      - "Subject/counterparty asymmetry: directional or symmetric?"
+      - "Receipt class: new RelationshipReceipt or kind-discriminated extension of existing class?"
+    icn_runtime_surface: "substrate primitive — type, store, receipt emission on lifecycle-state-change"
+    package_or_institution_expression: |
+      Institution packages declare their own relationship_kind values
+      (sponsor, funder, partner, member-coop, vendor, speaker) as
+      opaque strings. The kernel does not branch on these. Consent
+      scope enforcement is per-institution policy.
+    accessibility_implications: |
+      Substrate primitive with no member-facing surface of its own.
+      Accessibility lands in consumer tools; receipts must be small
+      enough that a member shell can render relationship history on
+      low-bandwidth devices.
+    conflict_or_dispute_path: |
+      Disputed records resolve through the institution's dispute
+      surface (ADR-0029 candidate); lifecycle-state-change receipts
+      under ADR-0026 are the authoritative log; consent-scope
+      disputes follow ScopedVault policy.
+    compute_or_automation_boundary: |
+      Compute may render and derive over relationship records; mutations
+      must produce a lifecycle-state-change receipt. Determinism and
+      fuel bounds apply per ADR-0030 where compute jobs are invoked.
+    website_truth_implication: |
+      Once accepted and implemented, the canonical site can claim
+      ICN supports a generic relationship primitive that institutional
+      packages compose specialized contact / partner / sponsor
+      surfaces from. Site does NOT claim ICN provides a CRM.
+    proposed_outputs:
+      - "ADR recording crate-placement decision and type contract"
+      - "Implementation issue for RelationshipRecord primitive"
+      - "Implementation issue for receipt envelope integration"
+      - "Update to INSTITUTION_PACKAGE_BOUNDARY.md Reusable Primitive Set table"
+      - "Prerequisite for icn-member-directory tool implementation"
+    priority: now
+
+  - id: "0017"
+    title: "Tool Install Infrastructure (ToolManifest, ToolBinding, ToolInstall lifecycle)"
+    status: drafted
+    rfc_path: "docs/rfcs/RFC-0017-tool-install-infrastructure.md"
+    domain: package
+    why_it_matters: |
+      COOPERATIVE_TOOL_COMMONS.md Missing-buildout section names five
+      infrastructure objects (ToolManifest, ToolBinding, ToolInstall
+      lifecycle, tool capability registry, service identity audit
+      trail) that need to land before any of the named base tools
+      (icn-member-directory, icn-meetings, icn-tables, icn-docs, etc.)
+      can be installed by a coop on its own ICN node. Without this
+      infrastructure the second-adopter narrative collapses ("fork
+      the entire NYCN repo" is the only adoption path), which is
+      exactly what the cooperative-tool architecture is meant to
+      avoid. Install must be a governance act, not a marketplace
+      transaction (per the parent doc's no-app-store stance).
+    related_adr_candidates: []
+    related_issues: []
+    design_questions:
+      - "Crate placement: single icn-tools crate (Option A), split (Option B), or hybrid (Option C)?"
+      - "Manifest format: YAML, JSON, CCL, or Rust-typed declaration compiled to manifest?"
+      - "Lifecycle as Activity: reuse existing Activity+Milestone substrate or new lifecycle type?"
+      - "Capability declaration vocabulary: ship a starter set as documentation only, or leave free?"
+      - "Service identity rotation/revocation: reuse existing key rotation patterns?"
+      - "Cross-domain tool installation: in scope here or future RFC?"
+      - "Manifest signing: who signs (author / distributor / institution at install time)?"
+    icn_runtime_surface: |
+      substrate types (ToolManifest, ToolBinding), lifecycle records
+      (ToolInstall states), per-domain capability registry, service
+      identity audit trail integrated with the receipt envelope.
+    package_or_institution_expression: |
+      Institutions express tool installs through tool_bindings blocks
+      in their package manifest. NYCN's institution/package.yaml is
+      the first concrete example. Each binding carries the
+      institution's specific schemas, capability requests, and
+      approval-flow values per its charter — not in ICN core.
+    accessibility_implications: |
+      Install flow surfaces in icn-domain-admin and the institution's
+      governance process. Per ADR-0028, the approval UI must be
+      plain-language, mobile-first, low-bandwidth.
+    conflict_or_dispute_path: |
+      Disputed install: reverse through new governance act
+      (lifecycle: installed → suspended → removed); audit trail
+      preserves original install. Disputed tool action: receipts under
+      ADR-0026 are the authoritative log; resolves through the existing
+      dispute surface. Tool fork: the lifecycle includes fork; an
+      institution may fork a tool's binding without removing the
+      canonical tool.
+    compute_or_automation_boundary: |
+      Tools compute over institution-owned state with declared
+      capabilities; mutations produce receipts. Compute workloads used
+      by tools follow ADR-0030 manifest constraints.
+    website_truth_implication: |
+      Once accepted and implemented (with at least one shipped tool
+      flowing through the lifecycle), the canonical site can claim
+      ICN supports cooperative-tool install and binding as a substrate
+      primitive. Site does NOT claim a marketplace, app store, tool
+      ranking, or any tool catalog beyond the per-domain capability
+      list.
+    proposed_outputs:
+      - "ADR recording crate-placement decision and type contract"
+      - "Implementation issue for ToolManifest"
+      - "Implementation issue for ToolBinding and per-domain capability registry"
+      - "Implementation issue for ToolInstall lifecycle with governance-act integration"
+      - "Implementation issue for service identity audit trail integration with ADR-0026"
+      - "NYCN-side issue: add tool_bindings block to institution/package.yaml once binding format is concrete"
+      - "Update to COOPERATIVE_TOOL_COMMONS.md Missing-buildout section marking objects landed"
+    priority: now
