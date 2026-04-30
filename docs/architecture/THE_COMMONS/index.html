@@ -429,14 +429,14 @@ Owner: Matt Faherty</h2>
 </tr>
 <tr>
 <td><code>GET /me/standing</code> (roles + memberships + mandates + active scopes)</td>
-<td>does not exist as a single query</td>
-<td><code>[future design]</code></td>
+<td>shipped — <code>icn-gateway</code> member-standing read model</td>
+<td><code>[shipped, #1627]</code></td>
 <td>—</td>
 </tr>
 <tr>
 <td><code>GET /me/action-cards</code> (unified call-to-action surface)</td>
-<td>does not exist</td>
-<td><code>[future design]</code></td>
+<td>shipped — three of five source paths emit proof-bearing receipts (proposal/vote, action_item/complete, meeting/attend); two RFC-gated under #1646 (signal_rule on #1631, obligation_lifecycle on #1634)</td>
+<td><code>[shipped, #1659]</code></td>
 <td>—</td>
 </tr>
 <tr>
@@ -501,7 +501,7 @@ Owner: Matt Faherty</h2>
 <li>representation mandates granted to her by other entities,</li>
 <li>operator-level rights on any node she runs.</li>
 </ul>
-<p>What does <strong>not</strong> yet exist as a single API is a query that returns &quot;everything Alice is standing in right now&quot;. That is the <code>[future design]</code> <code>GET /me/standing</code> surface (see §9).</p>
+<p>A single API returns &quot;everything Alice is standing in right now&quot; — the <code>GET /me/standing</code> surface, shipped in #1627 (see §9).</p>
 <blockquote>
 <p><strong>Illustrative only.</strong> The flow above composes real types but is pseudocode. Do not treat it as a single struct or a committed API contract.</p>
 </blockquote>
@@ -618,8 +618,8 @@ Owner: Matt Faherty</h2>
 <p>The mobile spec (<code>docs/mobile/icn-mobile-ux-spec-v1.md</code>) and the archived human-interface notes (<code>docs/archive/2026/plans-scratch/human-interface.md</code>) contain raw material for promoting this concept into current design docs. That promotion is <code>[future design]</code>.</p>
 <hr>
 <h2>Standing and Active Scope</h2>
-<p>Two <code>[future design]</code> surfaces are named here because they shape every member flow that follows.</p>
-<h3><code>GET /me/standing</code> <code>[future design]</code></h3>
+<p>Two surfaces are named here because they shape every member flow that follows. The first two below are shipped; the active-scope primitive remains <code>[future design]</code>.</p>
+<h3><code>GET /me/standing</code> <code>[shipped, #1627]</code></h3>
 <p>A single authenticated query that returns a member&#39;s full participatory position across ICN. Suggested shape (non-binding):</p>
 <pre><code class="language-text">GET /me/standing
 Authorization: Bearer &lt;JWT&gt;
@@ -680,7 +680,7 @@ Authorization: Bearer &lt;JWT&gt;
 <hr>
 <h2>Action Cards</h2>
 <p>An <strong>action card</strong> is a generated call-to-action item surfaced in the Commons Shell. It is not a notification, not a feed post, not a marketing message. It is a scoped, typed, dismissible prompt that says: <em>&quot;This is a thing in the Commons that needs you.&quot;</em></p>
-<p><code>GET /me/action-cards</code> <code>[future design]</code> — a unified query that returns the ranked list of action cards for the authenticated member across all their scopes.</p>
+<p><code>GET /me/action-cards</code> <code>[shipped, #1659]</code> — a unified query that returns the ranked list of action cards for the authenticated member across all their scopes. Three of five source paths currently emit proof-bearing receipts (<code>proposal/vote</code> → <code>GovernanceDecisionReceipt</code>; <code>action_item/complete</code> → <code>ActionItemCompletionReceipt</code>; <code>meeting/attend</code> → <code>MeetingAttendanceReceipt</code>). Two source paths remain RFC-gated under umbrella issue #1646: <code>signal_rule</code> (gated on #1631) and <code>obligation_lifecycle</code> (gated on #1634). Completion-receipt retrieval (<code>GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt</code>) shipped in #1675.</p>
 <h3>Sources</h3>
 <p>An action card may be generated from:</p>
 <ul>

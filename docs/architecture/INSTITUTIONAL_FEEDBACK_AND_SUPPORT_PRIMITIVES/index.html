@@ -48,7 +48,7 @@ Companions: <code>INSTITUTION_PACKAGE_BOUNDARY.md</code>, <code>KERNEL_APP_SEPAR
 <p>This document defines the foundation for the next generation of generic primitives ICN core will eventually model:</p>
 <ul>
 <li><strong>Institutional feedback primitives</strong> — <code>InstitutionalSignal</code>, <code>SignalRule</code>, <code>EscalationPolicy</code>, <code>MemberSignal</code>, <code>SignalPolarity</code>.</li>
-<li><strong>Member-facing read primitives</strong> — <code>/me/standing</code> (landed), <code>/me/action-cards</code> (future).</li>
+<li><strong>Member-facing read primitives</strong> — <code>/me/standing</code> (landed, #1627), <code>/me/action-cards</code> (landed, #1659; three of five source paths proof-bearing — <code>signal_rule</code> and <code>obligation_lifecycle</code> remain RFC-gated under #1646).</li>
 <li><strong>Authority primitives</strong> — <code>RoleAssignment.authority_scope</code> (landed), <code>TemporaryAuthorityGrant</code> (future).</li>
 <li><strong>Governed indicator primitive</strong> — <code>Indicator</code> with definition, owner, caveats, review interval, challenge path.</li>
 <li><strong>Resource governance primitives</strong> — <code>Obligation</code>, <code>Allocation</code>, <code>Settlement</code>, <code>Position</code>, <code>Unit</code>, <code>SettlementAsset</code>.</li>
@@ -268,7 +268,7 @@ Companions: <code>INSTITUTION_PACKAGE_BOUNDARY.md</code>, <code>KERNEL_APP_SEPAR
 </tr>
 </tbody></table>
 <h3>How signals become action cards</h3>
-<p>A signal at the appropriate severity, scoped to a body the caller belongs to, surfaces in that caller&#39;s <code>/me/action-cards</code> (future) as something they&#39;re being asked to attend to. The signal record itself is the unit of institutional truth; the action card is the member-facing rendering.</p>
+<p>A signal at the appropriate severity, scoped to a body the caller belongs to, surfaces in that caller&#39;s <code>/me/action-cards</code> (endpoint shipped in #1659; the <code>signal_rule</code> source path that emits these is RFC-gated under #1631, tracked by umbrella #1646) as something they&#39;re being asked to attend to. The signal record itself is the unit of institutional truth; the action card is the member-facing rendering.</p>
 <h3>Anti-patterns this primitive must refuse</h3>
 <ul>
 <li><strong>Signal-as-broadcast.</strong> A signal must have a defined target body, not just be screamed into the federation.</li>
@@ -327,7 +327,7 @@ Companions: <code>INSTITUTION_PACKAGE_BOUNDARY.md</code>, <code>KERNEL_APP_SEPAR
 <blockquote>
 <p>Action cards are not a new ontology. They are a <strong>rendering of institutional need that the caller can act on</strong>.</p>
 </blockquote>
-<p><code>/v1/gov/me/standing</code> (#1604) tells you <em>who you are</em>. <code>/v1/gov/me/action-cards</code> (future, #1608) tells you <em>what needs you</em>.</p>
+<p><code>/v1/gov/me/standing</code> (shipped, #1627) tells you <em>who you are</em>. <code>/v1/gov/me/action-cards</code> (shipped, #1659; signal_rule/obligation_lifecycle source paths still RFC-gated under #1646) tells you <em>what needs you</em>.</p>
 <p>An action card is not a stored entity. It is a derived view computed from:</p>
 <ul>
 <li>the caller&#39;s <code>StandingResponse</code>;</li>

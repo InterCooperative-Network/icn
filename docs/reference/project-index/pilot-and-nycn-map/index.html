@@ -68,16 +68,16 @@ Last Reviewed: 2026-04-29</h2>
 <td>This file lives here.</td>
 </tr>
 <tr>
-<td><strong><code>fahertym/nycn</code></strong></td>
+<td><strong><code>InterCooperative-Network/nycn</code></strong></td>
 <td>The separate NYCN operator repo where the drive-ingest operator ladder lives. Pure file-in / file-out tooling and localhost-only operator-gated runners.</td>
 <td>External; references in <code>STATE.md</code> and below.</td>
 </tr>
 </tbody></table>
-<p><code>institutions/nycn/</code> (here) is the institution package — the structures, charter material, and configuration that describes NYCN as an ICN entity. <code>fahertym/nycn</code> (external) is the day-to-day operator workflow — the procedural spine that walks organizer material into ICN action-item proofs.</p>
+<p><code>institutions/nycn/</code> (here) is the institution package — the structures, charter material, and configuration that describes NYCN as an ICN entity. <code>InterCooperative-Network/nycn</code> (external) is the day-to-day operator workflow — the procedural spine that walks organizer material into ICN action-item proofs.</p>
 <h2>The mutation boundary</h2>
 <p>This is the load-bearing safety property of the NYCN partnership track:</p>
 <ul>
-<li><strong>NYCN-side tools are pure (no network) or localhost-only operator-gated.</strong> No tool in <code>fahertym/nycn</code> ever mutates a remote ICN cluster.</li>
+<li><strong>NYCN-side tools are pure (no network) or localhost-only operator-gated.</strong> No tool in <code>InterCooperative-Network/nycn</code> ever mutates a remote ICN cluster.</li>
 <li><strong>K3s mutation is ICN-side and operator-authorized.</strong> It happens in the proof-path runbooks documented in this repo, not in NYCN-side tooling.</li>
 <li><strong>Two-flag operator gate.</strong> The local publisher (NYCN ladder layer 5) requires two operator flags plus a localhost-only <code>--gateway</code> to actually publish. Default is preflight (no execution).</li>
 </ul>
@@ -103,7 +103,7 @@ Last Reviewed: 2026-04-29</h2>
 <td>Operator-authorized exercise of the same proof loop against the deployed K3s cluster, image <code>91a63eec</code>.</td>
 </tr>
 </tbody></table>
-<h2>NYCN-side ladder (in <code>fahertym/nycn</code>, summary only)</h2>
+<h2>NYCN-side ladder (in <code>InterCooperative-Network/nycn</code>, summary only)</h2>
 <p>The NYCN drive-ingest operator ladder is recorded in <a href="/docs/STATE">`docs/STATE.md`</a> as merged through NYCN #21–#32; NYCN #33 was open at last sync — verify against the latest <code>STATE.md</code> sync. See <code>STATE.md</code> for the per-PR enumeration. Conceptually, the ladder is a procedural spine:</p>
 <ol>
 <li>Parser → review artifact</li>
