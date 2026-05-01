@@ -24,38 +24,14 @@ import argparse
 import datetime as dt
 import hashlib
 import json
-import os
 import subprocess
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
 
-
-TEXT_EXTENSIONS = {
-    ".adoc",
-    ".astro",
-    ".css",
-    ".csv",
-    ".env",
-    ".example",
-    ".html",
-    ".js",
-    ".json",
-    ".jsx",
-    ".md",
-    ".mjs",
-    ".py",
-    ".rs",
-    ".sh",
-    ".sql",
-    ".toml",
-    ".ts",
-    ".tsx",
-    ".txt",
-    ".yaml",
-    ".yml",
-}
+# datetime.timezone.utc works on every supported Python; dt.UTC is 3.11+.
+UTC = dt.timezone.utc
 
 LANGUAGE_BY_EXTENSION = {
     ".astro": "Astro",
@@ -116,6 +92,8 @@ class FileRecord:
     size_bytes: int
     sha256: str
     tracked: bool
+    kind: str  # "file", "symlink", or "broken-symlink"
+    symlink_target: str | None = None
 
 
 @dataclass(frozen=True)
@@ -195,21 +173,69 @@ def language_for(path: str) -> str:
     return LANGUAGE_BY_EXTENSION.get(suffix, "unknown")
 
 
+def classify_extension(name: str) -> str:
+    """Return a classification token for a file's extension.
+
+    Uses ``Path.suffix`` for ordinary files; for dotfiles like ``.env`` or
+    ``.gitignore`` (where ``Path('.env').suffix`` is empty), returns the full
+    name (``.env``) so dotfiles retain a meaningful extension classification
+    instead of being lumped into ``(none)``.
+    """
+
+    suffix = Path(name).suffix.lower()
+    if suffix:
+        return suffix
+    if name.startswith(".") and "." not in name[1:]:
+        return name.lower()
+    return "(none)"
+
+
 def make_file_record(repo: Path, rel: str, tracked: bool) -> FileRecord | None:
     full = repo / rel
-    if not full.is_file():
+    # Use lstat so we can inventory symlinks (including dangling ones) without
+    # following them. Codex P1: ``git ls-files`` returns tracked symlinks; the
+    # generator must not silently drop them.
+    try:
+        lst = full.lstat()
+    except FileNotFoundError:
         return None
-    suffix = full.suffix.lower()
+
+    is_symlink = full.is_symlink()
+    if is_symlink:
+        try:
+            target = str(full.readlink())
+        except OSError:
+            target = None
+        kind = "symlink" if full.exists() else "broken-symlink"
+        # Don't traverse into the target; record the link itself with size 0
+        # and a sha256 over the link target text so the record stays
+        # deterministic without depending on whether the target resolves.
+        link_text = (target or "").encode("utf-8", errors="replace")
+        sha = hashlib.sha256(link_text).hexdigest()
+        size = lst.st_size
+    elif not full.is_file():
+        # Tracked path that resolves to neither a regular file nor a symlink
+        # (e.g. submodule gitlink). Skip; ``git ls-files`` returning these is
+        # rare and the record schema is regular-file-shaped.
+        return None
+    else:
+        target = None
+        kind = "file"
+        sha = sha256_file(full)
+        size = lst.st_size
+
     return FileRecord(
         path=rel,
         directory=str(Path(rel).parent) if str(Path(rel).parent) != "." else "",
         name=full.name,
-        extension=suffix or "(none)",
+        extension=classify_extension(full.name),
         language=language_for(rel),
         role_guess=role_guess(rel),
-        size_bytes=full.stat().st_size,
-        sha256=sha256_file(full),
+        size_bytes=size,
+        sha256=sha,
         tracked=tracked,
+        kind=kind,
+        symlink_target=target,
     )
 
 
@@ -267,7 +293,6 @@ def build_directories(files: list[FileRecord]) -> list[DirectoryRecord]:
 def write_markdown(
     out_path: Path,
     repo_name: str,
-    repo_path: Path,
     head: str,
     branch: str,
     files: list[FileRecord],
@@ -281,7 +306,7 @@ def write_markdown(
     lines.append("---")
     lines.append("Status: generated")
     lines.append("Canonical: no")
-    lines.append(f"Generated: {dt.datetime.now(dt.UTC).isoformat()}")
+    lines.append(f"Generated: {dt.datetime.now(UTC).isoformat()}")
     lines.append("---")
     lines.append("")
     lines.append(f"# Full Repository Record — `{repo_name}`")
@@ -290,12 +315,22 @@ def write_markdown(
     lines.append("")
     lines.append("## Snapshot")
     lines.append("")
-    lines.append(f"- Repo path: `{repo_path}`")
+    # Intentionally no absolute repo path: the repo identity is the
+    # user-supplied repo name plus branch + HEAD. Persisting an absolute
+    # local checkout path would leak machine-specific filesystem details
+    # (usernames, home paths) into committed artifacts.
+    lines.append(f"- Repo: `{repo_name}`")
     lines.append(f"- Branch: `{branch}`")
     lines.append(f"- HEAD: `{head}`")
     lines.append(f"- Tracked files recorded: `{len(files)}`")
     lines.append(f"- Directories recorded: `{len(directories)}`")
     lines.append(f"- Total tracked bytes: `{total_size}`")
+    kind_counts = Counter(file.kind for file in files)
+    if kind_counts:
+        kind_summary = ", ".join(
+            f"{kind}: {count}" for kind, count in sorted(kind_counts.items())
+        )
+        lines.append(f"- Entry kinds: `{kind_summary}`")
     lines.append("")
     lines.append("## Role summary")
     lines.append("")
@@ -335,26 +370,39 @@ def write_markdown(
 
 
 def generate_for_repo(repo_name: str, repo_path: Path, out_dir: Path, include_untracked: bool) -> None:
-    repo_path = repo_path.resolve()
-    if not (repo_path / ".git").exists():
-        raise SystemExit(f"{repo_path} does not look like a git repository")
+    # Resolve internally so subprocess calls can run against the repo, but the
+    # resolved absolute path is intentionally NOT persisted in any generated
+    # artifact (Codex P2 / Copilot review): committed records would otherwise
+    # carry machine-specific paths and usernames.
+    resolved_path = repo_path.resolve()
+    if not (resolved_path / ".git").exists():
+        raise SystemExit(f"{repo_name}: {repo_path} does not look like a git repository")
 
-    tracked_paths = git_ls_files(repo_path)
+    tracked_paths = git_ls_files(resolved_path)
     all_paths: list[tuple[str, bool]] = [(path, True) for path in tracked_paths]
     if include_untracked:
-        all_paths.extend((path, False) for path in git_untracked(repo_path))
+        all_paths.extend((path, False) for path in git_untracked(resolved_path))
 
-    files = [record for path, tracked in all_paths if (record := make_file_record(repo_path, path, tracked))]
+    files: list[FileRecord] = []
+    skipped: list[str] = []
+    for path, tracked in all_paths:
+        record = make_file_record(resolved_path, path, tracked)
+        if record is None:
+            skipped.append(path)
+        else:
+            files.append(record)
     directories = build_directories(files)
-    head = git_head(repo_path)
-    branch = git_branch(repo_path)
+    head = git_head(resolved_path)
+    branch = git_branch(resolved_path)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     payload = {
         "schema": "icn.repo_record.v1",
-        "generated_at": dt.datetime.now(dt.UTC).isoformat(),
+        "generated_at": dt.datetime.now(UTC).isoformat(),
         "repo": repo_name,
-        "repo_path": str(repo_path),
+        # No `repo_path`: see Codex P2 / Copilot review. Repo identity is
+        # `repo` + `branch` + `head`. Add normalized fields here only if they
+        # cannot leak local filesystem details.
         "branch": branch,
         "head": head,
         "include_untracked": include_untracked,
@@ -364,6 +412,8 @@ def generate_for_repo(repo_name: str, repo_path: Path, out_dir: Path, include_un
             "total_size_bytes": sum(file.size_bytes for file in files),
             "extensions": dict(sorted(Counter(file.extension for file in files).items())),
             "roles": dict(sorted(Counter(file.role_guess for file in files).items())),
+            "kinds": dict(sorted(Counter(file.kind for file in files).items())),
+            "skipped_paths": sorted(skipped),
         },
         "directories": [asdict(record) for record in directories],
         "files": [asdict(record) for record in sorted(files, key=lambda item: item.path)],
@@ -372,7 +422,7 @@ def generate_for_repo(repo_name: str, repo_path: Path, out_dir: Path, include_un
     json_path = out_dir / f"{repo_name}-file-record.json"
     md_path = out_dir / f"{repo_name}-file-record.md"
     json_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    write_markdown(md_path, repo_name, repo_path, head, branch, files, directories)
+    write_markdown(md_path, repo_name, head, branch, files, directories)
 
     print(f"wrote {json_path}")
     print(f"wrote {md_path}")

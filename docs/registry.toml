@@ -2088,6 +2088,38 @@ domain_tags = ["project-index", "navigation", "show-readiness", "communications"
 recommended_action = "keep"
 last_reviewed = "2026-04-29"
 
+[docs."docs/reference/project-index/full-repo-record.md"]
+category = "reference"
+status = "living"
+title = "Full Repository Record Protocol"
+description = "Protocol for recording every tracked file and directory across InterCooperative-Network/icn (and adjacent repos) as a mechanical record plus an interpretive atlas. Defines outputs, generator, classification vocabulary, and privacy boundary."
+last_updated = "2026-05-01"
+owner = "matt"
+audiences = ["contributors", "architects"]
+truth_class = "operational"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "repo-record", "atlas"]
+recommended_action = "keep"
+last_reviewed = "2026-05-01"
+
+[docs."docs/reference/project-index/repo-atlas.md"]
+category = "reference"
+status = "draft"
+title = "ICN Repo Atlas"
+description = "Draft interpretive atlas paired with the mechanical full-repo record. Names directory families, Rust-workspace families, and a classification vocabulary for stable atlas authoring across icn / nycn / icn-learn."
+last_updated = "2026-05-01"
+owner = "matt"
+audiences = ["contributors", "architects"]
+truth_class = "draft"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "repo-atlas", "draft"]
+recommended_action = "keep"
+last_reviewed = "2026-05-01"
+
 [docs."docs/glossary.md"]
 category = "reference"
 status = "living"
