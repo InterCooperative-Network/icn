@@ -150,12 +150,18 @@ def git_untracked(repo: Path) -> list[str]:
 def git_working_tree_dirty(repo: Path) -> bool:
     """Return True if the working tree has unstaged or staged changes.
 
-    Use ``git status --porcelain`` against tracked files. Untracked files do
+    Uses ``git status --porcelain --untracked-files=no``. Untracked files do
     not count as "dirty" here; their inventory is gated separately by
-    ``--include-untracked``. This check guards against the audit hazard Codex
-    flagged: when generated records advertise a specific HEAD but compute file
-    SHAs from the working tree, an unclean tree silently mixes committed and
-    local state in the snapshot.
+    ``--include-untracked``.
+
+    The clean/dirty signal is necessary but not sufficient for blob-equality
+    with HEAD: file SHAs in this generator come from working-tree bytes (see
+    ``sha256_file``), and ``.gitattributes`` filters (CRLF normalization,
+    smudge filters, ident expansion) can make working-tree bytes differ from
+    HEAD blob bytes even when the porcelain status is clean. The dirty check
+    catches the obvious audit hazard (uncommitted local edits silently mixed
+    into the snapshot); a stricter "matches HEAD blobs" signal would require
+    hashing blobs from Git objects, which is a separate follow-up.
     """
 
     raw = subprocess.run(
@@ -348,13 +354,27 @@ def write_markdown(
     lines.append(f"- Repo: `{repo_name}`")
     lines.append(f"- Branch: `{branch}`")
     lines.append(f"- HEAD: `{head}`")
+    # File SHAs are computed from working-tree bytes (see
+    # `sha256_file`). The clean/dirty signal here reflects
+    # `git status --porcelain --untracked-files=no` only — it does
+    # NOT guarantee SHAs match the corresponding HEAD blob bytes,
+    # because `.gitattributes` filters (CRLF normalization, smudge
+    # filters, ident expansion) can make working-tree bytes diverge
+    # from blob bytes even on a fresh clean checkout. Hashing from
+    # Git objects is a separate follow-up if a stricter audit
+    # signal is needed.
     if working_tree_dirty:
         lines.append(
-            "- Working tree: `dirty (uncommitted changes; SHAs reflect "
-            "the working tree, not strictly HEAD blobs)`"
+            "- Working tree: `dirty (uncommitted changes against HEAD)`"
         )
     else:
-        lines.append("- Working tree: `clean (SHAs match HEAD blobs)`")
+        lines.append(
+            "- Working tree: `clean (no uncommitted changes against HEAD)`"
+        )
+    lines.append(
+        "- SHA source: `working tree bytes (may differ from HEAD blob "
+        "bytes when .gitattributes filters apply, e.g. CRLF normalization)`"
+    )
     # "Recorded" covers both tracked and untracked entries when
     # --include-untracked is supplied. Tracked-only counters are emitted
     # separately so audit consumers can filter without re-deriving from
@@ -472,10 +492,13 @@ def generate_for_repo(
         "branch": branch,
         "head": head,
         "include_untracked": include_untracked,
-        # `working_tree_dirty` makes the SHA-source semantics explicit: when
-        # true, file SHAs reflect the working tree (mix of HEAD + local
-        # changes), not strictly the HEAD blobs. Default-clean runs leave
-        # this false and the snapshot is HEAD-equivalent.
+        # `working_tree_dirty` reports whether the porcelain status shows
+        # unstaged or staged changes against HEAD. File SHAs are always
+        # computed from working-tree bytes; a clean tree means the snapshot
+        # has no uncommitted local edits, but does NOT guarantee SHAs equal
+        # HEAD blob bytes (`.gitattributes` filters such as CRLF
+        # normalization can introduce divergence even on a clean checkout).
+        # See `git_working_tree_dirty` and the Markdown "SHA source" line.
         "working_tree_dirty": dirty,
         "summary": {
             # `file_count` and `total_size_bytes` count every record in the
