@@ -93,6 +93,8 @@ These are sketches, not commitments. **Every type, field, and enum variant below
 
 **Pre-binding vs post-binding state split (proposed).** The install flow has two distinct lifecycles: an *install request* lifecycle (Submitted → Reviewing → Approved | Rejected) that runs *before* any `ToolBinding` exists, and a *binding* lifecycle (Bound → Running ↔ Suspended → Upgrading → Removed) that runs *after* approval. The sketches below split these onto two objects (`ToolInstallRequest` and `ToolBinding`) so an unbound install never has to live as a placeholder `ToolBinding`. Whether to keep this split, collapse to a single object with nullable binding fields, or reuse the `Activity + Milestone` substrate is a Bucket B open question — see § *Open questions* Q3.
 
+**Note on `ToolBindingPattern` in the worked example.** The L2 generic suite pattern in § *Worked example: sponsor / fundraising suite* uses an illustrative `kind: ToolBindingPattern` that is **not** sketched as a separate object above. It represents a *publishable template* an institution adopts and fills in as a `ToolBinding` — analogous to a Helm chart vs a Helm release. Whether `ToolBindingPattern` lands as a first-class object distinct from `ToolBinding`, or as a YAML-only template form that resolves to a `ToolBinding` at install time, is a follow-up question; the active phase deliberately does not commit either way.
+
 The six objects compose as follows:
 
 ```text
@@ -148,7 +150,7 @@ pub struct ToolManifest {
     /// strings — the kernel never branches on these values.
     pub capabilities: Vec<CapabilityDeclaration>,
 
-    /// Tool runtime mode. Closed enum for now; matches the seven modes
+    /// Tool runtime mode. Closed enum for now; matches the eight modes
     /// named in COOPERATIVE_TOOL_COMMONS.md § Tool runtime modes.
     pub runtime_mode: ToolRuntimeMode,
 
@@ -220,12 +222,19 @@ pub struct ToolBinding {
 
     /// Vault references for any MCP servers the manifest declares.
     /// Vaulted credentials are attached at session-create time and
-    /// auto-refreshed by Anthropic-side proxy; the binding itself never
-    /// holds credential bytes.
+    /// auto-refreshed by a credential-proxy / auth-broker the binding
+    /// runtime delegates to; the binding itself never holds credential
+    /// bytes. The specific proxy implementation is operational and
+    /// out of scope for this RFC.
     pub vault_ids: Vec<VaultId>,
 
     /// Parent binding, if this binding was forked from another.
     pub forked_from: Option<ToolBindingId>,
+
+    /// Back-reference to the install request that approved this binding.
+    /// None for forked bindings if forks bypass a fresh request cycle —
+    /// Bucket B Q3(c) decides whether forks require their own request.
+    pub approved_via: Option<ToolInstallRequestId>,
 
     /// Current lifecycle state. Constrained to post-bind states only;
     /// pre-binding states live on ToolInstallRequest.
@@ -257,12 +266,15 @@ pub enum ToolInstallRequestState {
     /// governance comment threads (out of scope for this RFC).
     Reviewing { opened_at: Timestamp },
 
-    /// Governance approved. Terminal on the approval branch; the binding
-    /// flow takes over from here (see ToolBindingLifecycleState).
+    /// Governance approved. Terminal on the approval branch. A
+    /// ToolBinding is created in a follow-up step; the binding's
+    /// `approved_via` field back-references this request id, so
+    /// traceability runs binding → request rather than embedding a
+    /// binding id here (which would imply the binding existed at the
+    /// moment Approved fired).
     Approved {
         approved_at: Timestamp,
         decision_receipt: GovernanceDecisionReceiptRef,
-        bound_as: ToolBindingId,
     },
 
     /// Governance rejected. Terminal on the rejection branch;
@@ -334,6 +346,7 @@ pub struct CapabilityRegistryEntry {
 
 pub enum CapabilityRegistryStatus {
     Active,        // binding in Running
+    Upgrading,     // binding in Upgrading; capabilities active under the previous manifest version until rebind completes
     Suspended,     // binding in Suspended
     Archived,      // binding in Removed (kept for audit)
 }
@@ -735,10 +748,17 @@ If accepted:
 
 This RFC moved from `draft` to `active` on 2026-04-30. The active-phase revision added type contract sketches (§ *Type contract sketches*), the install-flow lifecycle diagram + receipt-emit table (§ *Install flow lifecycle*), the manifest serialization clarification (§ *Manifest serialization*), and a worked sponsor / fundraising suite example with both L2 pattern and fictional L3 binding (§ *Worked example: sponsor / fundraising suite*). Open questions have been re-bucketed by whether they gate PR B (substrate types implementation) — see § *Open questions*.
 
-A subsequent revision before merge addressed two pre-merge review findings:
+A subsequent revision before merge addressed two Codex findings on the active-phase commit:
 - **Request/binding split.** Pre-binding states (`Submitted`/`Reviewing`/`Approved`/`Rejected`) were originally bundled with binding states on a single `ToolBinding.lifecycle_state` field, which forced placeholder bindings during early states. Refactored into a `ToolInstallRequest` object (request lifecycle) plus a `ToolBindingLifecycleState` (post-bind only). The request/binding split is presented as the proposed default; alternatives are tracked in Q3 and decided in *Outcome*.
 - **Receipt-emit guarantee narrowed.** Earlier prose claimed every lifecycle transition emits a receipt; the table correctly showed `Bound → Running` as no-receipt. The prose was tightened to point at the table as authoritative.
 - All `apiVersion`, `kind`, path, capability-string, and receipt-class names inside the worked-example YAML blocks were re-marked as illustrative; the L2 example's `ActionCardCompletionReceipt` was corrected to the actually-existing `ActionItemCompletionReceipt`; the L2 path was changed from `docs/templates/...` to `docs/tool-patterns/...`; "fork the pattern" softened to "adopt or fork the generic L2 pattern."
+
+A second pre-merge round addressed Copilot + Codex findings on the request/binding split commit:
+- **`bound_as` removed from `ToolInstallRequestState::Approved`.** The pre-bind Approved state no longer references a `ToolBindingId` (which would have implied the binding existed at the moment Approved fired). Traceability now runs binding → request via a new `ToolBinding.approved_via: Option<ToolInstallRequestId>` field.
+- **Vendor-neutral vault docstring.** The `vault_ids` docstring no longer hardcodes "Anthropic-side proxy"; replaced with a generic credential-proxy / auth-broker reference and an explicit note that the proxy implementation is operational and out of scope.
+- **Mode count corrected.** The `runtime_mode` field's docstring said "seven modes"; the source `COOPERATIVE_TOOL_COMMONS.md` § Tool runtime modes lists eight (the enum was already correct). Comment fixed.
+- **`CapabilityRegistryStatus::Upgrading` added.** The registry status enum was missing a state for the binding's `Upgrading` phase, so the registry's denormalized view couldn't distinguish "active under previous manifest version while rebind completes" from "active and stable." Added the `Upgrading` variant.
+- **`ToolBindingPattern` note added.** Copilot flagged that the worked example introduces `kind: ToolBindingPattern` which isn't sketched as a separate object. Added a clarifying note in the type-sketch intro: it represents a publishable template (analogous to a Helm chart vs release) and whether it lands as a first-class object or a YAML-only template form is a follow-up question.
 
 The recommended options carried forward from the draft phase are unchanged:
 - Crate placement: **Option A** (single combined `icn-tools` crate) as default; Option C (hybrid) as fallback if size demands.
