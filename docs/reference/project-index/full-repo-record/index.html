@@ -1,0 +1,400 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Full Repository Record Protocol | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>project index</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>full repo record</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/project-index/full-repo-record.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: operational
+Canonical: no
+Last Reviewed: 2026-05-01</h2>
+<h1>Full Repository Record Protocol</h1>
+<blockquote>
+<p>This document defines how ICN records <strong>everything in the repositories</strong> without confusing a mechanical file inventory with architectural truth.</p>
+</blockquote>
+<p>The living repo atlas needs two layers:</p>
+<ol>
+<li><strong>Mechanical record</strong> — every tracked file and directory, generated from Git, with stable metadata.</li>
+<li><strong>Interpretive atlas</strong> — what those files mean, which subsystem they belong to, whether they are current, stale, generated, private-boundary, implementation, design direction, or archive.</li>
+</ol>
+<p>A repository map that only summarizes major folders is not enough. A repository map that only dumps <code>git ls-files</code> is also not enough. ICN needs both: the ledger of what exists and the institutional memory of why it exists.</p>
+<h2>Scope</h2>
+<p>The full record covers, in order:</p>
+<ol>
+<li><code>InterCooperative-Network/icn</code></li>
+<li><code>InterCooperative-Network/nycn</code></li>
+<li><code>InterCooperative-Network/icn-learn</code> where relevant</li>
+</ol>
+<p>For each repo, produce a generated file record plus a human-curated atlas section.</p>
+<h2>Output artifacts</h2>
+<p>Generated artifacts live under:</p>
+<pre><code class="language-text">docs/reference/project-index/generated/
+</code></pre>
+<p>Expected generated files:</p>
+<pre><code class="language-text">docs/reference/project-index/generated/icn-file-record.json
+docs/reference/project-index/generated/icn-file-record.md
+docs/reference/project-index/generated/nycn-file-record.json
+docs/reference/project-index/generated/nycn-file-record.md
+docs/reference/project-index/generated/icn-learn-file-record.json
+docs/reference/project-index/generated/icn-learn-file-record.md
+</code></pre>
+<p>Human-authored atlas files live beside the existing project-index maps:</p>
+<pre><code class="language-text">docs/reference/project-index/repo-atlas.md
+docs/reference/project-index/capability-map.md
+docs/reference/project-index/source-of-truth-map.md
+docs/reference/project-index/stale-and-archived-map.md
+docs/reference/project-index/tool-commons-map.md
+docs/reference/project-index/nycn-package-map.md
+</code></pre>
+<h2>Generator</h2>
+<p>Use:</p>
+<pre><code class="language-bash">python3 scripts/generate_repo_record.py \
+  --repo icn=. \
+  --repo nycn=../nycn \
+  --repo icn-learn=../icn-learn \
+  --out docs/reference/project-index/generated
+</code></pre>
+<p>For a local archaeology pass that includes untracked non-ignored files:</p>
+<pre><code class="language-bash">python3 scripts/generate_repo_record.py \
+  --repo icn=. \
+  --out docs/reference/project-index/generated \
+  --include-untracked
+</code></pre>
+<p>Do <strong>not</strong> commit untracked/local archaeology output without review. It may include private, generated, or environment-specific files.</p>
+<h2>What the mechanical record contains</h2>
+<p>For every tracked file:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>path</code></td>
+<td>Repo-relative path</td>
+</tr>
+<tr>
+<td><code>directory</code></td>
+<td>Parent directory</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>File name</td>
+</tr>
+<tr>
+<td><code>extension</code></td>
+<td>File suffix, or <code>(none)</code></td>
+</tr>
+<tr>
+<td><code>language</code></td>
+<td>Coarse language guess from extension</td>
+</tr>
+<tr>
+<td><code>role_guess</code></td>
+<td>Path-based role guess</td>
+</tr>
+<tr>
+<td><code>size_bytes</code></td>
+<td>File size at generation time</td>
+</tr>
+<tr>
+<td><code>sha256</code></td>
+<td>File content hash</td>
+</tr>
+<tr>
+<td><code>tracked</code></td>
+<td>Whether Git tracks it</td>
+</tr>
+</tbody></table>
+<p>For every directory:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>path</code></td>
+<td>Repo-relative directory path</td>
+</tr>
+<tr>
+<td><code>depth</code></td>
+<td>Directory depth</td>
+</tr>
+<tr>
+<td><code>file_count</code></td>
+<td>Number of files under the directory recursively</td>
+</tr>
+<tr>
+<td><code>total_size_bytes</code></td>
+<td>Total tracked bytes under directory</td>
+</tr>
+<tr>
+<td><code>child_directory_count</code></td>
+<td>Number of immediate child directories detected</td>
+</tr>
+<tr>
+<td><code>extensions</code></td>
+<td>Extension count under directory</td>
+</tr>
+<tr>
+<td><code>role_guess</code></td>
+<td>Path-based role guess</td>
+</tr>
+</tbody></table>
+<h2>What the interpretive atlas must add</h2>
+<p>The generator cannot know truth. The human/agent atlas must classify files and directories by meaning:</p>
+<table>
+<thead>
+<tr>
+<th>Classification</th>
+<th>Use when</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>implemented</code></td>
+<td>Current code or docs match shipped behavior</td>
+</tr>
+<tr>
+<td><code>implemented but partial</code></td>
+<td>Real surface exists but has known gaps</td>
+</tr>
+<tr>
+<td><code>feature-gated</code></td>
+<td>Exists behind feature flag or compile/runtime gate</td>
+</tr>
+<tr>
+<td><code>docs-only/design-direction</code></td>
+<td>Describes future or intended behavior, not shipped behavior</td>
+</tr>
+<tr>
+<td><code>generated</code></td>
+<td>Machine-generated artifact; do not hand-edit</td>
+</tr>
+<tr>
+<td><code>test-only</code></td>
+<td>Test fixture, test helper, or verification artifact</td>
+</tr>
+<tr>
+<td><code>ops-only</code></td>
+<td>Deployment, runbook, monitoring, CI, or operator surface</td>
+</tr>
+<tr>
+<td><code>package-local</code></td>
+<td>Institution-specific package data, not ICN core</td>
+</tr>
+<tr>
+<td><code>private-boundary</code></td>
+<td>Must not expose private organizer/member/sponsor/contact/source data</td>
+</tr>
+<tr>
+<td><code>stale/historical</code></td>
+<td>Useful history but not current truth</td>
+</tr>
+<tr>
+<td><code>contradicted by current code</code></td>
+<td>Explicitly wrong relative to current source</td>
+</tr>
+<tr>
+<td><code>unknown / needs local verification</code></td>
+<td>Cannot be classified safely from current evidence</td>
+</tr>
+</tbody></table>
+<h2>First-pass directory families for <code>icn</code></h2>
+<p>The <code>icn</code> repository should be interpreted through these families:</p>
+<table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Paths</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Repo control</td>
+<td><code>README.md</code>, <code>AGENTS.md</code>, <code>CONTRIBUTING.md</code>, <code>CLAUDE.md</code>, <code>.github/</code></td>
+</tr>
+<tr>
+<td>Rust workspace</td>
+<td><code>icn/</code>, <code>icn/crates/</code>, <code>icn/apps/</code>, <code>icn/bins/</code></td>
+</tr>
+<tr>
+<td>Legacy/top-level app surface</td>
+<td><code>apps/</code></td>
+</tr>
+<tr>
+<td>Documentation control plane</td>
+<td><code>docs/</code>, <code>docs/registry.toml</code>, <code>docs/scripts/</code>, <code>docs/reference/project-index/</code></td>
+</tr>
+<tr>
+<td>ADR/RFC corpus</td>
+<td><code>docs/adr/</code>, <code>docs/rfcs/</code>, <code>ops/coordination/</code></td>
+</tr>
+<tr>
+<td>Public website</td>
+<td><code>website/</code></td>
+</tr>
+<tr>
+<td>Demo/member UI surfaces</td>
+<td><code>web/pilot-ui/</code>, <code>web/dashboard/</code>, <code>web/api-docs/</code></td>
+</tr>
+<tr>
+<td>SDKs</td>
+<td><code>sdk/typescript/</code>, <code>sdk/react-native/</code></td>
+</tr>
+<tr>
+<td>Institution packages</td>
+<td><code>institutions/</code>, <code>institutions/nycn/</code></td>
+</tr>
+<tr>
+<td>Contracts and examples</td>
+<td><code>contracts/</code>, <code>examples/</code></td>
+</tr>
+<tr>
+<td>Deployment and operations</td>
+<td><code>deploy/</code>, <code>ops/</code>, <code>monitoring/</code>, <code>docker/</code>, <code>config/</code>, <code>scripts/</code></td>
+</tr>
+<tr>
+<td>Simulations</td>
+<td><code>sims/</code></td>
+</tr>
+<tr>
+<td>Archives / historical material</td>
+<td><code>docs/archive/</code>, older <code>docs/planning/</code>, older issue waves</td>
+</tr>
+</tbody></table>
+<h2>File-record review procedure</h2>
+<p>For each repo:</p>
+<ol>
+<li>Generate the mechanical record.</li>
+<li>Commit the generated JSON and Markdown only if they do not include private or oversized material.</li>
+<li>Read directory summaries first.</li>
+<li>Assign directory-level classifications.</li>
+<li>Drill down into suspicious or high-importance file clusters.</li>
+<li>Identify stale docs, duplicated concepts, unsafe vocabulary, and generated artifacts.</li>
+<li>Promote stable findings into the human-authored atlas files.</li>
+<li>Keep generated records clearly marked as generated snapshots.</li>
+</ol>
+<h2>Privacy and safety boundary</h2>
+<p>Do not expose private organizer, sponsor, attendee, member, contact, Drive, email, credential, key, or infrastructure-secret data.</p>
+<p>The NYCN repo must be treated with stricter review than the public <code>icn</code> repo. If a generated record includes private names, emails, contact data, raw meeting material, sponsor details, or credentials, do not commit it. Instead, commit only directory-level summaries or redacted records.</p>
+<h2>Relationship to the living atlas issue</h2>
+<p>Issue <code>#1689</code> remains the live control document. Generated records are snapshots. Human-authored atlas docs are stable reviewed interpretations. If they disagree, prefer this order:</p>
+<ol>
+<li>Current source code and tests</li>
+<li><code>docs/STATE.md</code> / <code>docs/PHASE_PROGRESS.md</code></li>
+<li>Current ADRs/RFCs</li>
+<li>Generated file records</li>
+<li>Human-authored atlas docs</li>
+<li>Historical archives</li>
+</ol>
+<h2>Definition of done</h2>
+<p>The full repo-record effort is done only when a contributor can answer:</p>
+<ol>
+<li>What files and directories exist in each repo?</li>
+<li>Which are source, docs, generated, ops, tests, packages, or archives?</li>
+<li>Which directories are current truth and which are historical?</li>
+<li>Which files define shipped behavior?</li>
+<li>Which files describe future/design-direction behavior?</li>
+<li>Which files are institution-specific and must not leak into ICN core?</li>
+<li>Which files are private-boundary sensitive?</li>
+<li>Which files are stale, duplicated, or contradicted?</li>
+<li>Which components need follow-up issues or PRs?</li>
+<li>How can the record be regenerated later without redoing archaeology by hand?</li>
+</ol>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
