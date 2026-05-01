@@ -125,4 +125,4 @@ ICN is real, active, and uneven in maturity. The strongest parts today are prove
 
 ## License
 
-[AGPL-3.0](LICENSE)
+The root [`LICENSE`](LICENSE) file contains [AGPL-3.0](LICENSE). The Rust workspace metadata in [`icn/Cargo.toml`](icn/Cargo.toml) declares `MIT OR Apache-2.0`, and most crates in the workspace either declare it explicitly or inherit it via `license.workspace = true`. See [`LICENSING.md`](LICENSING.md) for current repository license metadata and open licensing questions; that document is not legal advice and does not relicense any code.
