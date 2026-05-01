@@ -319,12 +319,27 @@ def write_markdown(
     # user-supplied repo name plus branch + HEAD. Persisting an absolute
     # local checkout path would leak machine-specific filesystem details
     # (usernames, home paths) into committed artifacts.
+    tracked_count = sum(1 for file in files if file.tracked)
+    tracked_size = sum(file.size_bytes for file in files if file.tracked)
+    untracked_count = len(files) - tracked_count
+    untracked_size = total_size - tracked_size
+
     lines.append(f"- Repo: `{repo_name}`")
     lines.append(f"- Branch: `{branch}`")
     lines.append(f"- HEAD: `{head}`")
-    lines.append(f"- Tracked files recorded: `{len(files)}`")
+    # "Recorded" covers both tracked and untracked entries when
+    # --include-untracked is supplied. Tracked-only counters are emitted
+    # separately so audit consumers can filter without re-deriving from
+    # the per-file array.
+    lines.append(f"- Files recorded: `{len(files)}`")
+    lines.append(f"- Tracked files recorded: `{tracked_count}`")
+    if untracked_count:
+        lines.append(f"- Untracked files recorded: `{untracked_count}`")
     lines.append(f"- Directories recorded: `{len(directories)}`")
-    lines.append(f"- Total tracked bytes: `{total_size}`")
+    lines.append(f"- Total recorded bytes: `{total_size}`")
+    lines.append(f"- Total tracked bytes: `{tracked_size}`")
+    if untracked_size:
+        lines.append(f"- Total untracked bytes: `{untracked_size}`")
     kind_counts = Counter(file.kind for file in files)
     if kind_counts:
         kind_summary = ", ".join(
@@ -407,9 +422,17 @@ def generate_for_repo(repo_name: str, repo_path: Path, out_dir: Path, include_un
         "head": head,
         "include_untracked": include_untracked,
         "summary": {
+            # `file_count` and `total_size_bytes` count every record in the
+            # `files` array (tracked + untracked when --include-untracked is
+            # supplied). Tracked-only counters are emitted alongside so audit
+            # consumers can filter without re-deriving from the per-file array.
             "file_count": len(files),
+            "tracked_file_count": sum(1 for file in files if file.tracked),
+            "untracked_file_count": sum(1 for file in files if not file.tracked),
             "directory_count": len(directories),
             "total_size_bytes": sum(file.size_bytes for file in files),
+            "tracked_total_size_bytes": sum(file.size_bytes for file in files if file.tracked),
+            "untracked_total_size_bytes": sum(file.size_bytes for file in files if not file.tracked),
             "extensions": dict(sorted(Counter(file.extension for file in files).items())),
             "roles": dict(sorted(Counter(file.role_guess for file in files).items())),
             "kinds": dict(sorted(Counter(file.kind for file in files).items())),
