@@ -147,6 +147,26 @@ def git_untracked(repo: Path) -> list[str]:
     return [part.decode("utf-8", errors="replace") for part in raw.split(b"\0") if part]
 
 
+def git_working_tree_dirty(repo: Path) -> bool:
+    """Return True if the working tree has unstaged or staged changes.
+
+    Use ``git status --porcelain`` against tracked files. Untracked files do
+    not count as "dirty" here; their inventory is gated separately by
+    ``--include-untracked``. This check guards against the audit hazard Codex
+    flagged: when generated records advertise a specific HEAD but compute file
+    SHAs from the working tree, an unclean tree silently mixes committed and
+    local state in the snapshot.
+    """
+
+    raw = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        cwd=repo,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+    return bool(raw.strip())
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -297,6 +317,7 @@ def write_markdown(
     branch: str,
     files: list[FileRecord],
     directories: list[DirectoryRecord],
+    working_tree_dirty: bool,
 ) -> None:
     extension_counts = Counter(file.extension for file in files)
     role_counts = Counter(file.role_guess for file in files)
@@ -327,6 +348,13 @@ def write_markdown(
     lines.append(f"- Repo: `{repo_name}`")
     lines.append(f"- Branch: `{branch}`")
     lines.append(f"- HEAD: `{head}`")
+    if working_tree_dirty:
+        lines.append(
+            "- Working tree: `dirty (uncommitted changes; SHAs reflect "
+            "the working tree, not strictly HEAD blobs)`"
+        )
+    else:
+        lines.append("- Working tree: `clean (SHAs match HEAD blobs)`")
     # "Recorded" covers both tracked and untracked entries when
     # --include-untracked is supplied. Tracked-only counters are emitted
     # separately so audit consumers can filter without re-deriving from
@@ -384,7 +412,13 @@ def write_markdown(
     out_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def generate_for_repo(repo_name: str, repo_path: Path, out_dir: Path, include_untracked: bool) -> None:
+def generate_for_repo(
+    repo_name: str,
+    repo_path: Path,
+    out_dir: Path,
+    include_untracked: bool,
+    allow_dirty: bool,
+) -> None:
     # Resolve internally so subprocess calls can run against the repo, but the
     # resolved absolute path is intentionally NOT persisted in any generated
     # artifact (Codex P2 / Copilot review): committed records would otherwise
@@ -392,6 +426,23 @@ def generate_for_repo(repo_name: str, repo_path: Path, out_dir: Path, include_un
     resolved_path = repo_path.resolve()
     if not (resolved_path / ".git").exists():
         raise SystemExit(f"{repo_name}: {repo_path} does not look like a git repository")
+
+    # SHAs are computed from the working tree; the snapshot also advertises
+    # `head`. In a dirty checkout these two diverge silently and an audit
+    # consumer could read the record as commit-scoped while it is actually
+    # mixed commit + local state. Refuse by default unless --allow-dirty (or
+    # --include-untracked, which already implies working-tree semantics) is
+    # supplied.
+    dirty = git_working_tree_dirty(resolved_path)
+    if dirty and not (allow_dirty or include_untracked):
+        raise SystemExit(
+            f"{repo_name}: working tree is dirty (unstaged or staged changes against HEAD).\n"
+            "  File SHAs are computed from the working tree; recording them alongside HEAD\n"
+            "  would mix commit-scoped and local-scoped state. Refusing by default to avoid\n"
+            "  misleading audit consumers.\n"
+            "  Either commit/stash the changes, or rerun with --allow-dirty (or\n"
+            "  --include-untracked, which already implies working-tree semantics)."
+        )
 
     tracked_paths = git_ls_files(resolved_path)
     all_paths: list[tuple[str, bool]] = [(path, True) for path in tracked_paths]
@@ -421,6 +472,11 @@ def generate_for_repo(repo_name: str, repo_path: Path, out_dir: Path, include_un
         "branch": branch,
         "head": head,
         "include_untracked": include_untracked,
+        # `working_tree_dirty` makes the SHA-source semantics explicit: when
+        # true, file SHAs reflect the working tree (mix of HEAD + local
+        # changes), not strictly the HEAD blobs. Default-clean runs leave
+        # this false and the snapshot is HEAD-equivalent.
+        "working_tree_dirty": dirty,
         "summary": {
             # `file_count` and `total_size_bytes` count every record in the
             # `files` array (tracked + untracked when --include-untracked is
@@ -445,7 +501,7 @@ def generate_for_repo(repo_name: str, repo_path: Path, out_dir: Path, include_un
     json_path = out_dir / f"{repo_name}-file-record.json"
     md_path = out_dir / f"{repo_name}-file-record.md"
     json_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    write_markdown(md_path, repo_name, head, branch, files, directories)
+    write_markdown(md_path, repo_name, head, branch, files, directories, dirty)
 
     print(f"wrote {json_path}")
     print(f"wrote {md_path}")
@@ -480,10 +536,26 @@ def main() -> None:
         action="store_true",
         help="Also record untracked, non-ignored local files. Review carefully before committing outputs.",
     )
+    parser.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help=(
+            "Allow snapshot generation when the working tree has unstaged or "
+            "staged changes against HEAD. The resulting record will set "
+            "working_tree_dirty=true so audit consumers can see that the "
+            "file SHAs reflect the working tree, not strictly the HEAD blobs."
+        ),
+    )
     args = parser.parse_args()
 
     for repo_name, repo_path in args.repo:
-        generate_for_repo(repo_name, repo_path, args.out, args.include_untracked)
+        generate_for_repo(
+            repo_name,
+            repo_path,
+            args.out,
+            args.include_untracked,
+            args.allow_dirty,
+        )
 
 
 if __name__ == "__main__":
