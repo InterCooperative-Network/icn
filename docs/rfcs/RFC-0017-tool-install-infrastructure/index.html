@@ -41,7 +41,7 @@ View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
 <h2>id: &quot;0017&quot;
 title: &quot;Tool Install Infrastructure (ToolManifest, ToolBinding, ToolInstall lifecycle)&quot;
-status: &quot;draft&quot;
+status: &quot;active&quot;
 created: &quot;2026-04-30&quot;
 updated: &quot;2026-04-30&quot;
 authors: [&quot;Matt Faherty&quot;]
@@ -52,8 +52,24 @@ supersedes: []
 superseded_by: []</h2>
 <h1>RFC 0017: Tool Install Infrastructure (ToolManifest, ToolBinding, ToolInstall lifecycle)</h1>
 <h2>Status</h2>
-<p><code>draft</code> — being written, not yet ready for review. This RFC explores the L2 install infrastructure already named in <a href="/docs/architecture/COOPERATIVE_TOOL_COMMONS">`docs/architecture/COOPERATIVE_TOOL_COMMONS.md`</a> § <em>Missing buildout</em>: <code>ToolManifest</code>, <code>ToolBinding</code>, <code>ToolInstall</code> lifecycle, tool capability registry per <code>InstitutionalDomain</code>, and service identity audit trail.</p>
+<p><code>active</code> — open for review and comments. This RFC explores the L2 install infrastructure already named in <a href="/docs/architecture/COOPERATIVE_TOOL_COMMONS">`docs/architecture/COOPERATIVE_TOOL_COMMONS.md`</a> § <em>Missing buildout</em>: <code>ToolManifest</code>, <code>ToolBinding</code>, <code>ToolInstall</code> lifecycle, tool capability registry per <code>InstitutionalDomain</code>, and service identity audit trail.</p>
 <p><strong>Accepted RFC does not mean implemented.</strong> Implementation lands under follow-up ADR(s) and issues with code/test evidence.</p>
+<h3>What changed in this revision (draft → active)</h3>
+<p>This revision adds reviewable substance to the previous stub:</p>
+<ul>
+<li><strong>Type contract sketches</strong> — Rust pseudocode for the infrastructure objects (§ <em>Type contract sketches</em>). Pre-binding states (<code>Submitted</code>/<code>Reviewing</code>/<code>Approved</code>/<code>Rejected</code>) live on a <code>ToolInstallRequest</code> object; post-binding states (<code>Bound</code>/<code>Running</code>/<code>Suspended</code>/<code>Upgrading</code>/<code>Removed</code>) live on <code>ToolBinding</code>. Whether to keep this split is a Bucket B open question.</li>
+<li><strong>Install-flow lifecycle</strong> — state diagram + per-transition receipt-emit table (§ <em>Install flow lifecycle</em>). The table is authoritative: most transitions emit a receipt, but steady-state activations (e.g. <code>Bound → Running</code>) do not.</li>
+<li><strong>Serialization clarification</strong> — YAML is the package-authored manifest format; the runtime contract is typed Rust structs parsed and validated from serialization (§ <em>Manifest serialization</em>).</li>
+<li><strong>Worked example</strong> — generic L2 sponsor / fundraising suite pattern + a fictional NYCN-style L3 binding, expressed entirely in this RFC (no NYCN files added by this PR). All <code>apiVersion</code>, <code>kind</code>, path, and receipt-name strings inside the YAML blocks are illustrative.</li>
+<li><strong>Open questions reorganized</strong> by bucket — questions that block PR B (substrate types) vs questions deferable to a successor RFC.</li>
+</ul>
+<h3>Reviewer roles needed</h3>
+<p>Repository convention keeps <code>reviewers:</code> empty in frontmatter until reviewers are formally assigned. The roles this RFC most needs at the <code>active</code> phase:</p>
+<ul>
+<li><strong>Architecture reviewer</strong> — placement decisions per <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a> <em>Reusable Primitive Set</em>, kernel/app firewall preservation per <a href="/docs/architecture/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a>.</li>
+<li><strong>MCP-savvy reviewer</strong> — <code>ToolBinding</code> interacts with <code>vault_ids</code> and MCP server attachments; the audit trail integration with vaulted credentials needs scrutiny.</li>
+<li><strong>Receipt-envelope reviewer</strong> — alignment with <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> for the new install-lifecycle receipt classes.</li>
+</ul>
 <h2>Summary</h2>
 <p><code>COOPERATIVE_TOOL_COMMONS.md</code> (status: design-direction, last reviewed 2026-04-27) names a base-tool catalog (<code>icn-domain-admin</code>, <code>icn-member-directory</code>, <code>icn-governance</code>, <code>icn-meetings</code>, <code>icn-action-cards</code>, <code>icn-drive</code>, <code>icn-docs</code>, <code>icn-tables</code>, <code>icn-forms</code>, <code>icn-calendar</code>, <code>icn-publish</code>, <code>icn-search</code>, <code>icn-agreements</code>, <code>icn-budget</code>, <code>icn-signals</code>, <code>icn-compute-jobs</code>, <code>icn-directory</code>) and a <em>Missing buildout</em> section listing five infrastructure objects that need to land before any tool can be installed by a coop on its own ICN node:</p>
 <ul>
@@ -97,6 +113,266 @@ superseded_by: []</h2>
 <li>ADR-0031 (Commons Compute Admission and Settlement Policy) — shared-service tool runtime mode references this.</li>
 <li>PR #1626 (person-directory overlay), PR #1627 (<code>/me/standing</code>), PR #1630 (authority scope plumbing) — substrate that <code>ToolBinding</code> capability grants extend.</li>
 </ul>
+<h2>Type contract sketches</h2>
+<p>These are sketches, not commitments. <strong>Every type, field, and enum variant below is illustrative — names like <code>ToolManifestVersion</code>, <code>ToolBindingId</code>, <code>InstitutionalDomainId</code>, <code>ServiceIdentityRef</code>, <code>CapabilityDeclaration</code>, <code>SchemaSlot</code>, <code>ReceiptClassRef</code>, <code>McpServerRef</code>, <code>SlotValue</code>, <code>VaultId</code>, <code>PrivacyClass</code>, <code>ToolRuntimeMode</code> are proposals only.</strong> Final naming, field shapes, and trait surfaces are decided in <em>Outcome</em> once Bucket B questions are resolved. The kernel-discipline review against <a href="/docs/architecture/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a> and the placement review against <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a> <em>Reusable Primitive Set</em> may rename, restructure, or split these. The intent is to give reviewers something concrete to react to.</p>
+<p><strong>Pre-binding vs post-binding state split (proposed).</strong> The install flow has two distinct lifecycles: an <em>install request</em> lifecycle (Submitted → Reviewing → Approved | Rejected) that runs <em>before</em> any <code>ToolBinding</code> exists, and a <em>binding</em> lifecycle (Bound → Running ↔ Suspended → Upgrading → Removed) that runs <em>after</em> approval. The sketches below split these onto two objects (<code>ToolInstallRequest</code> and <code>ToolBinding</code>) so an unbound install never has to live as a placeholder <code>ToolBinding</code>. Whether to keep this split, collapse to a single object with nullable binding fields, or reuse the <code>Activity + Milestone</code> substrate is a Bucket B open question — see § <em>Open questions</em> Q3.</p>
+<p><strong>Note on <code>ToolBindingPattern</code> in the worked example.</strong> The L2 generic suite pattern in § <em>Worked example: sponsor / fundraising suite</em> uses an illustrative <code>kind: ToolBindingPattern</code> that is <strong>not</strong> sketched as a separate object above. It represents a <em>publishable template</em> an institution adopts and fills in as a <code>ToolBinding</code> — analogous to a Helm chart vs a Helm release. Whether <code>ToolBindingPattern</code> lands as a first-class object distinct from <code>ToolBinding</code>, or as a YAML-only template form that resolves to a <code>ToolBinding</code> at install time, is a follow-up question; the active phase deliberately does not commit either way.</p>
+<p>The six objects compose as follows:</p>
+<pre><code class="language-text">ToolManifest        ─────► declared by tool author; describes the tool itself
+       │
+       │ (referenced by id + version)
+       ▼
+ToolInstallRequest  ─────► one per install attempt; carries Submitted/Reviewing/
+       │                  Approved/Rejected. No ToolBinding exists yet.
+       │ (on Approved, instantiates)
+       ▼
+ToolBinding         ─────► authored by an institution package; binds a specific
+       │                  ToolManifest into a specific InstitutionalDomain.
+       │ (carries Bound/Running/Suspended/Upgrading/Removed states inline)
+       ▼
+CapabilityRegistryEntry     ─────► per-domain index of installed bindings + scopes
+       │
+       │ (tool actions surface as)
+       ▼
+ServiceIdentityAuditEntry   ─────► append-only log of acts performed under the
+                                   tool&#39;s service identity
+</code></pre>
+<h3><code>ToolManifest</code></h3>
+<p>Declared by a tool author, ideally checked into version control. Identity is the (<code>id</code>, <code>version</code>) pair: every <code>ToolBinding</code> pins to a specific manifest version, and upgrades produce a new version. The manifest itself is <strong>not</strong> institution-specific — it describes what the tool needs to function on <em>any</em> <code>InstitutionalDomain</code>.</p>
+<pre><code class="language-rust">/// Declared by a tool author. Describes what the tool needs to function on
+/// any InstitutionalDomain. Carries no institution-specific values.
+pub struct ToolManifest {
+    /// Stable identifier for the tool. Convention: `icn-&lt;name&gt;` for base
+    /// tools listed in COOPERATIVE_TOOL_COMMONS.md; arbitrary-but-namespaced
+    /// for third-party tools.
+    pub id: ToolId,
+
+    /// Manifest version. Monotonic per `id`. Each upgrade produces a new
+    /// version; existing bindings keep their pinned version.
+    pub version: ToolManifestVersion,
+
+    /// Human-readable name and description. Surfaced at install-review time.
+    pub name: String,
+    pub description: String,
+
+    /// Author identity (DID), used for manifest signing (signing model
+    /// itself is deferred to a successor RFC; field reserved here).
+    pub authored_by: Did,
+
+    /// Capabilities the tool requests. Each declaration is opaque to the
+    /// kernel; the institution&#39;s governance reviews them at approve time
+    /// and the CapabilityRegistry indexes them at bind time. Per the
+    /// anti-ontology-laundering rule, capability vocabulary is opaque
+    /// strings — the kernel never branches on these values.
+    pub capabilities: Vec&lt;CapabilityDeclaration&gt;,
+
+    /// Tool runtime mode. Closed enum for now; matches the eight modes
+    /// named in COOPERATIVE_TOOL_COMMONS.md § Tool runtime modes.
+    pub runtime_mode: ToolRuntimeMode,
+
+    /// Schemas the tool defines for institution-package binding (e.g.
+    /// `icn-tables` declares the row-record schema slot; package fills it).
+    /// Slot names are free strings; schema bodies are JSON Schema (or the
+    /// project&#39;s chosen schema language — see § Manifest serialization).
+    pub binding_schema_slots: Vec&lt;SchemaSlot&gt;,
+
+    /// Receipt classes the tool emits. Each class must already exist in
+    /// the ADR-0026 receipt envelope, or be proposed in a follow-up ADR.
+    pub emits_receipts: Vec&lt;ReceiptClassRef&gt;,
+
+    /// MCP server dependencies, if any. Vaulted credentials attach at
+    /// session/binding time, not in the manifest.
+    pub mcp_servers: Vec&lt;McpServerRef&gt;,
+}
+
+pub struct CapabilityDeclaration {
+    pub name: String,                   // opaque to kernel
+    pub description: String,            // for governance review
+    pub privacy_class: PrivacyClass,    // opaque-string-style enum (see open questions)
+}
+
+pub enum ToolRuntimeMode {
+    LocalNodeService,
+    FrontendOnlyView,
+    ComputeWorkload,
+    BridgeAdapter,
+    SharedService,
+    WorkstationApp,
+    MobileApp,
+    PackageTemplate,
+}
+</code></pre>
+<h3><code>ToolBinding</code></h3>
+<p>Authored by the institution&#39;s package (e.g. NYCN&#39;s <code>institution/package.yaml</code> would point at one or more bindings). Pins a specific manifest version into a specific domain; carries the institution-specific values that fill the manifest&#39;s <code>binding_schema_slots</code>.</p>
+<pre><code class="language-rust">/// Per-institution configuration. Created at install time, mutated by
+/// upgrade and fork transitions, archived at removal. Carries the
+/// institution-specific values that fill the manifest&#39;s slots.
+pub struct ToolBinding {
+    /// Stable binding identifier; stable across upgrades.
+    pub id: ToolBindingId,
+
+    /// The manifest this binding installs. Pinned to a version at install
+    /// time; rebound to a new version on upgrade.
+    pub manifest_ref: (ToolId, ToolManifestVersion),
+
+    /// The InstitutionalDomain this binding belongs to.
+    pub domain_id: InstitutionalDomainId,
+
+    /// Filled-in slot values, opaque to the kernel. The manifest&#39;s slot
+    /// schema validates these at parse time (see § Manifest serialization).
+    pub slot_values: Vec&lt;SlotValue&gt;,
+
+    /// Capabilities granted by this binding. Subset of the manifest&#39;s
+    /// requested capabilities; the institution&#39;s governance may grant
+    /// fewer than were requested.
+    pub granted_capabilities: Vec&lt;CapabilityDeclaration&gt;,
+
+    /// Service identity provisioned for this binding. Stable across run
+    /// and suspend; rotated on upgrade per the chosen service-identity
+    /// rotation model (open question).
+    pub service_identity: ServiceIdentityRef,
+
+    /// Vault references for any MCP servers the manifest declares.
+    /// Vaulted credentials are attached at session-create time and
+    /// auto-refreshed by a credential-proxy / auth-broker the binding
+    /// runtime delegates to; the binding itself never holds credential
+    /// bytes. The specific proxy implementation is operational and
+    /// out of scope for this RFC.
+    pub vault_ids: Vec&lt;VaultId&gt;,
+
+    /// Parent binding, if this binding was forked from another.
+    pub forked_from: Option&lt;ToolBindingId&gt;,
+
+    /// Back-reference to the install request that approved this binding.
+    /// None for forked bindings if forks bypass a fresh request cycle —
+    /// Bucket B Q3(c) decides whether forks require their own request.
+    pub approved_via: Option&lt;ToolInstallRequestId&gt;,
+
+    /// Current lifecycle state. Constrained to post-bind states only;
+    /// pre-binding states live on ToolInstallRequest.
+    pub lifecycle_state: ToolBindingLifecycleState,
+}
+</code></pre>
+<h3><code>ToolInstallRequest</code> (proposed)</h3>
+<p>The pre-binding object. One per install attempt; carries the Submitted → Reviewing → Approved | Rejected lifecycle. On <code>Approved</code>, the request transitions terminate and a <code>ToolBinding</code> is instantiated; on <code>Rejected</code>, no binding ever exists. Modeling the request as its own object keeps <code>ToolBinding</code> from carrying placeholder values for installs that haven&#39;t bound yet.</p>
+<pre><code class="language-rust">/// One install request per (target_domain_id, manifest_ref) attempt.
+/// Terminal states (Approved | Rejected) — Approved spawns a ToolBinding;
+/// Rejected is final and binding never exists.
+pub struct ToolInstallRequest {
+    pub id: ToolInstallRequestId,
+    pub manifest_ref: (ToolId, ToolManifestVersion),
+    pub target_domain_id: InstitutionalDomainId,
+    pub requested_by: Did,
+    pub state: ToolInstallRequestState,
+}
+
+pub enum ToolInstallRequestState {
+    /// Author has submitted the manifest for review. No binding exists yet.
+    Submitted { submitted_at: Timestamp },
+
+    /// Domain governance has opened review. May produce review notes via
+    /// governance comment threads (out of scope for this RFC).
+    Reviewing { opened_at: Timestamp },
+
+    /// Governance approved. Terminal on the approval branch. A
+    /// ToolBinding is created in a follow-up step; the binding&#39;s
+    /// `approved_via` field back-references this request id, so
+    /// traceability runs binding → request rather than embedding a
+    /// binding id here (which would imply the binding existed at the
+    /// moment Approved fired).
+    Approved {
+        approved_at: Timestamp,
+        decision_receipt: GovernanceDecisionReceiptRef,
+    },
+
+    /// Governance rejected. Terminal on the rejection branch;
+    /// no ToolBinding is ever created.
+    Rejected { rejected_at: Timestamp, decision_receipt: GovernanceDecisionReceiptRef },
+}
+</code></pre>
+<h3><code>ToolBindingLifecycleState</code></h3>
+<p>The state machine for an existing <code>ToolBinding</code>. Pre-binding states (Submitted/Reviewing/Approved/Rejected) live on <code>ToolInstallRequest</code> above and are <strong>not</strong> represented here. The sketch shows this as a fresh enum for clarity; alternatives (reusing <code>Activity + Milestone</code> from <code>icn-governance</code>, or collapsing back to a single state machine) are tracked in § <em>Open questions</em> Q3.</p>
+<pre><code class="language-rust">/// Lifecycle states for a ToolBinding (post-bind only).
+/// Most transitions emit a receipt; see § Install flow lifecycle for the
+/// transition→receipt mapping. Steady-state activations (e.g. Bound→Running)
+/// are NOT receipt-bearing — the table is authoritative.
+pub enum ToolBindingLifecycleState {
+    /// Binding written; service identity provisioned; capability registry
+    /// entry recorded; vault attachments verified.
+    Bound { bound_at: Timestamp },
+
+    /// Binding actively held by the domain. Tool actions emit their own
+    /// receipts under the binding&#39;s service identity. No transition event
+    /// fires while in this state; ongoing operation is the steady state.
+    Running { entered_at: Timestamp },
+
+    /// Capabilities revoked; binding intact. Tool actions blocked. May
+    /// resume back to Running.
+    Suspended { suspended_at: Timestamp, reason: String },
+
+    /// New manifest version submitted; transient state until rebind to
+    /// the new version completes. The new manifest version goes through
+    /// its own ToolInstallRequest (Submitted → Reviewing → Approved) before
+    /// the binding rebinds.
+    Upgrading { from_version: ToolManifestVersion, to_version: ToolManifestVersion, started_at: Timestamp },
+
+    /// Binding removed; service identity destroyed; capability registry
+    /// entry archived. Terminal state.
+    Removed { removed_at: Timestamp },
+}
+</code></pre>
+<p>Forks are <strong>not</strong> a state on the parent binding — a fork creates a <em>new</em> <code>ToolBinding</code> whose <code>forked_from</code> field points at the parent. The parent stays in <code>Running</code> (or whatever state it was in). Whether forks require a fresh <code>ToolInstallRequest</code> cycle (governance review for the new binding) or can short-circuit through the parent&#39;s prior approval is a Bucket B open question — see § <em>Open questions</em> Q3.</p>
+<h3><code>CapabilityRegistryEntry</code></h3>
+<p>Per-<code>InstitutionalDomain</code> index of installed bindings and the capabilities each holds. The registry is the answer to &quot;what tools does this domain currently have, and what can they do?&quot; — read by audit, by <code>icn-domain-admin</code> UIs, and by the kernel for capability checks at action time.</p>
+<pre><code class="language-rust">/// One entry per (domain_id, binding_id) pair. The registry as a whole
+/// is owned by the InstitutionalDomain and updated on every lifecycle
+/// transition.
+pub struct CapabilityRegistryEntry {
+    pub domain_id: InstitutionalDomainId,
+    pub binding_id: ToolBindingId,
+    pub manifest_ref: (ToolId, ToolManifestVersion),
+    pub service_identity: ServiceIdentityRef,
+
+    /// Capabilities currently active for this binding. Mirrors the
+    /// binding&#39;s granted_capabilities, but reflects suspension —
+    /// capabilities go to the empty set in Suspended state.
+    pub active_capabilities: Vec&lt;CapabilityDeclaration&gt;,
+
+    /// Status snapshot for fast queries. Authoritative state lives on
+    /// the binding itself; this is a denormalized view.
+    pub status: CapabilityRegistryStatus,
+}
+
+pub enum CapabilityRegistryStatus {
+    Active,        // binding in Running
+    Upgrading,     // binding in Upgrading; capabilities active under the previous manifest version until rebind completes
+    Suspended,     // binding in Suspended
+    Archived,      // binding in Removed (kept for audit)
+}
+</code></pre>
+<h3><code>ServiceIdentityAuditEntry</code></h3>
+<p>Append-only log of acts performed under a tool&#39;s service identity. Integrates with the existing receipt envelope (<a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a>) — every entry references a receipt, and the receipt envelope is the authoritative log; this entry is the per-identity index into the envelope.</p>
+<pre><code class="language-rust">/// One entry per action the tool&#39;s service identity performs. Indexed
+/// by service_identity for &quot;what has this tool done?&quot; queries; indexed
+/// by domain_id for &quot;what tools have acted in this domain?&quot; queries.
+pub struct ServiceIdentityAuditEntry {
+    pub service_identity: ServiceIdentityRef,
+    pub domain_id: InstitutionalDomainId,
+    pub binding_id: ToolBindingId,
+
+    /// Timestamp of the act.
+    pub at: Timestamp,
+
+    /// Capability the act invoked. Opaque to the kernel.
+    pub capability: String,
+
+    /// Reference to the receipt the act produced. The receipt envelope
+    /// is the authoritative log; this audit entry is the per-identity
+    /// index into the envelope.
+    pub receipt_ref: ReceiptRef,
+}
+</code></pre>
+<p>The audit trail is not a parallel receipt mechanism — it indexes the existing receipt envelope. Avoiding a parallel store is a deliberate choice: the receipt envelope is already the authoritative log, and the kernel-discipline review is easier when there&#39;s one place to verify.</p>
 <h2>Design options</h2>
 <h3>Option A — Single combined RFC, single substrate crate</h3>
 <p>Land all five infrastructure objects (<code>ToolManifest</code>, <code>ToolBinding</code>, <code>ToolInstall</code> lifecycle, capability registry, service identity audit trail) as one substrate package. New crate <code>icn-tools</code> (location TBD; may be <code>icn/crates/icn-tools/</code> or a new module under existing crate per architecture review). Single PR per phase; one mental model for adopters.</p>
@@ -141,6 +417,162 @@ superseded_by: []</h2>
 <td>crate-boundary drift over time</td>
 </tr>
 </tbody></table>
+<h2>Install flow lifecycle</h2>
+<p>The flow spans two objects: a <code>ToolInstallRequest</code> (Submitted → Reviewing → Approved | Rejected), and — on Approved — a <code>ToolBinding</code> whose own <code>ToolBindingLifecycleState</code> carries Bound → Running → (Suspended ↔ Running) → Upgrading → Removed. <strong>Forks are not a state on the parent</strong>; they create a new <code>ToolBinding</code> with <code>forked_from</code> set, and the parent stays in whatever state it was in.</p>
+<pre><code class="language-mermaid">stateDiagram-v2
+    state ToolInstallRequest {
+        [*] --&gt; Submitted: author submits ToolManifest
+        Submitted --&gt; Reviewing: governance opens review
+        Reviewing --&gt; Approved: governance accept
+        Reviewing --&gt; Rejected: governance reject
+    }
+    Rejected --&gt; [*]
+    Approved --&gt; Bound: write ToolBinding;\nprovision ServiceIdentity;\nrecord CapabilityRegistryEntry
+    state ToolBinding {
+        Bound --&gt; Running: capabilities active\n(steady-state, no transition receipt)
+        Running --&gt; Suspended: suspend (revoke capabilities;\nbinding intact)
+        Suspended --&gt; Running: resume
+        Running --&gt; Upgrading: author submits manifest v2
+        Upgrading --&gt; Running: rebind to new manifest version
+        Running --&gt; Removed: remove
+        Suspended --&gt; Removed: remove
+    }
+    Removed --&gt; [*]
+</code></pre>
+<h3>Transition → receipt-emit mapping</h3>
+<p>Most lifecycle transitions emit a receipt through the existing receipt envelope (<a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a>). The table below is authoritative — steady-state activations (notably <code>Bound → Running</code>) are <strong>not</strong> receipt-bearing transitions; ongoing tool actions in <code>Running</code> emit their own per-action receipts under the bound service identity, indexed via <code>ServiceIdentityAuditEntry</code>. The receipt classes below are <strong>proposed names only</strong> (every <code>*Receipt</code> introduced in this table is illustrative); whether each is a new class or a kind-discriminated extension of an existing class is part of the <em>active</em>-phase question set (see § <em>Open questions</em> Q4).</p>
+<table>
+<thead>
+<tr>
+<th>Transition</th>
+<th>Receipt class (proposed)</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>[*] → Submitted</code></td>
+<td><code>ToolInstallSubmittedReceipt</code></td>
+<td>Author identity + manifest hash. Indexes the install request.</td>
+</tr>
+<tr>
+<td><code>Submitted → Reviewing</code></td>
+<td><code>ToolInstallReviewOpenedReceipt</code></td>
+<td>Domain governance acknowledges receipt of the request. May be optional / collapsed into <code>Submitted</code> for simple flows.</td>
+</tr>
+<tr>
+<td><code>Reviewing → Approved</code></td>
+<td><code>GovernanceDecisionReceipt</code> (existing) + <code>ToolInstallApprovedReceipt</code></td>
+<td>Governance act produces the decision receipt; install receipt cross-links to it.</td>
+</tr>
+<tr>
+<td><code>Reviewing → Rejected</code></td>
+<td><code>GovernanceDecisionReceipt</code> (existing) + <code>ToolInstallRejectedReceipt</code></td>
+<td>Same dual-receipt pattern; terminal on the rejection branch.</td>
+</tr>
+<tr>
+<td><code>Approved → Bound</code></td>
+<td><code>ToolBindingCreatedReceipt</code> + <code>ServiceIdentityProvisionedReceipt</code></td>
+<td>Binding written; service identity provisioned; capability registry entry created. The two receipts may be one composite — open question.</td>
+</tr>
+<tr>
+<td><code>Bound → Running</code></td>
+<td>(no transition receipt)</td>
+<td>Steady state. Tool actions in <code>Running</code> emit their own per-action receipts under the bound service identity, indexed via <code>ServiceIdentityAuditEntry</code>.</td>
+</tr>
+<tr>
+<td><code>Running → Suspended</code></td>
+<td><code>ToolInstallSuspendedReceipt</code></td>
+<td>Reason field surfaces in audit. Capability registry entry status flips to <code>Suspended</code>.</td>
+</tr>
+<tr>
+<td><code>Suspended → Running</code></td>
+<td><code>ToolInstallResumedReceipt</code></td>
+<td>Capability registry entry status flips back to <code>Active</code>.</td>
+</tr>
+<tr>
+<td><code>Running → Upgrading</code></td>
+<td><code>ToolUpgradeRequestedReceipt</code></td>
+<td>Records (<code>from_version</code>, <code>to_version</code>); binding still operates under the old version while review proceeds.</td>
+</tr>
+<tr>
+<td><code>Upgrading → Running</code></td>
+<td><code>ToolUpgradeCompletedReceipt</code></td>
+<td>Binding rebound to new manifest version. Service identity rotation policy is an open question — see § <em>Open questions</em>.</td>
+</tr>
+<tr>
+<td><code>(any) → fork creation</code></td>
+<td><code>ToolForkReceipt</code></td>
+<td>Created when a new <code>ToolBinding</code> is written with <code>forked_from = parent_binding_id</code>. Parent binding&#39;s state is unchanged.</td>
+</tr>
+<tr>
+<td><code>Running / Suspended → Removed</code></td>
+<td><code>ToolInstallRemovedReceipt</code> + <code>ServiceIdentityDestroyedReceipt</code></td>
+<td>Service identity destroyed; capability registry entry archived (kept for audit, status <code>Archived</code>). Terminal state.</td>
+</tr>
+</tbody></table>
+<h3>Authority required for each transition</h3>
+<p>Each transition requires a specific authority scope under the existing <code>authority_scope</code> plumbing (PRs #1626/#1627/#1630). <strong>Authority strings below are illustrative</strong> — final naming is part of the capability vocabulary open question.</p>
+<table>
+<thead>
+<tr>
+<th>Transition</th>
+<th>Authority required (proposed)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>[*] → Submitted</code></td>
+<td>None (any authenticated DID may submit; review is the gate)</td>
+</tr>
+<tr>
+<td><code>Submitted → Reviewing</code></td>
+<td><code>tool_install:open_review</code> (held by <code>icn-domain-admin</code> role assignments)</td>
+</tr>
+<tr>
+<td><code>Reviewing → Approved</code> / <code>Rejected</code></td>
+<td>Governance decision per the domain&#39;s charter; binds to existing proposal/vote machinery</td>
+</tr>
+<tr>
+<td><code>Approved → Bound</code></td>
+<td><code>tool_install:bind</code> (typically held by the same role that holds approve, but split allowed)</td>
+</tr>
+<tr>
+<td><code>Bound → Running</code></td>
+<td>None (automatic on successful bind)</td>
+</tr>
+<tr>
+<td><code>Running ↔ Suspended</code></td>
+<td><code>tool_install:suspend</code>, <code>tool_install:resume</code></td>
+</tr>
+<tr>
+<td><code>Running → Upgrading → Running</code></td>
+<td><code>tool_install:upgrade</code> (or governance act for higher-risk capability changes)</td>
+</tr>
+<tr>
+<td>Fork creation</td>
+<td><code>tool_install:fork</code></td>
+</tr>
+<tr>
+<td>Removal</td>
+<td><code>tool_install:remove</code> (typically governance act for non-trivial bindings)</td>
+</tr>
+</tbody></table>
+<h2>Manifest serialization (proposed default)</h2>
+<p><strong>The runtime contract is the typed Rust struct, not the YAML file.</strong> YAML is the package-authored serialization format that institutions edit; a YAML manifest is parsed and validated against the typed struct before any runtime operation reads it.</p>
+<p>Recommendation:</p>
+<ul>
+<li><strong>Authoring format</strong>: YAML, matching the <code>*.yaml</code> package convention NYCN already uses (<code>institution/package.yaml</code>, <code>institution/communication-groups.example.yaml</code>, etc.).</li>
+<li><strong>Runtime contract</strong>: typed Rust structs as sketched in § <em>Type contract sketches</em>.</li>
+<li><strong>Parser surface</strong>: serde-driven YAML → typed struct with explicit per-field validation, plus a JSON Schema (or equivalent) for editor tooling and CI validation.</li>
+<li><strong>Schema location</strong>: under <code>schemas/</code> in either ICN or the institution package, depending on whose schema slot is being declared. The manifest&#39;s own schema is canonical to the tool author and ships alongside the manifest.</li>
+</ul>
+<p>This split matters: it lets institutions author manifests by hand (YAML), validates them mechanically (typed parse), and keeps the kernel-discipline review honest (the kernel only sees the typed struct, never the YAML bytes). It also keeps parser implementation out of the kernel — parsing is an app-layer concern, the kernel receives already-typed data.</p>
+<p>Alternatives (kept open in § <em>Open questions</em>):</p>
+<ul>
+<li><strong>JSON</strong> instead of YAML — same typed-struct discipline, slightly less ergonomic to author by hand. Acceptable.</li>
+<li><strong>CCL</strong> for portions that need to be governance-evaluated (e.g. capability grants, milestone-style approval gates). Out of scope for the <em>active</em>-phase decision; deferred.</li>
+<li><strong>Rust-typed declaration</strong> (the manifest <em>is</em> a <code>.rs</code> file in the tool&#39;s repo, generated from a derive macro). Strongest type safety, weakest non-Rust-native authoring story. Likely a poor fit for institution packages but possible for tool authors who happen to be Rust crates.</li>
+</ul>
+<p>The decision criterion is &quot;can a non-Rust institution package author a manifest?&quot; — yes for YAML/JSON, no for Rust-typed-declaration.</p>
 <h2>Core/package boundary</h2>
 <ul>
 <li><strong>What lives in ICN core</strong> under this RFC: the five infrastructure objects (manifest, binding, lifecycle, registry, audit trail). All five are generic shapes, not institution-specific.</li>
@@ -171,22 +603,187 @@ superseded_by: []</h2>
 <p>Once accepted and implemented, the canonical site can claim that ICN supports cooperative-tool install and binding as a substrate primitive. The site does <strong>not</strong> claim a marketplace, an app store, a tool ranking, or any tool catalog beyond the per-domain capability list. Maturity band moves from &quot;design-direction only&quot; to &quot;early&quot; once the install lifecycle has at least one shipped tool flowing through it (probably PR C1 in the build plan: <code>icn-member-directory</code>).</p>
 <h2>Migration / compatibility</h2>
 <p>Greenfield substrate. No migration cost for existing deployments, governance proposals, CCL contracts, API consumers, or test surfaces. The first tools to consume this infrastructure (<code>icn-member-directory</code>, <code>icn-tables</code>) are themselves unbuilt at the time of this RFC.</p>
+<h2>Worked example: sponsor / fundraising suite</h2>
+<p>Two artifacts illustrate the L2 / L3 split. <strong>Both live in this RFC body only — no NYCN files are added by this PR.</strong> They use fictional values throughout.</p>
+<h3>Generic L2 suite pattern (no institution-specific values)</h3>
+<p>A &quot;specialized suite&quot; in <code>COOPERATIVE_TOOL_COMMONS.md</code> terms is <strong>not</strong> a base tool — it&#39;s a published <code>ToolBinding</code> skeleton that composes base tools and declares schema slots for institutions to fill. The L2 sponsor / fundraising pattern is generic across cooperative networks:</p>
+<pre><code class="language-yaml"># L2 PATTERN — published in ICN, no institution-specific values.
+# Path, apiVersion, and kind names below are ALL illustrative — final
+# names land in *Outcome* once Bucket B is resolved.
+# Path (illustrative): docs/tool-patterns/sponsor-fundraising/pattern.yaml
+apiVersion: icn.tools/v0alpha1   # illustrative; not a committed API version
+kind: ToolBindingPattern         # illustrative; not a committed kind name
+metadata:
+  id: sponsor-fundraising
+  version: 1
+  name: &quot;Sponsor / fundraising suite pattern&quot;
+  description: |
+    Generic composition for cooperative networks running sponsor or
+    funder pipelines. Composes icn-member-directory, icn-tables, and
+    icn-action-cards. Settlement and recognition phases are gated on
+    icn#1634 (obligation/allocation/settlement primitives).
+
+# Which base tools this suite composes. Each entry pins a manifest id
+# and a version range; the institution&#39;s binding pins to a concrete
+# version at install time.
+composes:
+  - tool_id: icn-member-directory
+    version_range: &quot;&gt;=1, &lt;2&quot;
+    purpose: &quot;Sponsor + funder relationship records&quot;
+  - tool_id: icn-tables
+    version_range: &quot;&gt;=1, &lt;2&quot;
+    purpose: &quot;Tier catalog, obligation lifecycle records, follow-up queue&quot;
+  - tool_id: icn-action-cards
+    version_range: &quot;&gt;=1, &lt;2&quot;
+    purpose: &quot;Follow-up cards, recognition tasks, thank-you tasks&quot;
+
+# Schema slots the institution fills. Names are free strings; bodies
+# are JSON Schema fragments that validate the institution&#39;s filled-in
+# value at parse time.
+binding_schema_slots:
+  - name: tier_catalog
+    description: &quot;Tier names + scoped benefits. Tier values are L3-local.&quot;
+    schema_ref: &quot;schemas/tier-catalog.schema.json&quot;
+  - name: obligation_lifecycle_template
+    description: |
+      State machine for one sponsor obligation. Pre-#1634, the suite
+      supports outreach -&gt; draft -&gt; confirmed lifecycle transitions only.
+      Settlement / recognition / thank-you phases are declared here but
+      gated on the obligation/allocation/settlement primitive landing.
+    schema_ref: &quot;schemas/obligation-lifecycle.schema.json&quot;
+  - name: recognition_workflow
+    description: &quot;How recognition obligations surface (post-#1634).&quot;
+    schema_ref: &quot;schemas/recognition-workflow.schema.json&quot;
+
+# Receipts the suite emits, by composing receipts from the underlying
+# base tools. The suite itself does not emit a new receipt class; it
+# documents which receipts a binding will produce. Names marked
+# (proposed) are illustrative — they belong to RFCs / base tools that
+# have not shipped yet.
+emits_receipts:
+  - RelationshipLifecycleStateChangeReceipt    # (proposed; from icn-member-directory; gated on RFC-0016)
+  - TableRowProvenanceReceipt                   # (proposed; from icn-tables; not yet built)
+  - ActionItemCompletionReceipt                 # existing (icn-governance, #1661)
+  - GovernanceDecisionReceipt                   # existing (icn-governance) — for above-threshold approvals
+  # Settlement / recognition receipts gated on icn#1634 — listed in the
+  # binding for forward-compatibility but never emitted pre-#1634.
+
+# Phases that are gated on substrate not yet shipped. Bindings that
+# reference a gated phase declare blocked_on: &lt;issue&gt; and the install
+# review surfaces the gate at approve time.
+gated_phases:
+  - phase: settlement
+    blocked_on: &quot;icn#1634&quot;
+  - phase: recognition_fulfillment
+    blocked_on: &quot;icn#1634&quot;
+  - phase: thank_you_receipt
+    blocked_on: &quot;icn#1634&quot;
+</code></pre>
+<p>This pattern carries no NYCN values: no tier amounts, no specific committee names, no recognition obligations, no charter references. It declares which base tools compose, what schema slots exist, and what receipts a binding will produce. Any cooperative network adopting it writes their own L3 binding (below).</p>
+<h3>Fictional L3 binding (NYCN-shaped, illustrative only)</h3>
+<p>The institution&#39;s package authors a <code>ToolBinding</code> that fills the L2 pattern&#39;s slots with institution-specific values. Below is what NYCN&#39;s binding <em>would look like</em> once both this RFC and the underlying base tools have shipped — <strong>it is illustrative only; no NYCN files are added by this PR.</strong></p>
+<pre><code class="language-yaml"># L3 BINDING — fictional NYCN-shaped example. NOT a real file.
+# Path, apiVersion, and kind names below are ALL illustrative.
+# Eventual path (illustrative): nycn/institution/specialized-suites/sponsor-fundraising.yaml
+apiVersion: icn.tools/v0alpha1   # illustrative; not a committed API version
+kind: ToolBinding                # illustrative; matches the type sketch above, but final naming is pending Outcome
+metadata:
+  id: nycn-sponsor-fundraising
+  domain_id: nycn-organizing
+  binds_pattern:
+    id: sponsor-fundraising
+    version: 1
+
+# Concrete versions of the base tools the institution accepts.
+manifest_refs:
+  icn-member-directory: { version: 1 }
+  icn-tables:           { version: 1 }
+  icn-action-cards:     { version: 1 }
+
+# Slot fills. These are NYCN-specific values; another cooperative
+# network adopting or forking the L2 pattern writes their own.
+slot_values:
+  tier_catalog:
+    - name: anchor
+      example_amount: 2000
+      benefits: [&quot;registrations:8&quot;, &quot;logo_size:large&quot;, &quot;table:reserved&quot;, &quot;recognition:keynote_thank_you&quot;]
+    - name: program
+      example_amount: 1000
+      benefits: [&quot;registrations:4&quot;, &quot;logo_size:medium&quot;, &quot;recognition:program_listing&quot;]
+    - name: supporter
+      example_amount: 500
+      benefits: [&quot;registrations:2&quot;, &quot;logo_size:small&quot;]
+    - name: friend
+      example_amount: 250
+      benefits: [&quot;recognition:program_listing&quot;]
+  obligation_lifecycle_template:
+    # State names below are NYCN-specific values; another network forking
+    # this binding writes their own state names. The pattern only enforces
+    # which slots exist, not which values fill them.
+    states:
+      - outreach
+      - draft
+      - confirmed
+      # Phases below are pinned to shape but gated on icn#1634.
+      - { name: contribution_settled, blocked_on: &quot;icn#1634&quot; }
+      - { name: logo_received,        blocked_on: &quot;icn#1634&quot; }
+      - { name: recognition_fulfilled, blocked_on: &quot;icn#1634&quot; }
+      - { name: thank_you_sent,       blocked_on: &quot;icn#1634&quot; }
+  recognition_workflow:
+    blocked_on: &quot;icn#1634&quot;   # gated on obligation/allocation/settlement primitives
+
+# Capabilities granted to the suite&#39;s bound tools. Subset of the
+# capabilities the manifests requested; institution&#39;s governance may
+# grant fewer.
+granted_capabilities:
+  icn-member-directory:
+    - read:relationships
+    - write:relationships
+    - emit:relationship-receipts
+  icn-tables:
+    - read:tables.sponsors
+    - write:tables.sponsors
+    - emit:table-row-provenance
+  icn-action-cards:
+    - emit:action-cards.followup
+    - emit:action-cards.recognition
+
+# Vault references for any MCP servers the manifests declare.
+vault_ids: []
+</code></pre>
+<p>(Capability strings above — <code>read:relationships</code>, <code>emit:action-cards.followup</code>, etc. — are illustrative; the capability vocabulary itself is a Bucket B open question, see § <em>Open questions</em> Q5.)</p>
+<p>The split is the architectural firewall. The L2 pattern is a <strong>publishable artifact</strong> other cooperative networks can adopt or fork — they adopt or fork the generic L2 pattern, not NYCN&#39;s L3 binding. The L3 binding is the institution&#39;s specific configuration; its values stay local. If a value in the L3 binding would be the same for every adopter, it should have been a slot default in the L2 pattern instead.</p>
 <h2>Open questions</h2>
+<p>Questions are organized by whether they gate the first downstream PR (PR B — substrate types implementation per the cooperative tooling build plan). <strong>Bucket B</strong> items must be answered in this RFC&#39;s <code>Outcome</code> section before it moves to <code>accepted</code>. <strong>Bucket C</strong> items are valid but don&#39;t gate substrate work; they should be deferred to a successor RFC to keep this one bounded.</p>
+<h3>Bucket B — must resolve before <code>accepted</code> (BLOCKS-PR-B)</h3>
 <ol>
-<li><strong>Crate placement</strong> — Option A (single new crate) vs Option B (split) vs Option C (hybrid). Architecture review per <code>INSTITUTION_PACKAGE_BOUNDARY.md</code> <em>Reusable Primitive Set</em> discipline should decide. Default recommendation: Option A.</li>
-<li><strong>Manifest format</strong> — YAML, JSON, CCL, or a Rust-typed declaration that compiles into a manifest? Tradeoffs across authoring ergonomics, kernel-discipline review surface, and CI validation cost.</li>
-<li><strong>Lifecycle as <code>Activity</code>?</strong> Should the install lifecycle reuse the existing <code>Activity + Milestone</code> substrate, or is it a new lifecycle type? Existing primitive likely suffices; verify.</li>
-<li><strong>Capability declaration vocabulary</strong> — Should ICN ship a starter set of capability strings (<code>read-relationships</code>, <code>emit-action-cards</code>, <code>bridge-import-from-external</code>, etc.) as documentation only, or leave declarations entirely free?</li>
-<li><strong>Service identity rotation and revocation</strong> — When a tool is suspended or removed, how is its service identity invalidated across the network? Reuses existing key rotation patterns, or needs new mechanism?</li>
-<li><strong>Cross-domain tool installation</strong> — A federation may want to share a tool install across member entities. Out of scope for this RFC; flag as future work.</li>
-<li><strong>Manifest signing</strong> — Who signs a <code>ToolManifest</code> (tool author? distributor? institution at install time)? Implications for trust graph and supply-chain security.</li>
+<li><strong>Crate placement</strong> — Option A (single new <code>icn-tools</code> crate) vs Option B (split) vs Option C (hybrid). Architecture review per <code>INSTITUTION_PACKAGE_BOUNDARY.md</code> <em>Reusable Primitive Set</em> discipline decides. Default recommendation: Option A.</li>
+<li><strong>Manifest format default</strong> — YAML / JSON / CCL / Rust-typed-declaration. Recommended in this revision: YAML for authoring + typed Rust struct as runtime contract (see § <em>Manifest serialization</em>). Reviewers may push back; pick concretely before <code>accepted</code>.</li>
+<li><strong>Lifecycle representation and request/binding split</strong> — three sub-questions, all blocking PR B:<ul>
+<li><strong>(a) Request vs binding split.</strong> The sketches above show the install request and the binding as two distinct objects (<code>ToolInstallRequest</code> carrying Submitted/Reviewing/Approved/Rejected; <code>ToolBinding</code> carrying Bound/Running/Suspended/Upgrading/Removed). Alternatives: (i) collapse to a single object with nullable post-bind fields, (ii) reuse the existing <code>Activity + Milestone</code> substrate from <code>icn-governance</code>. Pick before substrate types land.</li>
+<li><strong>(b) Lifecycle representation.</strong> If the split is kept, are the two state machines fresh enums (as sketched) or expressed against <code>Activity + Milestone</code>? Affects whether install transitions live in governance state or a parallel state machine.</li>
+<li><strong>(c) Forks and re-approval.</strong> A fork creates a new <code>ToolBinding</code> from an existing one. Does the fork require its own <code>ToolInstallRequest</code> cycle (governance review of the new binding) or can it short-circuit through the parent&#39;s prior approval? The sketches do not commit either way.</li>
+</ul>
+</li>
+<li><strong>Receipt class hierarchy</strong> — for each transition in § <em>Install flow lifecycle</em>, decide whether to introduce a new receipt class in the ADR-0026 envelope or extend an existing class with a <code>kind</code> discriminator. Specifically: does <code>Approved</code> use <code>GovernanceDecisionReceipt</code> alone, or pair it with a separate <code>ToolInstallApprovedReceipt</code>? Decide per row; envelope review with ADR-0026 author.</li>
+<li><strong>Capability declaration model</strong> — typed enum vs opaque-string-per-anti-ontology-laundering. Likely opaque string per the firewall rule, but pin the choice. Affects how <code>CapabilityRegistry</code> indexes and how the kernel validates capability checks at action time.</li>
+<li><strong>Service identity model</strong> — new entity-kind variant, <code>RoleAssignment</code> over a synthetic DID, or a new <code>ServiceIdentity</code> type? The kernel-discipline review hinges on this not leaking app semantics. Decide before substrate types land.</li>
+</ol>
+<h3>Bucket C — deferred to successor RFC</h3>
+<ol start="7">
+<li><strong>Manifest signing</strong> — who signs a <code>ToolManifest</code> (author / distributor / institution at install time)? Trust-graph and supply-chain-security implications justify a separate RFC. Note here as <code>out of scope; tracked for follow-up</code>. The <code>authored_by</code> field on <code>ToolManifest</code> is reserved for this; signature attachment is a successor-RFC decision.</li>
+<li><strong>Service identity rotation and revocation</strong> — when a tool is suspended or removed, how is its service identity invalidated across the network? Reuse existing key rotation patterns, or new mechanism? Operationally important; not type-contract-blocking.</li>
+<li><strong>Cross-domain tool installation</strong> — a federation may want to share a tool install across member entities. Out of scope here; future RFC under the federation domain.</li>
 </ol>
 <h2>Decision criteria</h2>
+<p>The RFC moves to <code>accepted</code> when every Bucket B open question above has a concrete answer in the <em>Outcome</em> section. Bucket C questions may stay open and will be tracked as candidate rows in <code>ops/coordination/rfc_candidates.yaml</code> for successor RFCs.</p>
+<p>For the crate-placement question specifically:</p>
 <ul>
 <li>Pick <strong>A (single crate)</strong> if the architecture review concludes the five concepts evolve coherently and the crate is small enough to maintain. Default expectation.</li>
 <li>Pick <strong>B (split)</strong> if architecture review identifies distinct lifecycles for the five objects (e.g. <code>ToolManifest</code> is mostly static while audit trail evolves continuously). Unlikely.</li>
 <li>Pick <strong>C (hybrid)</strong> if architecture review concludes a single crate would exceed reasonable size after first-cycle implementation; split along natural seams (manifest+binding vs lifecycle vs registry+audit).</li>
 </ul>
+<p>For the manifest-format question: pick <strong>YAML + typed Rust struct</strong> unless reviewers identify a concrete reason a non-Rust institution package cannot author its bindings — in which case escalate to a follow-up question rather than picking JSON/CCL/Rust-typed-declaration without justification.</p>
 <h2>Outcome</h2>
 <p>To be filled when the RFC moves to <code>accepted</code> or <code>rejected</code>.</p>
 <h2>Follow-up ADRs</h2>
@@ -210,7 +807,34 @@ superseded_by: []</h2>
 </ul>
 <hr>
 <h2>Notes</h2>
-<p>This RFC is a stub. The design space is sketched; the recommended option is named (Option A — single combined RFC and crate, default; Option C as fallback if size demands) but not committed. Drafting will deepen the type contract sketches, the install-flow sequence diagram, and the integration with ADR-0026 / ADR-0027 in particular.</p>
+<p>This RFC moved from <code>draft</code> to <code>active</code> on 2026-04-30. The active-phase revision added type contract sketches (§ <em>Type contract sketches</em>), the install-flow lifecycle diagram + receipt-emit table (§ <em>Install flow lifecycle</em>), the manifest serialization clarification (§ <em>Manifest serialization</em>), and a worked sponsor / fundraising suite example with both L2 pattern and fictional L3 binding (§ <em>Worked example: sponsor / fundraising suite</em>). Open questions have been re-bucketed by whether they gate PR B (substrate types implementation) — see § <em>Open questions</em>.</p>
+<p>A subsequent revision before merge addressed two Codex findings on the active-phase commit:</p>
+<ul>
+<li><strong>Request/binding split.</strong> Pre-binding states (<code>Submitted</code>/<code>Reviewing</code>/<code>Approved</code>/<code>Rejected</code>) were originally bundled with binding states on a single <code>ToolBinding.lifecycle_state</code> field, which forced placeholder bindings during early states. Refactored into a <code>ToolInstallRequest</code> object (request lifecycle) plus a <code>ToolBindingLifecycleState</code> (post-bind only). The request/binding split is presented as the proposed default; alternatives are tracked in Q3 and decided in <em>Outcome</em>.</li>
+<li><strong>Receipt-emit guarantee narrowed.</strong> Earlier prose claimed every lifecycle transition emits a receipt; the table correctly showed <code>Bound → Running</code> as no-receipt. The prose was tightened to point at the table as authoritative.</li>
+<li>All <code>apiVersion</code>, <code>kind</code>, path, capability-string, and receipt-class names inside the worked-example YAML blocks were re-marked as illustrative; the L2 example&#39;s <code>ActionCardCompletionReceipt</code> was corrected to the actually-existing <code>ActionItemCompletionReceipt</code>; the L2 path was changed from <code>docs/templates/...</code> to <code>docs/tool-patterns/...</code>; &quot;fork the pattern&quot; softened to &quot;adopt or fork the generic L2 pattern.&quot;</li>
+</ul>
+<p>A second pre-merge round addressed Copilot + Codex findings on the request/binding split commit:</p>
+<ul>
+<li><strong><code>bound_as</code> removed from <code>ToolInstallRequestState::Approved</code>.</strong> The pre-bind Approved state no longer references a <code>ToolBindingId</code> (which would have implied the binding existed at the moment Approved fired). Traceability now runs binding → request via a new <code>ToolBinding.approved_via: Option&lt;ToolInstallRequestId&gt;</code> field.</li>
+<li><strong>Vendor-neutral vault docstring.</strong> The <code>vault_ids</code> docstring no longer hardcodes &quot;Anthropic-side proxy&quot;; replaced with a generic credential-proxy / auth-broker reference and an explicit note that the proxy implementation is operational and out of scope.</li>
+<li><strong>Mode count corrected.</strong> The <code>runtime_mode</code> field&#39;s docstring said &quot;seven modes&quot;; the source <code>COOPERATIVE_TOOL_COMMONS.md</code> § Tool runtime modes lists eight (the enum was already correct). Comment fixed.</li>
+<li><strong><code>CapabilityRegistryStatus::Upgrading</code> added.</strong> The registry status enum was missing a state for the binding&#39;s <code>Upgrading</code> phase, so the registry&#39;s denormalized view couldn&#39;t distinguish &quot;active under previous manifest version while rebind completes&quot; from &quot;active and stable.&quot; Added the <code>Upgrading</code> variant.</li>
+<li><strong><code>ToolBindingPattern</code> note added.</strong> Copilot flagged that the worked example introduces <code>kind: ToolBindingPattern</code> which isn&#39;t sketched as a separate object. Added a clarifying note in the type-sketch intro: it represents a publishable template (analogous to a Helm chart vs release) and whether it lands as a first-class object or a YAML-only template form is a follow-up question.</li>
+</ul>
+<p>The recommended options carried forward from the draft phase are unchanged:</p>
+<ul>
+<li>Crate placement: <strong>Option A</strong> (single combined <code>icn-tools</code> crate) as default; Option C (hybrid) as fallback if size demands.</li>
+<li>Manifest format: <strong>YAML authoring + typed Rust struct runtime contract</strong> (introduced in the active-phase revision; the draft left this entirely open).</li>
+<li>Lifecycle representation: presented as two state machines (<code>ToolInstallRequestState</code> + <code>ToolBindingLifecycleState</code>) for clarity; reusing <code>Activity + Milestone</code> is plausible and remains a Bucket B question.</li>
+</ul>
+<p>What stays out of this RFC:</p>
+<ul>
+<li>Manifest signing model (trust-graph / supply-chain-security RFC; deferred).</li>
+<li>Service identity rotation and revocation specifics (operational, not type-contract-blocking).</li>
+<li>Cross-domain / federation-wide tool installation (federation-domain RFC).</li>
+<li>Specific tool implementations — <code>icn-member-directory</code>, <code>icn-tables</code>, <code>icn-meetings</code>, etc. land under their own work, downstream of this RFC.</li>
+</ul>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
