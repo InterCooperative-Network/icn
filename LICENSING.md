@@ -21,11 +21,11 @@ The metadata signals below are **observations of the present state**, not claims
 license = "MIT OR Apache-2.0"
 ```
 
-Every crate in the canonical Rust workspace either declares this license explicitly or inherits it via `license.workspace = true`. As of this writing, of the 49 canonical `Cargo.toml` files (excluding `target/` and `.claude/worktrees/`):
+Most crates in the canonical Rust workspace declare this license explicitly or inherit it via `license.workspace = true`; a small number declare no `license` field at all. As of this writing, of the 49 canonical `Cargo.toml` files (excluding `target/` and `.claude/worktrees/`):
 
 - 13 declare `license = "MIT OR Apache-2.0"` explicitly. These are: `icn/Cargo.toml` (workspace root), the four `apps/*` crates (`apps/governance`, `apps/trust`, `apps/ledger`, `apps/echo`), the four `icn/apps/*` crates (`membership`, `charter`, `governance`, `ledger`), and four `icn/crates/*` crates (`icn-kernel-api`, `icn-http-kit`, `icn-zkp`, `icn-crypto-pq`).
 - 34 inherit via `license.workspace = true`. These are the rest of `icn/crates/*` and all three `icn/bins/*` binaries (`icnd`, `icnctl`, `icn-console`).
-- 2 declare no `license` field at all (`examples/wasm-compute/Cargo.toml`, `icn/crates/icn-ccl/fuzz/Cargo.toml`).
+- 2 declare no `license` field at all and do not opt into the workspace inheritance: `examples/wasm-compute/Cargo.toml` (an example crate) and `icn/crates/icn-ccl/fuzz/Cargo.toml` (a fuzz test harness). What license applies to these two `Cargo.toml`s on their own is one of the [Open Questions](#open-questions) below.
 
 **No `Cargo.toml` in the canonical set declares AGPL-3.0.** The AGPL-3.0 declaration lives only in the root `LICENSE` file.
 
@@ -49,6 +49,7 @@ The following questions are **not resolved by this document**. They are recorded
 - **Data and autonomy protections.** Whether any component requires data-rights or autonomy-rights protections beyond what `MIT OR Apache-2.0` or AGPL-3.0 provide on their own.
 - **Trademark and certification policy.** Whether the project intends to maintain a separate trademark or certification policy distinct from its source license, and where such a policy would live in the repository.
 - **SPDX header policy.** Whether per-file SPDX identifiers should be added across the source tree, and to what scope.
+- **Crates with no `license` field.** What license applies on its own to `examples/wasm-compute/Cargo.toml` and `icn/crates/icn-ccl/fuzz/Cargo.toml`, both of which omit the `license` field entirely and do not opt into workspace inheritance. The repository-level `LICENSE` file applies to the source tree as a whole; whether each of these two crates should also declare `license.workspace = true` (or an explicit license) is a separate decision.
 
 These questions are deliberately phrased as questions, not tentative answers. Answering any of them is a maintainer/legal decision and should land as an explicit, dedicated PR or RFC clearly titled and reviewed for the licensing implication.
 
