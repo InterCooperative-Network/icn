@@ -332,6 +332,20 @@ When ending a session or passing work to another agent, write a handoff note usi
 
 This section applies to **any** non-interactive environment: Cursor Cloud, Claude Code, Codex, Copilot agents, CI runners, Docker containers, etc. Build/lint/test commands are in the sections above; this covers only non-obvious runtime issues.
 
+### Environment setup by platform
+
+The repo provides multiple setup paths. Pick the one matching your environment:
+
+| Platform | Setup method |
+|----------|-------------|
+| **Devcontainer** (Codespaces, Copilot, VS Code) | `.devcontainer/devcontainer.json` — installs system deps, Rust toolchain, Node.js 20, builds workspace automatically |
+| **Local / bare VM** | `./scripts/bootstrap.sh` — checks system deps and installs cargo dev tools. System packages (`mold`, `libssl-dev`, `protobuf-compiler`, `clang`, `pkg-config`) and Node.js must be installed separately |
+| **Cursor Cloud** | VM update script handles system deps, Node.js, `cargo fetch`, `npm ci` |
+
+After setup, verify with: `cd icn && cargo build && cargo test --workspace --lib`
+
+The Rust toolchain version is pinned in `icn/rust-toolchain.toml` and auto-installed by rustup on first use.
+
 ### Running the ICN daemon without a TTY
 
 Identity init and daemon start both prompt for a passphrase interactively. Set `ICN_PASSPHRASE` to bypass:
@@ -360,7 +374,3 @@ ICN_PASSPHRASE=dev ./target/debug/icnctl --data-dir /tmp/icn auth token \
 ```
 
 Then: `curl -H "Authorization: Bearer <token>" http://localhost:8080/v1/...`
-
-### System dependencies for building from source
-
-Rust workspace requires: `pkg-config`, `libssl-dev`, `clang`, `mold`, `protobuf-compiler`. Node.js >= 18 (20 recommended) for the TypeScript SDK and web projects. The Rust toolchain version is pinned in `icn/rust-toolchain.toml` and auto-installed by rustup.

@@ -33,14 +33,14 @@
       }
     }
   },
-  "postCreateCommand": "cd icn && cargo build && cd ../sdk/typescript && npm install",
-  "forwardPorts": [8080, 9090],
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y mold protobuf-compiler && cd icn && cargo build && cd ../sdk/typescript && npm ci",
+  "forwardPorts": [8080, 9100],
   "portsAttributes": {
     "8080": {
       "label": "Gateway API",
       "onAutoForward": "notify"
     },
-    "9090": {
+    "9100": {
       "label": "Prometheus Metrics",
       "onAutoForward": "silent"
     }
