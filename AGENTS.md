@@ -325,3 +325,38 @@ When ending a session or passing work to another agent, write a handoff note usi
 - **Copilot instructions**: `.github/copilot-instructions.md`
 - **Path-specific rules**: `.github/instructions/` (`rust-core.md`, `sdk.md`, `web-ui.md`, `documentation.md`)
 - **Custom agents**: `.github/agents/` (ICN-specific specialists)
+
+---
+
+## Cursor Cloud specific instructions
+
+### System dependencies
+
+The VM update script installs system packages (`mold`, `libssl-dev`, `protobuf-compiler`) and Node.js 20 via nodesource, then runs `cd icn && cargo fetch` and `cd sdk/typescript && npm ci`. The Rust toolchain (1.95.0) is auto-resolved from `icn/rust-toolchain.toml` by rustup on first use.
+
+### Running the ICN daemon locally
+
+The daemon requires an identity keystore. Use `ICN_PASSPHRASE` env var to avoid interactive prompts:
+
+```bash
+cd icn
+ICN_PASSPHRASE=<passphrase> ./target/debug/icnctl --data-dir ~/.icn id init
+ICN_PASSPHRASE=<passphrase> ICN_GATEWAY_JWT_SECRET=<secret> ./target/debug/icnd --data-dir ~/.icn --gateway-enable
+```
+
+**Gotchas:**
+- The gateway is disabled by default. Pass `--gateway-enable` to start it on port 8080.
+- A JWT secret is required for the gateway. Set `ICN_GATEWAY_JWT_SECRET` env var (any string ≥16 chars). The `--insecure-gateway-no-jwt` flag does NOT bypass the secret check in `init_gateway.rs` (known issue — the main clears the placeholder before the supervisor reads it).
+- Metrics are served on port 9100 regardless of gateway config.
+- Health check: `GET http://localhost:8080/v1/health` (no auth required).
+
+### Verification commands
+
+See `AGENTS.md > Build / lint / test` and `AGENTS.md > Change routing` above for the canonical commands. Quick reference:
+
+| Check | Command (from `icn/`) |
+|-------|----------------------|
+| Format | `cargo fmt --all --check` |
+| Clippy | `cargo clippy --workspace --all-targets -- -D warnings` |
+| Unit tests | `cargo test --workspace --lib` |
+| TS SDK | `cd sdk/typescript && npm ci && npm run build && npm test` |
