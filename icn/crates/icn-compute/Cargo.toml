@@ -46,9 +46,11 @@ num_cpus = "1.16"
 sled.workspace = true
 
 # WASM runtime (optional)
-# Bumped to 36.0.7 to fix RUSTSEC-2026-0095 (critical: sandbox-escaping memory access via Winch).
-# Previous pin at 24.x was due to old rustc constraints; 36.x requires rustc >= 1.86.0.
-wasmtime = { version = "36.0.7", optional = true }
+# 36.0.8: minimal patched compatible version for RUSTSEC-2026-0114
+# (panic when allocating a table exceeding the host's address space).
+# Earlier history: 36.0.7 fixed RUSTSEC-2026-0095 (Winch sandbox-escape);
+# previous pin at 24.x was due to old rustc constraints; 36.x requires rustc >= 1.86.0.
+wasmtime = { version = "36.0.8", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.49", features = ["rt-multi-thread", "macros"] }
