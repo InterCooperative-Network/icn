@@ -325,3 +325,46 @@ When ending a session or passing work to another agent, write a handoff note usi
 - **Copilot instructions**: `.github/copilot-instructions.md`
 - **Path-specific rules**: `.github/instructions/` (`rust-core.md`, `sdk.md`, `web-ui.md`, `documentation.md`)
 - **Custom agents**: `.github/agents/` (ICN-specific specialists)
+
+---
+
+## Headless / CI / cloud-agent runtime gotchas
+
+This section applies to **any** non-interactive environment: Cursor Cloud, Claude Code, Codex, Copilot agents, CI runners, Docker containers, etc.
+
+### Environment setup
+
+Run `./scripts/bootstrap.sh` from the repo root. It installs system packages (Debian/Ubuntu), ensures the pinned Rust toolchain, installs Node.js if missing, fetches Rust deps, and installs TypeScript SDK deps. It is idempotent.
+
+Flags: `--ci` skips optional cargo dev tools (faster). `--no-sysdeps` skips system package installation (use on non-Debian systems or without root).
+
+After bootstrap, verify with: `cd icn && cargo build && cargo test --workspace --lib`
+
+### Running the ICN daemon without a TTY
+
+Identity init and daemon start both prompt for a passphrase interactively. Set `ICN_PASSPHRASE` to bypass:
+
+```bash
+cd icn
+ICN_PASSPHRASE=dev ./target/debug/icnctl --data-dir /tmp/icn id init
+ICN_PASSPHRASE=dev ICN_GATEWAY_JWT_SECRET=dev-secret-must-be-at-least-32-bytes \
+  ./target/debug/icnd --data-dir /tmp/icn --gateway-enable
+```
+
+**Gotchas:**
+- Gateway is **off by default**. Pass `--gateway-enable` to bind port 8080.
+- Gateway requires `ICN_GATEWAY_JWT_SECRET` (minimum 32 bytes for HS256). The `--insecure-gateway-no-jwt` flag does **not** work — `main.rs` clears the placeholder before `init_gateway.rs` reads it, so the gateway silently refuses to start.
+- Metrics always bind port 9100. Health: `GET http://localhost:8080/v1/health` (no auth).
+- The daemon also accepts `ICN_KEYSTORE_PASSPHRASE` (checked before `ICN_PASSPHRASE`).
+
+### Obtaining a JWT token
+
+The default scopes in `icnctl auth token` use `gov:read`/`gov:write`, which the gateway rejects. Use full scope names:
+
+```bash
+ICN_PASSPHRASE=dev ./target/debug/icnctl --data-dir /tmp/icn auth token \
+  --coop-id test-coop \
+  --scopes "ledger:read,ledger:write,coop:read,governance:read,governance:write"
+```
+
+Then: `curl -H "Authorization: Bearer <token>" http://localhost:8080/v1/...`
