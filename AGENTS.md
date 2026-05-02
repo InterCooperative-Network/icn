@@ -328,13 +328,13 @@ When ending a session or passing work to another agent, write a handoff note usi
 
 ---
 
-## Cursor Cloud specific instructions
+## Headless / CI / cloud-agent runtime gotchas
 
-Build/lint/test commands are in the **Build / lint / test** and **Change routing** sections above. This section covers non-obvious runtime gotchas only.
+This section applies to **any** non-interactive environment: Cursor Cloud, Claude Code, Codex, Copilot agents, CI runners, Docker containers, etc. Build/lint/test commands are in the sections above; this covers only non-obvious runtime issues.
 
-### Running the ICN daemon
+### Running the ICN daemon without a TTY
 
-Identity init and daemon start both prompt for a passphrase interactively. Set `ICN_PASSPHRASE` to avoid TTY prompts:
+Identity init and daemon start both prompt for a passphrase interactively. Set `ICN_PASSPHRASE` to bypass:
 
 ```bash
 cd icn
@@ -347,6 +347,7 @@ ICN_PASSPHRASE=dev ICN_GATEWAY_JWT_SECRET=dev-secret-at-least-16 \
 - Gateway is **off by default**. Pass `--gateway-enable` to bind port 8080.
 - Gateway requires `ICN_GATEWAY_JWT_SECRET` (any string >= 16 chars). The `--insecure-gateway-no-jwt` flag does **not** work — `main.rs` clears the placeholder before `init_gateway.rs` reads it, so the gateway silently refuses to start.
 - Metrics always bind port 9100. Health: `GET http://localhost:8080/v1/health` (no auth).
+- The daemon also accepts `ICN_KEYSTORE_PASSPHRASE` (checked before `ICN_PASSPHRASE`).
 
 ### Obtaining a JWT token
 
@@ -359,3 +360,7 @@ ICN_PASSPHRASE=dev ./target/debug/icnctl --data-dir /tmp/icn auth token \
 ```
 
 Then: `curl -H "Authorization: Bearer <token>" http://localhost:8080/v1/...`
+
+### System dependencies for building from source
+
+Rust workspace requires: `pkg-config`, `libssl-dev`, `clang`, `mold`, `protobuf-compiler`. Node.js >= 18 (20 recommended) for the TypeScript SDK and web projects. The Rust toolchain version is pinned in `icn/rust-toolchain.toml` and auto-installed by rustup.
