@@ -330,33 +330,32 @@ When ending a session or passing work to another agent, write a handoff note usi
 
 ## Cursor Cloud specific instructions
 
-### System dependencies
+Build/lint/test commands are in the **Build / lint / test** and **Change routing** sections above. This section covers non-obvious runtime gotchas only.
 
-The VM update script installs system packages (`mold`, `libssl-dev`, `protobuf-compiler`) and Node.js 20 via nodesource, then runs `cd icn && cargo fetch` and `cd sdk/typescript && npm ci`. The Rust toolchain (1.95.0) is auto-resolved from `icn/rust-toolchain.toml` by rustup on first use.
+### Running the ICN daemon
 
-### Running the ICN daemon locally
-
-The daemon requires an identity keystore. Use `ICN_PASSPHRASE` env var to avoid interactive prompts:
+Identity init and daemon start both prompt for a passphrase interactively. Set `ICN_PASSPHRASE` to avoid TTY prompts:
 
 ```bash
 cd icn
-ICN_PASSPHRASE=<passphrase> ./target/debug/icnctl --data-dir ~/.icn id init
-ICN_PASSPHRASE=<passphrase> ICN_GATEWAY_JWT_SECRET=<secret> ./target/debug/icnd --data-dir ~/.icn --gateway-enable
+ICN_PASSPHRASE=dev ./target/debug/icnctl --data-dir /tmp/icn id init
+ICN_PASSPHRASE=dev ICN_GATEWAY_JWT_SECRET=dev-secret-at-least-16 \
+  ./target/debug/icnd --data-dir /tmp/icn --gateway-enable
 ```
 
 **Gotchas:**
-- The gateway is disabled by default. Pass `--gateway-enable` to start it on port 8080.
-- A JWT secret is required for the gateway. Set `ICN_GATEWAY_JWT_SECRET` env var (any string ≥16 chars). The `--insecure-gateway-no-jwt` flag does NOT bypass the secret check in `init_gateway.rs` (known issue — the main clears the placeholder before the supervisor reads it).
-- Metrics are served on port 9100 regardless of gateway config.
-- Health check: `GET http://localhost:8080/v1/health` (no auth required).
+- Gateway is **off by default**. Pass `--gateway-enable` to bind port 8080.
+- Gateway requires `ICN_GATEWAY_JWT_SECRET` (any string >= 16 chars). The `--insecure-gateway-no-jwt` flag does **not** work — `main.rs` clears the placeholder before `init_gateway.rs` reads it, so the gateway silently refuses to start.
+- Metrics always bind port 9100. Health: `GET http://localhost:8080/v1/health` (no auth).
 
-### Verification commands
+### Obtaining a JWT token
 
-See `AGENTS.md > Build / lint / test` and `AGENTS.md > Change routing` above for the canonical commands. Quick reference:
+The default scopes in `icnctl auth token` use `gov:read`/`gov:write`, which the gateway rejects. Use full scope names:
 
-| Check | Command (from `icn/`) |
-|-------|----------------------|
-| Format | `cargo fmt --all --check` |
-| Clippy | `cargo clippy --workspace --all-targets -- -D warnings` |
-| Unit tests | `cargo test --workspace --lib` |
-| TS SDK | `cd sdk/typescript && npm ci && npm run build && npm test` |
+```bash
+ICN_PASSPHRASE=dev ./target/debug/icnctl --data-dir /tmp/icn auth token \
+  --coop-id test-coop \
+  --scopes "ledger:read,ledger:write,coop:read,governance:read,governance:write"
+```
+
+Then: `curl -H "Authorization: Bearer <token>" http://localhost:8080/v1/...`
