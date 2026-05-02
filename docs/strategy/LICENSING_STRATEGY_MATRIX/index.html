@@ -1,0 +1,421 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Licensing strategy matrix (autonomy review) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>strategy</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>LICENSING STRATEGY MATRIX</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/LICENSING_STRATEGY_MATRIX.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: draft
+Canonical: no
+Last Reviewed: 2026-05-01</h2>
+<h1>Licensing strategy matrix (autonomy review)</h1>
+<blockquote>
+<p><strong>Status: planning artifact only.</strong> Not legal advice. Not a relicensing decision. No license metadata changes are proposed by this document. No obligations are defined for downstream consumers. This is a maintainer-facing scaffold for a future maintainer/legal review and any follow-up RFC or ADR. Where this prose and <code>LICENSE</code> / per-crate <code>Cargo.toml</code> files disagree, the metadata governs.</p>
+</blockquote>
+<blockquote>
+<p><strong>Companion docs</strong>:
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/LICENSING">`../../LICENSING.md`</a> records the current repository license metadata and the open questions this document begins to scope;
+<a href="/docs/internal/legal-considerations">`../internal/legal-considerations.md`</a> records community-deployment regulatory questions (also &quot;not legal advice&quot;);
+<a href="/docs/architecture/KERNEL_APP_SEPARATION">`../architecture/KERNEL_APP_SEPARATION.md`</a> and <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`../architecture/INSTITUTION_PACKAGE_BOUNDARY.md`</a> describe the structural boundaries this matrix is organized along.</p>
+</blockquote>
+<blockquote>
+<p><strong>Tracking issue</strong>: <a href="https://github.com/InterCooperative-Network/icn/issues/1692" target="_blank" rel="noopener">#1692</a>.</p>
+</blockquote>
+<h2>Purpose</h2>
+<p>Begin a docs-only licensing strategy pass after PR #1686 (<code>244b8bb0</code>) documented the current inconsistent metadata. Produce a component-by-component licensing/autonomy matrix and a recommendation outline that future maintainer/legal review can refine into an RFC/ADR candidate.</p>
+<p>This document does not select a license, does not modify metadata, and does not give legal advice.</p>
+<h2>Current metadata summary</h2>
+<p>Carried forward verbatim from <a href="https://github.com/InterCooperative-Network/icn/blob/main/LICENSING">`LICENSING.md`</a>:</p>
+<ul>
+<li>The root <a href="https://github.com/InterCooperative-Network/icn/blob/main/LICENSE">`LICENSE`</a> file contains the GNU Affero General Public License, Version 3 (AGPL-3.0).</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/Cargo.toml">`icn/Cargo.toml`</a> declares <code>[workspace.package] license = &quot;MIT OR Apache-2.0&quot;</code>.</li>
+<li>Of 49 canonical <code>Cargo.toml</code> files (excluding <code>target/</code> and <code>.claude/worktrees/</code>): 13 declare <code>MIT OR Apache-2.0</code> explicitly, 34 inherit via <code>license.workspace = true</code>, 2 declare no <code>license</code> field at all (<code>examples/wasm-compute/Cargo.toml</code>, <code>icn/crates/icn-ccl/fuzz/Cargo.toml</code>).</li>
+<li>No <code>Cargo.toml</code> in the canonical set declares AGPL-3.0.</li>
+<li>The Cargo <code>license</code> field is intent metadata, not a license document.</li>
+</ul>
+<p>The relationship between the root <code>LICENSE</code> (AGPL-3.0) and the workspace metadata (<code>MIT OR Apache-2.0</code>) is an <a href="#decision-questions-for-maintainerlegal-review">open question</a>.</p>
+<h2>Why source-code availability is not enough for ICN</h2>
+<p>ICN&#39;s anti-enclosure promise is institutional autonomy, not just open source code. A source-code-only license — even AGPL-3.0 — does not by itself guarantee that a hosted ICN user retains:</p>
+<ul>
+<li><strong>Identity continuity.</strong> Cooperative DIDs and signing keys remain controlled by the cooperative, not the host.</li>
+<li><strong>Record portability.</strong> Members can verify receipts; institutions can export full governance / ledger / receipt history at any time, in a portable form, regardless of who hosted them.</li>
+<li><strong>Federation portability.</strong> An institution can change federation membership or hosting providers without losing state, without re-signing receipts, and without re-issuing identity.</li>
+<li><strong>Provenance integrity.</strong> Receipts are signed by the institution&#39;s keys, not the host&#39;s; provenance graphs remain intact across migration.</li>
+<li><strong>Hosted-provider exit.</strong> A hosted provider cannot become a landlord. Tenant export is a baseline requirement, not a paid feature.</li>
+<li><strong>Source access for modified network services.</strong> When a host runs a modified ICN, that host&#39;s modifications are available to the network of users.</li>
+</ul>
+<p>Some of these guarantees are within scope of a source-code copyleft (AGPL or similar). Others — particularly identity continuity, record portability, federation portability, and hosted-provider exit — may be more naturally enforced by <strong>policy layers</strong> (certification, trademark, hosting agreements, federation admission) rather than by the source license itself.</p>
+<p>This document organizes the question along those two axes.</p>
+<h2>Component-by-component matrix</h2>
+<p>The matrix is descriptive of present state and candidate posture only. <strong>Posture is &quot;candidate to evaluate,&quot; not &quot;decision.&quot;</strong> Final scope, license selection, and policy obligations are deferred to a future maintainer/legal review.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Current metadata signal</th>
+<th>Path evidence</th>
+<th>Adoption pressure</th>
+<th>Enclosure risk</th>
+<th>Autonomy risk</th>
+<th>Candidate posture</th>
+<th>Open questions</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Root repository / source distribution</td>
+<td><code>LICENSE</code> contains AGPL-3.0</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/LICENSE">`LICENSE`</a></td>
+<td>Medium (project as whole)</td>
+<td>Medium-high (source-only copyleft)</td>
+<td>High (no key/data/receipt portability guarantee)</td>
+<td>Network copyleft + policy layer</td>
+<td>Whether AGPL-3.0 is intended to govern the project as a whole; relationship with the Rust workspace metadata</td>
+</tr>
+<tr>
+<td>Kernel / substrate crates (<code>icn-core</code>, <code>icn-kernel-api</code>, <code>icn-net</code>, <code>icn-gossip</code>, <code>icn-store</code>, <code>icn-encoding</code>, <code>icn-protocol</code>, <code>icn-services</code>, <code>icn-commons</code>)</td>
+<td><code>license.workspace = true</code> → <code>MIT OR Apache-2.0</code></td>
+<td><code>icn/crates/icn-{core,kernel-api,net,gossip,store,encoding,protocol,services,commons}/Cargo.toml</code></td>
+<td>High (reusable substrate; permissive aids ecosystem reuse)</td>
+<td>Lower (kernel is small surface; firewall keeps it semantically blind per <a href="/docs/architecture/KERNEL_APP_SEPARATION">KERNEL_APP_SEPARATION.md</a>)</td>
+<td>Lower (kernel doesn&#39;t hold institutional state)</td>
+<td>Permissive (preserve <code>MIT OR Apache-2.0</code>)</td>
+<td>Whether kernel&#39;s permissive posture should be made explicit per-crate vs. inherited; SPDX header policy</td>
+</tr>
+<tr>
+<td>Identity / crypto crates (<code>icn-identity</code>, <code>icn-crypto</code>, <code>icn-crypto-pq</code>, <code>icn-zkp</code>, <code>icn-authz</code>, <code>icn-naming</code>, <code>icn-steward</code>)</td>
+<td>Mixed: <code>icn-zkp</code> and <code>icn-crypto-pq</code> declare <code>MIT OR Apache-2.0</code> explicitly; the rest inherit via workspace</td>
+<td><code>icn/crates/icn-{identity,crypto,crypto-pq,zkp,authz,naming,steward}/Cargo.toml</code></td>
+<td>High (broad reuse value for any DID / Ed25519 / PQ ecosystem)</td>
+<td>Lower (crypto primitives are commodity once standardized)</td>
+<td>Medium (key custody patterns matter institutionally; library APIs themselves do not capture data)</td>
+<td>Permissive for libraries; pair with <strong>policy</strong> layer for key-custody requirements</td>
+<td>Whether key-custody / rotation / export policies live as runtime contracts, certification policy, or hosted-provider obligations</td>
+</tr>
+<tr>
+<td>Daemon / runtime binaries (<code>icnd</code>, <code>icnctl</code>, <code>icn-console</code>)</td>
+<td><code>license.workspace = true</code> → <code>MIT OR Apache-2.0</code></td>
+<td><code>icn/bins/{icnd,icnctl,icn-console}/Cargo.toml</code></td>
+<td>Lower (the binaries themselves are not typically library deps)</td>
+<td><strong>High</strong> (a hosted modified daemon could withhold member-facing source / data without obligation)</td>
+<td><strong>High</strong> (the daemon holds keys, receipts, governance state during operation)</td>
+<td>Network copyleft (AGPL or similar) <strong>plus</strong> policy layer for tenant export / key custody</td>
+<td>The contradiction the LICENSING.md flagged: workspace says <code>MIT OR Apache-2.0</code>; root <code>LICENSE</code> says AGPL. Future decision must resolve which signal applies to the daemon, and whether AGPL alone is sufficient</td>
+</tr>
+<tr>
+<td>Gateway / API services (<code>icn-gateway</code>, <code>icn-rpc</code>, <code>icn-api</code>, <code>icn-http-kit</code>)</td>
+<td><code>license.workspace = true</code> → <code>MIT OR Apache-2.0</code></td>
+<td><code>icn/crates/icn-{gateway,rpc,api,http-kit}/Cargo.toml</code></td>
+<td>High (API surface attracts ecosystem)</td>
+<td>Medium (a hosted gateway is the most likely landlord vector)</td>
+<td>High (the gateway is what members and apps actually talk to; observability / identity binding lives here)</td>
+<td>Mixed: permissive for API surface + libraries; <strong>network copyleft + autonomy policy for hosted instances</strong></td>
+<td>Whether AGPL on hosted gateways suffices; whether &quot;hosted ICN&quot; requires a separate certification policy distinct from source license</td>
+</tr>
+<tr>
+<td>SDKs (<code>sdk/typescript/</code>, <code>sdk/react-native/</code>)</td>
+<td><code>MIT OR Apache-2.0</code> (per <code>package.json</code> / repo conventions)</td>
+<td><code>sdk/typescript/package.json</code>, <code>sdk/react-native/package.json</code>, <code>sdk/typescript/README.md</code></td>
+<td>High (SDK adoption depends on permissive posture)</td>
+<td>Lower (SDKs are libraries; they do not host institutional state)</td>
+<td>Lower (SDKs are clients, not custodians)</td>
+<td>Permissive (preserve current)</td>
+<td>None novel; SPDX header policy applies</td>
+</tr>
+<tr>
+<td>Apps / tools (<code>apps/governance</code>, <code>apps/trust</code>, <code>apps/ledger</code>, <code>apps/echo</code>, <code>icn/apps/{governance,membership,charter,ledger}</code>)</td>
+<td>All declare <code>license = &quot;MIT OR Apache-2.0&quot;</code> explicitly</td>
+<td>the eight <code>apps/*</code> and <code>icn/apps/*</code> <code>Cargo.toml</code>s</td>
+<td>Medium (Policy Oracles + apps are reusable but more domain-shaped than substrate)</td>
+<td>Medium-high (apps interpret meaning; a hosted modified app could absorb governance state without source obligation)</td>
+<td>Medium-high (apps are where institutional decisions and receipts originate)</td>
+<td>Network copyleft for app deployments <strong>or</strong> policy-layer requirement that hosted apps publish modifications</td>
+<td>Whether apps should follow the daemon&#39;s posture or stay permissive with separate policy guarantees</td>
+</tr>
+<tr>
+<td>Docs (text under <code>docs/</code>)</td>
+<td>No per-doc license declaration; effectively covered by root <code>LICENSE</code> (AGPL-3.0) for the source distribution</td>
+<td><code>docs/**/*.md</code>, <code>LICENSING.md</code>, <code>README.md</code></td>
+<td>Medium (docs are reused as orientation by adopters)</td>
+<td>Lower (text reuse is rarely an enclosure vector)</td>
+<td>Lower</td>
+<td>Same posture as the source distribution; consider explicit documentation license (e.g., CC-BY or CC-BY-SA) only if a decision is made to distinguish docs from code</td>
+<td>Whether to declare a separate documentation license; CC-BY vs CC-BY-SA fit</td>
+</tr>
+<tr>
+<td>Generated artifacts (<code>docs/reference/project-index/generated/</code>, dist artifacts)</td>
+<td>No per-artifact license declaration; covered by source distribution license</td>
+<td><code>docs/reference/project-index/generated/icn-file-record.{json,md}</code> (PR #1691) and similar</td>
+<td>Lower</td>
+<td>Lower</td>
+<td>Lower (artifacts describe state, not state itself)</td>
+<td>Same as source distribution</td>
+<td>Whether generated artifacts should carry an explicit license header for downstream redistribution</td>
+</tr>
+<tr>
+<td>Deployment manifests (<code>deploy/</code>, <code>docker/</code>, <code>monitoring/</code>, <code>ops/</code>)</td>
+<td>Deploy README references <code>MIT OR Apache-2.0</code>; manifests themselves carry no per-file license declaration</td>
+<td><code>deploy/</code>, <code>deploy/README.md</code>, <code>docker/</code>, <code>monitoring/</code>, <code>ops/</code></td>
+<td>Medium (operators copy manifests as starting points)</td>
+<td>Medium (manifest defaults can lock in landlord-shaped configurations)</td>
+<td>Medium (default config shapes how hosted providers run ICN)</td>
+<td>Permissive for manifests + policy guidance for hosted-provider autonomy defaults</td>
+<td>Whether hosted-provider autonomy policy should ship with default manifests (e.g., default tenant-export config, default key-custody defaults)</td>
+</tr>
+<tr>
+<td>Institution packages (per <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a>)</td>
+<td>Per-package; ICN does not own institution-specific licensing decisions</td>
+<td>NYCN&#39;s package lives at <code>InterCooperative-Network/nycn</code>; this document does not modify NYCN</td>
+<td>N/A (per-institution)</td>
+<td>N/A (per-institution)</td>
+<td>N/A (per-institution)</td>
+<td>Per-institution decision; ICN-side recommendation is to publish guidance, not to dictate</td>
+<td>Whether ICN provides a recommended package-licensing template (mirroring the recommended boundary doc)</td>
+</tr>
+<tr>
+<td>Website / public narrative (<code>website/</code>)</td>
+<td>Uses <code>MIT OR Apache-2.0</code> per repo conventions</td>
+<td><code>website/</code>, <code>web/api-docs/</code>, <code>web/pilot-ui/</code>, <code>web/dashboard/</code></td>
+<td>Medium</td>
+<td>Lower</td>
+<td>Lower</td>
+<td>Permissive; consider documentation license for narrative content if a docs-license decision is made</td>
+<td>Whether website narrative content (vs. code) should declare a separate license</td>
+</tr>
+<tr>
+<td><strong>External reference: NYCN package</strong> (not modified by this document)</td>
+<td>Per-package metadata at <code>InterCooperative-Network/nycn</code>; not in scope here</td>
+<td>external repo</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>per-institution; out of scope</td>
+<td>None for this document</td>
+</tr>
+<tr>
+<td><strong>External reference: icn-learn</strong> (not modified by this document)</td>
+<td>Per-package metadata at <code>InterCooperative-Network/icn-learn</code>; not in scope here</td>
+<td>external repo</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>per-package; out of scope</td>
+<td>None for this document</td>
+</tr>
+</tbody></table>
+<p>The &quot;Candidate posture&quot; column is <strong>what to evaluate</strong>, not what to adopt. None of these postures is selected by this document.</p>
+<h3>Must-not-overclaim notes</h3>
+<ul>
+<li>The matrix describes <strong>observed metadata</strong> plus <strong>structural risk shape</strong>; it does not assert that any candidate posture is the right answer for any component.</li>
+<li>Where the matrix lists &quot;Network copyleft&quot; or &quot;CAL/CAL-like&quot; as a candidate, that means <em>as a candidate to evaluate</em>, not as a settled choice.</li>
+<li>Where the matrix lists &quot;policy layer,&quot; that includes potential mechanisms that do not yet exist in the project (certification policy, trademark policy, hosted-provider autonomy policy, federation admission criteria). Those mechanisms would have to be authored separately if the maintainer/legal review chooses to use them.</li>
+<li>The Cargo <code>license</code> field is intent metadata; the matrix&#39;s &quot;Current metadata signal&quot; column reflects what <code>Cargo.toml</code> declares, not what governs reuse in any binding sense.</li>
+</ul>
+<h2>License / policy strategy options</h2>
+<p>Five non-exclusive option families for the maintainer/legal review to consider. Each is described as a candidate; the recommendation in this document is <strong>not to choose one</strong> but to scope a future decision.</p>
+<h3>Option A — Keep current metadata; clean inconsistencies only</h3>
+<ul>
+<li>Resolve the two <code>Cargo.toml</code> files with no <code>license</code> field (<code>examples/wasm-compute</code>, <code>icn/crates/icn-ccl/fuzz</code>) by either adding <code>license.workspace = true</code> or an explicit license.</li>
+<li>Decide whether the root <code>LICENSE</code> (AGPL-3.0) is intended or whether the workspace <code>MIT OR Apache-2.0</code> is canonical, and align the metadata accordingly.</li>
+<li>Do not change any other license posture.</li>
+<li><strong>Cost</strong>: low. <strong>Strength against enclosure</strong>: weak (no new guarantees beyond current code license). <strong>Compatible with</strong>: every other option as a step zero.</li>
+</ul>
+<h3>Option B — Permissive libraries + AGPL runtime / services</h3>
+<ul>
+<li>Keep <code>MIT OR Apache-2.0</code> for substrate / kernel crates / SDKs / API client libraries.</li>
+<li>Move daemon / runtime / hosted-service crates explicitly to AGPL-3.0.</li>
+<li>Document the boundary in <code>LICENSING.md</code> and update Cargo metadata to match.</li>
+<li><strong>Cost</strong>: medium (per-crate license-field updates; ecosystem-compatibility review). <strong>Strength against enclosure</strong>: medium (network copyleft for hosted services). <strong>Gap</strong>: does not by itself guarantee key/data/receipt portability for a hosted user.</li>
+</ul>
+<h3>Option C — Permissive libraries + CAL / CAL-like runtime / autonomy layer</h3>
+<ul>
+<li>Keep <code>MIT OR Apache-2.0</code> for libraries.</li>
+<li>Adopt CAL (Cryptographic Autonomy License) — or CAL-like obligations — for components where user control over keys and personal data is core (daemon, gateway, custody-bearing apps).</li>
+<li>Pair with policy layers for non-license obligations.</li>
+<li><strong>Cost</strong>: high (legal review of CAL fit; ecosystem-compatibility review; CAL is less broadly adopted than AGPL/MIT/Apache). <strong>Strength against enclosure</strong>: high (data/key control is licensed, not just policy-bound). <strong>Risk</strong>: CAL is novel relative to common licenses; ecosystem and contributor reactions need evaluation. CAL is <strong>not</strong> chosen by this document; its appropriateness for any specific ICN component is an open question.</li>
+</ul>
+<h3>Option D — Code license stays conventional; autonomy moves into policy layers</h3>
+<ul>
+<li>Keep current license metadata or move to Option B.</li>
+<li>Author dedicated policy layers separately:<ul>
+<li><strong>Hosted-provider autonomy policy</strong> (tenant export, key custody, rotation, receipt portability obligations for any hosted ICN deployment).</li>
+<li><strong>Certification / trademark policy</strong> (use of &quot;ICN&quot; name and certification mark requires meeting autonomy criteria).</li>
+<li><strong>Federation admission baseline</strong> (federations admitting an institution require autonomy guarantees the institution can verify).</li>
+</ul>
+</li>
+<li><strong>Cost</strong>: medium-high (policy authoring + governance). <strong>Strength against enclosure</strong>: medium-high (depending on enforcement). <strong>Risk</strong>: policy layers without legal teeth can be ignored by hostile hosts. A trademark policy is the most enforceable of the three.</li>
+</ul>
+<h3>Option E — Hybrid model</h3>
+<ul>
+<li>Combine Options A, B, C, and D selectively across the matrix:<ul>
+<li>permissive substrate (Option A baseline + Option B&#39;s per-component split for libraries vs runtime);</li>
+<li>network copyleft for hosted services (Option B);</li>
+<li>CAL or CAL-like obligations only on components where data/key autonomy is the central guarantee (Option C, narrow scope);</li>
+<li>non-license autonomy policy layered on top (Option D).</li>
+</ul>
+</li>
+<li><strong>Cost</strong>: highest (every component decided explicitly; multiple policy artifacts authored). <strong>Strength against enclosure</strong>: highest, if the hybrid is coherent. <strong>Risk</strong>: complexity for adopters and contributors; review burden.</li>
+</ul>
+<p>The maintainer/legal review will likely converge on Option A as a step zero (resolve inconsistencies) and then choose between Options B–E for the architectural posture. <strong>No option is recommended by this document</strong>; the goal is to scope the decision, not to make it.</p>
+<h2>ICN autonomy guarantees to preserve</h2>
+<p>Independent of which license/policy combination future review selects, the autonomy guarantees the strategy should preserve are:</p>
+<ol>
+<li><strong>Institutional export.</strong> Every institution can export the full governance / ledger / receipt / membership history at any time, in a documented format, signed by the institution&#39;s keys.</li>
+<li><strong>Key custody and rotation.</strong> Identity keys remain under the institution&#39;s control; key rotation is supported without losing record continuity; a hosted provider does not hold primary custody of an institution&#39;s signing keys.</li>
+<li><strong>Receipt / provenance portability.</strong> Receipts are signed by the institution&#39;s keys, not the host&#39;s; the receipt envelope (per <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">`ADR-0026`</a> and <a href="/docs/architecture/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a>) is portable across hosts.</li>
+<li><strong>Federation portability.</strong> Federation membership is changeable without losing state; an institution can leave a federation, change federations, or be hosted independently.</li>
+<li><strong>Hosted-provider exit.</strong> Tenant export is a baseline requirement of any hosted ICN deployment, not a paid or opt-in feature. Exit must be technically possible, format-documented, and signature-preserving.</li>
+<li><strong>Source access for modified network services.</strong> When a host runs a modified ICN, the modifications are available to the network of users (the AGPL-style guarantee, but written into both license and policy where overlap is helpful).</li>
+<li><strong>Institution package portability.</strong> An institution&#39;s package (e.g., NYCN&#39;s) remains portable across ICN deployments without dependency on a specific host&#39;s modifications.</li>
+<li><strong>No platform-landlord capture.</strong> No structural mechanism by which a hosted provider can become a landlord over the cooperative network — neither through license loophole, certification monopoly, nor data-exit friction.</li>
+</ol>
+<p>These guarantees are the substantive output the licensing strategy should defend. The license + policy combination is the means; these guarantees are the ends.</p>
+<h2>Decision questions for maintainer/legal review</h2>
+<p>Carried forward from <code>LICENSING.md</code> and #1692, refined where this matrix sharpens them:</p>
+<ol>
+<li>Which parts of ICN should remain permissively licensed for adoption (kernel, identity / crypto libraries, SDKs)?</li>
+<li>Which parts need network copyleft (daemon, gateway, hosted apps)?</li>
+<li>Which parts need data/autonomy protections beyond source-code copyleft (custody-bearing components)?</li>
+<li>Is CAL appropriate for any ICN component? Which components, and under what scope?</li>
+<li>If CAL is not appropriate, which CAL-like obligations need to live in policy, certification, hosting agreements, or governance requirements?</li>
+<li>Should runtime / tool layers differ from low-level libraries in license posture (the Option B / E split)?</li>
+<li>Should institution packages have a different posture than generic ICN substrate? Should ICN publish a recommended package-licensing template?</li>
+<li>What export / key / provenance rights must every hosted ICN user retain, in concrete terms (formats, frequency, signature requirements)?</li>
+<li>What is the relationship between license, trademark, certification, and federation admission? Is one of these mechanisms load-bearing over the others?</li>
+<li>What specific metadata changes would be needed if the project adopts a new posture (per-crate <code>license</code> fields, <code>workspace.package.license</code>, root <code>LICENSE</code>, <code>NOTICE</code> files, SPDX headers)? In what order should they land?</li>
+<li>What relationship is intended between the root <code>LICENSE</code> (AGPL-3.0) and the workspace <code>MIT OR Apache-2.0</code>? Is one signal stale, or is a hybrid posture intended?</li>
+<li>What licensing applies to the two <code>Cargo.toml</code> files with no <code>license</code> field, and should they declare <code>license.workspace = true</code> or an explicit license?</li>
+</ol>
+<p>Resolving any of these is a maintainer/legal decision and should land as a dedicated, explicit PR or RFC.</p>
+<h2>Recommended next artifacts</h2>
+<p>If the maintainer/legal review proceeds, the following artifacts are likely needed. <strong>None of them is started by this document</strong>; this is a scoping list for the next planning step:</p>
+<ol>
+<li><strong>Licensing strategy RFC candidate.</strong> <code>docs/rfcs/RFC-NNNN-licensing-strategy.md</code> proposing one of Options A–E (or a refined hybrid) with explicit per-component decisions and a metadata-change sequence.</li>
+<li><strong>SPDX / header audit.</strong> Per-file inventory of where SPDX identifiers exist, where they would be added, and the policy decision on whether to add them.</li>
+<li><strong>Component metadata audit.</strong> Per-crate inventory of <code>license</code> field values vs. desired values, including the two unset crates; the existing PR #1691 generated repo-record snapshot can be a starting point.</li>
+<li><strong>Hosted-provider autonomy policy.</strong> A separate document defining tenant-export obligations, key-custody constraints, receipt-portability requirements, and federation-portability requirements that any hosted ICN deployment is expected to meet.</li>
+<li><strong>Certification / trademark policy.</strong> Use of the &quot;ICN&quot; name and any certification mark requires meeting the autonomy criteria above. This is a non-license enforcement mechanism that complements (or stands in for) license-based copyleft.</li>
+<li><strong>Federation admission autonomy baseline.</strong> Federations admitting an institution require the institution to retain the autonomy guarantees above. A baseline checklist for federation admission.</li>
+<li><strong>Updated <code>LICENSING.md</code>.</strong> After the strategy decision lands, the conservative metadata + open-questions document is updated to record the decision (in a separate PR clearly titled and reviewed for the licensing implication).</li>
+</ol>
+<h2>Recommended framing on CAL</h2>
+<p>CAL is a <strong>candidate to evaluate</strong> for components where user control over keys and personal data is core (daemon, gateway, custody-bearing apps). Specifically:</p>
+<ul>
+<li>CAL-like data and key custody obligations are a closer fit for ICN&#39;s anti-enclosure goals than AGPL alone, because AGPL primarily protects source code availability while CAL extends to the user&#39;s data and keys.</li>
+<li>CAL is less broadly adopted than AGPL / MIT / Apache. Ecosystem and contributor reactions need evaluation; some downstream adopters may be unwilling or legally unable to adopt CAL-licensed components.</li>
+<li>CAL adoption requires legal review. CAL is not chosen by this document. Whether CAL applies to any specific ICN component is one of the <a href="#decision-questions-for-maintainerlegal-review">decision questions</a>.</li>
+</ul>
+<p>A safe summary recommendation, for the future maintainer/legal review to refine or replace:</p>
+<blockquote>
+<p>Evaluate CAL or CAL-like obligations for runtime / hosted / autonomy-sensitive layers, while preserving permissive licensing for low-level reusable primitives where adoption matters.</p>
+</blockquote>
+<p>This recommendation is <strong>not a decision</strong>. It is an articulation of the trade-off the review will need to weigh.</p>
+<h2>Non-goals</h2>
+<p>This document does <strong>not</strong>:</p>
+<ul>
+<li>modify <code>LICENSE</code>, any <code>Cargo.toml</code> license field, or any other license-bearing artifact;</li>
+<li>relicense any code;</li>
+<li>add SPDX headers;</li>
+<li>give legal advice;</li>
+<li>define obligations for downstream consumers;</li>
+<li>select a license or a license combination for any component;</li>
+<li>make any change to NYCN, icn-learn, or any non-ICN-repo source;</li>
+<li>start runtime implementation, create crates, or modify code;</li>
+<li>start RFC-0016, RFC-0017, or any PR B/C/D/E work;</li>
+<li>start a hosted-provider autonomy policy, a certification / trademark policy, or a federation admission baseline (those are listed as <strong>next-step artifacts</strong>, not deliverables of this document);</li>
+<li>assert that the present license metadata signals are intentional, harmonized, or final.</li>
+</ul>
+<p>When the future maintainer/legal review converges on a posture, the resulting decision lands as a dedicated, explicit PR or RFC clearly titled and reviewed for the licensing implication. This document supports that future review by scoping the question; it does not pre-empt it.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
