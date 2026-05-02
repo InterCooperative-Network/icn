@@ -7,15 +7,15 @@ Instructions for agentic coding agents operating in this repo.
 ## Operating mode (must follow)
 
 1. **Plan first.** Before edits, produce:
-   - Goal + success criteria
-   - Files/crates you will touch
-   - Commands you will run to verify
+  - Goal + success criteria
+  - Files/crates you will touch
+  - Commands you will run to verify
 2. **Keep diffs small and reviewable.** Prefer multiple PRs over one mega-PR.
 3. **No "fixing" by weakening safety.**
-   - Do not relax validation, trust gates, signature checks, or encoding rules to make tests pass.
+  - Do not relax validation, trust gates, signature checks, or encoding rules to make tests pass.
 4. **Run the right checks for the area you touched** (see "Change routing" below).
 5. **Docs/specs must match reality.** If you change semantics, update the relevant doc/spec in the same PR,
-   or create a blocking issue and reference it in the PR description.
+  or create a blocking issue and reference it in the PR description.
 6. **No new tooling.** Do not introduce new linters, build systems, or frameworks unless explicitly requested.
 
 ---
@@ -24,15 +24,18 @@ Instructions for agentic coding agents operating in this repo.
 
 These are the protocol invariants that must never be violated:
 
-| Invariant | Description |
-|-----------|-------------|
-| **Adversarial-by-default** | Treat peers as untrusted until trust is established. No implicit trust shortcuts. |
-| **Determinism** | Protocol state transitions, proofs, and derived roots must be deterministic. Same inputs → same outputs. |
-| **Canonical encodings** | Do not change wire/proof/encoding structures without explicit intent + docs + tests. |
-| **No panics in protocol paths** | Never panic in network/protocol/actor runtime/deserialization paths. Use `Result<T, E>`. |
-| **Kernel/app boundaries** | Keep crate layering clean; avoid dependency cycles; follow forbidden-deps policy. |
+
+| Invariant                       | Description                                                                                              |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Adversarial-by-default**      | Treat peers as untrusted until trust is established. No implicit trust shortcuts.                        |
+| **Determinism**                 | Protocol state transitions, proofs, and derived roots must be deterministic. Same inputs → same outputs. |
+| **Canonical encodings**         | Do not change wire/proof/encoding structures without explicit intent + docs + tests.                     |
+| **No panics in protocol paths** | Never panic in network/protocol/actor runtime/deserialization paths. Use `Result<T, E>`.                 |
+| **Kernel/app boundaries**       | Keep crate layering clean; avoid dependency cycles; follow forbidden-deps policy.                        |
+
 
 If a change might impact any invariant:
+
 - Call it out explicitly in the plan
 - Add tests proving the invariant still holds
 - Update the relevant docs/specs
@@ -163,15 +166,17 @@ npm run dev  # python3 -m http.server 8080
 
 ## Change routing (run the right verification)
 
-| If you touch... | Run these checks |
-|-----------------|------------------|
-| **Rust crates** (`icn/crates/**`) | `cargo fmt --all --check`, `cargo clippy ...`, appropriate `cargo test` scope |
-| **Gateway API** (`icn-gateway`) | `cargo test -p icn-gateway --features sled-storage`, regenerate OpenAPI + TS types if API changed |
-| **TypeScript SDK** (`sdk/typescript/`) | `npm ci && npm run build && npm test && npm run lint` |
-| **React Native SDK** (`sdk/react-native/`) | `npm test && npm run build` |
-| **Pilot UI** (`web/pilot-ui/`) | `npm run test && npm run test:e2e && npm run test:a11y` |
-| **Deploy manifests** (`deploy/`) | Ensure no secrets committed; keep placeholders; update deploy docs if behavior changes |
-| **Documentation** (`docs/`) | Verify links, check terminology consistency |
+
+| If you touch...                            | Run these checks                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| **Rust crates** (`icn/crates/`**)          | `cargo fmt --all --check`, `cargo clippy ...`, appropriate `cargo test` scope                     |
+| **Gateway API** (`icn-gateway`)            | `cargo test -p icn-gateway --features sled-storage`, regenerate OpenAPI + TS types if API changed |
+| **TypeScript SDK** (`sdk/typescript/`)     | `npm ci && npm run build && npm test && npm run lint`                                             |
+| **React Native SDK** (`sdk/react-native/`) | `npm test && npm run build`                                                                       |
+| **Pilot UI** (`web/pilot-ui/`)             | `npm run test && npm run test:e2e && npm run test:a11y`                                           |
+| **Deploy manifests** (`deploy/`)           | Ensure no secrets committed; keep placeholders; update deploy docs if behavior changes            |
+| **Documentation** (`docs/`)                | Verify links, check terminology consistency                                                       |
+
 
 ---
 
@@ -229,11 +234,13 @@ npm run dev  # python3 -m http.server 8080
 **All documentation goes in `docs/`** - never save docs to project root (except the core files listed in CLAUDE.md).
 
 **Finding documentation:**
+
 - Start with `docs/INDEX.md` for comprehensive navigation
 - Use `docs/README.md` for quick overview
 - Follow the category structure in `docs/`
 
 **Where to put new docs:**
+
 - Architecture/design decisions → `docs/architecture/` or `docs/design/`
 - API documentation → `docs/reference/api/`
 - User/developer guides → `docs/guides/user/` or `docs/guides/developer/`
@@ -270,6 +277,7 @@ When running multiple agents in parallel, each agent gets its own Git worktree w
 ```
 
 **Rules:**
+
 - One agent = one branch = one worktree
 - Never commit to `main` — all work on feature branches
 - Worktrees live in `../icn-wt/` (sibling to repo root)
@@ -307,12 +315,14 @@ When ending a session or passing work to another agent, write a handoff note usi
 ```
 
 **Rules:**
+
 - Write to `docs/dev-journal/session-YYYY-MM-DD.md` (append if file exists today)
 - Stash must be empty before ending — commit or drop stashes
 - If pushing, use `/push` (runs fmt + clippy gates first)
 - The handoff file is for context continuity — do not auto-commit it
 
 **Resuming from a handoff:**
+
 1. Read `docs/dev-journal/session-YYYY-MM-DD.md` (most recent date)
 2. Run `/preflight` to verify environment
 3. Run `git fetch origin && git rebase origin/main` if branch is stale
@@ -330,21 +340,15 @@ When ending a session or passing work to another agent, write a handoff note usi
 
 ## Headless / CI / cloud-agent runtime gotchas
 
-This section applies to **any** non-interactive environment: Cursor Cloud, Claude Code, Codex, Copilot agents, CI runners, Docker containers, etc. Build/lint/test commands are in the sections above; this covers only non-obvious runtime issues.
+This section applies to **any** non-interactive environment: Cursor Cloud, Claude Code, Codex, Copilot agents, CI runners, Docker containers, etc.
 
-### Environment setup by platform
+### Environment setup
 
-The repo provides multiple setup paths. Pick the one matching your environment:
+Run `./scripts/bootstrap.sh` from the repo root. It installs system packages, ensures the pinned Rust toolchain, installs Node.js if missing, fetches Rust deps, and installs TypeScript SDK deps. It is idempotent and works as root or with sudo.
 
-| Platform | Setup method |
-|----------|-------------|
-| **Devcontainer** (Codespaces, Copilot, VS Code) | `.devcontainer/devcontainer.json` — installs system deps, Rust toolchain, Node.js 20, builds workspace automatically |
-| **Local / bare VM** | `./scripts/bootstrap.sh` — checks system deps and installs cargo dev tools. System packages (`mold`, `libssl-dev`, `protobuf-compiler`, `clang`, `pkg-config`) and Node.js must be installed separately |
-| **Cursor Cloud** | VM update script handles system deps, Node.js, `cargo fetch`, `npm ci` |
+Flags: `--ci` skips optional cargo dev tools (faster). `--no-sysdeps` skips apt package installation.
 
-After setup, verify with: `cd icn && cargo build && cargo test --workspace --lib`
-
-The Rust toolchain version is pinned in `icn/rust-toolchain.toml` and auto-installed by rustup on first use.
+After bootstrap, verify with: `cd icn && cargo build && cargo test --workspace --lib`
 
 ### Running the ICN daemon without a TTY
 
@@ -358,6 +362,7 @@ ICN_PASSPHRASE=dev ICN_GATEWAY_JWT_SECRET=dev-secret-at-least-16 \
 ```
 
 **Gotchas:**
+
 - Gateway is **off by default**. Pass `--gateway-enable` to bind port 8080.
 - Gateway requires `ICN_GATEWAY_JWT_SECRET` (any string >= 16 chars). The `--insecure-gateway-no-jwt` flag does **not** work — `main.rs` clears the placeholder before `init_gateway.rs` reads it, so the gateway silently refuses to start.
 - Metrics always bind port 9100. Health: `GET http://localhost:8080/v1/health` (no auth).

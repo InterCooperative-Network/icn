@@ -33,7 +33,7 @@
       }
     }
   },
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y mold protobuf-compiler && cd icn && cargo build && cd ../sdk/typescript && npm ci",
+  "postCreateCommand": "./scripts/bootstrap.sh && cd icn && cargo build",
   "forwardPorts": [8080, 9100],
   "portsAttributes": {
     "8080": {
