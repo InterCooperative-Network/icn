@@ -1,0 +1,397 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Service Hosting Model | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SERVICE HOSTING MODEL</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/SERVICE_HOSTING_MODEL.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: descriptive
+Canonical: no
+Last Reviewed: 2026-05-01</h2>
+<h1>Service Hosting Model</h1>
+<blockquote>
+<p><strong>Status: design direction.</strong> This document names how ICN should treat hosted services such as a forge, identity-provider bridge, status page, registry, documentation surface, metrics surface, and future tool services. It is not an implementation report and it does not declare any service live.</p>
+</blockquote>
+<h2>Summary</h2>
+<p>ICN services should not merely be deployed. They should be <strong>governed</strong>.</p>
+<p>A service is legitimate when its authority, custody, access, failure modes, backups, upgrades, event streams, compute jobs, and receipts are legible. Running a service is an operational fact; governing a service is an institutional fact.</p>
+<p>This document adds a service-hosting layer to the existing architecture:</p>
+<pre><code class="language-text">public / learning surfaces
+        ↓
+institution packages
+        ↓
+sovereign service hosting layer  ← this document
+        ↓
+tool / service adapter layer
+        ↓
+ICN runtime apps
+        ↓
+ICN substrate
+        ↓
+ops / infrastructure
+</code></pre>
+<p>The immediate forcing case is a sovereign forge, but the model is generic. The same service skeleton should eventually apply to the forge, auth bridge, status page, registry, docs, receipts, metrics, and institution-facing hosted tools.</p>
+<h2>Relationship to existing architecture</h2>
+<p>This document extends, but does not replace:</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_DOMAIN_INFRASTRUCTURE">`COOPERATIVE_DOMAIN_INFRASTRUCTURE.md`</a> — institutional domains, service identities, devices, workspaces, vaults, agreements, routing, and commons resource sharing.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_TOOL_COMMONS">`COOPERATIVE_TOOL_COMMONS.md`</a> — installable / forkable tools that operate on institution-owned state and emit receipts.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/DOMAIN_ROUTING_AND_DNS_BINDINGS">`DOMAIN_ROUTING_AND_DNS_BINDINGS.md`</a> — DNS routes are bindings to authority; DNS is not authority itself.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/MODEL_WORKLOADS_AND_DELIBERATION">`MODEL_WORKLOADS_AND_DELIBERATION.md`</a> — compute assists institutions; it does not govern them.</li>
+<li><a href="/docs/rfcs/RFC-0017-tool-install-infrastructure">RFC-0017</a> — future <code>ToolManifest</code>, <code>ToolBinding</code>, service identity audit trail, and tool install lifecycle.</li>
+</ul>
+<p>This document focuses on the operational bridge between those designs: how an actual service should be described before it becomes ICN-native.</p>
+<h2>Core doctrine</h2>
+<pre><code class="language-text">ICN owns authority.
+Services expose functions.
+Adapters translate service events.
+Receipts prove transitions.
+Compute produces evidence.
+Governance authorizes power.
+</code></pre>
+<p>A service may host workflows, files, repositories, dashboards, or login screens. It does not become the source of institutional truth unless ICN explicitly records and proves the transition that made something true.</p>
+<h2>Hosted → governed → native</h2>
+<p>Services should move through three stages.</p>
+<h3>1. Hosted service</h3>
+<p>The service runs on infrastructure operated by ICN or an ICN-aligned operator.</p>
+<p>Examples:</p>
+<ul>
+<li>Forgejo running at <code>forge.intercooperative.network</code>.</li>
+<li>An identity-provider bridge running at <code>auth.intercooperative.network</code>.</li>
+<li>Grafana behind authenticated access.</li>
+</ul>
+<p>At this stage, the service is operationally useful but may not yet emit ICN receipts or consume ICN-native service identities.</p>
+<h3>2. Governed service</h3>
+<p>Changes to the service are bound to explicit authority.</p>
+<p>Examples:</p>
+<ul>
+<li>Admin access changes require the right operator scope.</li>
+<li>Backup policy is documented and tested.</li>
+<li>Upgrade policy names who may apply updates.</li>
+<li>Route changes produce binding records.</li>
+<li>Access grants and revocations are auditable.</li>
+</ul>
+<p>At this stage, the service is no longer just a sysadmin artifact. It has institutional custody.</p>
+<h3>3. ICN-native service</h3>
+<p>The service participates directly in ICN primitives.</p>
+<p>Examples:</p>
+<ul>
+<li>The service has a <code>ServiceIdentity</code>.</li>
+<li>Its actions are capability-scoped.</li>
+<li>Meaningful transitions emit receipts.</li>
+<li>Event streams carry receipt pointers.</li>
+<li>Compute jobs are represented as constrained workloads.</li>
+<li>Installation and suspension eventually map to <code>ToolManifest</code> / <code>ToolBinding</code> lifecycle records.</li>
+</ul>
+<p>The first deployment of a service should not pretend to be stage 3. The path should be explicit.</p>
+<h2>Service definition</h2>
+<p>Every ICN-governed service should have a service definition before it is treated as a durable dependency.</p>
+<pre><code class="language-yaml">service: forge
+status: planned
+route: forge.intercooperative.network
+service_kind: hosted_service
+runtime: Forgejo
+operator_scope: ICN Infrastructure
+governance_scope: ICN Core Maintainers
+identity_provider: auth.intercooperative.network
+canonical_data:
+  - repositories                                  # rehearsal-stage canonical (forge holds working-tree mirrors)
+  - issues (after cutover from GitHub)            # GitHub remains canonical until explicit cutover
+  - pull requests (after cutover from GitHub)     # GitHub remains canonical until explicit cutover
+  - releases (after cutover from GitHub)          # GitHub remains canonical until explicit cutover
+external_mirrors:
+  - github.com/InterCooperative-Network/icn       # pre-cutover canonical for issues, pull requests, releases
+receipts_initial:
+  - BackupReceipt
+  - RepoMirrorReceipt
+  - ReleaseReceipt
+receipts_future:
+  - AccessGrantReceipt
+  - AccessRevocationReceipt
+  - MergeReceipt
+  - ToolBindingReceipt
+protocols:
+  commands: HTTP
+  events: SSE
+  realtime: WebSocket only when justified
+backup_required: true
+restore_test_required: true
+exit_path_required: true
+</code></pre>
+<p>The service definition is not the runtime implementation. It is the institutional declaration of what the service is, who operates it, what data it touches, what authority it requires, and how the institution leaves cleanly if the service fails or is replaced.</p>
+<h2>Required questions for any service</h2>
+<p>A service definition must answer:</p>
+<ul>
+<li>Who operates the service?</li>
+<li>Which governance scope authorizes it?</li>
+<li>Which route points to it?</li>
+<li>What data does it hold?</li>
+<li>Which data is canonical and which is cached or mirrored?</li>
+<li>Which identities may administer it?</li>
+<li>Which identities may use it?</li>
+<li>Which actions require receipts?</li>
+<li>Which actions merely produce operational logs?</li>
+<li>How is the service backed up?</li>
+<li>Where are backups stored?</li>
+<li>How is restore tested?</li>
+<li>What happens if the operator disappears?</li>
+<li>What happens if the host fails?</li>
+<li>How does the institution export and leave?</li>
+<li>Which protocol surfaces does it expose?</li>
+<li>Which critical features degrade to polling or ordinary HTTP?</li>
+</ul>
+<h2>Authority model</h2>
+<p>A hosted service must not become a private root of power. ICN authority remains expressed through DIDs, standing, roles, authority scopes, governance decisions, and receipts.</p>
+<p>A service may maintain local accounts as an operational projection. Those accounts are not sovereign identity.</p>
+<p>Correct pattern:</p>
+<pre><code class="language-text">member DID / service DID
+        ↓
+ICN standing + authority scope
+        ↓
+auth bridge or service adapter
+        ↓
+service-local account/session
+        ↓
+action
+        ↓
+receipt if the action changes institutional state
+</code></pre>
+<p>Incorrect pattern:</p>
+<pre><code class="language-text">service admin panel
+        ↓
+service-local role
+        ↓
+institutional authority
+</code></pre>
+<p>The second pattern rebuilds a platform tenant model and must not become ICN doctrine.</p>
+<h2>Event model</h2>
+<p>Service events are not truth by themselves. They are notifications or evidence.</p>
+<p>A service event should usually become one of three things:</p>
+<ol>
+<li><strong>Ignored operational noise</strong> — routine logs, health checks, view events.</li>
+<li><strong>Evidence</strong> — a CI result, scan result, backup report, or audit summary.</li>
+<li><strong>Institutional transition</strong> — an access grant, release, mirror update, publication, or other state change that must emit a receipt.</li>
+</ol>
+<p>For member-facing and operator-facing streams, events should generally carry pointers rather than private payloads:</p>
+<pre><code class="language-json">{
+  &quot;event_id&quot;: &quot;18492&quot;,
+  &quot;type&quot;: &quot;receipt.created&quot;,
+  &quot;domain_id&quot;: &quot;icn-core&quot;,
+  &quot;receipt_id&quot;: &quot;rec_abc&quot;,
+  &quot;source&quot;: &quot;forge.release&quot;
+}
+</code></pre>
+<p>The client then fetches the receipt or state object through ordinary authorization.</p>
+<h2>Protocol rule</h2>
+<p>Protocol selection is part of service design.</p>
+<p>Default posture:</p>
+<pre><code class="language-text">HTTP is for institutional facts.
+SSE is for institutional awareness.
+WebSockets are for shared live activity.
+Receipts are the source of truth.
+Polling is the fallback.
+</code></pre>
+<p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/PROTOCOL_SELECTION_FOR_MEMBER_SERVICES">`PROTOCOL_SELECTION_FOR_MEMBER_SERVICES.md`</a>.</p>
+<h2>Compute rule</h2>
+<p>Services may ask compute to produce evidence:</p>
+<ul>
+<li>run tests</li>
+<li>run accessibility checks</li>
+<li>scan dependencies</li>
+<li>generate release artifacts</li>
+<li>summarize logs</li>
+<li>produce repo maps</li>
+<li>generate source-linked review packets</li>
+</ul>
+<p>Compute does not decide. A compute result may inform a maintainer or governance body; it does not merge, release, grant access, revoke access, publish, or settle anything by itself.</p>
+<h2>Data custody</h2>
+<p>A service must distinguish:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Canonical state</td>
+<td>The service currently holds the authoritative working copy for the institution. Requires backup, export, restore, and future receipt path.</td>
+</tr>
+<tr>
+<td>Projection</td>
+<td>Service-local view of ICN state. Can be regenerated from ICN.</td>
+</tr>
+<tr>
+<td>Cache</td>
+<td>Performance copy. Disposable.</td>
+</tr>
+<tr>
+<td>Mirror</td>
+<td>Copy pushed outward for discovery or redundancy. Not canonical.</td>
+</tr>
+<tr>
+<td>External source</td>
+<td>Data imported from a non-ICN surface. Requires bridge markers and review boundaries.</td>
+</tr>
+</tbody></table>
+<p>For the forge, GitHub should become a mirror and contributor funnel, not the canonical home of ICN development.</p>
+<h2>Initial services to model</h2>
+<p>The first services worth modeling are:</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Role</th>
+<th>Why first</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>forge</code></td>
+<td>Sovereign code forge</td>
+<td>ICN should not depend on a corporate forge as its only workshop.</td>
+</tr>
+<tr>
+<td><code>auth</code></td>
+<td>Web identity-provider bridge</td>
+<td>Normal web services need OIDC/OAuth2-style sessions; ICN DIDs remain the authority.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>Public status surface</td>
+<td>Makes outages legible without requiring service access.</td>
+</tr>
+<tr>
+<td><code>metrics</code></td>
+<td>Internal observability</td>
+<td>Existing monitoring should be behind governed access.</td>
+</tr>
+<tr>
+<td><code>registry</code></td>
+<td>Future artifact / release / receipt registry</td>
+<td>Connects releases, proofs, and artifacts.</td>
+</tr>
+<tr>
+<td><code>docs</code></td>
+<td>Future documentation/publishing service</td>
+<td>Public/civic documents with publication receipts.</td>
+</tr>
+</tbody></table>
+<h2>Non-goals</h2>
+<ul>
+<li>No runtime implementation in this document.</li>
+<li>No declaration that any service is currently live.</li>
+<li>No requirement to abandon GitHub immediately.</li>
+<li>No treatment of Keycloak, authentik, ZITADEL, Forgejo, Grafana, or any other tool as ICN authority.</li>
+<li>No claim that service hosting is already ICN-native.</li>
+<li>No institution-specific nouns introduced as ICN core primitives.</li>
+</ul>
+<h2>Build order</h2>
+<p>Recommended order:</p>
+<ol>
+<li>Land service-hosting doctrine and templates.</li>
+<li>Define the sovereign forge plan.</li>
+<li>Define the auth bridge plan.</li>
+<li>Deploy non-production services.</li>
+<li>Add backups and restore tests.</li>
+<li>Add OIDC login for the forge.</li>
+<li>Add service event adapters.</li>
+<li>Add receipt classes or map to existing receipt envelope where appropriate.</li>
+<li>Add compute jobs as evidence producers.</li>
+<li>Later, map mature services into <code>ToolManifest</code> / <code>ToolBinding</code> lifecycle once RFC-0017 lands.</li>
+</ol>
+<h2>One-line rule</h2>
+<p><strong>ICN services should be operated like infrastructure, governed like institutions, and verified like receipts.</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

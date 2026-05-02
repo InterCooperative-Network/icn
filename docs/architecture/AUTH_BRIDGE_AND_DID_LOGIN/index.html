@@ -1,0 +1,382 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Auth Bridge and DID Login | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>AUTH BRIDGE AND DID LOGIN</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/AUTH_BRIDGE_AND_DID_LOGIN.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: descriptive
+Canonical: no
+Last Reviewed: 2026-05-01</h2>
+<h1>Auth Bridge and DID Login</h1>
+<blockquote>
+<p><strong>Status: design direction.</strong> This document defines how conventional identity-provider infrastructure should bridge into ICN DID identity and authority. It is not an implementation report and it does not select a specific IdP product.</p>
+</blockquote>
+<h2>Summary</h2>
+<p>ICN should support conventional web login for conventional web services, but without letting the identity-provider layer become the source of institutional authority.</p>
+<p>The rule:</p>
+<pre><code class="language-text">OIDC authenticates sessions.
+ICN authorizes institutional power.
+Receipts prove institutional transitions.
+</code></pre>
+<p>Keycloak, authentik, ZITADEL, Ory, Kanidm, Forgejo login sources, and similar systems may help browsers and services establish sessions. They do not replace DIDs, standing, role assignments, authority scopes, governance decisions, service identities, or receipts.</p>
+<h2>Why this exists</h2>
+<p>Many useful services speak ordinary identity-provider protocols:</p>
+<ul>
+<li>OIDC</li>
+<li>OAuth2</li>
+<li>SAML</li>
+<li>LDAP / directory bridges</li>
+<li>passkeys / WebAuthn</li>
+<li>session cookies</li>
+</ul>
+<p>A sovereign forge, status page, metrics dashboard, docs service, registry, or operator console should not each invent its own login system. A shared auth bridge is the right service boundary.</p>
+<p>But ICN is not building another corporate tenant stack. The bridge exists so ordinary tools can understand ICN identity; it must not become the authority source.</p>
+<h2>Identity stack</h2>
+<pre><code class="language-text">DID / ICN identity
+  = durable cryptographic identity
+
+Device keys / recovery
+  = how that identity survives device change or loss
+
+Auth bridge / IdP
+  = how web services receive login sessions
+
+ICN governance / standing / authority
+  = what the DID may do inside a domain
+
+Receipts
+  = proof that a meaningful transition was authorized and happened
+</code></pre>
+<p>A user may log into a web service through an IdP. The institution still knows the person or service by DID and domain-scoped authority.</p>
+<h2>Correct authority direction</h2>
+<p>Correct:</p>
+<pre><code class="language-text">DID proves control
+  ↓
+ICN checks standing / role / authority scope
+  ↓
+auth bridge issues short-lived OIDC claims
+  ↓
+service grants local session
+  ↓
+important action emits receipt
+</code></pre>
+<p>Incorrect:</p>
+<pre><code class="language-text">IdP group membership
+  ↓
+service-local admin role
+  ↓
+institutional authority
+</code></pre>
+<p>The incorrect pattern lets a web admin panel silently become the constitution.</p>
+<h2>Candidate service shape</h2>
+<p>The first auth bridge should likely live at:</p>
+<pre><code class="language-text">auth.intercooperative.network
+</code></pre>
+<p>Possible implementation choices:</p>
+<table>
+<thead>
+<tr>
+<th>Candidate</th>
+<th>Useful for</th>
+<th>Caution</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Keycloak</td>
+<td>Mature OIDC/OAuth2/SAML bridge, extensibility, enterprise patterns</td>
+<td>Heavier operational surface. Must not become authority source.</td>
+</tr>
+<tr>
+<td>authentik</td>
+<td>Friendly self-hosted SSO and proxy-provider patterns</td>
+<td>Still an IdP projection; ICN authority remains elsewhere.</td>
+</tr>
+<tr>
+<td>ZITADEL</td>
+<td>Organization/multitenant identity patterns</td>
+<td>Needs evaluation against ICN domain model.</td>
+</tr>
+<tr>
+<td>Ory Hydra/Kratos</td>
+<td>More composable identity stack</td>
+<td>More assembly; probably not first deployment unless custom UX is desired.</td>
+</tr>
+<tr>
+<td>Kanidm</td>
+<td>Modern identity management with Rust alignment</td>
+<td>Needs maturity/fit review for ICN service integration.</td>
+</tr>
+</tbody></table>
+<p>The implementation choice is operational. The architecture rule is product-agnostic.</p>
+<h2>DID login flow</h2>
+<p>A future <code>icn-id-bridge</code> or equivalent service should support a DID challenge-response login flow.</p>
+<pre><code class="language-text">1. User opens forge.intercooperative.network.
+2. Forge redirects to auth.intercooperative.network.
+3. Auth bridge offers DID login.
+4. Bridge issues a nonce.
+5. User signs nonce with an authorized DID/device key.
+6. Bridge verifies DID authentication.
+7. Bridge queries ICN standing / role / authority scope for the target domain.
+8. Bridge issues short-lived OIDC claims.
+9. Forge creates or updates a service-local session.
+10. Important service actions later map back to ICN receipts.
+</code></pre>
+<p>The session is temporary. The DID is durable.</p>
+<h2>Example claims</h2>
+<p>An OIDC token may project ICN state into claims like:</p>
+<pre><code class="language-json">{
+  &quot;sub&quot;: &quot;did:icn:z...&quot;,
+  &quot;icn_did&quot;: &quot;did:icn:z...&quot;,
+  &quot;icn_domain&quot;: &quot;intercooperative-network&quot;,
+  &quot;icn_standing&quot;: &quot;active&quot;,
+  &quot;icn_roles&quot;: [&quot;maintainer&quot;, &quot;infra-operator&quot;],
+  &quot;icn_scopes&quot;: [&quot;repo:write&quot;, &quot;release:publish&quot;],
+  &quot;icn_claims_version&quot;: &quot;v1&quot;
+}
+</code></pre>
+<p>Claims are projections. They must be short-lived and refreshable from ICN state.</p>
+<h2>External account bindings</h2>
+<p>External identities may be useful as login conveniences:</p>
+<ul>
+<li>GitHub account</li>
+<li>Google account</li>
+<li>email/password account</li>
+<li>passkey account</li>
+<li>institutional directory account</li>
+</ul>
+<p>But they must be bound to an ICN DID through an explicit ceremony.</p>
+<p>Correct pattern:</p>
+<pre><code class="language-text">external account login
+  ↓
+DID challenge signature
+  ↓
+binding record
+  ↓
+optional receipt / audit record
+  ↓
+external account may help enter a session
+</code></pre>
+<p>External account binding does not make the external provider sovereign.</p>
+<h2>Binding classes</h2>
+<table>
+<thead>
+<tr>
+<th>Binding</th>
+<th>Meaning</th>
+<th>Authority posture</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Login convenience</td>
+<td>External account can initiate a session.</td>
+<td>No authority by itself.</td>
+</tr>
+<tr>
+<td>Recovery aid</td>
+<td>External account participates in recovery flow.</td>
+<td>Must be bounded and revocable.</td>
+</tr>
+<tr>
+<td>Migration bridge</td>
+<td>Legacy account maps to DID during transition.</td>
+<td>Temporary; should expire or be reviewed.</td>
+</tr>
+<tr>
+<td>Service account binding</td>
+<td>Non-human service identity maps to tool/service role.</td>
+<td>Requires service identity and scoped capabilities.</td>
+</tr>
+</tbody></table>
+<h2>Service identity login</h2>
+<p>Services also need to authenticate.</p>
+<p>A service identity may represent:</p>
+<ul>
+<li>forge event adapter</li>
+<li>CI runner</li>
+<li>release builder</li>
+<li>backup job</li>
+<li>bridge importer</li>
+<li>metrics collector</li>
+<li>model runner</li>
+<li>registry publisher</li>
+</ul>
+<p>Service login must be scoped more tightly than human login. A service should receive only the capabilities needed for its job, for the shortest useful duration.</p>
+<h2>What the auth bridge may do</h2>
+<p>The auth bridge may:</p>
+<ul>
+<li>verify DID challenge-response login</li>
+<li>broker external IdP login</li>
+<li>issue OIDC claims</li>
+<li>map ICN standing/roles/scopes into service claims</li>
+<li>maintain short-lived sessions</li>
+<li>support passkeys or MFA as session-hardening</li>
+<li>record sensitive access changes for audit</li>
+<li>help ordinary tools use ICN identity without custom integrations</li>
+</ul>
+<h2>What the auth bridge must not do</h2>
+<p>The auth bridge must not:</p>
+<ul>
+<li>replace DIDs as identity roots</li>
+<li>decide membership</li>
+<li>decide standing</li>
+<li>assign institutional authority</li>
+<li>become the canonical role database</li>
+<li>silently grant repository, release, or admin power</li>
+<li>become the only recovery path</li>
+<li>trap identity data without export</li>
+<li>require all members to use a developer-oriented login flow</li>
+</ul>
+<h2>Access changes and receipts</h2>
+<p>Not every login needs a receipt. Routine logins may be operational logs.</p>
+<p>Actions that should become receipt-bearing or at least ICN-audited include:</p>
+<ul>
+<li>grant admin access</li>
+<li>revoke admin access</li>
+<li>bind external account to DID</li>
+<li>rotate service identity credential</li>
+<li>create OIDC client for a governed service</li>
+<li>change claim-mapping policy</li>
+<li>change MFA/passkey policy for privileged scopes</li>
+<li>disable a service identity</li>
+<li>recover a privileged account</li>
+</ul>
+<p>The receipt taxonomy is future work and should align with ADR-0026 rather than create a parallel audit store.</p>
+<h2>Browser and mobile posture</h2>
+<p>The bridge must support ordinary browser flows and future mobile/member-shell flows.</p>
+<p>Member-facing participation must not require:</p>
+<ul>
+<li>command line use</li>
+<li>developer accounts</li>
+<li>special browser extensions</li>
+<li>crypto-wallet metaphors</li>
+<li>long-lived bearer tokens copied by hand</li>
+<li>laptop-only workflows</li>
+</ul>
+<p>The auth bridge is infrastructure. It exists to make member access easier, not to make technical users feel clever.</p>
+<h2>Relationship to protocol selection</h2>
+<p>For browser services, the bridge should prefer:</p>
+<ul>
+<li>HTTP-only secure cookies for ordinary browser sessions.</li>
+<li>Short-lived tokens for service-to-service calls.</li>
+<li>SSE streams authorized by cookie or short-lived stream token where appropriate.</li>
+<li>WebSockets only where a service has a real bidirectional live-state requirement.</li>
+</ul>
+<p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/PROTOCOL_SELECTION_FOR_MEMBER_SERVICES">`PROTOCOL_SELECTION_FOR_MEMBER_SERVICES.md`</a>.</p>
+<h2>Migration posture</h2>
+<p>The first deployment can be pragmatic:</p>
+<ol>
+<li>Deploy an IdP bridge for ordinary service login.</li>
+<li>Connect Forgejo via OIDC.</li>
+<li>Manually map initial maintainers/admins.</li>
+<li>Add DID claim-mapping later.</li>
+<li>Add external account binding records later.</li>
+<li>Add access-change receipts later.</li>
+<li>Move local role truth out of service-local groups and into ICN standing/authority as runtime support lands.</li>
+</ol>
+<p>Do not block the first service deployment on a perfect DID-native flow. Do not pretend a conventional IdP is the final authority model.</p>
+<h2>Non-goals</h2>
+<ul>
+<li>No product selection in this document.</li>
+<li>No runtime implementation.</li>
+<li>No claim that DID login exists today.</li>
+<li>No replacement of ICN identity or authority with IdP groups.</li>
+<li>No requirement that ordinary members interact with Keycloak-like administration surfaces.</li>
+<li>No new cryptographic method definition here.</li>
+</ul>
+<h2>One-line rule</h2>
+<p><strong>The auth bridge translates ICN identity into web sessions; it does not translate web sessions into ICN authority.</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

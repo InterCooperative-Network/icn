@@ -1,0 +1,405 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Protocol Selection for Member Services | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>PROTOCOL SELECTION FOR MEMBER SERVICES</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/PROTOCOL_SELECTION_FOR_MEMBER_SERVICES.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: descriptive
+Canonical: no
+Last Reviewed: 2026-05-01</h2>
+<h1>Protocol Selection for Member Services</h1>
+<blockquote>
+<p><strong>Status: design direction.</strong> This document defines protocol-selection doctrine for ICN member-facing and operator-facing services. It is not an implementation report.</p>
+</blockquote>
+<h2>Summary</h2>
+<p>Protocol choice is infrastructure design. Every protocol carries promises that the network, load balancers, proxies, browsers, mobile devices, and service operators must live with.</p>
+<p>ICN should use the least stateful protocol that preserves the institutional function.</p>
+<p>Default doctrine:</p>
+<pre><code class="language-text">HTTP is for institutional facts.
+SSE is for institutional awareness.
+WebSockets are for shared live activity.
+Receipts are the source of truth.
+Polling is the fallback.
+</code></pre>
+<p>This doctrine applies to ICN runtime surfaces, member shells, service-hosting surfaces, operator dashboards, future tool commons services, and institution packages that expose member-facing flows.</p>
+<h2>Why this matters</h2>
+<p>ICN must work for people on phones, older laptops, public Wi-Fi, rural connections, cellular networks, shared devices, screen readers, and interrupted sessions. A fragile real-time stack privileges people with stable hardware and stable networks.</p>
+<p>Protocol choice is therefore an accessibility issue, not just an engineering preference.</p>
+<h2>Commands, queries, events</h2>
+<p>ICN services should separate three things.</p>
+<h3>Commands</h3>
+<p>Commands intentionally change state.</p>
+<p>Examples (illustrative; consult the gateway&#39;s current routes for the canonical surface):</p>
+<pre><code class="language-text">POST /v1/gov/proposals                                              # current implemented route
+POST /v1/gov/proposals/{proposal_id}/vote                           # current implemented route
+PUT  /v1/gov/domains/{domain_id}/action-items/{item_id}/status      # illustrative future shape
+POST /v1/services/{service_id}/access-grants                        # illustrative future shape
+</code></pre>
+<p>Commands should use ordinary HTTP. They should be idempotent where possible and receipt-bearing where the transition matters.</p>
+<h3>Queries</h3>
+<p>Queries read canonical state.</p>
+<p>Examples (illustrative; current gateway routes are the canonical surface):</p>
+<pre><code class="language-text">GET /v1/gov/me/standing                  # current implemented route
+GET /v1/gov/me/action-cards              # current implemented route
+GET /v1/receipts/{receipt_id}            # illustrative
+GET /v1/services/{service_id}            # current implemented route
+</code></pre>
+<p>Queries should use ordinary HTTP. They should not require a live socket to answer basic membership, governance, or receipt questions.</p>
+<h3>Events</h3>
+<p>Events notify clients that something changed.</p>
+<p>Examples (conceptual stream shapes; not an existing API contract — at least the governance <code>/events</code> resource is not currently exposed in the gateway):</p>
+<pre><code class="language-text">GET /v1/events/stream                              # conceptual global stream
+GET /v1/gov/domains/{domain_id}/events             # conceptual domain-scoped stream
+GET /v1/services/forge/builds/{build_id}/events    # conceptual build-scoped stream
+</code></pre>
+<p>Events should usually use SSE if they are one-way server-to-client updates. Implementation should use whatever streaming endpoints the gateway already exposes; the names above describe the <em>shape</em> of streams a future gateway would offer, not endpoints that exist today.</p>
+<h2>SSE default for awareness</h2>
+<p>Server-Sent Events are the default for one-way update streams:</p>
+<ul>
+<li>action card became available</li>
+<li>receipt was created</li>
+<li>proposal changed state</li>
+<li>build step progressed</li>
+<li>compute job completed</li>
+<li>backup finished</li>
+<li>mirror sync finished</li>
+<li>service incident updated</li>
+</ul>
+<p>SSE keeps the update channel close to ordinary HTTP. It supports replay through event IDs and works well for awareness streams where the server talks and the client listens.</p>
+<h2>WebSocket justification rule</h2>
+<p>A service must justify WebSockets with a real bidirectional requirement.</p>
+<p>Use WebSockets for:</p>
+<ul>
+<li>collaborative editing</li>
+<li>live meeting room presence where both sides send independent events</li>
+<li>interactive operator shell or console sessions</li>
+<li>multiplayer-style deliberation surfaces if they ever exist</li>
+<li>low-latency bidirectional workflows where HTTP + SSE is insufficient</li>
+</ul>
+<p>Do not use WebSockets for:</p>
+<ul>
+<li>action card refresh</li>
+<li>ordinary notifications</li>
+<li>receipt updates</li>
+<li>build progress</li>
+<li>governance event feeds</li>
+<li>status dashboards</li>
+<li>most admin dashboards</li>
+</ul>
+<p>Those should be HTTP + SSE until proven otherwise.</p>
+<h2>Event streams carry pointers, not secrets</h2>
+<p>Event streams should usually carry pointers rather than full private payloads.</p>
+<p>Preferred shape:</p>
+<pre><code class="language-json">{
+  &quot;event_id&quot;: &quot;18492&quot;,
+  &quot;type&quot;: &quot;receipt.created&quot;,
+  &quot;domain_id&quot;: &quot;icn-core&quot;,
+  &quot;receipt_id&quot;: &quot;rec_abc&quot;,
+  &quot;source&quot;: &quot;action_item.complete&quot;
+}
+</code></pre>
+<p>Then the client fetches:</p>
+<pre><code class="language-text">GET /v1/receipts/rec_abc
+</code></pre>
+<p>That lets normal authorization protect the full object. It also reduces risk from logs, proxies, browser buffers, and cross-scope leaks.</p>
+<h2>Replayability</h2>
+<p>Any event stream that carries institutional awareness must be replayable.</p>
+<p>Required event fields:</p>
+<pre><code class="language-text">event_id
+sequence or cursor
+source
+domain_id or scope
+type
+timestamp
+object pointer
+</code></pre>
+<p>A reconnecting client should be able to resume:</p>
+<pre><code class="language-text">Last-Event-ID: 18492
+</code></pre>
+<p>or equivalent cursor semantics.</p>
+<p>A disconnected member must not lose institutional state because the network dropped.</p>
+<h2>Disconnection is normal</h2>
+<p>ICN services must assume:</p>
+<ul>
+<li>phones sleep</li>
+<li>laptops close</li>
+<li>Wi-Fi changes</li>
+<li>tunnels kill connections</li>
+<li>cellular NATs evict idle sessions</li>
+<li>browsers refresh</li>
+<li>deployments restart services</li>
+<li>gateways fail</li>
+</ul>
+<p>Therefore:</p>
+<ul>
+<li>writes should be idempotent where possible</li>
+<li>client UX should distinguish pending / sent / confirmed</li>
+<li>receipt confirmation should be explicit</li>
+<li>streams should replay</li>
+<li>critical functions should have polling fallback</li>
+<li>reconnect should use backoff and jitter where the client controls reconnection</li>
+</ul>
+<h2>Polling fallback</h2>
+<p>Critical member functions must not depend exclusively on live transport.</p>
+<p>If SSE or WebSockets fail, the client should fall back to ordinary HTTP polling for critical surfaces:</p>
+<pre><code class="language-text">GET /v1/gov/me/action-cards
+GET /v1/gov/me/standing
+GET /v1/receipts/{receipt_id}
+GET /v1/services/{service_id}/status
+</code></pre>
+<p>Polling is not elegant. It is resilient. ICN should prefer member access over architectural vanity.</p>
+<h2>Auth posture by protocol</h2>
+<h3>HTTP commands and queries</h3>
+<p>Use ordinary session or capability-token authorization, depending on client class.</p>
+<p>Browser path:</p>
+<pre><code class="language-text">OIDC login → secure HTTP-only session cookie → HTTP command/query
+</code></pre>
+<p>Native/mobile path:</p>
+<pre><code class="language-text">DID/device auth → short-lived capability token → HTTP command/query
+</code></pre>
+<h3>SSE streams</h3>
+<p>Browser EventSource does not support arbitrary custom request headers. Therefore, choose deliberately:</p>
+<ul>
+<li>secure HTTP-only cookie session for browser streams;</li>
+<li>short-lived stream token if cookies are not available;</li>
+<li>fetch-based SSE only when custom headers are necessary;</li>
+<li>never put sensitive long-lived bearer tokens in URLs.</li>
+</ul>
+<p>SSE streams should send pointers, not private payloads.</p>
+<h3>WebSockets</h3>
+<p>WebSockets must authenticate at connection establishment and must re-check authorization for sensitive per-message actions. A long-lived connection must not become a long-lived authority grant.</p>
+<p>WebSocket clients must implement:</p>
+<ul>
+<li>heartbeat / ping-pong or equivalent liveness check</li>
+<li>exponential backoff</li>
+<li>jitter</li>
+<li>reset-on-success</li>
+<li>state resync after reconnect</li>
+<li>authorization refresh or disconnect on privilege change</li>
+</ul>
+<h2>Service template fields</h2>
+<p>Any service definition that exposes live updates should include:</p>
+<pre><code class="language-yaml">protocols:
+  commands: HTTP
+  queries: HTTP
+  events: SSE
+  realtime: none
+replay:
+  event_ids: true
+  resume_after_disconnect: true
+fallback:
+  polling: true
+payload_policy:
+  event_streams_carry: pointers
+receipt_source_of_truth: true
+auth:
+  browser: cookie-session
+  mobile: short-lived-capability-token
+</code></pre>
+<p>For WebSocket services:</p>
+<pre><code class="language-yaml">protocols:
+  realtime: WebSocket
+why_websocket: collaborative editing requires bidirectional low-latency presence
+heartbeat_required: true
+reconnect:
+  backoff: exponential
+  jitter: true
+  reset_on_success: true
+state_recovery: document log / CRDT / receipt replay
+fallback: read-only HTTP view
+</code></pre>
+<h2>Examples</h2>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Preferred protocol</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/v1/gov/me/standing</code></td>
+<td>HTTP</td>
+<td>Canonical read.</td>
+</tr>
+<tr>
+<td><code>/v1/gov/me/action-cards</code></td>
+<td>HTTP</td>
+<td>Canonical read.</td>
+</tr>
+<tr>
+<td>action-card updates</td>
+<td>SSE</td>
+<td>Awareness stream.</td>
+</tr>
+<tr>
+<td>proposal vote</td>
+<td>HTTP command</td>
+<td>Intentional state transition.</td>
+</tr>
+<tr>
+<td>receipt retrieval</td>
+<td>HTTP</td>
+<td>Canonical read.</td>
+</tr>
+<tr>
+<td>receipt-created notification</td>
+<td>SSE</td>
+<td>Pointer to canonical record.</td>
+</tr>
+<tr>
+<td>forge build progress</td>
+<td>SSE</td>
+<td>One-way progress stream.</td>
+</tr>
+<tr>
+<td>forge PR discussion comments</td>
+<td>HTTP + refresh/SSE</td>
+<td>Not inherently bidirectional socket state.</td>
+</tr>
+<tr>
+<td>collaborative document editing</td>
+<td>WebSocket or equivalent</td>
+<td>Shared live activity.</td>
+</tr>
+<tr>
+<td>operator shell</td>
+<td>WebSocket</td>
+<td>Interactive bidirectional session.</td>
+</tr>
+<tr>
+<td>service status page</td>
+<td>HTTP + optional SSE</td>
+<td>Public awareness.</td>
+</tr>
+</tbody></table>
+<h2>Relationship to compute</h2>
+<p>Compute jobs should produce records and receipts, not hidden socket state.</p>
+<p>Preferred flow:</p>
+<pre><code class="language-text">POST compute job
+  ↓
+HTTP returns job id
+  ↓
+SSE emits progress pointers
+  ↓
+GET job status / receipts for canonical state
+</code></pre>
+<p>A WebSocket may be justified for an interactive compute session, but batch jobs should not require one.</p>
+<h2>Relationship to service hosting</h2>
+<p>Every hosted service should declare its protocol posture in its service definition. See <a href="https://github.com/InterCooperative-Network/icn/blob/main/SERVICE_HOSTING_MODEL">`SERVICE_HOSTING_MODEL.md`</a>.</p>
+<p>A service that uses WebSockets must also declare the operational tax:</p>
+<ul>
+<li>connection limits</li>
+<li>backend routing model</li>
+<li>shared message bus if needed</li>
+<li>heartbeat interval</li>
+<li>reconnect behavior</li>
+<li>deploy/restart behavior</li>
+<li>state recovery path</li>
+<li>degraded mode</li>
+</ul>
+<h2>Non-goals</h2>
+<ul>
+<li>No ban on WebSockets.</li>
+<li>No runtime implementation.</li>
+<li>No protocol API spec.</li>
+<li>No requirement that every service expose SSE immediately.</li>
+<li>No claim that polling is the ideal UX.</li>
+</ul>
+<h2>One-line rule</h2>
+<p><strong>Make institutional truth boring, make awareness replayable, and make live state justify itself.</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

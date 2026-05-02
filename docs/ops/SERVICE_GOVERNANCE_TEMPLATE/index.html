@@ -1,0 +1,344 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Service Governance Template | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>ops</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>SERVICE GOVERNANCE TEMPLATE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/SERVICE_GOVERNANCE_TEMPLATE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: operational
+Canonical: no
+Last Reviewed: 2026-05-01</h2>
+<h1>Service Governance Template</h1>
+<blockquote>
+<p><strong>Status: operational template.</strong> Copy this template when proposing a new ICN-hosted or ICN-governed service. Filling out this template does not deploy the service or make it canonical.</p>
+</blockquote>
+<h2>Purpose</h2>
+<p>This template forces every service proposal to answer the same questions:</p>
+<ul>
+<li>What is the service?</li>
+<li>Who operates it?</li>
+<li>Who governs it?</li>
+<li>What data does it hold?</li>
+<li>How does identity work?</li>
+<li>What protocol promises does it make?</li>
+<li>What produces receipts?</li>
+<li>How is it backed up?</li>
+<li>How does the institution leave cleanly?</li>
+</ul>
+<p>A service that cannot answer these questions is not ready to become an ICN dependency.</p>
+<hr>
+<h2>Service definition</h2>
+<pre><code class="language-yaml">service: &lt;short-name&gt;
+status: planned | rehearsal | active | canonical | deprecated
+route: &lt;host-or-route&gt;
+service_kind: hosted_service | governed_service | icn_native_service
+runtime: &lt;software/runtime&gt;
+operator_scope: &lt;who runs it&gt;
+governance_scope: &lt;who authorizes policy changes&gt;
+identity_provider: &lt;auth route or none&gt;
+canonical_status: none | rehearsal | canonical | mirror | projection
+</code></pre>
+<h2>Summary</h2>
+<p>Describe what the service does in one paragraph.</p>
+<h2>Why this service exists</h2>
+<p>Explain the institutional need. Avoid tool-first justification. The service should reduce burden, preserve memory, improve access, create resilience, or make authority/provenance clearer.</p>
+<h2>Non-goals</h2>
+<p>List what this service does not do.</p>
+<p>Examples:</p>
+<ul>
+<li>Does not become ICN authority.</li>
+<li>Does not replace DIDs.</li>
+<li>Does not hold private data beyond stated scopes.</li>
+<li>Does not make GitHub obsolete on day one.</li>
+<li>Does not introduce institution-specific nouns into ICN core.</li>
+</ul>
+<h2>Data custody</h2>
+<table>
+<thead>
+<tr>
+<th>Data class</th>
+<th>Canonical / projection / cache / mirror / external</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p>Data classes:</p>
+<ul>
+<li><strong>Canonical</strong> — source of truth for a bounded area.</li>
+<li><strong>Projection</strong> — derived view of ICN or another source.</li>
+<li><strong>Cache</strong> — disposable performance copy.</li>
+<li><strong>Mirror</strong> — copy for discovery, redundancy, or compatibility.</li>
+<li><strong>External</strong> — imported or linked from outside ICN.</li>
+</ul>
+<h2>Authority model</h2>
+<p>Who may use the service?</p>
+<p>Who may administer it?</p>
+<p>Which authority scopes are required?</p>
+<p>Which actions require governance approval?</p>
+<p>Which actions are ordinary operator actions?</p>
+<h2>Identity and login</h2>
+<pre><code class="language-yaml">auth:
+  browser: cookie-session | oidc | local-temporary | none
+  did_login: planned | implemented | not_applicable
+  external_idp_bindings: allowed | disallowed | transition_only
+  service_identities: planned | implemented | not_applicable
+</code></pre>
+<p>State clearly whether service-local users/groups are canonical or projections.</p>
+<p>Preferred doctrine:</p>
+<pre><code class="language-text">DID / ICN standing / authority_scope = authority
+IdP / OIDC / service-local account = session projection
+</code></pre>
+<h2>Protocol posture</h2>
+<pre><code class="language-yaml">protocols:
+  commands: HTTP | other
+  queries: HTTP | other
+  events: SSE | polling | none
+  realtime: WebSocket | none
+replay:
+  event_ids: true | false | not_applicable
+  resume_after_disconnect: true | false | not_applicable
+fallback:
+  polling: true | false | not_applicable
+payload_policy:
+  event_streams_carry: pointers | payloads | none
+receipt_source_of_truth: true | false
+</code></pre>
+<p>If <code>realtime: WebSocket</code>, justify why HTTP + SSE is insufficient.</p>
+<h2>Receipt posture</h2>
+<p>List actions that should be receipt-bearing.</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Receipt candidate</th>
+<th>Implemented now?</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td></td>
+<td></td>
+<td>no</td>
+<td></td>
+</tr>
+</tbody></table>
+<p>Receipt candidates must eventually align with the ADR-0026 receipt envelope. Do not invent a parallel audit system.</p>
+<h2>Compute posture</h2>
+<p>Can this service trigger compute jobs?</p>
+<p>Examples:</p>
+<ul>
+<li>scans</li>
+<li>indexing</li>
+<li>summarization</li>
+<li>release builds</li>
+<li>docs freshness</li>
+<li>accessibility tests</li>
+<li>translation</li>
+<li>model-assisted deliberation packets</li>
+</ul>
+<p>Rule:</p>
+<pre><code class="language-text">compute produces evidence; governance / authorized humans decide
+</code></pre>
+<h2>Backups</h2>
+<pre><code class="language-yaml">backup:
+  required: true | false
+  frequency: daily | weekly | manual | other
+  includes:
+    - database
+    - files
+    - configuration
+    - repositories
+  offsite_copy: true | false
+  encryption: required | not_required | unknown
+  restore_test_required: true | false
+</code></pre>
+<p>Describe where backups go and who can restore them.</p>
+<h2>Restore test</h2>
+<p>Describe how restore is tested.</p>
+<p>Minimum questions:</p>
+<ul>
+<li>Can the service start from backup?</li>
+<li>Is canonical data present?</li>
+<li>Are permissions/session projections restored or intentionally recreated?</li>
+<li>Are secrets handled safely?</li>
+<li>Can clients reconnect or reauthenticate?</li>
+<li>Is mirror direction preserved or intentionally reset?</li>
+</ul>
+<h2>Incident plan</h2>
+<p>Describe what happens when:</p>
+<ul>
+<li>service is down</li>
+<li>operator loses access</li>
+<li>host fails</li>
+<li>database corrupts</li>
+<li>credentials leak</li>
+<li>route/TLS fails</li>
+<li>upgrade fails</li>
+<li>mirror diverges</li>
+<li>unauthorized access is suspected</li>
+</ul>
+<h2>Exit / migration path</h2>
+<p>A service that traps institutional state should not be installed.</p>
+<p>Explain:</p>
+<ul>
+<li>How data exports.</li>
+<li>Which formats are used.</li>
+<li>How another service can import it.</li>
+<li>What must be retained for audit.</li>
+<li>Which data can be discarded.</li>
+<li>How users are notified.</li>
+</ul>
+<h2>Privacy / access boundaries</h2>
+<p>List the most sensitive data the service can see.</p>
+<p>List the data it must never receive.</p>
+<p>List scopes or roles that can access sensitive data.</p>
+<h2>Observability</h2>
+<p>Describe:</p>
+<ul>
+<li>metrics</li>
+<li>logs</li>
+<li>uptime checks</li>
+<li>alerting</li>
+<li>status-page integration</li>
+<li>who can see operational logs</li>
+<li>whether logs include sensitive data</li>
+</ul>
+<h2>Deployment target</h2>
+<pre><code class="language-yaml">deploy:
+  target: vps | k3s | kubernetes | docker-compose | systemd | other
+  persistence: pvc | host-path | object-store | database | other
+  tls: acme | manual | reverse-proxy | other
+  ssh_or_special_ports: []
+</code></pre>
+<h2>Cutover gates</h2>
+<p>For services that replace an external dependency, list cutover gates.</p>
+<p>Example gates:</p>
+<ul>
+<li>backup passes</li>
+<li>restore tested</li>
+<li>auth works</li>
+<li>route stable</li>
+<li>mirror tested</li>
+<li>contributor docs updated</li>
+<li>incident rollback documented</li>
+<li>service owners named</li>
+<li>export path confirmed</li>
+</ul>
+<h2>Review checklist</h2>
+<ul>
+<li><input disabled="" type="checkbox"> Service definition is complete.</li>
+<li><input disabled="" type="checkbox"> Authority model is clear.</li>
+<li><input disabled="" type="checkbox"> Data custody is classified.</li>
+<li><input disabled="" type="checkbox"> Backup plan exists.</li>
+<li><input disabled="" type="checkbox"> Restore test exists.</li>
+<li><input disabled="" type="checkbox"> Exit path exists.</li>
+<li><input disabled="" type="checkbox"> Protocol posture is justified.</li>
+<li><input disabled="" type="checkbox"> WebSocket use, if any, is justified.</li>
+<li><input disabled="" type="checkbox"> Receipt candidates are named.</li>
+<li><input disabled="" type="checkbox"> Compute use is evidence-only.</li>
+<li><input disabled="" type="checkbox"> Auth bridge does not become authority.</li>
+<li><input disabled="" type="checkbox"> No secrets are committed.</li>
+<li><input disabled="" type="checkbox"> No institution-specific nouns are introduced into ICN core.</li>
+<li><input disabled="" type="checkbox"> Accessibility / mobile implications are considered.</li>
+</ul>
+<h2>One-line rule</h2>
+<p><strong>A service proposal is not ready until the institution can explain how to operate it, govern it, recover it, audit it, and leave it.</strong></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
