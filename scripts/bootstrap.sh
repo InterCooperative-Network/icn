@@ -77,7 +77,11 @@ install_sys_packages() {
         esac
     done
 
-    if [ "$(id -u)" -eq 0 ]; then
+    if ! has_cmd apt-get; then
+        warn "Missing packages: ${pkgs[*]}"
+        echo "  This script auto-installs on Debian/Ubuntu only."
+        echo "  Install equivalents manually for your OS, then re-run with --no-sysdeps."
+    elif [ "$(id -u)" -eq 0 ]; then
         apt-get update -qq && apt-get install -y -qq "${pkgs[@]}"
         ok "Installed: ${pkgs[*]}"
     elif has_cmd sudo; then
@@ -126,17 +130,28 @@ setup_node() {
     fi
 
     echo "  Installing Node.js 20..."
-    if [ "$(id -u)" -eq 0 ] || has_cmd sudo; then
+
+    # Try nvm first (works without root, common in dev environments)
+    if [ -z "${NVM_DIR:-}" ] && [ -s "$HOME/.nvm/nvm.sh" ]; then
+        export NVM_DIR="$HOME/.nvm"
+        # shellcheck disable=SC1091
+        . "$NVM_DIR/nvm.sh"
+    fi
+    if has_cmd nvm; then
+        nvm install 20 && nvm use 20 && nvm alias default 20
+        ok "Node.js $(node --version) installed via nvm"
+    elif has_cmd apt-get && { [ "$(id -u)" -eq 0 ] || has_cmd sudo; }; then
         local sudo_cmd=""
         [ "$(id -u)" -ne 0 ] && sudo_cmd="sudo"
-        curl -fsSL https://deb.nodesource.com/setup_20.x | $sudo_cmd bash - >/dev/null 2>&1
-        $sudo_cmd apt-get install -y -qq nodejs >/dev/null 2>&1
-        ok "Node.js $(node --version) installed"
-    elif has_cmd nvm; then
-        nvm install 20 && nvm use 20
-        ok "Node.js $(node --version) installed via nvm"
+        if ! curl -fsSL https://deb.nodesource.com/setup_20.x | $sudo_cmd bash -; then
+            fail "NodeSource setup failed — install Node.js >= 18 manually"
+            echo ""
+            return
+        fi
+        $sudo_cmd apt-get install -y -qq nodejs
+        ok "Node.js $(node --version) installed via nodesource"
     else
-        fail "Cannot install Node.js — no root access and nvm not found"
+        fail "Cannot install Node.js — no nvm, no apt-get, and no root access"
         echo "  Install Node.js >= 18 manually"
     fi
     echo ""
