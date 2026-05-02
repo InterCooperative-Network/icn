@@ -1,6 +1,24 @@
 # ICN Phase Progress
-**Last Updated:** 2026-04-29
-**Current Phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot); the next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers to formalize the pilot. Subsequent gates: partnership formalization, then first operator pilot rehearsal. Institutional-operability infrastructure, the action-card runtime, the action-item completion-receipt retrieval endpoint, and the NYCN drive-ingest operator ladder are all in place; all currently emitted source paths are proof-bearing both locally and on K3s.
+**Last Updated:** 2026-05-02
+**Current Phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot); the next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers to formalize the pilot. Subsequent gates: partnership formalization, then first operator pilot rehearsal. Institutional-operability infrastructure, the action-card runtime, the action-item completion-receipt retrieval endpoint, and the NYCN drive-ingest operator ladder are all in place; all currently emitted source paths are proof-bearing both locally and on K3s. May-cycle repo-governance, licensing, RFC, repo-record, and service-hosting docs have landed, but they do not mark Phase 2 complete or imply production readiness, live federation integration, implemented service hosting, or resolved licensing.
+
+<!-- [sync edit] 2026-05-02 (post-#1686/#1688/#1690/#1691/#1693/#1694):
+     State extended after May-cycle repo-governance and strategy docs:
+     licensing metadata/open questions (#1686); RFC-0017 active for
+     Tool Install Infrastructure (#1688, not implemented); repo-record
+     protocol/generator (#1690); generated ICN repo-record snapshot
+     (#1691, mechanical inventory, not interpretive atlas);
+     licensing/autonomy strategy matrix (#1693, planning only, no
+     relicensing); sovereign service hosting stack (#1694, design
+     direction only, no Forgejo deploy, DNS mutation, K3s mutation,
+     hosted-service rollout, or GitHub cutover). Current open PR queue
+     includes Dependabot Actions major-version bumps #1695-#1698,
+     security dependency bump #1699, and draft agent-docs PR #1700.
+     Phase 2 remains in progress. NYCN remains intended first
+     cooperative partner, not a formally committed pilot. The next
+     concrete human gate remains presenting the merged ladder + ICN
+     proof-loop machinery to NYCN organizers, then formalization, then
+     first operator rehearsal. -->
 
 <!-- [sync edit] 2026-04-29 (post-NYCN-#32, ICN PR queue clean):
      Truth-sync extension. NYCN drive-ingest work has continued
@@ -194,6 +212,12 @@
 - [x] NYCN start-here onboarding pass (NYCN #30) — short cold-reader docs (`START_HERE.md`, `ORGANIZER_QUICKSTART.md`, `STEWARD_QUICKSTART.md`, `GLOSSARY.md`) plus a no-network artifact-ladder checker.
 - [x] NYCN one-command local preflight runner (NYCN #31) — orchestrates the seven-stage chain in a single deterministic, no-network run; preserves both human-review boundaries; preflight only.
 - [x] NYCN whole-system operating-surfaces inventory + Google-Groups boundary policy + repo-safe communication-groups fixture (NYCN #32) — modeling only; no live sync, no private data.
+- [x] Licensing metadata and open questions documented (#1686) — documentation only; licensing is not resolved.
+- [x] RFC-0017 moved to active for Tool Install Infrastructure (#1688) — active RFC only; infrastructure is not implemented.
+- [x] Repo-record protocol/generator added (#1690) — documentation/control-plane generator work.
+- [x] Generated ICN repo-record snapshot added (#1691) — mechanical inventory snapshot, not an interpretive atlas.
+- [x] Licensing/autonomy strategy matrix added (#1693) — planning only; no relicensing.
+- [x] Sovereign service hosting stack documented (#1694) — design direction only; no Forgejo deployment, DNS mutation, K3s mutation, hosted-service rollout, or GitHub cutover.
 - [ ] NYCN steward-facing communication-groups directory tool (NYCN #33) — open at last sync; verify status before reading.
 - [ ] Action-card runtime — remaining gates under #1646 (RFC-gated): `signal_rule` source path (gated on #1631); `obligation_lifecycle` source path (gated on #1634)
 - [ ] One-command deployment script per cooperative
@@ -211,6 +235,7 @@
 - Subsequent gate: partnership formalization, then first operator pilot rehearsal against real (or fixture-equivalent) organizer material
 
 **Decisions Made:**
+- (2026-05-02, post-#1686/#1688/#1690/#1691/#1693/#1694) May-cycle repo-governance and strategy docs updated licensing metadata/open questions, RFC-0017 status, repo-record generation, the generated repo-record snapshot, licensing/autonomy planning, and sovereign service hosting design. These are truth/control-plane and planning landings only. They do not complete Phase 2, formally commit NYCN as a pilot, claim production readiness, claim live federation integration, deploy service hosting, mutate DNS/K3s/GitHub state, implement RFC-0017, or resolve licensing. The next concrete human gate remains presenting the merged ladder + ICN proof-loop machinery to NYCN organizers, then formalization, then first operator rehearsal. Current open PR queue: #1695-#1698 Dependabot Actions major-version bumps, #1699 wasmtime security bump, and draft #1700 agent-docs update.
 - (2026-04-29, post-#1675/#1677, post-NYCN-#28) The Phase 2 *machinery* is now in place end-to-end: (a) action-card runtime is proof-bearing for all currently emitted source paths, (b) the completion-receipt retrieval endpoint exists so a holder shell can read receipts over HTTP, (c) the local HTTP proof loop is closed and documented, (d) the K3s smoke proof loop is closed against deployed image `91a63eec` and documented, and (e) the NYCN drive-ingest operator ladder is merged end-to-end as a procedural spine. NYCN is the intended first cooperative partner (active partnership track); the next concrete step is **presenting the merged ladder + ICN proof-loop machinery to NYCN organizers** to formalize the pilot. Phase 2 remains ⏳ until that presentation, the partnership formalization that follows, and the first operator pilot rehearsal happen and are recorded. The two RFC-gated action-card source paths (`signal_rule`, `obligation_lifecycle`) remain open under #1646 and are independent of the partner gate.
 - (2026-04-27, post-#1663) Action-card runtime is now proof-bearing for **all three currently emitted source paths**: `proposal`/`vote` (#1660), `action_item`/`complete` (#1661), and `meeting`/`attend` (#1663). Issue #1646 remains open for the two RFC-gated paths: `signal_rule` (#1631) and `obligation_lifecycle` (#1634). Phase 2 status is unaffected (still partner-bound).
 - (2026-04-27) Action-card runtime is partial: `/me/action-cards` exists, `proposal`/`vote` and `action_item`/`complete` source paths have verified end-to-end receipt proof loops, and `meeting`/`attend`, `signal_rule`, `obligation_lifecycle` paths remain pending under #1646. Phase 2 status is unaffected.

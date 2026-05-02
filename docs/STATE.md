@@ -1,10 +1,30 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-04-29
+Last Reviewed: 2026-05-02
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-05-02 (post-#1686/#1688/#1690/#1691/#1693/#1694):
+     May-cycle repo-governance and strategy docs landed after the
+     2026-04-29 snapshot: licensing metadata/open questions (#1686);
+     RFC-0017 moved to active for Tool Install Infrastructure (#1688,
+     active only, not implemented); repo-record protocol/generator
+     (#1690); generated ICN repo-record snapshot (#1691, mechanical
+     inventory, not an interpretive atlas); licensing/autonomy strategy
+     matrix (#1693, planning only, no relicensing); sovereign service
+     hosting stack (#1694, design direction only, no Forgejo deploy,
+     DNS mutation, K3s mutation, or GitHub cutover). Current open PR
+     queue includes Dependabot Actions major-version bumps #1695-#1698,
+     security dependency bump #1699, and draft agent-docs PR #1700.
+     Phase 2 remains in progress. NYCN remains the intended first
+     cooperative partner, not a formally committed pilot. The next
+     concrete human gate remains presenting the merged ladder + ICN
+     proof-loop machinery to NYCN organizers, then formalization, then
+     first operator rehearsal. Do not read this sync as production
+     readiness, live federation integration, implemented service
+     hosting, or resolved licensing. -->
 
 <!-- [sync edit] 2026-04-29 (post-NYCN-#32, ICN PR queue clean):
      NYCN drive-ingest work has continued past the operator
@@ -77,15 +97,21 @@ Last Reviewed: 2026-04-29
      Aligned crate list, merged PRs, and metrics to verified repo state.
      Phase model unchanged — phase classification is governance territory (PR C). -->
 
-## Current status (2026-04-29 snapshot)
+## Current status (2026-05-02 snapshot)
 
 **Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers to formalize the pilot. Subsequent gates: partnership formalization, then first operator pilot rehearsal against real (or fixture-equivalent) organizer material. The Phase 2 *machinery* is in place end-to-end; what remains is the human procedure — pitch, formalize, rehearse — and recording each step.
-Active execution: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN's drive-ingest operator ladder (NYCN #21–#28 in `fahertym/nycn`) is merged end-to-end, with subsequent NYCN #29–#32 also merged: organizer briefing + summit demo, start-here onboarding pass, one-command local preflight runner, and whole-NYCN operating-surfaces inventory plus Google-Groups boundary policy. NYCN #33 (steward-facing communication-groups directory tool) was open at last sync and may have merged since. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
+Active execution: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN's drive-ingest operator ladder (NYCN #21–#28 in `fahertym/nycn`) is merged end-to-end, with subsequent NYCN #29–#32 also merged: organizer briefing + summit demo, start-here onboarding pass, one-command local preflight runner, and whole-NYCN operating-surfaces inventory plus Google-Groups boundary policy. NYCN #33 (steward-facing communication-groups directory tool) was open at the prior sync and may have merged since. Since then, ICN also merged repo-governance and strategy documentation for licensing metadata, RFC-0017 activation, repo-record generation, a generated repo-record snapshot, licensing/autonomy planning, and sovereign service hosting design. Those are documentation/control-plane landings only: RFC-0017 is not implemented, service hosting is not deployed, DNS/K3s/GitHub state was not mutated, and licensing is not resolved. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
 
 ### Recently merged (since 2026-04-15)
 
 | PR | Title | Merged |
 |----|-------|--------|
+| #1694 | docs(architecture): add sovereign service hosting stack | 2026-05-02 |
+| #1693 | docs(licensing): add autonomy-focused strategy matrix | 2026-05-02 |
+| #1691 | docs(project-index): add generated repo record snapshot | 2026-05-01 |
+| #1690 | docs(project-index): add full repo record protocol | 2026-05-01 |
+| #1688 | docs(rfcs): RFC-0017 draft → active (Tool Install Infrastructure) | 2026-05-01 |
+| #1686 | docs(licensing): document current license metadata and open questions | 2026-05-01 |
 | #1678 | docs(state): sync to post-#1675/#1677 and post-NYCN-#28 reality | 2026-04-29 |
 | #1665 | deps(ts-sdk): bump the dev-dependencies group in /sdk/typescript with 2 updates | 2026-04-29 |
 | #1677 | docs(dev): record K3s NYCN action-item receipt proof path | 2026-04-29 |
@@ -140,9 +166,24 @@ Active execution: institutional-operability runtime (live charter activation, pe
 
 ### Open PRs
 
-_(none — ICN PR queue is empty as of this sync. All recent activity is on the NYCN side.)_
+| PR | Title | Status |
+|----|-------|--------|
+| #1700 | docs(agents): add Cursor Cloud specific instructions to AGENTS.md | Draft |
+| #1699 | fix(compute): bump wasmtime for RUSTSEC-2026-0114 | Open; local validation clean; benchmark gate classified as unrelated/noisy |
+| #1698 | ci: bump actions/setup-node from 4 to 6 | Open Dependabot major-version bump |
+| #1697 | ci: bump actions/checkout from 4 to 6 | Open Dependabot major-version bump |
+| #1696 | ci: bump actions/github-script from 8 to 9 | Open Dependabot major-version bump |
+| #1695 | ci: bump softprops/action-gh-release from 2 to 3 | Open Dependabot major-version bump |
 
 ### What landed since Phase 1 (Charter Engine)
+
+May-cycle repo governance and strategy documentation (added 2026-05-01 → 2026-05-02; documentation/control-plane only, not runtime deployment):
+- Licensing metadata and open questions documented — #1686.
+- RFC-0017 moved from draft to active for Tool Install Infrastructure — #1688. Active means accepted for implementation; it does not mean the tool install infrastructure is implemented.
+- Full repo-record protocol/generator added — #1690.
+- Generated ICN repo-record snapshot added — #1691. This is a mechanical inventory snapshot, not an interpretive atlas.
+- Licensing/autonomy strategy matrix added — #1693. Planning only; no relicensing happened.
+- Sovereign service hosting stack added — #1694. Design direction only; no Forgejo deployment, DNS mutation, K3s mutation, hosted-service rollout, or GitHub cutover happened.
 
 Action-card runtime (added 2026-04-27 → 2026-04-29, all currently emitted source paths now proof-bearing — issue #1646 remains open for the two RFC-gated paths):
 - `GET /v1/gov/me/action-cards` member endpoint with closed source/action enums — #1659
