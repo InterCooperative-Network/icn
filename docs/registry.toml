@@ -1315,6 +1315,22 @@ domain_tags = ["strategy", "partner-discovery"]
 recommended_action = "keep"
 last_reviewed = "2026-04-29"
 
+[docs."docs/strategy/LICENSING_STRATEGY_MATRIX.md"]
+category = "strategy"
+status = "draft"
+title = "Licensing strategy matrix (autonomy review)"
+description = "Planning artifact only. Component-by-component licensing/autonomy matrix and option families (permissive / AGPL / CAL / policy-layer / hybrid) for a future maintainer/legal review. Not legal advice; not a relicensing decision; no metadata changes."
+last_updated = "2026-05-01"
+owner = "matt"
+audiences = ["maintainers", "legal-review"]
+truth_class = "draft"
+role = "strategy"
+canonical = "no"
+freshness = "current"
+domain_tags = ["strategy", "licensing", "autonomy", "draft"]
+recommended_action = "keep"
+last_reviewed = "2026-05-01"
+
 [docs."docs/strategy/ICN-Evolution-Arc.md"]
 category = "strategy"
 status = "living"
