@@ -129,7 +129,7 @@ Independent of which license/policy combination future review selects, the auton
 
 1. **Institutional export.** Every institution can export the full governance / ledger / receipt / membership history at any time, in a documented format, signed by the institution's keys.
 2. **Key custody and rotation.** Identity keys remain under the institution's control; key rotation is supported without losing record continuity; a hosted provider does not hold primary custody of an institution's signing keys.
-3. **Receipt / provenance portability.** Receipts are signed by the institution's keys, not the host's; the receipt envelope (per [`ADR-0026`](../adr/) and [`KERNEL_APP_SEPARATION.md`](../architecture/KERNEL_APP_SEPARATION.md)) is portable across hosts.
+3. **Receipt / provenance portability.** Receipts are signed by the institution's keys, not the host's; the receipt envelope (per [`ADR-0026`](../adr/ADR-0026-receipt-and-provenance-proof-envelope.md) and [`KERNEL_APP_SEPARATION.md`](../architecture/KERNEL_APP_SEPARATION.md)) is portable across hosts.
 4. **Federation portability.** Federation membership is changeable without losing state; an institution can leave a federation, change federations, or be hosted independently.
 5. **Hosted-provider exit.** Tenant export is a baseline requirement of any hosted ICN deployment, not a paid or opt-in feature. Exit must be technically possible, format-documented, and signature-preserving.
 6. **Source access for modified network services.** When a host runs a modified ICN, the modifications are available to the network of users (the AGPL-style guarantee, but written into both license and policy where overlap is helpful).
