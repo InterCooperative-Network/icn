@@ -30,11 +30,71 @@ Single authoritative architecture covering all 8 primitives, kernel-app separati
 
 **For:** `developers`, `architects`, `grant-reviewers` | **Updated:** 2026-03-21
 
-### 📝 **Living** [ADR-0010: App Topology](/docs/adr/ADR-0010-app-topology.md)
+### 📝 **Living** [ADR-0001: Orchestration Plane Architecture (decision superseded by ADR-0017)](/docs/adr/ADR-0001-orchestration-plane-architecture.md)
 
-Architectural decision record on app topology
+Original multi-repo orchestration-plane decision; physical layout DECISION superseded by ADR-0017, durable principle (explicit orchestration/state plane) retained. ADR remains as institutional memory at canonical path.
 
-**For:** `architects` | **Updated:** 2026-03-10
+**For:** `architects` | **Updated:** 2026-04-26
+
+### 📝 **Living** [ADR-0002: MCP Server Registration via ~/.mcp.json (amended by ADR-0017)](/docs/adr/ADR-0002-mcp-server-registration-via-mcp-json.md)
+
+Registration mechanism unchanged; path moved from a separate icn-ops/ repo into ops/mcp/ in the main ICN repo (decision amended by ADR-0017).
+
+**For:** `developers` | **Updated:** 2026-04-26
+
+### 📝 **Living** [ADR-0010: App Topology (decision superseded by ADR-0017)](/docs/adr/ADR-0010-app-topology.md)
+
+Architectural decision record on app topology — DECISION superseded by ADR-0017 (canonical-roots table); ADR file remains at canonical path as institutional memory.
+
+**For:** `architects` | **Updated:** 2026-04-26
+
+### 📝 **Living** [ADR-0012: Federation State Origin Model (decision amended by ADR-0013)](/docs/adr/ADR-0012-federation-state-origin-model.md)
+
+Model C (Explicit Parallel) for federation clearing state origins. Decision still holds; Step 3 status now owned by ADR-0013.
+
+**For:** `architects` | **Updated:** 2026-04-26
+
+### 📝 **Living** [ADR-0013: Federation Clearing Adoption Contract](/docs/adr/ADR-0013-federation-clearing-adoption-contract.md)
+
+Step 3 architecture for federation clearing adoption (3a–3d implemented). Open items remain: FederationProvenance not Sled-persisted, coop_a_did empty in execution handler, store-isolation tests not written. Verified unresolved 2026-04-26.
+
+**For:** `architects` | **Updated:** 2026-04-26
+
+### 📝 **Living** [ADR-0014: Constitutional Object Model — AuthorityClass, AuthorityGrant, TypedScope, Mandate](/docs/adr/ADR-0014-constitutional-object-model.md)
+
+Semantic freeze for the four governance constitutional types. Decision: accepted; implementation: partially landed (types + accepted-decision minting seam land at the governance app layer; kernel dispatch is not yet gated by mandates). See ADR-0019 for the minting/persistence seam decision.
+
+**For:** `architects`, `developers` | **Updated:** 2026-04-26
+
+### 📝 **Living** [ADR-0015: Service Discovery Auth Semantics — Auth-gated with Enumeration-Safe 404](/docs/adr/ADR-0015-service-discovery-auth-semantics.md)
+
+Decision: all /v1/services/* require JWT; missing/unauthorized -> 404 (enumeration-safe). Implementation status (2026-04-26): needs verification — route-level auth gating not visible in api/services.rs; follow-up audit issue suggested.
+
+**For:** `architects`, `developers` | **Updated:** 2026-04-26
+
+### 📝 **Living** [ADR-0017: Monorepo Consolidation with Explicit Internal Boundaries](/docs/adr/ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries.md)
+
+Canonical roots table for the consolidated monorepo: icn/, icn/apps/, apps/, website/, ops/mcp/, ops/state/, docs/, docs/adr/, deploy/, sdk/, web/. Decision supersedes ADR-0001 and ADR-0010; amends ADR-0002.
+
+**For:** `architects`, `developers` | **Updated:** 2026-04-26
+
+### 📝 **Living** [ADR-0018: ADR Lifecycle and Canonical Decision Index](/docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index.md)
+
+ADR lifecycle vocabulary (proposed/accepted/amended/superseded/deprecated), metadata convention (YAML frontmatter going forward, classic + bullet still supported), tooling contract for ops/mcp/src/tools/decisions.ts. Documents the docs/adr/ canonicalization landed in PR #1637.
+
+**For:** `architects`, `developers` | **Updated:** 2026-04-26
+
+### 📝 **Living** [ADR-0019: Authority Grant Minting and Mandate Persistence Seam](/docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md)
+
+Records the deterministic seam where accepted governance decisions emit zero or more truthful AuthorityGrants plus exactly one Mandate. Conservative minting (only steward-appointment / steward-reconfirmation today); pending-grants fall-through is the truthful failure mode; kernel dispatch is NOT gated by mandates. Implementation: partially landed.
+
+**For:** `architects`, `developers` | **Updated:** 2026-04-26
+
+### 📝 **Living** [ADR-0020: Institutional Bootstrap Activation and Standing Read Model](/docs/adr/ADR-0020-institutional-bootstrap-activation-and-standing-read-model.md)
+
+Reusable activation chain: package manifest -> private overlay -> bootstrap apply -> charter activation -> entity/structure/role creation -> /me/standing -> (future) action cards. Locks the boundary between ICN runtime contract and institution-package vocabulary. Steps 1-6 implemented; action cards (icn#1608) future.
+
+**For:** `architects`, `developers` | **Updated:** 2026-04-26
 
 ### 📝 **Living** [Architectural Gaps & Remediation Plan](/docs/architecture/ARCHITECTURAL_GAPS_AND_FIXES.md)
 
@@ -60,6 +120,24 @@ Architecture of ICN client models and their relationship to kernel primitives
 
 **For:** `developers`, `architects` | **Updated:** 2026-03-15
 
+### 📋 **Draft** [Cooperative Domain Infrastructure](/docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md)
+
+Forward-direction architecture for cooperative institutional infrastructure: institutional domains, sessions, devices, services, workspaces, artifacts, vaults, agreements, DNS bindings, hybrid commons cloud, workstations. Names what is implemented today vs what is future buildout.
+
+**For:** `developers`, `architects` | **Updated:** 2026-04-27
+
+### 📋 **Draft** [Cooperative Tool Commons](/docs/architecture/COOPERATIVE_TOOL_COMMONS.md)
+
+Forward-direction tool ecosystem: core base tools, specialized suites, third-party tools, manifests, service identities, capability grants, anti-capture rules. Companion to Cooperative Domain Infrastructure.
+
+**For:** `developers`, `architects` | **Updated:** 2026-04-27
+
+### 📋 **Draft** [Domain Routing and DNS Bindings](/docs/architecture/DOMAIN_ROUTING_AND_DNS_BINDINGS.md)
+
+Forward-direction design distinguishing institutional domains, icn.zone utility routes, custom public domains, short routes, and binding verification receipts. Companion to Cooperative Domain Infrastructure.
+
+**For:** `developers`, `architects` | **Updated:** 2026-04-27
+
 ### 📝 **Living** [Federation Actions](/docs/architecture/FEDERATION_ACTIONS.md)
 
 Design of federated action execution across network boundaries
@@ -84,17 +162,41 @@ Design of identity primitives, membership verification, and member lifecycle
 
 **For:** `architects`, `developers` | **Updated:** 2026-03-10
 
+### 📝 **Living** [Institutional Feedback and Support Primitives](/docs/architecture/INSTITUTIONAL_FEEDBACK_AND_SUPPORT_PRIMITIVES.md)
+
+Doctrine for institutional feedback, member signals, governed indicators, action cards, temporary authority, resource governance, and support programs as planned ICN primitives
+
+**For:** `developers`, `architects` | **Updated:** 2026-04-25
+
+### 📝 **Living** [Institution Package Boundary](/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md)
+
+Normative definition of ICN platform vs institution package boundary, CCL vs host runtime split, and reusable primitive set for NYCN/Summit
+
+**For:** `developers`, `architects` | **Updated:** 2026-04-16
+
 ### 📝 **Living** [Kernel/App Separation Architecture](/docs/architecture/KERNEL_APP_SEPARATION.md)
 
 Normative specification of kernel-app boundary, infection vectors, and capability propagation rules
 
 **For:** `developers`, `architects` | **Updated:** 2026-03-17
 
+### 📋 **Draft** [Model Workloads and Deliberation](/docs/architecture/MODEL_WORKLOADS_AND_DELIBERATION.md)
+
+Forward-direction design for model-driven advisory compute workloads, deliberation packets, model registry, advisory vs deterministic classification, and the rule that compute assists but does not govern.
+
+**For:** `developers`, `architects` | **Updated:** 2026-04-27
+
 ### 📝 **Living** [Scope Bounded Trust](/docs/architecture/SCOPE_BOUNDED_TRUST.md)
 
 Trust model design limiting trust scope to organizational boundaries
 
 **For:** `architects`, `security` | **Updated:** 2026-03-10
+
+### 🔒 **Canonical** [Constitutional Genesis](/docs/genesis.md)
+
+Immutable substrate invariants, bootstrap sequence, and governance boundaries
+
+**For:** `developers`, `agents`, `stakeholders` | **Updated:** 2026-04-10
 
 ### 📋 **Draft** [ICN Kernel Contracts Specification](/docs/spec/KERNEL_CONTRACTS.md)
 
@@ -110,6 +212,18 @@ Specification of kernel contract primitives
 Design for evolving ICN commons governance and stewardship models over phases 0-3
 
 **For:** `architects`, `stakeholders` | **Updated:** 2026-03-15
+
+### 📋 **Draft** [ICN Prompt Library](/docs/design/ICN_PROMPT_LIBRARY.md)
+
+Tactical prompt library for doctrine-aligned image generation and visual exploration
+
+**For:** `architects`, `developers`, `designers` | **Updated:** 2026-04-22
+
+### 📋 **Draft** [ICN Visual System](/docs/design/ICN_VISUAL_SYSTEM.md)
+
+Stable visual doctrine for ICN across website, docs, product surfaces, onboarding, demo materials, and future institutional deployments
+
+**For:** `architects`, `developers`, `stakeholders` | **Updated:** 2026-04-22
 
 ### 📝 **Living** [Minimal Viable Coop Track](/docs/design/MINIMAL-VIABLE-COOP.md)
 
@@ -1048,7 +1162,7 @@ Master context and instructions for AI-assisted development on ICN
 
 Master navigation and directory of all documentation with cross-references
 
-**For:** `all` | **Updated:** 2026-03-15
+**For:** `all` | **Updated:** 2026-04-15
 
 ### 🔒 **Canonical** [Docs Directory README](/docs/README.md)
 
@@ -1230,6 +1344,24 @@ Approach for hosted cooperative pilot deployments
 
 **For:** `team` | **Updated:** 2026-03-10
 
+### 📝 **Living** [NYCN Boundary Brief](/docs/pilots/nycn-boundary-brief.md)
+
+Honest scope-of-now brief for NYCN organizers and ICN-side preparers: what ICN can demonstrate today, what it cannot honestly claim yet, what NYCN organizers would need to validate, and what is explicitly not being asked. Defers to STATE.md and PHASE_PROGRESS.md for current truth.
+
+**For:** `team`, `organizers` | **Updated:** 2026-04-29
+
+### 📝 **Living** [NYCN Demo Script](/docs/pilots/nycn-demo-script.md)
+
+Step-by-step organizer-facing demo flow against a localhost ICN gateway: action cards, proof loop, receipts, provenance, and explicit limit-naming. Not a pitch.
+
+**For:** `team` | **Updated:** 2026-04-29
+
+### 📝 **Living** [NYCN Organizer Asks](/docs/pilots/nycn-organizer-asks.md)
+
+Bounded set of questions to ask NYCN organizers — workflow validation, source/data validation, pilot-readiness — without assuming any partnership commitment. Includes explicit non-asks.
+
+**For:** `team`, `organizers` | **Updated:** 2026-04-29
+
 ### 📋 **Draft** [Agent Knowledge Architecture](/docs/planning/agent-knowledge-architecture.md)
 
 Design for AI agent knowledge bases and context management
@@ -1301,6 +1433,72 @@ Identity keystore backend configuration guide
 Trust score threshold configuration guide
 
 **For:** `operators` | **Updated:** 2026-03-10
+
+### 📝 **Living** [ICN Project Index](/docs/reference/project-index/README.md)
+
+Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to STATE.md and PHASE_PROGRESS.md for current truth.
+
+**For:** `all` | **Updated:** 2026-04-29
+
+### 📝 **Living** [CI / Ops / Deploy Map](/docs/reference/project-index/ci-ops-deploy-map.md)
+
+GitHub Actions workflows, deploy paths, K3s smoke runbooks, monitoring; routing layer to substantive runbooks under guides/operations/.
+
+**For:** `operators`, `contributors` | **Updated:** 2026-04-29
+
+### 📝 **Living** [Current Truth Map](/docs/reference/project-index/current-truth-map.md)
+
+One-screen routing for what is real now, what is not, what gates remain — pointing at STATE.md and PHASE_PROGRESS.md for the per-PR record.
+
+**For:** `all` | **Updated:** 2026-04-29
+
+### 📝 **Living** [Docs Control Map](/docs/reference/project-index/docs-control-map.md)
+
+How INDEX.md, registry.toml, DOCUMENT_REGISTRY.md, and doc_control_check.py relate; truth classes; how to add a doc.
+
+**For:** `contributors`, `agents` | **Updated:** 2026-04-29
+
+### 📝 **Living** [Full Repository Record Protocol](/docs/reference/project-index/full-repo-record.md)
+
+Protocol for recording every tracked file and directory across InterCooperative-Network/icn (and adjacent repos) as a mechanical record plus an interpretive atlas. Defines outputs, generator, classification vocabulary, and privacy boundary.
+
+**For:** `contributors`, `architects` | **Updated:** 2026-05-01
+
+### 📝 **Living** [Pilot and NYCN Map](/docs/reference/project-index/pilot-and-nycn-map.md)
+
+The ICN ↔ NYCN boundary — what lives in this repo, what lives in the separate InterCooperative-Network/nycn repo, the mutation boundary, and what the next gates are.
+
+**For:** `all` | **Updated:** 2026-04-29
+
+### 📋 **Draft** [ICN Repo Atlas](/docs/reference/project-index/repo-atlas.md)
+
+Draft interpretive atlas paired with the mechanical full-repo record. Names directory families, Rust-workspace families, and a classification vocabulary for stable atlas authoring across icn / nycn / icn-learn.
+
+**For:** `contributors`, `architects` | **Updated:** 2026-05-01
+
+### 📝 **Living** [Runtime Surface Map](/docs/reference/project-index/runtime-surface-map.md)
+
+Real runtime surfaces a member or app actually touches today (/me/standing, /me/action-cards, completion-receipt retrieval, governance primitives, identity/trust/ledger surfaces).
+
+**For:** `developers`, `architects` | **Updated:** 2026-04-29
+
+### 📝 **Living** [Rust Workspace Map](/docs/reference/project-index/rust-workspace-map.md)
+
+The icn/ Rust workspace grouped by rough layer (kernel, identity, networking, ledger, governance, etc.) plus app crates and binaries. Authority over kernel/app boundaries lives in KERNEL_APP_SEPARATION.md.
+
+**For:** `developers`, `contributors` | **Updated:** 2026-04-29
+
+### 📝 **Living** [Show-Readiness Map](/docs/reference/project-index/show-readiness-map.md)
+
+What can be shown now, what should not be shown as finished, suggested first-demo narrative, and red lines for outside-facing material.
+
+**For:** `all`, `team` | **Updated:** 2026-04-29
+
+### 📝 **Living** [Source Tree Map](/docs/reference/project-index/source-tree-map.md)
+
+Top-level repo surfaces and what each is for; monorepo root vs Rust workspace at icn/.
+
+**For:** `contributors`, `developers` | **Updated:** 2026-04-29
 
 ### 📝 **Living** [SDIS API Guide](/docs/sdis/SDIS_API_GUIDE.md)
 
@@ -1402,7 +1600,7 @@ Comprehensive threat model covering attack vectors, adversary capabilities, and 
 
 Living snapshot of repo layout, decisions, constraints, and current engineering status
 
-**For:** `developers`, `agents` | **Updated:** 2026-03-18
+**For:** `developers`, `agents` | **Updated:** 2026-05-02
 
 
 ## Strategy
@@ -1431,6 +1629,12 @@ Architectural Decision Record defining ICN scope, non-goals, and boundary condit
 
 **For:** `developers`, `architects`, `stakeholders` | **Updated:** 2026-02-28
 
+### 📝 **Living** [Cooperative-developer discovery brief](/docs/strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md)
+
+Internal prep doc for discovery conversations with cooperative developers (e.g. launch.coop / comp.coop). Listening + language calibration; not a sales pitch, not a technical demo, not a partnership commitment.
+
+**For:** `internal`, `matt` | **Updated:** 2026-04-29
+
 ### 📝 **Living** [What ICN Is](/docs/strategy/ICN-Definition.md)
 
 Canonical definition: problem statement, solution approach, scope and non-goals
@@ -1457,9 +1661,9 @@ Elevator pitch, one-pagers, and public communication messaging framework
 
 ### 📝 **Living** [ICN Live Roadmap](/docs/strategy/ICN-Roadmap-Live.md)
 
-Current sprint and quarterly priorities, immediate milestones, and dependencies
+Long-arc roadmap and rationale companion that points at STATE.md / PHASE_PROGRESS.md as canonical current-state truth. Not a per-PR changelog.
 
-**For:** `team`, `stakeholders` | **Updated:** 2026-03-21
+**For:** `team`, `stakeholders` | **Updated:** 2026-04-29
 
 ### 📝 **Living** [ICN Roadmap Strategy](/docs/strategy/ICN-Roadmap-Strategy.md)
 
@@ -1484,6 +1688,18 @@ Specific sprint plan and tactical objectives for week of March 17, 2026
 Formal technical specification for grants, regulatory review, and architectural validation
 
 **For:** `grant-reviewers`, `architects`, `compliance` | **Updated:** 2026-03-15
+
+### 📋 **Draft** [Licensing strategy matrix (autonomy review)](/docs/strategy/LICENSING_STRATEGY_MATRIX.md)
+
+Planning artifact only. Component-by-component licensing/autonomy matrix and option families (permissive / AGPL / CAL / policy-layer / hybrid) for a future maintainer/legal review. Not legal advice; not a relicensing decision; no metadata changes.
+
+**For:** `maintainers`, `legal-review` | **Updated:** 2026-05-01
+
+### 📋 **Draft** [NYCN Phase 2 pilot rehearsal gate](/docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md)
+
+Organizer-safe control-plane gate for moving from Phase 2 machinery exists to formal NYCN pilot rehearsal: organizer presentation, pilot formalization, first operator rehearsal. Descriptive planning only; not production readiness or Phase 2 completion.
+
+**For:** `maintainers`, `organizers`, `operators` | **Updated:** 2026-05-02
 
 ### 📋 **Draft** [ICN Compliance Architecture](/docs/strategy/grants/compliance-architecture.md)
 
@@ -1520,9 +1736,9 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 246
+**Total documents:** 282
 
 **By status:**
-- Canonical: 38
-- Draft: 48
-- Living: 160
+- Canonical: 39
+- Draft: 57
+- Living: 186
