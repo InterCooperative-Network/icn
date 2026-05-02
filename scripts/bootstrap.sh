@@ -82,11 +82,19 @@ install_sys_packages() {
         echo "  This script auto-installs on Debian/Ubuntu only."
         echo "  Install equivalents manually for your OS, then re-run with --no-sysdeps."
     elif [ "$(id -u)" -eq 0 ]; then
-        apt-get update -qq && apt-get install -y -qq "${pkgs[@]}"
-        ok "Installed: ${pkgs[*]}"
+        if apt-get update -qq && apt-get install -y -qq "${pkgs[@]}"; then
+            ok "Installed: ${pkgs[*]}"
+        else
+            warn "apt-get could not install: ${pkgs[*]}"
+            echo "  Fix the package-manager error above or install the packages manually."
+        fi
     elif has_cmd sudo; then
-        sudo apt-get update -qq && sudo apt-get install -y -qq "${pkgs[@]}"
-        ok "Installed: ${pkgs[*]}"
+        if sudo apt-get update -qq && sudo apt-get install -y -qq "${pkgs[@]}"; then
+            ok "Installed: ${pkgs[*]}"
+        else
+            warn "apt-get could not install: ${pkgs[*]}"
+            echo "  Fix the package-manager error above or install the packages manually."
+        fi
     else
         fail "Missing packages: ${pkgs[*]}"
         echo "  Install manually: apt-get install -y ${pkgs[*]}"
@@ -131,18 +139,25 @@ setup_node() {
 
     echo "  Installing Node.js 20..."
 
-    # Try nvm first (works without root, common in dev environments)
-    if [ -z "${NVM_DIR:-}" ] && [ -s "$HOME/.nvm/nvm.sh" ]; then
-        export NVM_DIR="$HOME/.nvm"
-        # shellcheck disable=SC1091
-        . "$NVM_DIR/nvm.sh"
-    fi
-    if has_cmd nvm; then
+    # Try nvm first (works without root, common in dev/headless environments).
+    if load_nvm; then
         nvm install 20 && nvm use 20 && nvm alias default 20
         ok "Node.js $(node --version) installed via nvm"
-    elif has_cmd apt-get && { [ "$(id -u)" -eq 0 ] || has_cmd sudo; }; then
+    elif [ "$INSTALL_SYSPACKAGES" != true ]; then
+        warn "Node.js >= 18 not found and --no-sysdeps is set"
+        echo "  Install Node.js manually or install nvm, then re-run bootstrap."
+    elif ! has_cmd apt-get; then
+        warn "Node.js >= 18 not found and apt-get is unavailable"
+        echo "  Install Node.js manually or install nvm, then re-run bootstrap."
+    elif [ "$(id -u)" -eq 0 ] || has_cmd sudo; then
         local sudo_cmd=""
         [ "$(id -u)" -ne 0 ] && sudo_cmd="sudo"
+        if ! has_cmd curl; then
+            warn "curl not found; cannot run NodeSource setup"
+            echo "  Install curl and Node.js >= 18 manually, or install nvm."
+            echo ""
+            return
+        fi
         if ! curl -fsSL https://deb.nodesource.com/setup_20.x | $sudo_cmd bash -; then
             fail "NodeSource setup failed — install Node.js >= 18 manually"
             echo ""
@@ -151,10 +166,29 @@ setup_node() {
         $sudo_cmd apt-get install -y -qq nodejs
         ok "Node.js $(node --version) installed via nodesource"
     else
-        fail "Cannot install Node.js — no nvm, no apt-get, and no root access"
-        echo "  Install Node.js >= 18 manually"
+        warn "Node.js >= 18 not found and no root/sudo access is available"
+        echo "  Install Node.js manually or install nvm, then re-run bootstrap."
     fi
     echo ""
+}
+
+load_nvm() {
+    if has_cmd nvm; then
+        return 0
+    fi
+
+    local nvm_dir="${NVM_DIR:-}"
+    if [ -z "$nvm_dir" ] && [ -n "${HOME:-}" ]; then
+        nvm_dir="$HOME/.nvm"
+    fi
+
+    if [ -n "$nvm_dir" ] && [ -s "$nvm_dir/nvm.sh" ]; then
+        export NVM_DIR="$nvm_dir"
+        # shellcheck disable=SC1090
+        . "$nvm_dir/nvm.sh"
+    fi
+
+    has_cmd nvm
 }
 
 # ─── Rust dependencies ───────────────────────────────────────────────
