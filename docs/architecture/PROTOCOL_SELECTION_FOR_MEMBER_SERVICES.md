@@ -40,13 +40,13 @@ ICN services should separate three things.
 
 Commands intentionally change state.
 
-Examples:
+Examples (illustrative; consult the gateway's current routes for the canonical surface):
 
 ```text
-POST /v1/gov/domains/{domain_id}/proposals
-POST /v1/gov/domains/{domain_id}/votes
-PUT  /v1/gov/domains/{domain_id}/action-items/{item_id}/status
-POST /v1/services/{service_id}/access-grants
+POST /v1/gov/proposals                                              # current implemented route
+POST /v1/gov/proposals/{proposal_id}/vote                           # current implemented route
+PUT  /v1/gov/domains/{domain_id}/action-items/{item_id}/status      # illustrative future shape
+POST /v1/services/{service_id}/access-grants                        # illustrative future shape
 ```
 
 Commands should use ordinary HTTP. They should be idempotent where possible and receipt-bearing where the transition matters.
@@ -55,13 +55,13 @@ Commands should use ordinary HTTP. They should be idempotent where possible and 
 
 Queries read canonical state.
 
-Examples:
+Examples (illustrative; current gateway routes are the canonical surface):
 
 ```text
-GET /v1/gov/me/standing
-GET /v1/gov/me/action-cards
-GET /v1/receipts/{receipt_id}
-GET /v1/services/{service_id}/status
+GET /v1/gov/me/standing                  # current implemented route
+GET /v1/gov/me/action-cards              # current implemented route
+GET /v1/receipts/{receipt_id}            # illustrative
+GET /v1/services/{service_id}            # current implemented route
 ```
 
 Queries should use ordinary HTTP. They should not require a live socket to answer basic membership, governance, or receipt questions.
@@ -70,15 +70,15 @@ Queries should use ordinary HTTP. They should not require a live socket to answe
 
 Events notify clients that something changed.
 
-Examples:
+Examples (conceptual stream shapes; not an existing API contract — at least the governance `/events` resource is not currently exposed in the gateway):
 
 ```text
-GET /v1/events/stream
-GET /v1/gov/domains/{domain_id}/events
-GET /v1/services/forge/builds/{build_id}/events
+GET /v1/events/stream                              # conceptual global stream
+GET /v1/gov/domains/{domain_id}/events             # conceptual domain-scoped stream
+GET /v1/services/forge/builds/{build_id}/events    # conceptual build-scoped stream
 ```
 
-Events should usually use SSE if they are one-way server-to-client updates.
+Events should usually use SSE if they are one-way server-to-client updates. Implementation should use whatever streaming endpoints the gateway already exposes; the names above describe the *shape* of streams a future gateway would offer, not endpoints that exist today.
 
 ## SSE default for awareness
 
@@ -290,8 +290,8 @@ fallback: read-only HTTP view
 
 | Surface | Preferred protocol | Reason |
 |---|---|---|
-| `/me/standing` | HTTP | Canonical read. |
-| `/me/action-cards` | HTTP | Canonical read. |
+| `/v1/gov/me/standing` | HTTP | Canonical read. |
+| `/v1/gov/me/action-cards` | HTTP | Canonical read. |
 | action-card updates | SSE | Awareness stream. |
 | proposal vote | HTTP command | Intentional state transition. |
 | receipt retrieval | HTTP | Canonical read. |

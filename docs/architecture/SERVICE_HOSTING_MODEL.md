@@ -118,12 +118,12 @@ operator_scope: ICN Infrastructure
 governance_scope: ICN Core Maintainers
 identity_provider: auth.intercooperative.network
 canonical_data:
-  - repositories
-  - issues
-  - pull requests
-  - releases
+  - repositories                                  # rehearsal-stage canonical (forge holds working-tree mirrors)
+  - issues (after cutover from GitHub)            # GitHub remains canonical until explicit cutover
+  - pull requests (after cutover from GitHub)     # GitHub remains canonical until explicit cutover
+  - releases (after cutover from GitHub)          # GitHub remains canonical until explicit cutover
 external_mirrors:
-  - github.com/InterCooperative-Network/icn
+  - github.com/InterCooperative-Network/icn       # pre-cutover canonical for issues, pull requests, releases
 receipts_initial:
   - BackupReceipt
   - RepoMirrorReceipt

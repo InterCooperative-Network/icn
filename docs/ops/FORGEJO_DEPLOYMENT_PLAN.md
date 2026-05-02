@@ -42,11 +42,13 @@ Recommended initial posture:
 service: forge
 route: forge.intercooperative.network
 runtime: Forgejo
-stage: hosted_service
+service_kind: hosted_service
 canonical_status: rehearsal
 github_role: canonical_for_now
 cutover_status: not_started
 ```
+
+The `service_kind` value here uses the same vocabulary the rest of this PR uses for the hosted → governed → ICN-native classification (`hosted_service` | `governed_service` | `icn_native_service`). A forge in rehearsal stage is intentionally `hosted_service`, not yet `governed_service`.
 
 Do not start by claiming the forge is canonical. Start by making it real, backed up, restorable, observable, and documented.
 
