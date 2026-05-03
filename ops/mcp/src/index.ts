@@ -9,12 +9,13 @@ import { registerDecisionTools, syncDecisionIndex } from "./tools/decisions.js";
 import { startGitPolling } from "./polling/git.js";
 import { startClusterPolling } from "./polling/cluster.js";
 import { startBuildsPolling } from "./polling/builds.js";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolveMonorepoRoot, resolveOpsStatePath } from "./paths.js";
 import { registerEventTools } from "./tools/events.js";
 import { registerCommsTools } from "./tools/comms.js";
 import { registerWatcherTools } from "./tools/watchers.js";
 import { startProcessPolling } from "./polling/processes.js";
+import { registerAgentOpsTools } from "./tools/agent-ops.js";
 
 const ICN_ROOT = resolveMonorepoRoot();
 const SPRINT_FILE = resolveOpsStatePath("sprint", "current.json");
@@ -40,36 +41,95 @@ async function main() {
   registerEventTools(server, db);
   registerCommsTools(server, db);
   registerWatcherTools(server, db);
+  registerAgentOpsTools(server);
 
   // Resources — passively available context (sprint state, repo topology)
   server.resource(
     "sprint-state",
     "icn-ops://sprint/current",
     { mimeType: "application/json" },
-    async () => ({
-      contents: [
-        {
-          uri: "icn-ops://sprint/current",
-          mimeType: "application/json",
-          text: readFileSync(SPRINT_FILE, "utf-8"),
-        },
-      ],
-    })
+    async () => {
+      try {
+        if (!existsSync(SPRINT_FILE)) {
+          return {
+            contents: [
+              {
+                uri: "icn-ops://sprint/current",
+                mimeType: "application/json",
+                text: JSON.stringify({ error: "missing_file", path: SPRINT_FILE }),
+              },
+            ],
+          };
+        }
+        const text = readFileSync(SPRINT_FILE, "utf-8");
+        return {
+          contents: [
+            {
+              uri: "icn-ops://sprint/current",
+              mimeType: "application/json",
+              text,
+            },
+          ],
+        };
+      } catch (e) {
+        return {
+          contents: [
+            {
+              uri: "icn-ops://sprint/current",
+              mimeType: "application/json",
+              text: JSON.stringify({
+                error: "read_failed",
+                message: e instanceof Error ? e.message : String(e),
+              }),
+            },
+          ],
+        };
+      }
+    }
   );
 
   server.resource(
     "repo-map",
     "icn-ops://config/repo-map",
     { mimeType: "application/json" },
-    async () => ({
-      contents: [
-        {
-          uri: "icn-ops://config/repo-map",
-          mimeType: "application/json",
-          text: readFileSync(REPO_MAP_FILE, "utf-8"),
-        },
-      ],
-    })
+    async () => {
+      try {
+        if (!existsSync(REPO_MAP_FILE)) {
+          return {
+            contents: [
+              {
+                uri: "icn-ops://config/repo-map",
+                mimeType: "application/json",
+                text: JSON.stringify({ error: "missing_file", path: REPO_MAP_FILE }),
+              },
+            ],
+          };
+        }
+        const text = readFileSync(REPO_MAP_FILE, "utf-8");
+        return {
+          contents: [
+            {
+              uri: "icn-ops://config/repo-map",
+              mimeType: "application/json",
+              text,
+            },
+          ],
+        };
+      } catch (e) {
+        return {
+          contents: [
+            {
+              uri: "icn-ops://config/repo-map",
+              mimeType: "application/json",
+              text: JSON.stringify({
+                error: "read_failed",
+                message: e instanceof Error ? e.message : String(e),
+              }),
+            },
+          ],
+        };
+      }
+    }
   );
 
   // Background polling — pre-warms health_cache so first tool calls return instantly

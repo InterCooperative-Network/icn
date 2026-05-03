@@ -4,6 +4,8 @@ This repo ships a local `icn-ops` MCP server in `ops/mcp`.
 
 Both Claude Code and Cursor should launch that server from the current checkout, not from a developer-specific absolute path. The project configs therefore use repo-relative paths / commands so the same checkout works on any contributor machine.
 
+For **agent-facing MCP tools** (`icn_ops_doctor`, environment report, command catalog, etc.), see [agent-mcp-tooling.md](./agent-mcp-tooling.md).
+
 ## Config Surfaces
 
 - `./.mcp.json`

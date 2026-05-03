@@ -1,0 +1,180 @@
+export type SafetyLevel =
+  | "read_only"
+  | "modifies_local"
+  | "destructive"
+  | "external_side_effect";
+
+export type ExpectedRuntime = "quick" | "medium" | "long";
+
+export type CatalogCommand = {
+  id: string;
+  purpose: string;
+  command: string;
+  working_directory: "repo_root" | "icn" | "ops/mcp" | "sdk/typescript" | "web/pilot-ui" | "website";
+  safety: SafetyLevel;
+  runtime: ExpectedRuntime;
+  when_to_use: string;
+};
+
+export type CommandCatalog = {
+  version: 1;
+  groups: { name: string; commands: CatalogCommand[] }[];
+};
+
+export const COMMAND_CATALOG: CommandCatalog = {
+  version: 1,
+  groups: [
+    {
+      name: "MCP checks",
+      commands: [
+        {
+          id: "mcp_ci",
+          purpose: "Install MCP deps and rebuild native modules for current Node",
+          command: "npm ci",
+          working_directory: "ops/mcp",
+          safety: "modifies_local",
+          runtime: "medium",
+          when_to_use: "Fresh clone, Node version change, or better-sqlite3 load errors.",
+        },
+        {
+          id: "mcp_build",
+          purpose: "Compile ops/mcp TypeScript",
+          command: "npm run build",
+          working_directory: "ops/mcp",
+          safety: "modifies_local",
+          runtime: "quick",
+          when_to_use: "After editing MCP server sources.",
+        },
+        {
+          id: "mcp_test",
+          purpose: "Run MCP unit tests",
+          command: "npm test",
+          working_directory: "ops/mcp",
+          safety: "read_only",
+          runtime: "quick",
+          when_to_use: "Before committing MCP changes.",
+        },
+        {
+          id: "mcp_portability",
+          purpose: "Verify MCP JSON configs are portable and aligned",
+          command: "python3 scripts/check-mcp-portability.py",
+          working_directory: "repo_root",
+          safety: "read_only",
+          runtime: "quick",
+          when_to_use: "After editing .mcp.json or .cursor/mcp.json.",
+        },
+      ],
+    },
+    {
+      name: "Docs checks",
+      commands: [
+        {
+          id: "docs_index",
+          purpose: "Navigate documentation index",
+          command: "test -f docs/INDEX.md && echo ok",
+          working_directory: "repo_root",
+          safety: "read_only",
+          runtime: "quick",
+          when_to_use: "Finding where to document changes.",
+        },
+      ],
+    },
+    {
+      name: "Rust checks",
+      commands: [
+        {
+          id: "rust_fmt",
+          purpose: "Rust formatting gate",
+          command: "cargo fmt --all --check",
+          working_directory: "icn",
+          safety: "read_only",
+          runtime: "medium",
+          when_to_use: "Any Rust change before push.",
+        },
+        {
+          id: "rust_clippy",
+          purpose: "Clippy with workspace warnings denied",
+          command: "cargo clippy --workspace --all-targets --all-features -- -D warnings",
+          working_directory: "icn",
+          safety: "read_only",
+          runtime: "long",
+          when_to_use: "Rust changes; scope per AGENTS.md.",
+        },
+        {
+          id: "rust_test",
+          purpose: "Full workspace tests",
+          command: "cargo test",
+          working_directory: "icn",
+          safety: "read_only",
+          runtime: "long",
+          when_to_use: "Validate behavior after substantive Rust edits.",
+        },
+      ],
+    },
+    {
+      name: "Website checks",
+      commands: [
+        {
+          id: "website_build",
+          purpose: "Build public site (if package scripts exist)",
+          command: "npm run build",
+          working_directory: "website",
+          safety: "modifies_local",
+          runtime: "medium",
+          when_to_use: "After content or Astro changes (skip if website/ absent).",
+        },
+      ],
+    },
+    {
+      name: "Vocabulary scans (manual)",
+      commands: [
+        {
+          id: "grep_payment",
+          purpose: "Find payment wording in economics docs",
+          command: 'rg -n "payment" docs icn crates icn/apps || true',
+          working_directory: "repo_root",
+          safety: "read_only",
+          runtime: "quick",
+          when_to_use: "Compliance pass; prefer settlement terminology per project rules.",
+        },
+      ],
+    },
+    {
+      name: "PR checks",
+      commands: [
+        {
+          id: "gh_pr_checks",
+          purpose: "List CI checks for a PR",
+          command: "gh pr checks <PR_NUMBER> || true",
+          working_directory: "repo_root",
+          safety: "external_side_effect",
+          runtime: "quick",
+          when_to_use: "After push; requires gh auth.",
+        },
+      ],
+    },
+    {
+      name: "Repo status",
+      commands: [
+        {
+          id: "git_status",
+          purpose: "Short worktree status",
+          command: "git status --short",
+          working_directory: "repo_root",
+          safety: "read_only",
+          runtime: "quick",
+          when_to_use: "Before commit; confirm scope.",
+        },
+        {
+          id: "git_diff_stat",
+          purpose: "Diffstat for review sizing",
+          command: "git diff --stat",
+          working_directory: "repo_root",
+          safety: "read_only",
+          runtime: "quick",
+          when_to_use: "Before opening PR.",
+        },
+      ],
+    },
+  ],
+};

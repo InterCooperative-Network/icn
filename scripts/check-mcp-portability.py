@@ -21,6 +21,11 @@ CONFIGS = [
     ROOT / ".cursor" / "mcp.json",
 ]
 
+# Every MCP-capable client must start icn-ops the same way so `tsc` + `node`
+# run under one Node, and postinstall keeps better-sqlite3 aligned with that Node.
+ICN_OPS_COMMAND = "npm"
+ICN_OPS_ARGS = ["--prefix", "./ops/mcp", "run", "start:stdio"]
+
 FORBIDDEN_PATTERNS = [
     re.compile(r"/home/[^\s\"']+"),
     re.compile(r"/Users/[^\s\"']+"),
@@ -73,17 +78,15 @@ def main() -> None:
         data = load_json(path)
         server = assert_mcp_shape(path, data)
 
-        rel = path.relative_to(ROOT).as_posix()
-        if rel == ".mcp.json":
-            expected_args = ["--prefix", "./ops/mcp", "run", "start:stdio"]
-            if server.get("command") != "npm":
-                fail(".mcp.json must launch icn-ops through npm, not an absolute node path")
-            if server.get("args") != expected_args:
-                fail(f".mcp.json args must be {expected_args!r}")
-        elif rel == ".cursor/mcp.json":
-            args = server.get("args")
-            if not isinstance(args, list) or "./ops/mcp/dist/index.js" not in args:
-                fail(".cursor/mcp.json must use the repo-relative ./ops/mcp/dist/index.js")
+        if server.get("command") != ICN_OPS_COMMAND:
+            fail(
+                f"{path.relative_to(ROOT)} must launch icn-ops with command {ICN_OPS_COMMAND!r}"
+            )
+        if server.get("args") != ICN_OPS_ARGS:
+            fail(
+                f"{path.relative_to(ROOT)} icn-ops args must be {ICN_OPS_ARGS!r} "
+                "(keep .mcp.json and .cursor/mcp.json identical for all MCP clients)"
+            )
 
     print("MCP portability check passed")
 
