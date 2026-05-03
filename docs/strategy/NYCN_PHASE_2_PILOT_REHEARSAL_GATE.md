@@ -23,9 +23,6 @@ declare production readiness, or authorize live infrastructure mutation.
 
 Required inputs:
 
-- Optional facilitator prep (NYCN repo, checklist only — does **not** record
-  that the presentation occurred):
-  [REHEARSAL-0002 — Organizer gate prep](https://github.com/InterCooperative-Network/nycn/blob/main/docs/rehearsals/REHEARSAL-0002-organizer-gate-prep.md).
 - Drive-ingest `START_HERE`, organizer briefing, and simple summit demo.
 - Plain-language explanation of the ICN proof loop: organizer material becomes
   reviewable action items, operator decisions produce receipts, and provenance
@@ -34,6 +31,11 @@ Required inputs:
   Google Groups synchronization, no K3s mutation, and no NYCN private data in
   the public ICN repository.
 - A clear statement of what organizers are being asked to decide.
+
+Optional prep (NYCN repo, checklist only — does **not** record that the
+presentation occurred):
+
+- [REHEARSAL-0002 — Organizer gate prep](https://github.com/InterCooperative-Network/nycn/blob/main/docs/rehearsals/REHEARSAL-0002-organizer-gate-prep.md).
 
 Required organizer decision:
 
