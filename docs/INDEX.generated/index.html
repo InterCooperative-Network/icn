@@ -58,9 +58,39 @@ View source on GitHub →
 <h3>🔒 <strong>Canonical</strong> <a href="/docs/ARCHITECTURE.md">ICN Architecture Reference</a></h3>
 <p>Single authoritative architecture covering all 8 primitives, kernel-app separation, subsystems, and implementation status</p>
 <p><strong>For:</strong> <code>developers</code>, <code>architects</code>, <code>grant-reviewers</code> | <strong>Updated:</strong> 2026-03-21</p>
-<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0010-app-topology.md">ADR-0010: App Topology</a></h3>
-<p>Architectural decision record on app topology</p>
-<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0001-orchestration-plane-architecture.md">ADR-0001: Orchestration Plane Architecture (decision superseded by ADR-0017)</a></h3>
+<p>Original multi-repo orchestration-plane decision; physical layout DECISION superseded by ADR-0017, durable principle (explicit orchestration/state plane) retained. ADR remains as institutional memory at canonical path.</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-04-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0002-mcp-server-registration-via-mcp-json.md">ADR-0002: MCP Server Registration via ~/.mcp.json (amended by ADR-0017)</a></h3>
+<p>Registration mechanism unchanged; path moved from a separate icn-ops/ repo into ops/mcp/ in the main ICN repo (decision amended by ADR-0017).</p>
+<p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-04-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0010-app-topology.md">ADR-0010: App Topology (decision superseded by ADR-0017)</a></h3>
+<p>Architectural decision record on app topology — DECISION superseded by ADR-0017 (canonical-roots table); ADR file remains at canonical path as institutional memory.</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-04-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0012-federation-state-origin-model.md">ADR-0012: Federation State Origin Model (decision amended by ADR-0013)</a></h3>
+<p>Model C (Explicit Parallel) for federation clearing state origins. Decision still holds; Step 3 status now owned by ADR-0013.</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-04-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0013-federation-clearing-adoption-contract.md">ADR-0013: Federation Clearing Adoption Contract</a></h3>
+<p>Step 3 architecture for federation clearing adoption (3a–3d implemented). Open items remain: FederationProvenance not Sled-persisted, coop_a_did empty in execution handler, store-isolation tests not written. Verified unresolved 2026-04-26.</p>
+<p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-04-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0014-constitutional-object-model.md">ADR-0014: Constitutional Object Model — AuthorityClass, AuthorityGrant, TypedScope, Mandate</a></h3>
+<p>Semantic freeze for the four governance constitutional types. Decision: accepted; implementation: partially landed (types + accepted-decision minting seam land at the governance app layer; kernel dispatch is not yet gated by mandates). See ADR-0019 for the minting/persistence seam decision.</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-04-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0015-service-discovery-auth-semantics.md">ADR-0015: Service Discovery Auth Semantics — Auth-gated with Enumeration-Safe 404</a></h3>
+<p>Decision: all /v1/services/* require JWT; missing/unauthorized -&gt; 404 (enumeration-safe). Implementation status (2026-04-26): needs verification — route-level auth gating not visible in api/services.rs; follow-up audit issue suggested.</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-04-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries.md">ADR-0017: Monorepo Consolidation with Explicit Internal Boundaries</a></h3>
+<p>Canonical roots table for the consolidated monorepo: icn/, icn/apps/, apps/, website/, ops/mcp/, ops/state/, docs/, docs/adr/, deploy/, sdk/, web/. Decision supersedes ADR-0001 and ADR-0010; amends ADR-0002.</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-04-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index.md">ADR-0018: ADR Lifecycle and Canonical Decision Index</a></h3>
+<p>ADR lifecycle vocabulary (proposed/accepted/amended/superseded/deprecated), metadata convention (YAML frontmatter going forward, classic + bullet still supported), tooling contract for ops/mcp/src/tools/decisions.ts. Documents the docs/adr/ canonicalization landed in PR #1637.</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-04-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md">ADR-0019: Authority Grant Minting and Mandate Persistence Seam</a></h3>
+<p>Records the deterministic seam where accepted governance decisions emit zero or more truthful AuthorityGrants plus exactly one Mandate. Conservative minting (only steward-appointment / steward-reconfirmation today); pending-grants fall-through is the truthful failure mode; kernel dispatch is NOT gated by mandates. Implementation: partially landed.</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-04-26</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0020-institutional-bootstrap-activation-and-standing-read-model.md">ADR-0020: Institutional Bootstrap Activation and Standing Read Model</a></h3>
+<p>Reusable activation chain: package manifest -&gt; private overlay -&gt; bootstrap apply -&gt; charter activation -&gt; entity/structure/role creation -&gt; /me/standing -&gt; (future) action cards. Locks the boundary between ICN runtime contract and institution-package vocabulary. Steps 1-6 implemented; action cards (icn#1608) future.</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-04-26</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/architecture/ARCHITECTURAL_GAPS_AND_FIXES.md">Architectural Gaps & Remediation Plan</a></h3>
 <p>Analysis of architectural weaknesses and remediation strategies</p>
 <p><strong>For:</strong> <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
@@ -73,6 +103,15 @@ View source on GitHub →
 <h3>📝 <strong>Living</strong> <a href="/docs/architecture/CLIENT_MODEL.md">Client Model Architecture</a></h3>
 <p>Architecture of ICN client models and their relationship to kernel primitives</p>
 <p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md">Cooperative Domain Infrastructure</a></h3>
+<p>Forward-direction architecture for cooperative institutional infrastructure: institutional domains, sessions, devices, services, workspaces, artifacts, vaults, agreements, DNS bindings, hybrid commons cloud, workstations. Names what is implemented today vs what is future buildout.</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-04-27</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/architecture/COOPERATIVE_TOOL_COMMONS.md">Cooperative Tool Commons</a></h3>
+<p>Forward-direction tool ecosystem: core base tools, specialized suites, third-party tools, manifests, service identities, capability grants, anti-capture rules. Companion to Cooperative Domain Infrastructure.</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-04-27</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/architecture/DOMAIN_ROUTING_AND_DNS_BINDINGS.md">Domain Routing and DNS Bindings</a></h3>
+<p>Forward-direction design distinguishing institutional domains, icn.zone utility routes, custom public domains, short routes, and binding verification receipts. Companion to Cooperative Domain Infrastructure.</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-04-27</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/architecture/FEDERATION_ACTIONS.md">Federation Actions</a></h3>
 <p>Design of federated action execution across network boundaries</p>
 <p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
@@ -85,12 +124,24 @@ View source on GitHub →
 <h3>📝 <strong>Living</strong> <a href="/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md">Identity and Membership Architecture</a></h3>
 <p>Design of identity primitives, membership verification, and member lifecycle</p>
 <p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/INSTITUTIONAL_FEEDBACK_AND_SUPPORT_PRIMITIVES.md">Institutional Feedback and Support Primitives</a></h3>
+<p>Doctrine for institutional feedback, member signals, governed indicators, action cards, temporary authority, resource governance, and support programs as planned ICN primitives</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-04-25</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md">Institution Package Boundary</a></h3>
+<p>Normative definition of ICN platform vs institution package boundary, CCL vs host runtime split, and reusable primitive set for NYCN/Summit</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-04-16</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/architecture/KERNEL_APP_SEPARATION.md">Kernel/App Separation Architecture</a></h3>
 <p>Normative specification of kernel-app boundary, infection vectors, and capability propagation rules</p>
 <p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-17</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/architecture/MODEL_WORKLOADS_AND_DELIBERATION.md">Model Workloads and Deliberation</a></h3>
+<p>Forward-direction design for model-driven advisory compute workloads, deliberation packets, model registry, advisory vs deterministic classification, and the rule that compute assists but does not govern.</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-04-27</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/architecture/SCOPE_BOUNDED_TRUST.md">Scope Bounded Trust</a></h3>
 <p>Trust model design limiting trust scope to organizational boundaries</p>
 <p><strong>For:</strong> <code>architects</code>, <code>security</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>🔒 <strong>Canonical</strong> <a href="/docs/genesis.md">Constitutional Genesis</a></h3>
+<p>Immutable substrate invariants, bootstrap sequence, and governance boundaries</p>
+<p><strong>For:</strong> <code>developers</code>, <code>agents</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-04-10</p>
 <h3>📋 <strong>Draft</strong> <a href="/docs/spec/KERNEL_CONTRACTS.md">ICN Kernel Contracts Specification</a></h3>
 <p>Specification of kernel contract primitives</p>
 <p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
@@ -98,6 +149,12 @@ View source on GitHub →
 <h3>📝 <strong>Living</strong> <a href="/docs/design/COMMONS_EVOLUTION.md">RFC: ICN Commons Evolution</a></h3>
 <p>Design for evolving ICN commons governance and stewardship models over phases 0-3</p>
 <p><strong>For:</strong> <code>architects</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/ICN_PROMPT_LIBRARY.md">ICN Prompt Library</a></h3>
+<p>Tactical prompt library for doctrine-aligned image generation and visual exploration</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code>, <code>designers</code> | <strong>Updated:</strong> 2026-04-22</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/ICN_VISUAL_SYSTEM.md">ICN Visual System</a></h3>
+<p>Stable visual doctrine for ICN across website, docs, product surfaces, onboarding, demo materials, and future institutional deployments</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-04-22</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/design/MINIMAL-VIABLE-COOP.md">Minimal Viable Coop Track</a></h3>
 <p>Program for shipping one end-to-end cooperative use case for production 6-month validation</p>
 <p><strong>For:</strong> <code>product</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-15</p>
@@ -565,7 +622,7 @@ View source on GitHub →
 <p><strong>For:</strong> <code>agents</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-18</p>
 <h3>🔒 <strong>Canonical</strong> <a href="/docs/INDEX.md">ICN Documentation Index</a></h3>
 <p>Master navigation and directory of all documentation with cross-references</p>
-<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-03-15</p>
+<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-04-15</p>
 <h3>🔒 <strong>Canonical</strong> <a href="/docs/README.md">Docs Directory README</a></h3>
 <p>Overview of documentation structure and navigation guide</p>
 <p><strong>For:</strong> <code>contributors</code> | <strong>Updated:</strong> 2026-03-10</p>
@@ -656,6 +713,15 @@ View source on GitHub →
 <h3>📋 <strong>Draft</strong> <a href="/docs/pilots/hosted-approach.md">Hosted Pilot Approach</a></h3>
 <p>Approach for hosted cooperative pilot deployments</p>
 <p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/pilots/nycn-boundary-brief.md">NYCN Boundary Brief</a></h3>
+<p>Honest scope-of-now brief for NYCN organizers and ICN-side preparers: what ICN can demonstrate today, what it cannot honestly claim yet, what NYCN organizers would need to validate, and what is explicitly not being asked. Defers to STATE.md and PHASE_PROGRESS.md for current truth.</p>
+<p><strong>For:</strong> <code>team</code>, <code>organizers</code> | <strong>Updated:</strong> 2026-04-29</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/pilots/nycn-demo-script.md">NYCN Demo Script</a></h3>
+<p>Step-by-step organizer-facing demo flow against a localhost ICN gateway: action cards, proof loop, receipts, provenance, and explicit limit-naming. Not a pitch.</p>
+<p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-04-29</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/pilots/nycn-organizer-asks.md">NYCN Organizer Asks</a></h3>
+<p>Bounded set of questions to ask NYCN organizers — workflow validation, source/data validation, pilot-readiness — without assuming any partnership commitment. Includes explicit non-asks.</p>
+<p><strong>For:</strong> <code>team</code>, <code>organizers</code> | <strong>Updated:</strong> 2026-04-29</p>
 <h3>📋 <strong>Draft</strong> <a href="/docs/planning/agent-knowledge-architecture.md">Agent Knowledge Architecture</a></h3>
 <p>Design for AI agent knowledge bases and context management</p>
 <p><strong>For:</strong> <code>agents</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-10</p>
@@ -692,6 +758,39 @@ View source on GitHub →
 <h3>📋 <strong>Draft</strong> <a href="/docs/reference/config/trust-threshold-configuration.md">Trust Threshold Configuration</a></h3>
 <p>Trust score threshold configuration guide</p>
 <p><strong>For:</strong> <code>operators</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/README.md">ICN Project Index</a></h3>
+<p>Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to STATE.md and PHASE_PROGRESS.md for current truth.</p>
+<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-04-29</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/ci-ops-deploy-map.md">CI / Ops / Deploy Map</a></h3>
+<p>GitHub Actions workflows, deploy paths, K3s smoke runbooks, monitoring; routing layer to substantive runbooks under guides/operations/.</p>
+<p><strong>For:</strong> <code>operators</code>, <code>contributors</code> | <strong>Updated:</strong> 2026-04-29</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/current-truth-map.md">Current Truth Map</a></h3>
+<p>One-screen routing for what is real now, what is not, what gates remain — pointing at STATE.md and PHASE_PROGRESS.md for the per-PR record.</p>
+<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-04-29</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/docs-control-map.md">Docs Control Map</a></h3>
+<p>How INDEX.md, registry.toml, DOCUMENT_REGISTRY.md, and doc_control_check.py relate; truth classes; how to add a doc.</p>
+<p><strong>For:</strong> <code>contributors</code>, <code>agents</code> | <strong>Updated:</strong> 2026-04-29</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/full-repo-record.md">Full Repository Record Protocol</a></h3>
+<p>Protocol for recording every tracked file and directory across InterCooperative-Network/icn (and adjacent repos) as a mechanical record plus an interpretive atlas. Defines outputs, generator, classification vocabulary, and privacy boundary.</p>
+<p><strong>For:</strong> <code>contributors</code>, <code>architects</code> | <strong>Updated:</strong> 2026-05-01</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/pilot-and-nycn-map.md">Pilot and NYCN Map</a></h3>
+<p>The ICN ↔ NYCN boundary — what lives in this repo, what lives in the separate InterCooperative-Network/nycn repo, the mutation boundary, and what the next gates are.</p>
+<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-04-29</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/reference/project-index/repo-atlas.md">ICN Repo Atlas</a></h3>
+<p>Draft interpretive atlas paired with the mechanical full-repo record. Names directory families, Rust-workspace families, and a classification vocabulary for stable atlas authoring across icn / nycn / icn-learn.</p>
+<p><strong>For:</strong> <code>contributors</code>, <code>architects</code> | <strong>Updated:</strong> 2026-05-01</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/runtime-surface-map.md">Runtime Surface Map</a></h3>
+<p>Real runtime surfaces a member or app actually touches today (/me/standing, /me/action-cards, completion-receipt retrieval, governance primitives, identity/trust/ledger surfaces).</p>
+<p><strong>For:</strong> <code>developers</code>, <code>architects</code> | <strong>Updated:</strong> 2026-04-29</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/rust-workspace-map.md">Rust Workspace Map</a></h3>
+<p>The icn/ Rust workspace grouped by rough layer (kernel, identity, networking, ledger, governance, etc.) plus app crates and binaries. Authority over kernel/app boundaries lives in KERNEL_APP_SEPARATION.md.</p>
+<p><strong>For:</strong> <code>developers</code>, <code>contributors</code> | <strong>Updated:</strong> 2026-04-29</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/show-readiness-map.md">Show-Readiness Map</a></h3>
+<p>What can be shown now, what should not be shown as finished, suggested first-demo narrative, and red lines for outside-facing material.</p>
+<p><strong>For:</strong> <code>all</code>, <code>team</code> | <strong>Updated:</strong> 2026-04-29</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/source-tree-map.md">Source Tree Map</a></h3>
+<p>Top-level repo surfaces and what each is for; monorepo root vs Rust workspace at icn/.</p>
+<p><strong>For:</strong> <code>contributors</code>, <code>developers</code> | <strong>Updated:</strong> 2026-04-29</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/sdis/SDIS_API_GUIDE.md">SDIS API Guide</a></h3>
 <p>Complete API guide for Sovereign Digital Identity System</p>
 <p><strong>For:</strong> <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
@@ -741,7 +840,7 @@ View source on GitHub →
 <h2>Status</h2>
 <h3>📝 <strong>Living</strong> <a href="/docs/STATE.md">ICN State (living doc)</a></h3>
 <p>Living snapshot of repo layout, decisions, constraints, and current engineering status</p>
-<p><strong>For:</strong> <code>developers</code>, <code>agents</code> | <strong>Updated:</strong> 2026-03-18</p>
+<p><strong>For:</strong> <code>developers</code>, <code>agents</code> | <strong>Updated:</strong> 2026-05-02</p>
 <h2>Strategy</h2>
 <h3>📋 <strong>Draft</strong> <a href="/docs/planning/documentation-namespace-resolution.md">Documentation namespace resolution plan</a></h3>
 <p>Plans vs planning, ops vs operations; no moves executed here</p>
@@ -755,6 +854,9 @@ View source on GitHub →
 <h3>📝 <strong>Living</strong> <a href="/docs/strategy/ADR-001-What-ICN-Is.md">ADR-001: What ICN Is</a></h3>
 <p>Architectural Decision Record defining ICN scope, non-goals, and boundary conditions</p>
 <p><strong>For:</strong> <code>developers</code>, <code>architects</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-02-28</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md">Cooperative-developer discovery brief</a></h3>
+<p>Internal prep doc for discovery conversations with cooperative developers (e.g. launch.coop / comp.coop). Listening + language calibration; not a sales pitch, not a technical demo, not a partnership commitment.</p>
+<p><strong>For:</strong> <code>internal</code>, <code>matt</code> | <strong>Updated:</strong> 2026-04-29</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Definition.md">What ICN Is</a></h3>
 <p>Canonical definition: problem statement, solution approach, scope and non-goals</p>
 <p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-03-17</p>
@@ -768,8 +870,8 @@ View source on GitHub →
 <p>Elevator pitch, one-pagers, and public communication messaging framework</p>
 <p><strong>For:</strong> <code>stakeholders</code>, <code>public</code> | <strong>Updated:</strong> 2026-03-10</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Roadmap-Live.md">ICN Live Roadmap</a></h3>
-<p>Current sprint and quarterly priorities, immediate milestones, and dependencies</p>
-<p><strong>For:</strong> <code>team</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-03-21</p>
+<p>Long-arc roadmap and rationale companion that points at STATE.md / PHASE_PROGRESS.md as canonical current-state truth. Not a per-PR changelog.</p>
+<p><strong>For:</strong> <code>team</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-04-29</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Roadmap-Strategy.md">ICN Roadmap Strategy</a></h3>
 <p>Strategic roadmap phases 0-3 with dependencies, milestones, and long-term vision</p>
 <p><strong>For:</strong> <code>architects</code>, <code>stakeholders</code>, <code>grant-reviewers</code> | <strong>Updated:</strong> 2026-03-12</p>
@@ -782,6 +884,12 @@ View source on GitHub →
 <h3>📝 <strong>Living</strong> <a href="/docs/strategy/ICN-Technical-Whitepaper.md">ICN Technical Whitepaper</a></h3>
 <p>Formal technical specification for grants, regulatory review, and architectural validation</p>
 <p><strong>For:</strong> <code>grant-reviewers</code>, <code>architects</code>, <code>compliance</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/strategy/LICENSING_STRATEGY_MATRIX.md">Licensing strategy matrix (autonomy review)</a></h3>
+<p>Planning artifact only. Component-by-component licensing/autonomy matrix and option families (permissive / AGPL / CAL / policy-layer / hybrid) for a future maintainer/legal review. Not legal advice; not a relicensing decision; no metadata changes.</p>
+<p><strong>For:</strong> <code>maintainers</code>, <code>legal-review</code> | <strong>Updated:</strong> 2026-05-01</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md">NYCN Phase 2 pilot rehearsal gate</a></h3>
+<p>Organizer-safe control-plane gate for moving from Phase 2 machinery exists to formal NYCN pilot rehearsal: organizer presentation, pilot formalization, first operator rehearsal. Descriptive planning only; not production readiness or Phase 2 completion.</p>
+<p><strong>For:</strong> <code>maintainers</code>, <code>organizers</code>, <code>operators</code> | <strong>Updated:</strong> 2026-05-02</p>
 <h3>📋 <strong>Draft</strong> <a href="/docs/strategy/grants/compliance-architecture.md">ICN Compliance Architecture</a></h3>
 <p>Regulatory-safe design rationale for grants</p>
 <p><strong>For:</strong> <code>compliance</code>, <code>grant-reviewers</code> | <strong>Updated:</strong> 2026-03-10</p>
@@ -799,12 +907,12 @@ View source on GitHub →
 <p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
 <hr>
 <h2>Summary</h2>
-<p><strong>Total documents:</strong> 246</p>
+<p><strong>Total documents:</strong> 282</p>
 <p><strong>By status:</strong></p>
 <ul>
-<li>Canonical: 38</li>
-<li>Draft: 48</li>
-<li>Living: 160</li>
+<li>Canonical: 39</li>
+<li>Draft: 57</li>
+<li>Living: 186</li>
 </ul>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
