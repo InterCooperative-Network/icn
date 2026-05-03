@@ -6,7 +6,7 @@ Last Reviewed: 2026-05-03
 
 # NYCN organizer and user readiness (ICN side)
 
-ICN-side orientation for **NYCN organizers**, **stewards**, and anyone explaining **member-legible** surfaces. It does not duplicate the NYCN package repo; use [NYCN `docs/ORGANIZER-USER-READINESS.md`](https://github.com/fahertym/nycn/blob/main/docs/ORGANIZER-USER-READINESS.md) for ladder commands and fixture policy there.
+ICN-side orientation for **NYCN organizers**, **stewards**, and anyone explaining **member-legible** surfaces. It does not duplicate the NYCN package repo; use [NYCN `docs/ORGANIZER-USER-READINESS.md`](https://github.com/InterCooperative-Network/nycn/blob/main/docs/ORGANIZER-USER-READINESS.md) for ladder commands and fixture policy there.
 
 **Non-claims:** Phase 2 is **not** marked complete here. NYCN is the **intended** first cooperative partner, not a formally committed pilot unless a repo-safe organizer record says so. No production-readiness, live federation, or hosted multi-tenant guarantee.
 
@@ -24,7 +24,10 @@ Routing and vocabulary: [runtime-surface-map.md](../reference/project-index/runt
 
 1. **Standing** — one coherent view of participatory position (contract: [MEMBER_STANDING.md](../architecture/MEMBER_STANDING.md)); implementation exists per [STATE.md](../STATE.md).
 2. **Action cards** — a deterministic, derived list of what needs attention **now**; completing an item uses the normal governance endpoints for that object type, not a separate “card API.”
-3. **Receipts** — append-only records (governance decision, meeting attendance, action-item completion) retrievable over HTTP for audit and provenance.
+3. **Receipts** — append-only records close the proof loop, but **HTTP retrieval today is not uniform across kinds**:
+   - **Action-item completion:** `GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt` returns the completion receipt when permitted (see the table above and [runtime-surface-map.md](../reference/project-index/runtime-surface-map.md)).
+   - **Proposal / vote:** governance decision receipts and proof-style reads are exercised through the proposal/vote flow and related surfaces documented in runtime maps and tests — not the same URL shape as the action-item completion-receipt route.
+   - **Meeting / attend:** marking attendance (`PUT` on the meeting attendance surface) is part of the loop that **produces** `MeetingAttendanceReceipt` records in governance storage; this doc does **not** claim a dedicated public `GET …/attendance-receipt`-style HTTP mirror analogous to the action-item completion-receipt path unless one is listed in the gateway route map.
 4. **Evidence** — for pilot rehearsals, evidence is **human procedure + repo-safe artifacts** (see [NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md](../strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md) and NYCN evidence docs), not private data in the ICN tree.
 
 ## Generic substrate vs NYCN package material

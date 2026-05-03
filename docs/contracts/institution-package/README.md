@@ -14,7 +14,7 @@ Last Reviewed: 2026-05-03
 
 ## Stability
 
-The schema sets `"x-icn-status": "rfc"`. Treat the shape as **versioned contract surface**, not frozen public API — gateway field additions go through OpenAPI regeneration and CI drift checks. Publication and stabilization work is tracked in [#1713](https://github.com/InterCooperative-Network/icn/issues/1713).
+The schema sets `"x-icn-status": "rfc"`. Treat the shape as **versioned contract surface**, not frozen public API. **OpenAPI export and generated TypeScript types** are what CI drift checks guard today (`icnctl api export-openapi`, `sdk/typescript` regen) — those checks protect the **generated** API contract, not this hand-maintained JSON file. **`action-card.schema.json` is edited by hand** alongside contract work; changes to `ActionCard` / `ActionCardsResponse` in `icn/apps/governance/src/http/models.rs` should update this schema in the **same PR** as the API/OpenAPI change. **Mechanical** drift detection for this schema (for example CI comparing schema to serde shapes) is **future work** unless and until it is implemented. Publication and stabilization work is tracked in [#1713](https://github.com/InterCooperative-Network/icn/issues/1713).
 
 ## Validation guidance for package repos
 
