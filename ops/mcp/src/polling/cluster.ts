@@ -24,6 +24,7 @@ const SERVICE_ENDPOINTS = [
 
 async function pollOnce(db: Database.Database): Promise<void> {
   try {
+    // Pod status
     const kr = await runCommand(
       "kubectl",
       ["get", "pods", "--all-namespaces", "-o", "json"],
@@ -48,6 +49,7 @@ async function pollOnce(db: Database.Database): Promise<void> {
     }
     writeCache(db, "k3s:pods", { pods, services });
 
+    // Service endpoint reachability
     const reachability = await Promise.all(
       SERVICE_ENDPOINTS.map(async (e) => {
         const cr = await runCommand("curl", ["-sf", "--max-time", "3", e.url], {
