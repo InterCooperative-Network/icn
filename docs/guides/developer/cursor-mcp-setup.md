@@ -4,6 +4,8 @@ This repo ships a local `icn-ops` MCP server in `ops/mcp`.
 
 **Clients:** Cursor (`.cursor/mcp.json`), Claude Code and other tools that honor the repo-root `.mcp.json`, and any generic MCP host that can run a `command` + `args` from the workspace root should all launch the server the same way. Paths are repo-relative so a clone works on any machine; each host still uses **its own** `npm`/`node` from PATH, so keep Node majors aligned between “where you ran `npm ci`” and “where the MCP host spawns processes” (see Node ABI note below).
 
+For **agent-facing MCP tools** (`icn_ops_doctor`, environment report, command catalog, etc.), see [agent-mcp-tooling.md](./agent-mcp-tooling.md).
+
 ## Config Surfaces
 
 - `./.mcp.json`

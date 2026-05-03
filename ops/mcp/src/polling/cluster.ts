@@ -3,6 +3,7 @@
 
 import type Database from "better-sqlite3";
 import { execSync } from "child_process";
+import { safeJsonParse } from "../diagnostics/safe-json.js";
 
 const INTERVAL_MS = 60_000;
 
@@ -29,15 +30,11 @@ function parsePodsJson(cmd: { ok: boolean; output: string }): unknown {
   if (!text) {
     return { error: "empty kubectl/jq output (no cluster access or jq failed silently)" };
   }
-  try {
-    return JSON.parse(text) as unknown;
-  } catch (e) {
-    return {
-      error: "kubectl/jq output was not valid JSON",
-      detail: e instanceof Error ? e.message : String(e),
-      preview: text.slice(0, 400),
-    };
+  const parsed = safeJsonParse(text, "kubectl/jq pods");
+  if (!parsed.ok) {
+    return { error: parsed.error, preview: parsed.preview };
   }
+  return parsed.value;
 }
 
 const SERVICE_ENDPOINTS = [

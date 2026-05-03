@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type Database from "better-sqlite3";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { safeJsonParse } from "../diagnostics/safe-json.js";
 
 const execAsync = promisify(exec);
 const CACHE_TTL_SECS = 90;
@@ -70,8 +71,15 @@ export function registerHealthTools(
             (await runCmd(`curl -sf --max-time 3 ${ep.url}`)).ok,
           ] as [string, boolean])
         );
+        let podsValue: unknown;
+        if (pods.ok && pods.output) {
+          const p = safeJsonParse(pods.output, "cluster_health kubectl");
+          podsValue = p.ok ? p.value : { error: p.error, preview: p.preview };
+        } else {
+          podsValue = { error: pods.output || "no kubectl/jq output" };
+        }
         return {
-          pods: pods.ok && pods.output ? (JSON.parse(pods.output) as unknown) : { error: pods.output },
+          pods: podsValue,
           services: Object.fromEntries(serviceResults),
         };
       });
