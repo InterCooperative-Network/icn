@@ -1,14 +1,8 @@
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
+import type { RepoMapEntry } from "./schema.js";
 
-export type RepoMapEntry = {
-  path: string;
-  present: boolean;
-  kind: "file" | "directory";
-  description: string;
-  agent_use: string;
-  caution?: string;
-};
+export type { RepoMapEntry } from "./schema.js";
 
 const ENTRIES: Omit<RepoMapEntry, "present" | "kind">[] = [
   {

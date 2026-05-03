@@ -1,27 +1,25 @@
-import type { SafetyLevel } from "./command-catalog.js";
+import type {
+  Priority,
+  RecommendedStep,
+  SafetyLevel,
+  Severity,
+} from "./schema.js";
 import type { McpFileReport } from "./mcp-config.js";
 import { buildEnvironmentReport } from "./environment-report.js";
 import { buildDoctorReport } from "./doctor.js";
 import { buildStateIndex } from "./state-index.js";
 
-export type NextStepPriority = "high" | "medium" | "low";
+export type { RecommendedStep } from "./schema.js";
 
-export type RecommendedStep = {
-  title: string;
-  reason: string;
-  command?: string;
-  working_directory: "repo_root" | "icn" | "ops/mcp" | "sdk/typescript" | "website";
-  safety: SafetyLevel;
-  priority: NextStepPriority;
-  blocks_agent_work: boolean;
-};
+/** @deprecated Use Priority from schema.js */
+export type NextStepPriority = Priority;
 
 export type NextStepsReport = {
-  severity: "ok" | "warn" | "error";
+  severity: Severity;
   summary: string;
   recommended_steps: RecommendedStep[];
   diagnosis_digest: {
-    doctor_severity: "ok" | "warn" | "error";
+    doctor_severity: Severity;
     doctor_summary: string;
     doctor_suggested_repairs_count: number;
     doctor_error_checks: number;
@@ -72,7 +70,7 @@ export type NextStepsSignals = {
   kubectlAvailable: boolean;
   ghAvailable: boolean;
   stateMissingImportant: number;
-  doctorSeverity: "ok" | "warn" | "error";
+  doctorSeverity: Severity;
   doctorSummary: string;
   doctorSuggestedRepairsCount: number;
   doctorErrorChecks: number;

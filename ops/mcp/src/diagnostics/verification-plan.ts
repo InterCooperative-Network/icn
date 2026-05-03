@@ -1,4 +1,6 @@
-import type { SafetyLevel } from "./command-catalog.js";
+import type { VerificationPlanStep } from "./schema.js";
+
+export type { VerificationPlanStep } from "./schema.js";
 
 export type VerificationArea =
   | "mcp"
@@ -10,17 +12,6 @@ export type VerificationArea =
   | "full";
 
 export type RiskLevel = "quick" | "standard" | "thorough";
-
-export type VerificationPlanStep = {
-  order: number;
-  command: string;
-  working_directory: "repo_root" | "icn" | "ops/mcp" | "sdk/typescript" | "website";
-  purpose: string;
-  expected_success_signal: string;
-  safety: SafetyLevel;
-  estimated_runtime: "quick" | "medium" | "long";
-  notes?: string;
-};
 
 export type VerificationPlan = {
   area: VerificationArea;

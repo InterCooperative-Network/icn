@@ -9,6 +9,7 @@ import { buildStateIndex } from "../diagnostics/state-index.js";
 import { buildNextStepsReport } from "../diagnostics/next-steps.js";
 import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
 import { buildRepoMap } from "../diagnostics/repo-map.js";
+import { buildAgentToolSchemaBundle } from "../diagnostics/tool-schemas.js";
 
 export function registerAgentOpsTools(server: McpServer): void {
   const repoRoot = resolveMonorepoRoot();
@@ -120,6 +121,18 @@ export function registerAgentOpsTools(server: McpServer): void {
       const map = buildRepoMap(repoRoot);
       return {
         content: [{ type: "text", text: JSON.stringify(map, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "icn_ops_tool_schemas",
+    "Machine-readable contract for agent-facing tools: tool name, optional input_schema object, output_schema_summary string, stability (experimental|stable), notes. contract_version is shared across outputs; prefer fields over prose; ignore unknown future fields.",
+    {},
+    async () => {
+      const bundle = buildAgentToolSchemaBundle();
+      return {
+        content: [{ type: "text", text: JSON.stringify(bundle, null, 2) }],
       };
     }
   );

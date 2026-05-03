@@ -11,13 +11,9 @@ import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
 import { buildRepoMap } from "../diagnostics/repo-map.js";
 import { COMMAND_CATALOG } from "../diagnostics/command-catalog.js";
 import type { McpFileReport } from "../diagnostics/mcp-config.js";
+import { SAFETY_LEVELS, SEVERITY_LEVELS } from "../diagnostics/schema.js";
 
-const ALLOWED_SAFETY = [
-  "read_only",
-  "modifies_local",
-  "destructive",
-  "external_side_effect",
-] as const;
+const ALLOWED_SAFETY = SAFETY_LEVELS;
 
 const canonicalMcpFiles: McpFileReport[] = [
   {
@@ -101,7 +97,7 @@ describe("buildNextStepsReport", () => {
     const r = await buildNextStepsReport(dir);
     expect(Array.isArray(r.recommended_steps)).toBe(true);
     expect(r.diagnosis_digest).toBeDefined();
-    expect(["ok", "warn", "error"]).toContain(r.severity);
+    expect([...SEVERITY_LEVELS]).toContain(r.severity);
   });
 });
 

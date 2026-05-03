@@ -28,6 +28,7 @@ Native module note: `better-sqlite3` is rebuilt in `postinstall`. If the MCP hos
 
 | Tool | Purpose |
 |------|---------|
+| `icn_ops_tool_schemas` | **Contract bundle** — `contract_version`, per-tool `input_schema` (JSON-shaped summary or `null`), `output_schema_summary`, `stability` (`stable` \| `experimental`), optional `notes`. Lists all agent JSON tools below. **Read-only**; does not execute anything. |
 | `icn_ops_environment_report` | JSON snapshot: repo root, git branch/commit/dirty, Node ABI, npm/rust/python versions, optional `gh`/`kubectl`, MCP config inspection, `node_modules`/`dist` presence, `better-sqlite3` load probe. Missing optional CLIs are **warnings**, not hard failures. |
 | `icn_ops_doctor` | Read-only diagnosis: severity (`ok` / `warn` / `error`), per-check results, suggested **shell repair commands** (not executed). Covers MCP parity script, native module, dirty tree, optional tools, key `ops/state` files, and lightweight **CLI runner probes** (`git` / `npm` / `python3`). |
 | `icn_ops_agent_brief` | Compact structured briefing: docs to read first, safe vs forbidden vocabulary, verification commands by area, PR hygiene, completeness warning, MCP troubleshooting bullets. |
@@ -36,6 +37,17 @@ Native module note: `better-sqlite3` is rebuilt in `postinstall`. If the MCP hos
 | `icn_ops_next_steps` | **Read-only workflow guidance** — small JSON: `severity` (`ok` / `warn` / `error`), `summary`, `recommended_steps[]` (`title`, `reason`, optional `command`, `working_directory`, `safety`, `priority`, `blocks_agent_work`), plus `diagnosis_digest` counts (not full doctor dumps). Never executes repair commands. |
 | `icn_ops_verification_plan` | **Ordered checklist only** — input `area` (`mcp` \| `docs` \| `rust` \| `website` \| `vocabulary` \| `pr` \| `full`) and optional `risk_level` (`quick` \| `standard` \| `thorough`). Returns steps with `command`, `purpose`, `expected_success_signal`, `safety`, `estimated_runtime`, `notes`. Does not run commands. `full` layers MCP checks with docs, Rust, vocabulary, optional website, and (when `thorough`) PR API checks. |
 | `icn_ops_repo_map` | **Layout map** — key repo paths (`docs/`, `ops/mcp`, `icn`, `scripts`, ADR/RFC dirs, SDKs, `web/pilot-ui`, `deploy`, …) with `present`, `description`, `agent_use`, optional `caution`. Absent paths stay `present: false`. |
+
+### Contract version and schemas
+
+- Shared enums and object shapes live in **`ops/mcp/src/diagnostics/schema.ts`** (`AGENT_TOOL_CONTRACT_VERSION`, `Severity`, `SafetyLevel`, `RuntimeBucket`, `Priority`, `DiagnosticCheck`, `RecommendedStep`, `CommandCatalogEntry`, `VerificationPlanStep`, `RepoMapEntry`, `StateIndexEntry`).
+- **Agents should prefer typed fields** (`severity`, `safety`, `recommended_steps[]`, …) **over prose** in tool descriptions.
+- **Additive changes** bump the minor contract version; breaking renames bump major.
+- **Unknown JSON fields** in future responses should be **ignored** (forward-compatible clients).
+- **Optional host tools** (`kubectl`, `gh`) are **warnings** when absent, not fatal to repo work.
+- **`destructive`** and **`external_side_effect`** command strings in catalogs and plans are **not executed by MCP**; they require **human review** before running in a shell.
+
+Compact **example payloads**: [agent-mcp-examples.md](./agent-mcp-examples.md).
 
 Existing tools (`cluster_health`, sessions, tasks, decisions, etc.) remain available. Poller and health paths use **`execFile`-style argv** (via `runCommand` in `ops/mcp/src/utils/commands.ts`): no shell, bounded stdout/stderr, timeouts, and structured `{ ok, exitCode, stderr, timedOut }` results. `kubectl get pods -o json` is parsed in-process (no `jq` pipeline). External JSON goes through `safeJsonParse` so malformed output becomes `{ error, preview }` instead of throwing through the MCP boundary.
 
@@ -80,6 +92,7 @@ Existing tools (`cluster_health`, sessions, tasks, decisions, etc.) remain avail
 
 ## Related docs
 
+- [agent-mcp-examples.md](./agent-mcp-examples.md) — Short example JSON per tool
 - [cursor-mcp-setup.md](./cursor-mcp-setup.md) — Cursor vs Claude wiring and smoke-test commands
 - `AGENTS.md` (repo root) — invariants and verification matrix
 - `ops/CLAUDE.md` — orchestration plane layout

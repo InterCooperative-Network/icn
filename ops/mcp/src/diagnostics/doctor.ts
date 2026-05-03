@@ -1,17 +1,13 @@
 import { join } from "node:path";
+import type { DiagnosticCheck, Severity } from "./schema.js";
 import { buildEnvironmentReport } from "./environment-report.js";
 import { buildStateIndex } from "./state-index.js";
 import { runCommand } from "../utils/commands.js";
 
-export type DoctorCheck = {
-  id: string;
-  severity: "ok" | "warn" | "error";
-  message: string;
-  detail?: string;
-};
+export type DoctorCheck = DiagnosticCheck;
 
 export type DoctorReport = {
-  severity: "ok" | "warn" | "error";
+  severity: Severity;
   summary: string;
   checks: DoctorCheck[];
   suggested_repairs: string[];

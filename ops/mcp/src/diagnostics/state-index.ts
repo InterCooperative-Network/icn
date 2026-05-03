@@ -1,16 +1,8 @@
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
+import type { StateIndexEntry } from "./schema.js";
 
-export type StateIndexEntry = {
-  /** Repo-relative path or label */
-  id: string;
-  /** Absolute path checked */
-  absolutePath: string;
-  present: boolean;
-  kind: "file" | "directory";
-  /** One-line purpose for agents */
-  description: string;
-};
+export type { StateIndexEntry } from "./schema.js";
 
 const ENTRIES: Omit<StateIndexEntry, "absolutePath" | "present" | "kind">[] = [
   { id: "docs/STATE.md", description: "Current project state summary." },

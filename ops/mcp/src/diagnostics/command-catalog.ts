@@ -1,26 +1,16 @@
-export type SafetyLevel =
-  | "read_only"
-  | "modifies_local"
-  | "destructive"
-  | "external_side_effect";
+import type { CommandCatalogEntry, RuntimeBucket } from "./schema.js";
 
-export type ExpectedRuntime = "quick" | "medium" | "long";
+export type { CommandCatalogEntry, RuntimeBucket, SafetyLevel } from "./schema.js";
 
-export type CatalogCommand = {
-  id: string;
-  purpose: string;
-  command: string;
-  working_directory: "repo_root" | "icn" | "ops/mcp" | "sdk/typescript" | "web/pilot-ui" | "website";
-  safety: SafetyLevel;
-  runtime: ExpectedRuntime;
-  when_to_use: string;
-  /** Non-executable warning; aligns with verification_plan safety semantics. */
-  caution?: string;
-};
+/** @deprecated Use CommandCatalogEntry; kept for call-site readability. */
+export type CatalogCommand = CommandCatalogEntry;
+
+/** @deprecated Use RuntimeBucket */
+export type ExpectedRuntime = RuntimeBucket;
 
 export type CommandCatalog = {
   version: 1;
-  groups: { name: string; commands: CatalogCommand[] }[];
+  groups: { name: string; commands: CommandCatalogEntry[] }[];
 };
 
 export const COMMAND_CATALOG: CommandCatalog = {
