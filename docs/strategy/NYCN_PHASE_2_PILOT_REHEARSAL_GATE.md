@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-05-02
+Last Reviewed: 2026-05-03
 ---
 
 # NYCN Phase 2 Pilot Rehearsal Gate
@@ -31,6 +31,11 @@ Required inputs:
   Google Groups synchronization, no K3s mutation, and no NYCN private data in
   the public ICN repository.
 - A clear statement of what organizers are being asked to decide.
+
+Optional prep (NYCN repo, checklist only — does **not** record that the
+presentation occurred):
+
+- [REHEARSAL-0002 — Organizer gate prep](https://github.com/InterCooperative-Network/nycn/blob/main/docs/rehearsals/REHEARSAL-0002-organizer-gate-prep.md).
 
 Required organizer decision:
 

@@ -57,3 +57,5 @@ Tracking: [#1713](https://github.com/InterCooperative-Network/icn/issues/1713). 
 
 - [STATE.md](../STATE.md), [PHASE_PROGRESS.md](../PHASE_PROGRESS.md)
 - [NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md](../strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md)
+- NYCN facilitator prep (checklists only, not a decision record):
+  [REHEARSAL-0002 — Organizer gate prep](https://github.com/InterCooperative-Network/nycn/blob/main/docs/rehearsals/REHEARSAL-0002-organizer-gate-prep.md)

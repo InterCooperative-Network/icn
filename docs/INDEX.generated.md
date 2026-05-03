@@ -1711,7 +1711,7 @@ Planning artifact only. Component-by-component licensing/autonomy matrix and opt
 
 Organizer-safe control-plane gate for moving from Phase 2 machinery exists to formal NYCN pilot rehearsal: organizer presentation, pilot formalization, first operator rehearsal. Descriptive planning only; not production readiness or Phase 2 completion.
 
-**For:** `maintainers`, `organizers`, `operators` | **Updated:** 2026-05-02
+**For:** `maintainers`, `organizers`, `operators` | **Updated:** 2026-05-03
 
 ### 📋 **Draft** [ICN Compliance Architecture](/docs/strategy/grants/compliance-architecture.md)
 
