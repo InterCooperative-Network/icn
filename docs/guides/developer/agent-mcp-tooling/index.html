@@ -79,11 +79,23 @@ View source on GitHub →
 </tr>
 <tr>
 <td><code>icn_ops_command_catalog</code></td>
-<td><strong>Catalog only</strong> — grouped commands with <code>working_directory</code>, <code>safety</code> (<code>read_only</code> / <code>modifies_local</code> / <code>destructive</code> / <code>external_side_effect</code>), <code>runtime</code> hint, and <code>when_to_use</code>. Never runs commands.</td>
+<td><strong>Catalog only</strong> — grouped commands with <code>working_directory</code>, <code>safety</code> (<code>read_only</code> / <code>modifies_local</code> / <code>destructive</code> / <code>external_side_effect</code>), <code>runtime</code> hint, <code>when_to_use</code>, and optional <code>caution</code> (e.g. long <code>cargo test</code>, <code>npm ci</code> lockfile behavior, <code>gh</code> network). Never runs commands.</td>
 </tr>
 <tr>
 <td><code>icn_ops_state_index</code></td>
 <td>Lists canonical state/architecture paths with <code>present: true/false</code> (filesystem stat); does not invent missing files. Optional arg <code>include_absent</code> (default true).</td>
+</tr>
+<tr>
+<td><code>icn_ops_next_steps</code></td>
+<td><strong>Read-only workflow guidance</strong> — small JSON: <code>severity</code> (<code>ok</code> / <code>warn</code> / <code>error</code>), <code>summary</code>, <code>recommended_steps[]</code> (<code>title</code>, <code>reason</code>, optional <code>command</code>, <code>working_directory</code>, <code>safety</code>, <code>priority</code>, <code>blocks_agent_work</code>), plus <code>diagnosis_digest</code> counts (not full doctor dumps). Never executes repair commands.</td>
+</tr>
+<tr>
+<td><code>icn_ops_verification_plan</code></td>
+<td><strong>Ordered checklist only</strong> — input <code>area</code> (<code>mcp</code> | <code>docs</code> | <code>rust</code> | <code>website</code> | <code>vocabulary</code> | <code>pr</code> | <code>full</code>) and optional <code>risk_level</code> (<code>quick</code> | <code>standard</code> | <code>thorough</code>). Returns steps with <code>command</code>, <code>purpose</code>, <code>expected_success_signal</code>, <code>safety</code>, <code>estimated_runtime</code>, <code>notes</code>. Does not run commands. <code>full</code> layers MCP checks with docs, Rust, vocabulary, optional website, and (when <code>thorough</code>) PR API checks.</td>
+</tr>
+<tr>
+<td><code>icn_ops_repo_map</code></td>
+<td><strong>Layout map</strong> — key repo paths (<code>docs/</code>, <code>ops/mcp</code>, <code>icn</code>, <code>scripts</code>, ADR/RFC dirs, SDKs, <code>web/pilot-ui</code>, <code>deploy</code>, …) with <code>present</code>, <code>description</code>, <code>agent_use</code>, optional <code>caution</code>. Absent paths stay <code>present: false</code>.</td>
 </tr>
 </tbody></table>
 <p>Existing tools (<code>cluster_health</code>, sessions, tasks, decisions, etc.) remain available. Poller and health paths use <strong><code>execFile</code>-style argv</strong> (via <code>runCommand</code> in <code>ops/mcp/src/utils/commands.ts</code>): no shell, bounded stdout/stderr, timeouts, and structured <code>{ ok, exitCode, stderr, timedOut }</code> results. <code>kubectl get pods -o json</code> is parsed in-process (no <code>jq</code> pipeline). External JSON goes through <code>safeJsonParse</code> so malformed output becomes <code>{ error, preview }</code> instead of throwing through the MCP boundary.</p>
@@ -94,6 +106,39 @@ View source on GitHub →
 <li><strong>Failures:</strong> represented as <code>ok: false</code> plus stderr/exit/timedOut; pollers write those into <code>health_cache</code> or doctor checks — <strong>never</strong> <code>process.exit</code> from optional probes.</li>
 <li><strong>Warnings vs errors:</strong> <code>icn_ops_doctor</code> uses <code>warn</code> for optional CLIs and dirty trees; <code>error</code> for portability failures, native module load, or missing <code>node_modules</code>. Suggested repairs are <strong>strings only</strong> — not executed by MCP.</li>
 </ul>
+<h3>Diagnostics vs recommendations vs execution</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Tools</th>
+<th>Agent behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Diagnostics</strong></td>
+<td><code>icn_ops_environment_report</code>, <code>icn_ops_doctor</code>, <code>icn_ops_state_index</code></td>
+<td>Inspect facts; large payloads possible on doctor.</td>
+</tr>
+<tr>
+<td><strong>Recommendations</strong></td>
+<td><code>icn_ops_next_steps</code>, <code>icn_ops_command_catalog</code>, <code>icn_ops_verification_plan</code>, <code>icn_ops_repo_map</code>, <code>icn_ops_agent_brief</code></td>
+<td>Choose what to run locally; commands are <strong>strings only</strong>.</td>
+</tr>
+<tr>
+<td><strong>Execution</strong></td>
+<td>Your shell / CI / editor</td>
+<td>Only the human or agent host runs commands. MCP does <strong>not</strong> auto-fix, remediate, or open arbitrary shells.</td>
+</tr>
+</tbody></table>
+<p><strong>Human review:</strong> MCP guidance does <strong>not</strong> replace human judgment before <strong>destructive</strong> or <strong>external_side_effect</strong> actions (e.g. <code>git reset --hard</code>, <code>git clean</code>, <code>gh pr create</code>, production deploys). Treat catalog and verification plans as checklists, not autopilots.</p>
+<h3>Choosing checks before editing</h3>
+<ol>
+<li><code>icn_ops_next_steps</code> — see whether the worktree or MCP layer blocks progress (<code>blocks_agent_work</code>).</li>
+<li><code>icn_ops_repo_map</code> — confirm which subtrees exist for this checkout.</li>
+<li><code>icn_ops_verification_plan</code> with the right <code>area</code> and <code>risk_level</code> — copy commands into your terminal; adjust scope (<code>cargo test -p …</code>, filters) as needed.</li>
+<li><code>icn_ops_command_catalog</code> — deeper command lookup with the same <code>safety</code> vocabulary as verification plans.</li>
+</ol>
 <h2>Common failure modes</h2>
 <table>
 <thead>
@@ -126,10 +171,22 @@ View source on GitHub →
 </tbody></table>
 <h2>Validation before edits</h2>
 <ol>
-<li>Call <code>icn_ops_doctor</code> (or <code>icn_ops_environment_report</code>) after switching branches or Node versions.</li>
+<li>Call <code>icn_ops_next_steps</code> for a compact gate, or <code>icn_ops_doctor</code> / <code>icn_ops_environment_report</code> for full detail after branch or Node changes.</li>
 <li>Follow <code>icn_ops_agent_brief</code> + <code>AGENTS.md</code> change routing for the area you touch.</li>
-<li>Use <code>icn_ops_command_catalog</code> to pick verification commands; run them in your terminal (MCP does not auto-run them).</li>
+<li>Use <code>icn_ops_verification_plan</code> and/or <code>icn_ops_command_catalog</code> to pick checks; run them in your terminal (MCP does not auto-run them).</li>
 </ol>
+<h2>Ship checklist (ops MCP)</h2>
+<p><strong>Launch (Cursor + Claude + any MCP host):</strong> repo root, <code>command</code> = <code>npm</code>, <code>args</code> = <code>[&quot;--prefix&quot;, &quot;./ops/mcp&quot;, &quot;run&quot;, &quot;start:stdio&quot;]</code>. Do <strong>not</strong> point hosts at <code>node ./ops/mcp/dist/index.js</code> (ABI drift). After changing Node major: <code>cd ops/mcp &amp;&amp; npm ci</code>, then <strong>reload</strong> the MCP session / Cursor window.</p>
+<p><strong>Merge order to <code>main</code>:</strong> land <a href="https://github.com/InterCooperative-Network/icn/pull/1716" target="_blank" rel="noopener">#1716</a> (stdio unify) → <a href="https://github.com/InterCooperative-Network/icn/pull/1717" target="_blank" rel="noopener">#1717</a> (diagnostics) → <a href="https://github.com/InterCooperative-Network/icn/pull/1718" target="_blank" rel="noopener">#1718</a> (execFile runner) → <a href="https://github.com/InterCooperative-Network/icn/pull/1719" target="_blank" rel="noopener">#1719</a> (workflow guidance). Later PRs may need <code>git fetch &amp;&amp; git rebase origin/main</code> after earlier merges.</p>
+<p><strong>Local verification (repo root):</strong></p>
+<pre><code class="language-bash">npm --prefix ./ops/mcp ci
+npm --prefix ./ops/mcp run build
+npm --prefix ./ops/mcp test
+python3 scripts/check-mcp-portability.py
+timeout 5 npm --prefix ./ops/mcp run start:stdio   # exit 124 while server runs is OK
+</code></pre>
+<p><strong>Agents:</strong> use <code>icn_ops_doctor</code> / <code>icn_ops_next_steps</code> for “what’s wrong?” and “what should I run?” — all suggested commands are <strong>strings only</strong>; MCP does not run shells or auto-remediation.</p>
+<p><strong>Warnings vs blockers:</strong> missing <code>kubectl</code> / <code>gh</code> / dirty tree → usually <strong>warn</strong>. Missing <code>ops/mcp/node_modules</code>, failed <code>better-sqlite3</code> load, portability script failure → treat as <strong>blockers</strong> for MCP until fixed.</p>
 <h2>Related docs</h2>
 <ul>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/cursor-mcp-setup">cursor-mcp-setup.md</a> — Cursor vs Claude wiring and smoke-test commands</li>
