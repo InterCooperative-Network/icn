@@ -127,7 +127,7 @@ export function registerAgentOpsTools(server: McpServer): void {
 
   server.tool(
     "icn_ops_tool_schemas",
-    "Machine-readable contract for agent-facing tools: tool name, optional input_schema object, output_schema_summary string, stability (experimental|stable), notes. contract_version is shared across outputs; prefer fields over prose; ignore unknown future fields.",
+    "Machine-readable contract: contract_version, unknown_fields_policy, tools[] with tool, version, input_schema|null, input_schema_summary, output_schema_summary, stability (stable|experimental), notes. Per-tool version tracks AGENT_TOOL_CONTRACT_VERSION; prefer fields over prose.",
     {},
     async () => {
       const bundle = buildAgentToolSchemaBundle();

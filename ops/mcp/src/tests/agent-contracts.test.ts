@@ -12,7 +12,7 @@ import {
 import { buildAgentToolSchemaBundle } from "../diagnostics/tool-schemas.js";
 import { COMMAND_CATALOG } from "../diagnostics/command-catalog.js";
 import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
-import { analyzeNextStepsFromSignals } from "../diagnostics/next-steps.js";
+import { analyzeNextStepsFromSignals, buildNextStepsReport } from "../diagnostics/next-steps.js";
 import { buildRepoMap } from "../diagnostics/repo-map.js";
 import { buildStateIndex } from "../diagnostics/state-index.js";
 import { mkdtempSync } from "node:fs";
@@ -87,17 +87,25 @@ describe("icn_ops_tool_schemas bundle", () => {
   it("lists every agent-facing contract tool exactly once", () => {
     const bundle = buildAgentToolSchemaBundle();
     expect(bundle.contract_version).toBe(AGENT_TOOL_CONTRACT_VERSION);
+    expect(typeof bundle.unknown_fields_policy).toBe("string");
+    expect(bundle.unknown_fields_policy.length).toBeGreaterThan(20);
     const names = bundle.tools.map((t) => t.tool).sort();
     const expected = [...AGENT_TOOLS_WITH_CONTRACT].sort();
     expect(names).toEqual(expected);
   });
 
-  it("gives each tool stability and an output summary", () => {
+  it("gives each tool version, stability, input+output summaries", () => {
     const bundle = buildAgentToolSchemaBundle();
     for (const t of bundle.tools) {
+      expect(t.version).toBe(AGENT_TOOL_CONTRACT_VERSION);
       expect(TOOL_STABILITY_LEVELS).toContain(t.stability);
       expect(typeof t.output_schema_summary).toBe("string");
       expect(t.output_schema_summary.length).toBeGreaterThan(10);
+      expect(
+        t.input_schema_summary === null ||
+          (typeof t.input_schema_summary === "string" && t.input_schema_summary.length > 0)
+      ).toBe(true);
+      expect(t.input_schema === null || isRecord(t.input_schema)).toBe(true);
     }
   });
 
@@ -136,6 +144,16 @@ describe("shared enums on live outputs", () => {
     });
     expect(SEVERITY_LEVELS).toContain(r.severity);
     expect(SEVERITY_LEVELS).toContain(r.diagnosis_digest.doctor_severity);
+    for (const step of r.recommended_steps) {
+      assertRecommendedStepShape(step);
+    }
+  });
+
+  it("buildNextStepsReport does not throw on sparse temp repo", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "icn-mcp-contracts-sparse-"));
+    const r = await buildNextStepsReport(dir);
+    expect(SEVERITY_LEVELS).toContain(r.severity);
+    expect(Array.isArray(r.recommended_steps)).toBe(true);
     for (const step of r.recommended_steps) {
       assertRecommendedStepShape(step);
     }

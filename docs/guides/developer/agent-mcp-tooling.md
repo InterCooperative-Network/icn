@@ -28,7 +28,7 @@ Native module note: `better-sqlite3` is rebuilt in `postinstall`. If the MCP hos
 
 | Tool | Purpose |
 |------|---------|
-| `icn_ops_tool_schemas` | **Contract bundle** — `contract_version`, per-tool `input_schema` (JSON-shaped summary or `null`), `output_schema_summary`, `stability` (`stable` \| `experimental`), optional `notes`. Lists all agent JSON tools below. **Read-only**; does not execute anything. |
+| `icn_ops_tool_schemas` | **Contract bundle** — `contract_version`, `unknown_fields_policy`, `tools[]` each with `tool`, `version` (matches contract for now), `input_schema` \| `null`, `input_schema_summary`, `output_schema_summary`, `stability` (`stable` \| `experimental`), optional `notes`. Lists all agent JSON tools below. **Read-only**; does not execute anything. |
 | `icn_ops_environment_report` | JSON snapshot: repo root, git branch/commit/dirty, Node ABI, npm/rust/python versions, optional `gh`/`kubectl`, MCP config inspection, `node_modules`/`dist` presence, `better-sqlite3` load probe. Missing optional CLIs are **warnings**, not hard failures. |
 | `icn_ops_doctor` | Read-only diagnosis: severity (`ok` / `warn` / `error`), per-check results, suggested **shell repair commands** (not executed). Covers MCP parity script, native module, dirty tree, optional tools, key `ops/state` files, and lightweight **CLI runner probes** (`git` / `npm` / `python3`). |
 | `icn_ops_agent_brief` | Compact structured briefing: docs to read first, safe vs forbidden vocabulary, verification commands by area, PR hygiene, completeness warning, MCP troubleshooting bullets. |

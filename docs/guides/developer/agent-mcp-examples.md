@@ -16,6 +16,50 @@ Illustrative JSON shapes for `icn_ops_*` tools. Fields match `ops/mcp/src/diagno
 }
 ```
 
+## icn_ops_next_steps — clean gate
+
+```json
+{
+  "severity": "ok",
+  "summary": "Environment looks ready; pick a verification plan for your change area.",
+  "recommended_steps": [
+    {
+      "title": "Proceed with scoped verification",
+      "reason": "No blocking MCP issues detected; use icn_ops_verification_plan for area-specific checks.",
+      "working_directory": "repo_root",
+      "safety": "read_only",
+      "priority": "low",
+      "blocks_agent_work": false
+    }
+  ],
+  "diagnosis_digest": {
+    "doctor_severity": "ok",
+    "doctor_error_checks": 0,
+    "portability_script_ok": true
+  }
+}
+```
+
+## icn_ops_next_steps — missing `dist` only (`node_modules` present)
+
+```json
+{
+  "severity": "warn",
+  "recommended_steps": [
+    {
+      "title": "Build MCP TypeScript output",
+      "reason": "ops/mcp/dist/index.js is missing; some workflows expect a prebuilt dist.",
+      "command": "npm run build",
+      "working_directory": "ops/mcp",
+      "safety": "modifies_local",
+      "priority": "medium",
+      "blocks_agent_work": false
+    }
+  ],
+  "diagnosis_digest": { "doctor_severity": "warn", "portability_script_ok": true }
+}
+```
+
 ## icn_ops_next_steps — missing `node_modules`
 
 ```json
@@ -136,11 +180,14 @@ Illustrative JSON shapes for `icn_ops_*` tools. Fields match `ops/mcp/src/diagno
 ```json
 {
   "contract_version": "1.0.0",
+  "unknown_fields_policy": "Clients MUST ignore unknown JSON keys…",
   "tools": [
     {
       "tool": "icn_ops_environment_report",
+      "version": "1.0.0",
       "input_schema": null,
-      "output_schema_summary": "EnvironmentReport{…}",
+      "input_schema_summary": "No tool arguments (empty object).",
+      "output_schema_summary": "EnvironmentReport{repoRoot,warnings[],…}",
       "stability": "stable"
     }
   ]
