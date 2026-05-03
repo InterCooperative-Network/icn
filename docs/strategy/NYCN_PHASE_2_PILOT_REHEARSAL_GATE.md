@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-05-02
+Last Reviewed: 2026-05-03
 ---
 
 # NYCN Phase 2 Pilot Rehearsal Gate
@@ -23,6 +23,9 @@ declare production readiness, or authorize live infrastructure mutation.
 
 Required inputs:
 
+- Optional facilitator prep (NYCN repo, checklist only — does **not** record
+  that the presentation occurred):
+  [REHEARSAL-0002 — Organizer gate prep](https://github.com/InterCooperative-Network/nycn/blob/main/docs/rehearsals/REHEARSAL-0002-organizer-gate-prep.md).
 - Drive-ingest `START_HERE`, organizer briefing, and simple summit demo.
 - Plain-language explanation of the ICN proof loop: organizer material becomes
   reviewable action items, operator decisions produce receipts, and provenance
