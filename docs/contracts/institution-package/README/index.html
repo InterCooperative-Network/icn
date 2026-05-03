@@ -42,7 +42,7 @@ View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
 <h2>Status: descriptive
 Canonical: no
-Last Reviewed: 2026-05-03</h2>
+Last Reviewed: 2026-05-04</h2>
 <h1>Institution package — ActionCard contract notes</h1>
 <h2>Files</h2>
 <table>
@@ -59,11 +59,57 @@ Last Reviewed: 2026-05-03</h2>
 </tbody></table>
 <h2>Stability</h2>
 <p>The schema sets <code>&quot;x-icn-status&quot;: &quot;rfc&quot;</code>. Treat the shape as <strong>versioned contract surface</strong>, not frozen public API. <strong>OpenAPI export and generated TypeScript types</strong> are what CI drift checks guard today (<code>icnctl api export-openapi</code>, <code>sdk/typescript</code> regen) — those checks protect the <strong>generated</strong> API contract, not this hand-maintained JSON file. <strong><code>action-card.schema.json</code> is edited by hand</strong> alongside contract work; changes to <code>ActionCard</code> / <code>ActionCardsResponse</code> in <code>icn/apps/governance/src/http/models.rs</code> should update this schema in the <strong>same PR</strong> as the API/OpenAPI change. <strong>Mechanical</strong> drift detection for this schema (for example CI comparing schema to serde shapes) is <strong>future work</strong> unless and until it is implemented. Publication and stabilization work is tracked in <a href="https://github.com/InterCooperative-Network/icn/issues/1713" target="_blank" rel="noopener">#1713</a>.</p>
+<h2>Emitted pairs (runtime today)</h2>
+<p>These <code>(source_kind, action_kind)</code> combinations are what <code>icn/apps/governance</code> may place on <code>GET /v1/gov/me/action-cards</code> when matching governance objects exist. They are also listed in the schema extension <code>x-icn-emitted-source-action-pairs</code>.</p>
+<table>
+<thead>
+<tr>
+<th>source_kind</th>
+<th>action_kind</th>
+<th>Plain-language ask</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>proposal</code></td>
+<td><code>vote</code></td>
+<td>Cast or delegate a vote on an open proposal.</td>
+</tr>
+<tr>
+<td><code>meeting</code></td>
+<td><code>attend</code></td>
+<td>Confirm or adjust attendance for a scheduled meeting.</td>
+</tr>
+<tr>
+<td><code>action_item</code></td>
+<td><code>complete</code></td>
+<td>Close an assigned action item via its governance endpoints.</td>
+</tr>
+</tbody></table>
+<h2>Gated source kinds (schema reserved; not emitted)</h2>
+<p>Enum values exist for forward compatibility; the runtime does <strong>not</strong> return cards for these until their source paths land.</p>
+<table>
+<thead>
+<tr>
+<th>source_kind</th>
+<th>Tracking (implementation + contract)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>signal_rule</code></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1631" target="_blank" rel="noopener">#1631</a>, <a href="https://github.com/InterCooperative-Network/icn/issues/1711" target="_blank" rel="noopener">#1711</a>, <a href="https://github.com/InterCooperative-Network/icn/issues/1646" target="_blank" rel="noopener">#1646</a></td>
+</tr>
+<tr>
+<td><code>obligation_lifecycle</code></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1634" target="_blank" rel="noopener">#1634</a>, <a href="https://github.com/InterCooperative-Network/icn/issues/1712" target="_blank" rel="noopener">#1712</a>, <a href="https://github.com/InterCooperative-Network/icn/issues/1646" target="_blank" rel="noopener">#1646</a></td>
+</tr>
+</tbody></table>
+<h2>Organizer-facing chain (how to explain the demo)</h2>
+<p><strong>Standing → action cards → authorized action on native endpoints → receipt → provenance/evidence.</strong> Standing (<code>GET /v1/gov/me/standing</code>) says who the caller is and what scopes apply. Action cards (<code>GET /v1/gov/me/action-cards</code>) list pending work as generic derived rows only. Completing work uses the normal proposal, meeting, or action-item HTTP surfaces for that object type; cards do not define a separate mutation API. Receipts close the proof loop where documented (see runtime maps and ADR-0027).</p>
 <h2>Validation guidance for package repos</h2>
 <ol>
 <li>Validate each planned card object against <code>action-card.schema.json</code> <strong>only</strong> for keys you intend to align with ICN runtime; package-local extensions belong outside the validated object or in a separate schema owned by the package.</li>
 <li>Do <strong>not</strong> add institution-specific <strong>nouns</strong> to this schema; bind local meaning in package docs or mappings.</li>
-<li>Respect <strong>emitted vs gated</strong> <code>source_kind</code> values documented in the schema (<code>x-icn-emitted-source-kinds</code> vs <code>x-icn-rfc-gated-source-kinds</code>).</li>
+<li>Respect <strong>emitted vs gated</strong> <code>source_kind</code> values documented in the schema (<code>x-icn-emitted-source-kinds</code>, <code>x-icn-emitted-source-action-pairs</code>, and <code>x-icn-rfc-gated-source-kinds</code>).</li>
 <li>Prefer regulatory-safe vocabulary in human docs: <strong>settlement</strong>, <strong>obligation</strong>, <strong>allocation</strong>, <strong>receipt</strong>, <strong>provenance</strong> — not payment/wallet/balance framing for the substrate.</li>
 </ol>
 <h2>Runtime source of truth</h2>
