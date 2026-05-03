@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Cursor and Claude MCP Setup | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Agent MCP tooling (icn-ops) | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
@@ -37,94 +37,98 @@
   document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
 </script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
-          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>developer</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>cursor mcp setup</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/developer/cursor-mcp-setup.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>developer</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>agent mcp tooling</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/developer/agent-mcp-tooling.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Cursor and Claude MCP Setup</h1>
-<p>This repo ships a local <code>icn-ops</code> MCP server in <code>ops/mcp</code>.</p>
-<p><strong>Clients:</strong> Cursor (<code>.cursor/mcp.json</code>), Claude Code and other tools that honor the repo-root <code>.mcp.json</code>, and any generic MCP host that can run a <code>command</code> + <code>args</code> from the workspace root should all launch the server the same way. Paths are repo-relative so a clone works on any machine; each host still uses <strong>its own</strong> <code>npm</code>/<code>node</code> from PATH, so keep Node majors aligned between “where you ran <code>npm ci</code>” and “where the MCP host spawns processes” (see Node ABI note below).</p>
-<p>For <strong>agent-facing MCP tools</strong> (<code>icn_ops_doctor</code>, environment report, command catalog, etc.), see <a href="https://github.com/InterCooperative-Network/icn/blob/main/agent-mcp-tooling">agent-mcp-tooling.md</a>.</p>
-<h2>Config Surfaces</h2>
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Agent MCP tooling (icn-ops)</h1>
+<p>The <code>ops/mcp</code> server is a <strong>portable agent operations layer</strong>: one TypeScript stdio MCP that Cursor, Claude Code, Codex-style hosts, and future MCP clients can share. It is not editor-specific glue; it centralizes read-mostly diagnostics, cached cluster/git health, and safe discovery so agents can orient before changing the ICN monorepo.</p>
+<h2>Launch (all clients)</h2>
+<p>From the <strong>repository root</strong>, register <code>icn-ops</code> with:</p>
 <ul>
-<li><code>./.mcp.json</code><ul>
-<li>Repo-local MCP registration used by Claude-oriented workflows in this repo.</li>
-<li>Starts <code>icn-ops</code> through <code>npm --prefix ./ops/mcp run start:stdio</code>.</li>
-<li>Do not hard-code <code>/home/...</code>, <code>/Users/...</code>, WSL paths, VM names, or homelab host paths here.</li>
+<li><strong>Command:</strong> <code>npm</code></li>
+<li><strong>Args:</strong> <code>[&quot;--prefix&quot;, &quot;./ops/mcp&quot;, &quot;run&quot;, &quot;start:stdio&quot;]</code></li>
 </ul>
-</li>
-<li><code>./.claude/settings.json</code><ul>
-<li>Claude-specific permissions, hooks, and session behavior.</li>
-<li>This file is not the place to register MCP servers.</li>
-</ul>
-</li>
-<li><code>./.cursor/mcp.json</code><ul>
-<li>Project-local Cursor MCP registration for the currently opened workspace.</li>
-<li>Uses the <strong>same</strong> <code>icn-ops</code> launch stanza as <code>./.mcp.json</code> (portability script enforces this).</li>
-</ul>
-</li>
-<li><code>~/.mcp.json</code><ul>
-<li>User-level Claude MCP config.</li>
-<li>Use this only for personal/global servers you want in every workspace.</li>
-</ul>
-</li>
-<li><code>~/.cursor/mcp.json</code><ul>
-<li>User-level Cursor MCP config.</li>
-<li>Leave this empty or use it only for tools you want in every workspace.</li>
-</ul>
-</li>
-</ul>
-<h2>Install Dependencies</h2>
-<p>The checked-in Claude config builds and starts the MCP server automatically, but dependencies must be installed once per checkout:</p>
-<pre><code class="language-bash">cd ops/mcp
-npm ci
-</code></pre>
-<h2>Build The Server Manually</h2>
-<p>The runtime entrypoint is:</p>
-<pre><code class="language-text">ops/mcp/dist/index.js
-</code></pre>
-<p>Build it manually with:</p>
-<pre><code class="language-bash">cd ops/mcp
-npm run build
-</code></pre>
-<p>Both <code>./.mcp.json</code> and <code>./.cursor/mcp.json</code> use <code>npm --prefix ./ops/mcp run start:stdio</code>, which runs <code>tsc</code> then <code>node dist/index.js</code> under <strong>one</strong> <code>node</code> resolved for that <code>npm</code> invocation. After <code>npm ci</code> / <code>npm install</code>, <code>postinstall</code> runs <code>npm rebuild better-sqlite3</code> so native bindings match <strong>that</strong> Node.</p>
-<p><strong>Node ABI:</strong> <code>better-sqlite3</code> is native. If you install dependencies with Node 22 but the MCP host starts the server with Node 20 (or the reverse), the addon fails to load until you run <code>npm ci</code> or <code>npm rebuild better-sqlite3</code> using the same Node the host will use. The unified <code>npm … start:stdio</code> entrypoint does not remove that OS-level constraint; it only ensures <code>tsc</code> and <code>node dist/index.js</code> agree within a single spawn.</p>
-<p><strong>DevDependency noise:</strong> Vitest pulls Vite 7, which may print <code>EBADENGINE</code> on Node versions older than <strong>20.19</strong>; that warning is about the test runner stack, not the MCP runtime. Use Node <strong>20.19+</strong> or <strong>22.12+</strong> if you want a clean <code>npm ci</code> with no engine warnings.</p>
-<h2>Validate The Runtime</h2>
-<p>From the <strong>repo root</strong>, confirm dependencies install, TypeScript builds, and the stdio server stays up briefly without exiting (same path MCP clients use):</p>
-<pre><code class="language-bash">npm --prefix ./ops/mcp ci
-npm --prefix ./ops/mcp run build
-python3 scripts/check-mcp-portability.py
-timeout 5 npm --prefix ./ops/mcp run start:stdio
-</code></pre>
-<p>Smoke test: you should <strong>not</strong> see a Node stack trace right after <code>node dist/index.js</code> starts. With GNU <strong>coreutils</strong> <code>timeout</code>, exit status <strong>124</strong> means the timer fired while the server was still running (expected). If the server exits immediately, investigate stderr (common causes: missing <code>ops/mcp</code> deps, Node/native ABI mismatch, or DB path issues). On macOS, use <code>gtimeout</code> from Homebrew <strong>coreutils</strong> if <code>timeout</code> is missing. After <code>npm ci</code>, run <code>npm test</code> inside <code>ops/mcp</code> when changing server code.</p>
-<h2>Claude Workflow</h2>
-<ol>
-<li><p>Clone the repo anywhere.</p>
-</li>
-<li><p>Install dependencies once:</p>
-<pre><code class="language-bash">cd ops/mcp
-npm ci
-</code></pre>
-</li>
-<li><p>Start Claude Code from the repo root or a parent workspace that loads this repo&#39;s <code>.mcp.json</code>.</p>
-</li>
-<li><p>Confirm the <code>icn-ops</code> server appears in Claude&#39;s MCP UI/tools list.</p>
-</li>
-</ol>
-<h2>Cursor Workflow</h2>
-<ol>
-<li>Open the repo root in Cursor. Any local checkout path works.</li>
-<li>Run <code>cd ops/mcp &amp;&amp; npm ci</code> once per checkout (or after changing Node major versions).</li>
-<li>Reload the Cursor window so it re-reads <code>.cursor/mcp.json</code>.</li>
-<li>Confirm the <code>icn-ops</code> server appears in Cursor&#39;s MCP UI/tools list.</li>
-</ol>
-<h2>Claude / Cursor / other MCP hosts</h2>
+<p>Repo files:</p>
 <ul>
-<li>Repo-local MCP wiring for Claude-compatible hosts: <code>./.mcp.json</code> (same <code>icn-ops</code> stanza as Cursor).</li>
-<li>Claude lifecycle and hooks: <code>./.claude/settings.json</code> (not used for MCP server registration in this repo).</li>
-<li>Cursor project MCP: <code>./.cursor/mcp.json</code> (must stay identical to <code>./.mcp.json</code> for <code>icn-ops</code>; enforced by <code>scripts/check-mcp-portability.py</code>).</li>
-<li>User-global <code>~/.mcp.json</code> / <code>~/.cursor/mcp.json</code>: optional; do not duplicate <code>icn-ops</code> there unless you intentionally want a second registration.</li>
+<li><code>.mcp.json</code> — Claude-compatible project MCP</li>
+<li><code>.cursor/mcp.json</code> — Cursor project MCP</li>
 </ul>
-<p>This keeps contributor setup portable and prevents one developer&#39;s machine path from becoming everyone else&#39;s broken default.</p>
+<p>These must stay <strong>identical</strong> for <code>icn-ops</code> (enforced by <code>python3 scripts/check-mcp-portability.py</code>). Do not point MCP configs at <code>ops/mcp/dist/index.js</code> directly; <code>start:stdio</code> runs <code>tsc</code> then <code>node</code> under one Node.</p>
+<p>Install once per checkout (or after changing Node major):</p>
+<pre><code class="language-bash">cd ops/mcp &amp;&amp; npm ci
+</code></pre>
+<p>Native module note: <code>better-sqlite3</code> is rebuilt in <code>postinstall</code>. If the MCP host uses a different Node than the one used for <code>npm ci</code>, run <code>npm rebuild better-sqlite3</code> (or <code>npm ci</code> again) under the host’s Node.</p>
+<h2>Tools (agent-facing)</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn_ops_environment_report</code></td>
+<td>JSON snapshot: repo root, git branch/commit/dirty, Node ABI, npm/rust/python versions, optional <code>gh</code>/<code>kubectl</code>, MCP config inspection, <code>node_modules</code>/<code>dist</code> presence, <code>better-sqlite3</code> load probe. Missing optional CLIs are <strong>warnings</strong>, not hard failures.</td>
+</tr>
+<tr>
+<td><code>icn_ops_doctor</code></td>
+<td>Read-only diagnosis: severity (<code>ok</code> / <code>warn</code> / <code>error</code>), per-check results, suggested <strong>shell repair commands</strong> (not executed). Covers MCP parity script, native module, dirty tree, optional tools, key <code>ops/state</code> files.</td>
+</tr>
+<tr>
+<td><code>icn_ops_agent_brief</code></td>
+<td>Compact structured briefing: docs to read first, safe vs forbidden vocabulary, verification commands by area, PR hygiene, completeness warning, MCP troubleshooting bullets.</td>
+</tr>
+<tr>
+<td><code>icn_ops_command_catalog</code></td>
+<td><strong>Catalog only</strong> — grouped commands with <code>working_directory</code>, <code>safety</code> (<code>read_only</code> / <code>modifies_local</code> / <code>destructive</code> / <code>external_side_effect</code>), <code>runtime</code> hint, and <code>when_to_use</code>. Never runs commands.</td>
+</tr>
+<tr>
+<td><code>icn_ops_state_index</code></td>
+<td>Lists canonical state/architecture paths with <code>present: true/false</code> (filesystem stat); does not invent missing files. Optional arg <code>include_absent</code> (default true).</td>
+</tr>
+</tbody></table>
+<p>Existing tools (<code>cluster_health</code>, sessions, tasks, decisions, etc.) remain available; cluster polling and health tools guard external JSON so bad <code>kubectl</code>/<code>jq</code> output does not crash stdio.</p>
+<h2>Common failure modes</h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Likely cause</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MCP host shows native module / <code>NODE_MODULE_VERSION</code></td>
+<td>Node ABI mismatch vs <code>npm ci</code></td>
+<td><code>cd ops/mcp &amp;&amp; npm rebuild better-sqlite3</code> or reinstall with the host’s Node</td>
+</tr>
+<tr>
+<td><code>icn_ops_doctor</code> → portability error</td>
+<td><code>.mcp.json</code> ≠ <code>.cursor/mcp.json</code></td>
+<td>Align args to canonical <code>npm --prefix ./ops/mcp run start:stdio</code></td>
+</tr>
+<tr>
+<td>Doctor warns on missing <code>ops/state/...</code></td>
+<td>Fresh clone or ops state not checked in</td>
+<td>Confirm paths; some files are environment-specific</td>
+</tr>
+<tr>
+<td><code>kubectl</code> / <code>gh</code> warnings</td>
+<td>Optional tooling absent</td>
+<td>Expected on dev laptops; not required for MCP core</td>
+</tr>
+</tbody></table>
+<h2>Validation before edits</h2>
+<ol>
+<li>Call <code>icn_ops_doctor</code> (or <code>icn_ops_environment_report</code>) after switching branches or Node versions.</li>
+<li>Follow <code>icn_ops_agent_brief</code> + <code>AGENTS.md</code> change routing for the area you touch.</li>
+<li>Use <code>icn_ops_command_catalog</code> to pick verification commands; run them in your terminal (MCP does not auto-run them).</li>
+</ol>
+<h2>Related docs</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/cursor-mcp-setup">cursor-mcp-setup.md</a> — Cursor vs Claude wiring and smoke-test commands</li>
+<li><code>AGENTS.md</code> (repo root) — invariants and verification matrix</li>
+<li><code>ops/CLAUDE.md</code> — orchestration plane layout</li>
+</ul>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
