@@ -1,6 +1,11 @@
 import {
   AGENT_TOOL_CONTRACT_VERSION,
+  PRIORITY_LEVELS,
+  RUNTIME_BUCKETS,
+  SAFETY_LEVELS,
   SCHEMA_TOOL_NAME,
+  SEVERITY_LEVELS,
+  TOOL_STABILITY_LEVELS,
   type ToolStability,
 } from "./schema.js";
 
@@ -22,6 +27,42 @@ export type AgentToolSchemaBundle = {
   unknown_fields_policy: string;
   tools: AgentToolSchemaEntry[];
 };
+
+/** Static file + optional live tool superset: enums and provenance for offline agents. */
+export type AgentMcpContractExport = AgentToolSchemaBundle & {
+  generated_from: string;
+  enums: {
+    severity: readonly string[];
+    safety: readonly string[];
+    runtime: readonly string[];
+    priority: readonly string[];
+    tool_stability: readonly string[];
+  };
+};
+
+/** Deep-sort object keys for deterministic JSON (drift tests + export script). */
+export function sortKeysDeep(x: unknown): unknown {
+  if (Array.isArray(x)) {
+    return x.map(sortKeysDeep);
+  }
+  if (x !== null && typeof x === "object" && !Array.isArray(x)) {
+    const proto = Object.getPrototypeOf(x);
+    if (proto !== null && proto !== Object.prototype) {
+      return x;
+    }
+    const o = x as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(o).sort()) {
+      out[k] = sortKeysDeep(o[k]);
+    }
+    return out;
+  }
+  return x;
+}
+
+export function stableSerializeMcpContract(obj: unknown): string {
+  return `${JSON.stringify(sortKeysDeep(obj), null, 2)}\n`;
+}
 
 const V = AGENT_TOOL_CONTRACT_VERSION;
 
@@ -130,10 +171,26 @@ export function buildAgentToolSchemaBundle(): AgentToolSchemaBundle {
         tool: SCHEMA_TOOL_NAME,
         version: V,
         ...NO_INPUT,
-        output_schema_summary: "AgentToolSchemaBundle (this object shape, including unknown_fields_policy).",
+        output_schema_summary:
+          "AgentMcpContractExport: matches docs/guides/developer/agent-mcp-contracts.json (generated_from, enums, contract_version, unknown_fields_policy, tools[]).",
         stability: "experimental",
         notes: "Meta tool; contract_version applies to all listed tools. Prefer typed fields over prose in clients.",
       },
     ],
+  };
+}
+
+export function buildAgentMcpContractExport(): AgentMcpContractExport {
+  const base = buildAgentToolSchemaBundle();
+  return {
+    ...base,
+    generated_from: "icn-ops ops/mcp: diagnostics/schema.ts + diagnostics/tool-schemas.ts (buildAgentToolSchemaBundle)",
+    enums: {
+      severity: [...SEVERITY_LEVELS],
+      safety: [...SAFETY_LEVELS],
+      runtime: [...RUNTIME_BUCKETS],
+      priority: [...PRIORITY_LEVELS],
+      tool_stability: [...TOOL_STABILITY_LEVELS],
+    },
   };
 }

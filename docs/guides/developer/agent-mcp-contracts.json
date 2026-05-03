@@ -1,0 +1,147 @@
+{
+  "contract_version": "1.0.0",
+  "enums": {
+    "priority": [
+      "high",
+      "medium",
+      "low"
+    ],
+    "runtime": [
+      "quick",
+      "medium",
+      "long"
+    ],
+    "safety": [
+      "read_only",
+      "modifies_local",
+      "destructive",
+      "external_side_effect"
+    ],
+    "severity": [
+      "ok",
+      "warn",
+      "error"
+    ],
+    "tool_stability": [
+      "experimental",
+      "stable"
+    ]
+  },
+  "generated_from": "icn-ops ops/mcp: diagnostics/schema.ts + diagnostics/tool-schemas.ts (buildAgentToolSchemaBundle)",
+  "tools": [
+    {
+      "input_schema": null,
+      "input_schema_summary": "No tool arguments (empty object).",
+      "notes": "Read-only snapshot; missing optional CLIs appear as warnings[], not fatal errors.",
+      "output_schema_summary": "EnvironmentReport{repoRoot,warnings[],git,node,npm,rust,python,gh,kubectl,paths,betterSqlite3,mcpConfigs}",
+      "stability": "stable",
+      "tool": "icn_ops_environment_report",
+      "version": "1.0.0"
+    },
+    {
+      "input_schema": null,
+      "input_schema_summary": "No tool arguments (empty object).",
+      "notes": "Suggested repairs are strings only; never executed by MCP.",
+      "output_schema_summary": "DoctorReport{severity:Severity,summary,checks:DiagnosticCheck[],suggested_repairs:string[]}",
+      "stability": "stable",
+      "tool": "icn_ops_doctor",
+      "version": "1.0.0"
+    },
+    {
+      "input_schema": null,
+      "input_schema_summary": "No tool arguments (empty object).",
+      "output_schema_summary": "AgentBrief{read_first[],safe_vocabulary[],forbidden_vocabulary[],public_surface[],verification_by_area[],pr_hygiene[],completeness_warning,mcp_troubleshooting[]}",
+      "stability": "stable",
+      "tool": "icn_ops_agent_brief",
+      "version": "1.0.0"
+    },
+    {
+      "input_schema": null,
+      "input_schema_summary": "No tool arguments (empty object).",
+      "notes": "safety uses shared enum; cautions describe lockfile/time/network behavior only.",
+      "output_schema_summary": "CommandCatalog{version:1,groups{name,commands:CommandCatalogEntry[]}}; entry fields id,purpose,command,working_directory,safety,runtime,when_to_use,caution?",
+      "stability": "stable",
+      "tool": "icn_ops_command_catalog",
+      "version": "1.0.0"
+    },
+    {
+      "input_schema": {
+        "properties": {
+          "include_absent": {
+            "description": "List absent entries (default true).",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "input_schema_summary": "Optional include_absent:boolean (default true).",
+      "output_schema_summary": "{entries:StateIndexEntry[]}",
+      "stability": "stable",
+      "tool": "icn_ops_state_index",
+      "version": "1.0.0"
+    },
+    {
+      "input_schema": null,
+      "input_schema_summary": "No tool arguments (empty object).",
+      "notes": "recommended_steps[].safety uses shared enum; destructive steps must include caution when present.",
+      "output_schema_summary": "NextStepsReport{severity:Severity,summary,recommended_steps:RecommendedStep[],diagnosis_digest}",
+      "stability": "stable",
+      "tool": "icn_ops_next_steps",
+      "version": "1.0.0"
+    },
+    {
+      "input_schema": {
+        "properties": {
+          "area": {
+            "enum": [
+              "mcp",
+              "docs",
+              "rust",
+              "website",
+              "vocabulary",
+              "pr",
+              "full"
+            ],
+            "type": "string"
+          },
+          "risk_level": {
+            "description": "Default standard.",
+            "enum": [
+              "quick",
+              "standard",
+              "thorough"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "area"
+        ],
+        "type": "object"
+      },
+      "input_schema_summary": "Required area:string enum; optional risk_level:string enum (default standard).",
+      "output_schema_summary": "VerificationPlan{area,risk_level,steps:VerificationPlanStep[]}; step fields order,command,working_directory,purpose,expected_success_signal,safety,estimated_runtime,notes?",
+      "stability": "stable",
+      "tool": "icn_ops_verification_plan",
+      "version": "1.0.0"
+    },
+    {
+      "input_schema": null,
+      "input_schema_summary": "No tool arguments (empty object).",
+      "output_schema_summary": "{entries:RepoMapEntry[]}",
+      "stability": "stable",
+      "tool": "icn_ops_repo_map",
+      "version": "1.0.0"
+    },
+    {
+      "input_schema": null,
+      "input_schema_summary": "No tool arguments (empty object).",
+      "notes": "Meta tool; contract_version applies to all listed tools. Prefer typed fields over prose in clients.",
+      "output_schema_summary": "AgentMcpContractExport: matches docs/guides/developer/agent-mcp-contracts.json (generated_from, enums, contract_version, unknown_fields_policy, tools[]).",
+      "stability": "experimental",
+      "tool": "icn_ops_tool_schemas",
+      "version": "1.0.0"
+    }
+  ],
+  "unknown_fields_policy": "Clients MUST ignore unknown JSON keys in any tool response body so additive server fields do not break parsers."
+}

@@ -28,7 +28,7 @@ Native module note: `better-sqlite3` is rebuilt in `postinstall`. If the MCP hos
 
 | Tool | Purpose |
 |------|---------|
-| `icn_ops_tool_schemas` | **Contract bundle** — `contract_version`, `unknown_fields_policy`, `tools[]` each with `tool`, `version` (matches contract for now), `input_schema` \| `null`, `input_schema_summary`, `output_schema_summary`, `stability` (`stable` \| `experimental`), optional `notes`. Lists all agent JSON tools below. **Read-only**; does not execute anything. |
+| `icn_ops_tool_schemas` | **Contract bundle** (live MCP) — same payload shape as **[agent-mcp-contracts.json](./agent-mcp-contracts.json)**: `generated_from`, `enums` (severity, safety, runtime, priority, tool_stability), `contract_version`, `unknown_fields_policy`, `tools[]` (per-tool `version`, `input_schema`, `input_schema_summary`, `output_schema_summary`, `stability`, optional `notes`). **Read-only**; does not execute anything. |
 | `icn_ops_environment_report` | JSON snapshot: repo root, git branch/commit/dirty, Node ABI, npm/rust/python versions, optional `gh`/`kubectl`, MCP config inspection, `node_modules`/`dist` presence, `better-sqlite3` load probe. Missing optional CLIs are **warnings**, not hard failures. |
 | `icn_ops_doctor` | Read-only diagnosis: severity (`ok` / `warn` / `error`), per-check results, suggested **shell repair commands** (not executed). Covers MCP parity script, native module, dirty tree, optional tools, key `ops/state` files, and lightweight **CLI runner probes** (`git` / `npm` / `python3`). |
 | `icn_ops_agent_brief` | Compact structured briefing: docs to read first, safe vs forbidden vocabulary, verification commands by area, PR hygiene, completeness warning, MCP troubleshooting bullets. |
@@ -48,6 +48,13 @@ Native module note: `better-sqlite3` is rebuilt in `postinstall`. If the MCP hos
 - **`destructive`** and **`external_side_effect`** command strings in catalogs and plans are **not executed by MCP**; they require **human review** before running in a shell.
 
 Compact **example payloads**: [agent-mcp-examples.md](./agent-mcp-examples.md).
+
+### Static contract JSON (no MCP server)
+
+- **Path:** [`docs/guides/developer/agent-mcp-contracts.json`](./agent-mcp-contracts.json) — deterministic export of tool contracts + shared enums (`buildAgentMcpContractExport()` in `ops/mcp/src/diagnostics/tool-schemas.ts`).
+- **Regenerate:** from `ops/mcp`: `npm run export:contracts` (runs `tsc` then `node dist/scripts/export-agent-contracts.js`). Writes the JSON above; **review the diff** before commit.
+- **Drift guard:** `ops/mcp/src/tests/agent-mcp-contract-drift.test.ts` fails CI if the committed file does not match the generator (`npm test` includes it). Message tells maintainers to re-run `npm run export:contracts`.
+- **Not permission to execute:** the file and `icn_ops_tool_schemas` are **documentation contracts** only. Catalog/plan command strings still require **human review** for `destructive` / `external_side_effect` before any shell run.
 
 Existing tools (`cluster_health`, sessions, tasks, decisions, etc.) remain available. Poller and health paths use **`execFile`-style argv** (via `runCommand` in `ops/mcp/src/utils/commands.ts`): no shell, bounded stdout/stderr, timeouts, and structured `{ ok, exitCode, stderr, timedOut }` results. `kubectl get pods -o json` is parsed in-process (no `jq` pipeline). External JSON goes through `safeJsonParse` so malformed output becomes `{ error, preview }` instead of throwing through the MCP boundary.
 

@@ -9,7 +9,7 @@ import { buildStateIndex } from "../diagnostics/state-index.js";
 import { buildNextStepsReport } from "../diagnostics/next-steps.js";
 import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
 import { buildRepoMap } from "../diagnostics/repo-map.js";
-import { buildAgentToolSchemaBundle } from "../diagnostics/tool-schemas.js";
+import { buildAgentMcpContractExport } from "../diagnostics/tool-schemas.js";
 
 export function registerAgentOpsTools(server: McpServer): void {
   const repoRoot = resolveMonorepoRoot();
@@ -127,12 +127,12 @@ export function registerAgentOpsTools(server: McpServer): void {
 
   server.tool(
     "icn_ops_tool_schemas",
-    "Machine-readable contract: contract_version, unknown_fields_policy, tools[] with tool, version, input_schema|null, input_schema_summary, output_schema_summary, stability (stable|experimental), notes. Per-tool version tracks AGENT_TOOL_CONTRACT_VERSION; prefer fields over prose.",
+    "Machine-readable contract: same object shape as docs/guides/developer/agent-mcp-contracts.json (generated_from, enums, contract_version, unknown_fields_policy, tools[]). Prefer fields over prose; static file is for offline use without MCP.",
     {},
     async () => {
-      const bundle = buildAgentToolSchemaBundle();
+      const payload = buildAgentMcpContractExport();
       return {
-        content: [{ type: "text", text: JSON.stringify(bundle, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
     }
   );

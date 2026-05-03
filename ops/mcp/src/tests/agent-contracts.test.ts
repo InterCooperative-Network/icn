@@ -9,7 +9,10 @@ import {
   SEVERITY_LEVELS,
   TOOL_STABILITY_LEVELS,
 } from "../diagnostics/schema.js";
-import { buildAgentToolSchemaBundle } from "../diagnostics/tool-schemas.js";
+import {
+  buildAgentToolSchemaBundle,
+  buildAgentMcpContractExport,
+} from "../diagnostics/tool-schemas.js";
 import { COMMAND_CATALOG } from "../diagnostics/command-catalog.js";
 import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
 import { analyzeNextStepsFromSignals, buildNextStepsReport } from "../diagnostics/next-steps.js";
@@ -82,6 +85,18 @@ function assertRecommendedStepShape(s: unknown): void {
     expect(typeof s.caution === "string" && s.caution.length > 0).toBe(true);
   }
 }
+
+describe("AgentMcpContractExport", () => {
+  it("extends the tool bundle with enums and generated_from", () => {
+    const ex = buildAgentMcpContractExport();
+    const base = buildAgentToolSchemaBundle();
+    expect(ex.contract_version).toBe(base.contract_version);
+    expect(ex.tools).toEqual(base.tools);
+    expect(ex.generated_from.length).toBeGreaterThan(20);
+    expect(ex.enums.severity).toEqual([...SEVERITY_LEVELS]);
+    expect(ex.enums.safety).toEqual([...SAFETY_LEVELS]);
+  });
+});
 
 describe("icn_ops_tool_schemas bundle", () => {
   it("lists every agent-facing contract tool exactly once", () => {

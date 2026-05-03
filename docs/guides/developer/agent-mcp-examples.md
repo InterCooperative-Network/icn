@@ -2,6 +2,8 @@
 
 Illustrative JSON shapes for `icn_ops_*` tools. Fields match `ops/mcp/src/diagnostics/schema.ts` (`AGENT_TOOL_CONTRACT_VERSION`). Unknown future keys should be ignored.
 
+**Offline contract:** the full machine-readable bundle (including `enums` and `generated_from`) is committed at [`agent-mcp-contracts.json`](./agent-mcp-contracts.json). Regenerate with `npm run export:contracts` from `ops/mcp` after changing `schema.ts` or `tool-schemas.ts`.
+
 ## icn_ops_doctor — clean MCP layer
 
 ```json
