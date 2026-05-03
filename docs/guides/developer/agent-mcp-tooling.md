@@ -78,6 +78,26 @@ Existing tools (`cluster_health`, sessions, tasks, decisions, etc.) remain avail
 2. Follow `icn_ops_agent_brief` + `AGENTS.md` change routing for the area you touch.
 3. Use `icn_ops_verification_plan` and/or `icn_ops_command_catalog` to pick checks; run them in your terminal (MCP does not auto-run them).
 
+## Ship checklist (ops MCP)
+
+**Launch (Cursor + Claude + any MCP host):** repo root, `command` = `npm`, `args` = `["--prefix", "./ops/mcp", "run", "start:stdio"]`. Do **not** point hosts at `node ./ops/mcp/dist/index.js` (ABI drift). After changing Node major: `cd ops/mcp && npm ci`, then **reload** the MCP session / Cursor window.
+
+**Merge order to `main`:** land [#1716](https://github.com/InterCooperative-Network/icn/pull/1716) (stdio unify) → [#1717](https://github.com/InterCooperative-Network/icn/pull/1717) (diagnostics) → [#1718](https://github.com/InterCooperative-Network/icn/pull/1718) (execFile runner) → [#1719](https://github.com/InterCooperative-Network/icn/pull/1719) (workflow guidance). Later PRs may need `git fetch && git rebase origin/main` after earlier merges.
+
+**Local verification (repo root):**
+
+```bash
+npm --prefix ./ops/mcp ci
+npm --prefix ./ops/mcp run build
+npm --prefix ./ops/mcp test
+python3 scripts/check-mcp-portability.py
+timeout 5 npm --prefix ./ops/mcp run start:stdio   # exit 124 while server runs is OK
+```
+
+**Agents:** use `icn_ops_doctor` / `icn_ops_next_steps` for “what’s wrong?” and “what should I run?” — all suggested commands are **strings only**; MCP does not run shells or auto-remediation.
+
+**Warnings vs blockers:** missing `kubectl` / `gh` / dirty tree → usually **warn**. Missing `ops/mcp/node_modules`, failed `better-sqlite3` load, portability script failure → treat as **blockers** for MCP until fixed.
+
 ## Related docs
 
 - [cursor-mcp-setup.md](./cursor-mcp-setup.md) — Cursor vs Claude wiring and smoke-test commands
