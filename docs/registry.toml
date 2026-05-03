@@ -1315,6 +1315,22 @@ domain_tags = ["strategy", "partner-discovery"]
 recommended_action = "keep"
 last_reviewed = "2026-04-29"
 
+[docs."docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md"]
+category = "strategy"
+status = "draft"
+title = "NYCN Phase 2 pilot rehearsal gate"
+description = "Organizer-safe control-plane gate for moving from Phase 2 machinery exists to formal NYCN pilot rehearsal: organizer presentation, pilot formalization, first operator rehearsal. Descriptive planning only; not production readiness or Phase 2 completion."
+last_updated = "2026-05-02"
+owner = "matt"
+audiences = ["maintainers", "organizers", "operators"]
+truth_class = "descriptive"
+role = "strategy"
+canonical = "no"
+freshness = "current"
+domain_tags = ["strategy", "nycn", "pilot", "phase-2"]
+recommended_action = "keep"
+last_reviewed = "2026-05-02"
+
 [docs."docs/strategy/LICENSING_STRATEGY_MATRIX.md"]
 category = "strategy"
 status = "draft"

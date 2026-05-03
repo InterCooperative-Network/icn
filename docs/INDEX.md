@@ -424,6 +424,7 @@ Strategic direction and gap analysis (March 2026):
 - [NYCN-Repo-Architecture-Spec.md](strategy/NYCN-Repo-Architecture-Spec.md) - Repo-shaped architectural map grounded in current code: bounded domains, canonical objects, authority model, Program/cycle design (2026-04-14)
 - [NYCN-Implementation-Matrix.md](strategy/NYCN-Implementation-Matrix.md) - Execution ledger: per-object status (main/open_pr/branch_only/spec_only), touch points, bootstrap seed, ny-coop-net import crosswalk, phase-gated open questions (2026-04-14)
 - [NYCN-Execution-Tranches.md](strategy/NYCN-Execution-Tranches.md) - Merge-order + dependency plan across 7 tranches, rollback strategy, agent assignments (2026-04-14)
+- [NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md](strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md) - Organizer/operator gate before a formal NYCN Phase 2 pilot begins (2026-05-02)
 - [../institutions/nycn/README.md](../institutions/nycn/README.md) - NYCN institution package boundary, ownership rules, and package scaffold (2026-04-22)
 - [../institutions/nycn/docs/INDEX.md](../institutions/nycn/docs/INDEX.md) - NYCN package-local docs, bootstrap runbook, summit materials, and seed entrypoints (2026-04-22)
 
