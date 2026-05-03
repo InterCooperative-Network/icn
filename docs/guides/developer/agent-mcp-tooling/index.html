@@ -71,7 +71,7 @@ View source on GitHub →
 </tr>
 <tr>
 <td><code>icn_ops_doctor</code></td>
-<td>Read-only diagnosis: severity (<code>ok</code> / <code>warn</code> / <code>error</code>), per-check results, suggested <strong>shell repair commands</strong> (not executed). Covers MCP parity script, native module, dirty tree, optional tools, key <code>ops/state</code> files.</td>
+<td>Read-only diagnosis: severity (<code>ok</code> / <code>warn</code> / <code>error</code>), per-check results, suggested <strong>shell repair commands</strong> (not executed). Covers MCP parity script, native module, dirty tree, optional tools, key <code>ops/state</code> files, and lightweight <strong>CLI runner probes</strong> (<code>git</code> / <code>npm</code> / <code>python3</code>).</td>
 </tr>
 <tr>
 <td><code>icn_ops_agent_brief</code></td>
@@ -86,7 +86,14 @@ View source on GitHub →
 <td>Lists canonical state/architecture paths with <code>present: true/false</code> (filesystem stat); does not invent missing files. Optional arg <code>include_absent</code> (default true).</td>
 </tr>
 </tbody></table>
-<p>Existing tools (<code>cluster_health</code>, sessions, tasks, decisions, etc.) remain available; cluster polling and health tools guard external JSON so bad <code>kubectl</code>/<code>jq</code> output does not crash stdio.</p>
+<p>Existing tools (<code>cluster_health</code>, sessions, tasks, decisions, etc.) remain available. Poller and health paths use <strong><code>execFile</code>-style argv</strong> (via <code>runCommand</code> in <code>ops/mcp/src/utils/commands.ts</code>): no shell, bounded stdout/stderr, timeouts, and structured <code>{ ok, exitCode, stderr, timedOut }</code> results. <code>kubectl get pods -o json</code> is parsed in-process (no <code>jq</code> pipeline). External JSON goes through <code>safeJsonParse</code> so malformed output becomes <code>{ error, preview }</code> instead of throwing through the MCP boundary.</p>
+<h3>Safe command execution policy</h3>
+<ul>
+<li><strong>Default:</strong> <code>runCommand</code> / <code>runCommandQuick</code> / <code>runCommandJson</code> — argv only, no <code>/bin/sh -c</code>, predictable quoting, output truncation.</li>
+<li><strong>Why avoid shell pipelines:</strong> they inject quoting bugs, hide exit codes, and make “optional tool missing” look like opaque script failures.</li>
+<li><strong>Failures:</strong> represented as <code>ok: false</code> plus stderr/exit/timedOut; pollers write those into <code>health_cache</code> or doctor checks — <strong>never</strong> <code>process.exit</code> from optional probes.</li>
+<li><strong>Warnings vs errors:</strong> <code>icn_ops_doctor</code> uses <code>warn</code> for optional CLIs and dirty trees; <code>error</code> for portability failures, native module load, or missing <code>node_modules</code>. Suggested repairs are <strong>strings only</strong> — not executed by MCP.</li>
+</ul>
 <h2>Common failure modes</h2>
 <table>
 <thead>
