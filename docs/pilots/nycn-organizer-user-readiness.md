@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-05-03
+Last Reviewed: 2026-05-04
 ---
 
 # NYCN organizer and user readiness (ICN side)
@@ -48,7 +48,7 @@ Non-technical members should only need a **shell** (web, mobile, or assisted kio
 
 Institution packages should validate card-shaped JSON against:
 
-- `docs/contracts/institution-package/action-card.schema.json` (**experimental / RFC** — see `x-icn-status` in file)
+- `docs/contracts/institution-package/action-card.schema.json` (**RFC** — see `x-icn-status`; emitted `(source_kind, action_kind)` pairs are listed under `x-icn-emitted-source-action-pairs`, with `signal_rule` / `obligation_lifecycle` reserved-not-emitted)
 - Package validation notes: `docs/contracts/institution-package/README.md`
 
 Tracking: [#1713](https://github.com/InterCooperative-Network/icn/issues/1713). Organizer gate: [#1703](https://github.com/InterCooperative-Network/icn/issues/1703).

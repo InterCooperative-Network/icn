@@ -5,6 +5,11 @@
   "description": "A single pending action card for a member, returned by GET /v1/gov/me/action-cards. Cards are derived views — computed at request time from the holder's standing plus open governance state — and are never stored entities. See ADR-0027. The companion HTTP wrapper `{ did, cards, generated_at }` is OpenAPI-documented in the gateway; institution packages validating exports should validate each element of `cards` against this schema.",
   "x-icn-status": "rfc",
   "x-icn-emitted-source-kinds": ["proposal", "meeting", "action_item"],
+  "x-icn-emitted-source-action-pairs": [
+    { "source_kind": "proposal", "action_kind": "vote" },
+    { "source_kind": "meeting", "action_kind": "attend" },
+    { "source_kind": "action_item", "action_kind": "complete" }
+  ],
   "x-icn-rfc-gated-source-kinds": ["signal_rule", "obligation_lifecycle"],
   "x-icn-references": [
     "ADR-0020",
@@ -12,7 +17,11 @@
     "ADR-0028",
     "GitHub icn#1646",
     "GitHub icn#1608",
-    "GitHub icn#1713"
+    "GitHub icn#1713",
+    "GitHub icn#1631",
+    "GitHub icn#1634",
+    "GitHub icn#1711",
+    "GitHub icn#1712"
   ],
   "type": "object",
   "required": [
@@ -37,7 +46,7 @@
       "minLength": 1
     },
     "source_kind": {
-      "description": "Where this card was derived from. Closed taxonomy. Values in x-icn-emitted-source-kinds are returned today when matching governance objects exist. Values in x-icn-rfc-gated-source-kinds appear in this schema for forward compatibility only; they are not emitted until their source paths land (icn#1646, icn#1631, icn#1634).",
+      "description": "Where this card was derived from. Closed taxonomy. Values in x-icn-emitted-source-kinds are returned today when matching governance objects exist, paired with action_kind as listed in x-icn-emitted-source-action-pairs (proposal→vote, meeting→attend, action_item→complete). Values in x-icn-rfc-gated-source-kinds appear for forward compatibility only: signal_rule is tracked with icn#1631 / icn#1711; obligation_lifecycle with icn#1634 / icn#1712; neither is emitted until those paths land (see also icn#1646).",
       "type": "string",
       "enum": [
         "proposal",

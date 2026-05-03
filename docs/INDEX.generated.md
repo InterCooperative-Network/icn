@@ -1210,7 +1210,7 @@ CI gates, ratchet phases, required checks, and failure index
 
 Validation guidance for institution packages using action-card.schema.json; emitted vs RFC-gated source kinds; pointers to runtime models and issue icn#1713.
 
-**For:** `contributors`, `organizers` | **Updated:** 2026-05-03
+**For:** `contributors`, `organizers` | **Updated:** 2026-05-04
 
 ### 📝 **Living** [Demo System Documentation](/docs/demo/README.md)
 
@@ -1372,7 +1372,7 @@ Bounded set of questions to ask NYCN organizers — workflow validation, source/
 
 ICN-side pilot readiness: /me/standing, /me/action-cards, completion-receipt retrieval, proof loops, generic vs package-local material, gated paths, and accessible participation. Links to STATE, phase progress, runtime map, member standing, and NYCN Phase 2 rehearsal gate.
 
-**For:** `team`, `organizers` | **Updated:** 2026-05-03
+**For:** `team`, `organizers` | **Updated:** 2026-05-04
 
 ### 📋 **Draft** [Agent Knowledge Architecture](/docs/planning/agent-knowledge-architecture.md)
 
