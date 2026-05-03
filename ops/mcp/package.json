@@ -4,11 +4,15 @@
   "description": "ICN orchestration plane MCP server — live state coordination for Claude Code sessions",
   "type": "module",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=20.10.0"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "start:stdio": "npm run --silent build && node dist/index.js",
+    "postinstall": "npm rebuild better-sqlite3",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
