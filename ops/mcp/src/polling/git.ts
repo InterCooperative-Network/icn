@@ -2,17 +2,11 @@
 // Pre-warms health_cache so repo_status/worktree_status tool calls return instantly.
 
 import type Database from "better-sqlite3";
-import { execSync } from "child_process";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
+import { runCommand } from "../utils/commands.js";
 
 const INTERVAL_MS = 30_000;
-
-function runCmd(cmd: string): string | null {
-  try {
-    return execSync(cmd, { encoding: "utf-8", timeout: 15_000 }).trim();
-  } catch {
-    return null;
-  }
-}
 
 function writeCache(db: Database.Database, key: string, value: unknown): void {
   db.prepare(
@@ -20,44 +14,65 @@ function writeCache(db: Database.Database, key: string, value: unknown): void {
   ).run(key, JSON.stringify(value));
 }
 
-function pollOnce(db: Database.Database, icnRoot: string): void {
+async function gitOut(repoPath: string, args: readonly string[]): Promise<string> {
+  const r = await runCommand("git", [...args], {
+    cwd: repoPath,
+    timeoutMs: 15_000,
+    maxStdoutBytes: 256 * 1024,
+    maxStderrBytes: 32 * 1024,
+  });
+  return r.ok ? r.stdout.trim() : "";
+}
+
+async function pollOnce(db: Database.Database, icnRoot: string): Promise<void> {
   try {
-    // Monorepo: icnRoot IS the repo root. No separate website/ops repos to poll.
-    const repos = ["icn"];
+    const repos = ["icn"] as const;
 
     const statuses: Record<string, unknown> = {};
     for (const repo of repos) {
-      // For "icn", poll the root itself (icnRoot). For others, sibling directory.
-      const dir = repo === "icn" ? icnRoot : `${icnRoot}/../${repo}`;
-      const branch = runCmd(`git -C ${dir} rev-parse --abbrev-ref HEAD 2>/dev/null`);
+      const dir =
+        repo === "icn" ? icnRoot : join(icnRoot, "..", repo);
+      const branch = await gitOut(dir, ["rev-parse", "--abbrev-ref", "HEAD"]);
       if (!branch) {
         statuses[repo] = { error: "not a git repo or not found" };
         continue;
       }
-      const dirty = runCmd(`git -C ${dir} status --porcelain 2>/dev/null`);
-      const lastCommit = runCmd(
-        `git -C ${dir} log -1 --format="%h %cr: %s" 2>/dev/null`
-      );
+      const dirty = await gitOut(dir, ["status", "--porcelain"]);
+      const lastCommit = await gitOut(dir, ["log", "-1", '--format=%h %cr: %s']);
+      let ahead = await gitOut(dir, ["rev-list", "@{u}..HEAD", "--count"]);
+      if (!ahead) ahead = "0";
+      let behind = await gitOut(dir, ["rev-list", "HEAD..@{u}", "--count"]);
+      if (!behind) behind = "0";
+      const aheadN = parseInt(ahead, 10);
+      const behindN = parseInt(behind, 10);
       statuses[repo] = {
         branch,
-        dirty: dirty !== null && dirty.length > 0,
-        lastCommit: lastCommit ?? "unknown",
+        dirty: dirty.length > 0,
+        lastCommit: lastCommit || "unknown",
+        ahead: Number.isFinite(aheadN) ? aheadN : 0,
+        behind: Number.isFinite(behindN) ? behindN : 0,
       };
     }
     writeCache(db, "git:repo_statuses", statuses);
 
-    // Worktree lag vs origin/main for icn repo
-    const wtRoot = `${icnRoot}/../icn-wt`;
-    const wtList = runCmd(`ls ${wtRoot} 2>/dev/null`);
-    if (wtList) {
+    const wtRoot = join(icnRoot, "..", "icn-wt");
+    let dirs: string[] = [];
+    try {
+      dirs = readdirSync(wtRoot).filter((d) => !d.startsWith("."));
+    } catch {
+      dirs = [];
+    }
+    if (dirs.length > 0) {
       const worktrees: Record<string, unknown> = {};
-      for (const name of wtList.split("\n").filter(Boolean)) {
-        const wtDir = `${wtRoot}/${name}/icn`;
-        const branch = runCmd(`git -C ${wtDir} rev-parse --abbrev-ref HEAD 2>/dev/null`);
+      for (const name of dirs) {
+        const wtDir = join(wtRoot, name, "icn");
+        const branch = await gitOut(wtDir, ["rev-parse", "--abbrev-ref", "HEAD"]);
         if (!branch) continue;
-        const behind = runCmd(
-          `git -C ${wtDir} rev-list --count HEAD..origin/main 2>/dev/null`
-        );
+        const behind = await gitOut(wtDir, [
+          "rev-list",
+          "--count",
+          "HEAD..origin/main",
+        ]);
         const n = behind ? parseInt(behind, 10) : NaN;
         worktrees[name] = {
           branch,
@@ -81,8 +96,10 @@ export function startGitPolling(
   db: Database.Database,
   icnRoot: string
 ): NodeJS.Timeout {
-  // First poll immediately (fire and forget — don't block server startup)
-  setImmediate(() => pollOnce(db, icnRoot));
-
-  return setInterval(() => pollOnce(db, icnRoot), INTERVAL_MS);
+  setImmediate(() => {
+    void pollOnce(db, icnRoot).catch((e) => console.error("git poll async error:", e));
+  });
+  return setInterval(() => {
+    void pollOnce(db, icnRoot).catch((e) => console.error("git poll async error:", e));
+  }, INTERVAL_MS);
 }

@@ -89,6 +89,11 @@ describe("buildDoctorReport", () => {
 describe("COMMAND_CATALOG", () => {
   it("has stable top-level schema", () => {
     expect(COMMAND_CATALOG.version).toBe(1);
+    expect(
+      COMMAND_CATALOG.groups
+        .find((g) => g.name === "MCP checks")
+        ?.commands.some((c) => c.id === "mcp_subprocess_audit")
+    ).toBe(true);
     expect(Array.isArray(COMMAND_CATALOG.groups)).toBe(true);
     for (const g of COMMAND_CATALOG.groups) {
       expect(typeof g.name).toBe("string");

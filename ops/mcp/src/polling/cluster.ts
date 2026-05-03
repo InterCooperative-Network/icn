@@ -2,39 +2,16 @@
 // Pre-warms health_cache so cluster_health/service_endpoints tool calls return instantly.
 
 import type Database from "better-sqlite3";
-import { execSync } from "child_process";
-import { safeJsonParse } from "../diagnostics/safe-json.js";
+import { runCommand } from "../utils/commands.js";
+import { summarizePodsFromKubectlJsonString } from "../utils/kubectl-pods.js";
 
 const INTERVAL_MS = 60_000;
-
-function runCmd(cmd: string): { ok: boolean; output: string } {
-  try {
-    const output = execSync(cmd, { encoding: "utf-8", timeout: 10_000 }).trim();
-    return { ok: true, output };
-  } catch (err) {
-    return { ok: false, output: err instanceof Error ? err.message : String(err) };
-  }
-}
+const KUBECTL_JSON_MAX = 16 * 1024 * 1024;
 
 function writeCache(db: Database.Database, key: string, value: unknown): void {
   db.prepare(
     "INSERT OR REPLACE INTO health_cache (key, value, polled_at) VALUES (?, ?, datetime('now'))"
   ).run(key, JSON.stringify(value));
-}
-
-function parsePodsJson(cmd: { ok: boolean; output: string }): unknown {
-  if (!cmd.ok) {
-    return { error: cmd.output };
-  }
-  const text = cmd.output;
-  if (!text) {
-    return { error: "empty kubectl/jq output (no cluster access or jq failed silently)" };
-  }
-  const parsed = safeJsonParse(text, "kubectl/jq pods");
-  if (!parsed.ok) {
-    return { error: parsed.error, preview: parsed.preview };
-  }
-  return parsed.value;
 }
 
 const SERVICE_ENDPOINTS = [
@@ -45,28 +22,44 @@ const SERVICE_ENDPOINTS = [
   { name: "Registry", url: "http://10.8.30.40:30500/v2/_catalog" },
 ];
 
-function pollOnce(db: Database.Database): void {
+async function pollOnce(db: Database.Database): Promise<void> {
   try {
     // Pod status
-    const pods = runCmd(
-      "kubectl get pods --all-namespaces -o json 2>/dev/null | " +
-        "jq '[.items[] | {name: .metadata.name, namespace: .metadata.namespace, phase: .status.phase, ready: (.status.conditions // [] | map(select(.type == \"Ready\")) | first | .status // \"Unknown\")}]'"
+    const kr = await runCommand(
+      "kubectl",
+      ["get", "pods", "--all-namespaces", "-o", "json"],
+      { timeoutMs: 12_000, maxStdoutBytes: KUBECTL_JSON_MAX, maxStderrBytes: 32 * 1024 }
     );
+    const pods = kr.ok
+      ? summarizePodsFromKubectlJsonString(kr.stdout)
+      : {
+          error: kr.stderr || "kubectl failed",
+          exitCode: kr.exitCode,
+          timedOut: kr.timedOut,
+        };
+
     const services: Record<string, boolean> = {};
     for (const ep of SERVICE_ENDPOINTS) {
-      services[ep.name] = runCmd(`curl -sf --max-time 3 ${ep.url}`).ok;
+      const cr = await runCommand("curl", ["-sf", "--max-time", "3", ep.url], {
+        timeoutMs: 5000,
+        maxStdoutBytes: 4096,
+        maxStderrBytes: 1024,
+      });
+      services[ep.name] = cr.ok;
     }
-    writeCache(db, "k3s:pods", {
-      pods: parsePodsJson(pods),
-      services,
-    });
+    writeCache(db, "k3s:pods", { pods, services });
 
     // Service endpoint reachability
-    const reachability = SERVICE_ENDPOINTS.map((e) => ({
-      name: e.name,
-      url: e.url,
-      reachable: runCmd(`curl -sf --max-time 3 ${e.url}`).ok,
-    }));
+    const reachability = await Promise.all(
+      SERVICE_ENDPOINTS.map(async (e) => {
+        const cr = await runCommand("curl", ["-sf", "--max-time", "3", e.url], {
+          timeoutMs: 5000,
+          maxStdoutBytes: 4096,
+          maxStderrBytes: 1024,
+        });
+        return { name: e.name, url: e.url, reachable: cr.ok };
+      })
+    );
     writeCache(db, "k3s:endpoints", reachability);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -80,6 +73,10 @@ function pollOnce(db: Database.Database): void {
 }
 
 export function startClusterPolling(db: Database.Database): NodeJS.Timeout {
-  setImmediate(() => pollOnce(db));
-  return setInterval(() => pollOnce(db), INTERVAL_MS);
+  setImmediate(() => {
+    void pollOnce(db).catch((e) => console.error("cluster poll async error:", e));
+  });
+  return setInterval(() => {
+    void pollOnce(db).catch((e) => console.error("cluster poll async error:", e));
+  }, INTERVAL_MS);
 }

@@ -1,12 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type Database from "better-sqlite3";
-import { exec } from "child_process";
-import { promisify } from "util";
 import { safeJsonParse } from "../diagnostics/safe-json.js";
+import { runCommand } from "../utils/commands.js";
+import { summarizePodsFromKubectlJsonString } from "../utils/kubectl-pods.js";
 
-const execAsync = promisify(exec);
 const CACHE_TTL_SECS = 90;
-const MAX_BUFFER = 10 * 1024 * 1024; // 10 MB
+const KUBECTL_JSON_MAX = 16 * 1024 * 1024;
 
 async function cached<T>(
   db: Database.Database,
@@ -21,7 +20,13 @@ async function cached<T>(
     )
     .get(key, ttlSecs) as { value: string; polled_at: string } | undefined;
 
-  if (row) return JSON.parse(row.value) as T;
+  if (row) {
+    const parsed = safeJsonParse(row.value, `health_cache:${key}`);
+    if (parsed.ok) {
+      return parsed.value as T;
+    }
+    // Corrupt cache row — ignore and refresh
+  }
 
   const value = await fetch();
   db.prepare("INSERT OR REPLACE INTO health_cache (key, value) VALUES (?, ?)").run(
@@ -29,18 +34,6 @@ async function cached<T>(
     JSON.stringify(value)
   );
   return value;
-}
-
-async function runCmd(cmd: string): Promise<{ ok: boolean; output: string }> {
-  try {
-    const { stdout } = await execAsync(cmd, { timeout: 10000, maxBuffer: MAX_BUFFER });
-    return { ok: true, output: stdout.trim() };
-  } catch (err) {
-    return {
-      ok: false,
-      output: err instanceof Error ? err.message : String(err),
-    };
-  }
 }
 
 const SERVICE_ENDPOINTS = [
@@ -61,23 +54,33 @@ export function registerHealthTools(
     {},
     async () => {
       const result = await cached(db, "k3s:pods", CACHE_TTL_SECS, async () => {
-        const pods = await runCmd(
-          "kubectl get pods --all-namespaces -o json 2>/dev/null | " +
-          "jq '[.items[] | {name: .metadata.name, namespace: .metadata.namespace, phase: .status.phase, ready: (.status.conditions // [] | map(select(.type == \"Ready\")) | first | .status // \"Unknown\")}]'"
+        const kr = await runCommand(
+          "kubectl",
+          ["get", "pods", "--all-namespaces", "-o", "json"],
+          {
+            timeoutMs: 12_000,
+            maxStdoutBytes: KUBECTL_JSON_MAX,
+            maxStderrBytes: 32 * 1024,
+          }
         );
+        const podsValue = kr.ok
+          ? summarizePodsFromKubectlJsonString(kr.stdout)
+          : {
+              error: kr.stderr || "kubectl failed",
+              exitCode: kr.exitCode,
+              timedOut: kr.timedOut,
+            };
+
         const serviceResults = await Promise.all(
-          SERVICE_ENDPOINTS.map(async (ep) => [
-            ep.name,
-            (await runCmd(`curl -sf --max-time 3 ${ep.url}`)).ok,
-          ] as [string, boolean])
+          SERVICE_ENDPOINTS.map(async (ep) => {
+            const cr = await runCommand("curl", ["-sf", "--max-time", "3", ep.url], {
+              timeoutMs: 5000,
+              maxStdoutBytes: 4096,
+              maxStderrBytes: 1024,
+            });
+            return [ep.name, cr.ok] as [string, boolean];
+          })
         );
-        let podsValue: unknown;
-        if (pods.ok && pods.output) {
-          const p = safeJsonParse(pods.output, "cluster_health kubectl");
-          podsValue = p.ok ? p.value : { error: p.error, preview: p.preview };
-        } else {
-          podsValue = { error: pods.output || "no kubectl/jq output" };
-        }
         return {
           pods: podsValue,
           services: Object.fromEntries(serviceResults),
@@ -95,8 +98,17 @@ export function registerHealthTools(
     {},
     async () => {
       const result = await cached(db, "sccache:stats", 120, async () => {
-        const stats = await runCmd("sccache --show-stats");
-        return { ok: stats.ok, output: stats.output };
+        const r = await runCommand("sccache", ["--show-stats"], {
+          timeoutMs: 10_000,
+          maxStdoutBytes: 256 * 1024,
+          maxStderrBytes: 16 * 1024,
+        });
+        return {
+          ok: r.ok,
+          output: r.ok ? r.stdout : r.stderr || r.stdout,
+          exitCode: r.exitCode,
+          timedOut: r.timedOut,
+        };
       });
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -110,11 +122,18 @@ export function registerHealthTools(
     {},
     async () => {
       const results = await Promise.all(
-        SERVICE_ENDPOINTS.map(async (e) => ({
-          name: e.name,
-          url: e.url,
-          reachable: (await runCmd(`curl -sf --max-time 3 ${e.url}`)).ok,
-        }))
+        SERVICE_ENDPOINTS.map(async (e) => {
+          const cr = await runCommand("curl", ["-sf", "--max-time", "3", e.url], {
+            timeoutMs: 5000,
+            maxStdoutBytes: 4096,
+            maxStderrBytes: 1024,
+          });
+          return {
+            name: e.name,
+            url: e.url,
+            reachable: cr.ok,
+          };
+        })
       );
       return {
         content: [{ type: "text", text: JSON.stringify(results, null, 2) }],

@@ -2,7 +2,7 @@
 // Pre-warms health_cache so build_cache_status tool calls return instantly.
 
 import type Database from "better-sqlite3";
-import { execSync } from "child_process";
+import { runCommand } from "../utils/commands.js";
 
 const INTERVAL_MS = 120_000;
 
@@ -12,13 +12,23 @@ function writeCache(db: Database.Database, key: string, value: unknown): void {
   ).run(key, JSON.stringify(value));
 }
 
-function pollOnce(db: Database.Database): void {
+async function pollOnce(db: Database.Database): Promise<void> {
   try {
-    const output = execSync("sccache --show-stats", {
-      encoding: "utf-8",
-      timeout: 10_000,
-    }).trim();
-    writeCache(db, "sccache:stats", { ok: true, output });
+    const r = await runCommand("sccache", ["--show-stats"], {
+      timeoutMs: 10_000,
+      maxStdoutBytes: 256 * 1024,
+      maxStderrBytes: 16 * 1024,
+    });
+    if (r.ok) {
+      writeCache(db, "sccache:stats", { ok: true, output: r.stdout });
+    } else {
+      writeCache(db, "sccache:stats", {
+        ok: false,
+        output: r.stderr || r.stdout || "sccache failed",
+        exitCode: r.exitCode,
+        timedOut: r.timedOut,
+      });
+    }
   } catch (err) {
     writeCache(db, "sccache:stats", {
       ok: false,
@@ -28,6 +38,10 @@ function pollOnce(db: Database.Database): void {
 }
 
 export function startBuildsPolling(db: Database.Database): NodeJS.Timeout {
-  setImmediate(() => pollOnce(db));
-  return setInterval(() => pollOnce(db), INTERVAL_MS);
+  setImmediate(() => {
+    void pollOnce(db).catch((e) => console.error("builds poll async error:", e));
+  });
+  return setInterval(() => {
+    void pollOnce(db).catch((e) => console.error("builds poll async error:", e));
+  }, INTERVAL_MS);
 }

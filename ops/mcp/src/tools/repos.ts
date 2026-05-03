@@ -1,34 +1,39 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type Database from "better-sqlite3";
-import { execSync } from "child_process";
-import { readFileSync } from "fs";
 import { join } from "path";
 import { resolveMonorepoRoot } from "../paths.js";
+import { runCommand } from "../utils/commands.js";
 
 const ICN_ROOT = resolveMonorepoRoot();
 
-function runGit(cwd: string, args: string): string {
-  try {
-    return execSync(`git ${args}`, { cwd, encoding: "utf-8", timeout: 10000 }).trim();
-  } catch {
-    return "";
-  }
+async function gitLine(cwd: string, args: readonly string[]): Promise<string> {
+  const r = await runCommand("git", [...args], {
+    cwd,
+    timeoutMs: 10_000,
+    maxStdoutBytes: 256 * 1024,
+    maxStderrBytes: 32 * 1024,
+  });
+  return r.ok ? r.stdout.trim() : "";
 }
 
-function repoStatus(repoPath: string, name: string) {
-  const branch = runGit(repoPath, "rev-parse --abbrev-ref HEAD");
-  const dirty = runGit(repoPath, "status --porcelain");
-  const ahead = runGit(repoPath, "rev-list @{u}..HEAD --count 2>/dev/null || echo 0");
-  const behind = runGit(repoPath, "rev-list HEAD..@{u} --count 2>/dev/null || echo 0");
-  const lastCommit = runGit(repoPath, "log -1 --format=%s");
+async function repoStatus(repoPath: string, name: string) {
+  const branch = await gitLine(repoPath, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  const dirty = await gitLine(repoPath, ["status", "--porcelain"]);
+  let ahead = await gitLine(repoPath, ["rev-list", "@{u}..HEAD", "--count"]);
+  if (!ahead) ahead = "0";
+  let behind = await gitLine(repoPath, ["rev-list", "HEAD..@{u}", "--count"]);
+  if (!behind) behind = "0";
+  const lastCommit = await gitLine(repoPath, ["log", "-1", "--format=%s"]);
+  const aheadN = parseInt(ahead, 10);
+  const behindN = parseInt(behind, 10);
   return {
     name,
     branch,
     dirty: dirty !== "",
     dirtyFiles: dirty.split("\n").filter(Boolean).length,
-    ahead: parseInt(ahead) || 0,
-    behind: parseInt(behind) || 0,
+    ahead: Number.isFinite(aheadN) ? aheadN : 0,
+    behind: Number.isFinite(behindN) ? behindN : 0,
     lastCommit,
   };
 }
@@ -42,13 +47,13 @@ export function registerRepoTools(
     "Get current branch, dirty files, and sync status for all ICN repos.",
     {},
     async () => {
-      // Monorepo: ICN_ROOT is the repo root. website/ and ops/ are subdirectories.
-      // homelab-inventory is a separate repo at ../homelab-inventory.
       const repos = [
         { name: "icn", path: ICN_ROOT },
         { name: "homelab-inventory", path: join(ICN_ROOT, "..", "homelab-inventory") },
       ];
-      const results = repos.map((r) => repoStatus(r.path, r.name));
+      const results = await Promise.all(
+        repos.map((r) => repoStatus(r.path, r.name))
+      );
       return {
         content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
       };
@@ -62,37 +67,36 @@ export function registerRepoTools(
     async () => {
       const wtRoot = join(ICN_ROOT, "..", "icn-wt");
       const icnPath = join(ICN_ROOT, "icn");
-      const mainHash = runGit(icnPath, "rev-parse origin/main");
+      const mainHash = await gitLine(icnPath, ["rev-parse", "origin/main"]);
 
       let dirs: string[] = [];
       try {
         const { readdirSync } = await import("fs");
-        dirs = readdirSync(wtRoot).filter(
-          (d) => !d.startsWith(".")
-        );
+        dirs = readdirSync(wtRoot).filter((d) => !d.startsWith("."));
       } catch {
         dirs = [];
       }
 
-      const results = dirs.map((dir) => {
-        const wtPath = join(wtRoot, dir, "icn");
-        const branch = runGit(wtPath, "rev-parse --abbrev-ref HEAD");
-        const hash = runGit(wtPath, "rev-parse HEAD");
-        const lastCommit = runGit(wtPath, "log -1 --format=%s");
-        const behind = runGit(
-          wtPath,
-          `rev-list HEAD..${mainHash} --count`
-        );
-        return {
-          name: dir,
-          branch,
-          lastCommit,
-          behindMain: parseInt(behind) || 0,
-          stale: parseInt(behind) > 10,
-        };
-      });
+      const results = await Promise.all(
+        dirs.map(async (dir) => {
+          const wtPath = join(wtRoot, dir, "icn");
+          const branch = await gitLine(wtPath, ["rev-parse", "--abbrev-ref", "HEAD"]);
+          const lastCommit = await gitLine(wtPath, ["log", "-1", "--format=%s"]);
+          const behind =
+            mainHash && branch
+              ? await gitLine(wtPath, ["rev-list", "--count", `HEAD..${mainHash}`])
+              : "";
+          const behindN = behind ? parseInt(behind, 10) : 0;
+          return {
+            name: dir,
+            branch,
+            lastCommit,
+            behindMain: Number.isFinite(behindN) ? behindN : 0,
+            stale: Number.isFinite(behindN) && behindN > 10,
+          };
+        })
+      );
 
-      // Also check if the worktree has any claimed sessions
       const activeSessions = db
         .prepare(
           `SELECT worktree, task_description FROM sessions
@@ -139,13 +143,41 @@ export function registerRepoTools(
       try {
         const repoPath = join(ICN_ROOT, repo);
         const targetBranch =
-          branch ?? runGit(repoPath, "rev-parse --abbrev-ref HEAD");
-        const result = execSync(
-          `gh run list --repo InterCooperative-Network/${repo} --branch ${targetBranch} --limit 3 --json status,conclusion,name,createdAt`,
-          { encoding: "utf-8", timeout: 15000 }
-        ).trim();
+          branch ?? (await gitLine(repoPath, ["rev-parse", "--abbrev-ref", "HEAD"]));
+        const r = await runCommand(
+          "gh",
+          [
+            "run",
+            "list",
+            "--repo",
+            `InterCooperative-Network/${repo}`,
+            "--branch",
+            targetBranch,
+            "--limit",
+            "3",
+            "--json",
+            "status,conclusion,name,createdAt",
+          ],
+          { cwd: ICN_ROOT, timeoutMs: 15_000, maxStdoutBytes: 512 * 1024 }
+        );
+        if (!r.ok) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: "gh_failed",
+                  stderr: r.stderr,
+                  exitCode: r.exitCode,
+                  timedOut: r.timedOut,
+                }),
+              },
+            ],
+            isError: true,
+          };
+        }
         return {
-          content: [{ type: "text", text: result }],
+          content: [{ type: "text", text: r.stdout }],
         };
       } catch (err) {
         return {
@@ -169,12 +201,38 @@ export function registerRepoTools(
     },
     async ({ repo }) => {
       try {
-        const result = execSync(
-          `gh pr list --repo InterCooperative-Network/${repo} --json number,title,state,reviewDecision,headRefName,createdAt --limit 10`,
-          { encoding: "utf-8", timeout: 15000 }
-        ).trim();
+        const r = await runCommand(
+          "gh",
+          [
+            "pr",
+            "list",
+            "--repo",
+            `InterCooperative-Network/${repo}`,
+            "--json",
+            "number,title,state,reviewDecision,headRefName,createdAt",
+            "--limit",
+            "10",
+          ],
+          { cwd: ICN_ROOT, timeoutMs: 15_000, maxStdoutBytes: 512 * 1024 }
+        );
+        if (!r.ok) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: "gh_failed",
+                  stderr: r.stderr,
+                  exitCode: r.exitCode,
+                  timedOut: r.timedOut,
+                }),
+              },
+            ],
+            isError: true,
+          };
+        }
         return {
-          content: [{ type: "text", text: result }],
+          content: [{ type: "text", text: r.stdout }],
         };
       } catch (err) {
         return {
