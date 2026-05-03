@@ -3149,7 +3149,7 @@ category = "reference"
 status = "living"
 title = "NYCN Organizer User Readiness (ICN side)"
 description = "ICN-side pilot readiness: /me/standing, /me/action-cards, completion-receipt retrieval, proof loops, generic vs package-local material, gated paths, and accessible participation. Links to STATE, phase progress, runtime map, member standing, and NYCN Phase 2 rehearsal gate."
-last_updated = "2026-05-03"
+last_updated = "2026-05-04"
 owner = "matt"
 audiences = ["team", "organizers"]
 truth_class = "descriptive"
@@ -3158,14 +3158,14 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["pilot", "nycn", "communications", "action-cards"]
 recommended_action = "keep"
-last_reviewed = "2026-05-03"
+last_reviewed = "2026-05-04"
 
 [docs."docs/contracts/institution-package/README.md"]
 category = "reference"
 status = "living"
 title = "Institution Package ActionCard Contract Notes"
 description = "Validation guidance for institution packages using action-card.schema.json; emitted vs RFC-gated source kinds; pointers to runtime models and issue icn#1713."
-last_updated = "2026-05-03"
+last_updated = "2026-05-04"
 owner = "matt"
 audiences = ["contributors", "organizers"]
 truth_class = "descriptive"
@@ -3174,7 +3174,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["contracts", "governance", "action-cards"]
 recommended_action = "keep"
-last_reviewed = "2026-05-03"
+last_reviewed = "2026-05-04"
 
 # ============================================================================
 # PLANNING AND STRATEGY (Additional)
