@@ -14,6 +14,8 @@ export type CatalogCommand = {
   safety: SafetyLevel;
   runtime: ExpectedRuntime;
   when_to_use: string;
+  /** Non-executable warning; aligns with verification_plan safety semantics. */
+  caution?: string;
 };
 
 export type CommandCatalog = {
@@ -35,6 +37,8 @@ export const COMMAND_CATALOG: CommandCatalog = {
           safety: "modifies_local",
           runtime: "medium",
           when_to_use: "Fresh clone, Node version change, or better-sqlite3 load errors.",
+          caution:
+            "npm ci rewrites node_modules from the lockfile; expect native postinstall work and time on cold machines.",
         },
         {
           id: "mcp_build",
@@ -53,6 +57,7 @@ export const COMMAND_CATALOG: CommandCatalog = {
           safety: "read_only",
           runtime: "quick",
           when_to_use: "Before committing MCP changes.",
+          caution: "Test runners may write local caches; not a mutating production deploy.",
         },
         {
           id: "mcp_portability",
@@ -118,6 +123,7 @@ export const COMMAND_CATALOG: CommandCatalog = {
           safety: "read_only",
           runtime: "long",
           when_to_use: "Validate behavior after substantive Rust edits.",
+          caution: "cargo test can run for many minutes; scope with -p or filters when iterating.",
         },
       ],
     },
@@ -160,6 +166,29 @@ export const COMMAND_CATALOG: CommandCatalog = {
           safety: "external_side_effect",
           runtime: "quick",
           when_to_use: "After push; requires gh auth.",
+          caution: "Contacts GitHub; ensure gh is authenticated and the PR number is correct.",
+        },
+        {
+          id: "gh_pr_create",
+          purpose: "Open a new pull request from the current branch",
+          command: "gh pr create",
+          working_directory: "repo_root",
+          safety: "external_side_effect",
+          runtime: "quick",
+          when_to_use: "After local verification; human should review title/body before running.",
+          caution:
+            "Creates or updates remote PR metadata; has external side effects. Never run unattended from agent automation.",
+        },
+        {
+          id: "git_reset_hard_example",
+          purpose: "DESTRUCTIVE — discard local commits and working tree (example only; do not run blindly)",
+          command: "git reset --hard <REF>",
+          working_directory: "repo_root",
+          safety: "destructive",
+          runtime: "quick",
+          when_to_use: "Only when a human explicitly intends to throw away local work.",
+          caution:
+            "git reset --hard and git clean -fdx destroy uncommitted and unpushed work. Must never be suggested as an automatic fix.",
         },
       ],
     },
