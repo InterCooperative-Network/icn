@@ -63,6 +63,16 @@ export const COMMAND_CATALOG: CommandCatalog = {
           runtime: "quick",
           when_to_use: "After editing .mcp.json or .cursor/mcp.json.",
         },
+        {
+          id: "mcp_subprocess_audit",
+          purpose:
+            "Audit ops/mcp for Node execSync; SQLite db.exec DDL in state/db.ts is unrelated",
+          command: 'rg "execSync" ops/mcp/src || true',
+          working_directory: "repo_root",
+          safety: "read_only",
+          runtime: "quick",
+          when_to_use: "When changing subprocess or polling code in ops/mcp.",
+        },
       ],
     },
     {

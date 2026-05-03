@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { buildEnvironmentReport } from "./environment-report.js";
 import { buildStateIndex } from "./state-index.js";
-import { execFileNoThrow } from "./exec-safe.js";
+import { runCommand } from "../utils/commands.js";
 
 export type DoctorCheck = {
   id: string;
@@ -119,10 +119,15 @@ export async function buildDoctorReport(repoRoot: string): Promise<DoctorReport>
     }
   }
 
-  const py = await execFileNoThrow(
+  const py = await runCommand(
     "python3",
     [join(repoRoot, "scripts", "check-mcp-portability.py")],
-    { cwd: repoRoot, timeoutMs: 15_000 }
+    {
+      cwd: repoRoot,
+      timeoutMs: 15_000,
+      maxStdoutBytes: 32 * 1024,
+      maxStderrBytes: 32 * 1024,
+    }
   );
   if (py.ok) {
     checks.push({ id: "portability_script", severity: "ok", message: "MCP portability script passed." });
@@ -131,7 +136,7 @@ export async function buildDoctorReport(repoRoot: string): Promise<DoctorReport>
       id: "portability_script",
       severity: "error",
       message: "MCP portability script failed.",
-      detail: (py.stderr || py.stdout).slice(0, 800),
+      detail: [py.stderr, py.stdout].filter(Boolean).join("\n").slice(0, 800),
     });
     suggested.push("Fix .mcp.json / .cursor/mcp.json per script output.");
     top = maxSeverity(top, "error");
@@ -183,6 +188,32 @@ export async function buildDoctorReport(repoRoot: string): Promise<DoctorReport>
       severity: "ok",
       message: "Worktree clean.",
     });
+  }
+
+  const runnerProbes: [string, Awaited<ReturnType<typeof runCommand>>][] = [
+    ["git", await runCommand("git", ["--version"], { cwd: repoRoot, timeoutMs: 4000, maxStdoutBytes: 256 })],
+    ["npm", await runCommand("npm", ["-v"], { cwd: repoRoot, timeoutMs: 4000, maxStdoutBytes: 256 })],
+    [
+      "python3",
+      await runCommand("python3", ["-V"], { cwd: repoRoot, timeoutMs: 4000, maxStdoutBytes: 256 }),
+    ],
+  ];
+  for (const [name, pr] of runnerProbes) {
+    if (!pr.ok) {
+      checks.push({
+        id: `runner_${name}`,
+        severity: "warn",
+        message: `${name} CLI probe failed (command runner).`,
+        detail: [pr.stderr, pr.timedOut ? "timed out" : ""].filter(Boolean).join(" ").slice(0, 400),
+      });
+      top = maxSeverity(top, "warn");
+    } else {
+      checks.push({
+        id: `runner_${name}`,
+        severity: "ok",
+        message: `${name} CLI responds.`,
+      });
+    }
   }
 
   const state = buildStateIndex(repoRoot);

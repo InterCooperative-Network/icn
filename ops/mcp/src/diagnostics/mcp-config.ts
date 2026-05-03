@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { safeJsonParse } from "./safe-json.js";
 
 export const CANONICAL_ICN_OPS_COMMAND = "npm";
 export const CANONICAL_ICN_OPS_ARGS = ["--prefix", "./ops/mcp", "run", "start:stdio"] as const;
@@ -21,20 +22,17 @@ function readMcpServer(
   if (!existsSync(full)) {
     return { ok: false, error: "file missing" };
   }
-  try {
-    const raw = readFileSync(full, "utf-8");
-    const parsed = JSON.parse(raw) as { mcpServers?: Record<string, unknown> };
-    const icn = parsed.mcpServers?.["icn-ops"];
-    if (!icn || typeof icn !== "object") {
-      return { ok: false, error: "mcpServers.icn-ops missing or not an object" };
-    }
-    return { ok: true, server: icn as Record<string, unknown> };
-  } catch (e) {
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : String(e),
-    };
+  const raw = readFileSync(full, "utf-8");
+  const parsed = safeJsonParse(raw, relPath);
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error };
   }
+  const doc = parsed.value as { mcpServers?: Record<string, unknown> };
+  const icn = doc.mcpServers?.["icn-ops"];
+  if (!icn || typeof icn !== "object") {
+    return { ok: false, error: "mcpServers.icn-ops missing or not an object" };
+  }
+  return { ok: true, server: icn as Record<string, unknown> };
 }
 
 function analyzeServer(server: Record<string, unknown>): {

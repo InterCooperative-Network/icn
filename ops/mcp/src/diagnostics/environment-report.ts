@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { inspectMcpConfigs } from "./mcp-config.js";
-import { execFileNoThrow } from "./exec-safe.js";
+import { runCommand } from "../utils/commands.js";
 
 export type EnvironmentWarning = { code: string; message: string };
 
@@ -39,9 +39,14 @@ export type EnvironmentReport = {
 
 async function gitLine(
   repoRoot: string,
-  args: string[]
+  args: readonly string[]
 ): Promise<{ ok: boolean; out: string }> {
-  const r = await execFileNoThrow("git", args, { cwd: repoRoot, timeoutMs: 10_000 });
+  const r = await runCommand("git", args, {
+    cwd: repoRoot,
+    timeoutMs: 10_000,
+    maxStdoutBytes: 64 * 1024,
+    maxStderrBytes: 16 * 1024,
+  });
   return { ok: r.ok, out: r.stdout };
 }
 
@@ -63,19 +68,34 @@ export async function buildEnvironmentReport(repoRoot: string): Promise<Environm
     warnings.push({ code: "git_status", message: "Could not read git status in repo root." });
   }
 
-  const npmR = await execFileNoThrow("npm", ["-v"], { cwd: repoRoot, timeoutMs: 5000 });
+  const npmR = await runCommand("npm", ["-v"], {
+    cwd: repoRoot,
+    timeoutMs: 5000,
+    maxStdoutBytes: 256,
+    maxStderrBytes: 1024,
+  });
   const npmVersion = npmR.ok ? npmR.stdout : null;
   if (!npmR.ok) {
     warnings.push({ code: "npm_missing", message: npmR.stderr || "npm not found" });
   }
 
-  const rustcR = await execFileNoThrow("rustc", ["-V"], { cwd: repoRoot, timeoutMs: 5000 });
+  const rustcR = await runCommand("rustc", ["-V"], {
+    cwd: repoRoot,
+    timeoutMs: 5000,
+    maxStdoutBytes: 512,
+    maxStderrBytes: 1024,
+  });
   const rustVersion = rustcR.ok ? rustcR.stdout : null;
   if (!rustcR.ok) {
     warnings.push({ code: "rustc_missing", message: "rustc not on PATH or failed." });
   }
 
-  const pyR = await execFileNoThrow("python3", ["-V"], { cwd: repoRoot, timeoutMs: 5000 });
+  const pyR = await runCommand("python3", ["-V"], {
+    cwd: repoRoot,
+    timeoutMs: 5000,
+    maxStdoutBytes: 512,
+    maxStderrBytes: 1024,
+  });
   const pythonVersion = pyR.ok ? pyR.stdout : null;
   if (!pyR.ok) {
     warnings.push({ code: "python3_missing", message: "python3 not on PATH or failed." });
@@ -83,10 +103,20 @@ export async function buildEnvironmentReport(repoRoot: string): Promise<Environm
 
   let ghAvailable = false;
   let ghAuthSummary: string | null = null;
-  const ghVer = await execFileNoThrow("gh", ["--version"], { cwd: repoRoot, timeoutMs: 5000 });
+  const ghVer = await runCommand("gh", ["--version"], {
+    cwd: repoRoot,
+    timeoutMs: 5000,
+    maxStdoutBytes: 256,
+    maxStderrBytes: 1024,
+  });
   if (ghVer.ok) {
     ghAvailable = true;
-    const ghR = await execFileNoThrow("gh", ["auth", "status"], { cwd: repoRoot, timeoutMs: 8000 });
+    const ghR = await runCommand("gh", ["auth", "status"], {
+      cwd: repoRoot,
+      timeoutMs: 8000,
+      maxStdoutBytes: 2048,
+      maxStderrBytes: 2048,
+    });
     const combined = [ghR.stdout, ghR.stderr].filter(Boolean).join("\n").slice(0, 500);
     ghAuthSummary = combined || (ghR.ok ? "ok" : "unknown");
     if (!ghR.ok) {
@@ -101,19 +131,30 @@ export async function buildEnvironmentReport(repoRoot: string): Promise<Environm
 
   let kubectlAvailable = false;
   let kubectlContext: string | null = null;
-  const kc = await execFileNoThrow(
+  const kc = await runCommand(
     "kubectl",
     ["config", "current-context"],
-    { cwd: repoRoot, timeoutMs: 5000 }
+    {
+      cwd: repoRoot,
+      timeoutMs: 5000,
+      maxStdoutBytes: 4096,
+      maxStderrBytes: 4096,
+    }
   );
   if (kc.ok && kc.stdout) {
     kubectlAvailable = true;
     kubectlContext = kc.stdout;
   } else {
-    const whichK = await execFileNoThrow("kubectl", ["version", "--client=true"], {
-      cwd: repoRoot,
-      timeoutMs: 5000,
-    });
+    const whichK = await runCommand(
+      "kubectl",
+      ["version", "--client=true"],
+      {
+        cwd: repoRoot,
+        timeoutMs: 5000,
+        maxStdoutBytes: 16 * 1024,
+        maxStderrBytes: 4096,
+      }
+    );
     kubectlAvailable = whichK.ok;
     if (!kubectlAvailable) {
       warnings.push({ code: "kubectl_missing", message: "kubectl not available or not configured." });

@@ -29,12 +29,19 @@ Native module note: `better-sqlite3` is rebuilt in `postinstall`. If the MCP hos
 | Tool | Purpose |
 |------|---------|
 | `icn_ops_environment_report` | JSON snapshot: repo root, git branch/commit/dirty, Node ABI, npm/rust/python versions, optional `gh`/`kubectl`, MCP config inspection, `node_modules`/`dist` presence, `better-sqlite3` load probe. Missing optional CLIs are **warnings**, not hard failures. |
-| `icn_ops_doctor` | Read-only diagnosis: severity (`ok` / `warn` / `error`), per-check results, suggested **shell repair commands** (not executed). Covers MCP parity script, native module, dirty tree, optional tools, key `ops/state` files. |
+| `icn_ops_doctor` | Read-only diagnosis: severity (`ok` / `warn` / `error`), per-check results, suggested **shell repair commands** (not executed). Covers MCP parity script, native module, dirty tree, optional tools, key `ops/state` files, and lightweight **CLI runner probes** (`git` / `npm` / `python3`). |
 | `icn_ops_agent_brief` | Compact structured briefing: docs to read first, safe vs forbidden vocabulary, verification commands by area, PR hygiene, completeness warning, MCP troubleshooting bullets. |
 | `icn_ops_command_catalog` | **Catalog only** — grouped commands with `working_directory`, `safety` (`read_only` / `modifies_local` / `destructive` / `external_side_effect`), `runtime` hint, and `when_to_use`. Never runs commands. |
 | `icn_ops_state_index` | Lists canonical state/architecture paths with `present: true/false` (filesystem stat); does not invent missing files. Optional arg `include_absent` (default true). |
 
-Existing tools (`cluster_health`, sessions, tasks, decisions, etc.) remain available; cluster polling and health tools guard external JSON so bad `kubectl`/`jq` output does not crash stdio.
+Existing tools (`cluster_health`, sessions, tasks, decisions, etc.) remain available. Poller and health paths use **`execFile`-style argv** (via `runCommand` in `ops/mcp/src/utils/commands.ts`): no shell, bounded stdout/stderr, timeouts, and structured `{ ok, exitCode, stderr, timedOut }` results. `kubectl get pods -o json` is parsed in-process (no `jq` pipeline). External JSON goes through `safeJsonParse` so malformed output becomes `{ error, preview }` instead of throwing through the MCP boundary.
+
+### Safe command execution policy
+
+- **Default:** `runCommand` / `runCommandQuick` / `runCommandJson` — argv only, no `/bin/sh -c`, predictable quoting, output truncation.
+- **Why avoid shell pipelines:** they inject quoting bugs, hide exit codes, and make “optional tool missing” look like opaque script failures.
+- **Failures:** represented as `ok: false` plus stderr/exit/timedOut; pollers write those into `health_cache` or doctor checks — **never** `process.exit` from optional probes.
+- **Warnings vs errors:** `icn_ops_doctor` uses `warn` for optional CLIs and dirty trees; `error` for portability failures, native module load, or missing `node_modules`. Suggested repairs are **strings only** — not executed by MCP.
 
 ## Common failure modes
 
