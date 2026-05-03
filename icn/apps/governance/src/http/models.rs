@@ -233,8 +233,10 @@ pub enum ActionCardRiskLevel {
 /// does not learn package-specific nouns from this surface.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ActionCard {
-    /// Stable, deterministic id of the card. Format:
-    /// `card-<source_kind>-<source_id>` so the same underlying object yields
+    /// Stable, deterministic id of the card. Runtime format:
+    /// `card-<source_kind_snake>-<source_id>-<action_kind_snake>` (for example
+    /// `card-proposal-<id>-vote`, `card-meeting-<id>-attend`,
+    /// `card-action_item-<id>-complete`) so the same underlying object yields
     /// the same card id across requests.
     pub id: String,
     pub source_kind: ActionCardSourceKind,

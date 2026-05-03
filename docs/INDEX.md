@@ -357,6 +357,7 @@ Organizer-facing pilot materials. Honest scope-of-now framing; not pitch decks. 
 - [nycn-boundary-brief.md](pilots/nycn-boundary-brief.md) - What ICN can demonstrate now, what it cannot honestly claim yet, what NYCN organizers would need to validate, what is explicitly not being asked
 - [nycn-demo-script.md](pilots/nycn-demo-script.md) - Step-by-step organizer-facing demo flow against a localhost ICN gateway
 - [nycn-organizer-asks.md](pilots/nycn-organizer-asks.md) - Bounded set of validation questions for NYCN organizers; includes explicit non-asks
+- [nycn-organizer-user-readiness.md](pilots/nycn-organizer-user-readiness.md) - ICN-side organizer/member readiness: standing, action cards, receipts, gated paths; links NYCN rehearsal gate
 - [pilot-proposal-template.md](pilots/pilot-proposal-template.md) - Template for approaching potential pilot communities
 - [hosted-approach.md](pilots/hosted-approach.md) - Approach for hosted cooperative pilot deployments
 - [decision_registry_treasury_vote.md](pilots/decision_registry_treasury_vote.md) - Economic receipt chain implementation in pilot

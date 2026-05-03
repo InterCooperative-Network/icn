@@ -1206,6 +1206,12 @@ CI gates, ratchet phases, required checks, and failure index
 
 **For:** `developers` | **Updated:** 2026-03-10
 
+### 📝 **Living** [Institution Package ActionCard Contract Notes](/docs/contracts/institution-package/README.md)
+
+Validation guidance for institution packages using action-card.schema.json; emitted vs RFC-gated source kinds; pointers to runtime models and issue icn#1713.
+
+**For:** `contributors`, `organizers` | **Updated:** 2026-05-03
+
 ### 📝 **Living** [Demo System Documentation](/docs/demo/README.md)
 
 Documentation for ICN demonstration system
@@ -1361,6 +1367,12 @@ Step-by-step organizer-facing demo flow against a localhost ICN gateway: action 
 Bounded set of questions to ask NYCN organizers — workflow validation, source/data validation, pilot-readiness — without assuming any partnership commitment. Includes explicit non-asks.
 
 **For:** `team`, `organizers` | **Updated:** 2026-04-29
+
+### 📝 **Living** [NYCN Organizer User Readiness (ICN side)](/docs/pilots/nycn-organizer-user-readiness.md)
+
+ICN-side pilot readiness: /me/standing, /me/action-cards, completion-receipt retrieval, proof loops, generic vs package-local material, gated paths, and accessible participation. Links to STATE, phase progress, runtime map, member standing, and NYCN Phase 2 rehearsal gate.
+
+**For:** `team`, `organizers` | **Updated:** 2026-05-03
 
 ### 📋 **Draft** [Agent Knowledge Architecture](/docs/planning/agent-knowledge-architecture.md)
 
@@ -1736,9 +1748,9 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 282
+**Total documents:** 284
 
 **By status:**
 - Canonical: 39
 - Draft: 57
-- Living: 186
+- Living: 188

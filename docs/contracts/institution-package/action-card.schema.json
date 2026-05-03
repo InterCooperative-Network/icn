@@ -2,14 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://intercooperative.network/contracts/institution-package/action-card.schema.json",
   "title": "ActionCard",
-  "description": "A single pending action card for a member, returned by GET /v1/gov/me/action-cards. Cards are derived views — computed at request time from the holder's standing plus open governance state — and are never stored entities. See ADR-0027.",
+  "description": "A single pending action card for a member, returned by GET /v1/gov/me/action-cards. Cards are derived views — computed at request time from the holder's standing plus open governance state — and are never stored entities. See ADR-0027. The companion HTTP wrapper `{ did, cards, generated_at }` is OpenAPI-documented in the gateway; institution packages validating exports should validate each element of `cards` against this schema.",
   "x-icn-status": "rfc",
+  "x-icn-emitted-source-kinds": ["proposal", "meeting", "action_item"],
+  "x-icn-rfc-gated-source-kinds": ["signal_rule", "obligation_lifecycle"],
   "x-icn-references": [
     "ADR-0020",
     "ADR-0027",
     "ADR-0028",
     "GitHub icn#1646",
-    "GitHub icn#1608"
+    "GitHub icn#1608",
+    "GitHub icn#1713"
   ],
   "type": "object",
   "required": [
@@ -30,11 +33,11 @@
   "properties": {
     "id": {
       "type": "string",
-      "description": "Stable, deterministic id of the card. Format: card-<source_kind>-<source_id>(-<action_kind>). Two requests at the same moment from the same DID return identical card ids.",
+      "description": "Stable, deterministic id of the card. Runtime format today: card-<source_kind_snake>-<source_id>-<action_kind_snake> (examples: card-proposal-<proposal_id>-vote, card-meeting-<meeting_id>-attend, card-action_item-<item_id>-complete). Two requests at the same moment from the same DID return identical card ids.",
       "minLength": 1
     },
     "source_kind": {
-      "description": "Where this card was derived from. Closed taxonomy. Variants 'signal_rule' and 'obligation_lifecycle' are reserved by issue icn#1646 and not emitted by the runtime today; they will land alongside their source-path implementation.",
+      "description": "Where this card was derived from. Closed taxonomy. Values in x-icn-emitted-source-kinds are returned today when matching governance objects exist. Values in x-icn-rfc-gated-source-kinds appear in this schema for forward compatibility only; they are not emitted until their source paths land (icn#1646, icn#1631, icn#1634).",
       "type": "string",
       "enum": [
         "proposal",
