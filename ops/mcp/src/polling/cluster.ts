@@ -47,6 +47,7 @@ const SERVICE_ENDPOINTS = [
 
 function pollOnce(db: Database.Database): void {
   try {
+    // Pod status
     const pods = runCmd(
       "kubectl get pods --all-namespaces -o json 2>/dev/null | " +
         "jq '[.items[] | {name: .metadata.name, namespace: .metadata.namespace, phase: .status.phase, ready: (.status.conditions // [] | map(select(.type == \"Ready\")) | first | .status // \"Unknown\")}]'"
@@ -60,6 +61,7 @@ function pollOnce(db: Database.Database): void {
       services,
     });
 
+    // Service endpoint reachability
     const reachability = SERVICE_ENDPOINTS.map((e) => ({
       name: e.name,
       url: e.url,
