@@ -1,160 +1,121 @@
 # ICN Website
 
-The public-facing website for the InterCooperative Network (ICN) — institutional infrastructure for cooperatives, communities, and federations.
+The public-facing website for the InterCooperative Network at `intercooperative.network`. Built with Astro 5 (static output) + TypeScript. Lives inside the ICN monorepo at `website/`. Deploys automatically to the `gh-pages` branch on pushes to `main` that touch `website/**` or `docs/**`.
 
 ## Design language (read this first)
 
 The website is the first implementation surface of ICN's universal civic design language. Every public-facing edit should be checkable against the canonical design-language docs:
 
-- **[brief-v0](../docs/design-language/brief-v0.md)** — the canonical source of truth for the design language (principles, semantic layers, visual primitives, anti-patterns)
+- **[brief-v0](../docs/design-language/brief-v0.md)** — canonical source of truth for the design language (principles, semantic layers, visual primitives, anti-patterns)
 - **[concept-map](../docs/design-language/concept-map.md)** — canonical term → public plain-language label → localization notes, for every ICN concept
 - **[accessibility](../docs/design-language/accessibility.md)** — WCAG rules, contrast requirements, keyboard and screen-reader expectations, and the review checklist every PR must pass
 
 If an edit introduces something these docs do not describe, either the docs evolve or the edit is out of scope for the design language. Do not let ad-hoc decisions silently drift the system.
 
-## 🚀 Quick Start
+The brief is explicit about what the system is and is not: institutional, civic, calm, legible, federated, auditable, serious, accessible by design. Not crypto, not startup SaaS, not enterprise dashboard sludge, not generic govtech, not hacker-terminal aesthetic, not cyberpunk network maps, not AI vapor, not futuristic spectacle. Edits that drift toward those anti-patterns should be rejected.
 
-### Prerequisites
+## Token surface
 
-- Node.js 18+
-- npm or yarn
+All visual tokens live in **[`src/styles/global.css`](src/styles/global.css)** as CSS custom properties (colors, spacing scale, radii, typography, motion durations, shadows). It is the single source for runtime values; this README does not duplicate hex codes, font names, or scale numbers because they belong in one place and were drifting when they were duplicated here.
 
-### Installation
+Two operating rules apply across all `.astro` files:
+
+- **Never hardcode colors, fonts, or scale values.** Reference design tokens (`var(--accent-teal)`, `var(--bg-primary)`, `var(--space-md)`, etc.) in scoped `<style>` blocks.
+- **Theme-aware.** The site supports dark (default) and light themes via `[data-theme="light"]`. Tokens already resolve correctly per theme — do not add `prefers-color-scheme` media queries.
+
+See `.claude/rules/astro-conventions.md` for the full conventions list.
+
+## Quick start
+
+Prerequisites: Node.js 18+ and npm.
 
 ```bash
-# Clone the repository
-git clone https://github.com/InterCooperative-Network/icn-website.git
-cd icn-website
-
-# Install dependencies
+# From the icn monorepo root
+cd website
 npm install
-
-# Start development server
 npm run dev
 ```
 
-The website will be available at `http://localhost:4321`
+The dev server runs at `http://localhost:4321`.
 
-## 📁 Project Structure
+## Site structure
 
 ```
-icn-website/
-├── public/
-│   ├── images/           # Static images and SVG assets
-│   └── favicon.svg       # Site favicon
+website/
+├── public/                 # Static assets served at site root
 ├── src/
-│   ├── components/       # Reusable Astro components
-│   ├── layouts/          # Page layouts
-│   ├── pages/            # Site pages and routes
-│   │   ├── docs/         # Documentation pages
-│   │   └── blog/         # Blog posts
-│   └── styles/           # Global CSS and design system
-├── astro.config.mjs      # Astro configuration
-├── tailwind.config.mjs   # Tailwind CSS configuration
-└── package.json          # Dependencies and scripts
+│   ├── pages/              # File-based routing — every page is one .astro file
+│   ├── components/         # Reusable Astro components
+│   ├── content/
+│   │   ├── config.ts       # Astro content collection schemas (blog only)
+│   │   └── blog/           # Blog posts, git-tracked
+│   ├── layouts/            # Page layout wrappers
+│   ├── lib/                # Build-time helpers (markdown rendering, link rewriting)
+│   ├── styles/global.css   # Design tokens — single source of truth for colors/typography/spacing
+│   └── data/               # Build-time data
+├── astro.config.mjs        # Astro configuration
+└── package.json
 ```
 
-## 🎨 Design System
+There is **no Tailwind** in this site. Styling uses scoped `<style>` blocks in `.astro` files, with values pulled from CSS custom properties in `src/styles/global.css`.
 
-The website uses a modern design system with:
+## Documentation integration
 
-- **Typography**: Inter for body text, Lexend for headings
-- **Colors**: Dark theme with teal/blue accent palette
-- **Components**: Reusable button, card, and layout components
-- **Animations**: Subtle scroll animations and hover effects
-- **Responsive**: Mobile-first design with Tailwind CSS
+Documentation lives at the **repo root `docs/` directory**, not inside `website/`. Pages under `/docs/*` read markdown files from `../docs/` at build time via `import.meta.url`-relative path resolution.
 
-### Color Palette
+**To change documentation, edit files under the repo-root `docs/` directory.** Do not create `src/content/docs/` here — that pattern is obsolete and will not surface on the site.
 
-- **Primary**: `#00D4AA` (Teal)
-- **Secondary**: `#3B82F6` (Blue)
-- **Accent**: `#32FFD2` (Bright Teal)
-- **Purple**: `#8B5CF6` (Purple)
-- **Background**: `#0A0E1A` (Dark Navy)
+The files that resolve and render docs:
 
-## 📚 Documentation Integration
+- `src/pages/docs/[...slug].astro` — dynamic doc page renderer
+- `src/pages/docs/index.astro` — docs index/sidebar
+- `src/lib/markdown.ts` — markdown renderer with link rewriting
 
-The website includes comprehensive documentation with:
-
-- **Getting Started**: Quick setup guides and tutorials
-- **Core Features**: Deep dives into ICN's capabilities
-- **API Reference**: Complete API documentation
-- **RFCs**: Technical specifications and proposals
-- **Developer Tools**: CLI guides and development resources
-
-## 🛠 Development
-
-### Available Scripts
+## Scripts
 
 ```bash
-npm run dev        # Start development server
-npm run build      # Build for production
-npm run preview    # Preview production build
-npm run lint       # Run Astro checks
-npm run format     # Format code with Prettier
-npm run deploy     # Deploy to GitHub Pages
+npm run dev        # Astro dev server at http://localhost:4321
+npm run build      # Production build (runs scripts/gen-stats.mjs first)
+npm run preview    # Preview the production build locally
+npm run lint       # Astro TypeScript / content check
+npm run format     # Prettier formatting
+npm run deploy     # Build and force-push dist/ to gh-pages (manual fallback)
 ```
 
-### Adding Content
+The `prebuild` step (`scripts/gen-stats.mjs`) runs automatically before `build`.
 
-#### New Pages
+## Adding content
 
-Create `.astro` files in `src/pages/` directory. The file structure maps to URL routes.
+- **Pages** — create an `.astro` file under `src/pages/`. The URL path mirrors the file path.
+- **Blog posts** — add a markdown file under `src/content/blog/` matching the schema in `src/content/config.ts`.
+- **Documentation** — edit files under the **repo-root `docs/`** directory; the site picks them up at build time.
 
-#### Blog Posts
+For lists of more than ~3 items, prefer Astro content collections over hardcoded arrays in `.astro` frontmatter.
 
-Add new blog posts in `src/pages/blog/` directory with frontmatter for metadata.
+## Deployment
 
-#### Documentation
+Automatic. `.github/workflows/website-deploy.yml` builds and publishes to `gh-pages` on every push to `main` that touches `website/**`, `docs/**`, or the workflow itself. Uses `peaceiris/actions-gh-pages@v4` to force-push the `website/dist/` build output to `gh-pages`. The site is served at `https://intercooperative.network` by GitHub Pages.
 
-Add documentation pages in `src/pages/docs/` directory with proper navigation.
+Manual fallback: `npm run deploy` from `website/` builds and pushes via the `gh-pages` npm package. Use only when the workflow is broken or for a one-off deploy without a `main` commit.
 
-### Styling Guidelines
+## Contributing
 
-- Use Tailwind CSS utility classes for styling
-- Follow the established design system colors and typography
-- Ensure responsive design with mobile-first approach
-- Add hover states and transitions for interactive elements
+The website is institutional infrastructure copy, not a marketing surface. Edits should:
 
-## 🚀 Deployment
+- be checkable against the design-language docs above (especially `brief-v0` anti-patterns and `accessibility` gates)
+- preserve regulatory-safe vocabulary (obligation, allocation, settlement, unit, position, receipt, provenance, evidence) and avoid framing ICN-native primitives as payment, currency, balance, or wallet surfaces
+- preserve plain language and semantic HTML
+- include alt text for any image
+- be tested at narrow viewports and with the dark/light theme toggle
+- not introduce partner-specific or institution-specific content (those belong in partner repositories)
 
-The website is automatically deployed to GitHub Pages when changes are pushed to the main branch.
+## Links
 
-For manual deployment:
+- **Monorepo (where this site lives):** [InterCooperative-Network/icn](https://github.com/InterCooperative-Network/icn)
+- **Documentation root:** [`docs/`](../docs/)
+- **Design language:** [`docs/design-language/`](../docs/design-language/)
+- **Issues / discussions:** filed against the monorepo at `InterCooperative-Network/icn`
 
-```bash
-npm run deploy
-```
+## License
 
-## 🤝 Contributing
-
-We welcome contributions to improve the website! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-### Content Guidelines
-
-- Keep content clear and accessible
-- Use proper semantic HTML
-- Ensure all images have alt text
-- Test on multiple devices and browsers
-- Follow the established tone and style
-
-## 📄 License
-
-This project is licensed under the same terms as the ICN project. See the main repository for details.
-
-## 🔗 Links
-
-- **Main Repository**: [icn](https://github.com/InterCooperative-Network/icn)
-- **Documentation**: [ICN Docs](https://github.com/InterCooperative-Network/icn/tree/main/docs)
-- **Community**: [Discussions](https://github.com/InterCooperative-Network/icn/discussions)
-- **Issues**: [Bug Reports](https://github.com/InterCooperative-Network/icn-website/issues)
-
----
-
-Built with ❤️ by the ICN community
+Same terms as the ICN project. See the monorepo root for license details.
