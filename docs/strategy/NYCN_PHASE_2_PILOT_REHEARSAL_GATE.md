@@ -36,6 +36,8 @@ Optional prep (NYCN repo, checklist only — does **not** record that the
 presentation occurred):
 
 - [REHEARSAL-0002 — Organizer gate prep](https://github.com/InterCooperative-Network/nycn/blob/main/docs/rehearsals/REHEARSAL-0002-organizer-gate-prep.md).
+- Guided **no-CLI** organizer/member narrative (generic ICN): [`docs/pilots/no-cli-organizer-member-rehearsal-workflow.md`](../pilots/no-cli-organizer-member-rehearsal-workflow.md).
+- NYCN companion (package language, wireframe order): [`NO-CLI-ORGANIZER-REHEARSAL-WORKFLOW.md` on NYCN](https://github.com/InterCooperative-Network/nycn/blob/main/docs/NO-CLI-ORGANIZER-REHEARSAL-WORKFLOW.md).
 
 Required organizer decision:
 
