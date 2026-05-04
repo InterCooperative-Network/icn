@@ -1,10 +1,44 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-05-02
+Last Reviewed: 2026-05-04
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-05-04 (post-#1725 / NYCN-#53 / #1732):
+     Documentation and public-surface truth-sync. ICN #1725
+     landed the generic no-CLI organizer/member rehearsal
+     workflow spec at docs/pilots/no-cli-organizer-member-
+     rehearsal-workflow.md — review-first, mutation-last,
+     three roles distinguished (organizer / steward-operator /
+     future member), accessibility baseline release-blocking
+     for any user-facing shell, evidence export repo-safe by
+     default. NYCN #53 landed the NYCN companion at
+     docs/NO-CLI-ORGANIZER-REHEARSAL-WORKFLOW.md (in
+     fahertym/nycn). ICN #1732 landed the website README
+     civic design truth-sync, replacing stale Lexend / hex
+     palette / "modern design system" / Tailwind framing
+     with pointers to docs/design-language/ and
+     website/src/styles/global.css as the single token
+     surface. These are documentation and presentation-
+     readiness changes only. No Phase 2 status change. NYCN
+     remains the intended first cooperative partner, not a
+     formally committed pilot. Implementation follow-ups
+     remain open: ICN #1726-#1731 plus #1713 (organizer
+     rehearsal shell, fixture-backed demo mode, generic
+     preview/review read-model contract, repo-safe evidence
+     export schema, private-overlay/DID-binding activation
+     flow, accessibility review gate, ActionCard schema
+     stabilization); NYCN #54-#58 (presentation wireframe
+     deck, fixture demo packet, evidence packet example,
+     holder-label/DID activation policy, accessibility/
+     privacy checklist). Next substantive implementation
+     path remains ICN #1729 (repo-safe evidence export
+     schema). Do not read this sync as production readiness,
+     live federation integration, implemented service
+     hosting, K3s/DNS/Forgejo mutation, NYCN private-data
+     handling, or resolved licensing. -->
 
 <!-- [sync edit] 2026-05-02 (post-#1695/#1696/#1697/#1698/#1699/#1700/#1701):
      Follow-up May-cycle queue is now merged on main: Dependabot
