@@ -867,6 +867,22 @@ owner = "matt"
 audiences = ["developers", "architects"]
 depends_on = ["docs/ARCHITECTURE.md"]
 
+[docs."docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md"]
+category = "architecture"
+status = "living"
+title = "Architecture due diligence"
+description = "Process / principle doc codifying two checklists authors and reviewers run when introducing or changing an architectural surface: (1) convenience-vs-authority (centralized convenience is fine; centralized authority is not — name dependencies and assign them to the correct layer), and (2) participation access (language, plain-language, vision, motor, cognitive, bandwidth, AT compatibility, accommodation privacy — designed-in, not bolted on). Triggered by the rehearsal evidence schema's non-DNS $id decision and grounded in docs/design-language/accessibility.md."
+last_updated = "2026-05-04"
+owner = "matt"
+audiences = ["architects", "contributors"]
+truth_class = "descriptive"
+role = "architecture"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["architecture", "process", "contracts", "governance", "accessibility"]
+recommended_action = "keep"
+last_reviewed = "2026-05-04"
+
 [docs."docs/architecture/CELLS_AND_SCOPES.md"]
 category = "architecture"
 status = "living"

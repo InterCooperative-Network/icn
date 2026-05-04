@@ -39,6 +39,10 @@ Drafting an ADR before the design space is explored produces shallow ADRs. Draft
 
 See [RFC-0000](RFC-0000-rfc-process.md) for the process detail (when to write an RFC, how to move it forward, how to supersede or withdraw).
 
+## Before drafting
+
+Run the [Architecture due-diligence checklist](../architecture/ARCHITECTURE_DUE_DILIGENCE.md) before writing an RFC that introduces or changes an architectural surface (schemas, identifiers, distribution paths, governance touchpoints, dependency choices). The checklist surfaces convenience-vs-authority and centralized-dependency questions early, while the design space is still fluid; it is upstream of RFC drafting.
+
 ## File naming
 
 `RFC-NNNN-short-kebab-title.md` — four-digit zero-padded number, hyphen, kebab-case title. The number is allocated when the RFC moves from `candidate` (in `rfc_candidates.yaml`) to `draft`. Numbers are sequential and never reused.

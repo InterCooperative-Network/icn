@@ -275,5 +275,6 @@ Before any public-facing PR ships, run this checklist:
 
 - [brief-v0.md](./brief-v0.md) — the design language brief
 - [concept-map.md](./concept-map.md) — canonical → public term mapping
+- [`../architecture/ARCHITECTURE_DUE_DILIGENCE.md`](../architecture/ARCHITECTURE_DUE_DILIGENCE.md) — upstream architecture-review reflex; the participation-access half of that checklist sits one layer above the surface-level rules in this doc
 - `website/src/layouts/Layout.astro` — site shell, nav, skip link, focus handling
 - `website/src/styles/global.css` — token definitions, focus-visible rules, motion handling
