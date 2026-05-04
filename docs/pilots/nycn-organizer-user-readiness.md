@@ -8,6 +8,8 @@ Last Reviewed: 2026-05-04
 
 ICN-side orientation for **NYCN organizers**, **stewards**, and anyone explaining **member-legible** surfaces. It does not duplicate the NYCN package repo; use [NYCN `docs/ORGANIZER-USER-READINESS.md`](https://github.com/InterCooperative-Network/nycn/blob/main/docs/ORGANIZER-USER-READINESS.md) for ladder commands and fixture policy there.
 
+For the **presentation-first, no-terminal default story** (organizer vs steward vs future member), read the generic workflow spec: [no-cli-organizer-member-rehearsal-workflow.md](no-cli-organizer-member-rehearsal-workflow.md). NYCN copy and meeting-room wireframes: [NO-CLI-ORGANIZER-REHEARSAL-WORKFLOW.md on NYCN](https://github.com/InterCooperative-Network/nycn/blob/main/docs/NO-CLI-ORGANIZER-REHEARSAL-WORKFLOW.md).
+
 **Non-claims:** Phase 2 is **not** marked complete here. NYCN is the **intended** first cooperative partner, not a formally committed pilot unless a repo-safe organizer record says so. No production-readiness, live federation, or hosted multi-tenant guarantee.
 
 ## What ICN runtime surfaces matter for organizers now
@@ -51,10 +53,11 @@ Institution packages should validate card-shaped JSON against:
 - `docs/contracts/institution-package/action-card.schema.json` (**RFC** — see `x-icn-status`; emitted `(source_kind, action_kind)` pairs are listed under `x-icn-emitted-source-action-pairs`, with `signal_rule` / `obligation_lifecycle` reserved-not-emitted)
 - Package validation notes: `docs/contracts/institution-package/README.md`
 
-Tracking: [#1713](https://github.com/InterCooperative-Network/icn/issues/1713). Organizer gate: [#1703](https://github.com/InterCooperative-Network/icn/issues/1703).
+Tracking: [#1713](https://github.com/InterCooperative-Network/icn/issues/1713). Organizer gate: [#1703](https://github.com/InterCooperative-Network/icn/issues/1703). No-CLI rehearsal narrative: [#1724](https://github.com/InterCooperative-Network/icn/issues/1724).
 
 ## Source of truth
 
+- [no-cli-organizer-member-rehearsal-workflow.md](no-cli-organizer-member-rehearsal-workflow.md) — generic guided workflow; CLI remains steward/operator layer
 - [STATE.md](../STATE.md), [PHASE_PROGRESS.md](../PHASE_PROGRESS.md)
 - [NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md](../strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md)
 - NYCN facilitator prep (checklists only, not a decision record):

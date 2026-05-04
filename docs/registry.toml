@@ -3160,6 +3160,22 @@ domain_tags = ["pilot", "nycn", "communications", "action-cards"]
 recommended_action = "keep"
 last_reviewed = "2026-05-04"
 
+[docs."docs/pilots/no-cli-organizer-member-rehearsal-workflow.md"]
+category = "reference"
+status = "living"
+title = "No-CLI organizer and member rehearsal workflow (generic ICN)"
+description = "Guided browser/mobile-first rehearsal story: standing, action cards, action items, receipts, provenance, repo-safe evidence; organizer vs steward vs member paths; preview-before-mutation; CLI as operator layer only; follow-ups for UI/API/evidence contracts. Partner companion doc lives in NYCN repo."
+last_updated = "2026-05-04"
+owner = "matt"
+audiences = ["team", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "nycn", "communications", "action-cards", "accessibility"]
+recommended_action = "keep"
+last_reviewed = "2026-05-04"
+
 [docs."docs/contracts/institution-package/README.md"]
 category = "reference"
 status = "living"
