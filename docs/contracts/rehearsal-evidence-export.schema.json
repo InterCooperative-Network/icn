@@ -1,0 +1,305 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:icn:contract:rehearsal-evidence-export:v1",
+  "title": "RehearsalEvidenceExport",
+  "description": "A repo-safe rehearsal evidence packet emitted at the end of an organizer or steward rehearsal walk, as described by docs/pilots/no-cli-organizer-member-rehearsal-workflow.md (§3 step 9, §4 'Privacy-safe evidence by default'). The packet is the substrate-level shape every institution package's evidence checklist binds to. It enumerates what a rehearsal did, in plain language, with categories and basenames only — never private contact data, raw attendee rolls, tokens, sponsor information, accommodation needs, real Drive paths, or any field that would imply formal pilot approval or production deployment. Partner-internal overlays are not in this schema; they live in package private overlays and never enter the ICN repository tree. Packets validating against this schema are repo-safe by construction (export_safety_classification = 'repo-safe'); the partner-internal classification exists only to mark a packet that should NOT be checked into ICN, and is never produced from this repo. The schema $id is a non-DNS URN so contract identity does not depend on centralized DNS or registrar infrastructure; see docs/contracts/rehearsal-evidence-export.md for the rationale.",
+  "x-icn-status": "rfc",
+  "x-icn-contract-name": "icn.contract.rehearsal_evidence_export.v1",
+  "x-icn-distribution-hints": [
+    "docs/contracts/rehearsal-evidence-export.schema.json",
+    "docs/contracts/rehearsal-evidence-export.md",
+    "docs/contracts/rehearsal-evidence-export.example.json"
+  ],
+  "x-icn-references": [
+    "GitHub icn#1729",
+    "GitHub icn#1724",
+    "GitHub icn#1725",
+    "GitHub icn#1732",
+    "GitHub icn#1733",
+    "GitHub nycn#52",
+    "GitHub nycn#53",
+    "GitHub nycn#56"
+  ],
+  "x-icn-must-not-include": [
+    "real personal names (unless explicitly fictional / example-only)",
+    "real email addresses",
+    "real phone numbers",
+    "sponsor contact details",
+    "accommodation or access needs tied to an identifiable person",
+    "raw attendee or member rolls",
+    "API tokens, secrets, signed URLs, or session credentials",
+    "private Drive / Groups / Sheets paths or content",
+    "private overlay contents",
+    "live partner operational details",
+    "any field that implies formal pilot approval or production deployment",
+    "DIDs of unconsented participants"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "recorded_at",
+    "rehearsal_label",
+    "rehearsal_mode",
+    "audience_categories",
+    "source_material",
+    "workflow_steps_completed",
+    "decision_outcomes",
+    "preview_review_boundary",
+    "mutation_boundary",
+    "privacy_review",
+    "export_safety_classification",
+    "non_claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Semver-style version of this schema the packet was authored against. Accepts 'MAJOR.MINOR.PATCH' or 'MAJOR.MINOR'. Bumped only when the schema's required fields or closed enums change.",
+      "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+    },
+    "recorded_at": {
+      "type": "string",
+      "description": "Wall-clock timestamp when the packet was finalized for export. RFC 3339 'date-time' (e.g. 2026-05-04T22:31:16Z). The producer is responsible for ensuring this is the moment of human review-and-export, not an arbitrary build time.",
+      "format": "date-time"
+    },
+    "rehearsal_label": {
+      "type": "string",
+      "description": "Short, plain-language title for the rehearsal suitable for an issue comment or evidence index row. Generic labels only; no partner / organization / person names unless they are explicitly fictional examples.",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "rehearsal_mode": {
+      "description": "Closed taxonomy describing how mutation was treated during the rehearsal. 'fixture-only' = no mutation, no network. 'local-dry-run' = preview-only against a local gateway. 'local-execute' = explicit execution against a local non-production gateway. 'non-production-gateway' = an explicitly-labeled non-production gateway elsewhere. Production gateways are never a valid value here; this schema does not describe production runs.",
+      "type": "string",
+      "enum": [
+        "fixture-only",
+        "local-dry-run",
+        "local-execute",
+        "non-production-gateway"
+      ]
+    },
+    "audience_categories": {
+      "description": "Closed taxonomy of generic audience role labels present at the rehearsal. Categories only — never names, emails, or counts that could de-anonymize a small group. If no audience was present (solo dry-run), use an empty array.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "organizer",
+          "steward",
+          "operator",
+          "member",
+          "committee",
+          "facilitator",
+          "observer",
+          "reviewer"
+        ]
+      }
+    },
+    "source_material": {
+      "description": "Inputs the rehearsal walked through. Each entry is described by safe basename and category — never by raw external path. 'committed-fixture' = file already in the repository. 'example-snippet' = inline fictional content authored for the rehearsal. 'repo-safe-paste' = content reviewed and confirmed to contain no private fields before being pasted into the rehearsal surface. 'sha256' is optional and only meaningful for committed fixtures or otherwise public content.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "basename", "summary"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["committed-fixture", "example-snippet", "repo-safe-paste"]
+          },
+          "basename": {
+            "type": "string",
+            "description": "File or snippet basename only — no directory paths, no Drive URLs, no external links to private content.",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Optional content hash; include only when the underlying content is itself repo-safe (committed fixture or fictional example).",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One-sentence plain-language description of what this material is. Generic enough to publish in a public issue comment.",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        }
+      }
+    },
+    "workflow_steps_completed": {
+      "description": "Closed taxonomy mirroring §3 of docs/pilots/no-cli-organizer-member-rehearsal-workflow.md. Lists which steps the rehearsal actually completed in human-visible form. Steps that were skipped are simply omitted; this is not a checklist of intent.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "start",
+          "select-material",
+          "preview",
+          "decide",
+          "assign-by-label",
+          "preview-mutation",
+          "confirm",
+          "surface-result",
+          "export-evidence"
+        ]
+      }
+    },
+    "decision_outcomes": {
+      "description": "Plain-language record of how proposed action items / decisions were resolved during the rehearsal. Categories are closed; the plain summary is free text but must remain repo-safe (no private rolls, no contact details).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "plain_summary"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected",
+              "deferred",
+              "edit-and-resubmit",
+              "out-of-scope",
+              "withdrawn"
+            ]
+          },
+          "plain_summary": {
+            "type": "string",
+            "description": "One- or two-sentence plain-language description of the decision. Generic phrasing; no private fields.",
+            "minLength": 1,
+            "maxLength": 600
+          }
+        }
+      }
+    },
+    "preview_review_boundary": {
+      "description": "Whether the review-first / mutation-last boundary defined in the no-CLI workflow §3 was honored in this rehearsal. 'enforced' must be true for any rehearsal that intends to be reusable as evidence; if it was false, document why in 'notes' so the failure is visible rather than silent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enforced"],
+      "properties": {
+        "enforced": { "type": "boolean" },
+        "notes": { "type": "string", "minLength": 1, "maxLength": 600 }
+      }
+    },
+    "mutation_boundary": {
+      "description": "Whether the rehearsal performed any mutation, and if so, against what target. 'target' is the specific surface that received writes. 'none' is the only acceptable value when 'executed' is false; anything else implies executed = true.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executed", "target"],
+      "properties": {
+        "executed": { "type": "boolean" },
+        "target": {
+          "type": "string",
+          "enum": [
+            "none",
+            "fixture-only",
+            "local-dry-run",
+            "local-gateway",
+            "non-production-gateway"
+          ]
+        },
+        "notes": { "type": "string", "minLength": 1, "maxLength": 600 }
+      }
+    },
+    "proof_loop_references": {
+      "description": "Pointers to the proof-loop categories the rehearsal exercised. References are by category (and optionally a public id, e.g. an opaque receipt id from a non-production run that is already public). Never include private DIDs, holder identifiers, or partner-internal correlation ids. 'status' captures whether the loop closed in this rehearsal.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "status"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "governance-decision-receipt",
+              "action-item-completion-receipt",
+              "meeting-attendance-receipt",
+              "provenance-summary",
+              "validator-output-category"
+            ]
+          },
+          "public_id_or_category": {
+            "type": "string",
+            "description": "Optional opaque public id (already public — receipt id from a non-production run) or category label. Omit if the rehearsal did not generate a citable id."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["closed", "partial", "not-attempted", "skipped"]
+          }
+        }
+      }
+    },
+    "warnings": {
+      "description": "Plain-language warnings the rehearsal surfaced. These are repo-safe phrasings of what would have gone wrong if a step were skipped or misapplied; not stack traces, not raw error payloads.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 400 }
+    },
+    "follow_ups": {
+      "description": "Open follow-up items the rehearsal recorded. URLs, when present, must point to public issues or PRs only — never to private partner trackers, Drive paths, or internal links.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Optional public issue or PR URL. Omit for follow-ups that do not yet have a public tracker entry."
+          },
+          "notes": { "type": "string", "minLength": 1, "maxLength": 600 }
+        }
+      }
+    },
+    "privacy_review": {
+      "description": "Privacy review status of this packet. 'reviewer_role' is a generic role label — never a person name. 'status' captures whether the packet was reviewed and whether redactions were applied before export. 'not-reviewed' is permitted but should be uncommon; downstream consumers may treat it as a red flag.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewer_role", "status"],
+      "properties": {
+        "reviewer_role": {
+          "type": "string",
+          "enum": ["organizer", "steward", "facilitator", "reviewer", "operator"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["reviewed-clean", "redactions-applied", "not-reviewed"]
+        },
+        "notes": { "type": "string", "minLength": 1, "maxLength": 600 }
+      }
+    },
+    "accessibility_review": {
+      "description": "Accessibility review status of the rehearsal itself (not of this packet). Mirrors the privacy review shape. 'reviewer_role' is generic; 'status' is closed taxonomy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewer_role", "status"],
+      "properties": {
+        "reviewer_role": {
+          "type": "string",
+          "enum": ["organizer", "steward", "facilitator", "reviewer", "operator"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["reviewed-clean", "adjustments-applied", "not-reviewed"]
+        },
+        "notes": { "type": "string", "minLength": 1, "maxLength": 600 }
+      }
+    },
+    "export_safety_classification": {
+      "description": "Whether the packet is safe to commit to a public repository or share in a public issue comment. 'repo-safe' is the only classification produced from packets that validate against this schema in normal use; 'partner-internal-only' is reserved as a contractual marker that the producing system itself decided NOT to export through the repo-safe path. The latter MUST NOT appear in any packet checked into the ICN repository.",
+      "type": "string",
+      "enum": ["repo-safe", "partner-internal-only"]
+    },
+    "non_claims": {
+      "description": "Required free-text array enumerating the standing non-claims this packet preserves. At minimum: not production deployment, not a formal pilot, not a live federation or cloud-sync run, not private-data handling. Producers may add packet-specific non-claims; producers MUST NOT remove the standing four.",
+      "type": "array",
+      "minItems": 4,
+      "items": { "type": "string", "minLength": 1, "maxLength": 400 }
+    }
+  }
+}

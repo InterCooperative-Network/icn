@@ -85,7 +85,7 @@ Track as discrete work items (GitHub issues welcome; not all may exist yet):
 - **UI prototype** — Single guided shell (organizer mode) with the §3 screen list.
 - **Fixture-backed demo** — Deterministic fixture load with no network by default.
 - **Generic preview/review API contract** — Stable read models for “pending publish” summaries (package-agnostic shapes).
-- **Evidence export contract** — Machine-readable **repo-safe** evidence summary schema shared with partners.
+- **Evidence export contract** — Machine-readable **repo-safe** evidence summary schema shared with partners. Substrate contract: [`rehearsal-evidence-export.schema.json`](../contracts/rehearsal-evidence-export.schema.json) with companion notes at [`rehearsal-evidence-export.md`](../contracts/rehearsal-evidence-export.md). `$id` is the non-DNS URN `urn:icn:contract:rehearsal-evidence-export:v1` ([ICN#1729](https://github.com/InterCooperative-Network/icn/issues/1729)).
 - **Private-overlay / DID binding activation flow** — Documented UX for label → directory → DID without leaking overlay into public repos.
 - **Accessibility review** — WCAG-oriented pass on any new shell before calling it organizer-ready.
 - **Package validation** — Mechanical checks that package outputs align with [action-card.schema.json](../contracts/institution-package/action-card.schema.json) where applicable ([ICN#1713](https://github.com/InterCooperative-Network/icn/issues/1713), partner validation issues).
