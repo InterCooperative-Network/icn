@@ -1,0 +1,89 @@
+{
+  "schema_version": "0.1.0",
+  "recorded_at": "2026-05-04T22:31:16Z",
+  "rehearsal_label": "Fictional fixture-only organizer rehearsal — sample committee",
+  "rehearsal_mode": "fixture-only",
+  "audience_categories": ["organizer", "facilitator", "reviewer"],
+  "source_material": [
+    {
+      "kind": "committed-fixture",
+      "basename": "sample-committee-meeting-notes.fixture.md",
+      "summary": "Fictional sample committee meeting notes used to walk the parser preview step. No real people, no real organization."
+    },
+    {
+      "kind": "example-snippet",
+      "basename": "sample-action-item.snippet.md",
+      "summary": "One fictional action item in plain language: example committee to draft a sample agenda for a sample meeting."
+    }
+  ],
+  "workflow_steps_completed": [
+    "start",
+    "select-material",
+    "preview",
+    "decide",
+    "assign-by-label",
+    "preview-mutation",
+    "export-evidence"
+  ],
+  "decision_outcomes": [
+    {
+      "category": "approved",
+      "plain_summary": "Sample committee approved drafting a sample agenda for a fictional follow-up meeting; assigned to the example agenda role-label."
+    },
+    {
+      "category": "deferred",
+      "plain_summary": "Sample committee deferred a fictional sponsorship inquiry to a later rehearsal so the privacy boundary could be re-walked first."
+    }
+  ],
+  "preview_review_boundary": {
+    "enforced": true,
+    "notes": "Preview was shown and acknowledged before any assign-by-label or preview-mutation step. No mutation was attempted in this rehearsal."
+  },
+  "mutation_boundary": {
+    "executed": false,
+    "target": "none",
+    "notes": "Fixture-only rehearsal; no gateway contacted, no write attempted, no network egress."
+  },
+  "proof_loop_references": [
+    {
+      "kind": "action-item-completion-receipt",
+      "status": "not-attempted"
+    },
+    {
+      "kind": "validator-output-category",
+      "public_id_or_category": "fixture-validate-pass",
+      "status": "closed"
+    }
+  ],
+  "warnings": [
+    "Holder-label to DID binding remained a label-only step; activation flow was not exercised.",
+    "Live cloud sync surfaces were not part of this rehearsal and must not be inferred from this packet."
+  ],
+  "follow_ups": [
+    {
+      "title": "Walk the holder-label to DID activation flow in a separate rehearsal",
+      "url": "https://github.com/InterCooperative-Network/icn/issues/1730"
+    },
+    {
+      "title": "Cross-reference this schema from a partner package's evidence checklist",
+      "url": "https://github.com/InterCooperative-Network/nycn/issues/56"
+    }
+  ],
+  "privacy_review": {
+    "reviewer_role": "facilitator",
+    "status": "reviewed-clean",
+    "notes": "All material in this packet is fictional; no real names, contacts, or partner data were present at any point."
+  },
+  "accessibility_review": {
+    "reviewer_role": "facilitator",
+    "status": "reviewed-clean",
+    "notes": "Walkthrough materials were available in plain language and at large enough font for the room; no terminal use was required of any organizer."
+  },
+  "export_safety_classification": "repo-safe",
+  "non_claims": [
+    "Not a production deployment.",
+    "Not a formally committed cooperative pilot.",
+    "Not a live federation, live Google Drive / Groups / Sheets sync, or any K3s / DNS / Forgejo mutation.",
+    "Not private-data handling; all material is fictional and repo-safe by construction."
+  ]
+}

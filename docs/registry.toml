@@ -3192,6 +3192,22 @@ domain_tags = ["contracts", "governance", "action-cards"]
 recommended_action = "keep"
 last_reviewed = "2026-05-04"
 
+[docs."docs/contracts/rehearsal-evidence-export.md"]
+category = "reference"
+status = "living"
+title = "Rehearsal evidence export — contract notes"
+description = "Companion notes for the substrate-level repo-safe rehearsal evidence export schema (urn:icn:contract:rehearsal-evidence-export:v1). Defines field shape, must-not-include list, validation guidance, stability, and the non-DNS contract-identity decision. JSON schema and fictional example live alongside; tiny validator at docs/scripts/validate-rehearsal-evidence.py."
+last_updated = "2026-05-04"
+owner = "matt"
+audiences = ["contributors", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["contracts", "pilots", "evidence", "accessibility", "privacy"]
+recommended_action = "keep"
+last_reviewed = "2026-05-04"
+
 # ============================================================================
 # PLANNING AND STRATEGY (Additional)
 # ============================================================================
