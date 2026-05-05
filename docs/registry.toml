@@ -3256,6 +3256,22 @@ domain_tags = ["contracts", "architecture", "process"]
 recommended_action = "keep"
 last_reviewed = "2026-05-05"
 
+[docs."docs/contracts/preview-review.md"]
+category = "reference"
+status = "living"
+title = "Preview / review — contract notes"
+description = "Companion notes for the substrate-level read-model contract for human-reviewable previews of pending publish, action items, evidence packets, and fixture demos (urn:icn:contract:preview-review:v1). Defines field shape, must-not-include list, validation guidance, stability, and how the contract fits the no-CLI organizer/member workflow + organizer/member accessibility gate. Closes the 'Generic preview/review API contract' follow-up in icn#1724 / no-CLI workflow §7. Read-only; not a mutation API. JSON schema and fictional example live alongside; tiny validator at docs/scripts/validate-preview-review.py."
+last_updated = "2026-05-05"
+owner = "matt"
+audiences = ["contributors", "architects"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["contracts", "pilots", "review", "evidence", "accessibility"]
+recommended_action = "keep"
+last_reviewed = "2026-05-05"
+
 # ============================================================================
 # PLANNING AND STRATEGY (Additional)
 # ============================================================================

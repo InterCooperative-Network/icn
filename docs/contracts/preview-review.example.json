@@ -1,0 +1,73 @@
+{
+  "schema_version": "0.1.0",
+  "preview_id": "preview-example-sample-committee-2026-05-05-001",
+  "preview_kind": "meeting_notes_action_items",
+  "created_at": "2026-05-05T00:30:00Z",
+  "created_by_role": "facilitator",
+  "scope": "structure",
+  "source_material": [
+    {
+      "kind": "example-snippet",
+      "basename": "sample-committee-meeting-notes.fixture.md",
+      "summary": "Fictional sample committee meeting notes used to demonstrate the meeting-notes-to-action-items preview shape. No real people, no real organization."
+    },
+    {
+      "kind": "example-snippet",
+      "basename": "sample-organizing-circle-agenda.fixture.md",
+      "summary": "Fictional sample organizing-circle agenda referenced by the meeting notes for context. No real venue, no real attendee roll."
+    }
+  ],
+  "proposed_artifact": {
+    "kind": "action_item_set",
+    "title": "EXAMPLE — Two proposed action items from sample committee meeting notes",
+    "summary": "The parser proposes two fictional action items from the sample meeting notes: a sample working group to draft a sample agenda for a fictional follow-up cycle, and a sample working group to outline a sample obligation note for the same cycle. Reviewer is being asked to approve these as the next documented step (action-item creation) after a separate, named endpoint applies them.",
+    "detail": "Action item 1: Sample agenda working group (label only) drafts a sample agenda for a fictional follow-up organizing-circle cycle. Action item 2: Sample obligation working group (label only) outlines a sample obligation note clarifying unit and provenance fields before re-presenting at the next cycle. Both action items are described in plain language; neither carries an assignee DID — holder-label to DID binding is a separate documented step under the private-overlay / DID activation flow."
+  },
+  "review_status": "ready_for_review",
+  "review_requirements": [
+    "privacy_review",
+    "accessibility_review",
+    "repo_safety_review",
+    "scope_confirmation",
+    "no_mutation_check"
+  ],
+  "reviewer_actions": [
+    {
+      "action": "opened",
+      "by_role": "facilitator",
+      "recorded_at": "2026-05-05T00:30:00Z",
+      "notes": "Preview assembled from the bundled fictional source material; presented to the reviewer for the first time."
+    }
+  ],
+  "privacy_review": {
+    "reviewer_role": "facilitator",
+    "status": "reviewed-clean",
+    "notes": "All material in this preview is fictional; no real names, contacts, sponsors, attendee rolls, accommodation needs, tokens, or partner Drive paths were present at any point. The preview is checked into a public repository deliberately as a schema-conformance reference."
+  },
+  "repo_safety": {
+    "classification": "repo-safe",
+    "notes": "All source material is fictional and committed under docs/contracts/ (or referenced by basename only); no partner-internal data is present. The preview is safe to render in any public surface."
+  },
+  "evidence_links": [
+    {
+      "kind": "rehearsal-evidence-export",
+      "contract_urn": "urn:icn:contract:rehearsal-evidence-export:v1",
+      "title": "Upstream evidence-export contract that a separate, documented next step would write to once approved",
+      "url": "https://github.com/InterCooperative-Network/icn/blob/main/docs/contracts/rehearsal-evidence-export.md"
+    },
+    {
+      "kind": "public-issue",
+      "title": "ICN #1728 — generic preview/review read-model contract for pending-publish summaries",
+      "url": "https://github.com/InterCooperative-Network/icn/issues/1728"
+    }
+  ],
+  "non_claims": [
+    "This preview is a schema-conformance example, not a real review record.",
+    "Not a mutation; rendering this preview does not publish, apply, or export anything.",
+    "Not a production deployment.",
+    "Not a formally committed NYCN cooperative pilot.",
+    "Not a live federation, live Google Drive / Groups / Sheets sync, or any K3s / DNS / Forgejo mutation.",
+    "Not private-data handling; all material is fictional and repo-safe by construction.",
+    "Not a self-declared organizer-ready surface; the gate at docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md still runs against any UI that renders this preview."
+  ]
+}

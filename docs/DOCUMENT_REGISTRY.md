@@ -41,9 +41,9 @@ python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml
 
 ## Corpus coverage
 
-- **Markdown files under docs/**: 772
+- **Markdown files under docs/**: 773
 - **By truth_class (merged):**
-  - `descriptive`: 434
+  - `descriptive`: 435
   - `draft`: 43
   - `historical`: 79
   - `normative`: 60
@@ -76,5 +76,5 @@ What fails in CI, what warns, what `--strict` adds, and when to promote strict t
 
 ## Registry coverage (this snapshot)
 
-- **Files scanned:** 772 Markdown files under `docs/`
-- **Explicit `[docs."…"]` rows under `docs/`:** 282 (remaining files rely on `[[doc_path_defaults]]` only)
+- **Files scanned:** 773 Markdown files under `docs/`
+- **Explicit `[docs."…"]` rows under `docs/`:** 283 (remaining files rely on `[[doc_path_defaults]]` only)

@@ -176,6 +176,7 @@ Configuration files and environment settings:
 ### Contract notes (`contracts/`)
 
 - [schema-id-audit.md](contracts/schema-id-audit.md) - Audit-only record of every JSON schema `$id` under `docs/contracts/`, with per-schema keep / migrate / investigate recommendations and migration safety rules
+- [preview-review.md](contracts/preview-review.md) - Read-only / read-model contract for the human review boundary between source material and any subsequent action (`urn:icn:contract:preview-review:v1`); not a mutation API
 
 ### Other References
 
