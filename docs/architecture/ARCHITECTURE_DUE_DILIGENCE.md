@@ -252,5 +252,6 @@ NYCN remains the **intended first cooperative partner**, not a committed formal 
 - [icn#1738](https://github.com/InterCooperative-Network/icn/issues/1738) — issue this doc closes
 - [`../contracts/schema-id-audit.md`](../contracts/schema-id-audit.md) — first deliberate application of this checklist: audit of every contract-schema `$id` in the repo, with per-schema keep / migrate / investigate recommendations and the migration safety rules
 - [icn#1737](https://github.com/InterCooperative-Network/icn/issues/1737) — sibling issue: audit existing schema `$id` values (deliverable lives at the audit doc above)
-- [icn#1731](https://github.com/InterCooperative-Network/icn/issues/1731) — sibling issue: surface-specific accessibility review gate for organizer / member shells
+- [`../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`](../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md) — surface-specific PR-time review gate for organizer / member shells; the operational layer the participation-access half of this checklist sits upstream of
+- [icn#1731](https://github.com/InterCooperative-Network/icn/issues/1731) — sibling issue: surface-specific accessibility review gate for organizer / member shells (deliverable lives at the gate doc above)
 - [icn#1729](https://github.com/InterCooperative-Network/icn/issues/1729) — closed: rehearsal evidence export schema (the trigger)

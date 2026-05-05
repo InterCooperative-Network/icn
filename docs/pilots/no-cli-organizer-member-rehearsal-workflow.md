@@ -68,6 +68,8 @@ The organizer path is **review-first** and **mutation-last**. Numbers are the lo
 
 When a product shell implements this workflow, it must be **mobile-first**, **plain-language**, **keyboard** and **screen-reader** usable, with **large touch targets**, and **no terminal assumption**. Until that shell exists, facilitators should use **reduced-motion**, high-contrast materials and avoid requiring attendees to read raw JSON or stack traces in meeting rooms.
 
+The PR-time review gate that operationalizes this requirement is [`../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`](../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md). Any PR that introduces or changes a shell, action-card surface, preview/review surface, evidence packet rendering surface, or member-facing governance flow must run the organizer/member accessibility gate checklist (gate doc §5) before being treated as organizer-ready, member-facing, or pilot-ready.
+
 ## 6. Implementation status and smallest presentation storyboard
 
 **Today:** ICN exposes the **HTTP** surfaces above; institution packages own ingest and review file formats. The ICN `web/pilot-ui` tree is oriented to **pilot community** flows (governance, timebank-style demos) and **steward enrollment** (`steward-dashboard`); it does **not** yet implement the full ingest → review → assign → preview → confirm ladder as a single guided organizer shell.
