@@ -986,10 +986,14 @@ ideas:
       accept receipt or MinorityReport recorded receipt), (3) a real
       visibility/privacy boundary run with redaction in evidence
       export, (4) a real accessibility-gate ProcessGateResult on a
-      primitive's UI surface, and (5) at least one open question (Q1
-      AuthorityBasis polymorphism vs typed family, or Q5
-      ConflictDisclosure / MinorityReport placement) resolved or
-      explicitly deferred in writing. Runtime work is gated on idea-0019
+      primitive's UI surface, and (5) at least one open question — Q1
+      (AuthorityBasis polymorphism vs typed family) or Q5
+      (ConflictDisclosure / MinorityReport placement) — resolved in
+      writing per the framing brief's §16.1 promotion gate. Deferral
+      is not sufficient for the RFC gate per §16.1; the lenient
+      resolved-or-deferred standard at §16.3 applies only to the
+      broader runtime-justification threshold, not to RFC promotion.
+      Runtime work is gated on idea-0019
       promotion (for spine composition), #1632 (for delegation /
       TemporaryAuthorityGrant), #1609 (for federation tally
       semantics), #1631 (for signal / challenge-path semantics),
