@@ -804,8 +804,8 @@ ideas:
       defined surface rather than each feature inventing one.
     belongs_to: icn
     layer: substrate
-    current_artifact: "scattered: ADR-0026, ADR-0027, urn:icn:contract:preview-review:v1, urn:icn:contract:rehearsal-evidence-export:v1, docs/pilots/no-cli-organizer-member-rehearsal-workflow.md, docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md; no document names the generic process spine"
-    proposed_next_artifact: framing_brief
+    current_artifact: "framing brief at ops/ideas/framing/institutional-process-substrate.md (PR #1747); read-model dogfood slice at ops/ideas/dogfood/institutional-process-substrate-mvp.md (this PR); composes against ADR-0026, ADR-0027, urn:icn:contract:preview-review:v1, urn:icn:contract:rehearsal-evidence-export:v1, docs/pilots/no-cli-organizer-member-rehearsal-workflow.md, docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md"
+    proposed_next_artifact: dogfood_slice
     promoted_target: null
     proposed_objects:
       - "ProcessTargetRef (name candidate; not committed)"
@@ -837,18 +837,22 @@ ideas:
       - "Foreclosing CCL design — the brief must not lock the rule-authoring layer (idea-0012, idea-0018) into a specific runtime model."
       - "Conflicting with conflict-resolution model (ADR-0029, idea-0016) — the brief must defer dispute paths to that work, not absorb them."
     next_transform: |
-      Write the framing brief at
-      ops/ideas/framing/institutional-process-substrate.md. The brief
-      defines the spine as plain-language object families (no schemas),
-      classifies MVP/near-term vs Later, lists explicit non-goals,
-      explains why deliberation is first-class, and names the layer
-      fit (kernel meaning-blind / app generic process / CCL transitions
-      / institution package vocabulary / nodes store-sign-scope-sync /
-      action cards route attention / receipts prove transitions /
-      evidence exports summarize repo-safe outcomes). Do not promote
-      to RFC until at least one MVP slice has produced runtime evidence
-      against a real or fixture-equivalent process session. A
-      coordination milestone issue may be opened to track this work
-      across preview/review (#1728 / PR #1745), private-overlay
-      (#1730), action cards (#1713 / ADR-0027), evidence export
-      (#1729), accessibility gate, and proof-loop receipts.
+      Framing brief landed in PR #1747
+      (ops/ideas/framing/institutional-process-substrate.md).
+      Coordination milestone issue #1748 is open. The first read-model
+      dogfood slice landed in this PR
+      (ops/ideas/dogfood/institutional-process-substrate-mvp.md): a
+      fictional Example Cooperative process session walked end-to-end
+      against the existing committed examples
+      docs/contracts/preview-review.example.json and
+      docs/contracts/rehearsal-evidence-export.example.json — proving
+      the spine composes as a read-model surface without any kernel,
+      runtime, gateway, ledger, governance, or SDK code change. Next
+      artifact (separate session, not this one) is a runtime dogfood
+      slice that produces at least one process-transition receipt
+      class under the existing ADR-0026 envelope. Do not promote
+      idea-0019 to RFC until that runtime slice exists and at least
+      one of framing-brief open questions Q1 (ProcessTargetRef
+      polymorphism), Q3 (DeliberationEntry kind taxonomy), or Q4
+      (HumanDecisionSet vs proposal/vote) has been resolved or
+      explicitly deferred in writing.
