@@ -36,7 +36,7 @@ The default for new contract schemas is a non-DNS URN of the form `urn:icn:contr
 | Schema path | Current `$id` | Classification | Recommendation | Rationale |
 |---|---|---|---|---|
 | [`./rehearsal-evidence-export.schema.json`](rehearsal-evidence-export.schema.json) | `urn:icn:contract:rehearsal-evidence-export:v1` | non-DNS URN | **keep** | Already on the preferred non-DNS pattern. Companion fields `x-icn-contract-name` (human handle) and `x-icn-distribution-hints` (repo-relative paths) are explicitly not authority; full rationale in [`./rehearsal-evidence-export.md`](rehearsal-evidence-export.md) Identity section. |
-| [`./institution-package/action-card.schema.json`](institution-package/action-card.schema.json) | `https://intercooperative.network/contracts/institution-package/action-card.schema.json` | DNS-backed (HTTPS) | **investigate / migration review** | The schema is referenced by institution-package validation guidance ([`./institution-package/README.md`](institution-package/README.md)), TypeScript SDK regen, and partner-side validators. Migrating the `$id` is a contract-identity change that any pinned consumer must absorb. Migration should land in its own PR after a deliberate downstream-compatibility review per §5. Any retention beyond a near-term review window should be revisited at the next scheduled architecture pass. |
+| [`./institution-package/action-card.schema.json`](institution-package/action-card.schema.json) | `https://intercooperative.network/contracts/institution-package/action-card.schema.json` | DNS-backed (HTTPS) | **retain temporarily; review by 2026-06-30; migrate only after compatibility inventory** | The schema is referenced by institution-package validation guidance ([`./institution-package/README.md`](institution-package/README.md), which explicitly notes SDK / OpenAPI regen protects the **generated API contract**, not this hand-maintained JSON file). No in-repo generator path is currently known to consume this hand-maintained schema or its `$id`; migration still requires the §5 compatibility review because docs, examples, package validation, external consumers, or future tooling may have pinned the current identifier. Migration must land in its own PR. |
 
 ### 3.1 Out of scope but noted
 
@@ -51,7 +51,7 @@ The Astro-generated content-collection schemas under `website/.astro/collections
 ## 4. Recommendations summary
 
 - **Keep**: `rehearsal-evidence-export.schema.json` (already on the preferred pattern).
-- **Investigate / migration review**: `institution-package/action-card.schema.json`. **Do not migrate in the same PR as this audit.** Open a separate PR scoped to that single schema's `$id` migration, gated on §5 below.
+- **Retain temporarily; review by 2026-06-30; migrate only after compatibility inventory**: `institution-package/action-card.schema.json`. **Do not migrate in the same PR as this audit.** Open a separate PR scoped to that single schema's `$id` migration, gated on §5 below. If the 2026-06-30 review concludes that migration should not happen, document the decision in this audit and reset a new review date; do not let "temporarily" become "indefinitely."
 - **Add**: none — every contract schema in scope has an `$id`.
 - **No new schema** should ship in `docs/contracts/` with a DNS-backed `$id`. The default for new contract schemas is `urn:icn:contract:<short-name>:v<N>`. Where a meaningful URN is impractical, a stable UUID URN (`urn:uuid:<uuid>`) is the bounded fallback.
 
