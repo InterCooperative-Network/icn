@@ -120,7 +120,7 @@ A rehearsal facilitator (or a future organizer shell) walks the §3 ladder of th
 - Partner overlay format — partner-internal data lives in private overlays, outside this schema.
 - Federation export protocol.
 - UI rendering of evidence packets (organizer / member shell work tracked under [#1726](https://github.com/InterCooperative-Network/icn/issues/1726) / [#1727](https://github.com/InterCooperative-Network/icn/issues/1727)).
-- Migration of existing contract schemas (e.g. `action-card.schema.json`) to non-DNS `$id` — that is a deliberate follow-up evaluation, not part of this PR.
+- Migration of existing contract schemas (e.g. `action-card.schema.json`) to non-DNS `$id` — that is a deliberate follow-up evaluation, not part of this PR. The audit of where every contract `$id` currently sits lives at [`./schema-id-audit.md`](schema-id-audit.md); migration of any individual schema must follow §5 ("Migration safety rules") of that audit.
 
 ## See also
 

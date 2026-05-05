@@ -250,6 +250,7 @@ NYCN remains the **intended first cooperative partner**, not a committed formal 
 - [`../adr/ADR-0018-adr-lifecycle-and-canonical-decision-index.md`](../adr/ADR-0018-adr-lifecycle-and-canonical-decision-index.md) — ADR lifecycle; this checklist is upstream of ADR drafting
 - [`../adr/ADR-0028-accessibility-baseline-for-member-interfaces.md`](../adr/ADR-0028-accessibility-baseline-for-member-interfaces.md) — accessibility baseline for member interfaces; the surface-level decision the participation half of this checklist sits upstream of
 - [icn#1738](https://github.com/InterCooperative-Network/icn/issues/1738) — issue this doc closes
-- [icn#1737](https://github.com/InterCooperative-Network/icn/issues/1737) — sibling issue: audit existing schema `$id` values
+- [`../contracts/schema-id-audit.md`](../contracts/schema-id-audit.md) — first deliberate application of this checklist: audit of every contract-schema `$id` in the repo, with per-schema keep / migrate / investigate recommendations and the migration safety rules
+- [icn#1737](https://github.com/InterCooperative-Network/icn/issues/1737) — sibling issue: audit existing schema `$id` values (deliverable lives at the audit doc above)
 - [icn#1731](https://github.com/InterCooperative-Network/icn/issues/1731) — sibling issue: surface-specific accessibility review gate for organizer / member shells
 - [icn#1729](https://github.com/InterCooperative-Network/icn/issues/1729) — closed: rehearsal evidence export schema (the trigger)
