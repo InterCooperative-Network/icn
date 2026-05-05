@@ -113,12 +113,12 @@ packet all refer to the same institutional process run."
 
 ### PreviewReviewPacket
 
-Already shipping as a read-model contract
-(`urn:icn:contract:preview-review:v1`). Listed here for spine
-completeness only. Defines the human review boundary between source
-material and any subsequent action. The spine pins it as the surface
-where the **review** half of "preview → deliberation → decision" is
-captured.
+Defined by the read-model contract
+`urn:icn:contract:preview-review:v1` (landed in PR #1745, merged
+2026-05-05). Listed here for spine completeness only. Defines the
+human review boundary between source material and any subsequent
+action. The spine pins it as the surface where the **review** half of
+"preview → deliberation → decision" is captured.
 
 ### DeliberationThread
 
@@ -334,8 +334,9 @@ These integrate with already-merged or in-flight contracts and do not
 require new substrate runtime work beyond what the rehearsal milestone
 (#1746) is already coordinating:
 
-- `PreviewReviewPacket` integration (already a shipping contract;
-  spine pins where in the process it lives)
+- `PreviewReviewPacket` integration (contract
+  `urn:icn:contract:preview-review:v1` landed in PR #1745; spine pins
+  where in the process it lives)
 - object-bound `DeliberationThread` / `DeliberationEntry` as a
   read-model only, paired with the existing `PreviewReviewPacket` —
   no chat semantics, no notification system

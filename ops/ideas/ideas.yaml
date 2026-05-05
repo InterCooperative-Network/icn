@@ -810,7 +810,7 @@ ideas:
     proposed_objects:
       - "ProcessTargetRef (name candidate; not committed)"
       - "ProcessSession (name candidate)"
-      - "PreviewReviewPacket (already shipping as a read-model contract; included here only as the spine's preview surface)"
+      - "PreviewReviewPacket (defined by urn:icn:contract:preview-review:v1, landed in PR #1745; included here only as the spine's preview surface)"
       - "DeliberationThread (name candidate; object-bound, not chat)"
       - "DeliberationEntry (name candidate)"
       - "HumanDecisionSet (name candidate)"
