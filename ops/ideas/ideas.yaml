@@ -840,19 +840,34 @@ ideas:
       Framing brief landed in PR #1747
       (ops/ideas/framing/institutional-process-substrate.md).
       Coordination milestone issue #1748 is open. The first read-model
-      dogfood slice landed in this PR
+      fixture-walk variant of a dogfood slice landed in this PR
       (ops/ideas/dogfood/institutional-process-substrate-mvp.md): a
       fictional Example Cooperative process session walked end-to-end
-      against the existing committed examples
-      docs/contracts/preview-review.example.json and
-      docs/contracts/rehearsal-evidence-export.example.json — proving
-      the spine composes as a read-model surface without any kernel,
-      runtime, gateway, ledger, governance, or SDK code change. Next
-      artifact (separate session, not this one) is a runtime dogfood
-      slice that produces at least one process-transition receipt
-      class under the existing ADR-0026 envelope. Do not promote
-      idea-0019 to RFC until that runtime slice exists and at least
-      one of framing-brief open questions Q1 (ProcessTargetRef
-      polymorphism), Q3 (DeliberationEntry kind taxonomy), or Q4
-      (HumanDecisionSet vs proposal/vote) has been resolved or
-      explicitly deferred in writing.
+      against the SAME shipping contract URNs as the committed
+      examples docs/contracts/preview-review.example.json and
+      docs/contracts/rehearsal-evidence-export.example.json. The
+      slice does NOT byte-replay those example files; it produces a
+      different valid instance of the same contracts (a three-outcome
+      decision_outcomes shape using the schema's closed enum:
+      approved + edit-and-resubmit + deferred). The slice proves the
+      spine composes as a read-model surface without any kernel,
+      runtime, gateway, ledger, governance, or SDK code change. Per
+      ops/ideas/README.md "Dogfood slice variants" section (added in
+      this PR), a read-model fixture walk does NOT satisfy the
+      receipt-backed promotion thresholds. Promotion of idea-0019 to
+      RFC requires ALL FOUR conditions named in the dogfood doc's
+      "Promotion gate" section: (1) a separate runtime dogfood slice
+      that emits at least one ProcessTransitionReceipt class
+      (ProcessSessionOpenedReceipt, DeliberationEntryRecordedReceipt,
+      DecisionRecordedReceipt, ActivationCrossedReceipt,
+      MutationPlanRecordedReceipt, MutationAppliedReceipt,
+      EvidencePacketProducedReceipt, or ProcessGateResultReceipt)
+      under the existing ADR-0026 envelope; (2) a real visibility/
+      privacy-boundary run with redaction in the evidence export;
+      (3) a real accessibility-gate ProcessGateResult produced
+      through the docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md
+      checklist; (4) at least one framing-brief open question among
+      Q1 (ProcessTargetRef polymorphism), Q3 (DeliberationEntry kind
+      taxonomy), or Q4 (HumanDecisionSet vs proposal/vote) resolved
+      or explicitly deferred in writing. The runtime slice and these
+      conditions are NOT in scope of this PR.

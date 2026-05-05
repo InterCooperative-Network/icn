@@ -9,14 +9,21 @@
 schema. Not a decision. Not a pilot. Not production.
 
 > **Slice discipline.** The repo's standard dogfood-slice template
-> (`ops/ideas/templates/dogfood-slice.md`) assumes a real path that
-> emits real receipts against a running gateway. This slice is a
-> deliberate variant: a **fixture walk** that exercises spine
-> composition against already-committed example artifacts only. It
-> emits no receipts, contacts no gateway, and authorizes no mutation.
+> (`ops/ideas/templates/dogfood-slice.md`) defines a **NYCN-real,
+> receipt-backed** dogfood slice as the primary pattern. This
+> artifact is the documented **read-model fixture-walk variant**
+> formalized in `ops/ideas/README.md` § "Dogfood slice variants"
+> (added in this PR alongside the slice). The variant uses
+> fictional, repo-safe material exclusively, composes against
+> already-committed contract examples and shipping ADRs without
+> modification, emits no receipts, contacts no gateway, performs no
+> mutation, and writes nothing outside the `ops/ideas/` refinery.
 > Its purpose is to prove the spine **composes** as a read-model
-> shape, not that runtime works. A future `runtime` dogfood slice is
-> the next artifact after this one — see "Promotion gate" below.
+> shape, not that runtime works. A read-model fixture walk does
+> **not** satisfy promotion thresholds that require receipt-backed
+> runtime evidence — see "Promotion gate" below for the full list.
+> A future canonical (NYCN-real) dogfood slice is the next artifact
+> after this one.
 
 ## What this slice proves
 
@@ -125,10 +132,12 @@ as plain language only.
 - **What the spine pins:** the `PreviewReviewPacket` is the first
   human review boundary in the session. The reviewer sees what would
   be produced — they do not produce it.
-- **Receipts:** none today. A future `ProcessSessionOpenedReceipt`
-  and a future `PreviewRenderedReceipt` (both name candidates from
-  the framing brief) would attach to the existing `ADR-0026`
-  envelope without introducing a new envelope.
+- **Receipts:** none today. The framing brief lists
+  `ProcessSessionOpenedReceipt` (already cited at Step 0) as the
+  receipt that would attach to the existing `ADR-0026` envelope when
+  a session opens; the framing brief does **not** define a
+  per-preview receipt class, and this slice does not invent one.
+  Whether per-preview receipts are needed is a future open question.
 
 ### Step 2. Walk a `DeliberationThread` with three entries
 
@@ -167,13 +176,16 @@ The three entries:
   outcomes; a real institution may have one or many decision moments
   per session. The decision rule is recorded; no rule is invented.
 
-The decision row (fictional):
+The decision row (fictional). Outcome labels match the closed enum at
+`urn:icn:contract:rehearsal-evidence-export:v1` →
+`decision_outcomes[].category` (`approved | rejected | deferred |
+edit-and-resubmit | out-of-scope | withdrawn`):
 
-| Outcome   | Target                                        | Decision rule (recorded, not invented)                | Plain-language summary                                                                                |
-|-----------|-----------------------------------------------|--------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `approve` | proposed action item 2 (sample obligation)    | committee consensus, with no `objection` entry filed   | Sample obligation working group drafts a sample obligation note clarifying unit and provenance fields |
-| `revise`  | proposed action item 1 (sample agenda)        | committee consensus, after the `amendment` entry above | Sample agenda working group drafts the agenda only, schedule build deferred                            |
-| `defer`   | concern raised by `accessibility_review` entry| committee consensus, deferred to follow-up cycle       | Receipt-export rendering accessibility concern carried into a future cycle                              |
+| Outcome              | Target                                        | Decision rule (recorded, not invented)                | Plain-language summary                                                                                |
+|----------------------|-----------------------------------------------|--------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| `approved`           | proposed action item 2 (sample obligation)    | committee consensus, with no `objection` entry filed   | Sample obligation working group drafts a sample obligation note clarifying unit and provenance fields |
+| `edit-and-resubmit`  | proposed action item 1 (sample agenda)        | committee consensus, after the `amendment` entry above | Sample agenda working group drafts the agenda only, schedule build deferred                            |
+| `deferred`           | concern raised by `accessibility_review` entry| committee consensus, deferred to follow-up cycle       | Receipt-export rendering accessibility concern carried into a future cycle                              |
 
 - **Boundary:** a decision is **not** a mutation. The decision
   authorizes a downstream `MutationPlan`; it does not execute one.
@@ -267,26 +279,44 @@ All sketches; no ActionCard is actually emitted in this slice.
 - **`EvidencePacket`** — *existing contract*
   `urn:icn:contract:rehearsal-evidence-export:v1`.
 - **Input:** the spine state above.
-- **Output reference:** `docs/contracts/rehearsal-evidence-export.example.json`
-  exactly as committed. The slice does not author a new packet; it
-  composes against the one already in the repo. The committed
-  example's `decision_outcomes` array (`approved`, `deferred`) and
-  `preview_review_boundary.enforced: true` shape match what this
-  slice would produce.
-- **Repo safety:** the committed example's
-  `export_safety_classification: repo-safe`. All material is
-  fictional. Holder-label → DID activation is recorded as a
-  follow-up. No real partner data.
-- **Receipts:** the committed example's `proof_loop_references`
-  array correctly carries `action-item-completion-receipt: not-attempted`
-  for a fixture-only walk. A future runtime slice would flip that.
+- **Composition claim — precise:** the slice composes against the
+  **same contract URN** as the committed example
+  `docs/contracts/rehearsal-evidence-export.example.json`. The
+  committed example is **one valid two-outcome instance** of that
+  contract (`approved` + `deferred`). This slice would produce a
+  **different valid three-outcome instance** of the same contract
+  (`approved` + `edit-and-resubmit` + `deferred`), each outcome
+  drawn from the same closed `decision_outcomes[].category` enum.
+  The slice does **not** claim the committed example file would be
+  re-emitted byte-for-byte; it claims the committed example's shape
+  and the slice's three-outcome shape are both valid against the
+  same schema, which is what "composability" means in a read-model
+  walk.
+- **Reused shape elements** (those that *would* be identical between
+  the committed example and a packet produced by this slice):
+  `rehearsal_mode: fixture-only`, `preview_review_boundary.enforced:
+  true`, `mutation_boundary.executed: false`,
+  `export_safety_classification: repo-safe`, `proof_loop_references[]
+  .status: not-attempted` for a fixture walk, generic
+  `audience_categories`, fictional `rehearsal_label`. Schema
+  validation against the committed example today plus schema
+  validation against the three-outcome shape this slice describes
+  are the two pieces of evidence; both already pass under the
+  shipping `urn:icn:contract:rehearsal-evidence-export:v1` schema.
+- **Repo safety:** All material is fictional.
+  Holder-label → DID activation is recorded as a follow-up. No real
+  partner data.
+- **Receipts:** for any packet produced from this slice,
+  `proof_loop_references[].status: not-attempted` would be the
+  correct value (matching the committed example's posture for
+  fixture-only walks). A future runtime slice would flip that.
 
 ## Trace table (one-row-per-step)
 
 | Step | Spine object              | Status                 | Input                                                | Human review boundary               | Privacy boundary                                                                  | Receipt / evidence relationship                                                                                  | Implementation status                                                          |
 |------|---------------------------|------------------------|------------------------------------------------------|-------------------------------------|-----------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
 | 0    | `ProcessSession` / `ProcessTargetRef` | name candidate          | meeting-notes artifact (fictional, label only)        | session opens; reviewer not yet engaged | label only; no DID; no real org                                                | `ProcessSessionOpenedReceipt` — name candidate, would attach to ADR-0026 envelope                                | not runtime; read-model only                                                   |
-| 1    | `PreviewReviewPacket`     | existing contract       | `docs/contracts/preview-review.example.json` (committed) | first review boundary; reviewer sees the packet | repo-safe; `additionalProperties: false` enforces                                | future `PreviewRenderedReceipt` (name candidate) on existing envelope                                            | shipping read-model contract; rendered as-is in slice                          |
+| 1    | `PreviewReviewPacket`     | existing contract       | `docs/contracts/preview-review.example.json` (committed) | first review boundary; reviewer sees the packet | repo-safe; `additionalProperties: false` enforces                                | none — framing brief does not name a per-preview receipt class; the session-open receipt at Step 0 covers the boundary | shipping read-model contract; rendered as-is in slice                          |
 | 2    | `DeliberationThread` / `DeliberationEntry` | name candidate (closed-taxonomy proposed) | three fictional entries (question / accessibility_review / amendment) | object-bound entries; not chat       | charter-governed visibility default-conservative; no PII                          | future `DeliberationEntryRecordedReceipt` (name candidate) on existing envelope                                  | not runtime; read-model only                                                   |
 | 3    | `HumanDecisionSet` / `DecisionRecord` | name candidate          | three deliberation entries + decision rule (consensus, no objection) | second review boundary; decision is not mutation | generic role labels; no names                                                    | future `DecisionRecordedReceipt` (name candidate) on existing envelope                                           | not runtime; read-model only                                                   |
 | 4    | `MutationPlan`            | name candidate (sketch) | decision record                                       | preview-shape (`pending_publish_summary`) | repo-safe by construction; no live mutation                                       | future `MutationPlanRecordedReceipt` (name candidate) on existing envelope                                       | not runtime; sketch only                                                       |
@@ -423,10 +453,35 @@ any ICN code change.
 ## Acceptance criteria for this slice
 
 - [x] Slice document is committed to `ops/ideas/dogfood/`.
-- [x] Slice walks all spine objects from `idea-0019` end-to-end.
+- [x] Slice walks all spine **transition** objects from `idea-0019`
+      (`ProcessSession`, `ProcessTargetRef`, `PreviewReviewPacket`,
+      `DeliberationThread`, `DeliberationEntry`, `HumanDecisionSet`,
+      `DecisionRecord`, `MutationPlan`, `ActivationRequest`,
+      `ProcessGateResult`, `ActionCardTrigger`, `EvidencePacket`)
+      end-to-end as a read-model.
+- [x] Receipt classes named in `idea-0019` (the
+      `ProcessTransitionReceipt` family —
+      `ProcessSessionOpenedReceipt`,
+      `DeliberationEntryRecordedReceipt`,
+      `DecisionRecordedReceipt`, `ActivationCrossedReceipt`,
+      `MutationPlanRecordedReceipt`, `MutationAppliedReceipt`,
+      `EvidencePacketProducedReceipt`, `ProcessGateResultReceipt`)
+      are **referenced** at the right transition points but **not
+      exercised** in this slice — emitting any of them is the next
+      artifact (runtime dogfood). The slice does not claim runtime
+      receipt evidence.
 - [x] Slice composes against existing committed examples
       (`docs/contracts/preview-review.example.json`,
-      `docs/contracts/rehearsal-evidence-export.example.json`).
+      `docs/contracts/rehearsal-evidence-export.example.json`) by
+      pointing at the same shipping contract URNs and walking
+      shapes that validate against the same schemas. The slice
+      produces a three-outcome instance of
+      `urn:icn:contract:rehearsal-evidence-export:v1` whose
+      categories all come from that contract's closed
+      `decision_outcomes[].category` enum
+      (`approved` + `edit-and-resubmit` + `deferred`); the
+      committed example file is a separate two-outcome instance of
+      the same contract.
 - [x] Slice introduces no new schema, no new contract URN, no
       runtime code change, no SDK change, no website change.
 - [x] All material is fictional and repo-safe; no private data.
