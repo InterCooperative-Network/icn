@@ -173,6 +173,10 @@ Configuration files and environment settings:
 - [identity-backend-configuration.md](reference/config/identity-backend-configuration.md) - Identity backends
 - [trust-threshold-configuration.md](reference/config/trust-threshold-configuration.md) - Trust thresholds
 
+### Contract notes (`contracts/`)
+
+- [schema-id-audit.md](contracts/schema-id-audit.md) - Audit-only record of every JSON schema `$id` under `docs/contracts/`, with per-schema keep / migrate / investigate recommendations and migration safety rules
+
 ### Other References
 
 - [glossary.md](glossary.md) - Terminology and definitions

@@ -682,7 +682,7 @@ category = "reference"
 status = "living"
 title = "ICN Document Registry (human summary)"
 description = "Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh"
-last_updated = "2026-03-26"
+last_updated = "2026-05-04"
 owner = "matt"
 audiences = ["contributors", "agents"]
 truth_class = "descriptive"
@@ -691,7 +691,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["registry", "documentation-control"]
 recommended_action = "keep"
-last_reviewed = "2026-03-26"
+last_reviewed = "2026-05-04"
 
 [docs."docs/planning/documentation-namespace-resolution.md"]
 category = "strategy"
@@ -3223,6 +3223,22 @@ freshness = "current"
 domain_tags = ["contracts", "pilots", "evidence", "accessibility", "privacy"]
 recommended_action = "keep"
 last_reviewed = "2026-05-04"
+
+[docs."docs/contracts/schema-id-audit.md"]
+category = "reference"
+status = "living"
+title = "Schema $id audit"
+description = "Audit-only record of every JSON schema $id under docs/contracts/, classified DNS-backed vs non-DNS, with per-schema keep/migrate/investigate recommendations and migration safety rules. Performs no migration. First deliberate application of the architecture due-diligence checklist; deliverable for icn#1737."
+last_updated = "2026-05-05"
+owner = "matt"
+audiences = ["architects", "contributors"]
+truth_class = "descriptive"
+role = "architecture"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["contracts", "architecture", "process"]
+recommended_action = "keep"
+last_reviewed = "2026-05-05"
 
 # ============================================================================
 # PLANNING AND STRATEGY (Additional)
