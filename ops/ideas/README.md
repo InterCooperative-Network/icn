@@ -197,6 +197,34 @@ idea cards in `ideas.yaml` and is descriptive, not normative.
   promotion gate before any RFC / ADR / issue / package / learning /
   website target.
 
+### Dogfood slice variants
+
+The canonical dogfood slice (above) is **NYCN-real and
+receipt-backed**: it runs against real-shaped data and produces real
+receipts as evidence. That is the primary pattern and the threshold
+for any promotion that depends on runtime evidence.
+
+A dogfood slice may also be authored as a **read-model fixture walk**
+when the upstream framing brief explicitly calls for one *before* a
+runtime slice is scoped. A read-model fixture walk:
+
+- uses fictional, repo-safe material exclusively;
+- composes against already-committed contract examples and shipping
+  ADRs without modification;
+- emits **no** receipts, contacts no gateway, performs no mutation,
+  and writes nothing outside the `ops/ideas/` refinery;
+- must declare its variant status explicitly at the top of the
+  artifact and in the trace table's "Implementation status" column;
+- does **not** satisfy the promotion thresholds that require
+  receipt-backed runtime evidence — those thresholds still demand a
+  canonical NYCN-real slice.
+
+A read-model fixture walk is the cheapest honest test of *spine
+composition* before runtime work is justified. It does not replace
+the canonical pattern, and a successful fixture walk on its own is
+not sufficient for RFC promotion when the idea card's
+`evidence_required` calls for receipt-bearing evidence.
+
 ## Validator
 
 ```sh
