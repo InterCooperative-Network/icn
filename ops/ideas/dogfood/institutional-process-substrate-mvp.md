@@ -87,9 +87,14 @@ enum).
 **Process target:** one fictional `ProcessTargetRef` of kind
 `meeting_artifact` — the sample committee meeting notes — with two
 proposed action items derived from the notes (sample agenda working
-group; sample obligation working group). One proposed action item is
-approved as-is. One is revised before approval. One concern surfaced
-in deliberation is deferred to a follow-up cycle.
+group; sample obligation working group). One proposed action item
+receives the `approved` outcome. One receives the `edit-and-resubmit`
+outcome (its scope is narrowed before the working group proceeds).
+One concern surfaced in deliberation receives the `deferred` outcome
+(carried into a follow-up cycle). All three outcome labels are taken
+from the closed enum at
+`urn:icn:contract:rehearsal-evidence-export:v1` →
+`decision_outcomes[].category`.
 
 No real names. No real organization. No private organizer / member /
 sponsor / attendee data. No real Drive / Groups / Sheets paths.
@@ -205,11 +210,13 @@ plan kind:    pending_publish_summary  (preview_kind from the existing contract)
 plan target:  sample committee process session
 operations:
   - create:  ActionCard (kind from ADR-0027) — routes attention to the agenda
-             working group's holder label for the revised action item 1
+             working group's holder label for action item 1 (decision_outcomes
+             category: edit-and-resubmit)
   - create:  ActionCard (kind from ADR-0027) — routes attention to the obligation
-             working group's holder label for the approved action item 2
-  - record:  follow-up cycle item — receipt-export accessibility rendering, no
-             ActionCard yet
+             working group's holder label for action item 2 (decision_outcomes
+             category: approved)
+  - record:  follow-up cycle item for the deferred accessibility concern
+             (decision_outcomes category: deferred) — no ActionCard yet
 expected receipts:
   - one ActionItemCompletionReceipt per completed action item (existing receipt
     family under ADR-0026 envelope; not new)
@@ -260,16 +267,19 @@ not in plan:
   ActionCard kind. It pins which spine transitions are legitimate
   emit-points.
 
-The legitimate emit-points exercised (read-model only):
+The legitimate emit-points exercised (read-model only). Decision-
+outcome labels match the schema enum used in Step 3 and Step 7
+(`urn:icn:contract:rehearsal-evidence-export:v1` →
+`decision_outcomes[].category`):
 
 - `ProcessSessionOpened` → action card to the facilitator (sketch).
 - `DeliberationEntry: amendment` filed → action card to the
   organizer who proposed the amendment (sketch).
-- `DecisionRecord: revise` recorded → action card to the agenda
+- `DecisionRecord: edit-and-resubmit` recorded → action card to the
+  agenda working group's holder label (sketch).
+- `DecisionRecord: approved` recorded → action card to the obligation
   working group's holder label (sketch).
-- `DecisionRecord: approve` recorded → action card to the obligation
-  working group's holder label (sketch).
-- `DecisionRecord: defer` recorded → action card to the facilitator
+- `DecisionRecord: deferred` recorded → action card to the facilitator
   for the follow-up cycle (sketch).
 
 All sketches; no ActionCard is actually emitted in this slice.
