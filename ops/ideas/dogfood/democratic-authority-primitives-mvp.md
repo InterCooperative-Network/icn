@@ -208,19 +208,19 @@ DAP additions per entry:
 | # | Entry kind (`idea-0019`) | `ParticipationRole` | `AuthorityBasis` (kind) | DAP primitive composed |
 |---|--------------------------|---------------------|-------------------------|------------------------|
 | 1 | `question` | `reviewer` | `role_grade` (committee reviewer role per charter) | (none — typed entry only; primitive walk continues) |
-| 2 | `accessibility_review` | `facilitator` | `role_grade` + **`process_authority`** (facilitator process authority is typed but explicitly *non-decisional* per DAP brief §4.1 `FacilitatorSummary` row and §11 doctrinal rule) | **`FacilitatorSummary`** primitive composed: this entry IS a typed `FacilitatorSummary`. The substrate carries explicit non-decisional posture so a future reader cannot interpret the facilitator's process authority as outcome authority. |
+| 2 | `accessibility_review` | `facilitator` | `role_grade` + **`process_authority`** (facilitator process authority is typed but explicitly *non-decisional* per DAP brief §4.1 `FacilitatorSummary` row, which calls out the distinction between facilitator process authority and outcome authority) | **`FacilitatorSummary`** primitive composed: this entry IS a typed `FacilitatorSummary`. The substrate carries explicit non-decisional posture so a future reader cannot interpret the facilitator's process authority as outcome authority. |
 | 3 | `amendment` | `organizer` | `role_grade` (committee organizer role) + **`member_voice`** (the proposing organizer is also a member of the sample obligation working group affected by the amendment — `member_voice` is the AuthorityBasis kind for member-as-self speech, distinct from delegated authority per DAP brief §6 doctrinal rule "Member voice is not delegated authority") | **`ConflictDisclosure`** primitive composed: see below. |
 
 The `ConflictDisclosure` attached to entry #3 is a typed pairing
 (not a stand-alone log) carrying:
 
 - **Actor**: the organizer authoring the amendment entry.
-- **Nature of conflict**: `professional_affiliation` (the organizer
-  is a member of a working group whose scope is affected by the
-  proposed amendment). One of the closed `nature` taxonomy
-  candidates from DAP §10.1 (`financial`, `familial`,
-  `professional`, `prior_relationship`, `jurisdictional`,
-  `identity_based`, `ideological_but_declared`, `other`).
+- **Nature of conflict**: `professional` (the organizer is a member
+  of a working group whose scope is affected by the proposed
+  amendment). One of the closed `nature` taxonomy candidates from
+  DAP §10.1 (`financial`, `familial`, `professional`,
+  `prior-relationship`, `jurisdictional`, `identity-based`,
+  `ideological-but-declared`, `other`).
 - **Affected target**: proposed action item 1 (sample agenda).
 - **Proposed mitigation**: `declared_position` (the organizer
   declares the affiliation on the record but does not recuse — the
@@ -623,12 +623,17 @@ charters, and packages without any ICN code change.
       twelve reference families: `CharterRuleReference`,
       `PriorDecisionReference`, `AccessibilityNote`) end-to-end
       against the merged `idea-0019` read-model fixture walk.
-- [x] Receipt classes named in `idea-0020`'s framing brief and in
-      this slice (`FacilitatorSummaryRecordedReceipt`,
+- [x] Receipt class candidates referenced in this slice
+      (`FacilitatorSummaryRecordedReceipt`,
       `ConflictDisclosureAcceptedReceipt`,
       `MinorityReportRecordedReceipt`) are **referenced** at the
       right transition points but **not exercised** — emitting
-      any of them is the next artifact (runtime dogfood). The
+      any of them is the next artifact (runtime dogfood). These
+      identifiers are slice-local class candidates only; the DAP
+      framing brief's §16.1 names a `ConflictDisclosure` accept
+      receipt and a `MinorityReport` recorded receipt generically
+      without attaching concrete class identifiers, and this
+      slice does not commit any of these names as canonical. The
       slice does not claim runtime receipt evidence.
 - [x] Slice composes against existing committed examples
       (`docs/contracts/preview-review.example.json`,
