@@ -6,6 +6,65 @@ Last Reviewed: 2026-05-05
 
 # ICN State (living doc)
 
+<!-- [sync edit] 2026-05-05 (post-#1751):
+     Truth-sync for the Democratic Authority Primitives framing
+     landing. Doc/control-plane and idea-refinery only — no runtime,
+     no schema, no contract URN, no ADR, no RFC, no implementation
+     issue, no runtime dogfood, no Phase 2 advance.
+     Landings since the previous sync edit (2026-05-05 morning,
+     post-#1749):
+       - #1751 docs(ideas): name Democratic Authority Primitives
+         as `idea-0020` with framing brief at
+         `ops/ideas/framing/democratic-authority-primitives.md`.
+         Pre-RFC framing only. Names two generic primitive families
+         — authority/participation primitives (`AuthorityBasis`,
+         `ParticipationRole`, `DelegationGrant`,
+         `RepresentationMandate`, `ExpertStatement`,
+         `AdvisoryOpinion`, `ConflictDisclosure`,
+         `FacilitatorSummary`, `StewardReview`,
+         `OperatorExecutionAuthority`, `MinorityReport`,
+         `ChallengePath`, `RevocationPath`, `RecallPath`) and
+         deliberation-context / educational-reference primitives
+         (`DeliberationContext`, `ContextReference`,
+         `LearningReference`, `EvidenceReference`,
+         `PriorDecisionReference`, `CharterRuleReference`,
+         `CCLRuleReference`, `AccessibilityNote`, `PrivacyNote`,
+         `RiskNote`, `CounterargumentReference`,
+         `GlossaryReference`). All names are candidates only;
+         no schema, no URN, no implementation issue is opened.
+         Composes orthogonally with `idea-0019` (Institutional
+         Process Substrate): the spine names *what gets processed*;
+         these primitives fill the spine's records with authority
+         and context typing the spine deliberately deferred.
+     Open coordination/control issues at this sync:
+       - #1748 milestone(process): define Institutional Process
+         Substrate. Unchanged from prior sync. Four acceptance
+         gates remain unchecked.
+       - #1746 milestone(showcase): make NYCN organizer rehearsal
+         operable before first presentation. Unchanged.
+       - #1744 ci(review): make substantive AI review findings
+         merge-gating. Unchanged.
+     Open PR queue at this sync: only Dependabot dev-dependency
+     bumps (#1735 pilot-ui axe-core/playwright; #1736 TypeScript
+     SDK dev-deps). Unchanged from prior sync.
+     Next pre-RFC architecture move: **NOT YET SELECTED**. The
+     prior sync named Democratic Authority Primitives as next; that
+     framing now landed in #1751. This sync deliberately preserves
+     optionality for the next session rather than smuggling in a
+     new commitment. The candidate next moves the next session may
+     pick from are listed descriptively below in the "Current
+     status" paragraph; none is selected here.
+     Phase 2 framing unchanged: NYCN remains the intended first
+     cooperative partner, not a formally committed pilot. The
+     concrete next gate remains the partner-bound sequence in
+     `docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md`:
+     organizer presentation -> pilot formalization -> first
+     operator rehearsal. This sync does not claim production
+     readiness, live federation integration, implemented service
+     hosting, K3s/DNS/GitHub/Forgejo mutation, NYCN private-data
+     handling, live Google Drive/Groups/Sheets sync, or resolved
+     licensing. -->
+
 <!-- [sync edit] 2026-05-05 (post-#1734 / #1739 / #1741 / #1743 /
      #1745 / #1747 / #1749, with open #1748):
      Truth-sync for the May-5 institutional-process-substrate
@@ -187,12 +246,13 @@ Last Reviewed: 2026-05-05
 ## Current status (2026-05-05 snapshot)
 
 **Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate is defined in [NYCN Phase 2 Pilot Rehearsal Gate](strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md). The Phase 2 *machinery* is in place end-to-end; what remains is the human procedure — present, formalize, rehearse — and recording each step.
-Active execution since the previous sync has been entirely doc/control-plane: rehearsal evidence export schema (#1734); architecture due-diligence checklist (#1739); contract schema-identifier audit (#1741); organizer/member accessibility gate definition (#1743); the preview/review read-model contract `urn:icn:contract:preview-review:v1` (#1745); the `idea-0019` Institutional Process Substrate framing brief at `ops/ideas/framing/institutional-process-substrate.md` (#1747); a coordination/control milestone issue #1748 to track spine composition without licensing implementation; and a read-model fixture-walk dogfood slice for `idea-0019` at `ops/ideas/dogfood/institutional-process-substrate-mvp.md` plus a new "Dogfood slice variants" section in `ops/ideas/README.md` that formalizes the read-model variant (#1749). Carrying forward: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN's drive-ingest operator ladder (NYCN #21–#28 in `fahertym/nycn`) is merged end-to-end, with subsequent NYCN #29–#32 also merged. The May-5 process-substrate sequence is documentation/refinery only: no runtime executes; no kernel, gateway, ledger, governance, or SDK code changed; no new contract URN beyond `urn:icn:contract:preview-review:v1` (#1745) was minted; no implementation issue was opened from #1748; and a read-model fixture walk does not satisfy receipt-backed promotion thresholds per `ops/ideas/README.md` § "Dogfood slice variants". The next pre-RFC architecture move is **Democratic Authority Primitives** — generic delegation, representation, expert/advisory input, deliberation context, conflict disclosure, facilitator and steward/operator authority, and revocation/recall/challenge paths that institutions adopt and constrain through CCL, charters, and institution packages — and is **not started in this sync**. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
+Active execution since the previous sync has been entirely doc/control-plane: rehearsal evidence export schema (#1734); architecture due-diligence checklist (#1739); contract schema-identifier audit (#1741); organizer/member accessibility gate definition (#1743); the preview/review read-model contract `urn:icn:contract:preview-review:v1` (#1745); the `idea-0019` Institutional Process Substrate framing brief at `ops/ideas/framing/institutional-process-substrate.md` (#1747); a coordination/control milestone issue #1748 to track spine composition without licensing implementation; and a read-model fixture-walk dogfood slice for `idea-0019` at `ops/ideas/dogfood/institutional-process-substrate-mvp.md` plus a new "Dogfood slice variants" section in `ops/ideas/README.md` that formalizes the read-model variant (#1749). Carrying forward: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN's drive-ingest operator ladder (NYCN #21–#28 in `fahertym/nycn`) is merged end-to-end, with subsequent NYCN #29–#32 also merged. The May-5 process-substrate sequence is documentation/refinery only: no runtime executes; no kernel, gateway, ledger, governance, or SDK code changed; no new contract URN beyond `urn:icn:contract:preview-review:v1` (#1745) was minted; no implementation issue was opened from #1748; and a read-model fixture walk does not satisfy receipt-backed promotion thresholds per `ops/ideas/README.md` § "Dogfood slice variants". Democratic Authority Primitives framing landed in #1751 as `idea-0020` with framing brief at `ops/ideas/framing/democratic-authority-primitives.md` — pre-RFC framing only; no runtime, no schema, no contract URN, no ADR, no RFC, no implementation issue, no runtime dogfood. The brief names two generic primitive families (authority/participation: `AuthorityBasis`, `ParticipationRole`, `DelegationGrant`, `RepresentationMandate`, `ExpertStatement`, `AdvisoryOpinion`, `ConflictDisclosure`, `FacilitatorSummary`, `StewardReview`, `OperatorExecutionAuthority`, `MinorityReport`, `ChallengePath`, `RevocationPath`, `RecallPath`; deliberation context / educational reference: `DeliberationContext`, `ContextReference`, `LearningReference`, `EvidenceReference`, `PriorDecisionReference`, `CharterRuleReference`, `CCLRuleReference`, `AccessibilityNote`, `PrivacyNote`, `RiskNote`, `CounterargumentReference`, `GlossaryReference`) and composes orthogonally with `idea-0019` (Institutional Process Substrate). Next pre-RFC architecture move is **not yet selected**; this sync deliberately preserves optionality for the next session rather than smuggling in a new commitment. The candidate next moves the next session may pick from, listed descriptively only: (1) `idea-0020` read-model composition slice (the DAP brief's `[x]` next artifact, §17 follow-ups); (2) `idea-0019` runtime dogfood toward receipt-backed promotion, emitting at least one of eight named `ProcessTransitionReceipt` classes under the existing `ADR-0026` envelope (one of four #1748 acceptance gates); (3) one of the remaining #1748 process-control gates (visibility/privacy-boundary run with redaction in evidence export; accessibility-gate `ProcessGateResult` produced through `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` on a real surface; or resolve/defer one of `idea-0019` Q1/Q3/Q4 in writing); (4) another sync/control cleanup if inspection finds further canonical-truth drift, or one of the DAP §17 follow-up framing briefs (CCL hook-point catalog; expert/advisory across institution types; conflict object model connecting `ConflictDisclosure` to `idea-0016`/ADR-0029; federation tally semantics composing `RepresentationMandate` with #1609; delegation runtime gated on #1632). None is selected here. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
 
 ### Recently merged (since 2026-04-15)
 
 | PR | Title | Merged |
 |----|-------|--------|
+| #1751 | docs(ideas): name Democratic Authority Primitives (idea-0020 + framing brief) | 2026-05-05 |
 | #1749 | docs(ideas): add read-model dogfood slice for Institutional Process Substrate (idea-0019) | 2026-05-05 |
 | #1747 | docs(ideas): name Institutional Process Substrate (idea-0019 + framing brief) | 2026-05-05 |
 | #1745 | docs(contracts): define preview review contract | 2026-05-05 |
@@ -286,6 +346,9 @@ Open coordination/control issues at this sync (not implementation):
 | #1744 | ci(review): make substantive AI review findings merge-gating |
 
 ### What landed since Phase 1 (Charter Engine)
+
+Democratic Authority Primitives framing (added 2026-05-05; doc/control-plane and idea-refinery only, not runtime; no kernel, gateway, ledger, governance, or SDK code touched):
+- `idea-0020` Democratic Authority Primitives framing brief landed at `ops/ideas/framing/democratic-authority-primitives.md` and the matching idea-refinery row in `ops/ideas/ideas.yaml` — #1751. Pre-RFC framing only; not an RFC, not an ADR, not a schema, not a contract URN, not a backlog commitment. Names two generic primitive families (authority/participation: `AuthorityBasis`, `ParticipationRole`, `DelegationGrant`, `RepresentationMandate`, `ExpertStatement`, `AdvisoryOpinion`, `ConflictDisclosure`, `FacilitatorSummary`, `StewardReview`, `OperatorExecutionAuthority`, `MinorityReport`, `ChallengePath`, `RevocationPath`, `RecallPath`; deliberation context / educational reference: `DeliberationContext`, `ContextReference`, `LearningReference`, `EvidenceReference`, `PriorDecisionReference`, `CharterRuleReference`, `CCLRuleReference`, `AccessibilityNote`, `PrivacyNote`, `RiskNote`, `CounterargumentReference`, `GlossaryReference`). Composes orthogonally with `idea-0019` (Institutional Process Substrate): the spine names *what gets processed*; these primitives fill the spine's records with the authority and context typing the spine deliberately deferred. Hard rule preserved: institutions adopt and constrain through CCL, charters, and institution packages — not as ICN app features. Promotion to RFC requires (per the brief's §16.1 promotion gate) a read-model composition slice with `idea-0019`, a runtime dogfood emitting at least one receipt under `ADR-0026`, a real visibility/privacy-boundary run, an accessibility-gate `ProcessGateResult` on a real surface, and at least one open question — Q1 (`AuthorityBasis` polymorphism vs typed family) or Q5 (`ConflictDisclosure` and `MinorityReport` placement) — **resolved** in writing. Deferral is **not** sufficient for the RFC gate per §16.1; the lenient resolved-or-deferred standard at §16.3 applies only to the broader runtime-justification threshold, not to RFC promotion. None of those follow-ups is started in this sync; the next move is **not yet selected**.
 
 Institutional Process Substrate framing and read-model dogfood (added 2026-05-04 → 2026-05-05; doc/control-plane and idea-refinery only, not runtime; no kernel, gateway, ledger, governance, or SDK code touched):
 - Rehearsal evidence export schema landed under `docs/contracts/rehearsal-evidence-export.md` and `docs/contracts/rehearsal-evidence-export.schema.json` defining `urn:icn:contract:rehearsal-evidence-export:v1` — #1734. Contract definition only; no live evidence export pipeline runs.
@@ -416,11 +479,12 @@ Infrastructure:
 - docs/pilots/no-cli-organizer-member-rehearsal-workflow.md — no-CLI organizer/member rehearsal workflow spec (#1725)
 - ops/ideas/framing/institutional-process-substrate.md — `idea-0019` framing brief (#1747)
 - ops/ideas/dogfood/institutional-process-substrate-mvp.md — read-model fixture-walk dogfood slice for `idea-0019` (#1749)
+- ops/ideas/framing/democratic-authority-primitives.md — `idea-0020` framing brief (#1751)
 - ops/ideas/README.md § "Dogfood slice variants" — read-model fixture-walk variant convention (#1749)
 - docs/strategy/NYCN-Repo-Architecture-Spec.md — NYCN institutional architecture
 - docs/strategy/NYCN-Execution-Tranches.md — NYCN 7-tranche execution plan
 - docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md — exact Phase 2 organizer/operator gate before a formal NYCN pilot begins
-- docs/dev/handoff-2026-05-05.md — latest session handoff
+- docs/dev/handoff-2026-05-05-b.md — latest session handoff
 - deploy/README.md — deployment options
 
 ---
