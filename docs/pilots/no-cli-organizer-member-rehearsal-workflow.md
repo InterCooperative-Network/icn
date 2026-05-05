@@ -86,7 +86,7 @@ Track as discrete work items (GitHub issues welcome; not all may exist yet):
 
 - **UI prototype** — Single guided shell (organizer mode) with the §3 screen list.
 - **Fixture-backed demo** — Deterministic fixture load with no network by default.
-- **Generic preview/review API contract** — Stable read models for “pending publish” summaries (package-agnostic shapes).
+- **Generic preview/review API contract** — Stable read models for “pending publish” summaries (package-agnostic shapes). Substrate contract: [`preview-review.schema.json`](../contracts/preview-review.schema.json) with companion notes at [`preview-review.md`](../contracts/preview-review.md). `$id` is the non-DNS URN `urn:icn:contract:preview-review:v1` ([ICN#1728](https://github.com/InterCooperative-Network/icn/issues/1728)).
 - **Evidence export contract** — Machine-readable **repo-safe** evidence summary schema shared with partners. Substrate contract: [`rehearsal-evidence-export.schema.json`](../contracts/rehearsal-evidence-export.schema.json) with companion notes at [`rehearsal-evidence-export.md`](../contracts/rehearsal-evidence-export.md). `$id` is the non-DNS URN `urn:icn:contract:rehearsal-evidence-export:v1` ([ICN#1729](https://github.com/InterCooperative-Network/icn/issues/1729)).
 - **Private-overlay / DID binding activation flow** — Documented UX for label → directory → DID without leaking overlay into public repos.
 - **Accessibility review** — WCAG-oriented pass on any new shell before calling it organizer-ready.

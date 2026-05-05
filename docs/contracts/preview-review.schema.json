@@ -1,0 +1,317 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:icn:contract:preview-review:v1",
+  "title": "PreviewReview",
+  "description": "A repo-safe, read-only preview of a proposed artifact, presented to a human reviewer (organizer, steward, facilitator, reviewer) before any documented next step. The schema describes the **shape of the human review boundary** between source material (meeting notes, fixture material, package output, evidence-packet draft) and any subsequent action (publish, apply, export, mutate). It is the missing read-model contract between the no-CLI organizer/member rehearsal workflow (`docs/pilots/no-cli-organizer-member-rehearsal-workflow.md` §3 steps 3 + 6, §7), the evidence export contract (`urn:icn:contract:rehearsal-evidence-export:v1`), and any future shell, wireframe, or accessibility-gated surface. The schema is **read-only**: it does not mutate, publish, export, or apply anything. The `review_status: approved_for_next_step` value records that a human review boundary was crossed; it does **not** mean production deployment, formal pilot authorization, or any actual mutation. Mutation is performed by separate, named, documented endpoints; this contract only describes what a reviewer was shown and what they decided. Partner-internal data does not enter this contract; partner-specific overlays are out-of-scope and live in package-private storage. The schema $id is a non-DNS URN so contract identity does not depend on centralized DNS or registrar infrastructure; see docs/contracts/preview-review.md for the rationale and the architectural principle in docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md.",
+  "x-icn-status": "rfc",
+  "x-icn-contract-name": "icn.contract.preview_review.v1",
+  "x-icn-distribution-hints": [
+    "docs/contracts/preview-review.schema.json",
+    "docs/contracts/preview-review.md",
+    "docs/contracts/preview-review.example.json"
+  ],
+  "x-icn-references": [
+    "GitHub icn#1728",
+    "GitHub icn#1724",
+    "GitHub icn#1725",
+    "GitHub icn#1729",
+    "GitHub icn#1731",
+    "GitHub icn#1734",
+    "GitHub icn#1738",
+    "GitHub icn#1739",
+    "GitHub icn#1741",
+    "GitHub icn#1743"
+  ],
+  "x-icn-must-not-include": [
+    "real personal names (unless explicitly fictional / example-only)",
+    "real email addresses",
+    "real phone numbers",
+    "sponsor contact details",
+    "accommodation or access needs tied to an identifiable person",
+    "raw attendee or member rolls",
+    "API tokens, secrets, signed URLs, or session credentials",
+    "private Drive / Groups / Sheets paths or content",
+    "private overlay contents",
+    "live partner operational details",
+    "any field that implies production deployment or formal pilot authorization",
+    "DIDs of unconsented participants",
+    "free-form mutation payloads (this is a read-model contract; mutation is performed by separate documented endpoints)"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "preview_id",
+    "preview_kind",
+    "created_at",
+    "created_by_role",
+    "scope",
+    "source_material",
+    "proposed_artifact",
+    "review_status",
+    "review_requirements",
+    "privacy_review",
+    "repo_safety",
+    "non_claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Semver-style version of this schema the preview was authored against. Accepts 'MAJOR.MINOR.PATCH' or 'MAJOR.MINOR'. Bumped only when the schema's required fields or closed enums change.",
+      "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+    },
+    "preview_id": {
+      "type": "string",
+      "description": "Stable, locally-unique identifier for the preview. Producers choose the format; consumers treat it as opaque. Must not encode private data (no emails, phones, sponsor names, or DIDs of unconsented participants).",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "preview_kind": {
+      "description": "Closed taxonomy describing what kind of preview this is. 'meeting_notes_action_items' = parsed meeting notes proposing action items. 'pending_publish_summary' = staged publish summary before a steward applies/publishes artifacts. 'evidence_packet_preview' = a draft rehearsal evidence packet awaiting privacy / accessibility review before export. 'fixture_demo_preview' = a fixture-only rehearsal preview presented to organizers without any live data path. 'package_artifact_preview' = a package-side artifact preview before evidence export or repo-safe summary creation.",
+      "type": "string",
+      "enum": [
+        "meeting_notes_action_items",
+        "pending_publish_summary",
+        "evidence_packet_preview",
+        "fixture_demo_preview",
+        "package_artifact_preview"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "description": "RFC 3339 'date-time' (e.g. 2026-05-05T01:40:13Z). Wall-clock moment the preview was finalized for review.",
+      "format": "date-time"
+    },
+    "created_by_role": {
+      "description": "Closed taxonomy of generic role labels for who created the preview. Categories only — never names, emails, or DIDs.",
+      "type": "string",
+      "enum": [
+        "organizer",
+        "steward",
+        "facilitator",
+        "reviewer",
+        "system_fixture"
+      ]
+    },
+    "scope": {
+      "description": "What the preview targets, mapped to ICN's constitutional axes. Institution packages bind their local taxonomy to these. Mirrors the action-card scope axis.",
+      "type": "string",
+      "enum": [
+        "entity",
+        "structure",
+        "individual"
+      ]
+    },
+    "source_material": {
+      "description": "Inputs the preview was derived from. Each entry is described by safe basename and category — never by raw external path. 'committed-fixture' = file already in the repository. 'example-snippet' = inline fictional content authored for the preview. 'repo-safe-paste' = content reviewed and confirmed to contain no private fields before being pasted into the preview surface. 'sha256' is optional and only meaningful for committed fixtures or otherwise public content.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "basename", "summary"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["committed-fixture", "example-snippet", "repo-safe-paste"]
+          },
+          "basename": {
+            "type": "string",
+            "description": "File or snippet basename only — no directory paths, no Drive URLs, no external links to private content.",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Optional content hash; include only when the underlying content is itself repo-safe (committed fixture or fictional example).",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One-sentence plain-language description of what this material is. Generic enough to publish in a public issue comment.",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        }
+      }
+    },
+    "proposed_artifact": {
+      "description": "The artifact the reviewer is being asked to evaluate. The artifact is a **read-model**: it describes the shape of what would be produced if a separate, documented next step were taken. The schema does not implement that step. Free-form 'detail' is permitted as plain-language text only; structured payloads belong in their own per-kind schemas (this contract is the review-boundary shape, not the per-artifact shape).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "title", "summary"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "Closed taxonomy mirroring preview_kind. The artifact kind reflects what would be produced if the next step were taken.",
+          "enum": [
+            "action_item_set",
+            "publish_summary",
+            "evidence_packet",
+            "fixture_demo_artifact",
+            "package_artifact"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "description": "Short, plain-language title suitable for a list row in an organizer-facing UI.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "summary": {
+          "type": "string",
+          "description": "One- or two-sentence plain-language summary of the artifact. The reviewer should be able to understand what they are approving from this summary alone.",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "detail": {
+          "type": "string",
+          "description": "Optional longer plain-language detail. Free text; no private data. If structured detail is required, it belongs in a per-kind schema, not here.",
+          "maxLength": 4000
+        }
+      }
+    },
+    "review_status": {
+      "description": "Closed taxonomy. 'draft' = preview is being assembled, not ready for review. 'ready_for_review' = preview is presented to a reviewer and awaiting a decision. 'changes_requested' = reviewer asked for changes before approval. 'approved_for_next_step' = reviewer approved the preview for the next documented step. **'approved_for_next_step' is not production deployment, not pilot authorization, and not a mutation.** It only records that a human review boundary was crossed; the next step is performed separately by named, documented endpoints. 'rejected' = reviewer declined; the proposed artifact must not proceed.",
+      "type": "string",
+      "enum": [
+        "draft",
+        "ready_for_review",
+        "changes_requested",
+        "approved_for_next_step",
+        "rejected"
+      ]
+    },
+    "review_requirements": {
+      "description": "What this preview requires before approval is meaningful. Closed enum of categories the reviewer should have considered. Producers list every requirement that applies; consumers treat the absence of a requirement as 'not asserted by this preview' (not 'not required').",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "privacy_review",
+          "accessibility_review",
+          "repo_safety_review",
+          "scope_confirmation",
+          "second_reviewer_signoff",
+          "fixture_only_check",
+          "no_mutation_check"
+        ]
+      }
+    },
+    "reviewer_actions": {
+      "description": "Optional record of what the reviewer did. Each entry is a closed-taxonomy action plus an optional plain-language note. Roles are generic labels — never names, emails, or DIDs. The recorded_at moment is RFC 3339. This array is not authoritative for governance; it is a review-trail entry that producers may include when the preview surface needs to render a recent-activity timeline.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "by_role", "recorded_at"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "opened",
+              "viewed",
+              "annotated",
+              "requested_changes",
+              "approved_for_next_step",
+              "rejected",
+              "withdrew_approval",
+              "deferred"
+            ]
+          },
+          "by_role": {
+            "type": "string",
+            "enum": [
+              "organizer",
+              "steward",
+              "facilitator",
+              "reviewer",
+              "system_fixture"
+            ]
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional plain-language note. Generic phrasing; no private fields. Consumers must not treat this field as machine-actionable.",
+            "minLength": 1,
+            "maxLength": 600
+          }
+        }
+      }
+    },
+    "privacy_review": {
+      "description": "Privacy review status of this preview. 'reviewer_role' is a generic role label — never a person name. 'status' captures whether the preview was reviewed and whether redactions were applied before display. 'not-reviewed' is permitted but should be uncommon; downstream consumers may treat it as a red flag.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewer_role", "status"],
+      "properties": {
+        "reviewer_role": {
+          "type": "string",
+          "enum": ["organizer", "steward", "facilitator", "reviewer", "operator"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["reviewed-clean", "redactions-applied", "not-reviewed"]
+        },
+        "notes": { "type": "string", "minLength": 1, "maxLength": 600 }
+      }
+    },
+    "repo_safety": {
+      "description": "Whether the preview is safe to render or store in a public repository. 'repo-safe' is the only classification produced from previews that validate against this schema in normal use. The 'partner-internal-only' value exists as a contractual marker that the producing system itself decided NOT to render through the repo-safe path. The latter MUST NOT appear in any preview checked into the ICN repository. Companion 'notes' is plain language; no private fields.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification"],
+      "properties": {
+        "classification": {
+          "type": "string",
+          "enum": ["repo-safe", "partner-internal-only"]
+        },
+        "notes": { "type": "string", "minLength": 1, "maxLength": 600 }
+      }
+    },
+    "evidence_links": {
+      "description": "Optional links from this preview to public artifacts that contextualize it — e.g. an evidence packet exported from a prior rehearsal, a public issue, a public ADR. URLs must point to public resources only; never to private partner trackers, Drive paths, or internal links. Each entry includes the related contract URN where applicable so consumers can verify shape independently.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "title"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "rehearsal-evidence-export",
+              "public-issue",
+              "public-pr",
+              "public-adr",
+              "public-doc"
+            ]
+          },
+          "contract_urn": {
+            "type": "string",
+            "description": "Optional non-DNS URN for the related contract (e.g. urn:icn:contract:rehearsal-evidence-export:v1).",
+            "pattern": "^urn:[a-z0-9-]+:[a-z0-9:_-]+(?::v[0-9]+)?$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Optional public URL. Omit for in-repo references that have no canonical public URL."
+          }
+        }
+      }
+    },
+    "non_claims": {
+      "description": "Required free-text array enumerating the standing non-claims this preview preserves. At minimum: not a mutation, not production deployment, not formal pilot authorization, not private-data handling. Producers may add preview-specific non-claims; producers MUST NOT remove the standing four.",
+      "type": "array",
+      "minItems": 4,
+      "items": { "type": "string", "minLength": 1, "maxLength": 400 }
+    }
+  }
+}
