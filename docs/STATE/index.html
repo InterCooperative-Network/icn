@@ -40,8 +40,67 @@ View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
 <h2>Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-05-04</h2>
+Last Reviewed: 2026-05-05</h2>
 <h1>ICN State (living doc)</h1>
+<!-- [sync edit] 2026-05-05 (post-#1734 / #1739 / #1741 / #1743 /
+     #1745 / #1747 / #1749, with open #1748):
+     Truth-sync for the May-5 institutional-process-substrate
+     sequence. Doc/control-plane only — no runtime, no schema,
+     no contract URN beyond what already shipped, no implementation
+     issue, no Phase 2 advance.
+     Landings since the previous sync edit (2026-05-04):
+       - #1734 docs(contracts): rehearsal evidence export schema
+         (`urn:icn:contract:rehearsal-evidence-export:v1`).
+       - #1739 docs(architecture): codify due-diligence checklist
+         (`docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md`).
+       - #1741 docs(contracts): audit schema identifiers
+         (`docs/contracts/schema-id-audit.md`).
+       - #1743 docs(design): organizer/member accessibility gate
+         (`docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`).
+       - #1745 docs(contracts): preview/review read-model contract
+         (`urn:icn:contract:preview-review:v1`).
+       - #1747 docs(ideas): name Institutional Process Substrate
+         as `idea-0019` with framing brief at
+         `ops/ideas/framing/institutional-process-substrate.md`.
+       - #1749 docs(ideas): read-model fixture-walk dogfood slice
+         for `idea-0019` at
+         `ops/ideas/dogfood/institutional-process-substrate-mvp.md`,
+         plus the `ops/ideas/README.md` "Dogfood slice variants"
+         section that formalizes this variant. Read-model only —
+         emits no receipts, contacts no gateway, performs no
+         mutation, introduces no new contract URN, and does NOT
+         satisfy receipt-backed promotion thresholds.
+     Open coordination/control issue:
+       - #1748 milestone(process): define Institutional Process
+         Substrate. `epic:arch-invariants` + `type:spec`. Acceptance
+         criteria already record #1747 framing as merged and #1749
+         read-model dogfood as the smallest-safe slice; runtime
+         dogfood, visibility/privacy-boundary run, accessibility-
+         gate `ProcessGateResult`, and open-question triage remain
+         unchecked. No implementation work is opened from #1748
+         until a runtime dogfood slice is explicitly scoped.
+     Open PR queue at this sync: only Dependabot dev-dependency
+     bumps (#1735 pilot-ui axe-core/playwright; #1736 TypeScript
+     SDK dev-deps).
+     Next pre-RFC architecture move (not started in this sync):
+     Democratic Authority Primitives — generic delegation,
+     representation, expert/advisory input, deliberation context /
+     educational references, conflict disclosure, facilitator and
+     steward/operator authority, and revocation/recall/challenge
+     paths that institutions adopt and constrain through CCL,
+     charters, and institution packages. Not an ICN app feature.
+     Not an RFC by itself. Not a runtime commitment.
+     Phase 2 framing unchanged: NYCN remains the intended first
+     cooperative partner, not a formally committed pilot. The
+     concrete next gate remains the partner-bound sequence in
+     `docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md`:
+     organizer presentation -> pilot formalization -> first
+     operator rehearsal. This sync does not claim production
+     readiness, live federation integration, implemented service
+     hosting, K3s/DNS/GitHub/Forgejo mutation, NYCN private-data
+     handling, live Google Drive/Groups/Sheets sync, or resolved
+     licensing. -->
+
 <!-- [sync edit] 2026-05-04 (post-#1725 / NYCN-#53 / #1732):
      Documentation and public-surface truth-sync. ICN #1725
      landed the generic no-CLI organizer/member rehearsal
@@ -161,9 +220,9 @@ Last Reviewed: 2026-05-04</h2>
      Aligned crate list, merged PRs, and metrics to verified repo state.
      Phase model unchanged — phase classification is governance territory (PR C). -->
 
-<h2>Current status (2026-05-02 snapshot)</h2>
+<h2>Current status (2026-05-05 snapshot)</h2>
 <p><strong>Current phase:</strong> Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate is defined in <a href="/docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE">NYCN Phase 2 Pilot Rehearsal Gate</a>. The Phase 2 <em>machinery</em> is in place end-to-end; what remains is the human procedure — present, formalize, rehearse — and recording each step.
-Active execution: institutional-operability runtime (live charter activation, person-directory overlay, <code>/me/standing</code>, <code>authority_scope</code> plumbing) plus the action-card runtime (<code>/me/action-cards</code> endpoint with proof-loop linkage to <code>GovernanceDecisionReceipt</code> for proposal/vote, <code>ActionItemCompletionReceipt</code> for action_item/complete, and <code>MeetingAttendanceReceipt</code> for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN&#39;s drive-ingest operator ladder (NYCN #21–#28 in <code>fahertym/nycn</code>) is merged end-to-end, with subsequent NYCN #29–#32 also merged: organizer briefing + summit demo, start-here onboarding pass, one-command local preflight runner, and whole-NYCN operating-surfaces inventory plus Google-Groups boundary policy. NYCN #33 (steward-facing communication-groups directory tool) was open at the prior sync and may have merged since. Since then, ICN also merged repo-governance and strategy documentation for licensing metadata, RFC-0017 activation, repo-record generation, a generated repo-record snapshot, licensing/autonomy planning, and sovereign service hosting design, followed by CI/dependency maintenance, unified bootstrap docs, and the prior state sync. Those are documentation/control-plane or maintenance landings only: RFC-0017 is not implemented, service hosting is not deployed, DNS/K3s/GitHub/Forgejo state was not mutated, NYCN private data was not handled, and licensing is not resolved. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.</p>
+Active execution since the previous sync has been entirely doc/control-plane: rehearsal evidence export schema (#1734); architecture due-diligence checklist (#1739); contract schema-identifier audit (#1741); organizer/member accessibility gate definition (#1743); the preview/review read-model contract <code>urn:icn:contract:preview-review:v1</code> (#1745); the <code>idea-0019</code> Institutional Process Substrate framing brief at <code>ops/ideas/framing/institutional-process-substrate.md</code> (#1747); a coordination/control milestone issue #1748 to track spine composition without licensing implementation; and a read-model fixture-walk dogfood slice for <code>idea-0019</code> at <code>ops/ideas/dogfood/institutional-process-substrate-mvp.md</code> plus a new &quot;Dogfood slice variants&quot; section in <code>ops/ideas/README.md</code> that formalizes the read-model variant (#1749). Carrying forward: institutional-operability runtime (live charter activation, person-directory overlay, <code>/me/standing</code>, <code>authority_scope</code> plumbing) plus the action-card runtime (<code>/me/action-cards</code> endpoint with proof-loop linkage to <code>GovernanceDecisionReceipt</code> for proposal/vote, <code>ActionItemCompletionReceipt</code> for action_item/complete, and <code>MeetingAttendanceReceipt</code> for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN&#39;s drive-ingest operator ladder (NYCN #21–#28 in <code>fahertym/nycn</code>) is merged end-to-end, with subsequent NYCN #29–#32 also merged. The May-5 process-substrate sequence is documentation/refinery only: no runtime executes; no kernel, gateway, ledger, governance, or SDK code changed; no new contract URN beyond <code>urn:icn:contract:preview-review:v1</code> (#1745) was minted; no implementation issue was opened from #1748; and a read-model fixture walk does not satisfy receipt-backed promotion thresholds per <code>ops/ideas/README.md</code> § &quot;Dogfood slice variants&quot;. The next pre-RFC architecture move is <strong>Democratic Authority Primitives</strong> — generic delegation, representation, expert/advisory input, deliberation context, conflict disclosure, facilitator and steward/operator authority, and revocation/recall/challenge paths that institutions adopt and constrain through CCL, charters, and institution packages — and is <strong>not started in this sync</strong>. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.</p>
 <h3>Recently merged (since 2026-04-15)</h3>
 <table>
 <thead>
@@ -174,6 +233,56 @@ Active execution: institutional-operability runtime (live charter activation, pe
 </tr>
 </thead>
 <tbody><tr>
+<td>#1749</td>
+<td>docs(ideas): add read-model dogfood slice for Institutional Process Substrate (idea-0019)</td>
+<td>2026-05-05</td>
+</tr>
+<tr>
+<td>#1747</td>
+<td>docs(ideas): name Institutional Process Substrate (idea-0019 + framing brief)</td>
+<td>2026-05-05</td>
+</tr>
+<tr>
+<td>#1745</td>
+<td>docs(contracts): define preview review contract</td>
+<td>2026-05-05</td>
+</tr>
+<tr>
+<td>#1743</td>
+<td>docs(design): define organizer member accessibility gate</td>
+<td>2026-05-05</td>
+</tr>
+<tr>
+<td>#1741</td>
+<td>docs(contracts): audit schema identifiers</td>
+<td>2026-05-05</td>
+</tr>
+<tr>
+<td>#1739</td>
+<td>docs(architecture): codify due-diligence checklist</td>
+<td>2026-05-04</td>
+</tr>
+<tr>
+<td>#1734</td>
+<td>docs(contracts): define rehearsal evidence export schema</td>
+<td>2026-05-04</td>
+</tr>
+<tr>
+<td>#1733</td>
+<td>docs(state): sync no-CLI and website cleanup tranche</td>
+<td>2026-05-04</td>
+</tr>
+<tr>
+<td>#1732</td>
+<td>docs(website): align README with current civic design system</td>
+<td>2026-05-04</td>
+</tr>
+<tr>
+<td>#1725</td>
+<td>docs(pilots): add no-CLI organizer/member rehearsal workflow spec</td>
+<td>2026-05-04</td>
+</tr>
+<tr>
 <td>#1701</td>
 <td>docs(state): sync May-cycle project truth</td>
 <td>2026-05-02</td>
@@ -480,8 +589,57 @@ Active execution: institutional-operability runtime (live charter activation, pe
 </tr>
 </tbody></table>
 <h3>Open PRs</h3>
-<p>No open PRs at this sync.</p>
+<p>Only Dependabot dev-dependency bumps at this sync:</p>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Title</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1736</td>
+<td>deps(ts-sdk): bump the dev-dependencies group in /sdk/typescript with 3 updates</td>
+</tr>
+<tr>
+<td>#1735</td>
+<td>deps(pilot-ui): bump @axe-core/playwright from 4.11.2 to 4.11.3 in /web/pilot-ui</td>
+</tr>
+</tbody></table>
+<p>Open coordination/control issues at this sync (not implementation):</p>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Title</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1748</td>
+<td>milestone(process): define Institutional Process Substrate (<code>epic:arch-invariants</code> + <code>type:spec</code>)</td>
+</tr>
+<tr>
+<td>#1746</td>
+<td>milestone(showcase): make NYCN organizer rehearsal operable before first presentation</td>
+</tr>
+<tr>
+<td>#1744</td>
+<td>ci(review): make substantive AI review findings merge-gating</td>
+</tr>
+</tbody></table>
 <h3>What landed since Phase 1 (Charter Engine)</h3>
+<p>Institutional Process Substrate framing and read-model dogfood (added 2026-05-04 → 2026-05-05; doc/control-plane and idea-refinery only, not runtime; no kernel, gateway, ledger, governance, or SDK code touched):</p>
+<ul>
+<li>Rehearsal evidence export schema landed under <code>docs/contracts/rehearsal-evidence-export.md</code> and <code>docs/contracts/rehearsal-evidence-export.schema.json</code> defining <code>urn:icn:contract:rehearsal-evidence-export:v1</code> — #1734. Contract definition only; no live evidence export pipeline runs.</li>
+<li>Architecture due-diligence checklist landed at <code>docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md</code> — #1739. Reflex/process artifact only; no architectural change.</li>
+<li>Contract schema-identifier audit table landed at <code>docs/contracts/schema-id-audit.md</code> — #1741. Inventory/discipline only; no schema change.</li>
+<li>Organizer/member accessibility gate definition landed at <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> — #1743. PR-time gate definition only; no UI/runtime change.</li>
+<li>Preview/review read-model contract <code>urn:icn:contract:preview-review:v1</code> landed under <code>docs/contracts/preview-review.md</code>, <code>docs/contracts/preview-review.schema.json</code>, and <code>docs/contracts/preview-review.example.json</code> — #1745. Read-model contract definition only; no read-model serves over a gateway today.</li>
+<li><code>idea-0019</code> Institutional Process Substrate framing brief landed at <code>ops/ideas/framing/institutional-process-substrate.md</code> and the matching idea-refinery row in <code>ops/ideas/ideas.yaml</code> — #1747. Pre-RFC framing only; not an RFC, not an ADR, not a schema, not a backlog commitment.</li>
+<li>Read-model fixture-walk dogfood slice for <code>idea-0019</code> landed at <code>ops/ideas/dogfood/institutional-process-substrate-mvp.md</code>, alongside the new <code>ops/ideas/README.md</code> § &quot;Dogfood slice variants&quot; section that formalizes this variant convention — #1749. Fictional Example Cooperative process session walked end-to-end against the SAME shipping contract URNs as the committed examples (<code>urn:icn:contract:preview-review:v1</code>, <code>urn:icn:contract:rehearsal-evidence-export:v1</code>); emits no receipts, contacts no gateway, performs no mutation, introduces no new contract URN. A read-model fixture walk does NOT satisfy receipt-backed promotion thresholds; receipt-backed promotion of <code>idea-0019</code> to RFC still requires (1) a separate runtime dogfood slice that emits at least one <code>ProcessTransitionReceipt</code> class under <code>ADR-0026</code>, (2) a real visibility/privacy-boundary run with redaction in the evidence export, (3) a real accessibility-gate <code>ProcessGateResult</code> produced through the accessibility-gate checklist, and (4) at least one framing-brief open question among Q1/Q3/Q4 resolved or explicitly deferred in writing.</li>
+<li>Coordination/control milestone issue #1748 (<code>milestone(process): define Institutional Process Substrate</code>) is open with <code>epic:arch-invariants</code> + <code>type:spec</code>. Acceptance criteria record #1747 framing as merged and #1749 read-model dogfood as the smallest-safe slice; runtime dogfood, visibility-boundary run, accessibility-gate <code>ProcessGateResult</code>, and open-question triage remain unchecked. No implementation work is opened from #1748 until a runtime dogfood slice is explicitly scoped.</li>
+<li>Next pre-RFC architecture move: <strong>Democratic Authority Primitives</strong> (delegation, representation, expert/advisory input, deliberation context / educational references, conflict disclosure, facilitator and steward/operator authority, and revocation/recall/challenge paths) as generic primitives institutions adopt and constrain through CCL, charters, and institution packages. Not started in this sync. Not an ICN app feature. Not an RFC by itself. Not a runtime commitment.</li>
+</ul>
 <p>May-cycle repo governance and strategy documentation (added 2026-05-01 → 2026-05-02; documentation/control-plane only, not runtime deployment):</p>
 <ul>
 <li>Licensing metadata and open questions documented — #1686.</li>
@@ -600,10 +758,19 @@ Active execution: institutional-operability runtime (live charter activation, pe
 <li>docs/architecture/THE_COMMONS.md — Capital-C Commons doctrine (what ICN exists to enable)</li>
 <li>docs/architecture/MEMBER_STANDING.md — <code>/me/standing</code> design contract (member-facing standing + accessibility)</li>
 <li>docs/architecture/KERNEL_APP_SEPARATION.md — kernel/app boundary</li>
+<li>docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md — due-diligence reflex checklist (#1739)</li>
+<li>docs/contracts/preview-review.md — <code>urn:icn:contract:preview-review:v1</code> (#1745)</li>
+<li>docs/contracts/rehearsal-evidence-export.md — <code>urn:icn:contract:rehearsal-evidence-export:v1</code> (#1734)</li>
+<li>docs/contracts/schema-id-audit.md — contract schema-identifier audit (#1741)</li>
+<li>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md — organizer/member accessibility gate (#1743)</li>
+<li>docs/pilots/no-cli-organizer-member-rehearsal-workflow.md — no-CLI organizer/member rehearsal workflow spec (#1725)</li>
+<li>ops/ideas/framing/institutional-process-substrate.md — <code>idea-0019</code> framing brief (#1747)</li>
+<li>ops/ideas/dogfood/institutional-process-substrate-mvp.md — read-model fixture-walk dogfood slice for <code>idea-0019</code> (#1749)</li>
+<li>ops/ideas/README.md § &quot;Dogfood slice variants&quot; — read-model fixture-walk variant convention (#1749)</li>
 <li>docs/strategy/NYCN-Repo-Architecture-Spec.md — NYCN institutional architecture</li>
 <li>docs/strategy/NYCN-Execution-Tranches.md — NYCN 7-tranche execution plan</li>
 <li>docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md — exact Phase 2 organizer/operator gate before a formal NYCN pilot begins</li>
-<li>docs/dev/handoff-2026-04-15.md — latest session handoff</li>
+<li>docs/dev/handoff-2026-05-05.md — latest session handoff</li>
 <li>deploy/README.md — deployment options</li>
 </ul>
 <hr>
