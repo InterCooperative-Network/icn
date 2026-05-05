@@ -14,6 +14,8 @@ superseded_by: []
 
 # RFC NNNN: Short RFC Title
 
+> **Before drafting**, run the [Architecture due-diligence checklist](../architecture/ARCHITECTURE_DUE_DILIGENCE.md). The checklist surfaces convenience-vs-authority and centralized-dependency questions early, while the design space is still fluid.
+
 ## Status
 
 `draft` — being written, not yet ready for review.
