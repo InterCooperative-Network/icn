@@ -650,7 +650,7 @@ category = "status"
 status = "living"
 title = "ICN State (living doc)"
 description = "Living snapshot of repo layout, decisions, constraints, and current engineering status"
-last_updated = "2026-05-04"
+last_updated = "2026-05-05"
 owner = "matt"
 audiences = ["developers", "agents"]
 truth_class = "descriptive"
@@ -659,7 +659,7 @@ canonical = "yes"
 freshness = "current"
 domain_tags = ["status", "project"]
 recommended_action = "keep"
-last_reviewed = "2026-05-04"
+last_reviewed = "2026-05-05"
 
 [docs."docs/DOCUMENTATION_CONTROL_SYSTEM.md"]
 category = "reference"
