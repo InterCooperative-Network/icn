@@ -123,7 +123,7 @@ This list is also captured in the schema's `x-icn-must-not-include` extension so
 
 1. Validate every preview packet that will live in a **public repository** against `preview-review.schema.json` before committing. Use the bundled validator (`docs/scripts/validate-preview-review.py`) or any draft-2020-12 JSON Schema validator. Pin to the URN.
 2. Do **not** add partner-specific nouns to this schema. Bind local meaning in package docs.
-3. **Partner-internal previews do not validate against this schema and must not be committed.** This schema is for the repo-safe preview path only.
+3. **Partner-internal previews may use the same schema shape and may validate against this contract — but they must set `repo_safety.classification = partner-internal-only` and must not be committed to the ICN repository.** Only previews with `repo_safety.classification = repo-safe` belong in public ICN git. The schema's `partner-internal-only` enum value is a contractual marker that the producing system itself decided NOT to render through the repo-safe path; partner-internal data still belongs in private overlays or partner-private storage, never in this tree.
 4. Prefer regulatory-safe vocabulary in human-language fields: **obligation**, **allocation**, **settlement**, **unit**, **position**, **receipt**, **provenance**, **evidence** — not payment / wallet / balance / currency framing for substrate flows.
 5. Keep the standing non-claims in every preview. Producers may **add** preview-specific non-claims; producers MUST NOT **remove** the standing four.
 
