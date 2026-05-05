@@ -768,3 +768,87 @@ ideas:
       variation space and encoding classes. Do not promote to RFC until
       a later multi-source research pass compares bylaws across
       multiple cooperative types.
+
+  # --------------------------------------------------------------
+  # 19. Institutional Process Substrate
+  # --------------------------------------------------------------
+  - id: idea-0019
+    title: Institutional Process Substrate
+    status: framed
+    kind: architecture_concept
+    source: "session 2026-05-05; post-PR-#1745 (preview/review read-model contract) review of where process substrate work is currently scattered across no-CLI workflow, evidence export, accessibility gate, action cards, and proof-loop receipts"
+    one_sentence: |
+      ICN should name a single generic process spine — preview,
+      deliberation, decision, activation, mutation plan, action cards,
+      receipts, evidence — so that organizer rehearsal, member
+      participation, accessibility gates, and private-overlay flows
+      compose into one institutional process layer instead of
+      scattering into disconnected features.
+    problem: |
+      Several substrate-level pieces have already landed or are in
+      flight: the action-card contract (ADR-0027), the receipt /
+      provenance proof envelope (ADR-0026), the preview/review
+      read-model contract (PR #1745, urn:icn:contract:preview-review:v1),
+      the rehearsal evidence export contract
+      (urn:icn:contract:rehearsal-evidence-export:v1), the no-CLI
+      organizer/member rehearsal workflow, and the organizer/member
+      accessibility gate. Each is well-bounded individually. None of
+      them, alone or together, names the generic process spine that
+      ties preview to deliberation to decision to activation to
+      mutation planning to action cards to receipts to evidence. As a
+      result, deliberation in particular is at risk of remaining
+      implicit — captured only as decision corpses after the real
+      politics happened in chat threads, meeting rooms, or private
+      docs that ICN cannot prove. The spine should be named before the
+      limbs are built, so that future runtime work can hang off a
+      defined surface rather than each feature inventing one.
+    belongs_to: icn
+    layer: substrate
+    current_artifact: "scattered: ADR-0026, ADR-0027, urn:icn:contract:preview-review:v1, urn:icn:contract:rehearsal-evidence-export:v1, docs/pilots/no-cli-organizer-member-rehearsal-workflow.md, docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md; no document names the generic process spine"
+    proposed_next_artifact: framing_brief
+    promoted_target: null
+    proposed_objects:
+      - "ProcessTargetRef (name candidate; not committed)"
+      - "ProcessSession (name candidate)"
+      - "PreviewReviewPacket (defined by urn:icn:contract:preview-review:v1, landed in PR #1745; included here only as the spine's preview surface)"
+      - "DeliberationThread (name candidate; object-bound, not chat)"
+      - "DeliberationEntry (name candidate)"
+      - "HumanDecisionSet (name candidate)"
+      - "DecisionRecord (name candidate)"
+      - "ActivationRequest (name candidate)"
+      - "MutationPlan (name candidate)"
+      - "ProcessGateResult (name candidate)"
+      - "ActionCardTrigger (binding sketch only; ActionCard contract already shipping)"
+      - "ProcessTransitionReceipt (receipt class candidate; not a new envelope)"
+      - "EvidencePacket (already shipping as a contract; included here only as the spine's evidence surface)"
+    requires_rfc: unknown
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: high
+    boundary_risk: medium
+    risks:
+      - "Scope sprawl — bundling preview, deliberation, decision, activation, mutation planning, action cards, receipts, and evidence into one design doc that becomes doctrine before runtime exists."
+      - "Reinventing chat — DeliberationThread / DeliberationEntry must be object-bound institutional process, not a generic comment system or social media surface."
+      - "Premature schema commitment — naming objects in the brief is not a schema decision; promotion review must gate that."
+      - "NYCN-coupling — process spine objects must remain generic; no NYCN/Summit-specific nouns."
+      - "Privacy leakage — deliberation entries can carry sensitive institutional content (objections, accessibility concerns, conflict signals); the substrate must support private-overlay binding by design, not by retrofit."
+      - "Foreclosing CCL design — the brief must not lock the rule-authoring layer (idea-0012, idea-0018) into a specific runtime model."
+      - "Conflicting with conflict-resolution model (ADR-0029, idea-0016) — the brief must defer dispute paths to that work, not absorb them."
+    next_transform: |
+      Write the framing brief at
+      ops/ideas/framing/institutional-process-substrate.md. The brief
+      defines the spine as plain-language object families (no schemas),
+      classifies MVP/near-term vs Later, lists explicit non-goals,
+      explains why deliberation is first-class, and names the layer
+      fit (kernel meaning-blind / app generic process / CCL transitions
+      / institution package vocabulary / nodes store-sign-scope-sync /
+      action cards route attention / receipts prove transitions /
+      evidence exports summarize repo-safe outcomes). Do not promote
+      to RFC until at least one MVP slice has produced runtime evidence
+      against a real or fixture-equivalent process session. A
+      coordination milestone issue may be opened to track this work
+      across preview/review (#1728 / PR #1745), private-overlay
+      (#1730), action cards (#1713 / ADR-0027), evidence export
+      (#1729), accessibility gate, and proof-loop receipts.
