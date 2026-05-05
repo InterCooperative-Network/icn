@@ -58,6 +58,15 @@ What could break? Edge cases or known limitations?
 - [ ] Ran: `python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml` (add `--strict` if you touched registry structure, canon paths, or supersession; see `docs/DOCUMENTATION_MAINTENANCE.md`)
 - [ ] If `DOCUMENT_REGISTRY.md` should reflect corpus stats: same command with `--write-document-registry docs/DOCUMENT_REGISTRY.md`
 
+## Organizer / member accessibility gate (required when an organizer/member-facing surface changes)
+
+If this PR changes an organizer/member-facing UI, rehearsal surface, action-card surface, preview/review surface, evidence/receipt/provenance review surface, or member-facing governance flow, run the gate at [`docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`](../docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md) and:
+- [ ] Attach or link the completed §5 checklist (one outcome per category: **Pass** / **Pass with documented follow-ups** / **Blocked** / **N/A with reason**)
+- [ ] State the surface-readiness conclusion (organizer-ready / member-facing / pilot-ready / steward-only-experimental)
+- [ ] Open follow-up issues for any **Pass with documented follow-ups** categories before merge
+
+This section is conditional. PRs that do not change an organizer/member-facing surface can skip it.
+
 ## Structural changes (docs migrations)
 - Files added:
 - Files moved:

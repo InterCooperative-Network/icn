@@ -682,7 +682,7 @@ category = "reference"
 status = "living"
 title = "ICN Document Registry (human summary)"
 description = "Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh"
-last_updated = "2026-05-04"
+last_updated = "2026-05-05"
 owner = "matt"
 audiences = ["contributors", "agents"]
 truth_class = "descriptive"
@@ -691,7 +691,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["registry", "documentation-control"]
 recommended_action = "keep"
-last_reviewed = "2026-05-04"
+last_reviewed = "2026-05-05"
 
 [docs."docs/planning/documentation-namespace-resolution.md"]
 category = "strategy"
@@ -1018,7 +1018,7 @@ audiences = ["product", "architects"]
 category = "design"
 status = "living"
 title = "Organizer / member accessibility gate"
-description = "PR-time review checklist for any organizer- or member-facing surface (rehearsal shells, action-card surfaces, preview/review surfaces, evidence-packet rendering, receipt/provenance review, member-facing governance flows). Twelve review categories with four-value gate outcomes (Pass / Pass-with-follow-ups / Blocked / N/A); copy-paste PR checklist block. Operational layer beneath ADR-0028, design/ACCESSIBILITY_BASELINE.md, and design-language/accessibility.md; companion to architecture/ARCHITECTURE_DUE_DILIGENCE.md participation-access half. Not a CI gate; not a legal accessibility audit; not production-readiness."
+description = "PR-time review checklist for any organizer- or member-facing surface (rehearsal shells, action-card surfaces, preview/review surfaces, evidence-packet rendering, receipt/provenance review, member-facing governance flows). Twelve review categories with four-value gate outcomes (Pass / Pass with documented follow-ups / Blocked / N/A with reason); copy-paste PR checklist block. Operational layer beneath ADR-0028, design/ACCESSIBILITY_BASELINE.md, and design-language/accessibility.md; companion to architecture/ARCHITECTURE_DUE_DILIGENCE.md participation-access half. Not a CI gate; not a legal accessibility audit; not production-readiness."
 last_updated = "2026-05-05"
 owner = "matt"
 audiences = ["architects", "contributors", "design"]

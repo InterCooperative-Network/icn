@@ -40,7 +40,7 @@ The gate does **not** apply to:
 
 ## 3. Review categories
 
-Each category gives one short paragraph for what the reviewer is looking for. The reviewer marks each category Pass, Pass with documented follow-ups, Blocked, or Not applicable with reason (see §4).
+Each category gives one short paragraph for what the reviewer is looking for. The reviewer marks each category **Pass**, **Pass with documented follow-ups**, **Blocked**, or **N/A with reason** (see §4 for definitions and §5 for the copy-paste checklist).
 
 ### 3.1 Language access
 
@@ -97,9 +97,9 @@ For each of the twelve categories above, the reviewer marks one of:
 - **Pass** — the category is satisfied as shipped.
 - **Pass with documented follow-ups** — the category is acceptable for this PR, with one or more named follow-up issues that capture the remaining work. Each follow-up must reference a concrete issue or be opened alongside this PR.
 - **Blocked** — the category is not satisfied at a level that would let this surface be called organizer-ready, member-facing, or pilot-ready. The PR may still merge as a steward-only / experimental surface, but the surface must not be linked from organizer- or member-facing materials, demoed as the participation path, or rolled into pilot-track docs until the block is resolved.
-- **Not applicable with reason** — the category does not apply to this PR's surface. The reviewer states the reason in one sentence (e.g. "no audio content," "no visual layout — backend-only PR").
+- **N/A with reason** — the category does not apply to this PR's surface. The reviewer states the reason in one sentence (e.g. "no audio content," "no visual layout — backend-only PR").
 
-A surface is **organizer-ready / member-facing / pilot-ready** only when every category is **Pass** or **Pass with documented follow-ups** **or** **Not applicable with reason**. A single **Blocked** category gates the surface out of those tracks until resolved.
+A surface is **organizer-ready / member-facing / pilot-ready** only when every category is **Pass** or **Pass with documented follow-ups** or **N/A with reason**. A single **Blocked** category gates the surface out of those tracks until resolved.
 
 ## 5. PR-review checklist (copy into the PR body)
 
@@ -108,18 +108,18 @@ Reviewers and authors should copy the following block into the PR body when the 
 ```
 ## Organizer / member accessibility gate (docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md)
 
-- [ ] 3.1 Language access — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
-- [ ] 3.2 Screen-reader and non-visual access — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
-- [ ] 3.3 Low-vision access — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
-- [ ] 3.4 Color-independent meaning — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
-- [ ] 3.5 Keyboard, switch, and non-pointer access — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
-- [ ] 3.6 Captions, transcripts, and non-audio access — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
-- [ ] 3.7 Cognitive load and step complexity — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
-- [ ] 3.8 Low-bandwidth and low-device access — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
-- [ ] 3.9 Assistive-technology compatibility — AT exercised: <screen reader and input method tested> — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
-- [ ] 3.10 Privacy-preserving accommodation path — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
-- [ ] 3.11 Receipts, provenance, and evidence access — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
-- [ ] 3.12 Governance and action access — Pass | Pass-with-follow-up #<issue> | Blocked | N/A: <reason>
+- [ ] 3.1 Language access — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
+- [ ] 3.2 Screen-reader and non-visual access — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
+- [ ] 3.3 Low-vision access — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
+- [ ] 3.4 Color-independent meaning — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
+- [ ] 3.5 Keyboard, switch, and non-pointer access — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
+- [ ] 3.6 Captions, transcripts, and non-audio access — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
+- [ ] 3.7 Cognitive load and step complexity — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
+- [ ] 3.8 Low-bandwidth and low-device access — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
+- [ ] 3.9 Assistive-technology compatibility — AT exercised: <screen reader and input method tested> — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
+- [ ] 3.10 Privacy-preserving accommodation path — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
+- [ ] 3.11 Receipts, provenance, and evidence access — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
+- [ ] 3.12 Governance and action access — Pass | Pass with documented follow-ups #<issue> | Blocked | N/A with reason: <reason>
 
 **Surface readiness conclusion:** organizer-ready | member-facing | pilot-ready | steward-only-experimental
 ```
