@@ -871,3 +871,128 @@ ideas:
       taxonomy), or Q4 (HumanDecisionSet vs proposal/vote) resolved
       or explicitly deferred in writing. The runtime slice and these
       conditions are NOT in scope of this PR.
+
+  # --------------------------------------------------------------
+  # 20. Democratic Authority Primitives
+  # --------------------------------------------------------------
+  - id: idea-0020
+    title: Democratic Authority Primitives
+    status: framed
+    kind: architecture_concept
+    source: "session 2026-05-05; post-idea-0019 review of where authority basis, participation role, delegation, representation, expert/advisory input, deliberation context, conflict disclosure, facilitator and steward/operator authority, minority report, and revocation/recall/challenge paths are currently implicit across the spine, the action-card runtime, the no-CLI workflow, the architecture due-diligence checklist, and the institutional-feedback doctrine"
+    one_sentence: |
+      ICN should name a small set of generic authority/participation
+      and deliberation-context primitives so institutions can define,
+      constrain, prove, and revise their own democratic authority
+      structures through CCL, charters, and institution packages
+      rather than each feature inventing its own implicit shape.
+    problem: |
+      The Institutional Process Substrate (idea-0019) names what gets
+      processed but defers who is speaking, on what basis, in what
+      role, with what context, to which body, under what limits, and
+      contestable by which path. Without typed shapes for those, every
+      spine record imports its authority assumptions silently. A
+      deliberation surface without authority basis is a chat room with
+      timestamps. A decision record without authority basis is a
+      verdict from nowhere. A delegation without scope, expiry, and
+      revocation is quiet aristocracy. A representation without
+      mandate, constituency, term, duties, reporting, recall, and
+      conflict disclosure is unaccountable proxy sovereignty. An
+      expert claim that lands as a vote is expertocracy; an expert
+      claim filtered out is anti-expertise. A facilitator whose
+      process authority is not distinguished from outcome authority
+      quietly captures decisions. A steward or operator whose
+      execution authority is not distinguished from democratic
+      sovereignty quietly substitutes for it. The deliberation surface
+      itself fails without context: rule by whoever already had
+      context. Democratic deliberation requires both an authority
+      layer that lets every statement carry its basis, limits,
+      evidence, and accountability, and a context layer that lets
+      members understand what they are being asked to decide. ICN
+      should not prescribe one democratic model. It should provide
+      the primitives.
+    belongs_to: icn
+    layer: substrate
+    current_artifact: "framing brief at ops/ideas/framing/democratic-authority-primitives.md (this PR); composes against idea-0019 (Institutional Process Substrate framing + read-model dogfood), docs/architecture/INSTITUTIONAL_FEEDBACK_AND_SUPPORT_PRIMITIVES.md (signals/grants/indicators doctrine), docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md (placement rule), docs/architecture/KERNEL_APP_SEPARATION.md (meaning firewall), docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md (authority-vs-convenience and participation-access reflexes), docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md (receipt envelope), docs/adr/ADR-0027-action-card-contract.md (action-card contract), docs/adr/ADR-0028-accessibility-baseline-for-member-interfaces.md (accessibility baseline), docs/adr/ADR-0029-conflict-resolution-object-model.md (conflict resolution object model, proposed/partial), urn:icn:contract:preview-review:v1, urn:icn:contract:rehearsal-evidence-export:v1, docs/pilots/no-cli-organizer-member-rehearsal-workflow.md, docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md"
+    proposed_next_artifact: dogfood_slice
+    promoted_target: null
+    proposed_objects:
+      - "AuthorityBasis (name candidate; not committed)"
+      - "ParticipationRole (name candidate)"
+      - "DelegationGrant (name candidate; may compose with TemporaryAuthorityGrant per #1632)"
+      - "RepresentationMandate (name candidate; gated on #1609 federation tally semantics)"
+      - "ExpertStatement (name candidate; advisory-by-default)"
+      - "AdvisoryOpinion (name candidate)"
+      - "ConflictDisclosure (name candidate)"
+      - "FacilitatorSummary (name candidate; types idea-0019's facilitator_summary entry kind)"
+      - "StewardReview (name candidate)"
+      - "OperatorExecutionAuthority (name candidate; downstream of decision)"
+      - "MinorityReport (name candidate)"
+      - "ChallengePath (name candidate)"
+      - "RevocationPath (name candidate)"
+      - "RecallPath (name candidate)"
+      - "DeliberationContext (name candidate)"
+      - "ContextReference (name candidate; polymorphic root)"
+      - "LearningReference (name candidate)"
+      - "EvidenceReference (name candidate)"
+      - "PriorDecisionReference (name candidate)"
+      - "CharterRuleReference (name candidate)"
+      - "CCLRuleReference (name candidate)"
+      - "AccessibilityNote (name candidate)"
+      - "PrivacyNote (name candidate)"
+      - "RiskNote (name candidate)"
+      - "CounterargumentReference (name candidate)"
+      - "GlossaryReference (name candidate)"
+    requires_rfc: unknown
+    likely_adr: false
+    implementation_ready: false
+    public_claim_ready: false
+    evidence_required: []
+    privacy_risk: high
+    boundary_risk: medium
+    risks:
+      - "Scope sprawl — bundling authority basis, participation roles, delegation, representation, expert/advisory input, conflict disclosure, facilitator/steward/operator authority, minority report, revocation/recall/challenge, and the entire context family into one doc that becomes doctrine before runtime exists."
+      - "Premature schema commitment — naming objects in the brief is not a schema decision; promotion review must gate that."
+      - "Voting-system foreclosure — the brief must not imply a voting system, a liquid-democracy commitment, or any specific democratic model."
+      - "Expertocracy drift — typed ExpertStatement must remain advisory-by-default; elevation must always be an explicit charter act."
+      - "Anti-expertise drift — refusing typed expert claims at all imports the same opacity the brief refuses."
+      - "Quiet-aristocracy drift — DelegationGrant must not become an open-ended proxy primitive."
+      - "Unaccountable-proxy drift — RepresentationMandate without recall, reporting, and conflict disclosure recreates the failure it refuses."
+      - "Decision-vs-execution conflation — OperatorExecutionAuthority must never appear without the decision and gate results that authorize it."
+      - "Privacy leakage — ConflictDisclosure, MinorityReport, DeliberationContext references must support body-scoped visibility with redaction in evidence export."
+      - "Federation visibility leak — cross-cooperative sync of authority records can leak who-acted-on-whose-mandate without conservative defaults."
+      - "NYCN-coupling — primitives must remain generic; no NYCN/Summit-specific nouns."
+      - "Foreclosing CCL design — the brief must not lock the rule-authoring layer (idea-0012, idea-0018) into a specific runtime model."
+      - "Conflicting with conflict-resolution model (ADR-0029, idea-0016) — challenge paths defer to that work, do not absorb it."
+      - "Pre-empting idea-0019 open questions Q1, Q3, Q4 — the brief must not answer them; idea-0019 owns them."
+      - "Named-but-empty objects (per idea-0010) — the same risk applies; promotion review must enforce that naming is not commitment."
+    next_transform: |
+      Framing brief landed in this PR
+      (ops/ideas/framing/democratic-authority-primitives.md). No
+      runtime, no schema, no contract URN, no implementation issue is
+      opened from this brief. The next artifact is a separate
+      read-model dogfood slice (in a future PR) that composes
+      AuthorityBasis, ParticipationRole, FacilitatorSummary,
+      ConflictDisclosure, MinorityReport, and a small
+      DeliberationContext against the already-merged idea-0019
+      read-model fixture walk
+      (ops/ideas/dogfood/institutional-process-substrate-mvp.md). Per
+      ops/ideas/README.md "Dogfood slice variants", a read-model
+      fixture walk does NOT satisfy receipt-backed promotion
+      thresholds. Promotion of idea-0020 to RFC requires (1) the
+      read-model composition slice above, (2) a runtime dogfood that
+      emits at least one receipt under the existing ADR-0026 envelope
+      for one of the named primitives (preferably ConflictDisclosure
+      accept receipt or MinorityReport recorded receipt), (3) a real
+      visibility/privacy boundary run with redaction in evidence
+      export, (4) a real accessibility-gate ProcessGateResult on a
+      primitive's UI surface, and (5) at least one open question (Q1
+      AuthorityBasis polymorphism vs typed family, or Q5
+      ConflictDisclosure / MinorityReport placement) resolved or
+      explicitly deferred in writing. Runtime work is gated on idea-0019
+      promotion (for spine composition), #1632 (for delegation /
+      TemporaryAuthorityGrant), #1609 (for federation tally
+      semantics), #1631 (for signal / challenge-path semantics),
+      #1633 (for indicator challenge-path), ADR-0023 / idea-0012 /
+      idea-0018 (for CCL hooks), ADR-0029 / idea-0016 (for conflict
+      object model). None of those follow-ups are started in this PR.
