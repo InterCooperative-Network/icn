@@ -913,7 +913,7 @@ ideas:
       the primitives.
     belongs_to: icn
     layer: substrate
-    current_artifact: "framing brief at ops/ideas/framing/democratic-authority-primitives.md (this PR); composes against idea-0019 (Institutional Process Substrate framing + read-model dogfood), docs/architecture/INSTITUTIONAL_FEEDBACK_AND_SUPPORT_PRIMITIVES.md (signals/grants/indicators doctrine), docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md (placement rule), docs/architecture/KERNEL_APP_SEPARATION.md (meaning firewall), docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md (authority-vs-convenience and participation-access reflexes), docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md (receipt envelope), docs/adr/ADR-0027-action-card-contract.md (action-card contract), docs/adr/ADR-0028-accessibility-baseline-for-member-interfaces.md (accessibility baseline), docs/adr/ADR-0029-conflict-resolution-object-model.md (conflict resolution object model, proposed/partial), urn:icn:contract:preview-review:v1, urn:icn:contract:rehearsal-evidence-export:v1, docs/pilots/no-cli-organizer-member-rehearsal-workflow.md, docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md"
+    current_artifact: "framing brief at ops/ideas/framing/democratic-authority-primitives.md (#1751); read-model composition dogfood slice at ops/ideas/dogfood/democratic-authority-primitives-mvp.md (this PR) — composes orthogonally with the merged idea-0019 read-model fixture walk (ops/ideas/dogfood/institutional-process-substrate-mvp.md) by attaching AuthorityBasis, ParticipationRole, FacilitatorSummary, ConflictDisclosure, MinorityReport, and a small DeliberationContext to spine records without modifying the spine; composes against docs/architecture/INSTITUTIONAL_FEEDBACK_AND_SUPPORT_PRIMITIVES.md (signals/grants/indicators doctrine), docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md (placement rule), docs/architecture/KERNEL_APP_SEPARATION.md (meaning firewall), docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md (authority-vs-convenience and participation-access reflexes), docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md (receipt envelope), docs/adr/ADR-0027-action-card-contract.md (action-card contract), docs/adr/ADR-0028-accessibility-baseline-for-member-interfaces.md (accessibility baseline), docs/adr/ADR-0029-conflict-resolution-object-model.md (conflict resolution object model, proposed/partial), urn:icn:contract:preview-review:v1, urn:icn:contract:rehearsal-evidence-export:v1, docs/pilots/no-cli-organizer-member-rehearsal-workflow.md, docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md"
     proposed_next_artifact: dogfood_slice
     promoted_target: null
     proposed_objects:
@@ -967,33 +967,40 @@ ideas:
       - "Pre-empting idea-0019 open questions Q1, Q3, Q4 — the brief must not answer them; idea-0019 owns them."
       - "Named-but-empty objects (per idea-0010) — the same risk applies; promotion review must enforce that naming is not commitment."
     next_transform: |
-      Framing brief landed in this PR
-      (ops/ideas/framing/democratic-authority-primitives.md). No
-      runtime, no schema, no contract URN, no implementation issue is
-      opened from this brief. The next artifact is a separate
-      read-model dogfood slice (in a future PR) that composes
-      AuthorityBasis, ParticipationRole, FacilitatorSummary,
-      ConflictDisclosure, MinorityReport, and a small
-      DeliberationContext against the already-merged idea-0019
-      read-model fixture walk
-      (ops/ideas/dogfood/institutional-process-substrate-mvp.md). Per
-      ops/ideas/README.md "Dogfood slice variants", a read-model
-      fixture walk does NOT satisfy receipt-backed promotion
-      thresholds. Promotion of idea-0020 to RFC requires (1) the
-      read-model composition slice above, (2) a runtime dogfood that
+      Framing brief landed in #1751
+      (ops/ideas/framing/democratic-authority-primitives.md). The
+      first read-model fixture-walk dogfood slice landed in this PR
+      (ops/ideas/dogfood/democratic-authority-primitives-mvp.md): the
+      Example Cooperative scenario from the merged idea-0019 read-
+      model fixture walk
+      (ops/ideas/dogfood/institutional-process-substrate-mvp.md) is
+      extended end-to-end by attaching AuthorityBasis,
+      ParticipationRole, FacilitatorSummary, ConflictDisclosure,
+      MinorityReport, and a small DeliberationContext (three
+      reference families: CharterRuleReference, PriorDecisionReference,
+      AccessibilityNote) to spine records without modifying the spine,
+      the kernel, the gateway, the ledger, the governance crates, the
+      SDKs, or any shipping contract. Per ops/ideas/README.md "Dogfood
+      slice variants", a read-model fixture walk does NOT satisfy
+      receipt-backed promotion thresholds. Promotion of idea-0020 to
+      RFC requires ALL FIVE conditions named in the framing brief's
+      §16.1 promotion gate: (1) the read-model composition slice
+      above [LANDED in this PR]; (2) a separate runtime dogfood that
       emits at least one receipt under the existing ADR-0026 envelope
       for one of the named primitives (preferably ConflictDisclosure
-      accept receipt or MinorityReport recorded receipt), (3) a real
+      accept receipt or MinorityReport recorded receipt); (3) a real
       visibility/privacy boundary run with redaction in evidence
-      export, (4) a real accessibility-gate ProcessGateResult on a
-      primitive's UI surface, and (5) at least one open question — Q1
-      (AuthorityBasis polymorphism vs typed family) or Q5
+      export; (4) a real accessibility-gate ProcessGateResult on a
+      primitive's UI surface; and (5) at least one open question —
+      Q1 (AuthorityBasis polymorphism vs typed family) or Q5
       (ConflictDisclosure / MinorityReport placement) — resolved in
       writing per the framing brief's §16.1 promotion gate. Deferral
       is not sufficient for the RFC gate per §16.1; the lenient
       resolved-or-deferred standard at §16.3 applies only to the
       broader runtime-justification threshold, not to RFC promotion.
-      Runtime work is gated on idea-0019
+      Conditions (2)-(5) are NOT in scope of this PR. The next
+      artifact after this slice is a separate runtime dogfood that
+      satisfies condition (2). Runtime work is gated on idea-0019
       promotion (for spine composition), #1632 (for delegation /
       TemporaryAuthorityGrant), #1609 (for federation tally
       semantics), #1631 (for signal / challenge-path semantics),
