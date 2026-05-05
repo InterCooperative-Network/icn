@@ -358,10 +358,18 @@ All sketches; no ActionCard is actually emitted in this slice.
   the existing `ADR-0027` contract; no new ActionCard kind is
   proposed.
 - **Evidence export can summarize the process without private data.**
-  Step 7 reuses the committed evidence export example exactly;
-  `export_safety_classification: repo-safe` holds; the
-  `proof_loop_references[].status: not-attempted` correctly records
-  that this is a fixture walk, not a runtime exercise.
+  Step 7 composes against the **same shipping contract URN**
+  (`urn:icn:contract:rehearsal-evidence-export:v1`) as the committed
+  evidence export example: a packet produced from this slice's
+  three-outcome decision walk would be a different valid instance of
+  that contract — not a byte-for-byte reuse of the committed
+  example file. Both the committed example and the slice's produced
+  packet validate against the same schema. Reused shape elements
+  (`rehearsal_mode: fixture-only`,
+  `preview_review_boundary.enforced: true`,
+  `mutation_boundary.executed: false`,
+  `export_safety_classification: repo-safe`,
+  `proof_loop_references[].status: not-attempted`) hold for both.
 - **The spine can compose without touching kernel/runtime code.**
   Zero kernel, runtime, gateway, ledger, governance, or SDK files
   are edited by this slice. The composition is the proof.
