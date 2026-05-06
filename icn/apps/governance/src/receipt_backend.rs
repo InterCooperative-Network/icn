@@ -439,9 +439,24 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     ///
     /// Default impl is a no-op so backends that do not yet durably
     /// persist these receipts inherit a truthful "process gate result
-    /// not persisted" behavior. Test backends and the sled-backed
+    /// not persisted" behavior.
+    ///
+    /// **Override status as of this PR:** test backends in
+    /// `apps/governance/tests/process_gate_result_receipt_runtime_slice.rs`
+    /// override; the sled-backed
     /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
-    /// override.
+    /// **does not yet override** and so silently inherits the no-op
+    /// default. That means a `GovernanceManager` wired to the
+    /// production `ReceiptStore` returns the receipt to the caller
+    /// but does not persist it. A sled-backed override is a
+    /// follow-up: it requires extending the existing
+    /// `use icn_governance::{...}` import in
+    /// `crates/icn-gateway/src/receipt_store.rs`, which the
+    /// meaning-firewall ratchet hook currently blocks (see CLAUDE.md
+    /// "Pre-existing domain imports in icn-core and icn-gateway
+    /// remain; full extraction is ongoing work"). Production
+    /// durability for `ProcessGateResultReceipt` is gated on that
+    /// kernel-boundary cleanup.
     fn put_process_gate_result(&self, _receipt: &ProcessGateResultReceipt) -> Result<(), String> {
         Ok(())
     }
@@ -452,11 +467,18 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     ///
     /// Backends that store multiple receipts per pair (a re-record at
     /// a strictly later second appending a fresh receipt) must return
-    /// the receipt with the largest `recorded_at`.
+    /// the receipt with the largest `recorded_at`. Implementations
+    /// must compute the latest by `recorded_at`, not by insertion
+    /// order — out-of-order writes (e.g. a backend that batches or
+    /// reorders inserts) must still return the highest-`recorded_at`
+    /// receipt for the pair.
     ///
     /// Default impl returns `Ok(None)` so backends that do not
     /// implement process-gate-result storage are indistinguishable
-    /// from "no gate result recorded".
+    /// from "no gate result recorded". The sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
+    /// inherits this default until the kernel-boundary cleanup noted
+    /// on [`Self::put_process_gate_result`] lands.
     fn get_latest_process_gate_result(
         &self,
         _session_id: &str,
@@ -471,7 +493,11 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     ///
     /// Default impl returns an empty vector. Backends that override
     /// [`Self::put_process_gate_result`] should also override this
-    /// method to keep the per-session audit chain readable.
+    /// method to keep the per-session audit chain readable. The
+    /// sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
+    /// inherits this default until the kernel-boundary cleanup noted
+    /// on [`Self::put_process_gate_result`] lands.
     fn list_process_gate_results_for_session(
         &self,
         _session_id: &str,

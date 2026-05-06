@@ -1339,7 +1339,7 @@ mod tests {
     // ========================================================================
     // ProcessGateResultReceipt unit tests (the receipt's deterministic
     // hash binding; runtime emission is covered by an integration test
-    // in apps/governance/tests/process_gate_result_receipt.rs).
+    // in apps/governance/tests/process_gate_result_receipt_runtime_slice.rs).
     // ========================================================================
 
     fn sample_gate_receipt() -> ProcessGateResultReceipt {

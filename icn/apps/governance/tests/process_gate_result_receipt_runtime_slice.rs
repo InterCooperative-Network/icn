@@ -98,16 +98,21 @@ impl GovernanceReceiptBackend for TestReceiptStore {
         gate_kind: ProcessGateKind,
     ) -> Result<Option<ProcessGateResultReceipt>, String> {
         // Latest = receipt with the largest `recorded_at` for this
-        // (session_id, gate_kind) pair. The chain is appended in
-        // emission order; the manager method binds `recorded_at`
-        // monotonically per call, so `.rfind` returns the latest.
+        // (session_id, gate_kind) pair, per the trait contract on
+        // GovernanceReceiptBackend::get_latest_process_gate_result.
+        // Compute the max by `recorded_at` directly rather than
+        // assuming insertion order tracks recorded_at — the trait
+        // contract is "largest recorded_at", and a backend that
+        // batches or reorders inserts must still satisfy it. Mirrors
+        // the existing meeting-attendance test backend pattern of
+        // sorting then taking the last hit.
         Ok(self
             .persisted
             .lock()
             .unwrap()
             .iter()
-            .rev()
-            .find(|r| r.session_id == session_id && r.gate_kind == gate_kind)
+            .filter(|r| r.session_id == session_id && r.gate_kind == gate_kind)
+            .max_by_key(|r| r.recorded_at)
             .cloned())
     }
 
