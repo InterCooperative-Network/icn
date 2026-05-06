@@ -717,6 +717,188 @@ impl MeetingAttendanceReceipt {
     }
 }
 
+// ============================================================================
+// Process gate result receipts (ADR-0026 Layer 2 — first
+// `ProcessTransitionReceipt` class for the `idea-0019` Institutional
+// Process Substrate runtime slice)
+// ============================================================================
+
+/// Closed taxonomy of process gate kinds that produce a
+/// [`ProcessGateResultReceipt`].
+///
+/// The variants mirror the six gate kinds named in the `idea-0019`
+/// Institutional Process Substrate read-model fixture-walk dogfood
+/// (`ops/ideas/dogfood/institutional-process-substrate-mvp.md` Step 5
+/// gate table). The taxonomy is closed: the runtime never emits a gate
+/// kind not listed here. Adding a kind requires a separate change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessGateKind {
+    /// Privacy-review gate. Confirms no private data leaks into a
+    /// process artifact.
+    PrivacyReview,
+    /// Accessibility-review gate. Confirms the surface meets the
+    /// accessibility baseline before promotion to organizer-ready.
+    AccessibilityReview,
+    /// Repo-safety gate. Confirms only repo-safe material is exported.
+    RepoSafetyReview,
+    /// Scope-confirmation gate. Confirms the process target is in
+    /// scope for the recording body.
+    ScopeConfirmation,
+    /// No-mutation gate. Confirms a step writes nothing to the
+    /// runtime — read-model only.
+    NoMutationCheck,
+    /// Second-reviewer-signoff gate. Confirms an alternate reviewer
+    /// has signed off (used by some institution charters).
+    SecondReviewerSignoff,
+}
+
+/// Closed taxonomy of process gate results that produce a
+/// [`ProcessGateResultReceipt`].
+///
+/// `Pass` and `Fail` are receipt-bearing results. The framing brief's
+/// `n/a` value (a gate the charter does not require for this session
+/// kind) does not produce a receipt — the absence of a receipt for a
+/// gate that was not asserted is itself the institutional record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessGateResult {
+    /// The gate evaluated and passed.
+    Pass,
+    /// The gate evaluated and failed.
+    Fail,
+}
+
+/// Cross-node deterministic gate-result receipt for a process session.
+///
+/// Sits alongside [`GovernanceDecisionReceipt`],
+/// [`ActionItemCompletionReceipt`], and [`MeetingAttendanceReceipt`] in
+/// ADR-0026 Layer 2. Records the *fact* of a process gate evaluation
+/// the runtime can attest to, keyed so an audit chain can be
+/// reconstructed by `(session_id, gate_kind)` ordered by `recorded_at`.
+///
+/// This is the first `ProcessTransitionReceipt` class emitted by the
+/// runtime — the smallest receipt-backed slice that exercises the
+/// `idea-0019` Institutional Process Substrate spine. It does **not**
+/// implement a full process runtime, does **not** introduce a schema
+/// or contract URN, and does **not** promote `idea-0019` to RFC.
+///
+/// Equality is anchored to `record_hash`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProcessGateResultReceipt {
+    /// Identifier for the process session this gate result attaches
+    /// to. Caller-provided, treated as opaque by the runtime.
+    pub session_id: String,
+    /// Governance domain the session is scoped to.
+    pub domain_id: String,
+    /// Closed-taxonomy gate kind. See [`ProcessGateKind`].
+    pub gate_kind: ProcessGateKind,
+    /// Closed pass/fail result. See [`ProcessGateResult`].
+    pub result: ProcessGateResult,
+    /// DID of the actor who recorded this gate result. The
+    /// authenticated caller of the manager method that emitted the
+    /// receipt; no separate "subject" exists for a gate result.
+    pub recorded_by: String,
+    /// Unix-seconds the result was recorded.
+    pub recorded_at: u64,
+    /// blake3 canonical record hash binding the fields above.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for ProcessGateResultReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for ProcessGateResultReceipt {}
+
+impl ProcessGateResultReceipt {
+    /// Domain separation tag for canonical process-gate-result record
+    /// hashes. Distinct from the proposal-decision, action-item-
+    /// completion, and meeting-attendance tags so a record can never
+    /// collide across receipt types.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:process_gate_result:v1";
+
+    /// Build a new receipt and compute its canonical `record_hash`.
+    pub fn new(
+        session_id: String,
+        domain_id: String,
+        gate_kind: ProcessGateKind,
+        result: ProcessGateResult,
+        recorded_by: String,
+        recorded_at: u64,
+    ) -> Self {
+        let record_hash = Self::compute_record_hash(
+            &session_id,
+            &domain_id,
+            gate_kind,
+            result,
+            &recorded_by,
+            recorded_at,
+        );
+        Self {
+            session_id,
+            domain_id,
+            gate_kind,
+            result,
+            recorded_by,
+            recorded_at,
+            record_hash,
+        }
+    }
+
+    /// Compute the canonical record hash from the input fields.
+    ///
+    /// String inputs are length-prefixed (u64 LE) under
+    /// [`Self::DOMAIN_TAG`] so no two distinct field bindings can
+    /// produce the same hash. Enum inputs are hashed as single bytes
+    /// in declaration order; adding an enum variant after the last
+    /// variant in either enum is non-breaking for previously-emitted
+    /// hashes.
+    pub fn compute_record_hash(
+        session_id: &str,
+        domain_id: &str,
+        gate_kind: ProcessGateKind,
+        result: ProcessGateResult,
+        recorded_by: &str,
+        recorded_at: u64,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        for field in [session_id, domain_id, recorded_by] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        hasher.update(&[gate_kind_ordinal(gate_kind)]);
+        hasher.update(&[gate_result_ordinal(result)]);
+        hasher.update(&recorded_at.to_le_bytes());
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+}
+
+/// Map [`ProcessGateKind`] to a deterministic ordinal for hashing.
+fn gate_kind_ordinal(kind: ProcessGateKind) -> u8 {
+    match kind {
+        ProcessGateKind::PrivacyReview => 0,
+        ProcessGateKind::AccessibilityReview => 1,
+        ProcessGateKind::RepoSafetyReview => 2,
+        ProcessGateKind::ScopeConfirmation => 3,
+        ProcessGateKind::NoMutationCheck => 4,
+        ProcessGateKind::SecondReviewerSignoff => 5,
+    }
+}
+
+/// Map [`ProcessGateResult`] to a deterministic ordinal for hashing.
+fn gate_result_ordinal(result: ProcessGateResult) -> u8 {
+    match result {
+        ProcessGateResult::Pass => 0,
+        ProcessGateResult::Fail => 1,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1152,5 +1334,198 @@ mod tests {
         assert_eq!(receipt.vote_tally, recovered.vote_tally);
         assert_eq!(receipt.vote_hash, recovered.vote_hash);
         assert_eq!(receipt.decision_hash, recovered.decision_hash);
+    }
+
+    // ========================================================================
+    // ProcessGateResultReceipt unit tests (the receipt's deterministic
+    // hash binding; runtime emission is covered by an integration test
+    // in apps/governance/tests/process_gate_result_receipt_runtime_slice.rs).
+    // ========================================================================
+
+    fn sample_gate_receipt() -> ProcessGateResultReceipt {
+        ProcessGateResultReceipt::new(
+            "session-fixture-001".to_string(),
+            "coop:test".to_string(),
+            ProcessGateKind::PrivacyReview,
+            ProcessGateResult::Pass,
+            "did:icn:facilitator-fixture".to_string(),
+            1_700_000_300,
+        )
+    }
+
+    #[test]
+    fn process_gate_result_record_hash_determinism() {
+        let r1 = sample_gate_receipt();
+        let r2 = sample_gate_receipt();
+        assert_eq!(r1.record_hash, r2.record_hash);
+        assert_ne!(r1.record_hash, [0u8; 32]);
+        assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn process_gate_result_record_hash_changes_with_session_id() {
+        let r1 = sample_gate_receipt();
+        let r2 = ProcessGateResultReceipt::new(
+            "different-session".to_string(),
+            r1.domain_id.clone(),
+            r1.gate_kind,
+            r1.result,
+            r1.recorded_by.clone(),
+            r1.recorded_at,
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn process_gate_result_record_hash_changes_with_gate_kind() {
+        let r1 = sample_gate_receipt();
+        let r2 = ProcessGateResultReceipt::new(
+            r1.session_id.clone(),
+            r1.domain_id.clone(),
+            ProcessGateKind::AccessibilityReview,
+            r1.result,
+            r1.recorded_by.clone(),
+            r1.recorded_at,
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn process_gate_result_record_hash_changes_with_result() {
+        let r1 = sample_gate_receipt();
+        let r2 = ProcessGateResultReceipt::new(
+            r1.session_id.clone(),
+            r1.domain_id.clone(),
+            r1.gate_kind,
+            ProcessGateResult::Fail,
+            r1.recorded_by.clone(),
+            r1.recorded_at,
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn process_gate_result_record_hash_changes_with_recorded_by() {
+        let r1 = sample_gate_receipt();
+        let r2 = ProcessGateResultReceipt::new(
+            r1.session_id.clone(),
+            r1.domain_id.clone(),
+            r1.gate_kind,
+            r1.result,
+            "did:icn:steward-other".to_string(),
+            r1.recorded_at,
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn process_gate_result_record_hash_changes_with_recorded_at() {
+        let r1 = sample_gate_receipt();
+        let r2 = ProcessGateResultReceipt::new(
+            r1.session_id.clone(),
+            r1.domain_id.clone(),
+            r1.gate_kind,
+            r1.result,
+            r1.recorded_by.clone(),
+            r1.recorded_at + 1,
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn process_gate_result_domain_tag_is_part_of_hash() {
+        let r = sample_gate_receipt();
+        // Recompute manually without the domain tag and confirm the
+        // result differs — the tag must affect the hash so this
+        // receipt class can never collide with another receipt
+        // class's binding under the same field bytes.
+        let mut hasher = blake3::Hasher::new();
+        // Deliberately omit: hasher.update(ProcessGateResultReceipt::DOMAIN_TAG);
+        for field in [
+            r.session_id.as_str(),
+            r.domain_id.as_str(),
+            r.recorded_by.as_str(),
+        ] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        hasher.update(&[gate_kind_ordinal(r.gate_kind)]);
+        hasher.update(&[gate_result_ordinal(r.result)]);
+        hasher.update(&r.recorded_at.to_le_bytes());
+        let untagged: Hash = *hasher.finalize().as_bytes();
+        assert_ne!(r.record_hash, untagged);
+    }
+
+    #[test]
+    fn process_gate_result_length_prefix_prevents_field_collision() {
+        let r1 = ProcessGateResultReceipt::new(
+            "alpha".to_string(),
+            "coop:beta".to_string(),
+            ProcessGateKind::ScopeConfirmation,
+            ProcessGateResult::Pass,
+            "did:icn:r".to_string(),
+            42,
+        );
+        // Concatenate session_id + domain_id into the session_id with
+        // an empty domain_id: bare-string encoding would collide; the
+        // length-prefix scheme must keep them distinct.
+        let r2 = ProcessGateResultReceipt::new(
+            "alphacoop:beta".to_string(),
+            "".to_string(),
+            ProcessGateKind::ScopeConfirmation,
+            ProcessGateResult::Pass,
+            "did:icn:r".to_string(),
+            42,
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn process_gate_result_serde_roundtrip() {
+        let r = sample_gate_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let recovered: ProcessGateResultReceipt = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(r, recovered);
+        assert_eq!(r.session_id, recovered.session_id);
+        assert_eq!(r.domain_id, recovered.domain_id);
+        assert_eq!(r.gate_kind, recovered.gate_kind);
+        assert_eq!(r.result, recovered.result);
+        assert_eq!(r.recorded_by, recovered.recorded_by);
+        assert_eq!(r.recorded_at, recovered.recorded_at);
+        assert_eq!(r.record_hash, recovered.record_hash);
+    }
+
+    #[test]
+    fn process_gate_result_serde_uses_snake_case_for_enums() {
+        // Confirm the wire form keeps the closed taxonomies stable
+        // under serde rename_all = "snake_case". The hash is bound to
+        // ordinals (not names), but the serialized form is the
+        // contract a holder shell would consume.
+        let r = sample_gate_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        assert!(json.contains("\"gate_kind\":\"privacy_review\""));
+        assert!(json.contains("\"result\":\"pass\""));
+    }
+
+    #[test]
+    fn process_gate_result_no_regulated_finance_vocabulary() {
+        // The ProcessGateResultReceipt is not an economic record. Its
+        // serialized form must not echo regulated-finance terms,
+        // which would invite a wrong reading at the regulatory
+        // surface. Vocabulary discipline matches the rest of the
+        // receipt family (see the existing meeting-attendance test
+        // for the same set of forbidden terms).
+        let r = sample_gate_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let lower = json.to_lowercase();
+        for forbidden in [
+            "wallet", "balance", "currency", "payment", "token", "withdraw", "deposit",
+        ] {
+            assert!(
+                !lower.contains(forbidden),
+                "ProcessGateResultReceipt JSON must not contain regulated-finance vocabulary; \
+                 found `{forbidden}` in: {json}"
+            );
+        }
     }
 }

@@ -138,7 +138,8 @@ pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, Gover
 pub use proof::{
     ActionItemCompletionReceipt, ActionItemTransition, GovernanceDecisionAttestation,
     GovernanceDecisionReceipt, GovernanceProof, GovernanceProofV2, MeetingAttendanceReceipt,
-    MeetingAttendanceTransition, ProofOutcome,
+    MeetingAttendanceTransition, ProcessGateKind, ProcessGateResult, ProcessGateResultReceipt,
+    ProofOutcome,
 };
 pub use proposal::{
     AllocationOption, DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome,
