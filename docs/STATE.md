@@ -377,7 +377,9 @@ Active execution since the previous sync has been entirely doc/control-plane: re
 | PR | Title | Merged |
 |----|-------|--------|
 | #1753 | docs(ideas): add read-model dogfood slice for Democratic Authority Primitives (idea-0020) | 2026-05-05 |
+| #1752 | docs(state): sync Democratic Authority Primitives landing and agent handoff | 2026-05-05 |
 | #1751 | docs(ideas): name Democratic Authority Primitives (idea-0020 + framing brief) | 2026-05-05 |
+| #1750 | docs(state): sync process substrate landings and agent handoff | 2026-05-05 |
 | #1749 | docs(ideas): add read-model dogfood slice for Institutional Process Substrate (idea-0019) | 2026-05-05 |
 | #1747 | docs(ideas): name Institutional Process Substrate (idea-0019 + framing brief) | 2026-05-05 |
 | #1745 | docs(contracts): define preview review contract | 2026-05-05 |
