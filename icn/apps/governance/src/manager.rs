@@ -5562,6 +5562,83 @@ impl GovernanceManager {
     }
 
     // ========================================================================
+    // Process gate results (idea-0019 Institutional Process Substrate —
+    // first runtime receipt-backed slice, ADR-0026 Layer 2)
+    // ========================================================================
+
+    /// Record the result of a single named process gate evaluation
+    /// and emit a [`icn_governance::ProcessGateResultReceipt`].
+    ///
+    /// This is the first `ProcessTransitionReceipt` class the runtime
+    /// emits for the `idea-0019` Institutional Process Substrate. The
+    /// receipt is the institutional record of the gate result; the
+    /// runtime does not (yet) model the surrounding `ProcessSession`
+    /// as a stored object — `session_id` is treated opaquely so a
+    /// process surface (read-model viewer, holder shell, future
+    /// runtime session store) can reuse the same identifier.
+    ///
+    /// **Append-only.** A re-record of the same `(session_id,
+    /// gate_kind)` at a strictly later `recorded_at` produces a
+    /// distinct `record_hash` and a fresh receipt; prior receipts
+    /// remain readable as the audit chain. A same-second re-record
+    /// has the same `record_hash` and is therefore idempotent under
+    /// the backend's append-only contract — the chain reads as a
+    /// single receipt.
+    ///
+    /// **Persist-before-return.** The receipt is persisted to the
+    /// backend before this method returns — same fail-closed
+    /// discipline as `update_action_item_status` and
+    /// `update_meeting_attendance`. If the backend rejects the
+    /// receipt, this method returns the error and the caller observes
+    /// the failure rather than a silent commit-without-receipt.
+    /// When no receipt backend is configured, the receipt is still
+    /// constructed and returned but **not persisted** — callers
+    /// expecting durable provenance must wire a backend.
+    ///
+    /// **Domain scoping.** `domain_id` is bound into the receipt's
+    /// canonical hash; a probe with a different `domain_id` produces
+    /// a different `record_hash` even with identical other fields.
+    /// The runtime does not perform an authorization check here —
+    /// the caller is responsible for confirming that `recorded_by`
+    /// is permitted to record gate results for `domain_id` /
+    /// `session_id` per its institution charter. The receipt is the
+    /// record of fact; charter enforcement is upstream.
+    pub fn record_process_gate_result(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        gate_kind: icn_governance::ProcessGateKind,
+        result: icn_governance::ProcessGateResult,
+        recorded_by: &Did,
+    ) -> Result<icn_governance::ProcessGateResultReceipt> {
+        if session_id.is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_process_gate_result: session_id must be non-empty"
+            ));
+        }
+        let now = icn_time::current_timestamp_secs();
+        let receipt = icn_governance::ProcessGateResultReceipt::new(
+            session_id.to_string(),
+            domain_id.0.clone(),
+            gate_kind,
+            result,
+            recorded_by.to_string(),
+            now,
+        );
+
+        if let Some(ref store) = self.receipt_store {
+            store.put_process_gate_result(&receipt).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to persist process gate result receipt for session {session_id} kind {:?}: {e}",
+                    gate_kind
+                )
+            })?;
+        }
+
+        Ok(receipt)
+    }
+
+    // ========================================================================
     // Program management (multi-phase institutional endeavors)
     // ========================================================================
 

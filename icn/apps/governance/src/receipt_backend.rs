@@ -3,7 +3,8 @@
 
 use icn_governance::{
     ActionItemCompletionReceipt, AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt,
-    Grantee, Mandate, MeetingAttendanceReceipt, Timestamp,
+    Grantee, Mandate, MeetingAttendanceReceipt, ProcessGateKind, ProcessGateResultReceipt,
+    Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -422,6 +423,59 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         &self,
         _meeting_id: &str,
     ) -> Result<Vec<MeetingAttendanceReceipt>, String> {
+        Ok(vec![])
+    }
+
+    /// Persist a [`ProcessGateResultReceipt`] emitted when the runtime
+    /// records a single named process gate result for a process
+    /// session.
+    ///
+    /// First `ProcessTransitionReceipt` class (per the `idea-0019`
+    /// Institutional Process Substrate framing brief) emitted by the
+    /// runtime. Append-only: implementations should treat a same-
+    /// `record_hash` re-write as idempotent and must not overwrite
+    /// prior receipts on repeated transitions for the same
+    /// `(session_id, gate_kind)` pair.
+    ///
+    /// Default impl is a no-op so backends that do not yet durably
+    /// persist these receipts inherit a truthful "process gate result
+    /// not persisted" behavior. Test backends and the sled-backed
+    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
+    /// override.
+    fn put_process_gate_result(&self, _receipt: &ProcessGateResultReceipt) -> Result<(), String> {
+        Ok(())
+    }
+
+    /// Retrieve the latest [`ProcessGateResultReceipt`] for a
+    /// `(session_id, gate_kind)` pair, or `None` when no result has
+    /// been recorded for that gate in that session.
+    ///
+    /// Backends that store multiple receipts per pair (a re-record at
+    /// a strictly later second appending a fresh receipt) must return
+    /// the receipt with the largest `recorded_at`.
+    ///
+    /// Default impl returns `Ok(None)` so backends that do not
+    /// implement process-gate-result storage are indistinguishable
+    /// from "no gate result recorded".
+    fn get_latest_process_gate_result(
+        &self,
+        _session_id: &str,
+        _gate_kind: ProcessGateKind,
+    ) -> Result<Option<ProcessGateResultReceipt>, String> {
+        Ok(None)
+    }
+
+    /// List **all** [`ProcessGateResultReceipt`]s persisted for a
+    /// process session, oldest-first by `recorded_at`. Spans every
+    /// gate kind for that session.
+    ///
+    /// Default impl returns an empty vector. Backends that override
+    /// [`Self::put_process_gate_result`] should also override this
+    /// method to keep the per-session audit chain readable.
+    fn list_process_gate_results_for_session(
+        &self,
+        _session_id: &str,
+    ) -> Result<Vec<ProcessGateResultReceipt>, String> {
         Ok(vec![])
     }
 }
