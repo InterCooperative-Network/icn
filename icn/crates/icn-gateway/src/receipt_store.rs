@@ -98,6 +98,99 @@ const AUTHORITY_GRANT_BY_GRANTEE_PREFIX: &[u8] = b"adr0014:grant:by_grantee:";
 const MIGRATION_FLAG_V2_PROPOSAL_INDEX: &[u8] = b"receipt_store:migration:v2_proposal_index:done";
 const MIGRATION_FLAG_V2_IER_BY_PROPOSAL: &[u8] = b"receipt_store:migration:v2_ier_by_proposal:done";
 
+/// Primary key prefix for opaque receipt records, keyed by the
+/// caller-supplied `class` string + the receipt's canonical
+/// `record_hash`. The opaque storage shape lets the gateway store
+/// receipts without learning their typed shape: the `class` string is
+/// caller-supplied (e.g. `"governance_decision"`,
+/// `"process_gate_result"`), the `record_hash` is the receipt's own
+/// blake3 binding, and the value is an opaque payload (typically the
+/// JSON-serialized typed receipt).
+///
+/// **Write-once-by-hash.** A `(class, record_hash)` primary record
+/// is content-addressed and append-only:
+/// - If a re-write supplies **identical** payload bytes,
+///   `put_opaque` is idempotent and succeeds (the secondary index
+///   entry is also written, healing any prior partial-failure
+///   state).
+/// - If a re-write supplies **different** payload bytes,
+///   `put_opaque` returns an error with stable sentinel
+///   `opaque_record_hash_collision` and the stored bytes are NOT
+///   overwritten. This preserves the canonical-hash contract: a
+///   record_hash always identifies the same payload bytes.
+///
+/// Layout per entry:
+///   `<prefix><u32 BE class_len><class bytes><32-byte record_hash>`
+/// Class length is u32 BE (matching `Self::len_prefixed`'s scheme),
+/// followed by the raw record-hash bytes (no hex). Distinct from the
+/// secondary index's tail so blake3 record hashes cannot alias the
+/// `by_key` index range.
+const OPAQUE_REC_PREFIX: &[u8] = b"receipt:opaque:rec:";
+
+/// Secondary index prefix for opaque receipts, keyed by
+/// `(class, key1, key2_opt)` ordered by `recorded_at` so audit chains
+/// read oldest-first under `scan_prefix`. `key2` is **distinctly**
+/// encoded so an absent key (`None`) cannot alias an empty-string
+/// present key (`Some("")`):
+/// - `key2 = None` encodes as a single tag byte `0x00`.
+/// - `key2 = Some(s)` encodes as a tag byte `0x01` followed by the
+///   length-prefixed bytes of `s`.
+///
+/// Layout per entry:
+///   `<prefix><u32 BE class_len><class bytes>
+///    <u32 BE key1_len><key1 bytes>
+///    <key2 tag-byte + optional length-prefixed bytes>
+///    <u64 BE recorded_at><32-byte record_hash>`
+///
+/// Prefix-scan semantics:
+/// - `<prefix>` alone — every opaque entry across all classes.
+/// - `<prefix><class_lp>` — every entry for that class.
+/// - `<prefix><class_lp><key1_lp>` — every (class, key1) entry,
+///   regardless of key2 (used by `list_opaque_for`).
+/// - `<prefix><class_lp><key1_lp><key2_enc>` — the
+///   (class, key1, key2) audit chain, oldest-first
+///   (used by `get_latest_opaque`).
+///
+/// Length-prefix encoding (u32 BE) matches the existing
+/// `Self::len_prefixed` convention; see the helper for rationale on
+/// colon-safety. Prefix is distinct from `OPAQUE_REC_PREFIX` so blake3
+/// record hashes cannot alias this range.
+const OPAQUE_BY_KEY_PREFIX: &[u8] = b"receipt:opaque:by_key:";
+
+/// Inverse-binding prefix for opaque receipts. Each `(class,
+/// record_hash)` is bound exactly once to its canonical
+/// `(key1, key2_opt, recorded_at)` index tuple on first write. This
+/// closes a hole left by `OPAQUE_REC_PREFIX`'s write-once-by-hash
+/// check: that check only protects payload bytes for a fixed
+/// `(class, record_hash)` key, not the secondary index location. A
+/// caller that replays the same `(class, record_hash, payload)` tuple
+/// under a different `(key1, key2, recorded_at)` would otherwise add
+/// new secondary index entries pointing at the existing primary,
+/// letting one canonical receipt fan out across multiple audit chains
+/// or appear at a later timestamp under `get_latest_opaque`.
+///
+/// The bind value is the canonical index tuple, byte-encoded as:
+///   `<u32 BE key1_len><key1 bytes>
+///    <key2 tag-byte + optional length-prefixed bytes>
+///    <u64 BE recorded_at>`
+///
+/// `put_opaque` consults this entry inside its sled transaction:
+/// - absent → insert it (first-bind);
+/// - present and **identical** to the incoming tuple → idempotent
+///   fall-through (the secondary index entry is still re-written so
+///   the heal-missing-secondary-index path keeps working);
+/// - present and **different** from the incoming tuple → abort with
+///   stable sentinel `opaque_record_hash_index_collision` and **no**
+///   writes land. The originally-bound chain is preserved.
+///
+/// Layout per entry:
+///   `<prefix><u32 BE class_len><class bytes><32-byte record_hash>`
+///
+/// Prefix is distinct from `OPAQUE_REC_PREFIX` and
+/// `OPAQUE_BY_KEY_PREFIX` so blake3 record hashes cannot alias either
+/// range.
+const OPAQUE_HASH_BIND_PREFIX: &[u8] = b"receipt:opaque:hash_bind:";
+
 /// Receipt storage service for governance and economic chain artifacts.
 ///
 /// Stores receipts by canonical hash for cross-node deterministic lookup.
@@ -1464,6 +1557,331 @@ impl ReceiptStore {
             .map_err(|e: TransactionError<()>| {
                 format!("sled put_mandate_with_grants tx aborted: {e:?}")
             })
+    }
+}
+
+// ============================================================================
+// Opaque receipt storage primitive
+//
+// The gateway's receipt store has historically held typed knowledge of
+// every receipt class (e.g. governance decisions, action-item
+// completions, meeting attendance). Each new class required either
+// expanding the gateway's typed receipt imports (raising the
+// meaning-firewall ratchet) or hitting a fail-closed default (silent
+// loss prevented but feature blocked — the failure mode addressed in
+// PR 1755).
+//
+// This block provides a meaning-blind storage primitive: store
+// payloads under (class, key1, key2_opt) keyed and ordered by
+// recorded_at, tagged with the receipt's canonical record_hash. The
+// runtime layer in apps/governance owns the typed envelope and the
+// serde adapter; the gateway sees only opaque bytes. Adding a new
+// receipt class becomes a one-file change in apps — no gateway
+// touch, no firewall expansion.
+//
+// Wired through the GovernanceReceiptBackend trait by the adapter
+// layer in apps/governance/src/receipt_backend.rs (Stage 1b).
+// ============================================================================
+impl ReceiptStore {
+    /// Encode `key2` distinctly so an absent key (`None`) cannot
+    /// alias an empty-string present key (`Some("")`). Tag byte:
+    /// `0x00` for `None`, `0x01` for `Some(...)` followed by the
+    /// length-prefixed string bytes.
+    fn opaque_key2_encode(key2: Option<&str>) -> Vec<u8> {
+        match key2 {
+            None => vec![0x00],
+            Some(s) => {
+                let mut out = Vec::with_capacity(1 + 4 + s.len());
+                out.push(0x01);
+                out.extend_from_slice(&Self::len_prefixed(s.as_bytes()));
+                out
+            }
+        }
+    }
+
+    /// Build the primary opaque record key from class + record_hash.
+    fn opaque_primary_key(class: &str, record_hash: &[u8; 32]) -> Vec<u8> {
+        let mut k = OPAQUE_REC_PREFIX.to_vec();
+        k.extend_from_slice(&Self::len_prefixed(class.as_bytes()));
+        k.extend_from_slice(record_hash);
+        k
+    }
+
+    /// Build the secondary opaque by-key entry key.
+    fn opaque_by_key_key(
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+        recorded_at: u64,
+        record_hash: &[u8; 32],
+    ) -> Vec<u8> {
+        let mut k = OPAQUE_BY_KEY_PREFIX.to_vec();
+        k.extend_from_slice(&Self::len_prefixed(class.as_bytes()));
+        k.extend_from_slice(&Self::len_prefixed(key1.as_bytes()));
+        k.extend_from_slice(&Self::opaque_key2_encode(key2));
+        k.extend_from_slice(&recorded_at.to_be_bytes());
+        k.extend_from_slice(record_hash);
+        k
+    }
+
+    /// Build the scan prefix for a (class, key1, key2) triple.
+    fn opaque_by_key_scan_prefix(class: &str, key1: &str, key2: Option<&str>) -> Vec<u8> {
+        let mut p = OPAQUE_BY_KEY_PREFIX.to_vec();
+        p.extend_from_slice(&Self::len_prefixed(class.as_bytes()));
+        p.extend_from_slice(&Self::len_prefixed(key1.as_bytes()));
+        p.extend_from_slice(&Self::opaque_key2_encode(key2));
+        p
+    }
+
+    /// Build the scan prefix for a (class, key1) pair (every key2).
+    fn opaque_by_key1_scan_prefix(class: &str, key1: &str) -> Vec<u8> {
+        let mut p = OPAQUE_BY_KEY_PREFIX.to_vec();
+        p.extend_from_slice(&Self::len_prefixed(class.as_bytes()));
+        p.extend_from_slice(&Self::len_prefixed(key1.as_bytes()));
+        p
+    }
+
+    /// Build the inverse-binding key from `(class, record_hash)`.
+    /// See `OPAQUE_HASH_BIND_PREFIX` for layout.
+    fn opaque_hash_bind_key(class: &str, record_hash: &[u8; 32]) -> Vec<u8> {
+        let mut k = OPAQUE_HASH_BIND_PREFIX.to_vec();
+        k.extend_from_slice(&Self::len_prefixed(class.as_bytes()));
+        k.extend_from_slice(record_hash);
+        k
+    }
+
+    /// Encode the canonical index tuple `(key1, key2_opt, recorded_at)`
+    /// into the byte form stored at `opaque_hash_bind_key`. Identical
+    /// tuples produce identical bytes; differing tuples (in any
+    /// component, including `None` vs `Some("")` for `key2`) produce
+    /// differing bytes, by reusing the same `opaque_key2_encode`
+    /// scheme as the secondary index.
+    fn opaque_hash_bind_value(key1: &str, key2: Option<&str>, recorded_at: u64) -> Vec<u8> {
+        let mut v = Vec::new();
+        v.extend_from_slice(&Self::len_prefixed(key1.as_bytes()));
+        v.extend_from_slice(&Self::opaque_key2_encode(key2));
+        v.extend_from_slice(&recorded_at.to_be_bytes());
+        v
+    }
+
+    /// Persist an opaque receipt payload under a given
+    /// `(class, key1, key2_opt)` key, tagged with the receipt's
+    /// canonical `record_hash` and ordered by `recorded_at`.
+    ///
+    /// The `class` string identifies the receipt family (e.g.
+    /// `"governance_decision"`, `"meeting_attendance"`,
+    /// `"process_gate_result"`). It is treated opaquely by the
+    /// gateway — the apps layer is the single source of truth for
+    /// the closed taxonomy of class strings.
+    ///
+    /// `key1` is the primary lookup key (e.g. proposal id, meeting
+    /// id, session id). `key2` is an optional secondary key (e.g.
+    /// attendee did, gate kind name). The gateway treats them
+    /// opaquely. `key2 = None` and `key2 = Some("")` are encoded
+    /// distinctly (tag-byte scheme) — they do NOT alias.
+    ///
+    /// `record_hash` is the receipt's own canonical hash (typically a
+    /// blake3 binding over the typed envelope's fields) — the gateway
+    /// uses it as the primary record key but does not interpret it.
+    ///
+    /// `payload` is the opaque bytes the apps layer wants stored —
+    /// typically the JSON-serialized typed receipt.
+    ///
+    /// **Write-once-by-hash + canonical index binding + atomic
+    /// primary/index/bind write.** Three invariants are enforced
+    /// inside a single sled transaction:
+    /// 1. **Primary payload is content-addressed.** If the primary
+    ///    record already exists with **identical** payload bytes,
+    ///    the call is idempotent. If it exists with **different**
+    ///    payload bytes, the transaction aborts with stable
+    ///    sentinel `opaque_record_hash_collision` and **no** writes
+    ///    land; existing audit entries continue to hydrate the
+    ///    original payload.
+    /// 2. **Each `record_hash` binds to exactly one canonical
+    ///    `(key1, key2_opt, recorded_at)` index tuple** (recorded
+    ///    on first write under `OPAQUE_HASH_BIND_PREFIX`). A
+    ///    replay of the same `(class, record_hash)` and identical
+    ///    payload under a **different** `(key1, key2, recorded_at)`
+    ///    is rejected with stable sentinel
+    ///    `opaque_record_hash_index_collision`. Without this
+    ///    check, a buggy adapter retry could fan one canonical
+    ///    receipt out across multiple audit chains, or make it
+    ///    reappear at a later timestamp under `get_latest_opaque`,
+    ///    even though no new payload was written.
+    /// 3. **Primary, bind, and secondary index are written
+    ///    together.** A crash between any two is impossible — sled
+    ///    either applies all required writes or none.
+    ///
+    /// On the idempotent fall-through (matching primary, matching
+    /// bind), the secondary index entry is still re-written to
+    /// preserve the heal-missing-secondary-index behavior.
+    ///
+    /// **No `db.flush()`** per the existing receipt-store convention;
+    /// other typed write paths in this module do not flush per write
+    /// either.
+    pub fn put_opaque(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+        recorded_at: u64,
+        record_hash: [u8; 32],
+        payload: &[u8],
+    ) -> Result<(), String> {
+        let primary_key = Self::opaque_primary_key(class, &record_hash);
+        let by_key = Self::opaque_by_key_key(class, key1, key2, recorded_at, &record_hash);
+        let bind_key = Self::opaque_hash_bind_key(class, &record_hash);
+        let bind_value = Self::opaque_hash_bind_value(key1, key2, recorded_at);
+
+        self.db
+            .transaction(|tx| {
+                // Invariant 1: write-once-by-hash on the primary
+                // payload.
+                if let Some(existing) = tx.get(primary_key.as_slice())? {
+                    if existing.as_ref() != payload {
+                        // Diverging payload — abort. The stable
+                        // sentinel `opaque_record_hash_collision`
+                        // lets callers (and tests) match on it.
+                        return Err(ConflictableTransactionError::Abort(format!(
+                            "opaque_record_hash_collision: \
+                             same (class, record_hash) primary key already \
+                             stores different payload bytes; refusing to \
+                             overwrite. class={class}, hash={}",
+                            hex::encode(record_hash)
+                        )));
+                    }
+                    // Identical bytes — idempotent. Fall through to
+                    // the bind/secondary checks.
+                } else {
+                    tx.insert(primary_key.as_slice(), payload)?;
+                }
+
+                // Invariant 2: canonical index binding. Each
+                // (class, record_hash) is bound exactly once to a
+                // (key1, key2, recorded_at) tuple.
+                if let Some(existing_bind) = tx.get(bind_key.as_slice())? {
+                    if existing_bind.as_ref() != bind_value.as_slice() {
+                        // Same hash + (typically) identical payload
+                        // replayed under a different index tuple.
+                        // Rejecting this preserves the
+                        // one-canonical-chain-per-record_hash
+                        // contract.
+                        return Err(ConflictableTransactionError::Abort(format!(
+                            "opaque_record_hash_index_collision: \
+                             same (class, record_hash) is already bound to \
+                             a different (key1, key2, recorded_at) tuple; \
+                             refusing to add a divergent secondary index \
+                             entry. class={class}, hash={}",
+                            hex::encode(record_hash)
+                        )));
+                    }
+                    // Matching tuple — idempotent. Fall through to
+                    // re-write the secondary index in case it was
+                    // missing from a prior partial-failure state.
+                } else {
+                    tx.insert(bind_key.as_slice(), bind_value.as_slice())?;
+                }
+
+                // Invariant 3: secondary index is part of the same
+                // atomic write.
+                tx.insert(by_key.as_slice(), b"")?;
+                Ok::<(), ConflictableTransactionError<String>>(())
+            })
+            .map_err(|e: TransactionError<String>| match e {
+                TransactionError::Abort(msg) => msg,
+                TransactionError::Storage(s) => format!("sled put_opaque tx storage: {s}"),
+            })
+    }
+
+    /// Retrieve the latest opaque payload for a
+    /// `(class, key1, key2_opt)` triple, where "latest" means the
+    /// entry with the largest `recorded_at`.
+    ///
+    /// The `by_key` secondary index orders entries ascending by
+    /// `recorded_at` under a fixed `(class, key1, key2_opt)` prefix,
+    /// so the latest is the last hit under `scan_prefix`. Returns
+    /// `Ok(None)` when no entry exists for the triple.
+    pub fn get_latest_opaque(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+    ) -> Result<Option<Vec<u8>>, String> {
+        let prefix = Self::opaque_by_key_scan_prefix(class, key1, key2);
+
+        let mut latest: Option<Vec<u8>> = None;
+        for entry in self.db.scan_prefix(&prefix) {
+            let (key, _) = entry.map_err(|e| format!("sled scan_prefix get_latest_opaque: {e}"))?;
+            if key.len() < 32 {
+                continue;
+            }
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&key[key.len() - 32..]);
+            let primary_key = Self::opaque_primary_key(class, &hash);
+            let raw = self
+                .db
+                .get(&primary_key)
+                .map_err(|e| format!("sled get get_latest_opaque primary: {e}"))?;
+            if let Some(bytes) = raw {
+                latest = Some(bytes.to_vec());
+            }
+        }
+        Ok(latest)
+    }
+
+    /// List **all** opaque payloads for a given `(class, key1)`
+    /// regardless of `key2`, oldest-first by `recorded_at`. Used to
+    /// reconstruct an audit chain spanning every key2 under the same
+    /// (class, key1).
+    ///
+    /// The natural sled scan-prefix order under
+    /// `<class_lp><key1_lp>` is lexicographic on the key2 prefix,
+    /// NOT chronological. To return a chronological audit chain
+    /// across all key2 values we parse `recorded_at` and the
+    /// `record_hash` out of the secondary-index key (fixed
+    /// `<u64 BE recorded_at><32-byte record_hash>` tail) and sort by
+    /// `(recorded_at, record_hash)` after collection. The
+    /// `record_hash` tie-breaker keeps the order deterministic when
+    /// two receipts share `recorded_at`.
+    ///
+    /// Returns `Ok(vec![])` when no entries exist for the
+    /// (class, key1) prefix.
+    pub fn list_opaque_for(&self, class: &str, key1: &str) -> Result<Vec<Vec<u8>>, String> {
+        let prefix = Self::opaque_by_key1_scan_prefix(class, key1);
+
+        // Collect (recorded_at, record_hash, payload) so we can sort
+        // chronologically across the heterogeneous key2 range, with a
+        // deterministic record_hash tie-breaker for equal recorded_at.
+        let mut hits: Vec<(u64, [u8; 32], Vec<u8>)> = Vec::new();
+        for entry in self.db.scan_prefix(&prefix) {
+            let (key, _) = entry.map_err(|e| format!("sled scan_prefix list_opaque_for: {e}"))?;
+            // The secondary-index tail is fixed: 8 bytes of
+            // recorded_at (BE u64) + 32 bytes of record_hash. Skip
+            // entries with a malformed tail rather than aborting.
+            if key.len() < 8 + 32 {
+                continue;
+            }
+            let recorded_at_start = key.len() - 32 - 8;
+            let recorded_at_end = key.len() - 32;
+            let mut recorded_at_bytes = [0u8; 8];
+            recorded_at_bytes.copy_from_slice(&key[recorded_at_start..recorded_at_end]);
+            let recorded_at = u64::from_be_bytes(recorded_at_bytes);
+
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&key[recorded_at_end..]);
+
+            let primary_key = Self::opaque_primary_key(class, &hash);
+            let raw = self
+                .db
+                .get(&primary_key)
+                .map_err(|e| format!("sled get list_opaque_for primary: {e}"))?;
+            if let Some(bytes) = raw {
+                hits.push((recorded_at, hash, bytes.to_vec()));
+            }
+        }
+        // Deterministic tie-breaker: sort by (recorded_at, record_hash).
+        hits.sort_by_key(|(t, h, _)| (*t, *h));
+        Ok(hits.into_iter().map(|(_, _, payload)| payload).collect())
     }
 }
 
@@ -3330,5 +3748,424 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    // ========================================================================
+    // Opaque receipt-store primitive tests (Stage 1a)
+    //
+    // The opaque storage primitive must:
+    // - round-trip arbitrary bytes by (class, record_hash)
+    // - keep classes isolated (a probe under class A cannot see B)
+    // - keep (class, key1) isolated from (class, key1') for the same class
+    // - support get_latest by (class, key1, key2) ordered by recorded_at
+    // - support list_opaque_for spanning every key2 under (class, key1)
+    // - distinguish key2=None from key2=Some("") (length-prefix encoding)
+    // ========================================================================
+
+    fn fake_hash(seed: u8) -> [u8; 32] {
+        let mut h = [0u8; 32];
+        h[0] = seed;
+        h
+    }
+
+    #[test]
+    fn opaque_round_trip_by_record_hash() {
+        let store = ReceiptStore::new(temp_db());
+        let h = fake_hash(1);
+        store
+            .put_opaque(
+                "test_class",
+                "session-001",
+                Some("gate-privacy"),
+                100,
+                h,
+                b"opaque payload bytes",
+            )
+            .unwrap();
+
+        let latest = store
+            .get_latest_opaque("test_class", "session-001", Some("gate-privacy"))
+            .unwrap()
+            .expect("payload must be present");
+        assert_eq!(latest, b"opaque payload bytes");
+    }
+
+    #[test]
+    fn opaque_cross_class_isolation() {
+        let store = ReceiptStore::new(temp_db());
+        store
+            .put_opaque("class_a", "k", None, 100, fake_hash(1), b"A")
+            .unwrap();
+        store
+            .put_opaque("class_b", "k", None, 100, fake_hash(2), b"B")
+            .unwrap();
+
+        let a = store.get_latest_opaque("class_a", "k", None).unwrap();
+        let b = store.get_latest_opaque("class_b", "k", None).unwrap();
+        assert_eq!(a.as_deref(), Some(b"A".as_ref()));
+        assert_eq!(b.as_deref(), Some(b"B".as_ref()));
+
+        // A probe under a third class returns None.
+        let c = store.get_latest_opaque("class_c", "k", None).unwrap();
+        assert!(c.is_none());
+    }
+
+    #[test]
+    fn opaque_cross_key1_isolation_within_class() {
+        let store = ReceiptStore::new(temp_db());
+        store
+            .put_opaque("c", "session-alpha", None, 100, fake_hash(1), b"alpha")
+            .unwrap();
+        store
+            .put_opaque("c", "session-beta", None, 100, fake_hash(2), b"beta")
+            .unwrap();
+
+        let a = store.get_latest_opaque("c", "session-alpha", None).unwrap();
+        let b = store.get_latest_opaque("c", "session-beta", None).unwrap();
+        assert_eq!(a.as_deref(), Some(b"alpha".as_ref()));
+        assert_eq!(b.as_deref(), Some(b"beta".as_ref()));
+    }
+
+    #[test]
+    fn opaque_get_latest_returns_largest_recorded_at() {
+        let store = ReceiptStore::new(temp_db());
+        // Three records under the same (class, key1, key2) at
+        // distinct recorded_at values; the latest by recorded_at must
+        // win regardless of insertion order.
+        store
+            .put_opaque("c", "k", Some("k2"), 200, fake_hash(2), b"second")
+            .unwrap();
+        store
+            .put_opaque("c", "k", Some("k2"), 100, fake_hash(1), b"first")
+            .unwrap();
+        store
+            .put_opaque("c", "k", Some("k2"), 300, fake_hash(3), b"third")
+            .unwrap();
+
+        let latest = store
+            .get_latest_opaque("c", "k", Some("k2"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(latest, b"third");
+    }
+
+    #[test]
+    fn opaque_list_for_spans_every_key2_oldest_first() {
+        let store = ReceiptStore::new(temp_db());
+        store
+            .put_opaque("c", "k", Some("alpha"), 100, fake_hash(1), b"alpha-100")
+            .unwrap();
+        store
+            .put_opaque("c", "k", Some("beta"), 200, fake_hash(2), b"beta-200")
+            .unwrap();
+        store
+            .put_opaque("c", "k", None, 50, fake_hash(3), b"none-50")
+            .unwrap();
+        store
+            .put_opaque("c", "k", Some("alpha"), 150, fake_hash(4), b"alpha-150")
+            .unwrap();
+
+        // Different key1 — must be excluded from the list.
+        store
+            .put_opaque("c", "other", Some("alpha"), 200, fake_hash(5), b"other-200")
+            .unwrap();
+
+        let chain = store.list_opaque_for("c", "k").unwrap();
+        // Four entries under (c, k), spanning key2 = None, alpha,
+        // alpha (later), beta. Ordered ascending by recorded_at.
+        assert_eq!(chain.len(), 4);
+        assert_eq!(chain[0], b"none-50");
+        assert_eq!(chain[1], b"alpha-100");
+        assert_eq!(chain[2], b"alpha-150");
+        assert_eq!(chain[3], b"beta-200");
+    }
+
+    #[test]
+    fn opaque_key2_none_vs_empty_string_are_distinct() {
+        // Tag-byte encoding distinguishes `None` (encoded as `0x00`)
+        // from `Some("")` (encoded as `0x01` + length-prefix-zero).
+        // The two write paths produce non-overlapping secondary
+        // index entries, and lookups by `None` cannot return entries
+        // written under `Some("")`.
+        let store = ReceiptStore::new(temp_db());
+        store
+            .put_opaque("c", "k", None, 100, fake_hash(1), b"none")
+            .unwrap();
+        store
+            .put_opaque("c", "k", Some(""), 100, fake_hash(2), b"empty")
+            .unwrap();
+
+        let latest_none = store.get_latest_opaque("c", "k", None).unwrap().unwrap();
+        let latest_empty = store
+            .get_latest_opaque("c", "k", Some(""))
+            .unwrap()
+            .unwrap();
+        // Each lookup returns its own payload; they do NOT alias.
+        assert_eq!(latest_none, b"none");
+        assert_eq!(latest_empty, b"empty");
+        assert_ne!(latest_none, latest_empty);
+
+        // The (class, key1) chain spans both entries.
+        let chain = store.list_opaque_for("c", "k").unwrap();
+        assert_eq!(chain.len(), 2);
+    }
+
+    #[test]
+    fn opaque_class_with_colon_does_not_alias() {
+        // A class named "foo" must not collide with a class named
+        // "foo:bar" under prefix scan. Length-prefixing the class
+        // string is what prevents this — without it, the bare
+        // separator scheme would let "foo" match anything under
+        // "foo*".
+        let store = ReceiptStore::new(temp_db());
+        store
+            .put_opaque("foo", "k", None, 100, fake_hash(1), b"foo-payload")
+            .unwrap();
+        store
+            .put_opaque("foo:bar", "k", None, 100, fake_hash(2), b"foobar-payload")
+            .unwrap();
+
+        let foo = store.get_latest_opaque("foo", "k", None).unwrap().unwrap();
+        let foobar = store
+            .get_latest_opaque("foo:bar", "k", None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(foo, b"foo-payload");
+        assert_eq!(foobar, b"foobar-payload");
+
+        // Cross-list: list_opaque_for("foo", "k") must NOT see
+        // foo:bar's entry.
+        let foo_chain = store.list_opaque_for("foo", "k").unwrap();
+        assert_eq!(foo_chain.len(), 1);
+        assert_eq!(foo_chain[0], b"foo-payload");
+    }
+
+    #[test]
+    fn opaque_same_record_hash_same_payload_is_idempotent() {
+        // Write-once-by-hash: a re-write with the SAME record_hash
+        // and IDENTICAL payload bytes is treated as idempotent
+        // success. The stored bytes do not change; the secondary
+        // index entry is rewritten in case it was missing from a
+        // prior partial-failure state.
+        let store = ReceiptStore::new(temp_db());
+        let h = fake_hash(1);
+        store
+            .put_opaque("c", "k", Some("k2"), 100, h, b"first")
+            .unwrap();
+        store
+            .put_opaque("c", "k", Some("k2"), 100, h, b"first")
+            .expect("identical-payload re-write must be idempotent success");
+
+        let latest = store
+            .get_latest_opaque("c", "k", Some("k2"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(latest, b"first");
+
+        // The chain has only one entry — the duplicate write
+        // produced an identical secondary-index key.
+        let chain = store.list_opaque_for("c", "k").unwrap();
+        assert_eq!(chain.len(), 1);
+    }
+
+    #[test]
+    fn opaque_same_record_hash_different_payload_errors_no_overwrite() {
+        // Write-once-by-hash: a re-write with the SAME record_hash
+        // but DIFFERENT payload bytes must be rejected with the
+        // stable sentinel `opaque_record_hash_collision`. The
+        // originally-stored bytes must be preserved (no historical
+        // mutation), and the secondary index must reflect only the
+        // first write.
+        let store = ReceiptStore::new(temp_db());
+        let h = fake_hash(1);
+        store
+            .put_opaque("c", "k", Some("k2"), 100, h, b"first")
+            .unwrap();
+
+        let err = store
+            .put_opaque("c", "k", Some("k2"), 100, h, b"second-attempt")
+            .expect_err("diverging-payload re-write must be rejected");
+        assert!(
+            err.contains("opaque_record_hash_collision"),
+            "error must carry the stable sentinel: {err}"
+        );
+
+        // Original bytes preserved.
+        let latest = store
+            .get_latest_opaque("c", "k", Some("k2"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(latest, b"first");
+
+        // Chain still has the single original entry.
+        let chain = store.list_opaque_for("c", "k").unwrap();
+        assert_eq!(chain.len(), 1);
+        assert_eq!(chain[0], b"first");
+    }
+
+    #[test]
+    fn opaque_same_record_hash_different_index_tuple_errors_no_overwrite() {
+        // Canonical index binding: each (class, record_hash) is
+        // bound exactly once to a (key1, key2_opt, recorded_at)
+        // tuple. A replay of the same (class, record_hash) and
+        // identical payload under a DIFFERENT index tuple must be
+        // rejected with the stable sentinel
+        // `opaque_record_hash_index_collision`. Without this, a
+        // buggy adapter retry could fan one canonical receipt out
+        // across multiple audit chains or surface it under
+        // `get_latest_opaque` for the wrong tuple even though no
+        // new payload was written.
+        //
+        // Cover all three divergence axes: different key2,
+        // different key1, and different recorded_at — and confirm
+        // that none of them mutate the originally-bound chain.
+        let store = ReceiptStore::new(temp_db());
+        let h = fake_hash(1);
+        store
+            .put_opaque("c", "k", Some("k2"), 100, h, b"first")
+            .expect("first write must succeed");
+
+        // Axis A: different key2.
+        let err_key2 = store
+            .put_opaque("c", "k", Some("k3"), 100, h, b"first")
+            .expect_err("divergent-key2 replay must be rejected");
+        assert!(
+            err_key2.contains("opaque_record_hash_index_collision"),
+            "error must carry the stable sentinel: {err_key2}"
+        );
+
+        // Axis B: different key1.
+        let err_key1 = store
+            .put_opaque("c", "other_k", Some("k2"), 100, h, b"first")
+            .expect_err("divergent-key1 replay must be rejected");
+        assert!(
+            err_key1.contains("opaque_record_hash_index_collision"),
+            "error must carry the stable sentinel: {err_key1}"
+        );
+
+        // Axis C: different recorded_at.
+        let err_ts = store
+            .put_opaque("c", "k", Some("k2"), 200, h, b"first")
+            .expect_err("divergent-recorded_at replay must be rejected");
+        assert!(
+            err_ts.contains("opaque_record_hash_index_collision"),
+            "error must carry the stable sentinel: {err_ts}"
+        );
+
+        // The originally-bound chain is preserved — only one
+        // secondary index entry exists, under the original tuple.
+        let chain = store.list_opaque_for("c", "k").unwrap();
+        assert_eq!(chain.len(), 1);
+        assert_eq!(chain[0], b"first");
+
+        // The divergent index tuples must not have created any
+        // alternate audit chains either.
+        assert!(store.list_opaque_for("c", "other_k").unwrap().is_empty());
+        assert!(store
+            .get_latest_opaque("c", "k", Some("k3"))
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn opaque_idempotent_rewrite_heals_missing_secondary_index() {
+        // Simulates the edge case where the primary record is
+        // present but the secondary index entry is missing (e.g.
+        // from a hypothetical pre-transaction-era partial failure):
+        // an identical-payload re-write must heal the missing
+        // index entry rather than skip it.
+        let store = ReceiptStore::new(temp_db());
+        let h = fake_hash(1);
+
+        // Stage 1: write directly through the public API once.
+        store
+            .put_opaque("c", "k", Some("k2"), 100, h, b"first")
+            .unwrap();
+
+        // Manually nuke the secondary index entry to simulate the
+        // "primary durable, secondary missing" state.
+        let by_key = ReceiptStore::opaque_by_key_key("c", "k", Some("k2"), 100, &h);
+        store.db.remove(&by_key).unwrap();
+
+        // Confirm the simulated drift: lookups can no longer find
+        // the receipt because the secondary index is gone.
+        assert!(store
+            .get_latest_opaque("c", "k", Some("k2"))
+            .unwrap()
+            .is_none());
+
+        // An identical-payload re-write heals the index.
+        store
+            .put_opaque("c", "k", Some("k2"), 100, h, b"first")
+            .expect("identical-payload re-write must heal the secondary index");
+
+        let latest = store
+            .get_latest_opaque("c", "k", Some("k2"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(latest, b"first");
+    }
+
+    #[test]
+    fn opaque_list_is_deterministic_for_equal_recorded_at() {
+        // When two distinct receipts share `recorded_at`, the audit
+        // chain order must be deterministic. We sort by
+        // (recorded_at, record_hash) so two identical-timestamp
+        // receipts always appear in record_hash order, regardless
+        // of write order or sled scan order.
+        let store = ReceiptStore::new(temp_db());
+
+        // Insert in one order.
+        store
+            .put_opaque("c", "k", Some("a"), 100, fake_hash(7), b"hash-7-payload")
+            .unwrap();
+        store
+            .put_opaque("c", "k", Some("b"), 100, fake_hash(3), b"hash-3-payload")
+            .unwrap();
+        store
+            .put_opaque("c", "k", Some("c"), 100, fake_hash(5), b"hash-5-payload")
+            .unwrap();
+
+        let chain1 = store.list_opaque_for("c", "k").unwrap();
+        // Run twice (same store, no re-insert) — must be the same
+        // order. The sort_by_key is stable on the same input.
+        let chain2 = store.list_opaque_for("c", "k").unwrap();
+        assert_eq!(chain1, chain2);
+
+        // Concretely: the order is by record_hash because all three
+        // receipts have the same recorded_at. fake_hash(seed) sets
+        // byte[0] = seed; lex order is 3 < 5 < 7.
+        assert_eq!(chain1.len(), 3);
+        assert_eq!(chain1[0], b"hash-3-payload");
+        assert_eq!(chain1[1], b"hash-5-payload");
+        assert_eq!(chain1[2], b"hash-7-payload");
+    }
+
+    #[test]
+    fn opaque_distinct_recorded_at_appends_chain_entry() {
+        let store = ReceiptStore::new(temp_db());
+        // Same class/key1/key2 but distinct recorded_at + hash =
+        // distinct entries. The chain grows.
+        store
+            .put_opaque("c", "k", Some("k2"), 100, fake_hash(1), b"v1")
+            .unwrap();
+        store
+            .put_opaque("c", "k", Some("k2"), 200, fake_hash(2), b"v2")
+            .unwrap();
+        store
+            .put_opaque("c", "k", Some("k2"), 300, fake_hash(3), b"v3")
+            .unwrap();
+
+        let chain = store.list_opaque_for("c", "k").unwrap();
+        assert_eq!(chain.len(), 3);
+        assert_eq!(chain[0], b"v1");
+        assert_eq!(chain[1], b"v2");
+        assert_eq!(chain[2], b"v3");
+
+        let latest = store
+            .get_latest_opaque("c", "k", Some("k2"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(latest, b"v3");
     }
 }
