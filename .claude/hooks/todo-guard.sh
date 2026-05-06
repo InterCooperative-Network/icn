@@ -25,7 +25,11 @@ fi
 
 # Find TODO/FIXME/HACK lines that don't have an issue number
 # Valid formats: // TODO(#123): ..., // FIXME(#456): ..., // TODO(username#123): ...
-BARE_TODOS=$(echo "$NEW_CONTENT" | grep -nE '(//|#)\s*(TODO|FIXME|HACK)\b' | grep -vE '(//|#)\s*(TODO|FIXME|HACK)\(#[0-9]+\)' | grep -vE '(//|#)\s*(TODO|FIXME|HACK)\([a-zA-Z0-9_-]+#[0-9]+\)' | head -5)
+# `|| true` suppresses the exit-1 grep returns when the new_string has no
+# TODO/FIXME/HACK at all — that's the common case, not an error. Without
+# this, `set -o pipefail` propagates the no-match exit code and the hook
+# fails on every clean edit.
+BARE_TODOS=$(echo "$NEW_CONTENT" | grep -nE '(//|#)\s*(TODO|FIXME|HACK)\b' | grep -vE '(//|#)\s*(TODO|FIXME|HACK)\(#[0-9]+\)' | grep -vE '(//|#)\s*(TODO|FIXME|HACK)\([a-zA-Z0-9_-]+#[0-9]+\)' | head -5 || true)
 
 if [[ -n "$BARE_TODOS" ]]; then
   COUNT=$(echo "$BARE_TODOS" | wc -l | tr -d ' ')
