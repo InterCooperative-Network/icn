@@ -2197,6 +2197,43 @@ impl GovernanceReceiptBackend for ReceiptStore {
         }
         Ok(out)
     }
+
+    // ------------------------------------------------------------------------
+    // Opaque storage primitive overrides (Stage 1b)
+    //
+    // Delegate to the inherent `put_opaque`/`get_latest_opaque`/
+    // `list_opaque_for` methods on `ReceiptStore` (Stage 1a). The trait
+    // method signatures intentionally match the inherent signatures so
+    // these overrides are pure pass-through. The runtime layer in
+    // apps/governance can now route typed receipts through opaque
+    // storage on the production gateway-backed `ReceiptStore` without
+    // adding new typed governance imports here.
+    // ------------------------------------------------------------------------
+
+    fn put_opaque(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+        recorded_at: u64,
+        record_hash: [u8; 32],
+        payload: &[u8],
+    ) -> Result<(), String> {
+        ReceiptStore::put_opaque(self, class, key1, key2, recorded_at, record_hash, payload)
+    }
+
+    fn get_latest_opaque(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+    ) -> Result<Option<Vec<u8>>, String> {
+        ReceiptStore::get_latest_opaque(self, class, key1, key2)
+    }
+
+    fn list_opaque_for(&self, class: &str, key1: &str) -> Result<Vec<Vec<u8>>, String> {
+        ReceiptStore::list_opaque_for(self, class, key1)
+    }
 }
 
 #[cfg(test)]
@@ -4167,5 +4204,50 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(latest, b"v3");
+    }
+
+    // ========================================================================
+    // Opaque trait dispatch test (Stage 1b)
+    //
+    // Confirms the gateway's `impl GovernanceReceiptBackend for ReceiptStore`
+    // overrides for the opaque methods route correctly to the inherent
+    // implementations from Stage 1a. This is the integration point that
+    // unblocks the apps/governance adapter (Stage 1c+) — without this
+    // dispatch working the whole opaque indirection is dead weight.
+    // ========================================================================
+
+    #[test]
+    fn opaque_trait_dispatch_round_trip() {
+        // Box as `Box<dyn GovernanceReceiptBackend>` so the call site
+        // exercises the dynamic-dispatch path that the runtime layer
+        // (apps/governance) actually uses, not the inherent method
+        // directly.
+        let store: Box<dyn GovernanceReceiptBackend> = Box::new(ReceiptStore::new(temp_db()));
+
+        let h = fake_hash(42);
+        store
+            .put_opaque(
+                "trait_dispatch_class",
+                "key-alpha",
+                Some("key-beta"),
+                123,
+                h,
+                b"trait-routed payload",
+            )
+            .unwrap();
+
+        let latest = store
+            .get_latest_opaque("trait_dispatch_class", "key-alpha", Some("key-beta"))
+            .unwrap()
+            .expect("trait dispatch must surface the persisted payload");
+        assert_eq!(latest, b"trait-routed payload");
+
+        // list_opaque_for through the trait must also span every key2
+        // under the (class, key1).
+        let chain = store
+            .list_opaque_for("trait_dispatch_class", "key-alpha")
+            .unwrap();
+        assert_eq!(chain.len(), 1);
+        assert_eq!(chain[0], b"trait-routed payload");
     }
 }
