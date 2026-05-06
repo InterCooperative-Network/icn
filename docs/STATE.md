@@ -6,6 +6,130 @@ Last Reviewed: 2026-05-05
 
 # ICN State (living doc)
 
+<!-- [sync edit] 2026-05-05 (post-#1753):
+     Truth-sync for the Democratic Authority Primitives read-model
+     fixture-walk dogfood landing. Doc/control-plane and
+     idea-refinery only — no runtime, no schema, no contract URN,
+     no ADR, no RFC, no implementation issue, no runtime dogfood,
+     no Phase 2 advance.
+     Landings since the previous sync edit (2026-05-05 evening,
+     post-#1751):
+       - #1753 docs(ideas): add read-model dogfood slice for
+         Democratic Authority Primitives (idea-0020). Adds
+         `ops/ideas/dogfood/democratic-authority-primitives-mvp.md`
+         and updates the matching `ops/ideas/ideas.yaml` row.
+         Read-model fixture-walk variant per
+         `ops/ideas/README.md` § "Dogfood slice variants" (the
+         convention added in #1749). Composes the six DAP
+         primitive families named in the framing brief's §17
+         follow-up (`AuthorityBasis`, `ParticipationRole`,
+         `FacilitatorSummary`, `ConflictDisclosure`,
+         `MinorityReport`, `DeliberationContext` — the latter
+         exercising three of its twelve reference families:
+         `CharterRuleReference`, `PriorDecisionReference`,
+         `AccessibilityNote`) end-to-end against the merged
+         `idea-0019` read-model fixture walk
+         (`ops/ideas/dogfood/institutional-process-substrate-mvp.md`),
+         plus referencing `OperatorExecutionAuthority` as the
+         strictly-downstream-of-decision operator handle at the
+         activation gate. Walks `Step 0` through `Step 7` of the
+         existing `idea-0019` slice without re-describing the
+         spine; only DAP primitive additions are recorded.
+         Composes orthogonally with `idea-0019`: the spine names
+         *what gets processed*; the primitives fill the spine's
+         records with authority and context typing the spine
+         deliberately deferred. Emits no receipts, contacts no
+         gateway, performs no mutation, introduces no new contract
+         URN, modifies no kernel/runtime/contract/schema/ADR file.
+         Per `ops/ideas/README.md` § "Dogfood slice variants" and
+         per the DAP framing brief's §16.1 strict RFC promotion
+         gate, **a read-model fixture walk does NOT satisfy
+         receipt-backed promotion thresholds**; promotion of
+         `idea-0020` to RFC still requires (1) a separate runtime
+         dogfood that emits at least one receipt under `ADR-0026`
+         for one of the named primitives (preferably a
+         `ConflictDisclosure` accept receipt or a `MinorityReport`
+         recorded receipt — the framing brief's §16.1 names these
+         generically without attaching concrete class identifiers,
+         and the slice's slice-local class candidates
+         `ConflictDisclosureAcceptedReceipt` and
+         `MinorityReportRecordedReceipt` are not committed as
+         canonical), (2) a real visibility/privacy-boundary run
+         with redaction in evidence export, (3) an
+         accessibility-gate `ProcessGateResult` produced through
+         `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` on a
+         real surface, and (4) Q1 (`AuthorityBasis` polymorphism
+         vs typed family) or Q5 (`ConflictDisclosure` and
+         `MinorityReport` placement) **resolved** in writing
+         (deferral is not sufficient for the RFC gate per §16.1;
+         the lenient resolved-or-deferred standard at §16.3
+         applies only to the broader runtime-justification
+         threshold).
+     Open coordination/control issues at this sync (unchanged):
+       - #1748 milestone(process): define Institutional Process
+         Substrate. `epic:arch-invariants` + `type:spec`. Four
+         acceptance gates remain unchecked.
+       - #1746 milestone(showcase): make NYCN organizer rehearsal
+         operable before first presentation. Unchanged.
+       - #1744 ci(review): make substantive AI review findings
+         merge-gating. Unchanged.
+     Open PR queue at this sync: only Dependabot dev-dependency
+     bumps (#1735 pilot-ui axe-core/playwright; #1736 TypeScript
+     SDK dev-deps). Unchanged from prior sync.
+     Next pre-RFC architecture move: **NOT YET SELECTED**. The
+     prior sync (post-#1751) deliberately preserved optionality
+     and named four candidate classes; #1753 landed the artifact
+     that was the most directly named candidate from class (1)
+     (the DAP brief's `[x]` next artifact, §17 follow-ups), so
+     this sync removes class (1) from the open-candidate
+     enumeration. The remaining candidate classes the next
+     session may pick from, listed descriptively only:
+       (a) DAP **runtime** dogfood emitting at least one receipt
+           under `ADR-0026` for one DAP primitive — the next
+           artifact called for by the slice's promotion gate; the
+           framing brief's §16.1 names a `ConflictDisclosure`
+           accept receipt and a `MinorityReport` recorded receipt
+           generically; `ConflictDisclosureAcceptedReceipt` and
+           `MinorityReportRecordedReceipt` appear as slice-local
+           class candidates in the dogfood artifact and are not
+           committed as canonical.
+       (b) `idea-0019` runtime dogfood emitting at least one
+           `ProcessTransitionReceipt` class under `ADR-0026` (one
+           of four #1748 acceptance gates).
+       (c) `idea-0019` visibility/privacy-boundary run with
+           redaction in evidence export (one of four #1748
+           acceptance gates).
+       (d) `idea-0019` accessibility-gate `ProcessGateResult`
+           produced through `ORGANIZER_MEMBER_ACCESSIBILITY_GATE`
+           on a real surface (one of four #1748 acceptance
+           gates).
+       (e) `idea-0019` open-question triage: at least one of Q1
+           (`ProcessTargetRef` polymorphism), Q3
+           (`DeliberationEntry` kind taxonomy), or Q4
+           (`HumanDecisionSet` vs proposal/vote) resolved or
+           explicitly deferred in writing (one of four #1748
+           acceptance gates).
+       (f) DAP §17 follow-up framing briefs — pre-RFC,
+           decompose-only: CCL hook-point catalog;
+           expert/advisory across institution types; conflict
+           object model connecting `ConflictDisclosure` to
+           `idea-0016`/ADR-0029; federation tally semantics
+           composing `RepresentationMandate` with #1609;
+           delegation runtime gated on #1632.
+       (g) Control-plane cleanup, including unresolved/stale
+           review-thread hygiene if inspection confirms it.
+     None is selected here.
+     Phase 2 framing unchanged: NYCN remains the intended first
+     cooperative partner, not a formally committed pilot. The
+     concrete next gate remains the partner-bound sequence in
+     `docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md`:
+     organizer presentation -> pilot formalization -> first
+     operator rehearsal. This sync does not claim production
+     readiness, live federation integration, implemented service
+     hosting, K3s/DNS/GitHub/Forgejo mutation, NYCN private-data
+     handling, live Google Drive/Groups/Sheets sync, or resolved
+     licensing. -->
+
 <!-- [sync edit] 2026-05-05 (post-#1751):
      Truth-sync for the Democratic Authority Primitives framing
      landing. Doc/control-plane and idea-refinery only — no runtime,
@@ -246,13 +370,16 @@ Last Reviewed: 2026-05-05
 ## Current status (2026-05-05 snapshot)
 
 **Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate is defined in [NYCN Phase 2 Pilot Rehearsal Gate](strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md). The Phase 2 *machinery* is in place end-to-end; what remains is the human procedure — present, formalize, rehearse — and recording each step.
-Active execution since the previous sync has been entirely doc/control-plane: rehearsal evidence export schema (#1734); architecture due-diligence checklist (#1739); contract schema-identifier audit (#1741); organizer/member accessibility gate definition (#1743); the preview/review read-model contract `urn:icn:contract:preview-review:v1` (#1745); the `idea-0019` Institutional Process Substrate framing brief at `ops/ideas/framing/institutional-process-substrate.md` (#1747); a coordination/control milestone issue #1748 to track spine composition without licensing implementation; and a read-model fixture-walk dogfood slice for `idea-0019` at `ops/ideas/dogfood/institutional-process-substrate-mvp.md` plus a new "Dogfood slice variants" section in `ops/ideas/README.md` that formalizes the read-model variant (#1749). Carrying forward: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN's drive-ingest operator ladder (NYCN #21–#28 in `fahertym/nycn`) is merged end-to-end, with subsequent NYCN #29–#32 also merged. The May-5 process-substrate sequence is documentation/refinery only: no runtime executes; no kernel, gateway, ledger, governance, or SDK code changed; no new contract URN beyond `urn:icn:contract:preview-review:v1` (#1745) was minted; no implementation issue was opened from #1748; and a read-model fixture walk does not satisfy receipt-backed promotion thresholds per `ops/ideas/README.md` § "Dogfood slice variants". Democratic Authority Primitives framing landed in #1751 as `idea-0020` with framing brief at `ops/ideas/framing/democratic-authority-primitives.md` — pre-RFC framing only; no runtime, no schema, no contract URN, no ADR, no RFC, no implementation issue, no runtime dogfood. The brief names two generic primitive families (authority/participation: `AuthorityBasis`, `ParticipationRole`, `DelegationGrant`, `RepresentationMandate`, `ExpertStatement`, `AdvisoryOpinion`, `ConflictDisclosure`, `FacilitatorSummary`, `StewardReview`, `OperatorExecutionAuthority`, `MinorityReport`, `ChallengePath`, `RevocationPath`, `RecallPath`; deliberation context / educational reference: `DeliberationContext`, `ContextReference`, `LearningReference`, `EvidenceReference`, `PriorDecisionReference`, `CharterRuleReference`, `CCLRuleReference`, `AccessibilityNote`, `PrivacyNote`, `RiskNote`, `CounterargumentReference`, `GlossaryReference`) and composes orthogonally with `idea-0019` (Institutional Process Substrate). Next pre-RFC architecture move is **not yet selected**; this sync deliberately preserves optionality for the next session rather than smuggling in a new commitment. The candidate next moves the next session may pick from, listed descriptively only: (1) `idea-0020` read-model composition slice (the DAP brief's `[x]` next artifact, §17 follow-ups); (2) `idea-0019` runtime dogfood toward receipt-backed promotion, emitting at least one of eight named `ProcessTransitionReceipt` classes under the existing `ADR-0026` envelope (one of four #1748 acceptance gates); (3) one of the remaining #1748 process-control gates (visibility/privacy-boundary run with redaction in evidence export; accessibility-gate `ProcessGateResult` produced through `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` on a real surface; or resolve/defer one of `idea-0019` Q1/Q3/Q4 in writing); (4) another sync/control cleanup if inspection finds further canonical-truth drift, or one of the DAP §17 follow-up framing briefs (CCL hook-point catalog; expert/advisory across institution types; conflict object model connecting `ConflictDisclosure` to `idea-0016`/ADR-0029; federation tally semantics composing `RepresentationMandate` with #1609; delegation runtime gated on #1632). None is selected here. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
+Active execution since the previous sync has been entirely doc/control-plane: rehearsal evidence export schema (#1734); architecture due-diligence checklist (#1739); contract schema-identifier audit (#1741); organizer/member accessibility gate definition (#1743); the preview/review read-model contract `urn:icn:contract:preview-review:v1` (#1745); the `idea-0019` Institutional Process Substrate framing brief at `ops/ideas/framing/institutional-process-substrate.md` (#1747); a coordination/control milestone issue #1748 to track spine composition without licensing implementation; a read-model fixture-walk dogfood slice for `idea-0019` at `ops/ideas/dogfood/institutional-process-substrate-mvp.md` plus a new "Dogfood slice variants" section in `ops/ideas/README.md` that formalizes the read-model variant (#1749); the `idea-0020` Democratic Authority Primitives framing brief at `ops/ideas/framing/democratic-authority-primitives.md` (#1751); and a read-model fixture-walk dogfood slice for `idea-0020` at `ops/ideas/dogfood/democratic-authority-primitives-mvp.md` (#1753). Carrying forward: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN's drive-ingest operator ladder (NYCN #21–#28 in `fahertym/nycn`) is merged end-to-end, with subsequent NYCN #29–#32 also merged. The May-5 process-substrate and authority-primitive sequence is documentation/refinery only: no runtime executes; no kernel, gateway, ledger, governance, or SDK code changed; no new contract URN beyond `urn:icn:contract:preview-review:v1` (#1745) was minted; no implementation issue was opened from #1748; and a read-model fixture walk does not satisfy receipt-backed promotion thresholds per `ops/ideas/README.md` § "Dogfood slice variants". Democratic Authority Primitives now has both pieces of its idea-refinery surface: framing brief landed in #1751 as `idea-0020` with brief at `ops/ideas/framing/democratic-authority-primitives.md`, and the read-model fixture-walk dogfood slice landed in #1753 at `ops/ideas/dogfood/democratic-authority-primitives-mvp.md`. The dogfood slice composes the six DAP primitive families named in the framing brief's §17 follow-up (`AuthorityBasis`, `ParticipationRole`, `FacilitatorSummary`, `ConflictDisclosure`, `MinorityReport`, `DeliberationContext` exercising three of its twelve reference families: `CharterRuleReference`, `PriorDecisionReference`, `AccessibilityNote`) plus references `OperatorExecutionAuthority` as the strictly-downstream-of-decision operator handle at the activation gate, all attached end-to-end to the merged `idea-0019` read-model fixture walk without modifying any kernel, runtime, gateway, ledger, governance, SDK, or contract file. Both DAP framing (#1751) and DAP read-model dogfood (#1753) are pre-RFC framing/refinery only; together they do not claim runtime validity, do not emit receipts, do not contact gateway, do not create schema, do not create a contract URN, do not promote to RFC, do not open implementation issues, do not start runtime dogfood, and do not claim Phase 2 completion, formal NYCN pilot, production readiness, or live federation. Per `ops/ideas/README.md` § "Dogfood slice variants" and per the DAP framing brief's §16.1, **the read-model fixture walk does NOT satisfy receipt-backed promotion thresholds**; promotion of `idea-0020` to RFC still requires (1) a separate runtime dogfood that emits at least one receipt under `ADR-0026` for one of the named primitives — the framing brief's §16.1 names a `ConflictDisclosure` accept receipt and a `MinorityReport` recorded receipt generically; the dogfood artifact references slice-local class candidates `ConflictDisclosureAcceptedReceipt` and `MinorityReportRecordedReceipt` at the right transition points but does not commit them as canonical, (2) a real visibility/privacy-boundary run with redaction in evidence export, (3) an accessibility-gate `ProcessGateResult` produced through `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` on a real surface, and (4) Q1 (`AuthorityBasis` polymorphism vs typed family) or Q5 (`ConflictDisclosure` and `MinorityReport` placement) **resolved** in writing (deferral is not sufficient for the RFC gate per §16.1; the resolved-or-deferred standard at §16.3 applies only to the broader runtime-justification threshold). Next pre-RFC architecture move is **not yet selected**; this sync deliberately preserves optionality for the next session rather than smuggling in a new commitment. The prior sync (post-#1751) named the DAP read-model composition slice as the most directly named candidate; #1753 has now landed it, so the candidate enumeration is reduced. The candidate next moves the next session may pick from, listed descriptively only: (a) DAP **runtime** dogfood emitting at least one receipt under `ADR-0026` for one DAP primitive — the next artifact called for by the slice's promotion gate; (b) `idea-0019` runtime dogfood toward receipt-backed promotion, emitting at least one of eight named `ProcessTransitionReceipt` classes under `ADR-0026` (one of four #1748 acceptance gates); (c) `idea-0019` visibility/privacy-boundary run with redaction in evidence export (one of four #1748 acceptance gates); (d) `idea-0019` accessibility-gate `ProcessGateResult` produced through `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` on a real surface (one of four #1748 acceptance gates); (e) `idea-0019` open-question triage: at least one of Q1 (`ProcessTargetRef` polymorphism), Q3 (`DeliberationEntry` kind taxonomy), or Q4 (`HumanDecisionSet` vs proposal/vote) resolved or explicitly deferred in writing (one of four #1748 acceptance gates); (f) one of the DAP §17 follow-up framing briefs — pre-RFC, decompose-only (CCL hook-point catalog; expert/advisory across institution types; conflict object model connecting `ConflictDisclosure` to `idea-0016`/ADR-0029; federation tally semantics composing `RepresentationMandate` with #1609; delegation runtime gated on #1632); (g) control-plane cleanup, including unresolved/stale review-thread hygiene if inspection confirms it. None is selected here. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
 
 ### Recently merged (since 2026-04-15)
 
 | PR | Title | Merged |
 |----|-------|--------|
+| #1753 | docs(ideas): add read-model dogfood slice for Democratic Authority Primitives (idea-0020) | 2026-05-05 |
+| #1752 | docs(state): sync Democratic Authority Primitives landing and agent handoff | 2026-05-05 |
 | #1751 | docs(ideas): name Democratic Authority Primitives (idea-0020 + framing brief) | 2026-05-05 |
+| #1750 | docs(state): sync process substrate landings and agent handoff | 2026-05-05 |
 | #1749 | docs(ideas): add read-model dogfood slice for Institutional Process Substrate (idea-0019) | 2026-05-05 |
 | #1747 | docs(ideas): name Institutional Process Substrate (idea-0019 + framing brief) | 2026-05-05 |
 | #1745 | docs(contracts): define preview review contract | 2026-05-05 |
@@ -346,6 +473,9 @@ Open coordination/control issues at this sync (not implementation):
 | #1744 | ci(review): make substantive AI review findings merge-gating |
 
 ### What landed since Phase 1 (Charter Engine)
+
+Democratic Authority Primitives read-model fixture-walk dogfood (added 2026-05-05; doc/control-plane and idea-refinery only, not runtime; no kernel, gateway, ledger, governance, or SDK code touched):
+- Read-model fixture-walk dogfood slice for `idea-0020` landed at `ops/ideas/dogfood/democratic-authority-primitives-mvp.md` alongside an `ops/ideas/ideas.yaml` row update — #1753. Read-model fixture-walk variant per `ops/ideas/README.md` § "Dogfood slice variants" (formalized in #1749). Composes the six DAP primitive families named in the framing brief's §17 follow-up (`AuthorityBasis`, `ParticipationRole`, `FacilitatorSummary`, `ConflictDisclosure`, `MinorityReport`, `DeliberationContext` — the latter exercising three of its twelve reference families: `CharterRuleReference`, `PriorDecisionReference`, `AccessibilityNote`) end-to-end against the merged `idea-0019` read-model fixture walk (`ops/ideas/dogfood/institutional-process-substrate-mvp.md`). Walks `Step 0` through `Step 7` of the existing `idea-0019` slice without re-describing the spine; only DAP primitive additions are recorded. References `OperatorExecutionAuthority` as the strictly-downstream-of-decision operator handle at the activation gate (Step 5), typed to point at the `DecisionRecord` plus the `ProcessGateResult` set plus the steward's `RoleAssignment`. Composes orthogonally with `idea-0019`: the spine names *what gets processed*; the primitives fill the spine's records with the authority and context typing the spine deliberately deferred. Emits no receipts, contacts no gateway, performs no mutation, introduces no new contract URN, modifies no kernel/runtime/contract/schema/ADR file. Receipt class candidates `FacilitatorSummaryRecordedReceipt`, `ConflictDisclosureAcceptedReceipt`, and `MinorityReportRecordedReceipt` are referenced at the right transition points as slice-local candidates only — the framing brief's §16.1 names a `ConflictDisclosure` accept receipt and a `MinorityReport` recorded receipt generically without attaching concrete class identifiers, and the slice does not commit any of these names as canonical. Per `ops/ideas/README.md` § "Dogfood slice variants" and per the DAP framing brief's §16.1, **a read-model fixture walk does NOT satisfy receipt-backed promotion thresholds**; promotion of `idea-0020` to RFC still requires (1) a separate runtime dogfood emitting at least one receipt under `ADR-0026` for one of the named primitives, (2) a real visibility/privacy-boundary run with redaction in evidence export, (3) an accessibility-gate `ProcessGateResult` produced through `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` on a real surface, and (4) Q1 (`AuthorityBasis` polymorphism vs typed family) or Q5 (`ConflictDisclosure` and `MinorityReport` placement) **resolved** in writing — deferral is not sufficient for the RFC gate per §16.1; the resolved-or-deferred standard at §16.3 applies only to the broader runtime-justification threshold. The DAP brief's other open questions (Q2 through Q4, Q6 through Q10) are not surfaced by this slice and remain open. Hard rule preserved per DAP framing brief §14: not runtime, not a schema, not an RFC by itself, not a voting-system decision, not a liquid-democracy commitment, not expertocracy, not anti-expertise, not chat, not social media, not a moderation platform, not an identity directory implementation, not a credential verification implementation, not a private-overlay implementation, not NYCN-specific, not a production-readiness claim, not a Phase 2 completion claim, not a formal NYCN pilot authorization, not a live federation claim, not a live cloud sync claim, not a K3s/DNS/Forgejo mutation claim, not a private-data-handling claim, not a binding on partner repositories.
 
 Democratic Authority Primitives framing (added 2026-05-05; doc/control-plane and idea-refinery only, not runtime; no kernel, gateway, ledger, governance, or SDK code touched):
 - `idea-0020` Democratic Authority Primitives framing brief landed at `ops/ideas/framing/democratic-authority-primitives.md` and the matching idea-refinery row in `ops/ideas/ideas.yaml` — #1751. Pre-RFC framing only; not an RFC, not an ADR, not a schema, not a contract URN, not a backlog commitment. Names two generic primitive families (authority/participation: `AuthorityBasis`, `ParticipationRole`, `DelegationGrant`, `RepresentationMandate`, `ExpertStatement`, `AdvisoryOpinion`, `ConflictDisclosure`, `FacilitatorSummary`, `StewardReview`, `OperatorExecutionAuthority`, `MinorityReport`, `ChallengePath`, `RevocationPath`, `RecallPath`; deliberation context / educational reference: `DeliberationContext`, `ContextReference`, `LearningReference`, `EvidenceReference`, `PriorDecisionReference`, `CharterRuleReference`, `CCLRuleReference`, `AccessibilityNote`, `PrivacyNote`, `RiskNote`, `CounterargumentReference`, `GlossaryReference`). Composes orthogonally with `idea-0019` (Institutional Process Substrate): the spine names *what gets processed*; these primitives fill the spine's records with the authority and context typing the spine deliberately deferred. Hard rule preserved: institutions adopt and constrain through CCL, charters, and institution packages — not as ICN app features. Promotion to RFC requires (per the brief's §16.1 promotion gate) a read-model composition slice with `idea-0019`, a runtime dogfood emitting at least one receipt under `ADR-0026`, a real visibility/privacy-boundary run, an accessibility-gate `ProcessGateResult` on a real surface, and at least one open question — Q1 (`AuthorityBasis` polymorphism vs typed family) or Q5 (`ConflictDisclosure` and `MinorityReport` placement) — **resolved** in writing. Deferral is **not** sufficient for the RFC gate per §16.1; the lenient resolved-or-deferred standard at §16.3 applies only to the broader runtime-justification threshold, not to RFC promotion. None of those follow-ups is started in this sync; the next move is **not yet selected**.
@@ -480,11 +610,12 @@ Infrastructure:
 - ops/ideas/framing/institutional-process-substrate.md — `idea-0019` framing brief (#1747)
 - ops/ideas/dogfood/institutional-process-substrate-mvp.md — read-model fixture-walk dogfood slice for `idea-0019` (#1749)
 - ops/ideas/framing/democratic-authority-primitives.md — `idea-0020` framing brief (#1751)
+- ops/ideas/dogfood/democratic-authority-primitives-mvp.md — read-model fixture-walk dogfood slice for `idea-0020` (#1753)
 - ops/ideas/README.md § "Dogfood slice variants" — read-model fixture-walk variant convention (#1749)
 - docs/strategy/NYCN-Repo-Architecture-Spec.md — NYCN institutional architecture
 - docs/strategy/NYCN-Execution-Tranches.md — NYCN 7-tranche execution plan
 - docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md — exact Phase 2 organizer/operator gate before a formal NYCN pilot begins
-- docs/dev/handoff-2026-05-05-b.md — latest session handoff
+- docs/dev/handoff-2026-05-05-c.md — latest session handoff
 - deploy/README.md — deployment options
 
 ---
