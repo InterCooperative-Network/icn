@@ -181,6 +181,50 @@ impl GovernanceReceiptBackend for FailingProcessGateStore {
     }
 }
 
+/// A backend that does **not** override any process-gate methods, so
+/// it inherits the trait's fail-closed default for
+/// `put_process_gate_result`. Used to prove the production-path
+/// failure mode: a backend that has not opted in to storage produces
+/// an explicit error instead of a silent commit-without-persistence.
+///
+/// Mirrors what the production gateway-backed `ReceiptStore`
+/// currently does: it implements the older receipt-write methods
+/// (governance, allocation, action-item-completion, meeting-
+/// attendance, mandate, authority-grant) but inherits the new
+/// fail-closed default for the process-gate methods. This test
+/// simulates that inheritance cleanly without touching gateway
+/// code.
+#[derive(Default)]
+struct DefaultInheritingBackend;
+
+impl GovernanceReceiptBackend for DefaultInheritingBackend {
+    fn put_governance(&self, _r: &GovernanceDecisionReceipt) -> Result<(), String> {
+        Ok(())
+    }
+    fn get_governance_by_proposal(
+        &self,
+        _p: &str,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn put_allocation(&self, _r: &AllocationReceipt) -> Result<Hash, String> {
+        Ok([0u8; 32])
+    }
+    fn get_governance_by_decision(
+        &self,
+        _h: &Hash,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn list_allocations_by_decision(&self, _h: &Hash) -> Result<Vec<AllocationReceipt>, String> {
+        Ok(vec![])
+    }
+    // Deliberately do NOT override put_process_gate_result,
+    // get_latest_process_gate_result, or list_process_gate_results_for_session.
+    // The point of this backend is to exercise the trait's fail-closed
+    // default for the write path.
+}
+
 // ============================================================================
 // Scaffolding
 // ============================================================================
@@ -675,4 +719,44 @@ fn fail_result_is_recorded_distinct_from_pass() {
         .expect("latest")
         .expect("latest exists");
     assert_eq!(latest.result, ProcessGateResult::Fail);
+}
+
+#[test]
+fn default_inheriting_backend_fails_closed_no_silent_loss() {
+    // A backend that does not opt in to process-gate-result storage
+    // (matches the production gateway-backed `ReceiptStore` posture
+    // in this PR) must surface the gap as an explicit manager error
+    // rather than a silent commit-without-persistence. This is the
+    // production failure-mode the Codex P1 finding flagged.
+    let mgr =
+        GovernanceManager::new().with_receipt_store(
+            Arc::new(DefaultInheritingBackend) as Arc<dyn GovernanceReceiptBackend>
+        );
+    let recorder = fresh_did();
+    let domain = coop_test();
+
+    let err = mgr
+        .record_process_gate_result(
+            &domain,
+            "session-fail-closed-default",
+            ProcessGateKind::PrivacyReview,
+            ProcessGateResult::Pass,
+            &recorder,
+        )
+        .expect_err(
+            "a backend inheriting the fail-closed default must propagate an error \
+             rather than allow a silent commit-without-persistence",
+        );
+    let msg = err.to_string();
+    // The error must reference the affected session and carry the
+    // stable sentinel so callers and operators can pattern-match it.
+    assert!(
+        msg.contains("session-fail-closed-default"),
+        "error must reference the affected session: {msg}"
+    );
+    assert!(
+        msg.contains("process_gate_result_backend_not_implemented"),
+        "error must carry the trait's stable sentinel so callers can match \
+         on it programmatically: {msg}"
+    );
 }

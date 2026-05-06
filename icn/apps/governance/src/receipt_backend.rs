@@ -437,28 +437,43 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// prior receipts on repeated transitions for the same
     /// `(session_id, gate_kind)` pair.
     ///
-    /// Default impl is a no-op so backends that do not yet durably
-    /// persist these receipts inherit a truthful "process gate result
-    /// not persisted" behavior.
+    /// **Fail-closed default.** Unlike the older receipt-write
+    /// methods on this trait (which default to `Ok(())` and were
+    /// designed for backends that opt in over time), this default
+    /// returns `Err` with a stable sentinel
+    /// `process_gate_result_backend_not_implemented`. A backend that
+    /// has not opted in to storing this receipt class therefore
+    /// surfaces the gap as an explicit error rather than as a silent
+    /// commit-without-persistence. The manager's
+    /// `record_process_gate_result` propagates this error to the
+    /// caller via its existing `map_err(...)?` so the production
+    /// path cannot lose receipts undetectably.
     ///
     /// **Override status as of this PR:** test backends in
     /// `apps/governance/tests/process_gate_result_receipt_runtime_slice.rs`
     /// override; the sled-backed
     /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
-    /// **does not yet override** and so silently inherits the no-op
-    /// default. That means a `GovernanceManager` wired to the
-    /// production `ReceiptStore` returns the receipt to the caller
-    /// but does not persist it. A sled-backed override is a
-    /// follow-up: it requires extending the existing
+    /// **does not yet override** and so inherits this fail-closed
+    /// default. A `GovernanceManager` wired to the production
+    /// `ReceiptStore` therefore receives an explicit error from
+    /// `record_process_gate_result` rather than a silent success.
+    /// A sled-backed override would require extending the existing
     /// `use icn_governance::{...}` import in
     /// `crates/icn-gateway/src/receipt_store.rs`, which the
     /// meaning-firewall ratchet hook currently blocks (see CLAUDE.md
     /// "Pre-existing domain imports in icn-core and icn-gateway
-    /// remain; full extraction is ongoing work"). Production
-    /// durability for `ProcessGateResultReceipt` is gated on that
-    /// kernel-boundary cleanup.
+    /// remain; full extraction is ongoing work"). Until that
+    /// kernel-boundary cleanup lands, production callers must either
+    /// (a) handle the explicit error, or (b) wire a non-default
+    /// backend that opts in to storage.
     fn put_process_gate_result(&self, _receipt: &ProcessGateResultReceipt) -> Result<(), String> {
-        Ok(())
+        Err("process_gate_result_backend_not_implemented: \
+             this backend inherits the fail-closed default for \
+             put_process_gate_result. Override the method to opt in \
+             to durable storage, or handle this error at the caller. \
+             See GovernanceReceiptBackend::put_process_gate_result \
+             docs for details."
+            .to_string())
     }
 
     /// Retrieve the latest [`ProcessGateResultReceipt`] for a
