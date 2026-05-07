@@ -3212,8 +3212,8 @@ last_reviewed = "2026-05-04"
 category = "reference"
 status = "living"
 title = "Institution Package ActionCard Contract Notes"
-description = "Validation guidance for institution packages using action-card.schema.json; emitted vs RFC-gated source kinds; pointers to runtime models and issue icn#1713."
-last_updated = "2026-05-04"
+description = "Validation guidance for institution packages using action-card.schema.json; emitted vs RFC-gated source kinds; pointers to runtime models, ADR-0027, and issue icn#1713. JSON schema and fictional example live alongside; tiny validator at docs/scripts/validate-action-card.py. Schema $id retained temporarily per docs/contracts/schema-id-audit.md (review by 2026-06-30)."
+last_updated = "2026-05-07"
 owner = "matt"
 audiences = ["contributors", "organizers"]
 truth_class = "descriptive"
@@ -3222,7 +3222,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["contracts", "governance", "action-cards"]
 recommended_action = "keep"
-last_reviewed = "2026-05-04"
+last_reviewed = "2026-05-07"
 
 [docs."docs/contracts/rehearsal-evidence-export.md"]
 category = "reference"

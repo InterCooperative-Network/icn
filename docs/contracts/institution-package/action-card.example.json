@@ -1,0 +1,18 @@
+{
+  "id": "card-proposal-prop-example-2026-05-07-001-vote",
+  "source_kind": "proposal",
+  "action_kind": "vote",
+  "scope": "entity",
+  "title": "Vote on proposal: EXAMPLE — Adopt fictional sample charter amendment",
+  "summary": "An open proposal awaits your vote in a domain where you have voting standing.",
+  "authority_basis": "domain_membership",
+  "required_authority_scope": [
+    "vote_in:domain-example-fictional-cooperative"
+  ],
+  "deadline": 1778544000,
+  "risk_level": "normal",
+  "accessibility_hint": "Plain-language proposal summary available; alternate formats on request.",
+  "receipt_expected": true,
+  "source_id": "prop-example-2026-05-07-001",
+  "domain_id": "domain-example-fictional-cooperative"
+}
