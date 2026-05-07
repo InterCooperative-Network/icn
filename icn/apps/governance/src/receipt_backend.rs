@@ -11,6 +11,25 @@ use icn_kernel_api::{AllocationReceipt, Hash};
 use crate::dispatch_evidence::EffectDispatchEvidence;
 use crate::institutional_effect::InstitutionalEffectRecord;
 
+/// Class string for `ProcessGateResultReceipt` opaque storage. Chosen
+/// in the apps layer so the gateway never sees the typed name.
+const PROCESS_GATE_RESULT_CLASS: &str = "process_gate_result";
+
+/// Stable string mapping for `ProcessGateKind` used as the
+/// opaque-storage `key2`. Distinct from serde wire form so the
+/// storage key is unambiguous and free of any future enum-rename
+/// risk on the wire.
+fn process_gate_kind_key(kind: ProcessGateKind) -> &'static str {
+    match kind {
+        ProcessGateKind::PrivacyReview => "privacy_review",
+        ProcessGateKind::AccessibilityReview => "accessibility_review",
+        ProcessGateKind::RepoSafetyReview => "repo_safety_review",
+        ProcessGateKind::ScopeConfirmation => "scope_confirmation",
+        ProcessGateKind::NoMutationCheck => "no_mutation_check",
+        ProcessGateKind::SecondReviewerSignoff => "second_reviewer_signoff",
+    }
+}
+
 /// Minimal receipt-storage interface required by [`GovernanceManager`].
 ///
 /// Gateway implements this for its [`ReceiptStore`]; tests can provide a
@@ -437,43 +456,32 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// prior receipts on repeated transitions for the same
     /// `(session_id, gate_kind)` pair.
     ///
-    /// **Fail-closed default.** Unlike the older receipt-write
-    /// methods on this trait (which default to `Ok(())` and were
-    /// designed for backends that opt in over time), this default
-    /// returns `Err` with a stable sentinel
-    /// `process_gate_result_backend_not_implemented`. A backend that
-    /// has not opted in to storing this receipt class therefore
-    /// surfaces the gap as an explicit error rather than as a silent
-    /// commit-without-persistence. The manager's
-    /// `record_process_gate_result` propagates this error to the
-    /// caller via its existing `map_err(...)?` so the production
-    /// path cannot lose receipts undetectably.
-    ///
-    /// **Override status as of this PR:** test backends in
-    /// `apps/governance/tests/process_gate_result_receipt_runtime_slice.rs`
-    /// override; the sled-backed
-    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
-    /// **does not yet override** and so inherits this fail-closed
-    /// default. A `GovernanceManager` wired to the production
-    /// `ReceiptStore` therefore receives an explicit error from
-    /// `record_process_gate_result` rather than a silent success.
-    /// A sled-backed override would require extending the existing
-    /// `use icn_governance::{...}` import in
-    /// `crates/icn-gateway/src/receipt_store.rs`, which the
-    /// meaning-firewall ratchet hook currently blocks (see CLAUDE.md
-    /// "Pre-existing domain imports in icn-core and icn-gateway
-    /// remain; full extraction is ongoing work"). Until that
-    /// kernel-boundary cleanup lands, production callers must either
-    /// (a) handle the explicit error, or (b) wire a non-default
-    /// backend that opts in to storage.
-    fn put_process_gate_result(&self, _receipt: &ProcessGateResultReceipt) -> Result<(), String> {
-        Err("process_gate_result_backend_not_implemented: \
-             this backend inherits the fail-closed default for \
-             put_process_gate_result. Override the method to opt in \
-             to durable storage, or handle this error at the caller. \
-             See GovernanceReceiptBackend::put_process_gate_result \
-             docs for details."
-            .to_string())
+    /// **Default routes through opaque storage.** As of Stage 1d of
+    /// the architecture orchestration plan, the default body
+    /// serialises the typed receipt to JSON and delegates to
+    /// [`Self::put_opaque`] under class `"process_gate_result"` with
+    /// `key1 = receipt.session_id`,
+    /// `key2 = Some(stringified gate_kind)`. A backend that
+    /// implements opaque storage (e.g. the production gateway-backed
+    /// `ReceiptStore` via the Stage 1b override) gets durable
+    /// persistence for free. A backend that does NOT implement
+    /// opaque storage falls back to the opaque method's own
+    /// fail-closed default (`opaque_storage_not_implemented`), so
+    /// the persist-or-error semantics first introduced in #1755 are
+    /// preserved end-to-end. Backends that want custom typed
+    /// persistence (e.g. an in-memory test store with extra
+    /// counters) can still override this method directly.
+    fn put_process_gate_result(&self, receipt: &ProcessGateResultReceipt) -> Result<(), String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize ProcessGateResultReceipt: {e}"))?;
+        self.put_opaque(
+            PROCESS_GATE_RESULT_CLASS,
+            &receipt.session_id,
+            Some(process_gate_kind_key(receipt.gate_kind)),
+            receipt.recorded_at,
+            receipt.record_hash,
+            &payload,
+        )
     }
 
     /// Retrieve the latest [`ProcessGateResultReceipt`] for a
@@ -488,36 +496,59 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// reorders inserts) must still return the highest-`recorded_at`
     /// receipt for the pair.
     ///
-    /// Default impl returns `Ok(None)` so backends that do not
-    /// implement process-gate-result storage are indistinguishable
-    /// from "no gate result recorded". The sled-backed
-    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
-    /// inherits this default until the kernel-boundary cleanup noted
-    /// on [`Self::put_process_gate_result`] lands.
+    /// **Default routes through opaque storage.** Same convention as
+    /// [`Self::put_process_gate_result`]: class
+    /// `"process_gate_result"`, `key1 = session_id`,
+    /// `key2 = Some(stringified gate_kind)`. The opaque store's
+    /// `get_latest_opaque` already returns the entry with the
+    /// largest `recorded_at` (per its trait contract), so the
+    /// "max-recorded-at" semantics here come for free. The opaque
+    /// payload is JSON-deserialised back into the typed receipt.
     fn get_latest_process_gate_result(
         &self,
-        _session_id: &str,
-        _gate_kind: ProcessGateKind,
+        session_id: &str,
+        gate_kind: ProcessGateKind,
     ) -> Result<Option<ProcessGateResultReceipt>, String> {
-        Ok(None)
+        let payload = self.get_latest_opaque(
+            PROCESS_GATE_RESULT_CLASS,
+            session_id,
+            Some(process_gate_kind_key(gate_kind)),
+        )?;
+        match payload {
+            Some(bytes) => {
+                Ok(Some(serde_json::from_slice(&bytes).map_err(|e| {
+                    format!("deserialize ProcessGateResultReceipt: {e}")
+                })?))
+            }
+            None => Ok(None),
+        }
     }
 
     /// List **all** [`ProcessGateResultReceipt`]s persisted for a
     /// process session, oldest-first by `recorded_at`. Spans every
     /// gate kind for that session.
     ///
-    /// Default impl returns an empty vector. Backends that override
-    /// [`Self::put_process_gate_result`] should also override this
-    /// method to keep the per-session audit chain readable. The
-    /// sled-backed
-    /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
-    /// inherits this default until the kernel-boundary cleanup noted
-    /// on [`Self::put_process_gate_result`] lands.
+    /// **Default routes through opaque storage.** Class
+    /// `"process_gate_result"`, `key1 = session_id`. The opaque
+    /// store's `list_opaque_for` returns payloads ordered ascending
+    /// by `recorded_at` across all `key2` values (i.e. across every
+    /// gate kind for that session) — the chronological audit-chain
+    /// shape callers expect. Each payload is JSON-deserialised back
+    /// into the typed receipt; a deserialise failure aborts the
+    /// list with an error rather than silently dropping the bad
+    /// entry.
     fn list_process_gate_results_for_session(
         &self,
-        _session_id: &str,
+        session_id: &str,
     ) -> Result<Vec<ProcessGateResultReceipt>, String> {
-        Ok(vec![])
+        let payloads = self.list_opaque_for(PROCESS_GATE_RESULT_CLASS, session_id)?;
+        let mut out = Vec::with_capacity(payloads.len());
+        for bytes in payloads {
+            let r: ProcessGateResultReceipt = serde_json::from_slice(&bytes)
+                .map_err(|e| format!("deserialize ProcessGateResultReceipt: {e}"))?;
+            out.push(r);
+        }
+        Ok(out)
     }
 
     // ========================================================================

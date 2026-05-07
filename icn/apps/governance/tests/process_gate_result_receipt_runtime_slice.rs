@@ -181,19 +181,16 @@ impl GovernanceReceiptBackend for FailingProcessGateStore {
     }
 }
 
-/// A backend that does **not** override any process-gate methods, so
-/// it inherits the trait's fail-closed default for
-/// `put_process_gate_result`. Used to prove the production-path
-/// failure mode: a backend that has not opted in to storage produces
-/// an explicit error instead of a silent commit-without-persistence.
+/// A backend that does **not** override any process-gate methods AND
+/// does NOT implement opaque storage. Used to prove the production-
+/// path failure mode: a backend that has neither typed override nor
+/// opaque storage produces an explicit error instead of a silent
+/// commit-without-persistence.
 ///
-/// Mirrors what the production gateway-backed `ReceiptStore`
-/// currently does: it implements the older receipt-write methods
-/// (governance, allocation, action-item-completion, meeting-
-/// attendance, mandate, authority-grant) but inherits the new
-/// fail-closed default for the process-gate methods. This test
-/// simulates that inheritance cleanly without touching gateway
-/// code.
+/// As of Stage 1d, the trait's default `put_process_gate_result`
+/// routes through `put_opaque`. Without an opaque override, the
+/// opaque method's own fail-closed default fires. The end-to-end
+/// behavior is preserved: persist or error, never silent loss.
 #[derive(Default)]
 struct DefaultInheritingBackend;
 
@@ -220,9 +217,107 @@ impl GovernanceReceiptBackend for DefaultInheritingBackend {
         Ok(vec![])
     }
     // Deliberately do NOT override put_process_gate_result,
-    // get_latest_process_gate_result, or list_process_gate_results_for_session.
-    // The point of this backend is to exercise the trait's fail-closed
-    // default for the write path.
+    // get_latest_process_gate_result, list_process_gate_results_for_session,
+    // OR put_opaque/get_latest_opaque/list_opaque_for. The point of this
+    // backend is to exercise the cascade: typed default routes through
+    // opaque default, which is itself fail-closed.
+}
+
+/// A backend that implements ONLY the opaque storage methods (with an
+/// in-memory HashMap). Inherits the typed `put_process_gate_result`
+/// etc. from the trait, which now routes through opaque (Stage 1d).
+///
+/// Storage key for [`OpaqueOnlyBackend`]:
+/// `(class, key1, key2_opt, record_hash)`. Multiple record_hashes
+/// per `(class, key1, key2_opt)` form the audit chain.
+type OpaqueKey = (String, String, Option<String>, [u8; 32]);
+
+/// Storage value for [`OpaqueOnlyBackend`]: `(recorded_at, payload)`.
+/// `recorded_at` is tracked separately so `get_latest_opaque` can
+/// pick the largest deterministically.
+type OpaqueValue = (u64, Vec<u8>);
+
+/// This is the test analog of the production gateway-backed
+/// `ReceiptStore`'s posture after Stage 1b: opaque-storage-capable,
+/// no typed process-gate overrides. Calling `put_process_gate_result`
+/// on this backend should successfully persist via the cascade
+/// (typed default → opaque override → HashMap).
+#[derive(Default)]
+struct OpaqueOnlyBackend {
+    storage: std::sync::Mutex<std::collections::HashMap<OpaqueKey, OpaqueValue>>,
+}
+
+impl GovernanceReceiptBackend for OpaqueOnlyBackend {
+    fn put_governance(&self, _r: &GovernanceDecisionReceipt) -> Result<(), String> {
+        Ok(())
+    }
+    fn get_governance_by_proposal(
+        &self,
+        _p: &str,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn put_allocation(&self, _r: &AllocationReceipt) -> Result<Hash, String> {
+        Ok([0u8; 32])
+    }
+    fn get_governance_by_decision(
+        &self,
+        _h: &Hash,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn list_allocations_by_decision(&self, _h: &Hash) -> Result<Vec<AllocationReceipt>, String> {
+        Ok(vec![])
+    }
+
+    fn put_opaque(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+        recorded_at: u64,
+        record_hash: [u8; 32],
+        payload: &[u8],
+    ) -> Result<(), String> {
+        let key = (
+            class.to_string(),
+            key1.to_string(),
+            key2.map(|s| s.to_string()),
+            record_hash,
+        );
+        self.storage
+            .lock()
+            .unwrap()
+            .insert(key, (recorded_at, payload.to_vec()));
+        Ok(())
+    }
+
+    fn get_latest_opaque(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+    ) -> Result<Option<Vec<u8>>, String> {
+        let map = self.storage.lock().unwrap();
+        // Latest by recorded_at across record_hashes for the
+        // (class, key1, key2) triple.
+        Ok(map
+            .iter()
+            .filter(|((c, k1, k2, _), _)| c == class && k1 == key1 && k2.as_deref() == key2)
+            .max_by_key(|(_, (rec_at, _))| *rec_at)
+            .map(|(_, (_, payload))| payload.clone()))
+    }
+
+    fn list_opaque_for(&self, class: &str, key1: &str) -> Result<Vec<Vec<u8>>, String> {
+        let map = self.storage.lock().unwrap();
+        let mut hits: Vec<(u64, Vec<u8>)> = map
+            .iter()
+            .filter(|((c, k1, _, _), _)| c == class && k1 == key1)
+            .map(|(_, (rec_at, payload))| (*rec_at, payload.clone()))
+            .collect();
+        hits.sort_by_key(|(t, _)| *t);
+        Ok(hits.into_iter().map(|(_, p)| p).collect())
+    }
 }
 
 // ============================================================================
@@ -289,35 +384,36 @@ fn record_process_gate_result_emits_persisted_receipt() {
 
 #[test]
 fn record_hash_changes_on_rerecord_at_later_second() {
-    let (mgr, store) = make_manager_with_store();
+    // Construct two receipts with explicit, strictly-increasing
+    // `recorded_at` timestamps and put them directly through the
+    // backend trait. This exercises the same write path the
+    // manager would use without depending on wall-clock advance.
+    let (_mgr, store) = make_manager_with_store();
     let recorder = fresh_did();
     let domain = coop_test();
+    let session_id = "session-002";
 
-    let first = mgr
-        .record_process_gate_result(
-            &domain,
-            "session-002",
-            ProcessGateKind::AccessibilityReview,
-            ProcessGateResult::Pass,
-            &recorder,
-        )
-        .expect("first record");
+    let first = ProcessGateResultReceipt::new(
+        session_id.to_string(),
+        domain.0.clone(),
+        ProcessGateKind::AccessibilityReview,
+        ProcessGateResult::Pass,
+        recorder.to_string(),
+        100,
+    );
+    let second = ProcessGateResultReceipt::new(
+        session_id.to_string(),
+        domain.0.clone(),
+        ProcessGateKind::AccessibilityReview,
+        ProcessGateResult::Pass,
+        recorder.to_string(),
+        200,
+    );
 
-    // Wall clock must advance so the second record's `recorded_at` is
-    // strictly greater — the canonical hash binds `recorded_at`, so a
-    // same-second second receipt would alias the first record_hash and
-    // produce an idempotent no-op rather than a chain append.
-    std::thread::sleep(std::time::Duration::from_millis(1100));
-
-    let second = mgr
-        .record_process_gate_result(
-            &domain,
-            "session-002",
-            ProcessGateKind::AccessibilityReview,
-            ProcessGateResult::Pass,
-            &recorder,
-        )
-        .expect("second record");
+    store.put_process_gate_result(&first).expect("first record");
+    store
+        .put_process_gate_result(&second)
+        .expect("second record at strictly later recorded_at");
 
     assert_ne!(
         first.record_hash, second.record_hash,
@@ -326,7 +422,7 @@ fn record_hash_changes_on_rerecord_at_later_second() {
 
     // Audit chain reads oldest-first.
     let chain = store
-        .list_process_gate_results_for_session("session-002")
+        .list_process_gate_results_for_session(session_id)
         .expect("list chain");
     assert_eq!(chain.len(), 2);
     assert_eq!(chain[0].record_hash, first.record_hash);
@@ -335,7 +431,7 @@ fn record_hash_changes_on_rerecord_at_later_second() {
 
     // Latest lookup returns the most recent.
     let latest = store
-        .get_latest_process_gate_result("session-002", ProcessGateKind::AccessibilityReview)
+        .get_latest_process_gate_result(session_id, ProcessGateKind::AccessibilityReview)
         .expect("latest")
         .expect("latest must exist");
     assert_eq!(latest.record_hash, second.record_hash);
@@ -672,39 +768,41 @@ fn process_gate_result_receipt_uses_regulatory_safe_vocabulary() {
 
 #[test]
 fn fail_result_is_recorded_distinct_from_pass() {
-    // Pass and Fail are both receipt-bearing. Record both for the
-    // same session/gate at distinct seconds and confirm both land in
-    // the chain with distinct record_hashes.
-    let (mgr, store) = make_manager_with_store();
+    // Pass and Fail are both receipt-bearing. Construct each receipt
+    // with an explicit `recorded_at` so the test does not depend on
+    // wall-clock advance, then put through the backend trait. Both
+    // must land in the chain with distinct record_hashes.
+    let (_mgr, store) = make_manager_with_store();
     let recorder = fresh_did();
     let domain = coop_test();
+    let session_id = "session-pass-then-fail";
 
-    let pass = mgr
-        .record_process_gate_result(
-            &domain,
-            "session-pass-then-fail",
-            ProcessGateKind::AccessibilityReview,
-            ProcessGateResult::Pass,
-            &recorder,
-        )
-        .expect("pass");
-    std::thread::sleep(std::time::Duration::from_millis(1100));
-    let fail = mgr
-        .record_process_gate_result(
-            &domain,
-            "session-pass-then-fail",
-            ProcessGateKind::AccessibilityReview,
-            ProcessGateResult::Fail,
-            &recorder,
-        )
-        .expect("fail");
+    let pass = ProcessGateResultReceipt::new(
+        session_id.to_string(),
+        domain.0.clone(),
+        ProcessGateKind::AccessibilityReview,
+        ProcessGateResult::Pass,
+        recorder.to_string(),
+        100,
+    );
+    let fail = ProcessGateResultReceipt::new(
+        session_id.to_string(),
+        domain.0.clone(),
+        ProcessGateKind::AccessibilityReview,
+        ProcessGateResult::Fail,
+        recorder.to_string(),
+        200,
+    );
+
+    store.put_process_gate_result(&pass).expect("pass");
+    store.put_process_gate_result(&fail).expect("fail");
 
     assert_ne!(pass.record_hash, fail.record_hash);
     assert_eq!(pass.result, ProcessGateResult::Pass);
     assert_eq!(fail.result, ProcessGateResult::Fail);
 
     let chain = store
-        .list_process_gate_results_for_session("session-pass-then-fail")
+        .list_process_gate_results_for_session(session_id)
         .expect("chain");
     assert_eq!(chain.len(), 2);
     assert_eq!(chain[0].result, ProcessGateResult::Pass);
@@ -712,10 +810,7 @@ fn fail_result_is_recorded_distinct_from_pass() {
 
     // Latest reads the most recent.
     let latest = store
-        .get_latest_process_gate_result(
-            "session-pass-then-fail",
-            ProcessGateKind::AccessibilityReview,
-        )
+        .get_latest_process_gate_result(session_id, ProcessGateKind::AccessibilityReview)
         .expect("latest")
         .expect("latest exists");
     assert_eq!(latest.result, ProcessGateResult::Fail);
@@ -723,11 +818,15 @@ fn fail_result_is_recorded_distinct_from_pass() {
 
 #[test]
 fn default_inheriting_backend_fails_closed_no_silent_loss() {
-    // A backend that does not opt in to process-gate-result storage
-    // (matches the production gateway-backed `ReceiptStore` posture
-    // in this PR) must surface the gap as an explicit manager error
-    // rather than a silent commit-without-persistence. This is the
-    // production failure-mode the Codex P1 finding flagged.
+    // A backend that has neither typed process-gate overrides nor
+    // opaque storage must surface the gap as an explicit manager
+    // error rather than a silent commit-without-persistence.
+    //
+    // As of Stage 1d, the cascade is:
+    //   record_process_gate_result
+    //     -> put_process_gate_result (default, routes through opaque)
+    //     -> put_opaque (default, fail-closed)
+    // and the resulting error sentinel comes from the opaque layer.
     let mgr =
         GovernanceManager::new().with_receipt_store(
             Arc::new(DefaultInheritingBackend) as Arc<dyn GovernanceReceiptBackend>
@@ -744,19 +843,145 @@ fn default_inheriting_backend_fails_closed_no_silent_loss() {
             &recorder,
         )
         .expect_err(
-            "a backend inheriting the fail-closed default must propagate an error \
-             rather than allow a silent commit-without-persistence",
+            "a backend with no opaque storage must propagate an error rather than \
+             allow a silent commit-without-persistence",
         );
     let msg = err.to_string();
     // The error must reference the affected session and carry the
-    // stable sentinel so callers and operators can pattern-match it.
+    // stable opaque-layer sentinel so callers and operators can
+    // pattern-match it.
     assert!(
         msg.contains("session-fail-closed-default"),
         "error must reference the affected session: {msg}"
     );
     assert!(
-        msg.contains("process_gate_result_backend_not_implemented"),
-        "error must carry the trait's stable sentinel so callers can match \
+        msg.contains("opaque_storage_not_implemented"),
+        "error must carry the opaque-layer's stable sentinel so callers can match \
          on it programmatically: {msg}"
     );
+}
+
+#[test]
+fn opaque_only_backend_persists_and_round_trips_via_cascade() {
+    // A backend that implements ONLY the opaque storage methods
+    // (no typed process-gate overrides) gets durable persistence
+    // for free via the cascade:
+    //   record_process_gate_result
+    //     -> put_process_gate_result (default, routes through opaque)
+    //     -> put_opaque (overridden -> in-memory HashMap)
+    //
+    // This is the production-equivalent of the gateway-backed
+    // `ReceiptStore` after Stage 1b: opaque-capable, no typed
+    // process-gate overrides. Stage 1d is the change that wires
+    // the typed default through opaque so this cascade actually
+    // persists rather than fail-closing.
+    let store = Arc::new(OpaqueOnlyBackend::default());
+    let mgr = GovernanceManager::new()
+        .with_receipt_store(store.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let recorder = fresh_did();
+    let domain = coop_test();
+
+    // Record one pass result.
+    let receipt = mgr
+        .record_process_gate_result(
+            &domain,
+            "session-opaque-routed",
+            ProcessGateKind::PrivacyReview,
+            ProcessGateResult::Pass,
+            &recorder,
+        )
+        .expect("opaque-only backend must persist via the cascade rather than fail-close");
+    assert_ne!(receipt.record_hash, [0u8; 32]);
+
+    // Read back via get_latest_process_gate_result (also routed
+    // through the opaque cascade).
+    let latest = store
+        .get_latest_process_gate_result("session-opaque-routed", ProcessGateKind::PrivacyReview)
+        .expect("get_latest must succeed against an opaque-capable backend")
+        .expect("a receipt must be retrievable after a successful put");
+    assert_eq!(latest.session_id, "session-opaque-routed");
+    assert_eq!(latest.gate_kind, ProcessGateKind::PrivacyReview);
+    assert_eq!(latest.result, ProcessGateResult::Pass);
+    assert_eq!(latest.record_hash, receipt.record_hash);
+
+    // Cross-gate-kind isolation: a probe under a different gate_kind
+    // must NOT return this receipt — they have different opaque key2
+    // values.
+    let probe = store
+        .get_latest_process_gate_result(
+            "session-opaque-routed",
+            ProcessGateKind::AccessibilityReview,
+        )
+        .expect("probe must succeed");
+    assert!(
+        probe.is_none(),
+        "different gate kinds must not see each other's receipts via the opaque key2"
+    );
+}
+
+#[test]
+fn opaque_only_backend_chains_session_history_chronologically() {
+    // Multiple gate results across distinct gate kinds for the same
+    // session must form a chronologically ordered audit chain via
+    // the opaque cascade's `list_opaque_for` semantics.
+    //
+    // Construct receipts with explicit `recorded_at` timestamps and
+    // call `put_process_gate_result` directly so the test does not
+    // depend on wall-clock advance (no `std::thread::sleep`). This
+    // still exercises the full cascade:
+    //   put_process_gate_result (trait default)
+    //     -> put_opaque (OpaqueOnlyBackend override)
+    //     -> in-memory HashMap
+    let store = Arc::new(OpaqueOnlyBackend::default());
+    let recorder = fresh_did();
+    let domain = coop_test();
+    let domain_id = domain.0.clone();
+    let session_id = "session-multi-gate";
+
+    let r_privacy = ProcessGateResultReceipt::new(
+        session_id.to_string(),
+        domain_id.clone(),
+        ProcessGateKind::PrivacyReview,
+        ProcessGateResult::Pass,
+        recorder.to_string(),
+        100,
+    );
+    let r_access = ProcessGateResultReceipt::new(
+        session_id.to_string(),
+        domain_id.clone(),
+        ProcessGateKind::AccessibilityReview,
+        ProcessGateResult::Pass,
+        recorder.to_string(),
+        200,
+    );
+    let r_no_mut = ProcessGateResultReceipt::new(
+        session_id.to_string(),
+        domain_id,
+        ProcessGateKind::NoMutationCheck,
+        ProcessGateResult::Pass,
+        recorder.to_string(),
+        300,
+    );
+
+    store
+        .put_process_gate_result(&r_privacy)
+        .expect("privacy gate must persist via the cascade");
+    store
+        .put_process_gate_result(&r_access)
+        .expect("accessibility gate must persist via the cascade");
+    store
+        .put_process_gate_result(&r_no_mut)
+        .expect("no-mutation gate must persist via the cascade");
+
+    let chain = store
+        .list_process_gate_results_for_session(session_id)
+        .expect("list must succeed against an opaque-capable backend");
+    assert_eq!(chain.len(), 3);
+    assert_eq!(chain[0].gate_kind, ProcessGateKind::PrivacyReview);
+    assert_eq!(chain[1].gate_kind, ProcessGateKind::AccessibilityReview);
+    assert_eq!(chain[2].gate_kind, ProcessGateKind::NoMutationCheck);
+    // Chronologically ordered (sorted by recorded_at in
+    // OpaqueOnlyBackend::list_opaque_for).
+    assert!(chain[0].recorded_at < chain[1].recorded_at);
+    assert!(chain[1].recorded_at < chain[2].recorded_at);
 }
