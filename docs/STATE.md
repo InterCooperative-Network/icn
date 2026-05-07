@@ -1,10 +1,219 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-05-05
+Last Reviewed: 2026-05-07
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-05-07 (post-#1755 / #1756 / #1757 / #1758 / #1759):
+     Truth-sync for the opaque receipt storage stack landing.
+     Unlike the May-5 sync edits, this is **runtime/implementation
+     truth**, not doc/control-plane: real Rust changes landed in
+     `icn-gateway` and `apps/governance`. Phase 2 status remains
+     ⏳ (still partner-bound) — the next concrete human gate
+     remains the partner-bound sequence in
+     `docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md`.
+     Landings since the previous sync edit (2026-05-05 evening,
+     post-#1753):
+       - #1755 feat(governance): add first process-transition
+         receipt runtime slice. Adds `ProcessGateResultReceipt`
+         (one of eight named `ProcessTransitionReceipt` classes
+         in the `idea-0019` framing brief). Emitted by
+         `GovernanceManager::record_process_gate_result` and
+         persisted through the `GovernanceReceiptBackend` trait.
+         **First real runtime dogfood emitting a
+         `ProcessTransitionReceipt` class** — partial credit
+         toward #1748 acceptance gate (a). Surfaced a production
+         durability gap: the sled-backed `ReceiptStore` had not
+         yet overridden `put_process_gate_result`, so production
+         callers received an explicit fail-closed sentinel
+         (`process_gate_result_backend_not_implemented`) rather
+         than a silent commit-without-persistence — addressed by
+         the #1757-#1759 stack below.
+       - #1756 chore(hooks): fix scope-guard / todo-guard exec
+         bit and todo-guard pipeline. Repository-tooling fix; no
+         runtime, contract, schema, or API change.
+       - #1757 feat(gateway): add meaning-blind opaque receipt
+         storage primitive. Adds the `put_opaque` /
+         `get_latest_opaque` / `list_opaque_for` inherent methods
+         on `ReceiptStore` plus the supporting `OPAQUE_REC_PREFIX`
+         and `OPAQUE_BY_KEY_PREFIX` keyspaces. The gateway stores
+         payloads under a caller-supplied `(class, key1, key2_opt,
+         recorded_at, record_hash)` tuple without learning the
+         typed shape — the apps layer is the single source of
+         truth for the closed taxonomy of class strings. New
+         classes can be added in apps/ without expanding the
+         gateway's typed governance imports (no firewall ratchet
+         increase). Three substantive review findings addressed
+         in `cb9d6daf` before merge: write-once-by-hash on the
+         primary record (same `(class, record_hash)` + identical
+         payload is idempotent; different payload aborts with
+         stable sentinel `opaque_record_hash_collision`),
+         atomic primary + secondary index writes via a single
+         sled transaction, distinct `key2 = None` vs `key2 =
+         Some("")` encoding (tag-byte scheme), and deterministic
+         tie-breaker for equal `recorded_at` (sorted by
+         `(recorded_at, record_hash)`). One additional codex P2
+         raised against `cb9d6daf` and addressed in `a8fbb1a6`
+         before merge: a new `OPAQUE_HASH_BIND_PREFIX` keyspace
+         binds each `(class, record_hash)` to exactly one
+         canonical `(key1, key2_opt, recorded_at)` tuple on first
+         write; divergent re-binds abort with stable sentinel
+         `opaque_record_hash_index_collision`. Without this, an
+         identical-payload replay under different index tuples
+         could surface one canonical receipt across multiple
+         audit chains or appear under `get_latest_opaque` for the
+         wrong tuple. Bind, primary, and secondary writes are all
+         enforced atomically inside the same sled transaction.
+       - #1758 feat(governance): expose opaque storage on
+         `GovernanceReceiptBackend` trait. Adds
+         `put_opaque` / `get_latest_opaque` / `list_opaque_for`
+         to the trait surface in
+         `apps/governance/src/receipt_backend.rs`, each with a
+         fail-closed default returning the stable sentinel
+         `opaque_storage_not_implemented`. The sled-backed
+         `ReceiptStore` overrides them via thin delegates to its
+         inherent opaque methods. Existing typed test backends
+         (which override the typed `put_*`/`get_*`/`list_*`
+         methods) are unaffected — the opaque methods are only
+         exercised when callers explicitly route through them.
+         Validates dynamic dispatch with a `Box<dyn
+         GovernanceReceiptBackend>` round-trip test.
+       - #1759 feat(governance): route `ProcessGateResultReceipt`
+         through opaque storage cascade. Updates the trait
+         default for `put_process_gate_result` to attempt the
+         opaque cascade first (encoding the typed envelope as
+         JSON, calling `put_opaque` with class
+         `"process_gate_result"`, `key1 = session_id`,
+         `key2 = Some(gate_kind)`, the typed `recorded_at` and
+         `record_hash`), and to surface the explicit
+         `process_gate_result_backend_not_implemented` sentinel
+         only when the underlying `put_opaque` itself returns the
+         opaque-not-implemented sentinel. Production gateway-backed
+         `ReceiptStore` therefore now durably persists
+         `ProcessGateResultReceipt` through the opaque cascade
+         without any new typed governance import on
+         `icn-gateway` (no firewall ratchet increase).
+         Test-backend coverage: a new `OpaqueOnlyBackend` that
+         overrides only `put_opaque` exercises the
+         typed-default → opaque cascade end-to-end. Test-suite
+         determinism follow-up was applied in the same PR
+         (Copilot review): three tests previously used
+         `std::thread::sleep(Duration::from_millis(1100))` to
+         force `recorded_at` to advance one second between writes
+         — replaced with explicit, strictly-increasing
+         `recorded_at` timestamps on directly-constructed
+         `ProcessGateResultReceipt` values fed through the
+         backend trait. Suite now finishes in 0.01s, deterministic.
+     New invariant added during the merge cycle:
+       - **`OPAQUE_HASH_BIND_PREFIX`** keyspace in
+         `icn/crates/icn-gateway/src/receipt_store.rs`. Each
+         `(class, record_hash)` is bound to exactly one canonical
+         `(key1, key2_opt, recorded_at)` tuple. Divergent re-binds
+         abort with stable sentinel
+         `opaque_record_hash_index_collision`. Closes a
+         secondary-index fan-out hole that the original
+         write-once-by-hash check on `OPAQUE_REC_PREFIX` did not
+         catch.
+     Surfaced flake → real bug filed:
+       - Issue #1760 `fix(commons): add CommonsManager::close()`
+         (later updated; correct diagnosis: sled 0.34's flusher
+         thread holds the OS `flock(LOCK_EX)` past `Db::drop`).
+         Fired on #1759's Test job (run `25491262579`,
+         `test_commons_charter_survives_sled_drop_and_reopen`
+         panicked at `crates/icn-gateway/tests/commons_integration.rs:472:59`
+         with `EAGAIN/WouldBlock`). The diff on #1759 was
+         entirely in `apps/governance` and never touched the
+         commons stack — pre-existing race surfaced under CI
+         load. The `Test` job was rerun on the same SHA without
+         code changes and went green, confirming the load-
+         dependent classification.
+       - PR #1761 `fix(commons): retry sled open on WouldBlock to
+         bridge flusher shutdown` opened on
+         `fix/commons-sled-open-retry-on-wouldblock`. Bounded
+         retry-with-backoff in `SledCommonsStore::open` (8
+         attempts max, 500ms total budget cap, 10ms initial
+         backoff). Only matches `io::ErrorKind::WouldBlock` so
+         genuine errors (NotFound, PermissionDenied, etc.) are
+         not masked. Two new unit tests pin the new behavior.
+         CI in flight at sync write-time. Open at this sync.
+     Acceptance-gate posture for `idea-0019` (#1748) acceptance
+     criteria, restated for clarity:
+       - (a) **runtime dogfood emitting at least one
+         `ProcessTransitionReceipt` class under `ADR-0026`** —
+         partially advanced: #1755 emits
+         `ProcessGateResultReceipt`; #1759 makes that emission
+         durable through the opaque cascade on the production
+         gateway-backed `ReceiptStore`. The receipt envelope's
+         relationship to `ADR-0026`'s receipt-and-provenance
+         proof envelope is not separately re-stated here.
+       - (b) **real visibility/privacy-boundary run with
+         redaction in evidence export** — unchanged: not
+         started.
+       - (c) **accessibility-gate `ProcessGateResult` produced
+         through `ORGANIZER_MEMBER_ACCESSIBILITY_GATE` on a real
+         surface** — unchanged: not started.
+       - (d) **open-question triage (Q1, Q3, or Q4)** — unchanged:
+         not started.
+     This sync explicitly does NOT claim:
+       - Phase 2 completion; Phase 2 remains ⏳ partner-bound.
+       - Formal NYCN pilot authorization.
+       - Production readiness, live federation, live cloud sync,
+         K3s/DNS/GitHub/Forgejo mutation, or NYCN private-data
+         handling.
+       - That `idea-0019`'s receipt-backed promotion to RFC has
+         been satisfied — three of the four acceptance gates
+         remain open, and the runtime-dogfood gate is partial.
+       - That `idea-0020` (DAP) has any new runtime advancement —
+         unchanged from the post-#1753 sync; promotion gate
+         unchanged.
+       - That gateway typed governance imports were widened —
+         the opaque storage primitive is bytes-in / bytes-out,
+         and adds zero new domain types.
+       - That the meaning-firewall ratchet changed — baseline
+         10 known violations preserved, 0 new.
+     Open coordination/control issues at this sync (unchanged
+     from post-#1753):
+       - #1748 milestone(process): define Institutional Process
+         Substrate. Acceptance criteria advanced on gate (a)
+         (partial).
+       - #1746 milestone(showcase): make NYCN organizer rehearsal
+         operable before first presentation. Unchanged.
+       - #1744 ci(review): make substantive AI review findings
+         merge-gating. Unchanged.
+     Open PR queue at this sync:
+       - #1761 fix(commons): retry sled open on WouldBlock to
+         bridge flusher shutdown — CI in flight.
+       - #1736 / #1735 — Dependabot dev-dependency bumps.
+     Next pre-RFC architecture move: **NOT YET SELECTED**. The
+     candidate enumeration from the post-#1753 sync stands,
+     reduced as follows:
+       (a) DAP **runtime** dogfood emitting at least one receipt
+           under `ADR-0026` for one DAP primitive — unchanged,
+           unchanged scope.
+       (b) `idea-0019` runtime dogfood emitting **additional**
+           `ProcessTransitionReceipt` classes under `ADR-0026`
+           — the gate is no longer "first" but "additional";
+           candidates remain `ProcessSessionOpenedReceipt`,
+           `DeliberationEntryRecordedReceipt`,
+           `DecisionRecordedReceipt`,
+           `ActivationCrossedReceipt`,
+           `MutationPlanRecordedReceipt`,
+           `MutationAppliedReceipt`,
+           `EvidencePacketProducedReceipt`. All are eligible
+           through the same opaque storage cascade landed in
+           this sync.
+       (c) `idea-0019` visibility/privacy-boundary run with
+           redaction in evidence export — unchanged.
+       (d) `idea-0019` accessibility-gate `ProcessGateResult`
+           produced through `ORGANIZER_MEMBER_ACCESSIBILITY_GATE`
+           on a real surface — unchanged.
+       (e) `idea-0019` open-question triage — unchanged.
+       (f) DAP §17 follow-up framing briefs — unchanged.
+       (g) Control-plane cleanup, including unresolved/stale
+           review-thread hygiene — unchanged.
+     None is selected here. -->
 
 <!-- [sync edit] 2026-05-05 (post-#1753):
      Truth-sync for the Democratic Authority Primitives read-model
@@ -367,15 +576,21 @@ Last Reviewed: 2026-05-05
      Aligned crate list, merged PRs, and metrics to verified repo state.
      Phase model unchanged — phase classification is governance territory (PR C). -->
 
-## Current status (2026-05-05 snapshot)
+## Current status (2026-05-07 snapshot)
 
 **Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate is defined in [NYCN Phase 2 Pilot Rehearsal Gate](strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md). The Phase 2 *machinery* is in place end-to-end; what remains is the human procedure — present, formalize, rehearse — and recording each step.
-Active execution since the previous sync has been entirely doc/control-plane: rehearsal evidence export schema (#1734); architecture due-diligence checklist (#1739); contract schema-identifier audit (#1741); organizer/member accessibility gate definition (#1743); the preview/review read-model contract `urn:icn:contract:preview-review:v1` (#1745); the `idea-0019` Institutional Process Substrate framing brief at `ops/ideas/framing/institutional-process-substrate.md` (#1747); a coordination/control milestone issue #1748 to track spine composition without licensing implementation; a read-model fixture-walk dogfood slice for `idea-0019` at `ops/ideas/dogfood/institutional-process-substrate-mvp.md` plus a new "Dogfood slice variants" section in `ops/ideas/README.md` that formalizes the read-model variant (#1749); the `idea-0020` Democratic Authority Primitives framing brief at `ops/ideas/framing/democratic-authority-primitives.md` (#1751); and a read-model fixture-walk dogfood slice for `idea-0020` at `ops/ideas/dogfood/democratic-authority-primitives-mvp.md` (#1753). Carrying forward: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN's drive-ingest operator ladder (NYCN #21–#28 in `fahertym/nycn`) is merged end-to-end, with subsequent NYCN #29–#32 also merged. The May-5 process-substrate and authority-primitive sequence is documentation/refinery only: no runtime executes; no kernel, gateway, ledger, governance, or SDK code changed; no new contract URN beyond `urn:icn:contract:preview-review:v1` (#1745) was minted; no implementation issue was opened from #1748; and a read-model fixture walk does not satisfy receipt-backed promotion thresholds per `ops/ideas/README.md` § "Dogfood slice variants". Democratic Authority Primitives now has both pieces of its idea-refinery surface: framing brief landed in #1751 as `idea-0020` with brief at `ops/ideas/framing/democratic-authority-primitives.md`, and the read-model fixture-walk dogfood slice landed in #1753 at `ops/ideas/dogfood/democratic-authority-primitives-mvp.md`. The dogfood slice composes the six DAP primitive families named in the framing brief's §17 follow-up (`AuthorityBasis`, `ParticipationRole`, `FacilitatorSummary`, `ConflictDisclosure`, `MinorityReport`, `DeliberationContext` exercising three of its twelve reference families: `CharterRuleReference`, `PriorDecisionReference`, `AccessibilityNote`) plus references `OperatorExecutionAuthority` as the strictly-downstream-of-decision operator handle at the activation gate, all attached end-to-end to the merged `idea-0019` read-model fixture walk without modifying any kernel, runtime, gateway, ledger, governance, SDK, or contract file. Both DAP framing (#1751) and DAP read-model dogfood (#1753) are pre-RFC framing/refinery only; together they do not claim runtime validity, do not emit receipts, do not contact gateway, do not create schema, do not create a contract URN, do not promote to RFC, do not open implementation issues, do not start runtime dogfood, and do not claim Phase 2 completion, formal NYCN pilot, production readiness, or live federation. Per `ops/ideas/README.md` § "Dogfood slice variants" and per the DAP framing brief's §16.1, **the read-model fixture walk does NOT satisfy receipt-backed promotion thresholds**; promotion of `idea-0020` to RFC still requires (1) a separate runtime dogfood that emits at least one receipt under `ADR-0026` for one of the named primitives — the framing brief's §16.1 names a `ConflictDisclosure` accept receipt and a `MinorityReport` recorded receipt generically; the dogfood artifact references slice-local class candidates `ConflictDisclosureAcceptedReceipt` and `MinorityReportRecordedReceipt` at the right transition points but does not commit them as canonical, (2) a real visibility/privacy-boundary run with redaction in evidence export, (3) an accessibility-gate `ProcessGateResult` produced through `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` on a real surface, and (4) Q1 (`AuthorityBasis` polymorphism vs typed family) or Q5 (`ConflictDisclosure` and `MinorityReport` placement) **resolved** in writing (deferral is not sufficient for the RFC gate per §16.1; the resolved-or-deferred standard at §16.3 applies only to the broader runtime-justification threshold). Next pre-RFC architecture move is **not yet selected**; this sync deliberately preserves optionality for the next session rather than smuggling in a new commitment. The prior sync (post-#1751) named the DAP read-model composition slice as the most directly named candidate; #1753 has now landed it, so the candidate enumeration is reduced. The candidate next moves the next session may pick from, listed descriptively only: (a) DAP **runtime** dogfood emitting at least one receipt under `ADR-0026` for one DAP primitive — the next artifact called for by the slice's promotion gate; (b) `idea-0019` runtime dogfood toward receipt-backed promotion, emitting at least one of eight named `ProcessTransitionReceipt` classes under `ADR-0026` (one of four #1748 acceptance gates); (c) `idea-0019` visibility/privacy-boundary run with redaction in evidence export (one of four #1748 acceptance gates); (d) `idea-0019` accessibility-gate `ProcessGateResult` produced through `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` on a real surface (one of four #1748 acceptance gates); (e) `idea-0019` open-question triage: at least one of Q1 (`ProcessTargetRef` polymorphism), Q3 (`DeliberationEntry` kind taxonomy), or Q4 (`HumanDecisionSet` vs proposal/vote) resolved or explicitly deferred in writing (one of four #1748 acceptance gates); (f) one of the DAP §17 follow-up framing briefs — pre-RFC, decompose-only (CCL hook-point catalog; expert/advisory across institution types; conflict object model connecting `ConflictDisclosure` to `idea-0016`/ADR-0029; federation tally semantics composing `RepresentationMandate` with #1609; delegation runtime gated on #1632); (g) control-plane cleanup, including unresolved/stale review-thread hygiene if inspection confirms it. None is selected here. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
+Active execution since the previous sync is mixed: the May-5 sequence was entirely doc/control-plane (#1734 rehearsal evidence export schema; #1739 architecture due-diligence checklist; #1741 contract schema-identifier audit; #1743 organizer/member accessibility gate definition; #1745 preview/review read-model contract `urn:icn:contract:preview-review:v1`; #1747 `idea-0019` Institutional Process Substrate framing brief; #1748 coordination/control milestone for spine composition; #1749 read-model fixture-walk dogfood slice for `idea-0019` plus the new `ops/ideas/README.md` "Dogfood slice variants" section; #1751 `idea-0020` Democratic Authority Primitives framing brief; #1753 read-model fixture-walk dogfood slice for `idea-0020`); the May-6/May-7 sequence is **runtime/implementation truth**, not doc/refinery — real Rust changes landed in `icn-gateway` and `apps/governance`. The first runtime dogfood emitting one of the eight named `ProcessTransitionReceipt` classes from the `idea-0019` framing brief landed as #1755 (`ProcessGateResultReceipt`), surfacing a production durability gap on the sled-backed `ReceiptStore` because no opaque storage path existed without expanding gateway typed governance imports. The opaque receipt storage stack (#1757 → #1758 → #1759) closed that gap: the gateway gained a meaning-blind `put_opaque` / `get_latest_opaque` / `list_opaque_for` primitive keyed on `(class, key1, key2_opt, recorded_at, record_hash)` (#1757); the `GovernanceReceiptBackend` trait gained a fail-closed opaque method surface and the sled-backed `ReceiptStore` overrode it via thin delegates to its inherent opaque methods (#1758); and `put_process_gate_result`'s trait default was rewritten to attempt the opaque cascade first and fall back to the explicit `process_gate_result_backend_not_implemented` sentinel only when the underlying `put_opaque` itself returns the opaque-not-implemented sentinel (#1759). Production gateway-backed `ReceiptStore` therefore now durably persists `ProcessGateResultReceipt` through the opaque cascade without any new typed governance import on `icn-gateway`. A new invariant landed inside the merge cycle: the `OPAQUE_HASH_BIND_PREFIX` keyspace binds each `(class, record_hash)` to exactly one canonical `(key1, key2_opt, recorded_at)` tuple at first write; divergent re-binds abort with stable sentinel `opaque_record_hash_index_collision` to prevent one canonical receipt from fanning out across multiple audit chains. Bind, primary-record, and secondary-index writes are enforced atomically inside a single sled transaction. CI on #1759 surfaced a pre-existing sled-flusher race on the unrelated `test_commons_charter_survives_sled_drop_and_reopen` integration test (sled 0.34's flusher thread holds the OS `flock(LOCK_EX)` past `Db::drop`); filed as issue #1760 with corrected diagnosis and a follow-up bounded-retry fix opened on `fix/commons-sled-open-retry-on-wouldblock` as PR #1761 (open at this sync write-time). Carrying forward: rehearsal evidence export schema (#1734); architecture due-diligence checklist (#1739); contract schema-identifier audit (#1741); organizer/member accessibility gate definition (#1743); preview/review read-model contract `urn:icn:contract:preview-review:v1` (#1745); `idea-0019` framing brief (#1747) + read-model fixture-walk dogfood (#1749); `idea-0020` framing brief (#1751) + read-model fixture-walk dogfood (#1753). Carrying forward: institutional-operability runtime (live charter activation, person-directory overlay, `/me/standing`, `authority_scope` plumbing) plus the action-card runtime (`/me/action-cards` endpoint with proof-loop linkage to `GovernanceDecisionReceipt` for proposal/vote, `ActionItemCompletionReceipt` for action_item/complete, and `MeetingAttendanceReceipt` for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN's drive-ingest operator ladder (NYCN #21–#28 in `fahertym/nycn`) is merged end-to-end, with subsequent NYCN #29–#32 also merged. The May-5 process-substrate and authority-primitive sequence is documentation/refinery only: no runtime executes; no kernel, gateway, ledger, governance, or SDK code changed; no new contract URN beyond `urn:icn:contract:preview-review:v1` (#1745) was minted; no implementation issue was opened from #1748; and a read-model fixture walk does not satisfy receipt-backed promotion thresholds per `ops/ideas/README.md` § "Dogfood slice variants". Democratic Authority Primitives now has both pieces of its idea-refinery surface: framing brief landed in #1751 as `idea-0020` with brief at `ops/ideas/framing/democratic-authority-primitives.md`, and the read-model fixture-walk dogfood slice landed in #1753 at `ops/ideas/dogfood/democratic-authority-primitives-mvp.md`. The dogfood slice composes the six DAP primitive families named in the framing brief's §17 follow-up (`AuthorityBasis`, `ParticipationRole`, `FacilitatorSummary`, `ConflictDisclosure`, `MinorityReport`, `DeliberationContext` exercising three of its twelve reference families: `CharterRuleReference`, `PriorDecisionReference`, `AccessibilityNote`) plus references `OperatorExecutionAuthority` as the strictly-downstream-of-decision operator handle at the activation gate, all attached end-to-end to the merged `idea-0019` read-model fixture walk without modifying any kernel, runtime, gateway, ledger, governance, SDK, or contract file. Both DAP framing (#1751) and DAP read-model dogfood (#1753) are pre-RFC framing/refinery only; together they do not claim runtime validity, do not emit receipts, do not contact gateway, do not create schema, do not create a contract URN, do not promote to RFC, do not open implementation issues, do not start runtime dogfood, and do not claim Phase 2 completion, formal NYCN pilot, production readiness, or live federation. Per `ops/ideas/README.md` § "Dogfood slice variants" and per the DAP framing brief's §16.1, **the read-model fixture walk does NOT satisfy receipt-backed promotion thresholds**; promotion of `idea-0020` to RFC still requires (1) a separate runtime dogfood that emits at least one receipt under `ADR-0026` for one of the named primitives — the framing brief's §16.1 names a `ConflictDisclosure` accept receipt and a `MinorityReport` recorded receipt generically; the dogfood artifact references slice-local class candidates `ConflictDisclosureAcceptedReceipt` and `MinorityReportRecordedReceipt` at the right transition points but does not commit them as canonical, (2) a real visibility/privacy-boundary run with redaction in evidence export, (3) an accessibility-gate `ProcessGateResult` produced through `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` on a real surface, and (4) Q1 (`AuthorityBasis` polymorphism vs typed family) or Q5 (`ConflictDisclosure` and `MinorityReport` placement) **resolved** in writing (deferral is not sufficient for the RFC gate per §16.1; the resolved-or-deferred standard at §16.3 applies only to the broader runtime-justification threshold). Next pre-RFC architecture move is **not yet selected**; this sync deliberately preserves optionality for the next session rather than smuggling in a new commitment. The prior sync (post-#1751) named the DAP read-model composition slice as the most directly named candidate; #1753 has now landed it, so the candidate enumeration is reduced. The candidate next moves the next session may pick from, listed descriptively only: (a) DAP **runtime** dogfood emitting at least one receipt under `ADR-0026` for one DAP primitive — the next artifact called for by the slice's promotion gate; (b) `idea-0019` runtime dogfood emitting **additional** `ProcessTransitionReceipt` classes (the first — `ProcessGateResultReceipt` — landed in #1755 and is durably persisted via the opaque cascade since #1759; remaining candidates are `ProcessSessionOpenedReceipt`, `DeliberationEntryRecordedReceipt`, `DecisionRecordedReceipt`, `ActivationCrossedReceipt`, `MutationPlanRecordedReceipt`, `MutationAppliedReceipt`, `EvidencePacketProducedReceipt` — all eligible through the same opaque storage cascade); (c) `idea-0019` visibility/privacy-boundary run with redaction in evidence export (one of four #1748 acceptance gates); (d) `idea-0019` accessibility-gate `ProcessGateResult` produced through `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` on a real surface (one of four #1748 acceptance gates); (e) `idea-0019` open-question triage: at least one of Q1 (`ProcessTargetRef` polymorphism), Q3 (`DeliberationEntry` kind taxonomy), or Q4 (`HumanDecisionSet` vs proposal/vote) resolved or explicitly deferred in writing (one of four #1748 acceptance gates); (f) one of the DAP §17 follow-up framing briefs — pre-RFC, decompose-only (CCL hook-point catalog; expert/advisory across institution types; conflict object model connecting `ConflictDisclosure` to `idea-0016`/ADR-0029; federation tally semantics composing `RepresentationMandate` with #1609; delegation runtime gated on #1632); (g) control-plane cleanup, including unresolved/stale review-thread hygiene if inspection confirms it. None is selected here. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
 
 ### Recently merged (since 2026-04-15)
 
 | PR | Title | Merged |
 |----|-------|--------|
+| #1759 | feat(governance): route ProcessGateResultReceipt through opaque storage cascade | 2026-05-07 |
+| #1758 | feat(governance): expose opaque storage on GovernanceReceiptBackend trait | 2026-05-07 |
+| #1757 | feat(gateway): add meaning-blind opaque receipt storage primitive | 2026-05-06 |
+| #1756 | chore(hooks): fix scope-guard/todo-guard exec bit and todo-guard pipeline | 2026-05-06 |
+| #1755 | feat(governance): add first process-transition receipt runtime slice | 2026-05-06 |
+| #1754 | docs(state): sync Democratic Authority Primitives read-model dogfood landing | 2026-05-06 |
 | #1753 | docs(ideas): add read-model dogfood slice for Democratic Authority Primitives (idea-0020) | 2026-05-05 |
 | #1752 | docs(state): sync Democratic Authority Primitives landing and agent handoff | 2026-05-05 |
 | #1751 | docs(ideas): name Democratic Authority Primitives (idea-0020 + framing brief) | 2026-05-05 |
@@ -457,12 +672,17 @@ Active execution since the previous sync has been entirely doc/control-plane: re
 
 ### Open PRs
 
-Only Dependabot dev-dependency bumps at this sync:
-
 | PR | Title |
 |----|-------|
+| #1761 | fix(commons): retry sled open on WouldBlock to bridge flusher shutdown |
 | #1736 | deps(ts-sdk): bump the dev-dependencies group in /sdk/typescript with 3 updates |
 | #1735 | deps(pilot-ui): bump @axe-core/playwright from 4.11.2 to 4.11.3 in /web/pilot-ui |
+
+Open implementation follow-ups at this sync:
+
+| Issue | Title |
+|-------|-------|
+| #1760 | fix(commons): add CommonsManager::close() to drain actor before sled handle drop (`epic:commons-compute` + `type:impl`) — corrected diagnosis: sled 0.34 flusher-thread shutdown race; fix opened as PR #1761 |
 
 Open coordination/control issues at this sync (not implementation):
 
@@ -473,6 +693,16 @@ Open coordination/control issues at this sync (not implementation):
 | #1744 | ci(review): make substantive AI review findings merge-gating |
 
 ### What landed since Phase 1 (Charter Engine)
+
+Opaque receipt storage stack (added 2026-05-06 → 2026-05-07; **runtime/implementation truth** — real Rust changes in `icn-gateway` and `apps/governance`; no firewall ratchet increase; no new typed governance imports on `icn-gateway`):
+- First runtime dogfood emitting one of the eight named `ProcessTransitionReceipt` classes from the `idea-0019` framing brief landed as #1755 (`feat(governance): add first process-transition receipt runtime slice`). Adds `ProcessGateResultReceipt`, emitted by `GovernanceManager::record_process_gate_result`, persisted through the `GovernanceReceiptBackend` trait. Surfaced a production durability gap on the sled-backed `ReceiptStore` because no opaque storage path existed without expanding gateway typed governance imports — addressed by the #1757 → #1758 → #1759 stack.
+- Meaning-blind opaque receipt storage primitive landed at `icn/crates/icn-gateway/src/receipt_store.rs` — #1757. Adds `put_opaque(class, key1, key2_opt, recorded_at, record_hash, payload)` plus `get_latest_opaque` and `list_opaque_for` inherent methods on `ReceiptStore`. The gateway stores payloads under a caller-supplied `(class, key1, key2_opt, recorded_at, record_hash)` tuple without learning the typed shape; the apps layer is the single source of truth for the closed taxonomy of class strings. Adding a new receipt class becomes a one-file change in apps. Three substantive review findings addressed in `cb9d6daf` before merge (write-once-by-hash on the primary record with stable sentinel `opaque_record_hash_collision`; atomic primary + secondary index writes via single sled transaction; distinct `key2 = None` vs `key2 = Some("")` tag-byte encoding; deterministic `(recorded_at, record_hash)` tie-breaker). One additional codex P2 raised against `cb9d6daf` and addressed in `a8fbb1a6` before merge: the new `OPAQUE_HASH_BIND_PREFIX` keyspace binds each `(class, record_hash)` to exactly one canonical `(key1, key2_opt, recorded_at)` tuple at first write; divergent re-binds abort with stable sentinel `opaque_record_hash_index_collision`. Bind, primary, and secondary writes are enforced atomically inside the same sled transaction.
+- Opaque storage exposed on the `GovernanceReceiptBackend` trait at `icn/apps/governance/src/receipt_backend.rs` — #1758. Adds `put_opaque` / `get_latest_opaque` / `list_opaque_for` to the trait surface, each with a fail-closed default returning the stable sentinel `opaque_storage_not_implemented`. The sled-backed `ReceiptStore` overrides them via thin delegates to its inherent opaque methods. Existing typed test backends are unaffected; opaque methods are only exercised when callers explicitly route through them. Validates dynamic dispatch via a `Box<dyn GovernanceReceiptBackend>` round-trip test.
+- `ProcessGateResultReceipt` routed through opaque storage cascade — #1759. Updates the trait default for `put_process_gate_result` to attempt the opaque cascade first (encoding the typed envelope as JSON, calling `put_opaque` with class `"process_gate_result"`, `key1 = session_id`, `key2 = Some(gate_kind)`, the typed `recorded_at` and `record_hash`), and to surface the explicit `process_gate_result_backend_not_implemented` sentinel only when the underlying `put_opaque` itself returns the opaque-not-implemented sentinel. Production gateway-backed `ReceiptStore` therefore now durably persists `ProcessGateResultReceipt` through the opaque cascade. Test-backend coverage: a new `OpaqueOnlyBackend` overrides only `put_opaque` and exercises the typed-default → opaque cascade end-to-end. Test-suite determinism follow-up was applied in the same PR (Copilot review): three tests previously used `std::thread::sleep(Duration::from_millis(1100))` to force `recorded_at` to advance one second between writes — replaced with explicit, strictly-increasing `recorded_at` timestamps on directly-constructed `ProcessGateResultReceipt` values fed through the backend trait. Suite now finishes in 0.01s, deterministic.
+- New invariant: `OPAQUE_HASH_BIND_PREFIX` keyspace in `icn/crates/icn-gateway/src/receipt_store.rs`. Each `(class, record_hash)` is bound to exactly one canonical `(key1, key2_opt, recorded_at)` tuple. Divergent re-binds abort with stable sentinel `opaque_record_hash_index_collision`. Closes a secondary-index fan-out hole that the original write-once-by-hash check on `OPAQUE_REC_PREFIX` did not catch. Bind, primary, and secondary writes are atomic inside the same sled transaction.
+- Surfaced flake → real bug filed and fix opened: a pre-existing race on `test_commons_charter_survives_sled_drop_and_reopen` (sled 0.34's flusher thread holds the OS `flock(LOCK_EX)` past `Db::drop`) fired on #1759's CI Test job. Filed as issue #1760 with corrected diagnosis (initial actor-drop hypothesis was wrong; `CommonsHandle` is synchronous `Arc<RwLock<CommonsInner>>` with no spawned tasks). Fix opened as PR #1761 (`fix(commons): retry sled open on WouldBlock to bridge flusher shutdown`) — bounded retry-with-backoff in `SledCommonsStore::open`, 8 attempts max, 500ms total budget cap, 10ms initial backoff, only matches `io::ErrorKind::WouldBlock` so genuine errors (NotFound, PermissionDenied, etc.) are not masked. Two new unit tests pin the new behavior. Open at this sync write-time.
+- Hook tooling fix: scope-guard / todo-guard exec bit + todo-guard pipeline failures observed in earlier sessions resolved in #1756. Repository tooling only; no runtime, contract, schema, or API change.
+- Hard rule preserved: this stack does NOT widen gateway typed governance imports, does NOT increase the meaning-firewall ratchet (baseline 10 known violations preserved, 0 new), does NOT claim Phase 2 completion, does NOT claim formal NYCN pilot, does NOT claim production readiness, does NOT claim live federation, does NOT touch K3s/DNS/GitHub/Forgejo state, does NOT handle private partner/member/organizer data, and does NOT satisfy more than acceptance gate (a) of `idea-0019` (#1748) — the visibility/privacy-boundary run, accessibility-gate `ProcessGateResult` on a real surface, and open-question triage gates remain open.
 
 Democratic Authority Primitives read-model fixture-walk dogfood (added 2026-05-05; doc/control-plane and idea-refinery only, not runtime; no kernel, gateway, ledger, governance, or SDK code touched):
 - Read-model fixture-walk dogfood slice for `idea-0020` landed at `ops/ideas/dogfood/democratic-authority-primitives-mvp.md` alongside an `ops/ideas/ideas.yaml` row update — #1753. Read-model fixture-walk variant per `ops/ideas/README.md` § "Dogfood slice variants" (formalized in #1749). Composes the six DAP primitive families named in the framing brief's §17 follow-up (`AuthorityBasis`, `ParticipationRole`, `FacilitatorSummary`, `ConflictDisclosure`, `MinorityReport`, `DeliberationContext` — the latter exercising three of its twelve reference families: `CharterRuleReference`, `PriorDecisionReference`, `AccessibilityNote`) end-to-end against the merged `idea-0019` read-model fixture walk (`ops/ideas/dogfood/institutional-process-substrate-mvp.md`). Walks `Step 0` through `Step 7` of the existing `idea-0019` slice without re-describing the spine; only DAP primitive additions are recorded. References `OperatorExecutionAuthority` as the strictly-downstream-of-decision operator handle at the activation gate (Step 5), typed to point at the `DecisionRecord` plus the `ProcessGateResult` set plus the steward's `RoleAssignment`. Composes orthogonally with `idea-0019`: the spine names *what gets processed*; the primitives fill the spine's records with the authority and context typing the spine deliberately deferred. Emits no receipts, contacts no gateway, performs no mutation, introduces no new contract URN, modifies no kernel/runtime/contract/schema/ADR file. Receipt class candidates `FacilitatorSummaryRecordedReceipt`, `ConflictDisclosureAcceptedReceipt`, and `MinorityReportRecordedReceipt` are referenced at the right transition points as slice-local candidates only — the framing brief's §16.1 names a `ConflictDisclosure` accept receipt and a `MinorityReport` recorded receipt generically without attaching concrete class identifiers, and the slice does not commit any of these names as canonical. Per `ops/ideas/README.md` § "Dogfood slice variants" and per the DAP framing brief's §16.1, **a read-model fixture walk does NOT satisfy receipt-backed promotion thresholds**; promotion of `idea-0020` to RFC still requires (1) a separate runtime dogfood emitting at least one receipt under `ADR-0026` for one of the named primitives, (2) a real visibility/privacy-boundary run with redaction in evidence export, (3) an accessibility-gate `ProcessGateResult` produced through `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` on a real surface, and (4) Q1 (`AuthorityBasis` polymorphism vs typed family) or Q5 (`ConflictDisclosure` and `MinorityReport` placement) **resolved** in writing — deferral is not sufficient for the RFC gate per §16.1; the resolved-or-deferred standard at §16.3 applies only to the broader runtime-justification threshold. The DAP brief's other open questions (Q2 through Q4, Q6 through Q10) are not surfaced by this slice and remain open. Hard rule preserved per DAP framing brief §14: not runtime, not a schema, not an RFC by itself, not a voting-system decision, not a liquid-democracy commitment, not expertocracy, not anti-expertise, not chat, not social media, not a moderation platform, not an identity directory implementation, not a credential verification implementation, not a private-overlay implementation, not NYCN-specific, not a production-readiness claim, not a Phase 2 completion claim, not a formal NYCN pilot authorization, not a live federation claim, not a live cloud sync claim, not a K3s/DNS/Forgejo mutation claim, not a private-data-handling claim, not a binding on partner repositories.
@@ -615,7 +845,7 @@ Infrastructure:
 - docs/strategy/NYCN-Repo-Architecture-Spec.md — NYCN institutional architecture
 - docs/strategy/NYCN-Execution-Tranches.md — NYCN 7-tranche execution plan
 - docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md — exact Phase 2 organizer/operator gate before a formal NYCN pilot begins
-- docs/dev/handoff-2026-05-05-c.md — latest session handoff
+- docs/dev/handoff-2026-05-07.md — latest session handoff
 - deploy/README.md — deployment options
 
 ---
