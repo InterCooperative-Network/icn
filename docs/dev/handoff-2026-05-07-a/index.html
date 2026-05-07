@@ -1,0 +1,355 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-05-07-a | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>handoff 2026 05 07 a</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/handoff-2026-05-07-a.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-05-07-a</h1>
+<blockquote>
+<p><strong>Trigger:</strong> post-#1764 truth-sync (sync PR opened from <code>docs/sync-actioncard-contract-1764</code>; merge commit recorded after merge). Filename follows <code>docs/dev/HANDOFF_TEMPLATE.md</code> Usage Notes (<code>handoff-YYYY-MM-DD-b.md</code> suffix convention; <code>-a</code> is the second handoff on 2026-05-07 after <code>handoff-2026-05-07.md</code>). Two handoffs ship on 2026-05-07 because two distinct landings happened: the opaque receipt storage stack (#1755/#1756/#1757/#1758/#1759 → captured by #1762&#39;s handoff) and the May-7 close-out cycle (#1761/#1762/#1763/#1764 → captured here).</p>
+</blockquote>
+<h2>Session Goal</h2>
+<p>Close ICN #1713 by publishing the generic ActionCard contract surface for institution packages, then truth-sync the May-7 close-out cycle (#1761 sled retry fix; #1762 prior state sync; #1763 / #1735 Dependabot maintenance; #1764 ActionCard contract publication itself) into <code>docs/STATE.md</code> and <code>docs/PHASE_PROGRESS.md</code>. Doc/control-plane only with one runtime fix in <code>icn-commons</code>.</p>
+<h2>Decisive Test</h2>
+<blockquote>
+<p>Can a new organizer enter the system mid-cycle, switch into the right scope, see the summit&#39;s current phase, understand what was decided, know what is blocked, receive their obligations, trace why they exist, and continue the work without private oral history?</p>
+</blockquote>
+<p>Unchanged from the 2026-04-15 handoff. Every move is judged against whether it makes that more answerable. The ActionCard contract publication advances &quot;receive their obligations, trace why they exist&quot; by giving partner packages a generic ICN contract to validate their card templates against — institution-specific semantics stay in institution packages while ICN core ships only the generic primitive.</p>
+<hr>
+<h2>Final State (Verified)</h2>
+<!-- TRUTH TYPE: Implementation truth — only facts confirmed by commands or code inspection -->
+
+<h3><code>main</code> HEAD (pre-this-sync-PR)</h3>
+<p><code>f7c3bf73 docs(contracts): publish ActionCard contract for institution packages (#1764)</code></p>
+<h3>Open PRs</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Branch</th>
+<th>State</th>
+<th>CI Status</th>
+<th>Blocker</th>
+</tr>
+</thead>
+</table>
+<p>(none open at handoff write-time, verified via <code>gh pr list --state open</code> returning <code>[]</code>. Dependabot may surface follow-on bumps automatically.)</p>
+<h3>Open coordination/control issues (not implementation)</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Title</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1748</td>
+<td>milestone(process): define Institutional Process Substrate (<code>epic:arch-invariants</code> + <code>type:spec</code>)</td>
+</tr>
+<tr>
+<td>#1746</td>
+<td>milestone(showcase): make NYCN organizer rehearsal operable before first presentation</td>
+</tr>
+<tr>
+<td>#1744</td>
+<td>ci(review): make substantive AI review findings merge-gating</td>
+</tr>
+<tr>
+<td>#1742</td>
+<td>spec(contracts): ActionCard $id compatibility review by 2026-06-30</td>
+</tr>
+</tbody></table>
+<h3>Branches</h3>
+<ul>
+<li><code>docs/sync-actioncard-contract-1764</code> — local + remote at handoff write-time. This sync PR.</li>
+<li><code>main</code> — origin/main at <code>f7c3bf73</code> (post-#1764) at handoff write-time.</li>
+</ul>
+<h3>Cycle landed in order</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Squash SHA</th>
+<th>Merged At</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1761 <code>fix(commons): retry sled open on WouldBlock to bridge flusher shutdown</code></td>
+<td><code>9f699562</code></td>
+<td>2026-05-07 15:56 UTC</td>
+</tr>
+<tr>
+<td>#1762 <code>docs(state): sync opaque receipt storage stack landing</code></td>
+<td><code>6e8dce55</code></td>
+<td>2026-05-07 15:21 UTC</td>
+</tr>
+<tr>
+<td>#1735 <code>deps(pilot-ui): bump @axe-core/playwright in /web/pilot-ui</code></td>
+<td><code>fc12ff5a</code></td>
+<td>2026-05-07 17:05 UTC</td>
+</tr>
+<tr>
+<td>#1763 <code>deps(ts-sdk): bump the dev-dependencies group across 1 directory with 4 updates</code></td>
+<td><code>c0a614ee</code></td>
+<td>2026-05-07 17:25 UTC</td>
+</tr>
+<tr>
+<td>#1764 <code>docs(contracts): publish ActionCard contract for institution packages</code></td>
+<td><code>f7c3bf73</code></td>
+<td>2026-05-07 18:44 UTC</td>
+</tr>
+</tbody></table>
+<h3>Issues closed</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Closed At</th>
+<th>Closed By</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1760</td>
+<td>2026-05-07 15:56 UTC</td>
+<td>#1761 (auto-close keyword in PR body)</td>
+</tr>
+<tr>
+<td>#1713</td>
+<td>2026-05-07 18:44 UTC</td>
+<td>manual close after #1764 merge with acceptance-criteria comment</td>
+</tr>
+</tbody></table>
+<h3>Required-check status (each PR&#39;s final gates)</h3>
+<p>#1764 final gates (all required checks <strong>passed</strong> on the rebased SHA <code>abe7ff96</code>): claude-review (4m46s), Format Check, Clippy, Test, TypeScript SDK, Build Release, Documentation Control Plane, Documentation CI Summary, Check Documentation Freshness, Generate Documentation Index, Lint Architecture Doc, Agent Tooling Drift Check, Change Scope, Firewall Contract Enforcement, Kernel Forbidden Dependencies, Meaning Firewall Check, Regulatory Compliance Linter, Secrets Placeholder Check, Accessibility Tests. Skipped (normal for docs-only): Backup Validation, Security Audit, Test Coverage, Web UI, claude, Pilot Provenance Invariant. <code>mergeStateStatus</code> was <code>BEHIND</code> on first merge attempt (main had moved forward via #1763); rebased onto current main, force-pushed with <code>--force-with-lease</code>, CI re-ran clean, then squash-merged with <code>mergeStateStatus: CLEAN</code>.</p>
+<h3>Validators (this session, observed outputs)</h3>
+<ul>
+<li><code>git diff --check</code> — clean</li>
+<li><code>python3 docs/scripts/validate-action-card.py</code> — <code>OK: docs/contracts/institution-package/action-card.example.json validates against https://intercooperative.network/contracts/institution-package/action-card.schema.json</code></li>
+<li><code>python3 .github/scripts/compliance_linter.py</code> — <code>0 violations</code> (107 files scanned)</li>
+<li><code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict</code> — <code>OK: doc control check passed (778 docs markdown files under docs/); 36 enforcement warnings</code> (baseline; no new warnings; corpus 777 → 778 from this handoff itself)</li>
+<li><code>bash ops/scripts/drift-check.sh</code> — <code>STATUS: PASS</code> (0 errors, 0 warnings)</li>
+</ul>
+<hr>
+<h2>What Changed</h2>
+<!-- TRUTH TYPE: Execution truth — actions taken this session -->
+
+<h3>1. Opened and merged #1764</h3>
+<p>Branch <code>docs/actioncard-contract-1713</code> from <code>main</code> at <code>c0a614ee</code>. Added:</p>
+<ul>
+<li><code>docs/contracts/institution-package/action-card.example.json</code> — fictional <code>proposal</code>/<code>vote</code> <code>ActionCard</code> with all required fields plus optional <code>deadline</code> and <code>domain_id</code>. Uses fictional ids (<code>prop-example-2026-05-07-001</code>, <code>domain-example-fictional-cooperative</code>); contains no NYCN-specific nouns. Validates against the existing schema.</li>
+<li><code>docs/scripts/validate-action-card.py</code> — draft-2020-12 JSON Schema validator, mirrors <code>validate-preview-review.py</code> / <code>validate-rehearsal-evidence.py</code>. Defaults to validating the bundled example; accepts a partner-side card path positional; supports <code>--schema</code> for pinned-version validation. Stdlib-only <code>format: date-time</code> and <code>format: uri</code> checkers registered for symmetry with the other contract validators.</li>
+</ul>
+<p>Modified:</p>
+<ul>
+<li><code>docs/contracts/institution-package/README.md</code> — Files table now lists schema + example + validator; Stability section cites ADR-0027 § Card kind taxonomy (&quot;growable by ADR amendment&quot;) and documents the schema&#39;s DNS-backed <code>$id</code> retain-temporarily decision per <code>docs/contracts/schema-id-audit.md</code> (review by 2026-06-30 tracked by #1742); Validation guidance now includes explicit emitted-vs-gated source kind enumeration with tracking-issue cites, regulatory-safe vocabulary list (obligation, allocation, settlement, unit, position, receipt, provenance, evidence — explicitly not payment / wallet / balance / currency), explicit &quot;institution-specific semantics belong in institution packages, not in ICN core&quot; guidance, a worked CLI command block for the new validator, and partner-package vendor-or-invoke-from-CI guidance. <code>Last Reviewed</code> advanced 2026-05-04 → 2026-05-07.</li>
+<li><code>docs/registry.toml</code> — institution-package README entry: <code>last_updated</code> and <code>last_reviewed</code> advanced 2026-05-04 → 2026-05-07; <code>description</code> refreshed to mention the new example, validator, and schema-id-audit retention decision.</li>
+</ul>
+<p>One substantive Copilot review finding addressed pre-merge (commit <code>ffb4d791</code> on the branch, squashed into merge commit <code>f7c3bf73</code>): the positional CLI argument was <code>packet</code> (and the default constant was <code>DEFAULT_PACKET</code>) — leftover from <code>validate-preview-review.py</code> where &quot;packet&quot; is correct. Renamed to <code>card</code> / <code>DEFAULT_CARD</code> to align with the schema, ADR-0027, README, and runtime struct (<code>ActionCard</code> in <code>icn/apps/governance/src/http/models.rs:235</code>). Mechanical rename only; bundled example revalidated clean afterward.</p>
+<p><code>mergeStateStatus: BEHIND</code> on first merge attempt (main had moved forward via #1763 after my branch was created); rebased onto current main, force-pushed with <code>--force-with-lease</code>, full CI re-ran clean (claude-review 4m46s on the rebased SHA <code>abe7ff96</code>), confirmed <code>mergeStateStatus: CLEAN</code>, then squash-merged.</p>
+<h3>2. Manually closed #1713 with an acceptance-criteria comment</h3>
+<p>PR body intentionally avoided GitHub&#39;s auto-close regex (<code>closes ... #N</code> directly). After merge, closed #1713 by hand with a comment enumerating each of the six acceptance criteria and the merged-PR evidence path for each. Comment URL: <code>https://github.com/InterCooperative-Network/icn/issues/1713#issuecomment-...</code>.</p>
+<h3>3. STATE.md truth-sync (<code>docs/STATE.md</code>)</h3>
+<ul>
+<li>New 2026-05-07 (post-#1761 / #1762 / #1763 / #1764) sync edit comment block at the top, immediately before the existing 2026-05-07 (post-#1755 / #1756 / #1757 / #1758 / #1759) block. Records each landing in the May-7 close-out cycle, the #1713 closure, and the explicit non-claims.</li>
+<li>Top-of-file &quot;Current status (2026-05-07 snapshot)&quot; paragraph extended to include a second paragraph naming the May-7 close-out cycle and the ActionCard contract publication.</li>
+<li>Updated the post-#1755/#1759 paragraph: replaced &quot;PR #1761 (open at this sync write-time)&quot; with &quot;PR #1761 (merged 2026-05-07; closed #1760)&quot;.</li>
+<li>Appended five new rows at the top of &quot;Recently merged (since 2026-04-15)&quot; table: #1764, #1763, #1735, #1762, #1761.</li>
+<li>&quot;Open PRs&quot; table now shows the empty-queue note (verified via <code>gh pr list --state open</code>).</li>
+<li>&quot;Open implementation follow-ups&quot; table now shows the empty-queue note (#1760 closed by #1761 merge).</li>
+<li>New &quot;ActionCard contract publication for institution packages&quot; bullet block at the top of &quot;What landed since Phase 1 (Charter Engine)&quot; recording each artifact, the schema-id-audit retention decision, the #1713 closure, and the explicit hard-rule preservation.</li>
+<li>New &quot;May-7 close-out cycle&quot; bullet block recording #1761/#1762/#1763/#1735.</li>
+<li>References block extended with ADR-0027, the institution-package README, and the validator script. Latest handoff pointer updated 2026-05-07 → 2026-05-07-a; the prior 2026-05-07 handoff is preserved as a same-day historical artifact.</li>
+</ul>
+<h3>4. PHASE_PROGRESS.md truth-sync (<code>docs/PHASE_PROGRESS.md</code>)</h3>
+<ul>
+<li>Top-of-file phase paragraph extended to mention the May-7 close-out cycle and the ActionCard contract publication.</li>
+<li>New 2026-05-07 (post-#1761 / #1762 / #1763 / #1764) sync edit comment block recording each landing, the <code>idea-0019</code> (#1748) acceptance-gate posture (unchanged from #1762), the #1713 closure (independent of #1748 gates), and the explicit non-claims.</li>
+<li>Phase 2 deliverables list extended with five new <code>[x]</code> entries crediting #1761, #1762, #1763 / #1735, and #1764.</li>
+<li>New top entry in &quot;Decisions Made&quot; recording the cycle landing, the #1713 closure, the substantive Copilot review finding addressed pre-merge, the <code>$id</code> retain-temporarily decision (#1742 review by 2026-06-30), the unchanged <code>idea-0019</code> (#1748) acceptance-gate posture, the unchanged Phase 2 status, and the explicit &quot;next move not yet selected&quot; stance.</li>
+</ul>
+<h3>5. New session handoff</h3>
+<p>This file (<code>docs/dev/handoff-2026-05-07-a.md</code>). The prior 2026-05-07 handoff (<code>docs/dev/handoff-2026-05-07.md</code>) is preserved verbatim as the post-opaque-receipt-storage-stack handoff; this file is the post-May-7-close-out-cycle handoff.</p>
+<h3>6. Registry refresh</h3>
+<p>Regenerated <code>docs/DOCUMENT_REGISTRY.md</code> to reflect the +1 corpus delta (this new handoff under <code>docs/dev/</code>). The handoff falls under the existing <code>[[doc_path_defaults]]</code> rule with <code>prefix = &quot;docs/dev/&quot;</code> so no per-file overlay row is needed in <code>docs/registry.toml</code>.</p>
+<hr>
+<h2>What&#39;s Open</h2>
+<!-- TRUTH TYPE: Execution truth — known incomplete work -->
+
+<p>The next session picks one of these. <strong>None is selected here.</strong> The next session must choose deliberately from updated canonical truth, not auto-pilot.</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>Additional <code>idea-0019</code> <code>ProcessTransitionReceipt</code> classes</strong> — adding any of the seven remaining classes (<code>ProcessSessionOpenedReceipt</code>, <code>DeliberationEntryRecordedReceipt</code>, <code>DecisionRecordedReceipt</code>, <code>ActivationCrossedReceipt</code>, <code>MutationPlanRecordedReceipt</code>, <code>MutationAppliedReceipt</code>, <code>EvidencePacketProducedReceipt</code>) is now a one-file change in <code>apps/governance</code> because the opaque storage cascade landed in #1757/#1758/#1759. None of these is a separately scoped PR yet.</li>
+<li><input disabled="" type="checkbox"> <strong><code>idea-0019</code> (#1748) acceptance gate (b)</strong> — real visibility/privacy-boundary run with redaction in evidence export. Unchanged: not started.</li>
+<li><input disabled="" type="checkbox"> <strong><code>idea-0019</code> (#1748) acceptance gate (c)</strong> — accessibility-gate <code>ProcessGateResult</code> produced through <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> on a real surface. Unchanged: not started.</li>
+<li><input disabled="" type="checkbox"> <strong><code>idea-0019</code> (#1748) acceptance gate (d)</strong> — open-question triage: at least one of Q1 (<code>ProcessTargetRef</code> polymorphism), Q3 (<code>DeliberationEntry</code> kind taxonomy), or Q4 (<code>HumanDecisionSet</code> vs proposal/vote) resolved or explicitly deferred in writing. Unchanged: not started.</li>
+<li><input disabled="" type="checkbox"> <strong><code>idea-0020</code> (DAP) runtime dogfood</strong> — emitting at least one receipt under <code>ADR-0026</code> for one DAP primitive. Unchanged: not started. The opaque storage cascade (#1757/#1758/#1759) means adding DAP receipt classes is the same one-file change that <code>idea-0019</code> classes get.</li>
+<li><input disabled="" type="checkbox"> <strong>DAP §17 follow-up framing briefs</strong> — pre-RFC, decompose-only. Unchanged: not started.</li>
+<li><input disabled="" type="checkbox"> <strong>#1742 ActionCard <code>$id</code> compatibility review</strong> — calendar artifact for the audit&#39;s 2026-06-30 review. Not started; not due yet.</li>
+<li><input disabled="" type="checkbox"> <strong>Action-card runtime — remaining gates under #1646 (RFC-gated):</strong> <code>signal_rule</code> source path (gated on #1631 / #1711); <code>obligation_lifecycle</code> source path (gated on #1634 / #1712). Unchanged: not started.</li>
+<li><input disabled="" type="checkbox"> <strong>Control-plane cleanup</strong>, including unresolved/stale review-thread hygiene if inspection confirms it; pre-existing yaml-vs-registry drift on <code>docs/ai/*</code>, <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code>, <code>docs/design/*</code>, <code>docs/development/testing/governance-proof-layers.md</code>, <code>docs/onboarding/*</code>, <code>docs/planning/*</code>, <code>docs/plans/*</code> is named here as a possible candidate but not selected.</li>
+<li><input disabled="" type="checkbox"> <strong>NYCN steward-facing communication-groups directory tool (NYCN #33)</strong> — verify status before reading; not in this repo. Carried forward.</li>
+</ul>
+<hr>
+<h2>Unsafe Assumptions</h2>
+<!-- Explicitly name anything this session relied on that was not verified -->
+
+<ul>
+<li>This sync trusts that #1761/#1762/#1763/#1735/#1764 are themselves internally consistent; their squash commit messages and PR bodies are the audit record.</li>
+<li>&quot;Open PRs&quot; trusts <code>gh pr list --state open --limit 20</code> at handoff write-time. Dependabot may open additional dev-dependency bumps before the next session.</li>
+<li>The schema-id-audit retain-temporarily decision (review by 2026-06-30) is honored by <strong>citation only</strong>: this PR did not run a fresh consumer enumeration for the ActionCard schema&#39;s <code>$id</code>. The audit&#39;s §5 enumeration of downstream consumers will happen in the eventual migration PR (or in #1742 if the review chooses non-migration with a refreshed review date).</li>
+<li>The schema&#39;s field-by-field match against <code>ActionCard</code> in <code>icn/apps/governance/src/http/models.rs:235</code> is asserted by reading the file in #1764 prep but <strong>not</strong> verified by mechanical drift detection (which the README explicitly names as future work).</li>
+<li>The &quot;no Stage 1.5 / Stage 2 / Stage 3 / Stage 4 / Stage 5&quot; non-claim trusts the user&#39;s stage taxonomy verbatim from session prompts; this PR does not define those stages.</li>
+<li>Rust workspace verification was <strong>not</strong> run for this sync PR because no <code>.rs</code> files are touched. The May-7 cycle&#39;s only Rust change was #1761 (<code>icn/crates/icn-commons/src/store.rs</code>); that change is verified by #1761&#39;s own merged CI, not by this sync PR.</li>
+</ul>
+<hr>
+<h2>Next Move</h2>
+<!-- TRUTH TYPE: Execution truth — the exact sequence for the next session -->
+
+<p><strong>Not selected here.</strong> Pick deliberately from the &quot;What&#39;s Open&quot; list at the next session.</p>
+<p>Candidate next moves (named here so the next session can choose deliberately, not by inertia): (a) DAP runtime dogfood emitting at least one receipt under <code>ADR-0026</code> for one DAP primitive — the next artifact called for by <code>idea-0020</code>&#39;s read-model promotion gate; (b) <code>idea-0019</code> runtime dogfood emitting one of the seven remaining <code>ProcessTransitionReceipt</code> classes through the opaque cascade; (c) <code>idea-0019</code> visibility/privacy-boundary run; (d) <code>idea-0019</code> accessibility-gate <code>ProcessGateResult</code> on a real surface; (e) <code>idea-0019</code> open-question triage on Q1/Q3/Q4; (f) one of the DAP §17 follow-up framing briefs (CCL hook-point catalog; expert/advisory across institution types; conflict object model; federation tally semantics; delegation runtime); (g) control-plane cleanup. None is selected here.</p>
+<hr>
+<h2>Architectural Decisions</h2>
+<!-- TRUTH TYPE: Declared project truth changes (if any were made or ratified) -->
+
+<p>No new architectural decisions were ratified this session. Existing architectural decisions reaffirmed:</p>
+<ol>
+<li><strong>Institution-specific semantics belong in institution packages, not in ICN core.</strong> ICN core ships generic primitives; packages translate their local templates. Codified in the institution-package README&#39;s Validation guidance, item 5. Aligned with ADR-0027.</li>
+<li><strong>Hand-maintained contract schemas are edited alongside contract work.</strong> OpenAPI export and generated TypeScript types guard the <em>generated</em> API contract via CI drift checks (<code>icnctl api export-openapi</code>, <code>sdk/typescript</code> regen); hand-maintained JSON schemas under <code>docs/contracts/</code> are updated in the same PR as the API/OpenAPI change. Mechanical drift detection comparing the hand-maintained schema to serde-derived shapes is named as future work.</li>
+<li><strong>The default for new contract schemas is a non-DNS URN of the form <code>urn:icn:contract:&lt;short-name&gt;:v&lt;N&gt;</code>.</strong> Existing DNS-backed <code>$id</code>s (today: <code>action-card.schema.json</code>) are retained temporarily under the audit&#39;s per-schema review discipline; migration is a separate single-schema PR under audit §5 rules. Reaffirmed by this PR&#39;s README addition citing the audit decision.</li>
+</ol>
+<hr>
+<h2>Verification Commands</h2>
+<!-- Commands the next session should run to confirm starting state -->
+
+<pre><code class="language-bash"># 1. Confirm main HEAD is post-this-sync.
+git fetch origin main
+git log --oneline -1 origin/main
+# expect: &lt;sync-merge-sha&gt; docs(state): sync ActionCard contract publication landing (#&lt;sync-pr&gt;)
+
+# 2. Confirm Rust compile-clean against the cycle&#39;s runtime change.
+cd icn
+cargo check -p icn-commons
+cargo test -p icn-commons --lib
+
+# 3. Confirm contract validators still pass.
+cd ..
+python3 docs/scripts/validate-action-card.py
+python3 docs/scripts/validate-preview-review.py
+python3 docs/scripts/validate-rehearsal-evidence.py
+
+# 4. Confirm doc-control plane clean.
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict
+bash ops/scripts/drift-check.sh
+
+# 5. Confirm firewall ratchet preserved.
+python3 .github/scripts/firewall_denylist.py
+
+# 6. Confirm the open issue list matches this handoff.
+gh issue list --state open --limit 20
+gh pr list --state open --limit 20
+</code></pre>
+<p>If any of (1)-(5) diverges from the expected state, audit the divergence before resuming work.</p>
+<hr>
+<h2>Truth-Plane Notes</h2>
+<!-- Which truth types were relied on? Any known conflicts between layers? -->
+
+<ul>
+<li><strong>Declared project truth (loaded from):</strong> <code>docs/STATE.md</code> post-#1755/#1759 sync edit at session start; <code>docs/PHASE_PROGRESS.md</code> post-#1755/#1759 sync edit at session start. Both advanced this session to post-#1764 sync edits as part of this handoff&#39;s accompanying docs PR. The Phase 2 framing (still ⏳ partner-bound) is unchanged across this advance — only deliverable enumeration, references, and the post-#1755/#1759 paragraph&#39;s &quot;PR #1761 (open at this sync write-time)&quot; wording changed.</li>
+<li><strong>Implementation truth (what was verified from code):</strong> <code>ActionCard</code> struct field-by-field match against <code>docs/contracts/institution-package/action-card.schema.json</code> (12 always-emitted required fields; 2 <code>#[serde(skip_serializing_if = &quot;Option::is_none&quot;)]</code> optional fields; four enums with matching <code>#[serde(rename_all = &quot;snake_case&quot;)]</code> values). Bundled example revalidates against the schema (<code>OK: ... validates against ...</code>).</li>
+<li><strong>Execution truth (branch/PR/CI state confirmed):</strong> all five cycle PRs verified merged via <code>gh pr view</code> (states + merge SHAs); local working tree clean at handoff write-time; CI gate status confirmed via <code>gh pr checks</code> per PR; #1713 closure verified via <code>gh issue view 1713 --json state,closedAt</code>.</li>
+<li><strong>Narrative truth (any strategy doc claims that may be stale):</strong> the post-#1755/#1759 sync edit&#39;s reference to &quot;PR #1761 (open at this sync write-time)&quot; was stale at this session&#39;s start and is corrected to &quot;PR #1761 (merged 2026-05-07; closed #1760)&quot; in this advance.</li>
+<li><strong>Known conflicts between layers:</strong> none discovered this session beyond the stale &quot;open at this sync write-time&quot; wording in #1762&#39;s STATE.md edit, which is corrected by this PR.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
