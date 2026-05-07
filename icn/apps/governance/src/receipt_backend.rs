@@ -519,4 +519,91 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     ) -> Result<Vec<ProcessGateResultReceipt>, String> {
         Ok(vec![])
     }
+
+    // ========================================================================
+    // Opaque storage primitive (Stage 1b of architecture orchestration plan)
+    //
+    // The gateway-side ReceiptStore exposes a meaning-blind storage shape:
+    // store payloads under (class, key1, key2_opt) keyed by record_hash and
+    // ordered by recorded_at. The runtime layer (this crate) owns the typed
+    // envelope and the serde adapter; the gateway sees only opaque bytes.
+    //
+    // These trait methods exist so a `GovernanceReceiptBackend` can be
+    // routed through opaque storage WITHOUT adding new typed receipt types
+    // to the gateway's existing imports — the meaning-firewall ratchet
+    // stays where it is.
+    //
+    // Stage 1c will rewire the typed default impls above to delegate
+    // through these opaque methods, so adding a new receipt class becomes
+    // a one-file change in apps with no gateway touch. Stage 1d will then
+    // flip ProcessGateResultReceipt's fail-closed default to a routing
+    // default that uses opaque storage.
+    //
+    // Default impls below are FAIL-CLOSED. A backend that does not opt
+    // in to opaque storage surfaces the gap as an explicit error (stable
+    // sentinel `opaque_storage_not_implemented`) rather than as a silent
+    // commit-without-persistence. Same discipline as the existing
+    // `put_process_gate_result` default landed in #1755.
+    // ========================================================================
+
+    /// Persist an opaque receipt payload under a `(class, key1, key2_opt)`
+    /// key, tagged with the receipt's canonical `record_hash` and
+    /// ordered by `recorded_at`. See the gateway-side
+    /// `ReceiptStore::put_opaque` docstring for the layout contract;
+    /// this trait method is the indirection so the runtime layer can
+    /// call into the gateway storage without typing the receipt at the
+    /// boundary.
+    ///
+    /// **Fail-closed default.** A backend that has not opted in to
+    /// opaque storage returns `Err` with stable sentinel
+    /// `opaque_storage_not_implemented`. Callers must either handle
+    /// the error or wire a backend that overrides this method.
+    fn put_opaque(
+        &self,
+        _class: &str,
+        _key1: &str,
+        _key2: Option<&str>,
+        _recorded_at: u64,
+        _record_hash: [u8; 32],
+        _payload: &[u8],
+    ) -> Result<(), String> {
+        Err("opaque_storage_not_implemented: \
+             this backend inherits the fail-closed default for \
+             put_opaque. Override the method to opt in to durable \
+             opaque storage, or handle this error at the caller."
+            .to_string())
+    }
+
+    /// Retrieve the latest opaque payload for a
+    /// `(class, key1, key2_opt)` triple — the entry with the largest
+    /// `recorded_at`. Returns `Ok(None)` when the backend supports
+    /// opaque storage but has no entry for the triple. Returns
+    /// `Err(opaque_storage_not_implemented)` from the default impl
+    /// for backends that have not opted in.
+    fn get_latest_opaque(
+        &self,
+        _class: &str,
+        _key1: &str,
+        _key2: Option<&str>,
+    ) -> Result<Option<Vec<u8>>, String> {
+        Err("opaque_storage_not_implemented: \
+             this backend inherits the fail-closed default for \
+             get_latest_opaque. Override the method to opt in to \
+             durable opaque storage, or handle this error at the \
+             caller."
+            .to_string())
+    }
+
+    /// List all opaque payloads under a given `(class, key1)`
+    /// regardless of `key2`, oldest-first by `recorded_at`. Returns
+    /// `Err(opaque_storage_not_implemented)` from the default impl
+    /// for backends that have not opted in.
+    fn list_opaque_for(&self, _class: &str, _key1: &str) -> Result<Vec<Vec<u8>>, String> {
+        Err("opaque_storage_not_implemented: \
+             this backend inherits the fail-closed default for \
+             list_opaque_for. Override the method to opt in to \
+             durable opaque storage, or handle this error at the \
+             caller."
+            .to_string())
+    }
 }
