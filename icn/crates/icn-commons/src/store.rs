@@ -205,11 +205,70 @@ pub struct SledCommonsStore {
     db: sled::Db,
 }
 
+/// Returns `true` when a `sled::Error` indicates that the OS file lock
+/// for the database is currently held by another process (or the
+/// previous in-process flusher hasn't exited yet). The kernel surfaces
+/// this as `EAGAIN`, which `std::io` maps to `ErrorKind::WouldBlock`.
+fn is_sled_lock_contention(e: &sled::Error) -> bool {
+    match e {
+        sled::Error::Io(io_err) => io_err.kind() == std::io::ErrorKind::WouldBlock,
+        _ => false,
+    }
+}
+
 impl SledCommonsStore {
-    /// Open a persistent Sled database at the given path
+    /// Open a persistent Sled database at the given path.
+    ///
+    /// Retries briefly on lock contention. sled 0.34 spawns a
+    /// background flusher thread that holds the OS `flock(LOCK_EX)` on
+    /// the database directory's lockfile. On `Db::drop`, sled signals
+    /// the flusher to stop but does **not** synchronously join it —
+    /// the flock is released only when the flusher actually exits.
+    /// Without a retry, an immediate-reopen pattern (drop a manager,
+    /// open a new one against the same path) races against sled's
+    /// internal shutdown and surfaces as `EAGAIN/WouldBlock` from the
+    /// kernel. This is load-dependent and primarily fires on busy CI
+    /// runners but is also reachable in production daemon-restart
+    /// scenarios.
+    ///
+    /// The retry loop:
+    /// - only retries on `io::ErrorKind::WouldBlock` (the kernel's
+    ///   `EAGAIN` from `flock(LOCK_NB)` — every other error path is
+    ///   surfaced immediately;
+    /// - uses exponential backoff capped at a 500ms total budget so a
+    ///   genuinely-stuck lockfile fails fast;
+    /// - is a no-op on the cold-open path (single attempt, no sleep).
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
-        let db = sled::open(path).context("Failed to open Sled database")?;
-        Ok(SledCommonsStore { db })
+        const MAX_ATTEMPTS: u32 = 8;
+        const INITIAL_BACKOFF_MS: u64 = 10;
+        const MAX_TOTAL_BACKOFF_MS: u64 = 500;
+
+        let path = path.as_ref();
+        let mut attempt: u32 = 0;
+        let mut total_slept_ms: u64 = 0;
+        loop {
+            match sled::open(path) {
+                Ok(db) => return Ok(SledCommonsStore { db }),
+                Err(e)
+                    if is_sled_lock_contention(&e)
+                        && attempt < MAX_ATTEMPTS
+                        && total_slept_ms < MAX_TOTAL_BACKOFF_MS =>
+                {
+                    let remaining_budget = MAX_TOTAL_BACKOFF_MS - total_slept_ms;
+                    let backoff_ms = (INITIAL_BACKOFF_MS << attempt).min(remaining_budget);
+                    debug!(
+                        attempt,
+                        backoff_ms,
+                        path = ?path,
+                        "Sled open hit WouldBlock; backing off and retrying"
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(backoff_ms));
+                    total_slept_ms += backoff_ms;
+                    attempt += 1;
+                }
+                Err(e) => return Err(e).context("Failed to open Sled database"),
+            }
+        }
     }
 
     /// Create a temporary Sled database (deleted on drop)
@@ -1037,3 +1096,60 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
 // ============================================================================
 // Tests
 // ============================================================================
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::*;
+    use tempfile::tempdir;
+
+    /// `SledCommonsStore::open` must tolerate dropping a previous
+    /// instance and immediately reopening against the same path. The
+    /// retry-on-WouldBlock loop covers the window where sled's
+    /// background flusher thread still holds the OS flock past
+    /// `Db::drop`.
+    #[test]
+    fn sled_open_survives_rapid_drop_and_reopen() {
+        let tmp = tempdir().expect("tempdir");
+        let path = tmp.path().join("commons.sled");
+
+        // Repeat enough times to make a single flusher-shutdown delay
+        // statistically exposable. Without the retry loop this loop
+        // panics with `WouldBlock` under any meaningful CI load.
+        for i in 0..50 {
+            let store = SledCommonsStore::open(&path)
+                .unwrap_or_else(|e| panic!("iteration {i}: open should succeed, got: {e:#}"));
+            // Touch the store so sled actually spins up its flusher.
+            store
+                .flush()
+                .unwrap_or_else(|e| panic!("iteration {i}: flush should succeed, got: {e:#}"));
+            drop(store);
+        }
+    }
+
+    /// The lock-contention classifier must only treat
+    /// `io::ErrorKind::WouldBlock` as retryable. Other I/O errors
+    /// (NotFound, PermissionDenied, etc.) and non-I/O sled errors
+    /// must surface immediately so genuine failures are not masked.
+    #[test]
+    fn is_sled_lock_contention_only_matches_wouldblock() {
+        let would_block = sled::Error::Io(std::io::Error::new(
+            std::io::ErrorKind::WouldBlock,
+            "simulated EAGAIN from flock",
+        ));
+        assert!(is_sled_lock_contention(&would_block));
+
+        let other_io = sled::Error::Io(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "simulated EACCES",
+        ));
+        assert!(!is_sled_lock_contention(&other_io));
+
+        let not_found = sled::Error::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "simulated ENOENT",
+        ));
+        assert!(!is_sled_lock_contention(&not_found));
+    }
+}
