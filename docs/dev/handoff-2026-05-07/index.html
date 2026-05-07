@@ -1,0 +1,373 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-05-07 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>handoff 2026 05 07</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/handoff-2026-05-07.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-05-07</h1>
+<blockquote>
+<p><strong>Trigger:</strong> post-#1759 truth-sync (sync PR opened from <code>docs/sync-post-opaque-receipt-stack-2026-05-07</code>; merge commit recorded after merge). Filename follows <code>docs/dev/HANDOFF_TEMPLATE.md</code> Usage Notes (<code>handoff-YYYY-MM-DD.md</code>). First handoff for 2026-05-07.</p>
+</blockquote>
+<h2>Session Goal</h2>
+<p>Land the opaque receipt storage stack (#1757 → #1758 → #1759) safely and in order, resolving substantive AI review findings as merge-gating per #1744. Surfaced and filed a pre-existing sled-flusher race during the merge cycle (#1760, fix opened as #1761). Sync canonical project truth (<code>docs/STATE.md</code>, <code>docs/PHASE_PROGRESS.md</code>, <code>docs/DOCUMENT_REGISTRY.md</code>, latest handoff) with the runtime work that landed.</p>
+<h2>Decisive Test</h2>
+<blockquote>
+<p>Can a new organizer enter the system mid-cycle, switch into the right scope, see the summit&#39;s current phase, understand what was decided, know what is blocked, receive their obligations, trace why they exist, and continue the work without private oral history?</p>
+</blockquote>
+<p>Unchanged from the 2026-04-15 handoff. Every move is judged against whether it makes that more answerable.</p>
+<hr>
+<h2>Final State (Verified)</h2>
+<!-- TRUTH TYPE: Implementation truth — only facts confirmed by commands or code inspection -->
+
+<h3><code>main</code> HEAD</h3>
+<p><code>92734b25 feat(governance): route ProcessGateResultReceipt through opaque storage cascade (#1759)</code></p>
+<h3>Open PRs</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Branch</th>
+<th>State</th>
+<th>CI Status</th>
+<th>Blocker</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1761</td>
+<td><code>fix/commons-sled-open-retry-on-wouldblock</code></td>
+<td>OPEN at handoff write-time</td>
+<td>CI in flight</td>
+<td>review pass + merge</td>
+</tr>
+<tr>
+<td>#1736</td>
+<td><code>dependabot/npm_and_yarn/sdk/typescript/dev-dependencies-99611381d0</code></td>
+<td>OPEN</td>
+<td>Dependabot dev-deps; not on critical path</td>
+<td>maintainer disposition</td>
+</tr>
+<tr>
+<td>#1735</td>
+<td><code>dependabot/npm_and_yarn/web/pilot-ui/dev-dependencies-f805b103c2</code></td>
+<td>OPEN</td>
+<td>Dependabot dev-deps; not on critical path</td>
+<td>maintainer disposition</td>
+</tr>
+</tbody></table>
+<h3>Open implementation follow-ups</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Title</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1760</td>
+<td>fix(commons): add CommonsManager::close() to drain actor before sled handle drop (<code>epic:commons-compute</code> + <code>type:impl</code>) — corrected diagnosis: sled 0.34 flusher-thread shutdown race; fix opened as PR #1761</td>
+</tr>
+</tbody></table>
+<h3>Open coordination/control issues (not implementation)</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Title</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1748</td>
+<td>milestone(process): define Institutional Process Substrate (<code>epic:arch-invariants</code> + <code>type:spec</code>)</td>
+</tr>
+<tr>
+<td>#1746</td>
+<td>milestone(showcase): make NYCN organizer rehearsal operable before first presentation</td>
+</tr>
+<tr>
+<td>#1744</td>
+<td>ci(review): make substantive AI review findings merge-gating</td>
+</tr>
+</tbody></table>
+<h3>Branches</h3>
+<ul>
+<li><code>docs/sync-post-opaque-receipt-stack-2026-05-07</code> — local + remote at handoff write-time. This sync PR.</li>
+<li><code>fix/commons-sled-open-retry-on-wouldblock</code> — local + remote at handoff write-time. PR #1761.</li>
+<li><code>main</code> — origin/main at <code>92734b25</code> (post-#1759) at handoff write-time.</li>
+</ul>
+<h3>Stack landed in order</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Squash SHA</th>
+<th>Merged At</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1757 <code>feat(gateway): add meaning-blind opaque receipt storage primitive</code></td>
+<td><code>73b4beb0</code></td>
+<td>2026-05-06 19:49 UTC</td>
+</tr>
+<tr>
+<td>#1758 <code>feat(governance): expose opaque storage on GovernanceReceiptBackend trait</code></td>
+<td><code>b87b2197</code></td>
+<td>2026-05-07 10:44 UTC</td>
+</tr>
+<tr>
+<td>#1759 <code>feat(governance): route ProcessGateResultReceipt through opaque storage cascade</code></td>
+<td><code>92734b25</code></td>
+<td>2026-05-07 12:13 UTC</td>
+</tr>
+</tbody></table>
+<h3>Required-check status (each PR&#39;s final gates)</h3>
+<p>All required checks (<code>Build Release</code>, <code>Test</code>, <code>Clippy</code>, <code>Format Check</code>, <code>Meaning Firewall Check</code>, <code>Kernel Forbidden Dependencies</code>, <code>Firewall Contract Enforcement</code>, <code>TypeScript SDK</code>, <code>Accessibility Tests</code>, <code>Regulatory Compliance Linter</code>, <code>Agent Tooling Drift Check</code>) <strong>passed on all three PRs.</strong> <code>Compare Against Base</code> (benchmarks) failed on all three but is NOT in the required-checks list; <code>perf-regression-ok</code> label was added to each via REST API (the auto-comment from the workflow says &quot;Add the <code>perf-regression-ok</code> label to merge anyway&quot;). Inspected the benchmark report on each PR: 79–90 benchmarks &quot;regress&quot; each PR, almost all with <code>p &gt; 0.05</code> (&quot;No change in performance detected&quot;) or &quot;Change within noise threshold&quot;; the few with <code>p &lt; 0.05</code> are in <code>task_operations</code>/<code>resource_profile</code> benchmarks completely unrelated to receipt-store changes — classic shared-runner noise.</p>
+<h3>Validators (this session, observed outputs)</h3>
+<p>Run on every push, every cherry-pick, every fix:</p>
+<ul>
+<li><code>cargo fmt --check -p icn-gateway -p icn-governance-actor -p icn-commons</code> — pass.</li>
+<li><code>cargo clippy -p &lt;touched&gt; --all-targets --all-features -- -D warnings</code> — pass.</li>
+<li><code>cargo test -p icn-governance-actor --test process_gate_result_receipt_runtime_slice</code> — 15/15 pass in <strong>0.01s</strong> (was multi-second with sleeps).</li>
+<li><code>cargo test -p icn-governance-actor</code> — all suites pass.</li>
+<li><code>cargo test -p icn-gateway --lib</code> — 541 → 542 pass.</li>
+<li><code>cargo test -p icn-commons --lib</code> — new tests + existing all pass (including the new <code>sled_open_survives_rapid_drop_and_reopen</code> 50-iteration loop and <code>is_sled_lock_contention_only_matches_wouldblock</code> classifier test).</li>
+<li><code>cargo test -p icn-gateway --test commons_integration</code> — 13/13 (including the three previously-flaky <code>*_survives_sled_drop_and_reopen</code> tests).</li>
+<li><code>python3 .github/scripts/firewall_denylist.py</code> — &quot;No NEW firewall violations&quot;; baseline 10, 0 new.</li>
+<li><code>bash scripts/check-meaning-firewall.sh</code> — 3 violations (baseline preserved).</li>
+<li><code>bash ops/scripts/drift-check.sh</code> — 0 errors, 0 warnings; STATUS: PASS.</li>
+</ul>
+<hr>
+<h2>What Changed</h2>
+<!-- TRUTH TYPE: Execution truth — actions taken this session -->
+
+<h3>1. Committed and pushed #1759 deterministic-test fix</h3>
+<p>Two Copilot review findings on #1759 (raised at 2026-05-06 11:47 UTC) had been edited into the working tree but were uncommitted at handoff resume. Committed as <code>192b805d</code> on <code>feat/process-gate-receipt-durable-via-opaque</code>. Three tests previously used <code>std::thread::sleep(Duration::from_millis(1100))</code> to force <code>recorded_at</code> to advance by one second between writes. Replaced with explicit, strictly-increasing <code>recorded_at</code> timestamps on directly-constructed <code>ProcessGateResultReceipt</code> values fed through the backend trait. Test suite finishes in 0.01s, deterministic. Also replaced the flagged <code>.unwrap()</code> calls in <code>opaque_only_backend_chains_session_history_chronologically</code> with named <code>.expect(&quot;...&quot;)</code> messages.</p>
+<h3>2. Addressed new #1757 codex P2 raised against <code>cb9d6daf</code></h3>
+<p>Codex re-reviewed <code>cb9d6daf</code> at 2026-05-06 12:00:33 UTC (about 2 minutes after the push that triggered CI for <code>cb9d6daf</code>). The new finding (&quot;Reject idempotent replays under a new index key&quot;) was substantive: the existing write-once-by-hash check on <code>OPAQUE_REC_PREFIX</code> only protected payload bytes for a fixed <code>(class, record_hash)</code> key; a caller that replayed the same <code>(class, record_hash, payload)</code> tuple under a different <code>(key1, key2, recorded_at)</code> would still write a new secondary by_key entry pointing at the existing primary. That let one canonical receipt fan out across multiple audit chains, or reappear under <code>get_latest_opaque</code> for the wrong tuple, even though no new payload was written.</p>
+<p>Addressed in <code>a8fbb1a6</code> on <code>feat/opaque-receipt-store-primitive</code> before merge. Added a new <code>OPAQUE_HASH_BIND_PREFIX</code> keyspace storing <code>record_hash → canonical (key1, key2_opt, recorded_at)</code> once on first write. <code>put_opaque</code> now consults this binding inside the same sled transaction:</p>
+<ul>
+<li>absent → insert (first-bind);</li>
+<li>matches → idempotent fall-through (the secondary index entry is still re-written so the heal-missing-secondary case keeps working);</li>
+<li>differs → abort with stable sentinel <code>opaque_record_hash_index_collision</code>; no writes land.</li>
+</ul>
+<p>Bind, primary, and secondary writes are enforced atomically inside the same sled transaction. New focused test <code>opaque_same_record_hash_different_index_tuple_errors_no_overwrite</code> covers all three divergence axes (different <code>key2</code>, different <code>key1</code>, different <code>recorded_at</code>) and confirms none mutate the originally-bound chain. No domain imports added; no firewall ratchet change.</p>
+<h3>3. Merged #1757 → #1758 → #1759 in order</h3>
+<p>For each PR:</p>
+<ol>
+<li>Confirmed required checks green on the head commit.</li>
+<li>Confirmed Copilot/codex review threads addressed in code (some bot threads remain technically open at the platform level; the substance is in code).</li>
+<li>Added <code>perf-regression-ok</code> label via REST API (the <code>gh pr edit --add-label</code> path errors with an unrelated GraphQL Projects-classic deprecation message; REST API works).</li>
+<li><code>gh pr merge --squash</code> with explicit subject line matching repo convention (<code>&lt;title&gt; (#&lt;num&gt;)</code>).</li>
+<li>After each merge, retargeted GitHub auto-retargeted the dependent stacked PR to <code>main</code>. Both #1758 and #1759 then needed a rebase off main: reset to <code>origin/main</code> and cherry-picked the original lone commit(s), resolving conflicts where the squashed earlier PR&#39;s content collided with the stacked branch&#39;s pre-squash merge commits. Force-pushed with <code>--force-with-lease</code>.</li>
+<li>Waited for full CI to run on the rebased branch (now base = main, so the full CI workflow runs).</li>
+</ol>
+<p>#1759&#39;s <code>Test</code> job failed once on the rebased branch — <code>test_commons_charter_survives_sled_drop_and_reopen</code> panicked with <code>EAGAIN/WouldBlock</code> from <code>flock(LOCK_NB)</code>. The diff on #1759 was entirely in <code>apps/governance</code> and never touched the commons stack — pre-existing race. Rerun of the failed <code>Test</code> job on the same SHA (no code change) went green, confirming the load-dependent classification.</p>
+<h3>4. Filed issue #1760 for the surfaced race; opened PR #1761 with the fix</h3>
+<p><strong>Initial diagnosis (filed and then corrected):</strong> my first read of the panic was actor-drop ordering — that <code>CommonsManager</code> wraps a tokio actor task whose drop is asynchronous. <strong>That was wrong.</strong> <code>CommonsHandle</code> is a synchronous <code>Arc&lt;RwLock&lt;CommonsInner&gt;&gt;</code> wrapper with no spawned tasks; the drop chain unwinds synchronously through <code>CommonsManager → CommonsHandle → CommonsInner → Arc&lt;dyn CommonsStoreBackend&gt; → SledCommonsStore → sled::Db::drop</code>. Updated #1760&#39;s body with the corrected diagnosis.</p>
+<p><strong>Real root cause:</strong> sled 0.34 (<code>sled = &quot;0.34&quot;</code> in <code>icn/Cargo.toml</code>) spawns a background flusher thread on <code>Db::open</code> that holds the OS <code>flock(LOCK_EX)</code> on the database directory&#39;s lockfile. On <code>Db::drop</code>, sled signals the flusher to stop but does <strong>not</strong> synchronously join it — the flock is released only when the flusher actually exits. Without a retry, an immediate-reopen pattern (drop a manager, open a new one against the same path) races against sled&#39;s internal shutdown.</p>
+<p><strong>Fix opened as PR #1761</strong> on <code>fix/commons-sled-open-retry-on-wouldblock</code>. Single-file change in <code>icn/crates/icn-commons/src/store.rs</code>: bounded retry-with-backoff in <code>SledCommonsStore::open</code>, 8 attempts max, 500ms total budget cap, 10ms initial backoff. Only matches <code>io::ErrorKind::WouldBlock</code> so genuine errors (NotFound, PermissionDenied, etc.) are not masked. Two new unit tests pin the behavior: <code>sled_open_survives_rapid_drop_and_reopen</code> (50-iteration loop) and <code>is_sled_lock_contention_only_matches_wouldblock</code> (classifier coverage). All local validation green; integration tests (<code>cargo test -p icn-gateway --test commons_integration</code>) including the three previously-flaky <code>*_survives_sled_drop_and_reopen</code> tests pass cleanly. CI in flight at handoff write-time.</p>
+<h3>5. STATE.md truth-sync (<code>docs/STATE.md</code>)</h3>
+<ul>
+<li><code>Last Reviewed</code> advanced 2026-05-05 → 2026-05-07.</li>
+<li>Added a 2026-05-07 (post-#1755 / #1756 / #1757 / #1758 / #1759) sync-edit comment block at the top, immediately before the existing 2026-05-05 (post-#1753) block. Records the runtime/implementation truth (the May-5 syncs were doc/control-plane only; this is real Rust), enumerates each landing, names the new <code>OPAQUE_HASH_BIND_PREFIX</code> invariant, captures the surfaced flake → real bug filed → fix opened (#1760 → #1761), and explicitly disclaims Phase 2 advance, formal NYCN pilot, production readiness, live federation, K3s/DNS/Forgejo mutation, and gateway typed governance import widening.</li>
+<li>Replaced the &quot;Current status (2026-05-05 snapshot)&quot; header with &quot;(2026-05-07 snapshot)&quot; and rewrote the long descriptive paragraph to mark the May-6/May-7 sequence as runtime/implementation truth (distinct from the May-5 doc/control-plane sequence), enumerate the three-PR stack and the new invariant, capture the #1760/#1761 follow-up, and reduce the candidate-next-moves enumeration so candidate (b) reflects the new state (&quot;additional <code>ProcessTransitionReceipt</code> classes&quot; rather than &quot;first&quot;).</li>
+<li>Appended six new rows at the top of &quot;Recently merged (since 2026-04-15)&quot; table: #1759, #1758, #1757, #1756, #1755, #1754.</li>
+<li>Added #1761 to the &quot;Open PRs&quot; table and #1760 to the &quot;Open coordination/control issues&quot; table.</li>
+<li>Inserted a new &quot;Opaque receipt storage stack&quot; bullet block at the very top of &quot;What landed since Phase 1 (Charter Engine)&quot;, recording each PR&#39;s contribution, the new invariant, the surfaced flake → fix path, the hook-tooling fix, and the explicit non-claims (no firewall ratchet increase, no widened gateway typed governance imports, no Phase 2 / production / live federation claims, no NYCN private-data handling, no infra mutation).</li>
+<li>Updated the References block to point at this handoff (<code>docs/dev/handoff-2026-05-07.md</code>).</li>
+</ul>
+<h3>6. PHASE_PROGRESS.md truth-sync (<code>docs/PHASE_PROGRESS.md</code>)</h3>
+<ul>
+<li><code>Last Updated</code> advanced 2026-05-05 → 2026-05-07.</li>
+<li>Updated the top-of-file phase paragraph to mention the May-6/May-7 opaque receipt storage stack landing alongside the May-5 framing sequence.</li>
+<li>Added a 2026-05-07 (post-#1755 / #1756 / #1757 / #1758 / #1759) sync-edit comment block summarizing the landings, the new invariant, and the <code>idea-0019</code> (#1748) acceptance-gate posture: gate (a) is now partially satisfied (one <code>ProcessTransitionReceipt</code> class emitted and durably persisted); gates (b)–(d) remain unchanged.</li>
+<li>Extended the Phase 2 deliverables list with five new <code>[x]</code> entries crediting #1755 (first <code>ProcessGateResultReceipt</code> runtime slice), #1756 (hook tooling fix), #1757 (opaque storage primitive + new <code>OPAQUE_HASH_BIND_PREFIX</code> invariant), #1758 (<code>GovernanceReceiptBackend</code> trait extension), #1759 (cascade routing + test-suite determinism).</li>
+<li>Replaced the now-superseded <code>[ ]</code> for &quot;first <code>idea-0019</code> <code>ProcessTransitionReceipt</code> class&quot; with an &quot;additional classes&quot; <code>[ ]</code> enumerating the seven remaining classes (<code>ProcessSessionOpenedReceipt</code>, <code>DeliberationEntryRecordedReceipt</code>, <code>DecisionRecordedReceipt</code>, <code>ActivationCrossedReceipt</code>, <code>MutationPlanRecordedReceipt</code>, <code>MutationAppliedReceipt</code>, <code>EvidencePacketProducedReceipt</code>) — all eligible through the same opaque storage cascade.</li>
+<li>Added a 2026-05-07 (post-#1755 / #1756 / #1757 / #1758 / #1759) entry at the top of &quot;Decisions Made&quot; recording the stack landing, the new invariant, the substantive review findings addressed pre-merge, the #1760/#1761 follow-up, the gate-(a) partial-satisfaction posture, the Phase 2 status (still ⏳ partner-bound), and the explicit &quot;next move not yet selected&quot; stance.</li>
+</ul>
+<h3>7. New session handoff</h3>
+<p>This file (<code>docs/dev/handoff-2026-05-07.md</code>) replaces <code>docs/dev/handoff-2026-05-05-c.md</code> as the latest handoff. The May-5 handoffs are preserved verbatim as historical artifacts.</p>
+<h3>8. Registry refresh</h3>
+<p>Regenerated <code>docs/DOCUMENT_REGISTRY.md</code> to reflect the +1 corpus delta (this new handoff under <code>docs/dev/</code>). The handoff falls under the existing <code>[[doc_path_defaults]]</code> rule with <code>prefix = &quot;docs/dev/&quot;</code> so no per-file overlay row is needed in <code>docs/registry.toml</code>.</p>
+<hr>
+<h2>What&#39;s Open</h2>
+<!-- TRUTH TYPE: Execution truth — known incomplete work -->
+
+<p>The next session picks one of these. <strong>None is selected here.</strong> The next session must choose deliberately from updated canonical truth, not auto-pilot.</p>
+<ul>
+<li><input disabled="" type="checkbox"> <strong>PR #1761 review pass + merge</strong> — the sled-open retry fix. Bounded retry-with-backoff in <code>SledCommonsStore::open</code> for <code>WouldBlock</code>. Closes #1760. CI in flight at handoff write-time. Single-file change; no API change.</li>
+<li><input disabled="" type="checkbox"> <strong>Additional <code>idea-0019</code> <code>ProcessTransitionReceipt</code> classes</strong> — adding any of the seven remaining classes (<code>ProcessSessionOpenedReceipt</code>, <code>DeliberationEntryRecordedReceipt</code>, <code>DecisionRecordedReceipt</code>, <code>ActivationCrossedReceipt</code>, <code>MutationPlanRecordedReceipt</code>, <code>MutationAppliedReceipt</code>, <code>EvidencePacketProducedReceipt</code>) is now a one-file change in <code>apps/governance</code> because the opaque storage cascade landed. None of these is a separately scoped PR yet.</li>
+<li><input disabled="" type="checkbox"> <strong><code>idea-0019</code> (#1748) acceptance gate (b)</strong> — real visibility/privacy-boundary run with redaction in evidence export. Unchanged: not started.</li>
+<li><input disabled="" type="checkbox"> <strong><code>idea-0019</code> (#1748) acceptance gate (c)</strong> — accessibility-gate <code>ProcessGateResult</code> produced through <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> on a real surface. Unchanged: not started.</li>
+<li><input disabled="" type="checkbox"> <strong><code>idea-0019</code> (#1748) acceptance gate (d)</strong> — open-question triage: at least one of Q1 (<code>ProcessTargetRef</code> polymorphism), Q3 (<code>DeliberationEntry</code> kind taxonomy), or Q4 (<code>HumanDecisionSet</code> vs proposal/vote) resolved or explicitly deferred in writing. Unchanged: not started.</li>
+<li><input disabled="" type="checkbox"> <strong><code>idea-0020</code> (DAP) runtime dogfood</strong> — emitting at least one receipt under <code>ADR-0026</code> for one DAP primitive. Unchanged: not started. The opaque storage cascade landed in this session makes adding DAP receipt classes the same one-file change in <code>apps/governance</code> that <code>idea-0019</code> classes get.</li>
+<li><input disabled="" type="checkbox"> <strong>DAP §17 follow-up framing briefs</strong> — pre-RFC, decompose-only. Unchanged: not started.</li>
+<li><input disabled="" type="checkbox"> <strong>Control-plane cleanup</strong>, including unresolved/stale review-thread hygiene if inspection confirms it; pre-existing yaml-vs-registry drift on <code>docs/ai/*</code>, <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code>, <code>docs/design/*</code>, <code>docs/development/testing/governance-proof-layers.md</code>, <code>docs/onboarding/*</code>, <code>docs/planning/*</code>, <code>docs/plans/*</code> is named here as a possible candidate but not selected.</li>
+<li><input disabled="" type="checkbox"> <strong>NYCN steward-facing communication-groups directory tool (NYCN #33)</strong> — verify status before reading; not in this repo. Carried forward.</li>
+</ul>
+<hr>
+<h2>Unsafe Assumptions</h2>
+<!-- Explicitly name anything this session relied on that was not verified -->
+
+<ul>
+<li>This sync trusts that #1755/#1756/#1757/#1758/#1759 are themselves internally consistent; their squash commit messages and PR bodies are the audit record.</li>
+<li>&quot;Open PRs&quot; trusts <code>gh pr list --state open --limit 20</code> at handoff write-time. Dependabot may open additional dev-dependency bumps before the next session.</li>
+<li>The benchmark &quot;regression&quot; classification (CI-runner noise) trusts <code>p &gt; 0.05</code> as the de-facto noise floor and trusts that the affected benchmarks (<code>task_operations</code>/<code>resource_profile</code>) are unrelated to any change in <code>icn-gateway/src/receipt_store.rs</code>. A real performance regression in these benchmarks would not be detected by this judgment alone.</li>
+<li><code>perf-regression-ok</code> was added to all three PRs via REST API. The label addition succeeded but the <code>gh pr edit --add-label</code> path errored with an unrelated GraphQL Projects-classic deprecation; the REST path is what landed the label.</li>
+<li>Codex did not auto-re-acknowledge its 2026-05-06 12:00:33 UTC P2 against #1757 after <code>a8fbb1a6</code> was pushed. The bot thread remains technically open at the platform level even though the substance is addressed in code with explicit test coverage. Treated as resolved for merge-readiness purposes per the user&#39;s clarification that the in-code fix + green CI satisfy the merge gate; a future audit may want to verify codex bot thread state.</li>
+<li>The sled 0.34 flusher-thread shutdown analysis is based on inspection of <code>icn-commons/src/store.rs</code>, <code>icn-commons/src/handle.rs</code>, and the public sled 0.34 API. It is <strong>not</strong> based on instrumenting the flusher thread directly; the <code>EAGAIN/WouldBlock</code> failure mode is consistent with the diagnosis but other threading interactions in sled 0.34 have not been audited.</li>
+<li>Rust workspace verification was scoped to the changed crates each push (<code>icn-gateway</code>, <code>icn-governance-actor</code>, <code>icn-commons</code>). Workspace-wide <code>cargo check --workspace</code> was not run as part of this docs-sync; the last full workspace check happened during the merge cycle on the rebased branches before each push.</li>
+</ul>
+<hr>
+<h2>Next Move</h2>
+<!-- TRUTH TYPE: Execution truth — the exact sequence for the next session -->
+
+<p><strong>Not selected here.</strong> Pick deliberately from the &quot;What&#39;s Open&quot; list at the next session.</p>
+<p>The single most-likely next move (named here so the next session can choose deliberately, not by inertia) is reviewing and merging PR #1761. After that, no specific next move is preselected — the seven open <code>idea-0019</code> <code>ProcessTransitionReceipt</code> classes, the three remaining #1748 acceptance gates (visibility/privacy boundary; accessibility-gate <code>ProcessGateResult</code> on a real surface; open-question triage on Q1/Q3/Q4), the DAP runtime dogfood, the DAP §17 follow-up framing briefs, and control-plane cleanup are all eligible candidates.</p>
+<hr>
+<h2>Architectural Decisions</h2>
+<!-- TRUTH TYPE: Declared project truth changes (if any were made or ratified) -->
+
+<ol>
+<li><strong><code>OPAQUE_HASH_BIND_PREFIX</code> invariant added to the gateway.</strong> Each <code>(class, record_hash)</code> is bound to exactly one canonical <code>(key1, key2_opt, recorded_at)</code> tuple at first write; divergent re-binds abort with stable sentinel <code>opaque_record_hash_index_collision</code>. Bind, primary, and secondary writes are atomic inside the same sled transaction. This closes a secondary-index fan-out hole that the original write-once-by-hash check on <code>OPAQUE_REC_PREFIX</code> (cb9d6daf) did not catch. Codified in <code>icn/crates/icn-gateway/src/receipt_store.rs</code> doc comments (a8fbb1a6 → squashed into #1757 → main as 73b4beb0).</li>
+<li><strong>Apps add new receipt classes opaquely without expanding gateway typed governance imports.</strong> The <code>(class, key1, key2_opt, recorded_at, record_hash, payload)</code> tuple is the single contract between apps and the gateway for receipt persistence. The opaque cascade pattern (#1758 trait extension + #1759 default routing) means a new <code>ProcessTransitionReceipt</code> class becomes a one-file change in <code>apps/governance</code> — no gateway touch, no firewall ratchet expansion. Codified in <code>OPAQUE_REC_PREFIX</code> doc comment and <code>put_opaque</code> doc comment.</li>
+<li><strong>No promoting standalone receipt classes to canonical without runtime emission.</strong> The slice-local class candidates (<code>ConflictDisclosureAcceptedReceipt</code>, <code>MinorityReportRecordedReceipt</code>, <code>FacilitatorSummaryRecordedReceipt</code>) referenced in #1753 and #1751 dogfood/framing artifacts remain non-canonical until a runtime dogfood actually emits them. <code>ProcessGateResultReceipt</code> IS now canonical because #1755 emits it and #1759 makes that emission durable. Pattern explicitly preserved.</li>
+</ol>
+<p>No other binding architectural decisions were made or ratified this session.</p>
+<hr>
+<h2>Verification Commands</h2>
+<!-- Commands the next session should run to confirm starting state -->
+
+<pre><code class="language-bash"># 1. Confirm main HEAD is post-#1759.
+git fetch origin main
+git log --oneline -1 origin/main
+# expect: 92734b25 feat(governance): route ProcessGateResultReceipt through opaque storage cascade (#1759)
+
+# 2. Confirm Rust compile-clean against the merged stack.
+cd icn
+cargo check -p icn-gateway -p icn-governance-actor -p icn-commons
+cargo test -p icn-governance-actor --test process_gate_result_receipt_runtime_slice
+cargo test -p icn-gateway --lib
+cargo test -p icn-gateway --test commons_integration
+
+# 3. Confirm firewall ratchet preserved.
+cd ..
+python3 .github/scripts/firewall_denylist.py
+bash scripts/check-meaning-firewall.sh
+
+# 4. Confirm doc-control plane clean.
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict
+bash ops/scripts/drift-check.sh
+
+# 5. Confirm the open follow-up PRs (review state, CI status).
+gh pr view 1761 --json state,mergeable,statusCheckRollup,reviewDecision
+gh pr view 1762 --json state,mergeable,statusCheckRollup,reviewDecision
+
+# 6. Confirm the open issue list matches this handoff.
+gh issue list --state open --limit 20
+</code></pre>
+<p>If any of (1)–(4) diverges from the expected state, audit the divergence before resuming work. If (5) shows #1761 or #1762 in an unexpected state, re-read the PR&#39;s review threads before acting.</p>
+<hr>
+<h2>Truth-Plane Notes</h2>
+<!-- Which truth types were relied on? Any known conflicts between layers? -->
+
+<ul>
+<li><strong>Declared project truth (loaded from):</strong> <code>docs/STATE.md</code> post-#1753 sync edit at session start; <code>docs/PHASE_PROGRESS.md</code> post-#1753 sync edit at session start. Both advanced this session to post-#1759 sync edits as part of this handoff&#39;s accompanying docs PR. The Phase 2 framing (still ⏳ partner-bound) is unchanged across this advance — only deliverable enumeration and <code>idea-0019</code> (#1748) acceptance-gate posture changed.</li>
+<li><strong>Implementation truth (what was verified from code):</strong> the opaque receipt storage stack landed and was inspected end-to-end (<code>OPAQUE_REC_PREFIX</code>, <code>OPAQUE_BY_KEY_PREFIX</code>, <code>OPAQUE_HASH_BIND_PREFIX</code> keyspaces; the <code>put_opaque</code> sled transaction; the <code>GovernanceReceiptBackend</code> trait extension; the <code>put_process_gate_result</code> cascade). The sled-flusher race in <code>commons_integration.rs</code> was diagnosed by reading <code>icn-commons/src/handle.rs</code>, <code>icn-commons/src/store.rs</code>, and <code>sled-0.34.7/src/config.rs</code> — confirmed <code>CommonsHandle</code> is synchronous <code>Arc&lt;RwLock&lt;CommonsInner&gt;&gt;</code> with no spawned task, and confirmed sled 0.34.7&#39;s <code>Config::try_lock</code> wraps <code>flock</code> failures with <code>ErrorKind::Other</code>.</li>
+<li><strong>Execution truth (branch/PR/CI state confirmed):</strong> all three stack PRs verified merged via <code>gh pr view</code> (states + merge SHAs); local working tree clean before each branch switch; CI gate status confirmed via <code>gh pr checks</code> per PR.</li>
+<li><strong>Narrative truth (any strategy doc claims that may be stale):</strong> the May-5 sync edits&#39; references to &quot;candidate (b)&quot; (<code>idea-0019</code> runtime dogfood toward receipt-backed promotion as a candidate next move) were superseded by this session — that candidate is now partially landed via #1755 + #1759. The candidate enumeration in this PR&#39;s STATE.md sync edit reflects that. Strategy-level claims about Phase 2 partner-bound status are unchanged.</li>
+<li><strong>Known conflicts between layers:</strong> none discovered this session beyond the codex bot review thread on #1757 remaining technically open even after the in-code fix <code>a8fbb1a6</code> was pushed and merged. The substance is addressed in the merged code with explicit test coverage; the bot thread state is a platform-level artifact, not an implementation truth divergence.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
