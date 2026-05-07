@@ -1,0 +1,259 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Private-overlay DID activation flow (generic ICN spec) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>private overlay did activation flow</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/private-overlay-did-activation-flow.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: normative
+Canonical: no
+Last Reviewed: 2026-05-07</h2>
+<h1>Private-overlay DID activation flow (generic ICN spec)</h1>
+<p>This document specifies the <strong>generic substrate boundary</strong> for binding <strong>organizer-readable holder labels</strong> to <strong>substrate DIDs</strong> without leaking private overlay material into public ICN repositories.</p>
+<p>It defines the <strong>boundary and lifecycle</strong>, not partner-specific overlay contents. Institution packages (cooperative, community, federation, organizing-network) own their local overlay storage, steward roles, sign-off procedures, and retention policy. ICN core docs describe how the boundary works, what may cross it, and what must never cross it.</p>
+<p><strong>Tracking:</strong> <a href="https://github.com/InterCooperative-Network/icn/issues/1730" target="_blank" rel="noopener">ICN#1730</a>. Parent: <a href="https://github.com/InterCooperative-Network/icn/issues/1724" target="_blank" rel="noopener">ICN#1724</a>. Milestone: <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">ICN#1746</a>. Companion partner-package follow-up: NYCN#57.</p>
+<h2>1. Status and non-claims</h2>
+<p><strong>Status.</strong> Generic ICN spec. Documentation only. No runtime code is changed by this spec. No DID resolver is introduced or redesigned. No directory service is shipped. No partner overlay is implemented in this repository.</p>
+<p><strong>This document is NOT:</strong></p>
+<ul>
+<li>a partner overlay implementation;</li>
+<li>a directory service;</li>
+<li>a DID resolver redesign;</li>
+<li>a production launch flow;</li>
+<li>formal NYCN pilot authorization;</li>
+<li>a live federation flow;</li>
+<li>a place where private partner, member, sponsor, attendee, accommodation, or contact data is stored.</li>
+</ul>
+<p><strong>Vocabulary.</strong> Substrate-facing copy uses <strong>obligation</strong>, <strong>allocation</strong>, <strong>settlement</strong>, <strong>unit</strong>, <strong>position</strong>, <strong>receipt</strong>, <strong>provenance</strong>, and <strong>evidence</strong> when referring to ICN primitives. ICN-native economic primitives should not be described using consumer-finance or fintech framing.</p>
+<h2>2. Definitions</h2>
+<h3>2.1 Holder label</h3>
+<p>A <strong>holder label</strong> is the organizer-facing, human-readable placeholder used in repo-safe workflows.</p>
+<ul>
+<li>May be a <strong>role</strong> (for example <code>facilitator</code>, <code>treasurer-role</code>), a <strong>placeholder</strong> (for example <code>holder-A</code>, <code>committee-chair-2026</code>), or a <strong>fixture-local reference</strong> used for rehearsal.</li>
+<li>Lives in public/repo-safe organizer material: wireframes, fixtures, demo scripts, preview/review summaries, action-card examples.</li>
+<li>Is <strong>not</strong> a DID and is <strong>not</strong> proof of identity. It does not assert that any specific person controls any specific key.</li>
+<li>Is rebindable: a label can be reassigned, retired, or replaced without rewriting public history.</li>
+</ul>
+<h3>2.2 DID</h3>
+<p>A <strong>DID</strong> is the substrate identity reference used by the ICN runtime after a consented activation.</p>
+<ul>
+<li>Substrate-level form is <code>did:icn:&lt;...&gt;</code> as defined by <code>icn-identity</code>. Both key-derived (Ed25519 public-key) and anchor-derived (SDIS-anchor) forms are in scope; this spec does not pin a single underlying DID type. See <a href="/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE">`../architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md`</a> for the canonical DID forms and lifecycle.</li>
+<li>Appears in public/repo-safe artifacts only when the DID is <strong>explicitly fictional</strong>, <strong>fixture-safe</strong>, or <strong>already authorized</strong> by the relevant package policy for public reference.</li>
+<li>Carries <strong>no participant attributes</strong> by itself: a DID is a substrate handle, not a profile, contact card, or attendance record.</li>
+</ul>
+<h3>2.3 Private overlay</h3>
+<p>A <strong>private overlay</strong> is the non-public mapping/context that binds holder labels to real DIDs and to real-person records.</p>
+<ul>
+<li>May include private organizer/member/sponsor/attendee data (legal names, contact details, accommodation notes, attendance rolls, sponsor/member private fields, internal identifiers).</li>
+<li><strong>Must not be committed to public ICN docs or repositories.</strong> Overlay storage location, retention, and access are package-local concerns.</li>
+<li>May include the cryptographic material or recovery context that an institution package treats as private (for example, a rotation history, an internal sign-off log).</li>
+<li>Tokens, secrets, and credentials are private overlay material and never appear in public artifacts.</li>
+</ul>
+<h3>2.4 Activation</h3>
+<p><strong>Activation</strong> is the consented transition from a label-only workflow to a DID-bound workflow.</p>
+<ul>
+<li>Performed by an authorized steward/operator, or by a governed process explicitly defined in the institution package.</li>
+<li>Must be <strong>reviewable</strong> (an authorized reviewer can confirm the activation occurred and was authorized), <strong>reversible/rotatable where appropriate</strong> (a binding can be retired, rotated, or replaced), and <strong>auditable without leaking private overlay contents</strong> (public evidence shows status and authority basis, not mapping contents).</li>
+<li>Activation does <strong>not</strong> publish a person&#39;s identity. It records, in the appropriate authority context, that a label has become a DID-bound participant for a specific scope.</li>
+</ul>
+<h2>3. Public/private split</h2>
+<p>The boundary between public ICN material and private overlay material is enforced at the doc/PR level today and at the evidence-export level by the substrate. Institution packages must respect both directions of this split.</p>
+<h3>3.1 Public/repo-safe (allowed in this repository and in repo-safe partner artifacts)</h3>
+<ul>
+<li><strong>Holder labels</strong> (roles, placeholders, fixture-local references).</li>
+<li><strong>Fixture-only DID examples</strong> that are obviously non-live (clearly synthetic patterns; not the DID of any real participant).</li>
+<li><strong>Schema/contract references</strong> (for example <code>action-card.schema.json</code>, <code>preview-review.schema.json</code>, <code>rehearsal-evidence-export.schema.json</code>).</li>
+<li><strong>Policy boundaries</strong> (this document, the no-CLI workflow doc, the accessibility gate, package boundary briefs).</li>
+<li><strong>Redacted evidence summaries</strong> (basenames, categories, mode flags, outcome categories).</li>
+<li><strong>Activation status proofs</strong> that record <em>that</em> activation happened (event status, authority basis, timestamp/hash/redacted pointer) without exposing the private overlay contents.</li>
+</ul>
+<h3>3.2 Private/overlay-only (must never enter public ICN material)</h3>
+<ul>
+<li>Real <strong>person ↔ DID mapping</strong> (the binding contents themselves).</li>
+<li><strong>Contact details</strong> (email, phone, address, social handles tied to a real participant).</li>
+<li><strong>Attendance rolls</strong> that name real participants.</li>
+<li><strong>Access needs / accommodation notes</strong> for real participants.</li>
+<li><strong>Sponsor/member private data</strong> (private agreements, internal-only fields, private financial context).</li>
+<li><strong>Tokens, secrets, credentials</strong> of any participant or steward.</li>
+<li><strong>Partner-specific overlay records</strong> in their full form (raw mapping rows, private review notes, private sign-off logs).</li>
+</ul>
+<p>A reviewer who finds any item from §3.2 in this repository or in a repo-safe artifact must treat the PR as not-ready and route the material into the relevant package-local overlay before merge. There is no version of &quot;leak it once and rotate later&quot; that is acceptable for §3.2 categories.</p>
+<h2>4. Activation lifecycle (generic flow)</h2>
+<p>The activation lifecycle is the canonical sequence institution packages must follow to take an organizer-facing label and bind it to a substrate DID. Implementations may batch or reorder UI screens where safe, but every step&#39;s intent must be preserved.</p>
+<ol>
+<li><strong>Label appears in organizer-facing material.</strong> The label is created in the package&#39;s normal organizer workflow (rehearsal fixture, governance roster, action-item assignment) and is treated as a placeholder. No DID is implied.</li>
+<li><strong>Steward/facilitator identifies whether activation is needed.</strong> Many labels (committee roles, fixture references, future placeholders) never need activation. Activation is requested only when a substrate-bound action is required for that label (signing a receipt, casting a substrate-recognized vote, completing an action item under a DID-bound flow).</li>
+<li><strong>Person or authorized representative consents to DID binding.</strong> The participant whose label is being activated, or an explicitly authorized representative under package policy, gives <strong>informed consent</strong> to the binding. Consent records what scope the binding covers and what the participant should expect to see in public artifacts after activation.</li>
+<li><strong>Steward reviews the mapping in a private overlay.</strong> The mapping (label → DID → person record) is recorded in the package-local private overlay only. The review confirms that the DID is the participant&#39;s intended substrate handle, that the package is authorized to perform the binding, and that nothing private has leaked into a public surface.</li>
+<li><strong>Activation creates or confirms the DID binding.</strong> The substrate-side effect (registering the binding for the relevant scope, updating the standing/membership view, issuing a capability if applicable) is performed by an authorized steward/operator or governed process.</li>
+<li><strong>Public artifact records only boundary-safe activation status.</strong> A repo-safe summary records <em>that</em> activation occurred and under what authority basis (steward role, committee decision, governed process), in plain language. The mapping contents stay in the private overlay. A <em>structured</em> activation-status record (machine-readable status enum, redacted pointer to a private overlay row, structured authority basis) is a deliberate <strong>future extension</strong> of the <a href="/docs/contracts/rehearsal-evidence-export">`rehearsal-evidence-export`</a> contract and is <strong>not</strong> in scope for this spec; until that extension lands, packages produce plain-language summaries that name no participant.</li>
+<li><strong>Later revocation/rotation can replace or remove the binding.</strong> Subsequent rotations or revocations follow the same boundary: status + authority basis appear in public material as plain language; mapping changes are recorded only in the private overlay. A structured rotation/revocation record is the same future contract extension as activation status.</li>
+<li><strong>Evidence export records boundary-safe status only.</strong> Any rehearsal or pilot evidence export that references activations does so through fields the <a href="/docs/contracts/rehearsal-evidence-export">`rehearsal-evidence-export`</a> contract <strong>already supports</strong> today (for example a plain-language <code>decision_outcomes[]</code> entry, a <code>non_claims[]</code> entry, or a category label in <code>proof_loop_references[]</code>). The contract today does not define a dedicated activation-status record or a redacted-pointer field; extending it to support those is a future ICN contract change tracked separately from this spec.</li>
+</ol>
+<p>A package may add <strong>package-local steps</strong> (for example multi-steward sign-off, time-windowed consent, recorded review meetings) on top of this generic flow. A package may <strong>not</strong> remove a step from the generic flow.</p>
+<h2>5. Consent and authority boundary</h2>
+<p>Consent and authority rules apply to every activation, regardless of which package performs it.</p>
+<ul>
+<li><strong>No unconsented binding.</strong> An activation never proceeds without informed consent from the participant or an explicitly authorized representative under package policy.</li>
+<li><strong>No public doxxing-by-activation.</strong> The act of activating must not publish a participant&#39;s legal identity, contact info, or accommodation context. Public artifacts show status and authority, not mapping contents.</li>
+<li><strong>A public name does not authorize a DID binding.</strong> Mentioning a person in a public agenda, roster, or news item is not consent and does not authorize an activation. Authority and consent are distinct from public visibility.</li>
+<li><strong>No binding from scraped documents alone.</strong> Drive ingest, scraped agendas, mailing-list rosters, and similar inputs may surface a label and may suggest a future activation candidate. They are never sufficient by themselves to perform an activation.</li>
+<li><strong>Role/committee labels remain labels until activation is explicitly needed.</strong> A committee chair role can stay a label across many cycles; it becomes DID-bound only when a substrate-bound action requires it.</li>
+<li><strong>Activation is performed by an authorized steward/operator or governed process.</strong> Authority to activate is package-defined. ICN core does not enumerate steward identities; it enumerates the boundary they must respect.</li>
+<li><strong>Partner-specific procedures live in partner repositories/policies.</strong> Steward roster, multi-sign-off rules, retention windows, and overlay storage location are package concerns. ICN core does not encode any one partner&#39;s procedure.</li>
+</ul>
+<h2>6. Revocation, rotation, and correction</h2>
+<p>Bindings are <strong>mutable in the substrate sense</strong> (rotatable/revocable) and the public-evidence layer must reflect that without rewriting history.</p>
+<ul>
+<li><strong>DID rotation path.</strong> When a participant rotates their substrate key, the binding is updated in the private overlay; a plain-language rotation note appears in the public evidence trail. The previous DID is retired in the binding without erasing prior public receipts that referenced it.</li>
+<li><strong>Mistaken-binding correction path.</strong> When a mapping was recorded against the wrong DID, the package corrects the overlay row, records a plain-language correction note in public evidence, and (where applicable) issues an explicit reversal of any substrate-side effect that depended on the wrong binding.</li>
+<li><strong>Withdrawal/revocation of consent.</strong> A participant (or an authorized representative under package policy) may withdraw consent. The package retires the binding, records a plain-language revocation note in public evidence, and rebinds (or relabels) future obligations according to package rules.</li>
+<li><strong>Stale label cleanup.</strong> Labels that no longer correspond to any active role or participant are retired in the package&#39;s organizer surface. Retirement is a label-side action and does not by itself imply revocation of any substrate binding.</li>
+<li><strong>Evidence shows that a correction occurred without exposing private data.</strong> Public evidence records the kind of change (rotation, correction, revocation, retirement) and the authority basis in plain language; it does not record the prior or new mapping contents. A structured representation of these events is the same future contract extension noted in §4 step 6.</li>
+</ul>
+<h2>7. Threat model notes</h2>
+<p>The following risks must be addressed by every package implementing the activation flow. This list is not exhaustive; packages should add risks specific to their environment (live cloud sync, multi-org overlay, etc.) in their package-local policy.</p>
+<ul>
+<li><strong>Accidental private data commit.</strong> Private overlay rows committed to a public repo. Mitigation: PR-level review, redaction of evidence summaries, repo-safe export contract enforcement.</li>
+<li><strong>Unconsented DID binding.</strong> A binding performed without informed participant consent. Mitigation: package-local consent record, steward review step, withdrawal procedure.</li>
+<li><strong>Public label treated as identity proof.</strong> A label appearing in a public agenda or fixture being assumed to authorize substrate-bound action. Mitigation: explicit &quot;label ≠ DID&quot; statement in product UI and operator docs; activation as the only authorization path.</li>
+<li><strong>Role label confused for person identity.</strong> A role label (for example <code>treasurer-role</code>) being treated as a specific person across cycles after that role changes hands. Mitigation: rebinding flow, public retirement of the label-to-person association, no implicit carryover.</li>
+<li><strong>Fixture DID accidentally reused as a real DID.</strong> A demo/fixture DID being used as if it were a real participant. Mitigation: obviously synthetic fixture DID patterns; package validation that rejects fixture DIDs in non-rehearsal modes.</li>
+<li><strong>Evidence packet leaking overlay content.</strong> A rehearsal or pilot evidence export including raw mapping rows. Mitigation: the <a href="/docs/contracts/rehearsal-evidence-export">`rehearsal-evidence-export`</a> contract&#39;s <code>additionalProperties: false</code> and <code>x-icn-must-not-include</code> posture; plain-language summaries that name no participant; CI validation of evidence packet shape against the schema.</li>
+<li><strong>Live sync accidentally enabled during rehearsal.</strong> A package-local connector pushing private overlay rows to a live cloud sync surface. Mitigation: rehearsal-mode default-off for all live connectors; package-local pre-flight check.</li>
+<li><strong>Stale overlay mapping after role/person changes.</strong> An overlay row continuing to bind a label to a DID that no longer represents the participant&#39;s intent. Mitigation: rotation/revocation procedure; periodic package-local audit.</li>
+<li><strong>Unauthorized steward/operator activation.</strong> A non-authorized actor performing an activation. Mitigation: package-local authority list; steward identity verification; logged authority basis on every activation event.</li>
+</ul>
+<h2>8. Evidence and receipts</h2>
+<p>Evidence and receipts must prove <strong>boundary compliance</strong>, not reveal <strong>private mapping</strong>. The substrate&#39;s <a href="/docs/contracts/rehearsal-evidence-export">`rehearsal-evidence-export`</a> contract is the canonical repo-safe surface; this section describes what activation events should and should not contribute today, and which contract surfaces are deliberately out of scope.</p>
+<ul>
+<li><strong>Public evidence proves boundary compliance, in plain language today.</strong> A repo-safe evidence summary may state that an activation, rotation, revocation, or correction occurred, with authority basis, in plain language. It must not include legal names, contact info, accommodation notes, attendance rolls, or any other private overlay content. The current contract supports this through its existing free-text and category fields (<code>decision_outcomes[]</code>, <code>notes</code>-style entries, <code>non_claims[]</code>).</li>
+<li><strong>Receipts/provenance reference activation event status, not mapping contents.</strong> A receipt that records an activation event records the <strong>status</strong> of the event (activated / rotated / revoked / corrected) and the <strong>authority basis</strong> under which it was performed. It does not record the mapping contents. A structured form for receipts (machine-readable status enum, structured authority basis, redacted-pointer field bound to an overlay row hash) is a deliberate <strong>future extension</strong> of the contract and is <strong>not</strong> specified by this spec; packages must not invent partner-specific structured fields that other packages cannot consume.</li>
+<li><strong>Private overlay content is never published in receipts.</strong> A receipt is a public artifact. If a participant&#39;s private data appears in a receipt, the receipt is malformed and must be regenerated from a boundary-safe form.</li>
+<li><strong>Fixture-only examples must use obviously non-live DID patterns.</strong> Sample receipts and example evidence packets must use DIDs that cannot be mistaken for a real participant&#39;s substrate handle. Packages should provide synthetic patterns that are recognizable as fixtures.</li>
+</ul>
+<h2>9. Package responsibility</h2>
+<p>ICN core defines the generic boundary. Institution packages own the local concerns that make the boundary operable in their environment.</p>
+<p><strong>ICN core defines:</strong></p>
+<ul>
+<li>the public/private split;</li>
+<li>the activation lifecycle;</li>
+<li>the consent and authority requirements;</li>
+<li>the revocation, rotation, and correction expectations;</li>
+<li>the threat-model surface;</li>
+<li>the evidence and receipt boundary.</li>
+</ul>
+<p><strong>Institution packages define:</strong></p>
+<ul>
+<li>local overlay storage location and access controls;</li>
+<li>steward roles and sign-off procedure;</li>
+<li>retention policy;</li>
+<li>package-local consent UX;</li>
+<li>package-local authority list;</li>
+<li>live-sync defaults for any package connectors;</li>
+<li>package-local additions to the threat model in §7.</li>
+</ul>
+<p><strong>ICN core docs do not name partner-specific overlay contents.</strong> A partner&#39;s steward roster, mapping table, retention window, and live-sync provider are partner concerns. ICN docs reference the boundary, not the contents.</p>
+<p><strong>Downstream package-specific follow-up:</strong> NYCN#57 is the NYCN organizing-network package&#39;s holder-label → DID activation / private-overlay policy. It must reference this spec, define the seven package-local concerns named above, and keep all private partner data out of the public NYCN repository. NYCN#57 is not started in this PR.</p>
+<h2>10. Cross-links</h2>
+<ul>
+<li><a href="/docs/pilots/no-cli-organizer-member-rehearsal-workflow">`../pilots/no-cli-organizer-member-rehearsal-workflow.md`</a> — the no-CLI organizer/member workflow this spec serves; §3 step 5 and §4 &quot;No private partner data in ICN&quot; are the points where this boundary is invoked.</li>
+<li><a href="/docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">`../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`</a> — accessibility gate for organizer/member shells; relevant when the activation flow surfaces in a UI that must support privacy-preserving accommodation paths.</li>
+<li><a href="/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE">`../architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md`</a> — substrate identity primitives that the DID side of activation references.</li>
+<li><a href="/docs/contracts/rehearsal-evidence-export">`../contracts/rehearsal-evidence-export.md`</a> — repo-safe evidence export contract; the canonical shape for redacted activation-status entries.</li>
+<li>NYCN#57 — downstream NYCN-specific holder-label → DID activation / private-overlay policy (companion package-side policy; not authored in ICN core).</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
