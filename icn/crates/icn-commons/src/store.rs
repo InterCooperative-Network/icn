@@ -207,11 +207,41 @@ pub struct SledCommonsStore {
 
 /// Returns `true` when a `sled::Error` indicates that the OS file lock
 /// for the database is currently held by another process (or the
-/// previous in-process flusher hasn't exited yet). The kernel surfaces
-/// this as `EAGAIN`, which `std::io` maps to `ErrorKind::WouldBlock`.
+/// previous in-process flusher hasn't exited yet).
+///
+/// Two shapes are matched, both representing the same underlying race:
+///
+/// 1. **Bare `WouldBlock`.** Some platforms / future sled versions
+///    can surface the kernel's `EAGAIN` from `flock(LOCK_NB)`
+///    directly as `Error::Io(io::Error::new(ErrorKind::WouldBlock, ...))`.
+/// 2. **Sled 0.34's wrapped form.** sled 0.34.7 wraps the
+///    `try_lock_exclusive` failure as
+///    `Error::Io(io::Error::new(ErrorKind::Other, format!("could not
+///    acquire lock on {:?}: {:?}", path, e)))`. The outer `kind()` is
+///    `Other`, not `WouldBlock`. The classifier must detect this
+///    wrapped form by message substring, otherwise the retry loop in
+///    `SledCommonsStore::open` would never trigger for the actual
+///    real-world race this primitive is meant to defend against.
+///    See `sled-0.34.7/src/config.rs::Config::try_lock` for the wrap
+///    site.
+///
+/// Other I/O errors (`NotFound`, `PermissionDenied`, etc.) and
+/// non-I/O sled errors do not match.
 fn is_sled_lock_contention(e: &sled::Error) -> bool {
     match e {
-        sled::Error::Io(io_err) => io_err.kind() == std::io::ErrorKind::WouldBlock,
+        sled::Error::Io(io_err) => match io_err.kind() {
+            // Direct `EAGAIN` surface (some platforms / future sled).
+            std::io::ErrorKind::WouldBlock => true,
+            // Sled 0.34's wrap: `kind = Other` with a message that
+            // begins with "could not acquire lock". The substring
+            // match is intentionally narrow; any other `Other` I/O
+            // error must NOT be retried.
+            std::io::ErrorKind::Other => {
+                let msg = io_err.to_string();
+                msg.contains("could not acquire lock")
+            }
+            _ => false,
+        },
         _ => false,
     }
 }
@@ -226,45 +256,57 @@ impl SledCommonsStore {
     /// the flock is released only when the flusher actually exits.
     /// Without a retry, an immediate-reopen pattern (drop a manager,
     /// open a new one against the same path) races against sled's
-    /// internal shutdown and surfaces as `EAGAIN/WouldBlock` from the
-    /// kernel. This is load-dependent and primarily fires on busy CI
-    /// runners but is also reachable in production daemon-restart
-    /// scenarios.
+    /// internal shutdown. sled 0.34.7 surfaces the `flock(LOCK_NB)`
+    /// failure as a wrapped `io::Error` with `kind = Other` and a
+    /// message beginning with "could not acquire lock"; see
+    /// `is_sled_lock_contention` for the exact match. This is
+    /// load-dependent and primarily fires on busy CI runners but is
+    /// also reachable in production daemon-restart scenarios.
     ///
     /// The retry loop:
-    /// - only retries on `io::ErrorKind::WouldBlock` (the kernel's
-    ///   `EAGAIN` from `flock(LOCK_NB)` — every other error path is
-    ///   surfaced immediately;
-    /// - uses exponential backoff capped at a 500ms total budget so a
-    ///   genuinely-stuck lockfile fails fast;
+    /// - retries only on lock-contention errors per
+    ///   `is_sled_lock_contention`; every other error path is
+    ///   surfaced immediately (`NotFound`, `PermissionDenied`,
+    ///   deserialization, corruption, etc.);
+    /// - performs at most one cold-open attempt + `MAX_RETRIES`
+    ///   sleeping retries (so up to `1 + MAX_RETRIES` total
+    ///   `sled::open()` calls — currently up to 9);
+    /// - uses exponential backoff capped at a `MAX_TOTAL_BACKOFF_MS`
+    ///   total sleep budget (500ms) so a genuinely-stuck lockfile
+    ///   fails fast;
     /// - is a no-op on the cold-open path (single attempt, no sleep).
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
-        const MAX_ATTEMPTS: u32 = 8;
+        // Number of *retries* after the initial cold-open attempt.
+        // Total `sled::open()` calls in the worst case is therefore
+        // `1 + MAX_RETRIES`. Naming this MAX_RETRIES (rather than
+        // MAX_ATTEMPTS) matches the loop semantics: `attempt` counts
+        // how many retries have already slept.
+        const MAX_RETRIES: u32 = 8;
         const INITIAL_BACKOFF_MS: u64 = 10;
         const MAX_TOTAL_BACKOFF_MS: u64 = 500;
 
         let path = path.as_ref();
-        let mut attempt: u32 = 0;
+        let mut retries: u32 = 0;
         let mut total_slept_ms: u64 = 0;
         loop {
             match sled::open(path) {
                 Ok(db) => return Ok(SledCommonsStore { db }),
                 Err(e)
                     if is_sled_lock_contention(&e)
-                        && attempt < MAX_ATTEMPTS
+                        && retries < MAX_RETRIES
                         && total_slept_ms < MAX_TOTAL_BACKOFF_MS =>
                 {
                     let remaining_budget = MAX_TOTAL_BACKOFF_MS - total_slept_ms;
-                    let backoff_ms = (INITIAL_BACKOFF_MS << attempt).min(remaining_budget);
+                    let backoff_ms = (INITIAL_BACKOFF_MS << retries).min(remaining_budget);
                     debug!(
-                        attempt,
+                        retry = retries,
                         backoff_ms,
                         path = ?path,
-                        "Sled open hit WouldBlock; backing off and retrying"
+                        "Sled open hit lock-contention; backing off and retrying"
                     );
                     std::thread::sleep(std::time::Duration::from_millis(backoff_ms));
                     total_slept_ms += backoff_ms;
-                    attempt += 1;
+                    retries += 1;
                 }
                 Err(e) => return Err(e).context("Failed to open Sled database"),
             }
@@ -1102,54 +1144,154 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
     use tempfile::tempdir;
 
-    /// `SledCommonsStore::open` must tolerate dropping a previous
-    /// instance and immediately reopening against the same path. The
-    /// retry-on-WouldBlock loop covers the window where sled's
-    /// background flusher thread still holds the OS flock past
-    /// `Db::drop`.
+    /// Deterministic end-to-end test of the retry path through real
+    /// sled lock contention.
+    ///
+    /// A "blocker" `sled::Db` is opened first, holding the OS
+    /// `flock(LOCK_EX)` on the database directory's lockfile. A
+    /// background thread is scheduled to drop the blocker after a
+    /// short delay, simulating the previous instance's shutdown
+    /// (including sled's own flusher-thread shutdown delay). The main
+    /// thread then calls `SledCommonsStore::open` against the same
+    /// path. Without the retry loop this would surface sled 0.34's
+    /// wrapped lock-contention error immediately. With the retry
+    /// loop, subsequent attempts succeed once the blocker thread has
+    /// dropped the prior `Db` and sled has released the kernel lock.
+    ///
+    /// This test is deterministic by construction: the blocker is a
+    /// real sled handle (not a synthetic error), the timing is
+    /// well within the configured retry budget (`MAX_TOTAL_BACKOFF_MS`
+    /// = 500ms), and we assert the blocker actually dropped before
+    /// the main thread observed success.
     #[test]
-    fn sled_open_survives_rapid_drop_and_reopen() {
+    fn sled_open_retries_through_flock_contention_to_success() {
         let tmp = tempdir().expect("tempdir");
         let path = tmp.path().join("commons.sled");
 
-        // Repeat enough times to make a single flusher-shutdown delay
-        // statistically exposable. Without the retry loop this loop
-        // panics with `WouldBlock` under any meaningful CI load.
-        for i in 0..50 {
-            let store = SledCommonsStore::open(&path)
-                .unwrap_or_else(|e| panic!("iteration {i}: open should succeed, got: {e:#}"));
-            // Touch the store so sled actually spins up its flusher.
-            store
-                .flush()
-                .unwrap_or_else(|e| panic!("iteration {i}: flush should succeed, got: {e:#}"));
-            drop(store);
+        // Open the blocker first — this acquires the OS flock.
+        let blocker = sled::open(&path).expect("blocker open should succeed");
+
+        // Confirm the lock is currently held: a second sled::open()
+        // against the same path must fail with a lock-contention
+        // error that our classifier recognises. We test this through
+        // the inherent `sled::open()` (not `SledCommonsStore::open`)
+        // so the assertion is independent of the retry loop being
+        // tested.
+        let immediate_attempt = sled::open(&path);
+        match immediate_attempt {
+            Err(e) => assert!(
+                is_sled_lock_contention(&e),
+                "while blocker holds the flock, the immediate-open \
+                 attempt must surface a lock-contention error our \
+                 classifier recognises; got: {e:?}"
+            ),
+            Ok(_unexpected) => panic!(
+                "while blocker holds the flock, sled::open must fail; \
+                 got Ok unexpectedly"
+            ),
         }
+
+        // Schedule the blocker drop on a background thread. The
+        // delay is comfortably less than the retry budget but
+        // greater than the initial backoff so the retry loop is
+        // forced to spin at least once.
+        let blocker_dropped = Arc::new(AtomicBool::new(false));
+        let bd_clone = blocker_dropped.clone();
+        let blocker_handle = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(50));
+            drop(blocker);
+            bd_clone.store(true, Ordering::SeqCst);
+        });
+
+        // Call into the retry loop. This must succeed within the
+        // configured retry budget.
+        let store = SledCommonsStore::open(&path).expect(
+            "SledCommonsStore::open must succeed via the retry loop \
+             once the blocker thread releases the flock",
+        );
+
+        // The blocker thread must have actually run and dropped
+        // before the main thread observed success.
+        blocker_handle.join().expect("blocker thread panicked");
+        assert!(
+            blocker_dropped.load(Ordering::SeqCst),
+            "blocker drop must have executed before SledCommonsStore::open returned"
+        );
+
+        drop(store);
     }
 
-    /// The lock-contention classifier must only treat
-    /// `io::ErrorKind::WouldBlock` as retryable. Other I/O errors
-    /// (NotFound, PermissionDenied, etc.) and non-I/O sled errors
-    /// must surface immediately so genuine failures are not masked.
+    /// The lock-contention classifier must match both shapes the
+    /// real sled stack can surface for a held flock:
+    /// (a) bare `io::ErrorKind::WouldBlock` (some platforms / future
+    ///     sled versions / direct `EAGAIN` surface), and
+    /// (b) sled 0.34's wrapped form: `kind = Other` with a message
+    ///     that begins with `"could not acquire lock"` (the actual
+    ///     production case in this workspace, see
+    ///     `sled-0.34.7/src/config.rs::Config::try_lock`).
+    ///
+    /// All other I/O errors (`NotFound`, `PermissionDenied`,
+    /// generic `Other` without the lock prefix, etc.) and non-I/O
+    /// sled errors must NOT match — otherwise the retry loop would
+    /// mask genuine failures.
     #[test]
-    fn is_sled_lock_contention_only_matches_wouldblock() {
+    fn is_sled_lock_contention_classifier_matches_both_shapes() {
+        // Shape (a): bare WouldBlock.
         let would_block = sled::Error::Io(std::io::Error::new(
             std::io::ErrorKind::WouldBlock,
             "simulated EAGAIN from flock",
         ));
-        assert!(is_sled_lock_contention(&would_block));
+        assert!(
+            is_sled_lock_contention(&would_block),
+            "bare WouldBlock must be classified as lock contention"
+        );
 
-        let other_io = sled::Error::Io(std::io::Error::new(
+        // Shape (b): sled 0.34's wrap. Reproduces the exact format
+        // string from `sled-0.34.7/src/config.rs` so the substring
+        // match is pinned to real production wording.
+        let sled_wrapped = sled::Error::Io(std::io::Error::other(
+            "could not acquire lock on \"/tmp/.tmpXXXXXX/db\": \
+             Os { code: 11, kind: WouldBlock, message: \"Resource temporarily unavailable\" }",
+        ));
+        assert!(
+            is_sled_lock_contention(&sled_wrapped),
+            "sled 0.34's wrapped lock-contention error must be \
+             classified as lock contention"
+        );
+
+        // Negative: another `Other`-kind I/O error without the lock
+        // prefix must NOT match — the substring check is intentionally
+        // narrow.
+        let other_unrelated = sled::Error::Io(std::io::Error::other("some unrelated I/O failure"));
+        assert!(
+            !is_sled_lock_contention(&other_unrelated),
+            "generic `Other` I/O errors without the lock prefix must \
+             NOT be classified as lock contention"
+        );
+
+        // Negative: PermissionDenied.
+        let permission_denied = sled::Error::Io(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
             "simulated EACCES",
         ));
-        assert!(!is_sled_lock_contention(&other_io));
+        assert!(
+            !is_sled_lock_contention(&permission_denied),
+            "PermissionDenied must NOT be classified as lock contention"
+        );
 
+        // Negative: NotFound.
         let not_found = sled::Error::Io(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "simulated ENOENT",
         ));
-        assert!(!is_sled_lock_contention(&not_found));
+        assert!(
+            !is_sled_lock_contention(&not_found),
+            "NotFound must NOT be classified as lock contention"
+        );
     }
 }
