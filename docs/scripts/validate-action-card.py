@@ -50,7 +50,7 @@ DEFAULT_SCHEMA = (
     / "institution-package"
     / "action-card.schema.json"
 )
-DEFAULT_PACKET = (
+DEFAULT_CARD = (
     REPO_ROOT
     / "docs"
     / "contracts"
@@ -109,10 +109,10 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "packet",
+        "card",
         nargs="?",
         type=Path,
-        default=DEFAULT_PACKET,
+        default=DEFAULT_CARD,
         help="Card JSON file to validate (defaults to the bundled example).",
     )
     parser.add_argument(
@@ -143,13 +143,13 @@ def main() -> int:
     format_checker = build_format_checker(FormatChecker)
     validator = Draft202012Validator(schema, format_checker=format_checker)
 
-    packet = load_json(args.packet, "packet")
+    card = load_json(args.card, "card")
 
     try:
-        errors = sorted(validator.iter_errors(packet), key=lambda e: list(e.path))
+        errors = sorted(validator.iter_errors(card), key=lambda e: list(e.path))
     except Exception as exc:  # safety net; iter_errors normally returns, not raises
         print(
-            f"ERROR: validator raised unexpectedly while validating {args.packet}: {exc}",
+            f"ERROR: validator raised unexpectedly while validating {args.card}: {exc}",
             file=sys.stderr,
         )
         return 1
@@ -157,15 +157,15 @@ def main() -> int:
     if not errors:
         contract = schema.get("$id", "<unknown>")
         rel = (
-            args.packet.relative_to(REPO_ROOT)
-            if args.packet.is_relative_to(REPO_ROOT)
-            else args.packet
+            args.card.relative_to(REPO_ROOT)
+            if args.card.is_relative_to(REPO_ROOT)
+            else args.card
         )
         print(f"OK: {rel} validates against {contract}")
         return 0
 
     print(
-        f"FAIL: {args.packet} did not validate against {schema.get('$id', '<unknown>')}",
+        f"FAIL: {args.card} did not validate against {schema.get('$id', '<unknown>')}",
         file=sys.stderr,
     )
     for err in errors:
