@@ -24,7 +24,7 @@ Last Reviewed: 2026-05-07
          persisted through the `GovernanceReceiptBackend` trait.
          **First real runtime dogfood emitting a
          `ProcessTransitionReceipt` class** — partial credit
-         toward #1748 acceptance gate (b). Surfaced a production
+         toward #1748 acceptance gate (a). Surfaced a production
          durability gap: the sled-backed `ReceiptStore` had not
          yet overridden `put_process_gate_result`, so production
          callers received an explicit fail-closed sentinel
@@ -678,11 +678,16 @@ Active execution since the previous sync is mixed: the May-5 sequence was entire
 | #1736 | deps(ts-sdk): bump the dev-dependencies group in /sdk/typescript with 3 updates |
 | #1735 | deps(pilot-ui): bump @axe-core/playwright from 4.11.2 to 4.11.3 in /web/pilot-ui |
 
-Open coordination/control issues at this sync (not implementation):
+Open implementation follow-ups at this sync:
 
 | Issue | Title |
 |-------|-------|
 | #1760 | fix(commons): add CommonsManager::close() to drain actor before sled handle drop (`epic:commons-compute` + `type:impl`) — corrected diagnosis: sled 0.34 flusher-thread shutdown race; fix opened as PR #1761 |
+
+Open coordination/control issues at this sync (not implementation):
+
+| Issue | Title |
+|-------|-------|
 | #1748 | milestone(process): define Institutional Process Substrate (`epic:arch-invariants` + `type:spec`) |
 | #1746 | milestone(showcase): make NYCN organizer rehearsal operable before first presentation |
 | #1744 | ci(review): make substantive AI review findings merge-gating |
