@@ -39,8 +39,8 @@
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>KERNEL APP SEPARATION</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/KERNEL_APP_SEPARATION.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Kernel/App Separation Architecture</h1>
-<p><strong>Status</strong>: Living Document<br><strong>Last Updated</strong>: 2026-02-01
-<strong>Related Issues</strong>: Phase 19+ (Trust Extraction, PolicyOracle Migration), <a href="https://github.com/InterCooperative-Network/icn/issues/1007" target="_blank" rel="noopener">#1007</a> (Wave 1 Firewall Contract)</p>
+<p><strong>Status</strong>: Living Document<br><strong>Last Updated</strong>: 2026-05-08
+<strong>Related Issues</strong>: Phase 19+ (Trust Extraction, PolicyOracle Migration), <a href="https://github.com/InterCooperative-Network/icn/issues/1007" target="_blank" rel="noopener">#1007</a> (Wave 1 Firewall Contract), <a href="https://github.com/InterCooperative-Network/icn/issues/1748" target="_blank" rel="noopener">#1748</a> (Institutional Process Substrate — opaque receipt storage stack)</p>
 <hr>
 <h2>Executive Summary</h2>
 <blockquote>
@@ -277,6 +277,81 @@ impl PolicyOracle for TrustPolicyOracle {
     }
 }
 </code></pre>
+<h3>Invariant 6: Kernel Stores App-Generated Receipts Opaquely</h3>
+<p><strong>Rule</strong>: When apps generate typed receipts (e.g. <code>ProcessGateResultReceipt</code> from <code>apps/governance</code>), the kernel persists them as <strong>opaque bytes</strong> in a primary <code>(class, record_hash) → bytes</code> store with a secondary index over <code>(class, key1, key2_opt, recorded_at, record_hash)</code> for audit-chain ordering. The kernel does not parse or pattern-match on the typed body.</p>
+<p><strong>Rationale</strong>: The same separation that prevents the kernel from importing domain crates (Invariant 1) or matching on <code>ConstraintSet.custom</code> keys (Invariant 4) extends to receipt persistence. If the kernel parsed receipt bodies, it would acquire knowledge of which receipt classes mean what — and policy ownership would silently migrate from apps to the kernel. Storing receipts as <code>(class, record_hash) → bytes</code> with a secondary <code>(class, key1, key2_opt, recorded_at, record_hash)</code> audit-chain index keeps the kernel semantically blind: it can prove a receipt was committed and retrieve it for audit, but it cannot reason about its meaning.</p>
+<p><strong>Enforcement</strong>: The opaque storage primitive lives in <code>crates/icn-gateway/src/receipt_store.rs</code> as the <code>put_opaque</code> / <code>get_latest_opaque</code> / <code>list_opaque_for</code> inherent methods on <code>ReceiptStore</code>. These are exposed on the <code>GovernanceReceiptBackend</code> trait in <code>apps/governance/src/receipt_backend.rs</code> so apps route typed receipts through the opaque cascade. Three keyspaces enforce the boundary:</p>
+<table>
+<thead>
+<tr>
+<th>Keyspace</th>
+<th>Constant</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Record store</td>
+<td><code>OPAQUE_REC_PREFIX = b&quot;receipt:opaque:rec:&quot;</code></td>
+<td>Stores <code>(class, record_hash) → bytes</code>. Write-once-by-hash.</td>
+</tr>
+<tr>
+<td>Per-<code>(class, key1, key2)</code> chronology</td>
+<td><code>OPAQUE_BY_KEY_PREFIX = b&quot;receipt:opaque:by_key:&quot;</code></td>
+<td>Append-only index that backs <code>get_latest_opaque</code> / <code>list_opaque_for</code>. Largest <code>recorded_at</code> wins.</td>
+</tr>
+<tr>
+<td>Hash-bind invariant</td>
+<td><code>OPAQUE_HASH_BIND_PREFIX = b&quot;receipt:opaque:hash_bind:&quot;</code></td>
+<td>Prevents divergent re-binds: a given <code>(class, record_hash)</code> tuple binds to one canonical body forever. Collision aborts atomically with the <code>opaque_record_hash_index_collision</code> sentinel within a single sled transaction.</td>
+</tr>
+</tbody></table>
+<p><strong>Why the hash-bind invariant matters</strong>: <code>OPAQUE_REC_PREFIX</code>&#39;s write-once-by-hash check already rejects <strong>different payload bytes</strong> under the same <code>(class, record_hash)</code> primary key, so the hash-bind keyspace is <strong>not</strong> the body-uniqueness guard. It closes a different failure mode: replaying the <strong>same</strong> <code>(class, record_hash, payload)</code> tuple under a <strong>different</strong> <code>(key1, key2_opt, recorded_at)</code> secondary-index tuple. Without <code>OPAQUE_HASH_BIND_PREFIX</code>, that replay would let one canonical body fan out across multiple audit chains or surface at a later timestamp under <code>get_latest_opaque</code>. The hash-bind keyspace closes that hole atomically: the transaction either commits the first index-tuple binding or aborts the second; a <code>(class, record_hash)</code> that has been bound to one <code>(key1, key2_opt, recorded_at)</code> tuple stays bound to that tuple forever.</p>
+<p><strong>Tracking citations</strong>:</p>
+<ul>
+<li>PR <a href="https://github.com/InterCooperative-Network/icn/pull/1755" target="_blank" rel="noopener">#1755</a> — <code>feat(governance): add process-transition receipt runtime slice</code> introduces <code>ProcessGateResultReceipt</code> as the first real receipt class emitted by <code>apps/governance</code>.</li>
+<li>PR <a href="https://github.com/InterCooperative-Network/icn/pull/1757" target="_blank" rel="noopener">#1757</a> — <code>feat(gateway): add meaning-blind opaque receipt storage primitive</code> adds the inherent <code>put_opaque</code> / <code>get_latest_opaque</code> / <code>list_opaque_for</code> methods on <code>ReceiptStore</code> plus the <code>OPAQUE_REC_PREFIX</code> and <code>OPAQUE_BY_KEY_PREFIX</code> keyspaces.</li>
+<li>PR <a href="https://github.com/InterCooperative-Network/icn/pull/1758" target="_blank" rel="noopener">#1758</a> — <code>feat(governance): expose opaque storage on GovernanceReceiptBackend</code> lifts the trio onto the <code>GovernanceReceiptBackend</code> trait so apps can call the opaque cascade through the existing trait surface.</li>
+<li>PR <a href="https://github.com/InterCooperative-Network/icn/pull/1759" target="_blank" rel="noopener">#1759</a> — <code>feat(governance): route ProcessGateResultReceipt through opaque storage cascade</code> introduces <code>OPAQUE_HASH_BIND_PREFIX</code> and routes the typed default through the opaque cascade first, falling back to the per-method typed default only when the underlying <code>put_opaque</code> returns the <code>opaque_storage_not_implemented</code> sentinel.</li>
+</ul>
+<p>See <a href="/docs/STATE">`docs/STATE.md`</a> post-#1759 sync block for the canonical record of these merges and <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a> for the Phase 2 status frame they fit into.</p>
+<p><strong>Example</strong>: app emits typed receipt → kernel stores opaque bytes</p>
+<pre><code class="language-rust">// ✅ App owns the receipt class and body shape (real struct in
+// `icn-governance/src/proof.rs`).
+let receipt = ProcessGateResultReceipt {
+    session_id,
+    domain_id,
+    gate_kind,
+    result: ProcessGateResult::Pass,
+    recorded_by,
+    recorded_at,
+    record_hash,
+};
+
+// ✅ App routes through the opaque cascade. The kernel never sees
+// `ProcessGateResultReceipt` as a type — only the call arguments
+// below as opaque strings, an integer timestamp, a 32-byte hash, and
+// a payload byte slice. The hash-bind keyspace makes the binding
+// transactionally permanent.
+let payload = serde_json::to_vec(&amp;receipt)?;
+self.put_opaque(
+    PROCESS_GATE_RESULT_CLASS,                        // class — opaque to kernel
+    &amp;receipt.session_id,                              // key1 — opaque to kernel
+    Some(process_gate_kind_key(receipt.gate_kind)),   // key2 — opaque to kernel
+    receipt.recorded_at,
+    receipt.record_hash,
+    &amp;payload,                                         // bytes — opaque to kernel
+)?;
+</code></pre>
+<pre><code class="language-rust">// ❌ VIOLATION — kernel parsing receipt bodies to make decisions.
+// (Returns Option so `?` typechecks; the violation is the body
+// inspection itself, not the signature shape. The wire field is
+// `result` with snake_case values per serde, e.g. `&quot;pass&quot;` / `&quot;fail&quot;`.)
+fn promote_audit_chain(class: &amp;str, body: &amp;[u8]) -&gt; Option&lt;bool&gt; {
+    let parsed: serde_json::Value = serde_json::from_slice(body).ok()?;
+    Some(parsed.get(&quot;result&quot;) == Some(&amp;serde_json::json!(&quot;pass&quot;)))   // VIOLATION — kernel reads receipt semantics
+}
+</code></pre>
+<p>App-side code that needs the typed body deserializes after retrieving the bytes from <code>get_latest_opaque</code>; the kernel does not.</p>
 <h3>Violation Examples (What NOT to Do)</h3>
 <p><strong>❌ Direct trust-score call in kernel</strong>:</p>
 <pre><code class="language-rust">// icn/crates/icn-core/src/supervisor/init_gossip.rs
