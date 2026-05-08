@@ -120,37 +120,45 @@ This sequence is the actionable output of the discovery. Each PR is **small** (s
 
 ### PR 2 — pilot-ui demo-mode boundary header + guided demo landing screen
 
-- **What:** add a header banner that reads the runtime mode (one of `DEMO`, `FIXTURE`, `DEVNET`, `LOCAL`, `LIVE`) and renders a colored badge in the pilot-ui chrome; add a landing screen at `#/demo` (or `?mode=demo`) that walks the §3 nine-step narrative as a guided flow with **Next** buttons stepping through the existing pilot-ui sections (members → governance → action items → receipts).
-- **Why:** answers the user's "shortest path from existing surfaces to a usable ICN demo" — re-uses 100% of existing pilot-ui rendering and adds the composition layer.
-- **What runs after this PR:** opening pilot-ui at `?mode=demo` shows a guided landing → "I am [member label]" → "These are my action items" → "Here's a proposal I can vote on" → "Here's a receipt of an earlier decision" — each section labeled with the mode banner so the viewer knows what's runtime vs. fixture vs. mocked.
+- **What:** add a header banner that reads the runtime mode (one of `DEMO`, `FIXTURE`, `DEVNET`, `LOCAL`, `LIVE`) and renders a colored badge in the pilot-ui chrome; add a landing screen at `#/demo` (or `?mode=demo`) that walks the §3 Guided workflow narrative as a guided flow, with **Next** buttons stepping through the **existing** pilot-ui sections only.
+- **Why:** answers the user's "shortest path from existing surfaces to a usable ICN demo" — re-uses 100% of existing pilot-ui rendering and adds the composition layer. **Does not pretend standing or action-cards are already GUI-visible.**
+- **What runs after this PR (honest labeling required):** opening pilot-ui at `?mode=demo` shows a guided landing that lists the demo path explicitly:
+  - **Available now in pilot-ui:** governance / proposals / votes; action items (from `/gov/domains/{d}/action-items`); ledger; trust score; receipt chain view (via `receipts.js`).
+  - **Coming in this demo tranche (linked but labeled "Not yet wired"):** member standing read-model surface (PR 3), per-member action cards surface (PR 3), plain-language receipt framing (PR 4), fixture-backed local demo mode (PR 5).
+  - **Not implemented in demo at all:** federation topology, holder-label DID activation, allocation/settlement at scale, private-overlay activation, cross-cooperative federation, cloud-sync, K3s/DNS/Forgejo/production-deploy mutation.
+  The "I am [member label]" framing comes from the auth flow's known DID, **not** from a standing fetch — PR 2 must not introduce new endpoint consumers.
 - **Mode source for now:** environment / query-param toggle. Does **not** require backend change. (Real `--demo-mode` flag is PR 5.)
+- **Hard rule for PR 2 implementers:** **no new endpoint consumers.** PR 2 wires composition over existing fetches only. Adding `me/standing` or `me/action-cards` consumers is PR 3's scope. If the landing needs a member display, use the existing auth-known DID; do not add a fetch.
 - **Non-claims (must appear in PR body and in the banner-rendered legend):**
   - Demo mode is a UI labeling convention; the banner reflects what was passed to the page, not authoritative gateway state.
   - Mode `LIVE` does **not** mean production — it means the page is reading real gateway state. ICN is not production-deployed.
-  - Sections marked **Not implemented in demo** are honest gaps, not coming-soon teasers.
+  - Sections marked **Not yet wired** are honest gaps for upcoming PRs in this tranche; sections marked **Not implemented in demo** are out of scope for the entire tranche.
 - **Files (estimated):**
   - `web/pilot-ui/index.html` — header markup, landing template
-  - `web/pilot-ui/app.js` — mode parsing, banner render, landing routing, **Next**-button wiring
+  - `web/pilot-ui/app.js` — mode parsing, banner render, landing routing, **Next**-button wiring (no new fetches)
   - `web/pilot-ui/style.css` — banner + landing styling
   - `web/pilot-ui/tests/e2e/` — one Playwright test for landing → next-section flow
-- **Out of scope:** card-shaped action cards (PR 3), receipt/provenance plain-language render (PR 4), gateway-side fixture mode (PR 5).
+- **Out of scope:** member standing fetch + render (PR 3), action-cards fetch + card render (PR 3), receipt/provenance plain-language framing (PR 4), gateway-side fixture mode (PR 5), modifications to the existing Action Items tab.
 
-### PR 3 — pilot-ui action cards: add the missing fetch and render as real cards
+### PR 3 — pilot-ui member standing + action cards: add the missing fetches and render as a coherent member surface
 
-- **What:** **Add a new pilot-ui consumer** for `GET /v1/gov/me/action-cards` (the per-member action-cards endpoint), separate from the existing "Action Items" tab (which calls `/gov/domains/{d}/action-items` — a different endpoint and concept). Render the action-cards stream as a card-shaped UX surfacing fields per [`action-card.schema.json`](../contracts/institution-package/action-card.schema.json): source kind, action kind, authority basis, status, required decision, reversibility window, plain-language summary.
-- **Why:** the §3 Guided workflow talks about action *cards* as the per-member queue; pilot-ui today does not fetch `me/action-cards` from any code path (verified by `grep -rn "action-cards" web/pilot-ui/`). The "Action Items" tab is for the per-domain action-item ledger, a different surface. Without this PR, a viewer following the §3 Guided workflow will look for "their action cards" in pilot-ui and find no surface that matches.
-- **What runs after this PR:** opening the new Action Cards section shows the per-member action-cards queue with card layout, plain-language framing, and explicit authority basis / reversibility windows — matching the deck wireframes used in the NYCN-side rehearsal record ([NYCN PR #65](https://github.com/InterCooperative-Network/cooperative-network/pull/65)). The existing Action Items tab is unchanged.
-- **Backend change required?** **No.** The endpoint already exists (#1659).
-- **Naming note:** name the new pilot-ui section "Action Cards" distinct from "Action Items" to preserve the conceptual split. Implementers should not collapse them.
+- **What:** **Add two new pilot-ui consumers** for the per-member read-models that pilot-ui does not yet fetch — `GET /v1/gov/me/standing` (#1627) and `GET /v1/gov/me/action-cards` (#1659) — and render them together as the member's "Who am I, what's my standing, what can I do?" surface. Card-shaped UX for action cards per [`action-card.schema.json`](../contracts/institution-package/action-card.schema.json): source kind, action kind, authority basis, status, required decision, reversibility window, plain-language summary. Standing renders as the framing context above the action-cards queue.
+- **Why:** standing and action-cards belong together from the organizer/member point of view. The first question a viewer asks is **"Who am I in this institution, what is my standing, and what can/should I do?"** — and the gateway's two read-models that answer this question (`me/standing` + `me/action-cards`) are both not consumed by pilot-ui today (verified by `grep -rn "me/standing\|me/action-cards" web/pilot-ui/` returning zero matches). Splitting them into separate PRs risks two tiny PRs that technically advance the repo but do not give a coherent member surface. Both are missing; both should land together.
+- **What runs after this PR:** the new "My Standing & Action Cards" section in pilot-ui shows the logged-in member's standing (memberships, roles, scopes — per the standing read-model contract) as the framing context, with the action-cards queue rendered as cards directly below. Each card surfaces authority basis, status, required decision, reversibility window in plain language. The existing "Action Items" tab (per-domain action-item ledger, different endpoint, different concept) is unchanged.
+- **Backend change required?** **No.** Both endpoints already exist (#1627 + #1659).
+- **Naming note:** name the new pilot-ui section to make the conceptual split clear — e.g. **"My Standing & Action Cards"** — and keep it distinct from the existing "Action Items" tab. Implementers should not collapse standing-as-context with action-items-as-ledger.
 - **Non-claims:**
-  - Adds a new pilot-ui consumer for an existing gateway endpoint; does not change the gateway contract or schema.
+  - Adds two new pilot-ui consumers for existing gateway endpoints; does not change gateway contracts or schemas.
   - Does not modify or replace the existing Action Items tab.
-  - RFC-gated source kinds (signal_rule, obligation_lifecycle per the schema's `x-icn-rfc-gated-source-kinds`) appear as **Not implemented** placeholders; no false RFC promotion.
+  - Does not advance #1748 runtime gates (b)–(d) or any acceptance criterion beyond pilot-ui rendering of already-served data.
+  - RFC-gated source kinds (signal_rule, obligation_lifecycle per the action-card schema's `x-icn-rfc-gated-source-kinds`) appear as **Not implemented** placeholders; no false RFC promotion.
 - **Files (estimated):**
-  - `web/pilot-ui/app.js` — new fetch (`loadActionCards()` paralleling `loadActionItems()`) + card renderer
-  - `web/pilot-ui/index.html` — new tab + card template
-  - `web/pilot-ui/style.css` — card styling (may share patterns with action-items styles but should not collide)
-- **Out of scope:** new schema fields, new endpoint, mutation flows, modifications to the existing Action Items tab.
+  - `web/pilot-ui/app.js` — `loadStanding()` + `loadActionCards()` (paralleling `loadActionItems()`) + combined renderer
+  - `web/pilot-ui/index.html` — new section + card template + standing block
+  - `web/pilot-ui/style.css` — section + card + standing styling (may share patterns with existing action-items / dashboard styles but must not collide)
+  - `web/pilot-ui/tests/e2e/` — Playwright tests for both fetches and the combined render
+- **Out of scope:** new schema fields, new endpoints, mutation flows, modifications to the existing Action Items tab, plain-language framing of receipts (PR 4), fixture-backed runtime (PR 5).
+- **Sequencing note:** if standing turns out to be substantially larger than expected during implementation (e.g. multi-coop / multi-federation aggregation requires additional render shape), **stop and report** rather than fold complexity in silently. The user is willing to split into PR 3a (standing) + PR 3b (action cards) only if discovery shows that's necessary; the default is one PR.
 
 ### PR 4 — extend the existing receipts.js with plain-language framing
 
