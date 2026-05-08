@@ -5980,6 +5980,129 @@ footer .sync-status.error {
 }
 
 /* ============================================================
+ * Demo mode global layout
+ *
+ * The default `main { max-width: 800px }` is too narrow for the
+ * Demo Guide's 2-col card grid and for the action-cards surface.
+ * Widen main only when ?mode=demo flagged the body, so non-demo
+ * pages stay at their original 800px reading width.
+ * ============================================================ */
+
+body[data-demo-mode="true"] main {
+    max-width: 1200px;
+    padding: 1.5rem 1.75rem;
+}
+
+body[data-demo-mode="true"] main#main-content {
+    max-width: 1200px;
+}
+
+/* Demo-only: let the standing + action-cards sections use the full
+   widened main width instead of the default 80ch reading column. */
+body[data-demo-mode="true"] .member-standing-section,
+body[data-demo-mode="true"] .member-action-cards-section {
+    max-width: none;
+}
+
+/* Demo-only: render the action-cards list as a responsive grid so
+   each card has room to breathe and the section doesn't read as a
+   single tall column floating in empty page. */
+body[data-demo-mode="true"] .member-action-cards-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 1rem;
+}
+
+body[data-demo-mode="true"] .member-action-card {
+    background: var(--bg-primary);
+    box-shadow: var(--shadow-sm);
+    border-radius: 10px;
+    padding: 1.1rem 1.25rem;
+}
+
+/* Tighten the standing description so it doesn't read as a wall
+   of dense text running edge-to-edge. */
+body[data-demo-mode="true"] .member-standing-intro {
+    max-width: 70ch;
+    line-height: 1.6;
+}
+
+/* Demo-only "this surface is gateway-backed and not fixture-backed"
+   placeholder used in Governance, Federation, and Receipts tabs.
+   Same visual language as the Demo Guide's gateway-backed card so
+   the page reads as deliberately scoped, not broken. */
+.demo-tab-placeholder {
+    max-width: 64rem;
+    margin: 1.5rem auto;
+    padding: 0 0.5rem;
+}
+
+.demo-tab-placeholder-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid #f59e0b;
+    border-radius: 10px;
+    padding: 2rem 2.25rem 2.25rem 2.25rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.demo-tab-placeholder-eyebrow {
+    margin: 0 0 0.4rem 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #b45309;
+}
+
+.demo-tab-placeholder-card h2 {
+    margin: 0 0 1rem 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.25;
+}
+
+.demo-tab-placeholder-lead {
+    margin: 0 0 0.85rem 0;
+    font-size: 1.05rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.demo-tab-placeholder-card p {
+    line-height: 1.65;
+    color: var(--text-secondary);
+    max-width: 62ch;
+    margin: 0 0 0.85rem 0;
+}
+
+.demo-tab-placeholder-note {
+    margin: 1.25rem 0 0 0 !important;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    color: var(--text-tertiary);
+}
+
+.demo-tab-placeholder-note a {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: 1px dotted var(--primary);
+}
+
+.demo-tab-placeholder-note a:hover,
+.demo-tab-placeholder-note a:focus {
+    border-bottom-style: solid;
+    color: var(--primary-dark);
+}
+
+[data-theme="dark"] .demo-tab-placeholder-card {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================
  * Demo Guide visual hierarchy
  *
  * Card-based layout for ?mode=demo's organizing-committee landing.
