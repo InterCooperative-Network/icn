@@ -118,4 +118,43 @@ test.describe('Demo Mode (PR 2)', () => {
         await expect(guide).toContainText('Per-member action cards surface');
         await expect(guide).toContainText('PR 3');
     });
+
+    test('?mode=demo auto-bootstraps the main screen without a running gateway', async ({ page }) => {
+        // Verification fix on top of #1773: ?mode=demo previously required
+        // a real login (and therefore a running gateway) before the demo
+        // surfaces became visible. The bootstrap shim transitions straight
+        // into the main screen with fictional identity so the demo path
+        // works under a static server.
+        await page.goto('/?mode=demo');
+        await page.waitForLoadState('networkidle');
+
+        // Login screen hidden, main screen visible.
+        const loginScreen = page.locator('#login-screen');
+        const mainScreen = page.locator('#main-screen');
+        await expect(loginScreen).toHaveClass(/hidden/);
+        await expect(mainScreen).not.toHaveClass(/hidden/);
+
+        // Demo Guide tab is active by default.
+        const demoGuideTab = page.locator('#demo-guide');
+        await expect(demoGuideTab).toHaveClass(/active/);
+
+        // Banner reads DEMO and shows the fictional identity.
+        const badge = page.locator('#demo-mode-badge');
+        await expect(badge).toHaveText('DEMO');
+        const userDid = page.locator('#user-did');
+        await expect(userDid).toContainText('Demo organizer (fictional)');
+    });
+
+    test('without ?mode=demo, login screen still gates the main screen', async ({ page }) => {
+        // The bootstrap is gated on DEMO_MODE === 'demo'. Verify the
+        // non-demo path is unchanged: login-screen visible, main-screen
+        // hidden until real login.
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        const loginScreen = page.locator('#login-screen');
+        const mainScreen = page.locator('#main-screen');
+        await expect(loginScreen).not.toHaveClass(/hidden/);
+        await expect(mainScreen).toHaveClass(/hidden/);
+    });
 });
