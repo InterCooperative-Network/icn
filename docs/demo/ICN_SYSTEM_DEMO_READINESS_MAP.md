@@ -44,7 +44,7 @@ The blocker is sharper than "no GUI":
 
 Concretely:
 
-- **Pilot UI is timebank-flavored.** It renders members, balances, proposals, votes, ledger, trust score, and an Action Items tab driven by `loadActionItems()` (`web/pilot-ui/app.js:7040`) calling `/gov/domains/{domain_id}/action-items`. It does not walk the §2 nine-step organizer narrative ([`docs/pilots/no-cli-organizer-member-rehearsal-workflow.md`](../pilots/no-cli-organizer-member-rehearsal-workflow.md)) as a guided flow.
+- **Pilot UI is timebank-flavored.** It renders members, balances, proposals, votes, ledger, trust score, and an Action Items tab driven by `loadActionItems()` (`web/pilot-ui/app.js:7040`) calling `/gov/domains/{domain_id}/action-items`. It does not walk the §3 Guided workflow nine-step narrative ([`docs/pilots/no-cli-organizer-member-rehearsal-workflow.md`](../pilots/no-cli-organizer-member-rehearsal-workflow.md)) as a guided flow.
 - **Action cards are absent from pilot-ui entirely.** `GET /v1/gov/me/action-cards` returns JSON; **no pilot-ui code consumes that endpoint today** (verified by `grep -rn "action-cards" web/pilot-ui/`). Pilot-ui's "Action Items" tab is a different concept — it queries `/gov/domains/{domain_id}/action-items`, not the per-member action-cards stream. Card-shaped UX surfacing authority basis, status, required decision, or reversibility window per [`action-card.schema.json`](../contracts/institution-package/action-card.schema.json) does not exist in any pilot-ui surface.
 - **Receipts already have an HTML render surface; plain-language framing is the gap.** `web/pilot-ui/receipts.js` (~18 KB) queries `/v1/receipts/chain?decision_hash=...` and renders the chain + ledger as HTML via `renderResults()`. The opaque receipt storage stack (PRs #1755–#1759) lands `ProcessGateResultReceipt` durably under that surface. The remaining gap is **plain-language framing on top of the existing render** — status / authority / hash / timestamp summary stated *before* the structured chain — not absence of HTML rendering.
 - **No mode boundary.** Nothing on screen tells a viewer whether the data is fixture, demo-seed, devnet, or live. ICN [#1727](https://github.com/InterCooperative-Network/icn/issues/1727) (fixture-backed demo mode) is open and not implemented; no `--demo-mode` flag exists on `icnd`.
@@ -56,7 +56,7 @@ Per the user-supplied scheme: **runtime implemented and GUI-visible / runtime im
 
 | Function | Status | Evidence |
 |---|---|---|
-| Identity / DID / standing | runtime + GUI-visible | `GET /v1/gov/me/standing` (#1627) consumed in pilot-ui dashboard |
+| Identity / DID / standing | **runtime + missing in pilot-ui** | `GET /v1/gov/me/standing` (#1627) returns; **no pilot-ui consumer** (verified by `grep -rn "me/standing" web/pilot-ui/`). Pilot-ui knows the logged-in DID via auth flow; it does not fetch the standing read-model. |
 | Governance — proposals / voting / decision | runtime + GUI-visible | gateway routes; pilot-ui Governance tab |
 | Action cards | **runtime + missing in pilot-ui** | `GET /v1/gov/me/action-cards` (#1659) returns JSON; **no pilot-ui consumer** (the "Action Items" tab queries a different endpoint, `/gov/domains/{d}/action-items`) |
 | Receipts (governance / completion / attendance) | **runtime + GUI-visible (chain), plain-language framing absent** | opaque storage stack #1755–#1759; `web/pilot-ui/receipts.js` renders `/v1/receipts/chain` + ledger as HTML; raw structure shown without plain-language summary on top |
@@ -64,14 +64,14 @@ Per the user-supplied scheme: **runtime implemented and GUI-visible / runtime im
 | Obligations / allocations / settlement primitives | **runtime + only CLI/JSON-visible** | `/v1/receipts/allocations`, `/v1/receipts/intents` JSON; no UI |
 | Federation | runtime + only CLI/JSON-visible | `/v1/federation/peers` JSON; node-dashboard shows count only |
 | Private overlay / holder-label DID boundary | spec-only on substrate side | [`private-overlay-did-activation-flow.md`](../spec/private-overlay-did-activation-flow.md) is the substrate boundary; partner-package policy is required for activation; no runtime activation surface |
-| Organizer/member UX | **runtime + not wired to §2 narrative** | pilot-ui exists but is timebank-flavored, not the 9-step no-CLI organizer narrative |
+| Organizer/member UX | **runtime + not wired to §3 Guided workflow** | pilot-ui exists but is timebank-flavored, not the 9-step no-CLI organizer narrative |
 | Operator/admin UX | runtime + only CLI/HTML-visible (basic) | `web/dashboard` exists, no auth, basic; icn-console TUI for power users |
 | Accessibility gates | spec-only at runtime | [`ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`](../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md) is PR-time review reflex; no runtime enforcement |
 | Demo / runtime surfaces | **runtime + not yet a fixture-mode** | `run-tool-library-demo.sh` exists; ICN #1727 fixture-backed demo mode **OPEN, not implemented** |
 | Node / dashboard surfaces | runtime + only CLI/HTML-visible (basic) | `web/dashboard`, no auth |
 | NYCN package integration | fixture-only on NYCN side | NYCN renders concepts as markdown+JSON in `dist/`; not directly reused by ICN UI |
 | Local-first / demo mode | **missing as a first-class runtime mode** | no `--demo-mode` flag, no fixture loader; demo flow uses seeded-but-real state |
-| No-CLI path (organizer-visible) | **runtime + UI does not mirror §2 narrative** | endpoints exist; no GUI shell that walks the 9-step story |
+| No-CLI path (organizer-visible) | **runtime + UI does not mirror §3 Guided workflow** | endpoints exist; no GUI shell that walks the 9-step story |
 
 The pattern: **most ICN core functions are runtime-implemented and reachable through gateway HTTP routes; the gap is between routes and rendered, plain-language UX.**
 
@@ -82,13 +82,13 @@ The pattern: **most ICN core functions are runtime-implemented and reachable thr
 | # | Question | Answer |
 |---|---|---|
 | 1 | Can a local ICN node/demo process run today? | **Yes.** `./demo/scripts/run-tool-library-demo.sh` boots icnd + gateway + pilot-ui in ~30 s. |
-| 2 | Can it serve standing? | **Yes.** `GET /v1/gov/me/standing`. Consumed in pilot-ui. |
+| 2 | Can it serve standing? | **Yes (data); pilot-ui has no consumer.** `GET /v1/gov/me/standing` returns; pilot-ui code does not call this endpoint today (verified by grep). The auth flow knows the logged-in DID; the standing read-model is not fetched. |
 | 3 | Can it serve action cards? | **Yes (data); pilot-ui has no consumer.** `GET /v1/gov/me/action-cards` returns JSON. Pilot-ui's "Action Items" tab queries `/gov/domains/{d}/action-items` — a different endpoint and concept. The `action-cards` endpoint is not fetched by any pilot-ui code today. |
 | 4 | Can it show governance events / proposals? | **Yes.** Pilot-ui Governance tab; full create/vote flow. |
 | 5 | Can it produce or retrieve receipts? | **Yes, with HTML rendering.** Opaque receipt storage stack live (#1755–#1759); `GET /v1/receipts/chain` returns JSON; `web/pilot-ui/receipts.js` already renders the chain + ledger as HTML. |
 | 6 | Can it show provenance/evidence in plain language? | **Partial.** `receipts.js` renders chain HTML; **plain-language framing on top** (status / authority / hash / timestamp summary stated before the structured detail) is the remaining gap. |
 | 7 | Can it distinguish fixture / local / demo / live state? | **No.** No mode indicator on any UI; gateway has no `--demo-mode` flag. |
-| 8 | Is there an organizer/member GUI connected to any of this? | **Partial.** Pilot-ui (timebank-flavored) consumes standing, proposals, transactions, action items. **Does not** implement the §2 narrative as a guided flow. |
+| 8 | Is there an organizer/member GUI connected to any of this? | **Partial.** Pilot-ui (timebank-flavored) consumes proposals, votes, transactions, action items, ledger, trust score, and renders receipt chains via `receipts.js`. It does **not** consume the per-member `me/standing` or `me/action-cards` read-models, and does **not** implement the §3 Guided workflow as a guided flow. |
 | 9 | What still requires CLI? | Initial keystore (`icnctl id init`), token generation, gateway start, devnet bring-up, `icnctl audit verify`, all icn-console operations. |
 | 10 | What is the smallest runtime PR that makes the GUI/demo path more real? | **PR 2 below** — pilot-ui demo-mode boundary/header + guided demo landing screen. Lands on existing pilot-ui without backend work; sets the scaffolding for PRs 3–5. |
 
@@ -97,7 +97,7 @@ The pattern: **most ICN core functions are runtime-implemented and reachable thr
 | # | Question | Answer |
 |---|---|---|
 | 1 | Can the existing pilot-ui become the guided organizer/member demo surface? | **Yes**, with composition work — landing screen + guided flow + per-section labels. Pilot-ui's vanilla-JS architecture (no framework) makes targeted additions straightforward. |
-| 2 | What is the smallest change that makes pilot-ui show the ICN core loop clearly? | A **guided demo landing screen** that frames the §2 narrative steps and a **mode banner** that tells the viewer what state they're looking at. Both UI-only. |
+| 2 | What is the smallest change that makes pilot-ui show the ICN core loop clearly? | A **guided demo landing screen** that frames the §3 Guided workflow steps and a **mode banner** that tells the viewer what state they're looking at. Both UI-only. |
 | 3 | What runtime data is already available through gateway routes? | Standing, action-cards, governance proposals/votes/decisions, ledger postings, trust scores, decision-receipts, completion-receipts, attendance-receipts, allocation/intent receipts, federation peers, health/metrics. |
 | 4 | What needs only UI wiring (no backend change)? | (a) demo-mode banner / boundary labels; (b) guided demo landing screen; (c) action-card UX (cards, not list) — data already in JSON; (d) plain-language receipt / provenance panel — data already in JSON. |
 | 5 | What needs fixture/demo-mode support? | Stable, repeatable demo data not derived from a seeded but real state. ICN #1727 is the open scope: a `--demo-mode` flag + committed fixture pack the gateway serves deterministically. |
@@ -120,7 +120,7 @@ This sequence is the actionable output of the discovery. Each PR is **small** (s
 
 ### PR 2 — pilot-ui demo-mode boundary header + guided demo landing screen
 
-- **What:** add a header banner that reads the runtime mode (one of `DEMO`, `FIXTURE`, `DEVNET`, `LOCAL`, `LIVE`) and renders a colored badge in the pilot-ui chrome; add a landing screen at `#/demo` (or `?mode=demo`) that walks the §2 nine-step narrative as a guided flow with **Next** buttons stepping through the existing pilot-ui sections (members → governance → action items → receipts).
+- **What:** add a header banner that reads the runtime mode (one of `DEMO`, `FIXTURE`, `DEVNET`, `LOCAL`, `LIVE`) and renders a colored badge in the pilot-ui chrome; add a landing screen at `#/demo` (or `?mode=demo`) that walks the §3 nine-step narrative as a guided flow with **Next** buttons stepping through the existing pilot-ui sections (members → governance → action items → receipts).
 - **Why:** answers the user's "shortest path from existing surfaces to a usable ICN demo" — re-uses 100% of existing pilot-ui rendering and adds the composition layer.
 - **What runs after this PR:** opening pilot-ui at `?mode=demo` shows a guided landing → "I am [member label]" → "These are my action items" → "Here's a proposal I can vote on" → "Here's a receipt of an earlier decision" — each section labeled with the mode banner so the viewer knows what's runtime vs. fixture vs. mocked.
 - **Mode source for now:** environment / query-param toggle. Does **not** require backend change. (Real `--demo-mode` flag is PR 5.)
@@ -138,7 +138,7 @@ This sequence is the actionable output of the discovery. Each PR is **small** (s
 ### PR 3 — pilot-ui action cards: add the missing fetch and render as real cards
 
 - **What:** **Add a new pilot-ui consumer** for `GET /v1/gov/me/action-cards` (the per-member action-cards endpoint), separate from the existing "Action Items" tab (which calls `/gov/domains/{d}/action-items` — a different endpoint and concept). Render the action-cards stream as a card-shaped UX surfacing fields per [`action-card.schema.json`](../contracts/institution-package/action-card.schema.json): source kind, action kind, authority basis, status, required decision, reversibility window, plain-language summary.
-- **Why:** the §2 narrative talks about action *cards* as the per-member queue; pilot-ui today does not fetch `me/action-cards` from any code path (verified by `grep -rn "action-cards" web/pilot-ui/`). The "Action Items" tab is for the per-domain action-item ledger, a different surface. Without this PR, a viewer following the §2 narrative will look for "their action cards" in pilot-ui and find no surface that matches.
+- **Why:** the §3 Guided workflow talks about action *cards* as the per-member queue; pilot-ui today does not fetch `me/action-cards` from any code path (verified by `grep -rn "action-cards" web/pilot-ui/`). The "Action Items" tab is for the per-domain action-item ledger, a different surface. Without this PR, a viewer following the §3 Guided workflow will look for "their action cards" in pilot-ui and find no surface that matches.
 - **What runs after this PR:** opening the new Action Cards section shows the per-member action-cards queue with card layout, plain-language framing, and explicit authority basis / reversibility windows — matching the deck wireframes used in the NYCN-side rehearsal record ([NYCN PR #65](https://github.com/InterCooperative-Network/cooperative-network/pull/65)). The existing Action Items tab is unchanged.
 - **Backend change required?** **No.** The endpoint already exists (#1659).
 - **Naming note:** name the new pilot-ui section "Action Cards" distinct from "Action Items" to preserve the conceptual split. Implementers should not collapse them.
@@ -237,5 +237,5 @@ Each PR in the sequence should pass the same posture gates that #65/#66/#1768 fo
 - [`docs/architecture/KERNEL_APP_SEPARATION.md`](../architecture/KERNEL_APP_SEPARATION.md) — kernel/app boundary including Invariant 6 (opaque receipt storage)
 - [`docs/contracts/institution-package/action-card.schema.json`](../contracts/institution-package/action-card.schema.json) — action card contract; PR 3 renders against this
 - [`docs/spec/private-overlay-did-activation-flow.md`](../spec/private-overlay-did-activation-flow.md) — substrate boundary for partner activation; out of scope for this tranche
-- [`docs/pilots/no-cli-organizer-member-rehearsal-workflow.md`](../pilots/no-cli-organizer-member-rehearsal-workflow.md) — §2 nine-step narrative the demo composition walks
+- [`docs/pilots/no-cli-organizer-member-rehearsal-workflow.md`](../pilots/no-cli-organizer-member-rehearsal-workflow.md) — §3 nine-step narrative the demo composition walks
 - [`docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`](../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md) — PR-time review gate; applied to PRs 2–5 as they land
