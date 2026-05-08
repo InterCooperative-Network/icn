@@ -637,7 +637,7 @@
 
             <!-- Navigation -->
             <nav role="navigation" aria-label="Main navigation">
-                <button class="nav-btn hidden" data-tab="demo-guide" id="demo-guide-nav-btn">
+                <button class="nav-btn hidden" data-tab="demo-guide" id="demo-guide-nav-btn" aria-controls="demo-guide">
                     <span aria-label="Demo guide and orientation">Demo Guide</span>
                 </button>
                 <button class="nav-btn active" data-tab="dashboard" data-demo-irrelevant="true" aria-current="page">
@@ -678,7 +678,7 @@
             <!-- Dashboard Tab -->
             <main id="main-content" class="tab-container">
                 <!-- Demo Guide Tab (PR 2 — guided demo landing; reads existing app state only, no new endpoint consumers) -->
-                <div id="demo-guide" class="tab-content" role="tabpanel" aria-labelledby="tab-demo-guide">
+                <div id="demo-guide" class="tab-content" role="tabpanel" aria-labelledby="demo-guide-nav-btn">
                     <section class="demo-guide-section" aria-labelledby="demo-guide-heading">
                         <h2 id="demo-guide-heading">ICN Organizing Committee Demo</h2>
                         <p class="demo-guide-intro">
