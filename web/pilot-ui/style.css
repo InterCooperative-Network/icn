@@ -6129,34 +6129,442 @@ body[data-demo-mode="true"] main#main-content {
     max-width: 1200px;
 }
 
-/* Demo-only: let the standing + action-cards sections use the full
-   widened main width instead of the default 80ch reading column. */
+/* ============================================================
+ * Demo-mode My Standing & Action Cards layout redesign
+ *
+ * The default rendering put DID/label in a dl, memberships in a
+ * single line each ("name (id) MEMBER via static_list"), and
+ * action cards as a flex column with title and 3 badges fighting
+ * inside one header row. Result: dense, mushy, low scannability.
+ *
+ * Redesigned (demo-only) so each piece has its own visual region:
+ *  - Standing → identity hero + memberships table + roles cards +
+ *    authority chip cloud
+ *  - Action cards → grid of cards with hierarchy:
+ *      kind & scope (eyebrow)  ·  risk (right pill)
+ *      Title (prominent)
+ *      Summary (body)
+ *      Metadata row (Authority / Scope / Deadline as 3 cells)
+ *      Accessibility callout
+ *      Receipt-expected footer
+ * ============================================================ */
+
+/* Let the section escape the 80ch reading clamp */
 body[data-demo-mode="true"] .member-standing-section,
 body[data-demo-mode="true"] .member-action-cards-section {
     max-width: none;
 }
 
-/* Demo-only: render the action-cards list as a responsive grid so
-   each card has room to breathe and the section doesn't read as a
-   single tall column floating in empty page. */
-body[data-demo-mode="true"] .member-action-cards-list {
+/* Section headings ("My Standing", "Action Cards") become real
+   page titles instead of small h2 mixed with body text. */
+body[data-demo-mode="true"] .member-standing-section > h2,
+body[data-demo-mode="true"] .member-action-cards-section > h2 {
+    font-size: 1.5rem;          /* 24px */
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.4rem 0;
+}
+
+body[data-demo-mode="true"] .member-standing-intro,
+body[data-demo-mode="true"] .member-action-cards-intro {
+    max-width: 65ch;
+    font-size: 0.9375rem;       /* 15px */
+    line-height: 1.55;
+    color: var(--text-secondary);
+    margin: 0 0 1.25rem 0;
+}
+
+/* === Standing identity hero === */
+body[data-demo-mode="true"] .standing-id-block {
+    display: block;
+    background: linear-gradient(135deg,
+        rgba(37, 99, 235, 0.07) 0%,
+        rgba(37, 99, 235, 0.02) 100%);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--primary);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+}
+
+body[data-demo-mode="true"] .standing-id-block dt {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary-dark);
+    margin-top: 0.6rem;
+}
+
+body[data-demo-mode="true"] .standing-id-block dt:first-of-type {
+    margin-top: 0;
+}
+
+body[data-demo-mode="true"] .standing-id-block dd {
+    display: block;
+    margin: 0.15rem 0 0 0;
+    font-size: 1rem;
+    line-height: 1.4;
+    color: var(--text-primary);
+}
+
+body[data-demo-mode="true"] .standing-id-block dd.did-display {
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+/* === Section group heading inside standing ("Domain memberships",
+       "Role assignments", "Authority scopes (union)") === */
+body[data-demo-mode="true"] .member-standing-content > h3 {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin: 1.25rem 0 0.6rem 0;
+    padding: 0;
+    border: none;
+}
+
+/* === Domain memberships: tabular row layout === */
+body[data-demo-mode="true"] .standing-domain-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+body[data-demo-mode="true"] .standing-domain {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "name   status"
+        "id     source";
+    gap: 0.15rem 1rem;
+    padding: 0.85rem 1.15rem;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    line-height: 1.4;
+}
+
+body[data-demo-mode="true"] .standing-domain + .standing-domain {
+    border-top: 1px solid var(--border-color);
+}
+
+body[data-demo-mode="true"] .standing-domain > strong {
+    grid-area: name;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+body[data-demo-mode="true"] .standing-domain-id {
+    grid-area: id;
+    margin-left: 0;
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+}
+
+body[data-demo-mode="true"] .standing-domain .standing-status {
+    grid-area: status;
+    align-self: center;
+    margin-left: 0;
+    padding: 0.22rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+}
+
+body[data-demo-mode="true"] .standing-status-member {
+    background: rgba(22, 163, 74, 0.12);
+    color: #15803d;
+    border-color: rgba(22, 163, 74, 0.30);
+}
+
+body[data-demo-mode="true"] .standing-status-unverified {
+    background: rgba(245, 158, 11, 0.12);
+    color: #b45309;
+    border-color: rgba(245, 158, 11, 0.30);
+}
+
+body[data-demo-mode="true"] .standing-domain .standing-source {
+    grid-area: source;
+    margin-left: 0;
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+/* === Role assignments: card grid === */
+body[data-demo-mode="true"] .standing-role-list {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 0.75rem;
+}
+
+body[data-demo-mode="true"] .standing-role {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--primary);
+    border-radius: 10px;
+    padding: 1rem 1.15rem;
+    box-shadow: var(--shadow-sm);
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+body[data-demo-mode="true"] .standing-role > strong {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary-dark);
+}
+
+body[data-demo-mode="true"] .standing-role-structure {
+    margin-left: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    /* Strip the leading " in " prefix the renderer adds */
+    color: var(--text-primary);
+}
+
+body[data-demo-mode="true"] .standing-role-scope {
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+body[data-demo-mode="true"] .standing-role-scope-label {
+    color: var(--text-tertiary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-right: 0.15rem;
+}
+
+/* === Authority chip styling (used in roles + union) === */
+body[data-demo-mode="true"] .standing-scope-badge {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    padding: 0.18rem 0.55rem;
+    background: rgba(37, 99, 235, 0.10);
+    color: #1d4ed8;
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+}
+
+/* Authority union: chip cloud */
+body[data-demo-mode="true"] .standing-scope-union {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.85rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+
+/* === Action cards: redesigned card layout === */
+body[data-demo-mode="true"] .member-action-cards-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
     gap: 1rem;
+    align-items: stretch;
 }
 
 body[data-demo-mode="true"] .member-action-card {
     background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem 1.4rem 1.4rem 1.4rem;
     box-shadow: var(--shadow-sm);
-    border-radius: 10px;
-    padding: 1.1rem 1.25rem;
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    border-top: 4px solid var(--card-accent, var(--gray-300));
 }
 
-/* Tighten the standing description so it doesn't read as a wall
-   of dense text running edge-to-edge. */
-body[data-demo-mode="true"] .member-standing-intro {
-    max-width: 70ch;
-    line-height: 1.6;
+/* Per-card accent on the top stripe — driven by risk level by default,
+   set on the article via a CSS attribute selector */
+body[data-demo-mode="true"] .member-action-card:has(.badge-risk-low) {
+    --card-accent: #16a34a;
+}
+body[data-demo-mode="true"] .member-action-card:has(.badge-risk-normal) {
+    --card-accent: #2563eb;
+}
+body[data-demo-mode="true"] .member-action-card:has(.badge-risk-elevated) {
+    --card-accent: #dc2626;
+}
+
+/* Header: kind/scope eyebrow on left, risk pill on right */
+body[data-demo-mode="true"] .member-action-card-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem 1rem;
+    align-items: start;
+    margin: 0;
+}
+
+body[data-demo-mode="true"] .member-action-card-header h4 {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 0;
+    font-size: 1.0625rem;        /* 17px — prominent title */
+    line-height: 1.35;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--text-primary);
+}
+
+body[data-demo-mode="true"] .member-action-card-badges {
+    grid-row: 1;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* Kind / source = small-caps eyebrow, no background; risk = colored
+   pill, on the right of the row. */
+body[data-demo-mode="true"] .member-action-card .badge {
+    padding: 0.18rem 0.55rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    border-radius: 999px;
+    border: 1px solid transparent;
+}
+
+body[data-demo-mode="true"] .member-action-card .badge-source,
+body[data-demo-mode="true"] .member-action-card .badge-action {
+    background: transparent;
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+body[data-demo-mode="true"] .member-action-card .badge-risk-low {
+    background: rgba(22, 163, 74, 0.12);
+    color: #15803d;
+    border-color: rgba(22, 163, 74, 0.30);
+    margin-left: auto;
+}
+body[data-demo-mode="true"] .member-action-card .badge-risk-normal {
+    background: rgba(37, 99, 235, 0.12);
+    color: #1d4ed8;
+    border-color: rgba(37, 99, 235, 0.30);
+    margin-left: auto;
+}
+body[data-demo-mode="true"] .member-action-card .badge-risk-elevated {
+    background: rgba(220, 38, 38, 0.12);
+    color: #b91c1c;
+    border-color: rgba(220, 38, 38, 0.30);
+    margin-left: auto;
+}
+
+body[data-demo-mode="true"] .member-action-card-summary {
+    margin: 0;
+    font-size: 0.9375rem;        /* 15px — body slightly smaller than title */
+    color: var(--text-secondary);
+    line-height: 1.55;
+}
+
+/* Authority metadata: 3-cell row instead of dl pairs */
+body[data-demo-mode="true"] .member-action-card-authority {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: 0.65rem 1rem;
+    margin: 0;
+    padding: 0.85rem 0;
+    background: transparent;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+}
+
+body[data-demo-mode="true"] .member-action-card-authority dt {
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+}
+
+body[data-demo-mode="true"] .member-action-card-authority dd {
+    margin: 0.2rem 0 0 0;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+/* Accessibility callout: distinct quote-like block */
+body[data-demo-mode="true"] .member-action-card-accessibility {
+    margin: 0;
+    padding: 0.65rem 0.85rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+body[data-demo-mode="true"] .member-action-card-accessibility strong {
+    color: var(--text-primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* Receipt-expected footer: full-width subtle pill */
+body[data-demo-mode="true"] .member-action-card-receipt-expected {
+    margin: 0;
+    padding: 0.6rem 0.85rem;
+    background: rgba(22, 163, 74, 0.08);
+    border: 1px solid rgba(22, 163, 74, 0.25);
+    border-left-width: 3px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    color: #15803d;
+    font-weight: 500;
+}
+
+/* Dark-theme adjustments for the redesigned standing/action layouts */
+[data-theme="dark"] body[data-demo-mode="true"] .standing-id-block {
+    background: linear-gradient(135deg,
+        rgba(59, 130, 246, 0.12) 0%,
+        rgba(59, 130, 246, 0.04) 100%);
+}
+[data-theme="dark"] body[data-demo-mode="true"] .standing-domain-list,
+[data-theme="dark"] body[data-demo-mode="true"] .standing-role,
+[data-theme="dark"] body[data-demo-mode="true"] .member-action-card {
+    background: var(--bg-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 /* Demo-only "this surface is gateway-backed and not fixture-backed"
