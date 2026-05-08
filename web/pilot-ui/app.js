@@ -7182,7 +7182,32 @@ async function loadActionItems() {
 // accessibility_hint, receipt_expected.
 // =====================================================================
 
+// PR 5 (narrow frontend slice) — when ?mode=demo, short-circuit standing
+// and action-cards fetches to a committed fixture pack served as static
+// JSON from web/pilot-ui/fixtures/icn-organizer-demo/. No backend
+// change; the gateway-side --demo-mode flag described in the readiness
+// map §5 PR 5 remains open at ICN #1727. This is the first frontend
+// fixture slice, not the full backend fixture mode.
+async function loadDemoFixture(name) {
+    const url = `fixtures/icn-organizer-demo/${name}.json`;
+    const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!response.ok) {
+        throw new Error(`Demo fixture fetch failed: ${response.status} ${response.statusText} (${url})`);
+    }
+    return response.json();
+}
+
 async function loadMemberStanding() {
+    if (DEMO_MODE === 'demo') {
+        try {
+            state.memberStanding = await loadDemoFixture('standing');
+        } catch (error) {
+            console.error('Failed to load demo standing fixture:', error);
+            state.memberStanding = null;
+        }
+        renderMemberStanding();
+        return;
+    }
     try {
         const response = await apiRequest('GET', '/gov/me/standing');
         state.memberStanding = response || null;
@@ -7194,6 +7219,19 @@ async function loadMemberStanding() {
 }
 
 async function loadMemberActionCards() {
+    if (DEMO_MODE === 'demo') {
+        try {
+            const fixture = await loadDemoFixture('action-cards');
+            state.memberActionCards = Array.isArray(fixture)
+                ? fixture
+                : (fixture && Array.isArray(fixture.cards) ? fixture.cards : []);
+        } catch (error) {
+            console.error('Failed to load demo action-cards fixture:', error);
+            state.memberActionCards = [];
+        }
+        renderMemberActionCards();
+        return;
+    }
     try {
         const response = await apiRequest('GET', '/gov/me/action-cards');
         state.memberActionCards = Array.isArray(response)

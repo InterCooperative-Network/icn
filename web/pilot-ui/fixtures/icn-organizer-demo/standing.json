@@ -1,0 +1,47 @@
+{
+  "did": "did:icn:example-organizer-demo-not-live",
+  "display_label": "Demo organizer (fictional)",
+  "domains": [
+    {
+      "domain_id": "demo.coop.organizing",
+      "domain_name": "Organizing Cooperative (demo)",
+      "membership_source": "static_list",
+      "status": "member"
+    },
+    {
+      "domain_id": "demo.federation.regional",
+      "domain_name": "Regional Federation (demo)",
+      "membership_source": "trust_threshold",
+      "status": "unverified"
+    }
+  ],
+  "roles": [
+    {
+      "role_assignment_id": "demo-role-001",
+      "structure_id": "demo.committee.program",
+      "structure_name": "Program Committee (demo)",
+      "parent_entity_id": "demo.coop.organizing",
+      "role": "chair",
+      "authority_scope": [
+        "session_scheduling",
+        "program_review"
+      ]
+    },
+    {
+      "role_assignment_id": "demo-role-002",
+      "structure_id": "demo.committee.accessibility",
+      "structure_name": "Accessibility Committee (demo)",
+      "parent_entity_id": "demo.coop.organizing",
+      "role": "member",
+      "authority_scope": [
+        "veto_for_cause"
+      ]
+    }
+  ],
+  "authority_scopes": [
+    "session_scheduling",
+    "program_review",
+    "veto_for_cause"
+  ],
+  "generated_at": 1730000000
+}
