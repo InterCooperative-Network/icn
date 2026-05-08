@@ -32,8 +32,8 @@
         <div id="login-screen" class="screen">
             <main id="login-main" aria-label="Sign in to ICN">
             <div class="card login-card">
-                <h1>ICN Timebank</h1>
-                <p class="subtitle">Community Time Exchange</p>
+                <h1 id="app-title-login">ICN Timebank</h1>
+                <p class="subtitle" id="app-subtitle-login">Community Time Exchange</p>
 
                 <form id="login-form" aria-label="Sign in to your cooperative">
                     <div class="form-group">
@@ -512,7 +512,7 @@
             <!-- Header -->
             <header role="banner">
                 <div class="header-left">
-                    <h1>ICN Timebank</h1>
+                    <h1 id="app-title-header">ICN Timebank</h1>
                     <span id="coop-name" class="coop-badge" aria-label="Current cooperative"></span>
                 </div>
                 <div class="header-right">
@@ -640,22 +640,22 @@
                 <button class="nav-btn hidden" data-tab="demo-guide" id="demo-guide-nav-btn">
                     <span aria-label="Demo guide and orientation">Demo Guide</span>
                 </button>
-                <button class="nav-btn active" data-tab="dashboard" aria-current="page">
+                <button class="nav-btn active" data-tab="dashboard" data-demo-irrelevant="true" aria-current="page">
                     <span aria-label="Dashboard">Dashboard</span>
                 </button>
-                <button class="nav-btn" data-tab="log-hours">
+                <button class="nav-btn" data-tab="log-hours" data-demo-irrelevant="true">
                     <span aria-label="Log service hours">Log Hours</span>
                 </button>
-                <button class="nav-btn" data-tab="history">
+                <button class="nav-btn" data-tab="history" data-demo-irrelevant="true">
                     <span aria-label="Transaction history">History</span>
                 </button>
-                <button class="nav-btn" data-tab="members">
+                <button class="nav-btn" data-tab="members" data-demo-irrelevant="true">
                     <span aria-label="Member directory">Members</span>
                 </button>
                 <button class="nav-btn hidden" data-tab="service-board">
                     <span aria-label="Service marketplace">Services</span>
                 </button>
-                <button class="nav-btn" data-tab="member-profile">
+                <button class="nav-btn" data-tab="member-profile" data-demo-irrelevant="true">
                     <span aria-label="Your profile">Profile</span>
                 </button>
                 <button class="nav-btn" data-tab="my-standing" id="tab-my-standing">
@@ -680,9 +680,9 @@
                 <!-- Demo Guide Tab (PR 2 — guided demo landing; reads existing app state only, no new endpoint consumers) -->
                 <div id="demo-guide" class="tab-content" role="tabpanel" aria-labelledby="tab-demo-guide">
                     <section class="demo-guide-section" aria-labelledby="demo-guide-heading">
-                        <h2 id="demo-guide-heading">ICN Local Demo — Guided Path</h2>
+                        <h2 id="demo-guide-heading">ICN Organizing Committee Demo</h2>
                         <p class="demo-guide-intro">
-                            You are running ICN's pilot UI as a guided demo. This page tells you where you are, what is real runtime behavior, what is fixture/local/demo-only, and what is not implemented yet. The §3 Guided workflow narrative in <code>docs/pilots/no-cli-organizer-member-rehearsal-workflow.md</code> walks: <strong>standing → action cards → governance → receipts → provenance/evidence</strong>. Today's pilot-ui covers parts of this; the labels below tell you exactly which parts.
+                            You are running ICN's pilot UI as a local organizing-committee demo. ICN is a substrate for cooperative civic coordination, not a timebank app. The <strong>§3 Guided workflow</strong> narrative in <code>docs/pilots/no-cli-organizer-member-rehearsal-workflow.md</code> walks: <strong>standing → action cards → governance → receipts → provenance/evidence</strong>. This page labels exactly what is fixture-backed today, what is still gateway-backed, and what is not implemented in this demo.
                         </p>
 
                         <h3>Where you are</h3>
@@ -692,44 +692,60 @@
                             <dt>Mode</dt><dd id="demo-guide-mode">—</dd>
                             <dt>Logged-in DID</dt><dd id="demo-guide-did" class="did-display">— (sign in to populate)</dd>
                         </dl>
-                        <p class="demo-guide-note">
-                            The "Logged-in DID" line above comes from your sign-in (auth-known DID), not from a standing read-model fetch. The member standing read-model surface arrives in PR 3.
-                        </p>
 
-                        <h3>Available now in pilot-ui</h3>
+                        <h3>Available now in this local demo</h3>
                         <ul class="demo-guide-list demo-guide-available">
-                            <li><a href="#governance" data-demo-target="governance">Governance — proposals / votes</a> <span class="demo-status">live</span></li>
-                            <li><a href="#governance" data-demo-target="governance">Action items</a> <span class="demo-status">live</span> <span class="demo-note">per-domain ledger via <code>/gov/domains/{d}/action-items</code> — different endpoint and concept from per-member action cards</span></li>
-                            <li><a href="#history" data-demo-target="history">Ledger / transaction history</a> <span class="demo-status">live</span></li>
-                            <li><a href="#dashboard" data-demo-target="dashboard">Trust score</a> <span class="demo-status">live</span></li>
-                            <li><a href="#receipts" data-demo-target="receipts">Receipt chain view</a> <span class="demo-status">live</span> <span class="demo-note">via <code>receipts.js</code>; plain-language framing arrives in PR 4</span></li>
+                            <li>No-gateway demo bootstrap <span class="demo-status">live</span></li>
+                            <li>Demo / local mode banner <span class="demo-status">live</span></li>
+                            <li><a href="#my-standing" data-demo-target="my-standing">My Standing surface</a> <span class="demo-status">live</span></li>
+                            <li><a href="#my-standing" data-demo-target="my-standing">Action Cards surface</a> <span class="demo-status">live</span></li>
+                            <li>Standing fixture <span class="demo-status">fixture</span> <span class="demo-note">committed under <code>web/pilot-ui/fixtures/icn-organizer-demo/standing.json</code></span></li>
+                            <li>Action-card fixture <span class="demo-status">fixture</span> <span class="demo-note">committed under <code>web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json</code></span></li>
+                            <li>Plain-language receipt summary shell <span class="demo-status">live</span> <span class="demo-note">render path via <code>receipts.js</code>; needs gateway data to populate</span></li>
                         </ul>
 
-                        <h3>Coming next in this demo tranche — Not yet wired</h3>
-                        <ul class="demo-guide-list demo-guide-coming">
-                            <li>Member standing read-model surface <span class="demo-status">PR 3</span></li>
-                            <li>Per-member action cards surface <span class="demo-status">PR 3</span> <span class="demo-note">distinct from the existing Action Items tab; uses <code>/v1/gov/me/action-cards</code></span></li>
-                            <li>Plain-language receipt / provenance framing <span class="demo-status">PR 4</span> <span class="demo-note">extends existing <code>receipts.js</code> with a plain-language summary above the existing chain render</span></li>
-                            <li>Fixture-backed local demo mode (gateway-side) <span class="demo-status">PR 5</span></li>
+                        <h3>Fixture-backed today</h3>
+                        <ul class="demo-guide-list demo-guide-fixture">
+                            <li>Standing</li>
+                            <li>Action cards</li>
                         </ul>
 
-                        <h3>Not implemented in demo</h3>
+                        <h3>Visible but still gateway-backed / not fixture-backed</h3>
+                        <ul class="demo-guide-list demo-guide-gateway-backed">
+                            <li>Governance proposals / votes</li>
+                            <li>Receipt-chain data</li>
+                            <li>Ledger / history</li>
+                            <li>Members</li>
+                            <li>Trust</li>
+                            <li>Federation</li>
+                        </ul>
+
+                        <h3>Not implemented in this demo</h3>
                         <ul class="demo-guide-list demo-guide-not-implemented">
-                            <li>Federation topology — no first-class topology surface; node-dashboard's "peer count" is a proxy from <code>/v1/trust/edges</code></li>
-                            <li>Holder-label DID activation — substrate spec only; partner-package policy required</li>
-                            <li>Allocation / settlement at scale</li>
+                            <li>Backend <code>--demo-mode</code></li>
+                            <li>Full fixture-backed runtime mode</li>
+                            <li>Live federation</li>
+                            <li>Cloud sync</li>
                             <li>Private-overlay activation</li>
-                            <li>Cross-cooperative federation flows</li>
-                            <li>Cloud sync (Drive / Sheets / Groups / Calendar / mail)</li>
-                            <li>K3s / DNS / Forgejo / production deployment mutation</li>
+                            <li>Real holder-label activation</li>
+                            <li>Production deployment</li>
+                            <li>Formal NYCN pilot</li>
+                        </ul>
+
+                        <h3>Future narrow slices</h3>
+                        <ul class="demo-guide-list demo-guide-future">
+                            <li>Governance proposal / vote fixture slice</li>
+                            <li>Receipt / provenance fixture slice</li>
+                            <li>Ledger / federation only if needed</li>
+                            <li>Backend <code>--demo-mode</code> as a separate broader design pass</li>
                         </ul>
 
                         <h3>Non-claims</h3>
                         <ul class="demo-guide-non-claims">
-                            <li>Demo mode is a UI labeling convention until PR 5 adds gateway-side fixture/demo mode.</li>
-                            <li><strong>LIVE</strong> does not mean production — it means the page is reading real gateway state. ICN is not production-deployed.</li>
-                            <li>"Not yet wired" means upcoming in this tranche (PRs 3, 4, 5).</li>
-                            <li>"Not implemented in demo" means out of scope for this entire tranche.</li>
+                            <li>Demo mode is a UI labeling convention.</li>
+                            <li>Standing and action cards are fictional fixtures, not real participant state.</li>
+                            <li><strong>LIVE</strong> does not mean production — ICN is not production-deployed.</li>
+                            <li>"Not implemented in this demo" means out of scope for this slice.</li>
                         </ul>
                     </section>
                 </div>

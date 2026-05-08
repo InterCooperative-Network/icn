@@ -29,15 +29,24 @@ const DEMO_MODE = (() => {
     }
 })();
 const DEMO_MODE_MESSAGES = {
-    demo:    'UI is in DEMO mode — labeling convention; not authoritative gateway state. Gateway-side fixture/demo mode arrives in PR 5.',
+    demo:    'Local organizer/member demo. Standing and action cards are fixture-backed; governance, receipts, ledger, members, trust, and federation are not fixture-backed yet.',
     fixture: 'UI is in FIXTURE mode — committed test data only; not real participant state.',
     devnet:  'UI is in DEVNET mode — local 3-node Docker cluster; not production.',
     local:   'UI is in LOCAL mode — single-node local gateway.',
     live:    'UI is in LIVE mode — reading real gateway state. LIVE does not mean production; ICN is not production-deployed.',
 };
 
+// In ?mode=demo only, retitle the visible app and de-emphasize timebank
+// surfaces in nav so the first impression matches the organizing-committee
+// demo, not "ICN Timebank with extra tabs." Non-demo paths are unchanged.
+const DEMO_TITLE = 'ICN Organizing Committee Demo';
+const DEMO_SUBTITLE = 'Cooperative Civic Coordination — Local Demo';
+
 // Render the demo-mode banner and unhide the Demo Guide nav button.
-// Idempotent. Safe to call multiple times. No-op when DEMO_MODE is null.
+// In ?mode=demo only: also swap the visible app title away from "ICN
+// Timebank" and hide timebank-oriented nav buttons that aren't part of
+// the organizing-committee story. Idempotent. Safe to call multiple
+// times. No-op when DEMO_MODE is null.
 function applyDemoMode() {
     if (!DEMO_MODE) return;
     const banner = document.getElementById('demo-mode-banner');
@@ -53,6 +62,30 @@ function applyDemoMode() {
     if (navBtn) navBtn.classList.remove('hidden');
     const modeEl = document.getElementById('demo-guide-mode');
     if (modeEl) modeEl.textContent = DEMO_MODE.toUpperCase();
+
+    // ?mode=demo specifically (not fixture/devnet/local/live): retitle
+    // the app to the organizing-committee framing and hide timebank
+    // nav surfaces that aren't part of this demo's story. Only the
+    // visible UI changes; the underlying tabs remain in the DOM so a
+    // direct hash-link still works for adjacent tools.
+    if (DEMO_MODE === 'demo') {
+        try { document.title = DEMO_TITLE; } catch (_) { /* noop */ }
+        const headerTitle = document.getElementById('app-title-header');
+        if (headerTitle) headerTitle.textContent = DEMO_TITLE;
+        const loginTitle = document.getElementById('app-title-login');
+        if (loginTitle) loginTitle.textContent = DEMO_TITLE;
+        const loginSubtitle = document.getElementById('app-subtitle-login');
+        if (loginSubtitle) loginSubtitle.textContent = DEMO_SUBTITLE;
+
+        document.querySelectorAll('[data-demo-irrelevant="true"]').forEach((el) => {
+            el.classList.add('hidden');
+            // Strip the default "active" highlight so the demo-guide
+            // tab is the unambiguous starting point. switchTab() will
+            // handle the actual active-state once it runs.
+            el.classList.remove('active');
+            el.removeAttribute('aria-current');
+        });
+    }
 }
 
 // Update the per-session fields in the Demo Guide ("Where you are")

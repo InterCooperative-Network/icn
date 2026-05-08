@@ -65,11 +65,13 @@ test.describe('Demo Mode (PR 2)', () => {
         await page.waitForLoadState('networkidle');
 
         const guide = page.locator('#demo-guide');
-        await expect(guide).toContainText('ICN Local Demo — Guided Path');
+        await expect(guide).toContainText('ICN Organizing Committee Demo');
         await expect(guide).toContainText('Where you are');
-        await expect(guide).toContainText('Available now in pilot-ui');
-        await expect(guide).toContainText('Coming next in this demo tranche');
-        await expect(guide).toContainText('Not implemented in demo');
+        await expect(guide).toContainText('Available now in this local demo');
+        await expect(guide).toContainText('Fixture-backed today');
+        await expect(guide).toContainText('Visible but still gateway-backed');
+        await expect(guide).toContainText('Not implemented in this demo');
+        await expect(guide).toContainText('Future narrow slices');
         await expect(guide).toContainText('Non-claims');
 
         // Mode echo
@@ -103,20 +105,38 @@ test.describe('Demo Mode (PR 2)', () => {
         const nonClaims = page.locator('.demo-guide-non-claims');
         await expect(nonClaims).toContainText('UI labeling convention');
         await expect(nonClaims).toContainText('LIVE');
-        await expect(nonClaims).toContainText('Not yet wired');
-        await expect(nonClaims).toContainText('Not implemented in demo');
+        await expect(nonClaims).toContainText('fictional fixtures');
+        await expect(nonClaims).toContainText('Not implemented in this demo');
     });
 
-    test('Demo Guide labels Action Items as distinct from Action Cards', async ({ page }) => {
+    test('Demo Guide says standing and action cards are fixture-backed (not coming-next)', async ({ page }) => {
         await page.goto('/?mode=demo');
         await page.waitForLoadState('networkidle');
 
         const guide = page.locator('#demo-guide');
-        // Action Items live now, action-cards is PR 3
-        await expect(guide).toContainText('Action items');
-        await expect(guide).toContainText('different endpoint and concept from per-member action cards');
-        await expect(guide).toContainText('Per-member action cards surface');
-        await expect(guide).toContainText('PR 3');
+        // After #1771–#1774, standing + action cards are live + fixture-backed.
+        // Old "PR 3 / Not yet wired" framing must be gone.
+        await expect(guide).toContainText('My Standing surface');
+        await expect(guide).toContainText('Action Cards surface');
+        await expect(guide).toContainText('Fixture-backed today');
+
+        // Stale tranche labels must NOT appear.
+        await expect(guide).not.toContainText('Coming next in this demo tranche');
+        await expect(guide).not.toContainText('Not yet wired');
+        await expect(guide).not.toContainText('arrives in PR');
+    });
+
+    test('Demo Guide says governance and receipt-chain data are not fixture-backed yet', async ({ page }) => {
+        await page.goto('/?mode=demo');
+        await page.waitForLoadState('networkidle');
+
+        const gatewayBacked = page.locator('.demo-guide-gateway-backed');
+        await expect(gatewayBacked).toContainText('Governance proposals / votes');
+        await expect(gatewayBacked).toContainText('Receipt-chain data');
+        await expect(gatewayBacked).toContainText('Ledger / history');
+        await expect(gatewayBacked).toContainText('Members');
+        await expect(gatewayBacked).toContainText('Trust');
+        await expect(gatewayBacked).toContainText('Federation');
     });
 
     test('?mode=demo auto-bootstraps the main screen without a running gateway', async ({ page }) => {
@@ -156,5 +176,75 @@ test.describe('Demo Mode (PR 2)', () => {
         const mainScreen = page.locator('#main-screen');
         await expect(loginScreen).not.toHaveClass(/hidden/);
         await expect(mainScreen).toHaveClass(/hidden/);
+    });
+
+    test('?mode=demo retitles the app away from "ICN Timebank"', async ({ page }) => {
+        // Demo shell must read as an organizing-committee demo on first
+        // glance, not as a timebank app. Document title (browser tab),
+        // header title, and login-screen title must all be retitled.
+        await page.goto('/?mode=demo');
+        await page.waitForLoadState('networkidle');
+
+        await expect(page).toHaveTitle('ICN Organizing Committee Demo');
+
+        const headerTitle = page.locator('#app-title-header');
+        await expect(headerTitle).toHaveText('ICN Organizing Committee Demo');
+        await expect(headerTitle).not.toHaveText('ICN Timebank');
+
+        const loginTitle = page.locator('#app-title-login');
+        await expect(loginTitle).toHaveText('ICN Organizing Committee Demo');
+    });
+
+    test('non-demo path keeps "ICN Timebank" title', async ({ page }) => {
+        // Discovery did not show the non-demo shell to be obsolete, so
+        // the existing live/timebank surface stays as-is until the
+        // user explicitly asks for a global rename.
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        await expect(page).toHaveTitle('ICN Timebank');
+        const loginTitle = page.locator('#app-title-login');
+        await expect(loginTitle).toHaveText('ICN Timebank');
+    });
+
+    test('?mode=demo hides timebank-oriented nav buttons (Dashboard/Log Hours/History/Members/Profile)', async ({ page }) => {
+        // The organizing-committee demo's preferred nav is:
+        //   Demo Guide • My Standing & Action Cards • Governance • Receipts (• Federation, optional)
+        // Timebank-oriented surfaces are hidden in demo mode (only — they
+        // remain in the DOM and remain visible in non-demo mode).
+        await page.goto('/?mode=demo');
+        await page.waitForLoadState('networkidle');
+
+        for (const tab of ['dashboard', 'log-hours', 'history', 'members', 'member-profile']) {
+            const btn = page.locator(`[data-tab="${tab}"]`);
+            await expect(btn).toHaveClass(/hidden/);
+        }
+
+        // Organizing-path nav remains visible (no hidden class).
+        for (const tab of ['demo-guide', 'my-standing', 'governance', 'receipts']) {
+            const btn = page.locator(`[data-tab="${tab}"]`);
+            await expect(btn).not.toHaveClass(/hidden/);
+        }
+    });
+
+    test('non-demo path keeps timebank-oriented nav buttons visible', async ({ page }) => {
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+
+        for (const tab of ['dashboard', 'log-hours', 'history', 'members', 'member-profile']) {
+            const btn = page.locator(`[data-tab="${tab}"]`);
+            await expect(btn).not.toHaveClass(/hidden/);
+        }
+    });
+
+    test('?mode=demo banner copy is current (no stale "PR 5" claim)', async ({ page }) => {
+        await page.goto('/?mode=demo');
+        await page.waitForLoadState('networkidle');
+
+        const message = page.locator('#demo-mode-message');
+        await expect(message).toContainText('Local organizer/member demo');
+        await expect(message).toContainText('fixture-backed');
+        await expect(message).not.toContainText('PR 5');
+        await expect(message).not.toContainText('arrives in');
     });
 });
