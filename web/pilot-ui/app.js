@@ -63,7 +63,14 @@ function refreshDemoGuideContext() {
     if (!DEMO_MODE) return;
     const gatewayEl = document.getElementById('demo-guide-gateway');
     if (gatewayEl) {
-        gatewayEl.textContent = (typeof state !== 'undefined' && state.gatewayUrl) || '— (not signed in)';
+        // In demo bootstrap, state.gatewayUrl is intentionally empty
+        // (preventing URL builders from sending requests). Render an
+        // honest "(demo — no gateway)" placeholder for the user.
+        if (typeof state !== 'undefined' && state.demoBootstrapped) {
+            gatewayEl.textContent = '(demo — no gateway)';
+        } else {
+            gatewayEl.textContent = (typeof state !== 'undefined' && state.gatewayUrl) || '— (not signed in)';
+        }
     }
     const didEl = document.getElementById('demo-guide-did');
     if (didEl) {
@@ -383,6 +390,15 @@ function getUserFriendlyError(error) {
 
 // API Client with Better Error Handling
 async function apiRequest(method, path, body = null) {
+    // Demo bootstrap short-circuit: when ?mode=demo brought the user
+    // into the main screen without a real gateway, no fetch should
+    // leave the page. Surfaces that have demo-mode handling (standing,
+    // action cards) bypass apiRequest entirely; other surfaces will
+    // see this rejection and render their own empty/error state
+    // instead of producing a real network error against a wrong host.
+    if (state.demoBootstrapped) {
+        throw new Error('Demo mode — gateway not available. This surface is not fixture-backed in demo mode yet.');
+    }
     const url = `${state.gatewayUrl}/v1${path}`;
     const headers = {
         'Content-Type': 'application/json',
@@ -3110,7 +3126,7 @@ if (myStandingNavBtn) {
 applyDemoMode();
 
 // Auto-bootstrap demo mode (verification fix on top of #1773 fixture slice):
-// when `?mode=demo` is set and no real auth has populated state.token,
+// when `?mode=demo` is set and no real auth (live or saved) is present,
 // transition straight into the main screen with fictional identity so the
 // guided demo path is viewable from a static server without a running
 // gateway. The standing + action-cards surfaces (#1771) read fixture
@@ -3119,23 +3135,42 @@ applyDemoMode();
 // surface their own empty/error states honestly. Frontend-only.
 function bootstrapDemoMode() {
     if (DEMO_MODE !== 'demo') return;
-    // Don't override real auth: if a previous real session populated
-    // state.token (e.g. ?mode=demo against a live gateway), take the
-    // standard login path and let real auth flow.
+    // Don't override a live session.
     if (state.token) return;
+    // Don't override a saved real session either: the DOMContentLoaded
+    // auto-login restores state.token from localStorage AFTER this
+    // bootstrap runs (script-eval ordering), so we have to peek directly.
+    // If there's a cached real session, defer to the standard auto-login
+    // path so real-auth flows are never hijacked by demo mode.
+    let savedToken = null;
+    try {
+        savedToken = localStorage.getItem('icn-token');
+    } catch (_) {
+        // localStorage may be unavailable (e.g. file:// origin). Treat as
+        // no saved session and continue with the demo bootstrap.
+    }
+    if (savedToken) return;
+
     // Hard-coded fictional identity (matches the standing.json fixture
-    // committed under web/pilot-ui/fixtures/icn-organizer-demo/). The
-    // standing tab will repopulate with the same DID from the fixture
-    // when its lazy-load fires; using a literal here keeps the
-    // bootstrap synchronous so no DOMContentLoaded handlers race
-    // against an awaited fetch.
+    // committed under web/pilot-ui/fixtures/icn-organizer-demo/).
     state.did = 'did:icn:example-organizer-demo-not-live';
     state.userName = 'Demo organizer (fictional)';
     state.coopId = 'demo.coop.organizing';
-    state.gatewayUrl = '(demo — no gateway)';
-    // Sentinel — never a real bearer token. Set so other code paths
-    // checking `state.token` see "logged in" without sending the value.
-    state.token = 'demo-no-token-not-live';
+
+    // CRITICAL: leave state.token and state.gatewayUrl EMPTY.
+    //
+    // Setting state.token would cause apiRequest() to attach an
+    // Authorization: Bearer <sentinel> header and the 30s auto-refresh
+    // (gated on state.token) to fire — both would dispatch real
+    // network calls with a non-real token. Leaving the token empty is
+    // what tells those code paths "no auth available; do not fetch."
+    //
+    // Setting state.gatewayUrl to a non-URL string would corrupt URL
+    // builders that interpolate `${state.gatewayUrl}/v1/...`. Leaving
+    // it empty produces an obviously-relative URL that never resolves
+    // to a real gateway. The demoBootstrapped flag below is the
+    // "demo session active" signal that other code paths can read.
+    state.demoBootstrapped = true;
 
     if (elements.loginScreen) elements.loginScreen.classList.add('hidden');
     if (elements.mainScreen) elements.mainScreen.classList.remove('hidden');
