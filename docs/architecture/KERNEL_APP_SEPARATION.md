@@ -239,9 +239,9 @@ impl PolicyOracle for TrustPolicyOracle {
 
 ### Invariant 6: Kernel Stores App-Generated Receipts Opaquely
 
-**Rule**: When apps generate typed receipts (e.g. `ProcessGateResultReceipt` from `apps/governance`), the kernel persists them as **opaque bytes** keyed by `(class, key1, key2, record_hash)` without parsing or pattern-matching on the typed body.
+**Rule**: When apps generate typed receipts (e.g. `ProcessGateResultReceipt` from `apps/governance`), the kernel persists them as **opaque bytes** in a primary `(class, record_hash) → bytes` store with a secondary index over `(class, key1, key2_opt, recorded_at, record_hash)` for audit-chain ordering. The kernel does not parse or pattern-match on the typed body.
 
-**Rationale**: The same separation that prevents the kernel from importing domain crates (Invariant 1) or matching on `ConstraintSet.custom` keys (Invariant 4) extends to receipt persistence. If the kernel parsed receipt bodies, it would acquire knowledge of which receipt classes mean what — and policy ownership would silently migrate from apps to the kernel. Storing receipts as opaque `(class, key1, key2, record_hash, bytes)` keeps the kernel semantically blind: it can prove a receipt was committed and retrieve it for audit, but it cannot reason about its meaning.
+**Rationale**: The same separation that prevents the kernel from importing domain crates (Invariant 1) or matching on `ConstraintSet.custom` keys (Invariant 4) extends to receipt persistence. If the kernel parsed receipt bodies, it would acquire knowledge of which receipt classes mean what — and policy ownership would silently migrate from apps to the kernel. Storing receipts as `(class, record_hash) → bytes` with a secondary `(class, key1, key2_opt, recorded_at, record_hash)` audit-chain index keeps the kernel semantically blind: it can prove a receipt was committed and retrieve it for audit, but it cannot reason about its meaning.
 
 **Enforcement**: The opaque storage primitive lives in `crates/icn-gateway/src/receipt_store.rs` as the `put_opaque` / `get_latest_opaque` / `list_opaque_for` inherent methods on `ReceiptStore`. These are exposed on the `GovernanceReceiptBackend` trait in `apps/governance/src/receipt_backend.rs` so apps route typed receipts through the opaque cascade. Three keyspaces enforce the boundary:
 
@@ -265,19 +265,22 @@ See [`docs/STATE.md`](../STATE.md) post-#1759 sync block for the canonical recor
 **Example**: app emits typed receipt → kernel stores opaque bytes
 
 ```rust
-// ✅ App owns the receipt class and body shape
+// ✅ App owns the receipt class and body shape (real struct in
+// `icn-governance/src/proof.rs`).
 let receipt = ProcessGateResultReceipt {
     session_id,
+    domain_id,
     gate_kind,
-    outcome,
-    record_hash,
+    result: ProcessGateResult::Pass,
+    recorded_by,
     recorded_at,
-    /* ... */
+    record_hash,
 };
 
 // ✅ App routes through the opaque cascade. The kernel never sees
-// `ProcessGateResultReceipt` as a type — only `(class, key1, key2,
-// record_hash, bytes)`. The hash-bind keyspace makes the binding
+// `ProcessGateResultReceipt` as a type — only the call arguments
+// below as opaque strings, an integer timestamp, a 32-byte hash, and
+// a payload byte slice. The hash-bind keyspace makes the binding
 // transactionally permanent.
 let payload = serde_json::to_vec(&receipt)?;
 self.put_opaque(
@@ -291,10 +294,13 @@ self.put_opaque(
 ```
 
 ```rust
-// ❌ VIOLATION — kernel parsing receipt bodies to make decisions
-fn promote_audit_chain(class: &str, body: &[u8]) -> bool {
+// ❌ VIOLATION — kernel parsing receipt bodies to make decisions.
+// (Returns Option so `?` typechecks; the violation is the body
+// inspection itself, not the signature shape. The wire field is
+// `result` with snake_case values per serde, e.g. `"pass"` / `"fail"`.)
+fn promote_audit_chain(class: &str, body: &[u8]) -> Option<bool> {
     let parsed: serde_json::Value = serde_json::from_slice(body).ok()?;
-    parsed.get("outcome") == Some(&json!("Pass"))   // VIOLATION — kernel reads receipt semantics
+    Some(parsed.get("result") == Some(&serde_json::json!("pass")))   // VIOLATION — kernel reads receipt semantics
 }
 ```
 
