@@ -38,8 +38,8 @@ anything in this directory.
 
 | Surface | Endpoint shape | Fixture file |
 |---|---|---|
-| Member standing read-model | `GET /v1/gov/me/standing` shape (`StandingResponse`) | [`standing.json`](standing.json) |
-| Per-member action-cards queue | `GET /v1/gov/me/action-cards` shape (array of `ActionCard`) | [`action-cards.json`](action-cards.json) |
+| Member standing read-model | `GET /v1/gov/me/standing` returns `StandingResponse` `{ did, display_label?, domains[], roles[], authority_scopes[], generated_at }`. Each `roles[i]` is a `StandingRoleAssignment` with required `role_assignment_id`, `structure_id`, `role`, `authority_scope[]`, **`start_date`** (u64, Unix seconds), and optional `structure_name` / `parent_entity_id` / `end_date`. | [`standing.json`](standing.json) |
+| Per-member action-cards queue | `GET /v1/gov/me/action-cards` returns `ActionCardsResponse` **wrapper** `{ did, cards, generated_at }` — **not** a bare array. Each `cards[i]` matches `action-card.schema.json`, with `scope` as the **enum** `entity` / `structure` / `individual` (the constitutional-axis target) and `domain_id` carrying the governance domain identifier. | [`action-cards.json`](action-cards.json) |
 
 The fixture content matches the field shapes in
 [`docs/contracts/institution-package/action-card.schema.json`](../../../docs/contracts/institution-package/action-card.schema.json)

@@ -1,55 +1,59 @@
-[
-  {
-    "id": "demo-card-proposal-vote-001",
-    "source_kind": "proposal",
-    "action_kind": "vote",
-    "scope": "demo.coop.organizing",
-    "title": "Vote on the proposed program-review schedule",
-    "summary": "The Program Committee has proposed a tentative review schedule. As chair you may vote to accept the schedule or send it back for revision.",
-    "authority_basis": "Program Committee chair (demo role)",
-    "required_authority_scope": [
-      "program_review"
-    ],
-    "deadline": 1730500000,
-    "risk_level": "normal",
-    "accessibility_hint": "Plain-language outcome before structured ballot fields. Choices read in order; no color-only signaling.",
-    "receipt_expected": true,
-    "source_id": "demo-proposal-001",
-    "domain_id": "demo.coop.organizing"
-  },
-  {
-    "id": "demo-card-meeting-attend-001",
-    "source_kind": "meeting",
-    "action_kind": "attend",
-    "scope": "demo.coop.organizing",
-    "title": "Confirm attendance at the next program-committee meeting",
-    "summary": "Upcoming meeting of the Program Committee. Confirming attendance produces an attendance receipt.",
-    "authority_basis": "Program Committee chair (demo role)",
-    "required_authority_scope": [
-      "session_scheduling"
-    ],
-    "risk_level": "low",
-    "accessibility_hint": "Meeting summary is text-first; agenda is provided in advance.",
-    "receipt_expected": true,
-    "source_id": "demo-meeting-001",
-    "domain_id": "demo.coop.organizing"
-  },
-  {
-    "id": "demo-card-action-item-complete-001",
-    "source_kind": "action_item",
-    "action_kind": "complete",
-    "scope": "demo.coop.organizing",
-    "title": "Mark the accessibility-checklist review as complete",
-    "summary": "An action item from the most recent accessibility review is assigned to your role. Marking it complete produces a completion receipt.",
-    "authority_basis": "Accessibility Committee member (demo role)",
-    "required_authority_scope": [
-      "veto_for_cause"
-    ],
-    "deadline": 1730200000,
-    "risk_level": "elevated",
-    "accessibility_hint": "Action carries a veto-for-cause power; use plain-language framing of the outcome and any rejection reason.",
-    "receipt_expected": true,
-    "source_id": "demo-action-item-001",
-    "domain_id": "demo.coop.organizing"
-  }
-]
+{
+  "did": "did:icn:example-organizer-demo-not-live",
+  "cards": [
+    {
+      "id": "demo-card-proposal-vote-001",
+      "source_kind": "proposal",
+      "action_kind": "vote",
+      "scope": "structure",
+      "title": "Vote on the proposed program-review schedule",
+      "summary": "The Program Committee has proposed a tentative review schedule. As chair you may vote to accept the schedule or send it back for revision.",
+      "authority_basis": "Program Committee chair (demo role)",
+      "required_authority_scope": [
+        "program_review"
+      ],
+      "deadline": 1730500000,
+      "risk_level": "normal",
+      "accessibility_hint": "Plain-language outcome before structured ballot fields. Choices read in order; no color-only signaling.",
+      "receipt_expected": true,
+      "source_id": "demo-proposal-001",
+      "domain_id": "demo.coop.organizing"
+    },
+    {
+      "id": "demo-card-meeting-attend-001",
+      "source_kind": "meeting",
+      "action_kind": "attend",
+      "scope": "structure",
+      "title": "Confirm attendance at the next program-committee meeting",
+      "summary": "Upcoming meeting of the Program Committee. Confirming attendance produces an attendance receipt.",
+      "authority_basis": "Program Committee chair (demo role)",
+      "required_authority_scope": [
+        "session_scheduling"
+      ],
+      "risk_level": "low",
+      "accessibility_hint": "Meeting summary is text-first; agenda is provided in advance.",
+      "receipt_expected": true,
+      "source_id": "demo-meeting-001",
+      "domain_id": "demo.coop.organizing"
+    },
+    {
+      "id": "demo-card-action-item-complete-001",
+      "source_kind": "action_item",
+      "action_kind": "complete",
+      "scope": "individual",
+      "title": "Mark the accessibility-checklist review as complete",
+      "summary": "An action item from the most recent accessibility review is assigned to your role. Marking it complete produces a completion receipt.",
+      "authority_basis": "Accessibility Committee member (demo role)",
+      "required_authority_scope": [
+        "veto_for_cause"
+      ],
+      "deadline": 1730200000,
+      "risk_level": "elevated",
+      "accessibility_hint": "Action carries a veto-for-cause power; use plain-language framing of the outcome and any rejection reason.",
+      "receipt_expected": true,
+      "source_id": "demo-action-item-001",
+      "domain_id": "demo.coop.organizing"
+    }
+  ],
+  "generated_at": 1730000000
+}

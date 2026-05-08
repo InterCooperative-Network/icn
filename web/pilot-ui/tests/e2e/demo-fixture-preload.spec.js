@@ -47,17 +47,26 @@ test.describe('ICN organizer demo fixture preload (PR 5 narrow slice)', () => {
             expect(['member', 'unverified']).toContain(d.status);
         }
 
-        // Each role has the expected fields.
+        // Each role has the expected fields. StandingRoleAssignment
+        // requires `start_date` (u64) per the Rust model in
+        // icn/apps/governance/src/http/models.rs — pin it here so
+        // fixture drift from the wire shape gets caught.
         for (const r of standing.roles) {
             expect(typeof r.role).toBe('string');
             expect(typeof r.structure_id).toBe('string');
+            expect(typeof r.role_assignment_id).toBe('string');
             expect(Array.isArray(r.authority_scope)).toBeTruthy();
+            expect(typeof r.start_date).toBe('number');
+            // end_date is optional; when present it must also be a number.
+            if (r.end_date !== undefined) {
+                expect(typeof r.end_date).toBe('number');
+            }
         }
     });
 
-    test('action-cards fixture is reachable and has expected shape', async ({ page }) => {
+    test('action-cards fixture is reachable and has expected wrapper shape', async ({ page }) => {
         await page.goto('/');
-        const cards = await page.evaluate(async () => {
+        const response = await page.evaluate(async () => {
             const r = await fetch('fixtures/icn-organizer-demo/action-cards.json', {
                 headers: { 'Accept': 'application/json' },
             });
@@ -65,15 +74,25 @@ test.describe('ICN organizer demo fixture preload (PR 5 narrow slice)', () => {
             return r.json();
         });
 
-        // Top-level shape: array of ActionCard.
-        expect(Array.isArray(cards)).toBeTruthy();
-        expect(cards.length).toBeGreaterThan(0);
+        // ActionCardsResponse wrapper: { did, cards, generated_at }.
+        // Per icn/apps/governance/src/http/models.rs — NOT a bare array.
+        expect(typeof response.did).toBe('string');
+        expect(response.did.startsWith('did:icn:example-')).toBeTruthy();
+        expect(typeof response.generated_at).toBe('number');
+        expect(Array.isArray(response.cards)).toBeTruthy();
+        expect(response.cards.length).toBeGreaterThan(0);
+
+        const cards = response.cards;
 
         // Schema enum coverage: risk_level must use schema values
         // (low | normal | elevated). PR 3 review caught a previous
         // version that used the wrong values; this test pins the
         // schema-correct enum.
         const validRiskLevels = ['low', 'normal', 'elevated'];
+        // ActionCard.scope is also an enum per the schema:
+        // entity | structure | individual. PR 5 review caught a
+        // previous version that used a domain id as scope.
+        const validScopes = ['entity', 'structure', 'individual'];
 
         for (const c of cards) {
             // Required fields per action-card.schema.json (id,
@@ -83,7 +102,7 @@ test.describe('ICN organizer demo fixture preload (PR 5 narrow slice)', () => {
             expect(typeof c.id).toBe('string');
             expect(typeof c.source_kind).toBe('string');
             expect(typeof c.action_kind).toBe('string');
-            expect(typeof c.scope).toBe('string');
+            expect(validScopes).toContain(c.scope);
             expect(typeof c.title).toBe('string');
             expect(typeof c.summary).toBe('string');
             expect(typeof c.authority_basis).toBe('string');
@@ -119,10 +138,12 @@ test.describe('ICN organizer demo fixture preload (PR 5 narrow slice)', () => {
 
     test('fixture pack covers the three source-kind classes the §3 narrative needs', async ({ page }) => {
         await page.goto('/');
-        const cards = await page.evaluate(async () =>
+        const response = await page.evaluate(async () =>
             (await fetch('fixtures/icn-organizer-demo/action-cards.json')).json()
         );
 
+        // The fixture is an ActionCardsResponse wrapper; extract cards array.
+        const cards = response.cards;
         const sourceKinds = new Set(cards.map((c) => c.source_kind));
         // The §3 Guided workflow narrative walks through proposal/vote,
         // meeting/attend, and action_item/complete. Cover all three so

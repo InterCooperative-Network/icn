@@ -25,7 +25,8 @@
       "authority_scope": [
         "session_scheduling",
         "program_review"
-      ]
+      ],
+      "start_date": 1700000000
     },
     {
       "role_assignment_id": "demo-role-002",
@@ -35,7 +36,8 @@
       "role": "member",
       "authority_scope": [
         "veto_for_cause"
-      ]
+      ],
+      "start_date": 1710000000
     }
   ],
   "authority_scopes": [
