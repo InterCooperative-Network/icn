@@ -2159,6 +2159,15 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
                         </div>
                     </div>
 
+                    <!-- Plain-language summary (PR 4 — extends receipts.js with a plain-language framing block ABOVE the existing structured detail; the chain itself is unchanged below) -->
+                    <div id="receipt-plain-language-summary" class="receipt-plain-language-summary" aria-live="polite">
+                        <p class="empty-state">Query a decision hash to see the receipt chain in plain language.</p>
+                    </div>
+
+                    <!-- Structured detail (existing chain renderers — unchanged) -->
+                    <details id="receipt-structured-detail" class="receipt-structured-detail" open>
+                        <summary>Structured detail (allocations, intents, ledger entries)</summary>
+
                     <!-- Allocation Receipts -->
                     <div id="allocations-section" class="receipt-section">
                         <h4>Allocation Receipts</h4>
@@ -2182,6 +2191,7 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
                             <p class="empty-state">No ledger entries found</p>
                         </div>
                     </div>
+                    </details>
                 </div>
 
                 <!-- Error/Status Messages -->
