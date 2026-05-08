@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-title" content="ICN Timebank">
     <meta name="mobile-web-app-capable" content="yes">
     <title>ICN Timebank</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2026050802">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     <!-- QR Code library for wallet login -->
@@ -680,73 +680,115 @@
                 <!-- Demo Guide Tab (PR 2 — guided demo landing; reads existing app state only, no new endpoint consumers) -->
                 <div id="demo-guide" class="tab-content" role="tabpanel" aria-labelledby="demo-guide-nav-btn">
                     <section class="demo-guide-section" aria-labelledby="demo-guide-heading">
-                        <h2 id="demo-guide-heading">ICN Organizing Committee Demo</h2>
-                        <p class="demo-guide-intro">
-                            You are running ICN's pilot UI as a local organizing-committee demo. ICN is a substrate for cooperative civic coordination, not a timebank app. The <strong>§3 Guided workflow</strong> narrative in <code>docs/pilots/no-cli-organizer-member-rehearsal-workflow.md</code> walks: <strong>standing → action cards → governance → receipts → provenance/evidence</strong>. This page labels exactly what is fixture-backed today, what is still gateway-backed, and what is not implemented in this demo.
-                        </p>
+                        <div class="demo-guide-hero">
+                            <p class="demo-guide-eyebrow">Local demo · Civic coordination substrate</p>
+                            <h2 id="demo-guide-heading">ICN Organizing Committee Demo</h2>
+                            <p class="demo-guide-intro">
+                                You are running ICN's pilot UI as a local organizing-committee demo. ICN is a substrate for cooperative civic coordination, not a timebank app. The <strong>§3 Guided workflow</strong> narrative walks: <strong>standing → action cards → governance → receipts → provenance/evidence</strong>. The cards below label what is fixture-backed today, what is still gateway-backed, and what is not implemented in this demo.
+                            </p>
+                        </div>
 
-                        <h3>Where you are</h3>
-                        <dl class="demo-guide-where">
-                            <dt>Surface</dt><dd>pilot-ui (browser PWA)</dd>
-                            <dt>Gateway</dt><dd id="demo-guide-gateway">— (sign in to populate)</dd>
-                            <dt>Mode</dt><dd id="demo-guide-mode">—</dd>
-                            <dt>Logged-in DID</dt><dd id="demo-guide-did" class="did-display">— (sign in to populate)</dd>
-                        </dl>
+                        <section class="demo-guide-card demo-guide-where-card" data-section="context" aria-labelledby="demo-guide-where-heading">
+                            <div class="demo-guide-card-header">
+                                <h3 id="demo-guide-where-heading">Where you are</h3>
+                                <span class="demo-guide-card-badge">Context</span>
+                            </div>
+                            <dl class="demo-guide-where">
+                                <dt>Surface</dt><dd>pilot-ui (browser PWA)</dd>
+                                <dt>Gateway</dt><dd id="demo-guide-gateway">— (sign in to populate)</dd>
+                                <dt>Mode</dt><dd id="demo-guide-mode">—</dd>
+                                <dt>Logged-in DID</dt><dd id="demo-guide-did" class="did-display">— (sign in to populate)</dd>
+                            </dl>
+                        </section>
 
-                        <h3>Available now in this local demo</h3>
-                        <ul class="demo-guide-list demo-guide-available">
-                            <li>No-gateway demo bootstrap <span class="demo-status">live</span></li>
-                            <li>Demo / local mode banner <span class="demo-status">live</span></li>
-                            <li><a href="#my-standing" data-demo-target="my-standing">My Standing surface</a> <span class="demo-status">live</span></li>
-                            <li><a href="#my-standing" data-demo-target="my-standing">Action Cards surface</a> <span class="demo-status">live</span></li>
-                            <li>Standing fixture <span class="demo-status">fixture</span> <span class="demo-note">committed under <code>web/pilot-ui/fixtures/icn-organizer-demo/standing.json</code></span></li>
-                            <li>Action-card fixture <span class="demo-status">fixture</span> <span class="demo-note">committed under <code>web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json</code></span></li>
-                            <li>Plain-language receipt summary shell <span class="demo-status">live</span> <span class="demo-note">render path via <code>receipts.js</code>; needs gateway data to populate</span></li>
-                        </ul>
+                        <div class="demo-guide-grid">
+                            <section class="demo-guide-card" data-section="available" aria-labelledby="demo-guide-available-heading">
+                                <div class="demo-guide-card-header">
+                                    <h3 id="demo-guide-available-heading">Available now in this local demo</h3>
+                                    <span class="demo-guide-card-badge">Live</span>
+                                </div>
+                                <ul class="demo-guide-list demo-guide-available">
+                                    <li>No-gateway demo bootstrap <span class="demo-status demo-status--live">live</span></li>
+                                    <li>Demo / local mode banner <span class="demo-status demo-status--live">live</span></li>
+                                    <li><a href="#my-standing" data-demo-target="my-standing">My Standing surface</a> <span class="demo-status demo-status--live">live</span></li>
+                                    <li><a href="#my-standing" data-demo-target="my-standing">Action Cards surface</a> <span class="demo-status demo-status--live">live</span></li>
+                                    <li>Standing fixture <span class="demo-status demo-status--fixture">fixture</span> <span class="demo-note">committed under <code>web/pilot-ui/fixtures/icn-organizer-demo/standing.json</code></span></li>
+                                    <li>Action-card fixture <span class="demo-status demo-status--fixture">fixture</span> <span class="demo-note">committed under <code>web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json</code></span></li>
+                                    <li>Plain-language receipt summary shell <span class="demo-status demo-status--live">live</span> <span class="demo-note">render path via <code>receipts.js</code>; needs gateway data to populate</span></li>
+                                </ul>
+                            </section>
 
-                        <h3>Fixture-backed today</h3>
-                        <ul class="demo-guide-list demo-guide-fixture">
-                            <li>Standing</li>
-                            <li>Action cards</li>
-                        </ul>
+                            <section class="demo-guide-card" data-section="fixture" aria-labelledby="demo-guide-fixture-heading">
+                                <div class="demo-guide-card-header">
+                                    <h3 id="demo-guide-fixture-heading">Fixture-backed today</h3>
+                                    <span class="demo-guide-card-badge">Fixture</span>
+                                </div>
+                                <ul class="demo-guide-list demo-guide-fixture">
+                                    <li>Standing</li>
+                                    <li>Action cards</li>
+                                </ul>
+                                <p class="demo-guide-card-note">These two surfaces render committed fictional fixtures and require no running gateway.</p>
+                            </section>
 
-                        <h3>Visible but still gateway-backed / not fixture-backed</h3>
-                        <ul class="demo-guide-list demo-guide-gateway-backed">
-                            <li>Governance proposals / votes</li>
-                            <li>Receipt-chain data</li>
-                            <li>Ledger / history</li>
-                            <li>Members</li>
-                            <li>Trust</li>
-                            <li>Federation</li>
-                        </ul>
+                            <section class="demo-guide-card" data-section="gateway-backed" aria-labelledby="demo-guide-gateway-heading">
+                                <div class="demo-guide-card-header">
+                                    <h3 id="demo-guide-gateway-heading">Visible but still gateway-backed / not fixture-backed</h3>
+                                    <span class="demo-guide-card-badge">Gateway-backed</span>
+                                </div>
+                                <ul class="demo-guide-list demo-guide-gateway-backed">
+                                    <li>Governance proposals / votes</li>
+                                    <li>Receipt-chain data</li>
+                                    <li>Ledger / history</li>
+                                    <li>Members</li>
+                                    <li>Trust</li>
+                                    <li>Federation</li>
+                                </ul>
+                                <p class="demo-guide-card-note">These tabs exist in the UI; without a running gateway they render their existing empty state.</p>
+                            </section>
 
-                        <h3>Not implemented in this demo</h3>
-                        <ul class="demo-guide-list demo-guide-not-implemented">
-                            <li>Backend <code>--demo-mode</code></li>
-                            <li>Full fixture-backed runtime mode</li>
-                            <li>Live federation</li>
-                            <li>Cloud sync</li>
-                            <li>Private-overlay activation</li>
-                            <li>Real holder-label activation</li>
-                            <li>Production deployment</li>
-                            <li>Formal NYCN pilot</li>
-                        </ul>
+                            <section class="demo-guide-card" data-section="not-implemented" aria-labelledby="demo-guide-not-implemented-heading">
+                                <div class="demo-guide-card-header">
+                                    <h3 id="demo-guide-not-implemented-heading">Not implemented in this demo</h3>
+                                    <span class="demo-guide-card-badge">Out of scope</span>
+                                </div>
+                                <ul class="demo-guide-list demo-guide-not-implemented">
+                                    <li>Backend <code>--demo-mode</code></li>
+                                    <li>Full fixture-backed runtime mode</li>
+                                    <li>Live federation</li>
+                                    <li>Cloud sync</li>
+                                    <li>Private-overlay activation</li>
+                                    <li>Real holder-label activation</li>
+                                    <li>Production deployment</li>
+                                    <li>Formal NYCN pilot</li>
+                                </ul>
+                            </section>
 
-                        <h3>Future narrow slices</h3>
-                        <ul class="demo-guide-list demo-guide-future">
-                            <li>Governance proposal / vote fixture slice</li>
-                            <li>Receipt / provenance fixture slice</li>
-                            <li>Ledger / federation only if needed</li>
-                            <li>Backend <code>--demo-mode</code> as a separate broader design pass</li>
-                        </ul>
+                            <section class="demo-guide-card" data-section="future" aria-labelledby="demo-guide-future-heading">
+                                <div class="demo-guide-card-header">
+                                    <h3 id="demo-guide-future-heading">Future narrow slices</h3>
+                                    <span class="demo-guide-card-badge">Planned</span>
+                                </div>
+                                <ul class="demo-guide-list demo-guide-future">
+                                    <li>Governance proposal / vote fixture slice</li>
+                                    <li>Receipt / provenance fixture slice</li>
+                                    <li>Ledger / federation only if needed</li>
+                                    <li>Backend <code>--demo-mode</code> as a separate broader design pass</li>
+                                </ul>
+                            </section>
 
-                        <h3>Non-claims</h3>
-                        <ul class="demo-guide-non-claims">
-                            <li>Demo mode is a UI labeling convention.</li>
-                            <li>Standing and action cards are fictional fixtures, not real participant state.</li>
-                            <li><strong>LIVE</strong> does not mean production — ICN is not production-deployed.</li>
-                            <li>"Not implemented in this demo" means out of scope for this slice.</li>
-                        </ul>
+                            <section class="demo-guide-card" data-section="non-claims" aria-labelledby="demo-guide-non-claims-heading">
+                                <div class="demo-guide-card-header">
+                                    <h3 id="demo-guide-non-claims-heading">Non-claims</h3>
+                                    <span class="demo-guide-card-badge">Read carefully</span>
+                                </div>
+                                <ul class="demo-guide-non-claims">
+                                    <li>Demo mode is a UI labeling convention.</li>
+                                    <li>Standing and action cards are fictional fixtures, not real participant state.</li>
+                                    <li><strong>LIVE</strong> does not mean production — ICN is not production-deployed.</li>
+                                    <li>"Not implemented in this demo" means out of scope for this slice.</li>
+                                </ul>
+                            </section>
+                        </div>
                     </section>
                 </div>
 

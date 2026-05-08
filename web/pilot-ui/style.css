@@ -5675,6 +5675,9 @@ footer .sync-status.error {
     padding: 0.5rem;
     background: var(--background);
     border-radius: 4px;
+}
+
+/* ============================================================================
    Inline Receipt Chain (Proposal Detail Sidebar) — P0-T11
    ============================================================================ */
 
@@ -5976,135 +5979,369 @@ footer .sync-status.error {
     min-width: 0;
 }
 
-/* Demo Guide tab content */
+/* ============================================================
+ * Demo Guide visual hierarchy
+ *
+ * Card-based layout for ?mode=demo's organizing-committee landing.
+ * Each section is a self-contained card with a colored accent and a
+ * section badge so the eye can scan: Live / Fixture / Gateway-backed /
+ * Out of scope / Planned / Read-carefully. Light + dark theme aware
+ * via the existing CSS variables.
+ * ============================================================ */
+
 .demo-guide-section {
-    max-width: 80ch;
-    padding: 1rem 0;
+    max-width: 76rem;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 2.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
 }
 
-.demo-guide-section h2 {
-    margin: 0 0 0.5rem 0;
+/* Hero block */
+.demo-guide-hero {
+    background: linear-gradient(135deg,
+        rgba(37, 99, 235, 0.07) 0%,
+        rgba(37, 99, 235, 0.02) 100%);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--primary);
+    border-radius: 10px;
+    padding: 1.5rem 1.75rem;
 }
 
-.demo-guide-section h3 {
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
-    padding-bottom: 0.25rem;
+.demo-guide-eyebrow {
+    margin: 0 0 0.4rem 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--primary);
+}
+
+.demo-guide-section h2#demo-guide-heading {
+    margin: 0 0 0.6rem 0;
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
 }
 
 .demo-guide-intro {
-    font-size: 1.05rem;
-    line-height: 1.6;
-    margin-bottom: 1rem;
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    max-width: 75ch;
 }
 
+/* Section card — shared shell */
+.demo-guide-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--shadow-sm);
+    --section-accent: var(--gray-400);
+    border-left: 4px solid var(--section-accent);
+}
+
+.demo-guide-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 0 0.85rem 0;
+    flex-wrap: wrap;
+}
+
+.demo-guide-card-header h3 {
+    margin: 0;
+    padding: 0;
+    border: none;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.demo-guide-card-badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    background: var(--section-accent-bg, var(--bg-tertiary));
+    color: var(--section-accent-text, var(--text-secondary));
+    border: 1px solid var(--section-accent-border, var(--border-color));
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.demo-guide-card-note {
+    margin: 0.85rem 0 0 0;
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+    font-style: italic;
+}
+
+/* Per-section accents */
+.demo-guide-card[data-section="context"] {
+    --section-accent: var(--primary);
+    --section-accent-bg: rgba(37, 99, 235, 0.10);
+    --section-accent-text: var(--primary-dark);
+    --section-accent-border: rgba(37, 99, 235, 0.25);
+}
+
+.demo-guide-card[data-section="available"] {
+    --section-accent: #16a34a;
+    --section-accent-bg: rgba(22, 163, 74, 0.10);
+    --section-accent-text: #15803d;
+    --section-accent-border: rgba(22, 163, 74, 0.30);
+}
+
+.demo-guide-card[data-section="fixture"] {
+    --section-accent: #7c3aed;
+    --section-accent-bg: rgba(124, 58, 237, 0.10);
+    --section-accent-text: #6d28d9;
+    --section-accent-border: rgba(124, 58, 237, 0.30);
+}
+
+.demo-guide-card[data-section="gateway-backed"] {
+    --section-accent: #f59e0b;
+    --section-accent-bg: rgba(245, 158, 11, 0.10);
+    --section-accent-text: #b45309;
+    --section-accent-border: rgba(245, 158, 11, 0.30);
+}
+
+.demo-guide-card[data-section="not-implemented"] {
+    --section-accent: var(--gray-400);
+    --section-accent-bg: var(--gray-100);
+    --section-accent-text: var(--text-tertiary);
+    --section-accent-border: var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.demo-guide-card[data-section="future"] {
+    --section-accent: #0891b2;
+    --section-accent-bg: rgba(8, 145, 178, 0.10);
+    --section-accent-text: #0e7490;
+    --section-accent-border: rgba(8, 145, 178, 0.30);
+}
+
+.demo-guide-card[data-section="non-claims"] {
+    --section-accent: var(--gray-500);
+    --section-accent-bg: var(--gray-100);
+    --section-accent-text: var(--text-secondary);
+    --section-accent-border: var(--border-color);
+    background: var(--bg-secondary);
+}
+
+/* Where-you-are panel: 2-col definition list inside the context card */
 .demo-guide-where {
     display: grid;
     grid-template-columns: max-content 1fr;
-    gap: 0.5rem 1rem;
-    margin: 0.75rem 0;
-    padding: 0.75rem 1rem;
-    background: var(--bg-secondary, #f9fafb);
-    border-radius: 6px;
-    border: 1px solid var(--border-color, #e5e7eb);
+    gap: 0.5rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
 }
 
 .demo-guide-where dt {
     font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
 }
 
 .demo-guide-where dd {
     margin: 0;
     font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
     font-size: 0.9rem;
+    color: var(--text-primary);
 }
 
 .demo-guide-where .did-display {
     word-break: break-all;
 }
 
-.demo-guide-note {
-    font-size: 0.9rem;
-    color: var(--text-secondary, #6b7280);
-    font-style: italic;
+/* Two-column responsive grid for the section cards */
+.demo-guide-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+    gap: 1rem;
+    align-items: stretch;
 }
 
-.demo-guide-list {
-    padding-left: 0;
+.demo-guide-grid > .demo-guide-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.demo-guide-grid > .demo-guide-card > ul {
+    flex: 1 0 auto;
+}
+
+/* Lists inside the cards: clean separators, no dashed borders */
+.demo-guide-card .demo-guide-list,
+.demo-guide-card .demo-guide-non-claims {
+    margin: 0;
+    padding: 0;
     list-style: none;
-    margin: 0.5rem 0;
 }
 
-.demo-guide-list li {
-    padding: 0.4rem 0;
-    border-bottom: 1px dashed var(--border-color, #e5e7eb);
-    line-height: 1.5;
+.demo-guide-card .demo-guide-list li,
+.demo-guide-card .demo-guide-non-claims li {
+    padding: 0.45rem 0;
+    line-height: 1.55;
+    color: var(--text-primary);
+    border: none;
+    margin: 0;
 }
 
-.demo-guide-list li:last-child {
-    border-bottom: none;
+.demo-guide-card .demo-guide-list li + li,
+.demo-guide-card .demo-guide-non-claims li + li {
+    border-top: 1px solid var(--border-color);
 }
 
-.demo-guide-list a {
-    color: var(--link-color, #2563eb);
-    text-decoration: underline;
+.demo-guide-card .demo-guide-list a {
+    color: var(--primary);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--primary);
 }
 
-.demo-guide-available .demo-status,
-.demo-guide-coming .demo-status {
+.demo-guide-card .demo-guide-list a:hover,
+.demo-guide-card .demo-guide-list a:focus {
+    border-bottom-style: solid;
+    color: var(--primary-dark);
+}
+
+/* Status pills on individual list items */
+.demo-status {
     display: inline-block;
     margin-left: 0.4rem;
-    padding: 0.1rem 0.5rem;
-    border-radius: 3px;
-    font-size: 0.78rem;
-    font-weight: 600;
+    padding: 0.12rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
+    line-height: 1.4;
+    vertical-align: 0.05em;
+    border: 1px solid transparent;
+    white-space: nowrap;
 }
 
-.demo-guide-available .demo-status {
+.demo-status--live {
     background: rgba(22, 163, 74, 0.14);
     color: #15803d;
+    border-color: rgba(22, 163, 74, 0.25);
 }
 
-.demo-guide-coming .demo-status {
-    background: rgba(245, 158, 11, 0.14);
-    color: #b45309;
+.demo-status--fixture {
+    background: rgba(124, 58, 237, 0.14);
+    color: #6d28d9;
+    border-color: rgba(124, 58, 237, 0.25);
 }
 
-.demo-guide-not-implemented {
-    color: var(--text-secondary, #6b7280);
-}
-
-.demo-guide-not-implemented li::before {
-    content: "✕ ";
-    color: #9ca3af;
-    margin-right: 0.25rem;
-    font-weight: 700;
-}
-
+/* Inline note below an item */
 .demo-guide-list .demo-note {
     display: block;
     font-size: 0.85rem;
-    color: var(--text-secondary, #6b7280);
-    margin-top: 0.15rem;
+    color: var(--text-tertiary);
+    margin-top: 0.2rem;
+    line-height: 1.5;
 }
 
+/* "Not implemented" items — quieter without being illegible */
+.demo-guide-not-implemented li {
+    color: var(--text-secondary);
+}
+
+.demo-guide-not-implemented li::before {
+    content: "—  ";
+    color: var(--gray-400);
+    font-weight: 600;
+}
+
+/* Non-claims list: keep disc bullets but inside the card */
 .demo-guide-non-claims {
-    background: var(--bg-secondary, #f9fafb);
-    border-left: 3px solid var(--demo-banner-color, #2563eb);
-    padding: 0.75rem 1rem 0.75rem 1.25rem;
-    margin-top: 1rem;
-    list-style: disc;
+    list-style: none;
+    padding: 0;
+    margin: 0;
 }
 
 .demo-guide-non-claims li {
-    margin-bottom: 0.5rem;
+    position: relative;
+    padding-left: 1.25rem;
 }
 
-.demo-guide-non-claims li:last-child {
-    margin-bottom: 0;
+.demo-guide-non-claims li::before {
+    content: "•";
+    position: absolute;
+    left: 0.25rem;
+    top: 0.45rem;
+    color: var(--gray-500);
+    font-weight: 700;
+}
+
+/* Inline code inside the demo guide */
+.demo-guide-section code {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.85em;
+    color: var(--text-primary);
+}
+
+/* Dark mode tweaks: lift the card backgrounds away from the page bg */
+[data-theme="dark"] .demo-guide-card {
+    background: var(--bg-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .demo-guide-card[data-section="not-implemented"],
+[data-theme="dark"] .demo-guide-card[data-section="non-claims"] {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .demo-guide-hero {
+    background: linear-gradient(135deg,
+        rgba(59, 130, 246, 0.10) 0%,
+        rgba(59, 130, 246, 0.03) 100%);
+}
+
+/* Narrow-screen tightening */
+@media (max-width: 720px) {
+    .demo-guide-section {
+        padding: 1rem 0.75rem 2rem 0.75rem;
+        gap: 1rem;
+    }
+    .demo-guide-hero {
+        padding: 1.25rem 1rem;
+    }
+    .demo-guide-section h2#demo-guide-heading {
+        font-size: 1.35rem;
+    }
+    .demo-guide-card {
+        padding: 1rem 1.1rem;
+    }
+    .demo-guide-grid {
+        grid-template-columns: 1fr;
+    }
+    .demo-guide-where {
+        grid-template-columns: 1fr;
+        gap: 0.15rem 0;
+    }
+    .demo-guide-where dt {
+        margin-top: 0.4rem;
+    }
 }
 
 /* ============================================================
