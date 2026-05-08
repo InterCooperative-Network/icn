@@ -12,6 +12,65 @@ function debugLog(...args) {
     }
 }
 
+// ----- Demo Mode (PR 2) -------------------------------------------------
+// UI labeling convention only — driven by ?mode= query param. Does NOT
+// change any backend behavior or fetch new endpoints. Gateway-side
+// fixture/demo mode arrives in PR 5. See
+// docs/demo/ICN_SYSTEM_DEMO_READINESS_MAP.md §5 PR 2.
+const VALID_DEMO_MODES = ['demo', 'fixture', 'devnet', 'local', 'live'];
+const DEMO_MODE = (() => {
+    try {
+        const raw = new URLSearchParams(window.location.search).get('mode');
+        if (!raw) return null;
+        const m = raw.toLowerCase();
+        return VALID_DEMO_MODES.includes(m) ? m : null;
+    } catch (_) {
+        return null;
+    }
+})();
+const DEMO_MODE_MESSAGES = {
+    demo:    'UI is in DEMO mode — labeling convention; not authoritative gateway state. Gateway-side fixture/demo mode arrives in PR 5.',
+    fixture: 'UI is in FIXTURE mode — committed test data only; not real participant state.',
+    devnet:  'UI is in DEVNET mode — local 3-node Docker cluster; not production.',
+    local:   'UI is in LOCAL mode — single-node local gateway.',
+    live:    'UI is in LIVE mode — reading real gateway state. LIVE does not mean production; ICN is not production-deployed.',
+};
+
+// Render the demo-mode banner and unhide the Demo Guide nav button.
+// Idempotent. Safe to call multiple times. No-op when DEMO_MODE is null.
+function applyDemoMode() {
+    if (!DEMO_MODE) return;
+    const banner = document.getElementById('demo-mode-banner');
+    if (banner) {
+        banner.dataset.mode = DEMO_MODE;
+        banner.classList.remove('hidden');
+        const badge = document.getElementById('demo-mode-badge');
+        if (badge) badge.textContent = DEMO_MODE.toUpperCase();
+        const message = document.getElementById('demo-mode-message');
+        if (message) message.textContent = DEMO_MODE_MESSAGES[DEMO_MODE] || '';
+    }
+    const navBtn = document.getElementById('demo-guide-nav-btn');
+    if (navBtn) navBtn.classList.remove('hidden');
+    const modeEl = document.getElementById('demo-guide-mode');
+    if (modeEl) modeEl.textContent = DEMO_MODE.toUpperCase();
+}
+
+// Update the per-session fields in the Demo Guide ("Where you are")
+// after the user signs in. Reads existing app state — does NOT introduce
+// new endpoint consumers (no me/standing or me/action-cards fetch;
+// those are PR 3).
+function refreshDemoGuideContext() {
+    if (!DEMO_MODE) return;
+    const gatewayEl = document.getElementById('demo-guide-gateway');
+    if (gatewayEl) {
+        gatewayEl.textContent = (typeof state !== 'undefined' && state.gatewayUrl) || '— (not signed in)';
+    }
+    const didEl = document.getElementById('demo-guide-did');
+    if (didEl) {
+        didEl.textContent = (typeof state !== 'undefined' && state.did) || '— (not signed in)';
+    }
+}
+
 // State
 const state = {
     gatewayUrl: '',
@@ -973,6 +1032,14 @@ async function login() {
         // Show main screen
         elements.loginScreen.classList.add('hidden');
         elements.mainScreen.classList.remove('hidden');
+
+        // PR 2 — refresh Demo Guide "Where you are" fields and, when in
+        // demo mode, land the user on the Demo Guide tab. Reads existing
+        // state only; no new endpoint consumers.
+        refreshDemoGuideContext();
+        if (DEMO_MODE === 'demo') {
+            switchTab('demo-guide');
+        }
 
         // Update header
         elements.coopName.textContent = state.coopId;
@@ -3014,6 +3081,25 @@ elements.logHoursForm.addEventListener('submit', logHours);
 
 elements.navBtns.forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// PR 2 — paint the demo-mode banner and Demo Guide nav button as soon
+// as the DOM has the elements wired. Idempotent; refresh of DID/gateway
+// happens at refreshDemoGuideContext() call sites in the login flow.
+applyDemoMode();
+
+// PR 2 — Demo Guide "Available now" links route to existing tabs via
+// switchTab(). Anchors have href="#tabId" for keyboard / accessibility
+// (focus, screen-reader announcement) but the hash navigation does not
+// itself activate a tab — switchTab() owns that. preventDefault() to
+// avoid a no-op hash change.
+document.addEventListener('click', (e) => {
+    const link = e.target.closest && e.target.closest('[data-demo-target]');
+    if (!link) return;
+    const target = link.dataset.demoTarget;
+    if (!target) return;
+    e.preventDefault();
+    switchTab(target);
 });
 
 // Enter key on login form

@@ -5907,3 +5907,202 @@ footer .sync-status.error {
         padding: 0.5rem;
     }
 }
+
+/* ============================================================
+ * Demo Mode Banner + Demo Guide (PR 2)
+ *
+ * Mode is a UI labeling convention only (driven by ?mode= query
+ * param); PR 5 adds gateway-side fixture/demo mode. The banner is
+ * hidden by default and only renders when the mode is recognized.
+ * ============================================================ */
+
+.demo-mode-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 2px solid var(--demo-banner-color, #2563eb);
+    background: var(--demo-banner-bg, rgba(37, 99, 235, 0.08));
+    font-size: 0.95rem;
+    flex-wrap: wrap;
+    line-height: 1.4;
+}
+
+.demo-mode-banner.hidden {
+    display: none;
+}
+
+.demo-mode-banner[data-mode="demo"] {
+    --demo-banner-color: #2563eb;
+    --demo-banner-bg: rgba(37, 99, 235, 0.08);
+}
+
+.demo-mode-banner[data-mode="fixture"] {
+    --demo-banner-color: #7c3aed;
+    --demo-banner-bg: rgba(124, 58, 237, 0.08);
+}
+
+.demo-mode-banner[data-mode="devnet"] {
+    --demo-banner-color: #f59e0b;
+    --demo-banner-bg: rgba(245, 158, 11, 0.10);
+}
+
+.demo-mode-banner[data-mode="local"] {
+    --demo-banner-color: #16a34a;
+    --demo-banner-bg: rgba(22, 163, 74, 0.08);
+}
+
+.demo-mode-banner[data-mode="live"] {
+    --demo-banner-color: #dc2626;
+    --demo-banner-bg: rgba(220, 38, 38, 0.08);
+}
+
+.demo-mode-badge {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    background: var(--demo-banner-color);
+    color: #fff;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.demo-mode-message {
+    flex: 1;
+    color: var(--text-secondary, #4b5563);
+    min-width: 0;
+}
+
+/* Demo Guide tab content */
+.demo-guide-section {
+    max-width: 80ch;
+    padding: 1rem 0;
+}
+
+.demo-guide-section h2 {
+    margin: 0 0 0.5rem 0;
+}
+
+.demo-guide-section h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    padding-bottom: 0.25rem;
+}
+
+.demo-guide-intro {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+.demo-guide-where {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.5rem 1rem;
+    margin: 0.75rem 0;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary, #f9fafb);
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.demo-guide-where dt {
+    font-weight: 600;
+}
+
+.demo-guide-where dd {
+    margin: 0;
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+    font-size: 0.9rem;
+}
+
+.demo-guide-where .did-display {
+    word-break: break-all;
+}
+
+.demo-guide-note {
+    font-size: 0.9rem;
+    color: var(--text-secondary, #6b7280);
+    font-style: italic;
+}
+
+.demo-guide-list {
+    padding-left: 0;
+    list-style: none;
+    margin: 0.5rem 0;
+}
+
+.demo-guide-list li {
+    padding: 0.4rem 0;
+    border-bottom: 1px dashed var(--border-color, #e5e7eb);
+    line-height: 1.5;
+}
+
+.demo-guide-list li:last-child {
+    border-bottom: none;
+}
+
+.demo-guide-list a {
+    color: var(--link-color, #2563eb);
+    text-decoration: underline;
+}
+
+.demo-guide-available .demo-status,
+.demo-guide-coming .demo-status {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.demo-guide-available .demo-status {
+    background: rgba(22, 163, 74, 0.14);
+    color: #15803d;
+}
+
+.demo-guide-coming .demo-status {
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+}
+
+.demo-guide-not-implemented {
+    color: var(--text-secondary, #6b7280);
+}
+
+.demo-guide-not-implemented li::before {
+    content: "✕ ";
+    color: #9ca3af;
+    margin-right: 0.25rem;
+    font-weight: 700;
+}
+
+.demo-guide-list .demo-note {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary, #6b7280);
+    margin-top: 0.15rem;
+}
+
+.demo-guide-non-claims {
+    background: var(--bg-secondary, #f9fafb);
+    border-left: 3px solid var(--demo-banner-color, #2563eb);
+    padding: 0.75rem 1rem 0.75rem 1.25rem;
+    margin-top: 1rem;
+    list-style: disc;
+}
+
+.demo-guide-non-claims li {
+    margin-bottom: 0.5rem;
+}
+
+.demo-guide-non-claims li:last-child {
+    margin-bottom: 0;
+}
