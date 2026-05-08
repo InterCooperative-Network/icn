@@ -62,7 +62,7 @@ Per the user-supplied scheme: **runtime implemented and GUI-visible / runtime im
 | Receipts (governance / completion / attendance) | **runtime + GUI-visible (chain), plain-language framing absent** | opaque storage stack #1755–#1759; `web/pilot-ui/receipts.js` renders `/v1/receipts/chain` + ledger as HTML; raw structure shown without plain-language summary on top |
 | Provenance / evidence | **runtime + GUI-visible via receipts.js, plain-language framing absent** | same surface as receipts; chain HTML exists, status/authority/hash/timestamp summary not yet stated up front |
 | Obligations / allocations / settlement primitives | **runtime + only CLI/JSON-visible** | `/v1/receipts/allocations`, `/v1/receipts/intents` JSON; no UI |
-| Federation | runtime + only CLI/JSON-visible | `/v1/federation/peers` JSON; node-dashboard shows count only |
+| Federation | runtime + only CLI/JSON-visible (no peers endpoint) | actual federation routes are `/federation/status`, `/federation/coops`, `/federation/coops/{id}/vouches`, `/federation/attestations/{member_did}`, `/federation/init`, `/federation/clearing/...`; **there is no `/v1/federation/peers` route**. Node-dashboard's "peer count" is a proxy computed from `/v1/trust/edges`, not from a federation peers endpoint. Implementers planning federation surface work should not chase the missing peers route. |
 | Private overlay / holder-label DID boundary | spec-only on substrate side | [`private-overlay-did-activation-flow.md`](../spec/private-overlay-did-activation-flow.md) is the substrate boundary; partner-package policy is required for activation; no runtime activation surface |
 | Organizer/member UX | **runtime + not wired to §3 Guided workflow** | pilot-ui exists but is timebank-flavored, not the 9-step no-CLI organizer narrative |
 | Operator/admin UX | runtime + only CLI/HTML-visible (basic) | `web/dashboard` exists, no auth, basic; icn-console TUI for power users |
@@ -98,11 +98,11 @@ The pattern: **most ICN core functions are runtime-implemented and reachable thr
 |---|---|---|
 | 1 | Can the existing pilot-ui become the guided organizer/member demo surface? | **Yes**, with composition work — landing screen + guided flow + per-section labels. Pilot-ui's vanilla-JS architecture (no framework) makes targeted additions straightforward. |
 | 2 | What is the smallest change that makes pilot-ui show the ICN core loop clearly? | A **guided demo landing screen** that frames the §3 Guided workflow steps and a **mode banner** that tells the viewer what state they're looking at. Both UI-only. |
-| 3 | What runtime data is already available through gateway routes? | Standing, action-cards, governance proposals/votes/decisions, ledger postings, trust scores, decision-receipts, completion-receipts, attendance-receipts, allocation/intent receipts, federation peers, health/metrics. |
+| 3 | What runtime data is already available through gateway routes? | Standing, action-cards, governance proposals/votes/decisions, ledger postings, trust scores + edges, decision-receipts, completion-receipts, attendance-receipts, allocation/intent receipts, federation status / coops / vouches / attestations / clearing, health/metrics. (No `/v1/federation/peers` route exists; node-dashboard's "peer count" is a proxy computed from `/v1/trust/edges`.) |
 | 4 | What needs only UI wiring (no backend change)? | (a) demo-mode banner / boundary labels; (b) guided demo landing screen; (c) action-card UX (cards, not list) — data already in JSON; (d) plain-language receipt / provenance panel — data already in JSON. |
 | 5 | What needs fixture/demo-mode support? | Stable, repeatable demo data not derived from a seeded but real state. ICN #1727 is the open scope: a `--demo-mode` flag + committed fixture pack the gateway serves deterministically. |
 | 6 | What needs a new read-model route? | None for this tranche. A `/demo/state` summary route would be convenient but is **not** required to render guided demo + action cards + receipts. Keep this off the critical path. |
-| 7 | What must remain explicitly labeled as not live / not implemented? | Federation topology (currently only a peer count); holder-label DID activation (substrate spec only; partner-package policy required); allocation / settlement at scale; private-overlay activation; cross-cooperative federation flows; production cloud-sync; live K3s / DNS / Forgejo / GitHub-org mutation. Each of these gets a "**Not implemented in demo**" label on the relevant pilot-ui section. |
+| 7 | What must remain explicitly labeled as not live / not implemented? | Federation topology beyond the trust-edges-derived peer-count proxy (no real topology view); holder-label DID activation (substrate spec only; partner-package policy required); allocation / settlement at scale; private-overlay activation; cross-cooperative federation flows; production cloud-sync; live K3s / DNS / Forgejo / GitHub-org mutation. Each of these gets a "**Not implemented in demo**" label on the relevant pilot-ui section. |
 
 ## 5. Recommended PR sequence
 
@@ -197,7 +197,7 @@ This sequence is the actionable output of the discovery. Each PR is **small** (s
 
 Per the user's hard rules and the existing CLAUDE.md guard rails, the following are **deferred** and must remain labeled as such on every relevant pilot-ui surface:
 
-- Live federation; cross-cooperative federation flows; federation topology view beyond peer count.
+- Live federation; cross-cooperative federation flows; federation topology view beyond the trust-edges-derived peer-count proxy used by node-dashboard.
 - Private-overlay activation flows; holder-label DID binding from within the demo; any consent-moment UI.
 - Cloud sync (Drive / Sheets / Groups / Calendar / mail).
 - K3s / DNS / Forgejo / GitHub-org / production-deploy mutation from any demo path.
