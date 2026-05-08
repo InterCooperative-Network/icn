@@ -425,6 +425,18 @@ may extend the fixture coverage (proposals, receipts, ledger) and
 later add the runtime flag if/when the team chooses to invest in
 backend work. The pilot-ui-only slice does not constitute fixture-
 backed demo mode in the readiness-map&#39;s original sense.</p>
+<p><strong>Verification fix:</strong> the initial fixture slice (#1773) populated
+the standing + action-card surfaces with fixture data only after a
+successful login, which on a no-gateway laptop made the demo
+unreachable. A follow-up PR adds a tiny <code>bootstrapDemoMode()</code> on
+page load: when <code>?mode=demo</code> is set and no real auth has populated
+<code>state.token</code>, pilot-ui transitions straight into the main screen
+with the fictional <code>did:icn:example-organizer-demo-not-live</code>
+identity and lands on the Demo Guide tab. This makes the guided
+pilot-ui demo viewable from a static server (<code>python3 -m http.server</code>) without a running gateway. Other tabs (Governance,
+Receipts, Ledger) continue to fetch the gateway and will surface
+their own empty/error states honestly — they are explicitly not
+fixture-backed yet.</p>
 </blockquote>
 <ul>
 <li><strong>What:</strong> add a <code>--demo-mode</code> flag to <code>icnd</code> that, when set, serves a committed fixture pack from a locked path instead of seeded-but-real state. The fixture pack contains: members, proposals, votes, action cards, receipts, attendance records, ledger postings — all using the existing <code>did:icn:example-*-not-live</code> fixture convention.</li>
