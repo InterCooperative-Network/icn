@@ -608,6 +608,12 @@
                 </div>
             </header>
 
+            <!-- Demo Mode Boundary Banner (PR 2 — UI labeling convention; PR 5 adds gateway-side fixture/demo mode) -->
+            <div id="demo-mode-banner" class="demo-mode-banner hidden" role="region" aria-label="Demo mode indicator">
+                <span class="demo-mode-badge" id="demo-mode-badge" aria-label="Current demo mode">DEMO</span>
+                <span class="demo-mode-message" id="demo-mode-message">UI is in demo mode — labeling convention; not authoritative gateway state.</span>
+            </div>
+
             <!-- Scope Context Banner (P0-T04) -->
             <div id="scope-context-banner" class="scope-banner hidden" role="region" aria-label="Current scope context">
                 <div class="scope-info">
@@ -631,6 +637,9 @@
 
             <!-- Navigation -->
             <nav role="navigation" aria-label="Main navigation">
+                <button class="nav-btn hidden" data-tab="demo-guide" id="demo-guide-nav-btn">
+                    <span aria-label="Demo guide and orientation">Demo Guide</span>
+                </button>
                 <button class="nav-btn active" data-tab="dashboard" aria-current="page">
                     <span aria-label="Dashboard">Dashboard</span>
                 </button>
@@ -665,6 +674,63 @@
 
             <!-- Dashboard Tab -->
             <main id="main-content" class="tab-container">
+                <!-- Demo Guide Tab (PR 2 — guided demo landing; reads existing app state only, no new endpoint consumers) -->
+                <div id="demo-guide" class="tab-content" role="tabpanel" aria-labelledby="tab-demo-guide" hidden>
+                    <section class="demo-guide-section" aria-labelledby="demo-guide-heading">
+                        <h2 id="demo-guide-heading">ICN Local Demo — Guided Path</h2>
+                        <p class="demo-guide-intro">
+                            You are running ICN's pilot UI as a guided demo. This page tells you where you are, what is real runtime behavior, what is fixture/local/demo-only, and what is not implemented yet. The §3 Guided workflow narrative in <code>docs/pilots/no-cli-organizer-member-rehearsal-workflow.md</code> walks: <strong>standing → action cards → governance → receipts → provenance/evidence</strong>. Today's pilot-ui covers parts of this; the labels below tell you exactly which parts.
+                        </p>
+
+                        <h3>Where you are</h3>
+                        <dl class="demo-guide-where">
+                            <dt>Surface</dt><dd>pilot-ui (browser PWA)</dd>
+                            <dt>Gateway</dt><dd id="demo-guide-gateway">— (sign in to populate)</dd>
+                            <dt>Mode</dt><dd id="demo-guide-mode">—</dd>
+                            <dt>Logged-in DID</dt><dd id="demo-guide-did" class="did-display">— (sign in to populate)</dd>
+                        </dl>
+                        <p class="demo-guide-note">
+                            The "Logged-in DID" line above comes from your sign-in (auth-known DID), not from a standing read-model fetch. The member standing read-model surface arrives in PR 3.
+                        </p>
+
+                        <h3>Available now in pilot-ui</h3>
+                        <ul class="demo-guide-list demo-guide-available">
+                            <li><a href="#governance" data-demo-target="governance">Governance — proposals / votes</a> <span class="demo-status">live</span></li>
+                            <li><a href="#governance" data-demo-target="governance">Action items</a> <span class="demo-status">live</span> <span class="demo-note">per-domain ledger via <code>/gov/domains/{d}/action-items</code> — different endpoint and concept from per-member action cards</span></li>
+                            <li><a href="#history" data-demo-target="history">Ledger / transaction history</a> <span class="demo-status">live</span></li>
+                            <li><a href="#dashboard" data-demo-target="dashboard">Trust score</a> <span class="demo-status">live</span></li>
+                            <li><a href="#receipts" data-demo-target="receipts">Receipt chain view</a> <span class="demo-status">live</span> <span class="demo-note">via <code>receipts.js</code>; plain-language framing arrives in PR 4</span></li>
+                        </ul>
+
+                        <h3>Coming next in this demo tranche — Not yet wired</h3>
+                        <ul class="demo-guide-list demo-guide-coming">
+                            <li>Member standing read-model surface <span class="demo-status">PR 3</span></li>
+                            <li>Per-member action cards surface <span class="demo-status">PR 3</span> <span class="demo-note">distinct from the existing Action Items tab; uses <code>/v1/gov/me/action-cards</code></span></li>
+                            <li>Plain-language receipt / provenance framing <span class="demo-status">PR 4</span> <span class="demo-note">extends existing <code>receipts.js</code> with a plain-language summary above the existing chain render</span></li>
+                            <li>Fixture-backed local demo mode (gateway-side) <span class="demo-status">PR 5</span></li>
+                        </ul>
+
+                        <h3>Not implemented in demo</h3>
+                        <ul class="demo-guide-list demo-guide-not-implemented">
+                            <li>Federation topology — no first-class topology surface; node-dashboard's "peer count" is a proxy from <code>/v1/trust/edges</code></li>
+                            <li>Holder-label DID activation — substrate spec only; partner-package policy required</li>
+                            <li>Allocation / settlement at scale</li>
+                            <li>Private-overlay activation</li>
+                            <li>Cross-cooperative federation flows</li>
+                            <li>Cloud sync (Drive / Sheets / Groups / Calendar / mail)</li>
+                            <li>K3s / DNS / Forgejo / production deployment mutation</li>
+                        </ul>
+
+                        <h3>Non-claims</h3>
+                        <ul class="demo-guide-non-claims">
+                            <li>Demo mode is a UI labeling convention until PR 5 adds gateway-side fixture/demo mode.</li>
+                            <li><strong>LIVE</strong> does not mean production — it means the page is reading real gateway state. ICN is not production-deployed.</li>
+                            <li>"Not yet wired" means upcoming in this tranche (PRs 3, 4, 5).</li>
+                            <li>"Not implemented in demo" means out of scope for this entire tranche.</li>
+                        </ul>
+                    </section>
+                </div>
+
                 <div id="dashboard" class="tab-content active" role="tabpanel" aria-labelledby="tab-dashboard">
                 <div class="stats-grid" role="region" aria-label="Account statistics">
                     <div class="stat-card">
