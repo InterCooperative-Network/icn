@@ -5980,6 +5980,138 @@ footer .sync-status.error {
 }
 
 /* ============================================================
+ * Demo mode typography
+ *
+ * The default app uses a system font stack on body but native
+ * <button>/<input> elements fall back to Arial — visible mismatch
+ * across the nav. Force inheritance globally so every interactive
+ * element matches the body. Then establish a clean 5-step type
+ * scale for the demo surfaces (12 / 14 / 16 / 18 / 24 / 28 px) so
+ * titles, body text, badges, and metadata read as a hierarchy
+ * instead of as ten near-equal sizes.
+ * ============================================================ */
+
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+}
+
+body[data-demo-mode="true"] {
+    font-feature-settings: "kern" 1, "ss01" 0, "ss02" 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* App title in the main shell — a touch larger so the hero h2
+   below doesn't dwarf it, but still smaller than a page title. */
+body[data-demo-mode="true"] #app-title-header {
+    font-size: 1.125rem;     /* 18px */
+    line-height: 1.4;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+}
+
+/* Banner message: 14px; the badge to its left is uppercase 12px
+   tracked, so the sentence beside it reads as supporting copy. */
+body[data-demo-mode="true"] #demo-mode-message {
+    font-size: 0.875rem;     /* 14px */
+    line-height: 1.5;
+}
+
+/* Nav: 14px, slightly increased weight when active so the
+   selected tab doesn't fight the body text for attention. */
+body[data-demo-mode="true"] .nav-btn {
+    font-size: 0.875rem;     /* 14px */
+    font-weight: 500;
+    letter-spacing: 0;
+}
+body[data-demo-mode="true"] .nav-btn.active {
+    font-weight: 600;
+}
+
+/* Hero h2: a real page title (28px), tightened line-height. */
+body[data-demo-mode="true"] #demo-guide-heading {
+    font-size: 1.75rem;      /* 28px */
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    font-weight: 700;
+}
+
+/* Card titles: 18px so they read as titles, not body. */
+body[data-demo-mode="true"] .demo-guide-card-header h3,
+body[data-demo-mode="true"] .demo-tab-placeholder-card h2 {
+    font-size: 1.125rem;     /* 18px */
+    line-height: 1.35;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+}
+
+body[data-demo-mode="true"] .demo-tab-placeholder-card h2 {
+    font-size: 1.5rem;       /* 24px — placeholder is the only thing on the page */
+    line-height: 1.25;
+}
+
+/* Eyebrow + section badge: align both to 12px tracked uppercase
+   so they read as the same visual category instead of two
+   different small-caps treatments. */
+body[data-demo-mode="true"] .demo-guide-eyebrow,
+body[data-demo-mode="true"] .demo-tab-placeholder-eyebrow {
+    font-size: 0.75rem;      /* 12px */
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+}
+
+body[data-demo-mode="true"] .demo-guide-card-badge {
+    font-size: 0.75rem;      /* 12px — was 0.7rem */
+    line-height: 1.3;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+}
+
+/* Status pills on list items: also 12px, distinct via color */
+body[data-demo-mode="true"] .demo-status {
+    font-size: 0.7rem;       /* 11.2px — slightly smaller because they sit inline with body */
+    letter-spacing: 0.05em;
+    font-weight: 700;
+}
+
+/* Body text inside cards: 16px / 1.5 — readable, no surprises */
+body[data-demo-mode="true"] .demo-guide-intro,
+body[data-demo-mode="true"] .demo-tab-placeholder-card p,
+body[data-demo-mode="true"] .demo-guide-card .demo-guide-list li,
+body[data-demo-mode="true"] .demo-guide-card .demo-guide-non-claims li {
+    font-size: 1rem;         /* 16px */
+    line-height: 1.55;
+}
+
+/* Lead paragraph on placeholder cards: 18px, slightly larger than
+   the secondary explanatory paragraph below. */
+body[data-demo-mode="true"] .demo-tab-placeholder-lead {
+    font-size: 1.125rem;     /* 18px */
+    line-height: 1.5;
+}
+
+/* Notes + metadata: 14px, muted — clear secondary tier */
+body[data-demo-mode="true"] .demo-guide-list .demo-note,
+body[data-demo-mode="true"] .demo-guide-card-note,
+body[data-demo-mode="true"] .demo-tab-placeholder-note,
+body[data-demo-mode="true"] .demo-guide-where dt,
+body[data-demo-mode="true"] .demo-guide-where dd {
+    font-size: 0.875rem;     /* 14px */
+    line-height: 1.5;
+}
+
+/* "Where you are" values stay monospace but at the consistent
+   14px size rather than 14.4. */
+body[data-demo-mode="true"] .demo-guide-where dd {
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+}
+
+/* ============================================================
  * Demo mode global layout
  *
  * The default `main { max-width: 800px }` is too narrow for the
