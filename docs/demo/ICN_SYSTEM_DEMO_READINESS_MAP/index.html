@@ -1,0 +1,545 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN System Demo Readiness Map | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>demo</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN SYSTEM DEMO READINESS MAP</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/demo/ICN_SYSTEM_DEMO_READINESS_MAP.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN System Demo Readiness Map</h1>
+<p><strong>Status</strong>: Living planning artifact
+<strong>Last Updated</strong>: 2026-05-08
+<strong>Purpose</strong>: sequence runtime/UI work toward a usable ICN demo without claiming we built one</p>
+<p>This map is the canonical planning artifact for the <strong>demo-readiness tranche</strong>. It is <strong>not</strong>:</p>
+<ul>
+<li>a rehearsal-doc cousin to the NYCN side (those land in NYCN);</li>
+<li>a substrate readiness declaration (substrate state lives in <a href="/docs/STATE">`docs/STATE.md`</a> and <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>);</li>
+<li>a presentation gate (the cross-repo audit on 2026-05-08 found ICN+NYCN broadly coherent for the May framing);</li>
+<li>a prescription for new architecture (no new contracts; no new kernel boundaries; runtime work proposed below is composition, not invention).</li>
+</ul>
+<p>It <strong>is</strong> the planning seam between the discovery that &quot;ICN already has runtime + UI surfaces&quot; and the work needed to turn those surfaces into a guided, plain-language, honest ICN demo for organizers and members.</p>
+<h2>1. Status (read first)</h2>
+<ul>
+<li><strong>Documents existing state plus a planned PR sequence.</strong> No new architecture, no new contract, no behavior change introduced by this doc.</li>
+<li><strong>Repo-safe.</strong> No real names / real DIDs / real contact or private participant data. Already-committed fictional fixture labels (e.g. <code>did:icn:example-*-not-live</code>) may appear only where existing fixtures reference them.</li>
+<li><strong>Not an organizer decision.</strong></li>
+<li><strong>Not a formal pilot.</strong></li>
+<li><strong>Not production deployment.</strong> No live ICN runtime mutation, Google Drive / Groups / Sheets, federation, K3s, DNS, Forgejo, private-overlay, or cloud-sync activation. GitHub PR operations only.</li>
+<li><strong>Not real holder-label activation.</strong> Activation remains gated by <a href="/docs/spec/private-overlay-did-activation-flow">`docs/spec/private-overlay-did-activation-flow.md`</a> §5–§6 and partner-package policy.</li>
+<li><strong>Not Phase 2 completion.</strong> Phase truth lives in <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>; this map does not advance phase.</li>
+<li><strong>Not a presentation-readiness declaration.</strong> The cross-repo audit on 2026-05-08 found ICN+NYCN broadly coherent for the May framing. This map closes a planning gap so subsequent runtime/UI PRs land in sequence; it does not declare anything organizer-ready.</li>
+</ul>
+<h2>2. Diagnosis — composition gap, not GUI absence</h2>
+<p>The earlier framing assumed: &quot;ICN has no GUI; we need to build one.&quot; Discovery on 2026-05-08 contradicted that. The actual state:</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Present?</th>
+<th>Path</th>
+<th>Runnable today</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Pilot UI (PWA)</td>
+<td>yes</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/pilot-ui/">`web/pilot-ui/`</a></td>
+<td>yes (vanilla JS, Playwright e2e tests)</td>
+</tr>
+<tr>
+<td>Node Dashboard</td>
+<td>yes</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/dashboard/">`web/dashboard/`</a></td>
+<td>yes (basic, no auth)</td>
+</tr>
+<tr>
+<td>API docs (Swagger)</td>
+<td>yes</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/api-docs/">`web/api-docs/`</a></td>
+<td>yes</td>
+</tr>
+<tr>
+<td>One-click demo</td>
+<td>yes</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/demo/scripts/run-tool-library-demo.sh">`demo/scripts/run-tool-library-demo.sh`</a></td>
+<td>yes (~30 s startup)</td>
+</tr>
+<tr>
+<td>Devnet (3-node)</td>
+<td>yes</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/devnet/">`deploy/devnet/`</a></td>
+<td>yes (<code>make up</code>)</td>
+</tr>
+<tr>
+<td>TUI console</td>
+<td>yes</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/bins/icn-console/">`icn/bins/icn-console/`</a></td>
+<td>yes (terminal-only)</td>
+</tr>
+<tr>
+<td>TypeScript SDK</td>
+<td>yes</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdk/typescript/">`sdk/typescript/`</a></td>
+<td>yes (Node scripts)</td>
+</tr>
+</tbody></table>
+<p>The blocker is sharper than &quot;no GUI&quot;:</p>
+<blockquote>
+<p><strong>The existing GUI and runtime surfaces are not yet composed into a clear, guided, plain-language demo of ICN as imagined.</strong></p>
+</blockquote>
+<p>Concretely:</p>
+<ul>
+<li><strong>Pilot UI is timebank-flavored.</strong> It renders members, balances, proposals, votes, ledger, trust score, and an Action Items tab driven by <code>loadActionItems()</code> (<code>web/pilot-ui/app.js:7040</code>) calling <code>/gov/domains/{domain_id}/action-items</code>. It does not walk the §3 Guided workflow nine-step narrative (<a href="/docs/pilots/no-cli-organizer-member-rehearsal-workflow">`docs/pilots/no-cli-organizer-member-rehearsal-workflow.md`</a>) as a guided flow.</li>
+<li><strong>Action cards are absent from pilot-ui entirely.</strong> <code>GET /v1/gov/me/action-cards</code> returns JSON; <strong>no pilot-ui code consumes that endpoint today</strong> (verified by <code>grep -rn &quot;action-cards&quot; web/pilot-ui/</code>). Pilot-ui&#39;s &quot;Action Items&quot; tab is a different concept — it queries <code>/gov/domains/{domain_id}/action-items</code>, not the per-member action-cards stream. Card-shaped UX surfacing the organizer-facing fields per <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/contracts/institution-package/action-card.schema.json">`action-card.schema.json`</a> (<code>title</code>, <code>summary</code>, <code>source_kind</code>, <code>action_kind</code>, <code>authority_basis</code>, <code>required_authority_scope</code>, <code>deadline</code>, <code>risk_level</code>, <code>accessibility_hint</code>, <code>receipt_expected</code>) does not exist in any pilot-ui surface.</li>
+<li><strong>Receipts already have an HTML render surface; plain-language framing is the gap.</strong> <code>web/pilot-ui/receipts.js</code> (~18 KB) queries <code>/v1/receipts/chain?decision_hash=...</code> and renders the chain + ledger as HTML via <code>renderResults()</code>. The opaque receipt storage stack (PRs #1755–#1759) lands <code>ProcessGateResultReceipt</code> durably under that surface. The remaining gap is <strong>plain-language framing on top of the existing render</strong> — status / authority / hash / timestamp summary stated <em>before</em> the structured chain — not absence of HTML rendering.</li>
+<li><strong>No mode boundary.</strong> Nothing on screen tells a viewer whether the data is fixture, demo-seed, devnet, or live. ICN <a href="https://github.com/InterCooperative-Network/icn/issues/1727" target="_blank" rel="noopener">#1727</a> (fixture-backed demo mode) is open and not implemented; no <code>--demo-mode</code> flag exists on <code>icnd</code>.</li>
+<li><strong>Two web surfaces share a gateway.</strong> <code>web/pilot-ui</code> and <code>web/dashboard</code> consume the same routes with different auth postures; there is no curated landing that explains which surface is &quot;the demo.&quot;</li>
+</ul>
+<h2>3. Runtime classification per ICN function</h2>
+<p>Per the user-supplied scheme: <strong>runtime implemented and GUI-visible / runtime implemented but only CLI-visible / runtime implemented but not wired to demo fixtures / runtime implemented but not documented / fixture-only / mocked / spec-only / missing</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Status</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Identity / DID / standing</td>
+<td><strong>runtime + missing in pilot-ui</strong></td>
+<td><code>GET /v1/gov/me/standing</code> (#1627) returns; <strong>no pilot-ui consumer</strong> (verified by <code>grep -rn &quot;me/standing&quot; web/pilot-ui/</code>). Pilot-ui knows the logged-in DID via auth flow; it does not fetch the standing read-model.</td>
+</tr>
+<tr>
+<td>Governance — proposals / voting / decision</td>
+<td>runtime + GUI-visible</td>
+<td>gateway routes; pilot-ui Governance tab</td>
+</tr>
+<tr>
+<td>Action cards</td>
+<td><strong>runtime + missing in pilot-ui</strong></td>
+<td><code>GET /v1/gov/me/action-cards</code> (#1659) returns JSON; <strong>no pilot-ui consumer</strong> (the &quot;Action Items&quot; tab queries a different endpoint, <code>/gov/domains/{d}/action-items</code>)</td>
+</tr>
+<tr>
+<td>Receipts (governance / completion / attendance)</td>
+<td><strong>runtime + GUI-visible (chain), plain-language framing absent</strong></td>
+<td>opaque storage stack #1755–#1759; <code>web/pilot-ui/receipts.js</code> renders <code>/v1/receipts/chain</code> + ledger as HTML; raw structure shown without plain-language summary on top</td>
+</tr>
+<tr>
+<td>Provenance / evidence</td>
+<td><strong>runtime + GUI-visible via receipts.js, plain-language framing absent</strong></td>
+<td>same surface as receipts; chain HTML exists, status/authority/hash/timestamp summary not yet stated up front</td>
+</tr>
+<tr>
+<td>Obligations / allocations / settlement primitives</td>
+<td><strong>runtime + only CLI/JSON-visible</strong></td>
+<td><code>/v1/receipts/allocations</code>, <code>/v1/receipts/intents</code> JSON; no UI</td>
+</tr>
+<tr>
+<td>Federation</td>
+<td>runtime + only CLI/JSON-visible (no peers endpoint)</td>
+<td>actual federation routes are <code>/federation/status</code>, <code>/federation/coops</code>, <code>/federation/coops/{id}/vouches</code>, <code>/federation/attestations/{member_did}</code>, <code>/federation/init</code>, <code>/federation/clearing/...</code>; <strong>there is no <code>/v1/federation/peers</code> route</strong>. Node-dashboard&#39;s &quot;peer count&quot; is a proxy computed from <code>/v1/trust/edges</code>, not from a federation peers endpoint. Implementers planning federation surface work should not chase the missing peers route.</td>
+</tr>
+<tr>
+<td>Private overlay / holder-label DID boundary</td>
+<td>spec-only on substrate side</td>
+<td><a href="/docs/spec/private-overlay-did-activation-flow">`private-overlay-did-activation-flow.md`</a> is the substrate boundary; partner-package policy is required for activation; no runtime activation surface</td>
+</tr>
+<tr>
+<td>Organizer/member UX</td>
+<td><strong>runtime + not wired to §3 Guided workflow</strong></td>
+<td>pilot-ui exists but is timebank-flavored, not the 9-step no-CLI organizer narrative</td>
+</tr>
+<tr>
+<td>Operator/admin UX</td>
+<td>runtime + only CLI/HTML-visible (basic)</td>
+<td><code>web/dashboard</code> exists, no auth, basic; icn-console TUI for power users</td>
+</tr>
+<tr>
+<td>Accessibility gates</td>
+<td>spec-only at runtime</td>
+<td><a href="/docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">`ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`</a> is PR-time review reflex; no runtime enforcement</td>
+</tr>
+<tr>
+<td>Demo / runtime surfaces</td>
+<td><strong>runtime + not yet a fixture-mode</strong></td>
+<td><code>run-tool-library-demo.sh</code> exists; ICN #1727 fixture-backed demo mode <strong>OPEN, not implemented</strong></td>
+</tr>
+<tr>
+<td>Node / dashboard surfaces</td>
+<td>runtime + only CLI/HTML-visible (basic)</td>
+<td><code>web/dashboard</code>, no auth</td>
+</tr>
+<tr>
+<td>NYCN package integration</td>
+<td>fixture-only on NYCN side</td>
+<td>NYCN renders concepts as markdown+JSON in <code>dist/</code>; not directly reused by ICN UI</td>
+</tr>
+<tr>
+<td>Local-first / demo mode</td>
+<td><strong>missing as a first-class runtime mode</strong></td>
+<td>no <code>--demo-mode</code> flag, no fixture loader; demo flow uses seeded-but-real state</td>
+</tr>
+<tr>
+<td>No-CLI path (organizer-visible)</td>
+<td><strong>runtime + UI does not mirror §3 Guided workflow</strong></td>
+<td>endpoints exist; no GUI shell that walks the 9-step story</td>
+</tr>
+</tbody></table>
+<p>The pattern: <strong>most ICN core functions are runtime-implemented and reachable through gateway HTTP routes; the gap is between routes and rendered, plain-language UX.</strong></p>
+<h2>4. Direct answers to the 17 readiness questions</h2>
+<h3>Section 4.1 — runtime questions (the 10)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Question</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Can a local ICN node/demo process run today?</td>
+<td><strong>Yes.</strong> <code>./demo/scripts/run-tool-library-demo.sh</code> boots icnd + gateway + pilot-ui in ~30 s.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Can it serve standing?</td>
+<td><strong>Yes (data); pilot-ui has no consumer.</strong> <code>GET /v1/gov/me/standing</code> returns; pilot-ui code does not call this endpoint today (verified by grep). The auth flow knows the logged-in DID; the standing read-model is not fetched.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Can it serve action cards?</td>
+<td><strong>Yes (data); pilot-ui has no consumer.</strong> <code>GET /v1/gov/me/action-cards</code> returns JSON. Pilot-ui&#39;s &quot;Action Items&quot; tab queries <code>/gov/domains/{d}/action-items</code> — a different endpoint and concept. The <code>action-cards</code> endpoint is not fetched by any pilot-ui code today.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Can it show governance events / proposals?</td>
+<td><strong>Yes.</strong> Pilot-ui Governance tab; full create/vote flow.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Can it produce or retrieve receipts?</td>
+<td><strong>Yes, with HTML rendering.</strong> Opaque receipt storage stack live (#1755–#1759); <code>GET /v1/receipts/chain</code> returns JSON; <code>web/pilot-ui/receipts.js</code> already renders the chain + ledger as HTML.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Can it show provenance/evidence in plain language?</td>
+<td><strong>Partial.</strong> <code>receipts.js</code> renders chain HTML; <strong>plain-language framing on top</strong> (status / authority / hash / timestamp summary stated before the structured detail) is the remaining gap.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Can it distinguish fixture / local / demo / live state?</td>
+<td><strong>No.</strong> No mode indicator on any UI; gateway has no <code>--demo-mode</code> flag.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Is there an organizer/member GUI connected to any of this?</td>
+<td><strong>Partial.</strong> Pilot-ui (timebank-flavored) consumes proposals, votes, transactions, action items, ledger, trust score, and renders receipt chains via <code>receipts.js</code>. It does <strong>not</strong> consume the per-member <code>me/standing</code> or <code>me/action-cards</code> read-models, and does <strong>not</strong> implement the §3 Guided workflow as a guided flow.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>What still requires CLI?</td>
+<td>Initial keystore (<code>icnctl id init</code>), token generation, gateway start, devnet bring-up, <code>icnctl audit verify</code>, all icn-console operations.</td>
+</tr>
+<tr>
+<td>10</td>
+<td>What is the smallest runtime PR that makes the GUI/demo path more real?</td>
+<td><strong>PR 2 below</strong> — pilot-ui demo-mode boundary/header + guided demo landing screen. Lands on existing pilot-ui without backend work; sets the scaffolding for PRs 3–5.</td>
+</tr>
+</tbody></table>
+<h3>Section 4.2 — sharpened questions (the 7)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Question</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Can the existing pilot-ui become the guided organizer/member demo surface?</td>
+<td><strong>Yes</strong>, with composition work — landing screen + guided flow + per-section labels. Pilot-ui&#39;s vanilla-JS architecture (no framework) makes targeted additions straightforward.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>What is the smallest change that makes pilot-ui show the ICN core loop clearly?</td>
+<td>A <strong>guided demo landing screen</strong> that frames the §3 Guided workflow steps and a <strong>mode banner</strong> that tells the viewer what state they&#39;re looking at. Both UI-only.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>What runtime data is already available through gateway routes?</td>
+<td>Standing, action-cards, governance proposals/votes/decisions, ledger postings, trust scores + edges, decision-receipts, completion-receipts, attendance-receipts, allocation/intent receipts, federation status / coops / vouches / attestations / clearing, health/metrics. (No <code>/v1/federation/peers</code> route exists; node-dashboard&#39;s &quot;peer count&quot; is a proxy computed from <code>/v1/trust/edges</code>.)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>What needs only UI wiring (no backend change)?</td>
+<td>(a) demo-mode banner / boundary labels; (b) guided demo landing screen; (c) action-card UX (cards, not list) — data already in JSON; (d) plain-language receipt / provenance panel — data already in JSON.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>What needs fixture/demo-mode support?</td>
+<td>Stable, repeatable demo data not derived from a seeded but real state. ICN #1727 is the open scope: a <code>--demo-mode</code> flag + committed fixture pack the gateway serves deterministically.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>What needs a new read-model route?</td>
+<td>None for this tranche. A <code>/demo/state</code> summary route would be convenient but is <strong>not</strong> required to render guided demo + action cards + receipts. Keep this off the critical path.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>What must remain explicitly labeled as not live / not implemented?</td>
+<td>Federation topology beyond the trust-edges-derived peer-count proxy (no real topology view); holder-label DID activation (substrate spec only; partner-package policy required); allocation / settlement at scale; private-overlay activation; cross-cooperative federation flows; production cloud-sync; live K3s / DNS / Forgejo / GitHub-org mutation. Each of these gets a &quot;<strong>Not implemented in demo</strong>&quot; label on the relevant pilot-ui section.</td>
+</tr>
+</tbody></table>
+<h2>5. Recommended PR sequence</h2>
+<p>This sequence is the actionable output of the discovery. Each PR is <strong>small</strong> (single-concern, narrow file footprint), <strong>honest</strong> (no new claims, no new contracts), and <strong>composes with the next</strong>. PR 1 is this map. PRs 2–5 are the runtime/UI tranche. Each PR has its own approval gate; no PR is queued behind another.</p>
+<h3>PR 1 (this PR) — <code>docs/demo/ICN_SYSTEM_DEMO_READINESS_MAP.md</code> + index update</h3>
+<ul>
+<li><strong>What:</strong> the doc you are reading + a one-line addition to <a href="/docs/README">`docs/demo/README.md`</a> Documentation table.</li>
+<li><strong>Why:</strong> sequences PRs 2–5 with a single source of truth; surfaces discovery findings as repo state; prevents wrong runtime work before priorities are pinned.</li>
+<li><strong>What runs after this PR:</strong> nothing new at runtime. The map is a planning artifact, not a feature.</li>
+<li><strong>Non-claims:</strong> documents existing state + a planned sequence; no behavior change; no presentation-readiness claim.</li>
+<li><strong>Files:</strong><ul>
+<li><code>docs/demo/ICN_SYSTEM_DEMO_READINESS_MAP.md</code> (new)</li>
+<li><code>docs/demo/README.md</code> (one-line index addition)</li>
+</ul>
+</li>
+</ul>
+<h3>PR 2 — pilot-ui demo-mode boundary header + guided demo landing screen</h3>
+<ul>
+<li><strong>What:</strong> add a header banner that reads the runtime mode (one of <code>DEMO</code>, <code>FIXTURE</code>, <code>DEVNET</code>, <code>LOCAL</code>, <code>LIVE</code>) and renders a colored badge in the pilot-ui chrome; add a landing screen at <code>#/demo</code> (or <code>?mode=demo</code>) that walks the §3 Guided workflow narrative as a guided flow, with <strong>Next</strong> buttons stepping through the <strong>existing</strong> pilot-ui sections only.</li>
+<li><strong>Why:</strong> answers the user&#39;s &quot;shortest path from existing surfaces to a usable ICN demo&quot; — re-uses 100% of existing pilot-ui rendering and adds the composition layer. <strong>Does not pretend standing or action-cards are already GUI-visible.</strong></li>
+<li><strong>What runs after this PR (honest labeling required):</strong> opening pilot-ui at <code>?mode=demo</code> shows a guided landing that lists the demo path explicitly:<ul>
+<li><strong>Available now in pilot-ui:</strong> governance / proposals / votes; action items (from <code>/gov/domains/{d}/action-items</code>); ledger; trust score; receipt chain view (via <code>receipts.js</code>).</li>
+<li><strong>Coming in this demo tranche (linked but labeled &quot;Not yet wired&quot;):</strong> member standing read-model surface (PR 3), per-member action cards surface (PR 3), plain-language receipt framing (PR 4), fixture-backed local demo mode (PR 5).</li>
+<li><strong>Not implemented in demo at all:</strong> federation topology, holder-label DID activation, allocation/settlement at scale, private-overlay activation, cross-cooperative federation, cloud-sync, K3s/DNS/Forgejo/production-deploy mutation.
+The &quot;I am [member label]&quot; framing comes from the auth flow&#39;s known DID, <strong>not</strong> from a standing fetch — PR 2 must not introduce new endpoint consumers.</li>
+</ul>
+</li>
+<li><strong>Mode source for now:</strong> environment / query-param toggle. Does <strong>not</strong> require backend change. (Real <code>--demo-mode</code> flag is PR 5.)</li>
+<li><strong>Hard rule for PR 2 implementers:</strong> <strong>no new endpoint consumers.</strong> PR 2 wires composition over existing fetches only. Adding <code>me/standing</code> or <code>me/action-cards</code> consumers is PR 3&#39;s scope. If the landing needs a member display, use the existing auth-known DID; do not add a fetch.</li>
+<li><strong>Non-claims (must appear in PR body and in the banner-rendered legend):</strong><ul>
+<li>Demo mode is a UI labeling convention; the banner reflects what was passed to the page, not authoritative gateway state.</li>
+<li>Mode <code>LIVE</code> does <strong>not</strong> mean production — it means the page is reading real gateway state. ICN is not production-deployed.</li>
+<li>Sections marked <strong>Not yet wired</strong> are honest gaps for upcoming PRs in this tranche; sections marked <strong>Not implemented in demo</strong> are out of scope for the entire tranche.</li>
+</ul>
+</li>
+<li><strong>Files (estimated):</strong><ul>
+<li><code>web/pilot-ui/index.html</code> — header markup, landing template</li>
+<li><code>web/pilot-ui/app.js</code> — mode parsing, banner render, landing routing, <strong>Next</strong>-button wiring (no new fetches)</li>
+<li><code>web/pilot-ui/style.css</code> — banner + landing styling</li>
+<li><code>web/pilot-ui/tests/e2e/</code> — one Playwright test for landing → next-section flow</li>
+</ul>
+</li>
+<li><strong>Out of scope:</strong> member standing fetch + render (PR 3), action-cards fetch + card render (PR 3), receipt/provenance plain-language framing (PR 4), gateway-side fixture mode (PR 5), modifications to the existing Action Items tab.</li>
+</ul>
+<h3>PR 3 — pilot-ui member standing + action cards: add the missing fetches and render as a coherent member surface</h3>
+<ul>
+<li><strong>What:</strong> <strong>Add two new pilot-ui consumers</strong> for the per-member read-models that pilot-ui does not yet fetch — <code>GET /v1/gov/me/standing</code> (#1627) and <code>GET /v1/gov/me/action-cards</code> (#1659) — and render them together as the member&#39;s &quot;Who am I, what&#39;s my standing, what can I do?&quot; surface. Card-shaped UX for action cards using the actual fields in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/contracts/institution-package/action-card.schema.json">`action-card.schema.json`</a>: <code>title</code>, <code>summary</code>, <code>source_kind</code>, <code>action_kind</code>, <code>authority_basis</code>, <code>required_authority_scope</code>, <code>deadline</code> (when present), <code>risk_level</code>, <code>accessibility_hint</code>, <code>receipt_expected</code>. Standing renders as the framing context above the action-cards queue.</li>
+<li><strong>Why:</strong> standing and action-cards belong together from the organizer/member point of view. The first question a viewer asks is <strong>&quot;Who am I in this institution, what is my standing, and what can/should I do?&quot;</strong> — and the gateway&#39;s two read-models that answer this question (<code>me/standing</code> + <code>me/action-cards</code>) are both not consumed by pilot-ui today (verified by <code>grep -rn &quot;me/standing\|me/action-cards&quot; web/pilot-ui/</code> returning zero matches). Splitting them into separate PRs risks two tiny PRs that technically advance the repo but do not give a coherent member surface. Both are missing; both should land together.</li>
+<li><strong>What runs after this PR:</strong> the new &quot;My Standing &amp; Action Cards&quot; section in pilot-ui shows the logged-in member&#39;s standing (memberships, roles, scopes — per the standing read-model contract) as the framing context, with the action-cards queue rendered as cards directly below. Each card surfaces <code>title</code>, <code>summary</code>, <code>authority_basis</code>, <code>required_authority_scope</code>, and where present <code>deadline</code> / <code>risk_level</code> / <code>accessibility_hint</code>, with a <code>receipt_expected</code> indicator — all in plain language, no invented fields. The existing &quot;Action Items&quot; tab (per-domain action-item ledger, different endpoint, different concept) is unchanged.</li>
+<li><strong>Backend change required?</strong> <strong>No.</strong> Both endpoints already exist (#1627 + #1659).</li>
+<li><strong>Naming note:</strong> name the new pilot-ui section to make the conceptual split clear — e.g. <strong>&quot;My Standing &amp; Action Cards&quot;</strong> — and keep it distinct from the existing &quot;Action Items&quot; tab. Implementers should not collapse standing-as-context with action-items-as-ledger.</li>
+<li><strong>Non-claims:</strong><ul>
+<li>Adds two new pilot-ui consumers for existing gateway endpoints; does not change gateway contracts or schemas.</li>
+<li>Does not modify or replace the existing Action Items tab.</li>
+<li>Does not advance #1748 runtime gates (b)–(d) or any acceptance criterion beyond pilot-ui rendering of already-served data.</li>
+<li>RFC-gated source kinds (signal_rule, obligation_lifecycle per the action-card schema&#39;s <code>x-icn-rfc-gated-source-kinds</code>) appear as <strong>Not implemented</strong> placeholders; no false RFC promotion.</li>
+</ul>
+</li>
+<li><strong>Files (estimated):</strong><ul>
+<li><code>web/pilot-ui/app.js</code> — <code>loadStanding()</code> + <code>loadActionCards()</code> (paralleling <code>loadActionItems()</code>) + combined renderer</li>
+<li><code>web/pilot-ui/index.html</code> — new section + card template + standing block</li>
+<li><code>web/pilot-ui/style.css</code> — section + card + standing styling (may share patterns with existing action-items / dashboard styles but must not collide)</li>
+<li><code>web/pilot-ui/tests/e2e/</code> — Playwright tests for both fetches and the combined render</li>
+</ul>
+</li>
+<li><strong>Out of scope:</strong> new schema fields, new endpoints, mutation flows, modifications to the existing Action Items tab, plain-language framing of receipts (PR 4), fixture-backed runtime (PR 5).</li>
+<li><strong>Sequencing note:</strong> if standing turns out to be substantially larger than expected during implementation (e.g. multi-coop / multi-federation aggregation requires additional render shape), <strong>stop and report</strong> rather than fold complexity in silently. The user is willing to split into PR 3a (standing) + PR 3b (action cards) only if discovery shows that&#39;s necessary; the default is one PR.</li>
+</ul>
+<h3>PR 4 — extend the existing receipts.js with plain-language framing</h3>
+<ul>
+<li><strong>What:</strong> extend the <strong>existing</strong> receipt rendering in <code>web/pilot-ui/receipts.js</code> (<code>renderResults()</code>, <code>query-chain</code> flow) to lead with a plain-language status / authority / hash / timestamp summary <strong>before</strong> the existing chain + ledger HTML; keep the structured chain + ledger view as the supporting detail. Implementers should work from <code>receipts.js</code> rather than introduce a parallel surface.</li>
+<li><strong>Why:</strong> receipts are the audit-chain backbone of every ICN claim. The chain renders as HTML today, which is good — but it leads with structure, not meaning. A non-technical viewer looking at the existing surface sees hashes and field names before they see &quot;Decision X passed on date Y under authority Z.&quot; Adding plain-language framing on top of what&#39;s there closes that gap without parallel surfaces.</li>
+<li><strong>What runs after this PR:</strong> the same Receipts tab; same <code>query-chain</code> flow; same chain + ledger detail at the bottom — but the top of the rendered result is now a plain-language sentence stating outcome / authority / hash / timestamp. The structured detail remains visible (one scroll, not one click) for stewards.</li>
+<li><strong>Backend change required?</strong> <strong>No.</strong> Data already exists at <code>/v1/receipts/chain</code> and is already fetched by <code>receipts.js</code>.</li>
+<li><strong>Non-claims:</strong><ul>
+<li>Extends existing rendering; does not replace or duplicate it.</li>
+<li>Plain-language summaries do not replace the JSON / chain record; both are visible on the same surface.</li>
+<li>&quot;Pinned in opaque storage&quot; cites the <a href="/docs/architecture/KERNEL_APP_SEPARATION">Invariant 6</a> language verbatim — it is the kernel-blind storage primitive, not a trust claim.</li>
+</ul>
+</li>
+<li><strong>Files (estimated):</strong><ul>
+<li><code>web/pilot-ui/receipts.js</code> — extend <code>renderResults()</code> with plain-language summary block</li>
+<li><code>web/pilot-ui/index.html</code> — minor markup adjustment for the summary block above the existing chain results</li>
+<li><code>web/pilot-ui/style.css</code> — summary styling</li>
+</ul>
+</li>
+<li><strong>Out of scope:</strong> new receipt classes, new endpoints, structured proof verification (different runtime scope), parallel rendering surfaces.</li>
+</ul>
+<h3>PR 5 — fixture-backed local demo mode / stable demo data loader (advances ICN #1727)</h3>
+<ul>
+<li><strong>What:</strong> add a <code>--demo-mode</code> flag to <code>icnd</code> that, when set, serves a committed fixture pack from a locked path instead of seeded-but-real state. The fixture pack contains: members, proposals, votes, action cards, receipts, attendance records, ledger postings — all using the existing <code>did:icn:example-*-not-live</code> fixture convention.</li>
+<li><strong>Why:</strong> today the demo loop conflates &quot;what we seeded&quot; with &quot;what&#39;s stored.&quot; The PR makes demo mode deterministic and labeled — same data every time, no real keystore initialization, no real DID generation, no real signing. This is the runtime piece that makes the mode banner from PR 2 truthful.</li>
+<li><strong>What runs after this PR:</strong> <code>./demo/scripts/run-tool-library-demo.sh --demo</code> boots icnd in fixture mode; pilot-ui&#39;s banner reads <code>DEMO</code>; every entity on screen uses fictional fixture labels; nothing touches the real keystore or the real network.</li>
+<li><strong>Backend change required?</strong> <strong>Yes.</strong> This is the only runtime PR in the sequence. Scope per ICN <a href="https://github.com/InterCooperative-Network/icn/issues/1727" target="_blank" rel="noopener">#1727</a>: fixture set + minimal loader + default-to-demo toggle.</li>
+<li><strong>Non-claims:</strong><ul>
+<li>Fixture mode is for local demo only. It does <strong>not</strong> alter live-mode behavior, kernel invariants, or production code paths.</li>
+<li>The fixture pack is committed; it does not generate or store real data.</li>
+<li>Demo mode does <strong>not</strong> simulate federation, holder-label activation, private overlays, or cloud sync — those remain explicitly <strong>not implemented in demo</strong>.</li>
+</ul>
+</li>
+<li><strong>Files (estimated):</strong><ul>
+<li><code>icn/bins/icnd/src/main.rs</code> — flag wiring</li>
+<li><code>icn/crates/icn-gateway/src/...</code> — fixture loader (one new module under existing paths)</li>
+<li><code>icn/fixtures/demo/</code> — committed fixture pack (new; <code>did:icn:example-*-not-live</code> convention only)</li>
+<li><code>demo/scripts/run-tool-library-demo.sh</code> — pass <code>--demo</code> flag</li>
+</ul>
+</li>
+<li><strong>Out of scope:</strong> anything beyond loading committed fixtures — no synthetic generation, no record/replay, no live-mode toggle from within the running gateway.</li>
+</ul>
+<h2>6. What stays explicitly not-yet-done in this tranche</h2>
+<p>Per the user&#39;s hard rules and the existing CLAUDE.md guard rails, the following are <strong>deferred</strong> and must remain labeled as such on every relevant pilot-ui surface:</p>
+<ul>
+<li>Live federation; cross-cooperative federation flows; federation topology view beyond the trust-edges-derived peer-count proxy used by node-dashboard.</li>
+<li>Private-overlay activation flows; holder-label DID binding from within the demo; any consent-moment UI.</li>
+<li>Cloud sync (Drive / Sheets / Groups / Calendar / mail).</li>
+<li>K3s / DNS / Forgejo / GitHub-org / production-deploy mutation from any demo path.</li>
+<li>Allocation / settlement at scale; multi-cooperative obligations; treasury surfaces.</li>
+<li>Operator dashboards beyond the basic <code>web/dashboard</code> and <code>icn-console</code> TUI.</li>
+<li>Real-data ingest paths; live import from external sources.</li>
+<li>Production deployment posture; release-candidate gates.</li>
+</ul>
+<p>These appear in the demo as <strong>Not implemented in demo</strong> labels (PR 2 banner system) so a viewer can see what is and isn&#39;t simulated.</p>
+<h2>7. Cross-references</h2>
+<ul>
+<li>ICN <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a> — showcase milestone; Workstream A names #1727 / #1726 as required-before-presentation-feels-real (this map advances #1727 in PR 5; #1726 thin shell remains aspirational and is <strong>not</strong> in this tranche).</li>
+<li>ICN <a href="https://github.com/InterCooperative-Network/icn/issues/1727" target="_blank" rel="noopener">#1727</a> — fixture-backed demo mode; PR 5 is the smallest implementation slice.</li>
+<li>ICN <a href="https://github.com/InterCooperative-Network/icn/issues/1726" target="_blank" rel="noopener">#1726</a> — thin organizer rehearsal shell; <strong>out of scope</strong> for this tranche. Pilot-ui composition (PRs 2–4) is the smaller path that preserves the option to do #1726 later.</li>
+<li>ICN <a href="https://github.com/InterCooperative-Network/icn/issues/1748" target="_blank" rel="noopener">#1748</a> — institutional process substrate; Gate (a) runtime-receipt acceptance satisfied by #1755–#1759; Gates (b)–(d) (visibility / privacy redaction / accessibility runtime gate) remain open and are <strong>out of scope</strong> for this tranche.</li>
+<li>NYCN <a href="https://github.com/InterCooperative-Network/cooperative-network/pull/65" target="_blank" rel="noopener">#65</a> — REHEARSAL-0003 fixture-only walkthrough; PR 3&#39;s card UX should match the deck&#39;s wireframe expectations cited there.</li>
+<li>ICN <a href="https://github.com/InterCooperative-Network/icn/pull/1768" target="_blank" rel="noopener">#1768</a> (merged) — Invariant 6 documents opaque receipt storage; PR 4&#39;s receipt panel surfaces the same vocabulary.</li>
+</ul>
+<p>No issue checkbox edits in this PR. Status comments may be posted <strong>after</strong> PRs 2–5 land, scoped per the issues&#39; acceptance criteria.</p>
+<h2>8. Validation expectations for PRs 2–5</h2>
+<p>Each PR in the sequence should pass the same posture gates that #65/#66/#1768 followed:</p>
+<ul>
+<li><code>cargo check --workspace</code> (defensive — for non-runtime PRs the workspace must still compile; for PR 5 the new code paths must compile and pass <code>cargo test -p icn-gateway</code>).</li>
+<li><code>git diff --check</code> clean.</li>
+<li><code>git status --short</code> shows only the intended files.</li>
+<li>Pilot-ui Playwright E2E suite passes on PRs 2 / 3 / 4.</li>
+<li>Real-contact leak grep covering common email-provider domains, common phone-number formats, and known team contact patterns returns no matches outside explicit &quot;do not commit&quot; / non-claim contexts.</li>
+<li>Overclaim grep covering production / formal pilot / Phase 2 completion / live federation / live cloud / live infrastructure mutation terms hits only in explicit non-claim / red-line / out-of-scope contexts.</li>
+<li>For PR 5, the fixture pack must use only the committed <code>did:icn:example-*-not-live</code> convention; no real names, real DIDs, real contacts, or real keystore initialization.</li>
+<li>Each PR body uses the relevant non-claims block from §5 verbatim and includes the Test plan checklist.</li>
+</ul>
+<h2>9. Related docs</h2>
+<ul>
+<li><a href="/docs/README">README.md</a> — demo entry point and runnable surfaces</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/DEMO_SCRIPT">DEMO_SCRIPT.md</a> — 20-min presenter walkthrough (existing)</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/QUICK_START">QUICK_START.md</a> — 5-minute clone-to-running</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ARCHITECTURE_OVERVIEW">ARCHITECTURE_OVERVIEW.md</a> — visual diagrams</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/WALKTHROUGH">WALKTHROUGH.md</a> — system tour</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FAQ">FAQ.md</a> — talking points</li>
+<li><a href="/docs/STATE">`docs/STATE.md`</a> — substrate state (Phase 2 ⏳ partner-bound)</li>
+<li><a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a> — phase truth</li>
+<li><a href="/docs/architecture/KERNEL_APP_SEPARATION">`docs/architecture/KERNEL_APP_SEPARATION.md`</a> — kernel/app boundary including Invariant 6 (opaque receipt storage)</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/contracts/institution-package/action-card.schema.json">`docs/contracts/institution-package/action-card.schema.json`</a> — action card contract; PR 3 renders against this</li>
+<li><a href="/docs/spec/private-overlay-did-activation-flow">`docs/spec/private-overlay-did-activation-flow.md`</a> — substrate boundary for partner activation; out of scope for this tranche</li>
+<li><a href="/docs/pilots/no-cli-organizer-member-rehearsal-workflow">`docs/pilots/no-cli-organizer-member-rehearsal-workflow.md`</a> — §3 nine-step narrative the demo composition walks</li>
+<li><a href="/docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">`docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`</a> — PR-time review gate; applied to PRs 2–5 as they land</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
