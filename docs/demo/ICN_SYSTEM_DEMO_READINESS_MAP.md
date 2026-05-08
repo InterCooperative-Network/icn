@@ -190,6 +190,20 @@ This sequence is the actionable output of the discovery. Each PR is **small** (s
 > later add the runtime flag if/when the team chooses to invest in
 > backend work. The pilot-ui-only slice does not constitute fixture-
 > backed demo mode in the readiness-map's original sense.
+>
+> **Verification fix:** the initial fixture slice (#1773) populated
+> the standing + action-card surfaces with fixture data only after a
+> successful login, which on a no-gateway laptop made the demo
+> unreachable. A follow-up PR adds a tiny `bootstrapDemoMode()` on
+> page load: when `?mode=demo` is set and no real auth has populated
+> `state.token`, pilot-ui transitions straight into the main screen
+> with the fictional `did:icn:example-organizer-demo-not-live`
+> identity and lands on the Demo Guide tab. This makes the guided
+> pilot-ui demo viewable from a static server (`python3 -m
+> http.server`) without a running gateway. Other tabs (Governance,
+> Receipts, Ledger) continue to fetch the gateway and will surface
+> their own empty/error states honestly — they are explicitly not
+> fixture-backed yet.
 
 - **What:** add a `--demo-mode` flag to `icnd` that, when set, serves a committed fixture pack from a locked path instead of seeded-but-real state. The fixture pack contains: members, proposals, votes, action cards, receipts, attendance records, ledger postings — all using the existing `did:icn:example-*-not-live` fixture convention.
 - **Why:** today the demo loop conflates "what we seeded" with "what's stored." The PR makes demo mode deterministic and labeled — same data every time, no real keystore initialization, no real DID generation, no real signing. This is the runtime piece that makes the mode banner from PR 2 truthful.

@@ -3109,6 +3109,47 @@ if (myStandingNavBtn) {
 // happens at refreshDemoGuideContext() call sites in the login flow.
 applyDemoMode();
 
+// Auto-bootstrap demo mode (verification fix on top of #1773 fixture slice):
+// when `?mode=demo` is set and no real auth has populated state.token,
+// transition straight into the main screen with fictional identity so the
+// guided demo path is viewable from a static server without a running
+// gateway. The standing + action-cards surfaces (#1771) read fixture
+// data via the loadDemoFixture short-circuit in #1773; other tabs
+// (Governance, Receipts, Ledger) continue to fetch the gateway and will
+// surface their own empty/error states honestly. Frontend-only.
+function bootstrapDemoMode() {
+    if (DEMO_MODE !== 'demo') return;
+    // Don't override real auth: if a previous real session populated
+    // state.token (e.g. ?mode=demo against a live gateway), take the
+    // standard login path and let real auth flow.
+    if (state.token) return;
+    // Hard-coded fictional identity (matches the standing.json fixture
+    // committed under web/pilot-ui/fixtures/icn-organizer-demo/). The
+    // standing tab will repopulate with the same DID from the fixture
+    // when its lazy-load fires; using a literal here keeps the
+    // bootstrap synchronous so no DOMContentLoaded handlers race
+    // against an awaited fetch.
+    state.did = 'did:icn:example-organizer-demo-not-live';
+    state.userName = 'Demo organizer (fictional)';
+    state.coopId = 'demo.coop.organizing';
+    state.gatewayUrl = '(demo — no gateway)';
+    // Sentinel — never a real bearer token. Set so other code paths
+    // checking `state.token` see "logged in" without sending the value.
+    state.token = 'demo-no-token-not-live';
+
+    if (elements.loginScreen) elements.loginScreen.classList.add('hidden');
+    if (elements.mainScreen) elements.mainScreen.classList.remove('hidden');
+
+    if (elements.coopName) elements.coopName.textContent = state.coopId;
+    if (elements.userDid) elements.userDid.textContent = state.userName;
+
+    refreshDemoGuideContext();
+    if (typeof switchTab === 'function') {
+        switchTab('demo-guide');
+    }
+}
+bootstrapDemoMode();
+
 // PR 2 — Demo Guide "Available now" links route to existing tabs via
 // switchTab(). Anchors have href="#tabId" for keyboard / accessibility
 // (focus, screen-reader announcement) but the hash navigation does not
