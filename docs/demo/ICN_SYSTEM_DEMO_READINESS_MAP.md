@@ -178,6 +178,19 @@ This sequence is the actionable output of the discovery. Each PR is **small** (s
 
 ### PR 5 — fixture-backed local demo mode / stable demo data loader (advances ICN #1727)
 
+> **Implementation note (post-correction):** the original PR 5 framing
+> (a runtime `--demo-mode` flag on `icnd` that short-circuits gateway
+> handlers) is the **eventual scope** but is too broad for one
+> reviewable PR. The first PR landed under this number is a **narrow
+> frontend slice** that short-circuits standing + action-cards in
+> pilot-ui to a committed fixture pack when `?mode=demo` is set. ICN
+> [#1727](https://github.com/InterCooperative-Network/icn/issues/1727)
+> remains **open** for the full backend fixture mode. Subsequent PRs
+> may extend the fixture coverage (proposals, receipts, ledger) and
+> later add the runtime flag if/when the team chooses to invest in
+> backend work. The pilot-ui-only slice does not constitute fixture-
+> backed demo mode in the readiness-map's original sense.
+
 - **What:** add a `--demo-mode` flag to `icnd` that, when set, serves a committed fixture pack from a locked path instead of seeded-but-real state. The fixture pack contains: members, proposals, votes, action cards, receipts, attendance records, ledger postings — all using the existing `did:icn:example-*-not-live` fixture convention.
 - **Why:** today the demo loop conflates "what we seeded" with "what's stored." The PR makes demo mode deterministic and labeled — same data every time, no real keystore initialization, no real DID generation, no real signing. This is the runtime piece that makes the mode banner from PR 2 truthful.
 - **What runs after this PR:** `./demo/scripts/run-tool-library-demo.sh --demo` boots icnd in fixture mode; pilot-ui's banner reads `DEMO`; every entity on screen uses fictional fixture labels; nothing touches the real keystore or the real network.
