@@ -138,6 +138,7 @@ sudo ufw allow 3000/tcp
 
 | Document | Purpose |
 |----------|---------|
+| [ICN_SYSTEM_DEMO_READINESS_MAP.md](ICN_SYSTEM_DEMO_READINESS_MAP.md) | Demo-readiness diagnosis + planned PR sequence (banner / landing / cards / receipts / fixture mode) |
 | [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | 20-minute presenter walkthrough with timing |
 | [QUICK_START.md](QUICK_START.md) | 5-minute clone-to-running |
 | [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) | Visual diagrams for all subsystems |
