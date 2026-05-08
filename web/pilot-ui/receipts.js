@@ -236,14 +236,30 @@
         // createdAt; ledger transactions carry timestamp. Intents currently
         // do not surface a top-level timestamp, so we omit them from the
         // earliest-timestamp pick rather than make one up.
-        const candidates = [];
+        //
+        // Per Copilot review on b4200f0d: pilot-ui treats timestamps as
+        // numbers that may be either Unix seconds or milliseconds — the
+        // existing formatTimestamp() helper normalizes via the heuristic
+        // `ts > 1e12 ? ts : ts * 1000`. We MUST apply the same heuristic
+        // before comparison: Array.prototype.sort() without a comparator
+        // sorts lexicographically (wrong for numbers) and seconds vs
+        // milliseconds compare incorrectly even with a numeric comparator.
+        // Normalize each candidate to milliseconds, take the numeric min,
+        // and pass the ms value back to formatTimestamp (which sees
+        // ts > 1e12 and renders without double-converting).
+        const toMs = (ts) => (Number(ts) > 1e12 ? Number(ts) : Number(ts) * 1000);
+        const candidatesMs = [];
         for (const a of allocations) {
-            if (a.createdAt) candidates.push(a.createdAt);
+            if (a.createdAt !== undefined && a.createdAt !== null && Number.isFinite(Number(a.createdAt))) {
+                candidatesMs.push(toMs(a.createdAt));
+            }
         }
         for (const t of transactions) {
-            if (t.timestamp) candidates.push(t.timestamp);
+            if (t.timestamp !== undefined && t.timestamp !== null && Number.isFinite(Number(t.timestamp))) {
+                candidatesMs.push(toMs(t.timestamp));
+            }
         }
-        const earliest = candidates.length ? candidates.slice().sort()[0] : null;
+        const earliest = candidatesMs.length ? Math.min(...candidatesMs) : null;
 
         // Authority basis: the allocation scope is the closest thing the
         // chain currently surfaces to "under what governance authority did
