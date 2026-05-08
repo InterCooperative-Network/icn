@@ -23,6 +23,7 @@
         copyChainBtn: null,
         chainResults: null,
         chainStatus: null,
+        plainLanguageSummary: null, // PR 4: plain-language framing above the chain
         allocationsList: null,
         intentsList: null,
         ledgerList: null,
@@ -42,6 +43,7 @@
         elements.copyChainBtn = document.getElementById('copy-chain-btn');
         elements.chainResults = document.getElementById('receipt-chain-results');
         elements.chainStatus = document.getElementById('chain-status');
+        elements.plainLanguageSummary = document.getElementById('receipt-plain-language-summary');
         elements.allocationsList = document.getElementById('allocations-list');
         elements.intentsList = document.getElementById('intents-list');
         elements.ledgerList = document.getElementById('ledger-list');
@@ -188,6 +190,13 @@
             elements.chainStatus.className = 'status-badge warning';
         }
 
+        // PR 4: render plain-language summary BEFORE the structured detail.
+        // The structured chain (allocations + intents + ledger) renders below
+        // unchanged inside the existing <details> wrapper; the summary leads
+        // with outcome / authority / hash / timestamp in plain language so a
+        // non-technical viewer can read the chain without parsing fields.
+        renderPlainLanguageSummary(allocations, intents, transactions, decisionHash);
+
         // Render allocations
         renderAllocations(allocations);
 
@@ -196,6 +205,146 @@
 
         // Render ledger entries (from transactions)
         renderLedgerEntries(transactions);
+    }
+
+    // PR 4: Plain-language summary above the existing chain detail.
+    // Reads only what the gateway already returned at /v1/receipts/chain
+    // and /v1/ledger/{coop}/entries/by-decision; no new endpoint, no new
+    // fetch. Built via DOM API (createElement / textContent) so user-
+    // controlled values cannot be injected as HTML.
+    function renderPlainLanguageSummary(allocations, intents, transactions, decisionHash) {
+        const container = elements.plainLanguageSummary;
+        if (!container) return;
+        // Replace any prior contents.
+        while (container.firstChild) container.removeChild(container.firstChild);
+
+        const total = allocations.length + intents.length + transactions.length;
+        if (total === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'empty-state';
+            empty.appendChild(document.createTextNode('No receipt-chain data found for decision '));
+            const code = document.createElement('code');
+            code.className = 'hash';
+            code.textContent = truncateHash(decisionHash);
+            empty.appendChild(code);
+            empty.appendChild(document.createTextNode('. Either the decision hash has not produced a chain yet, or the caller does not have access.'));
+            container.appendChild(empty);
+            return;
+        }
+
+        // Earliest timestamp across the data we have. Allocations carry
+        // createdAt; ledger transactions carry timestamp. Intents currently
+        // do not surface a top-level timestamp, so we omit them from the
+        // earliest-timestamp pick rather than make one up.
+        const candidates = [];
+        for (const a of allocations) {
+            if (a.createdAt) candidates.push(a.createdAt);
+        }
+        for (const t of transactions) {
+            if (t.timestamp) candidates.push(t.timestamp);
+        }
+        const earliest = candidates.length ? candidates.slice().sort()[0] : null;
+
+        // Authority basis: the allocation scope is the closest thing the
+        // chain currently surfaces to "under what governance authority did
+        // this happen?". If we have allocations, use the first allocation's
+        // scope; otherwise we say authority is unstated in the chain shape.
+        const scope = allocations.length && allocations[0].scope
+            ? allocations[0].scope
+            : null;
+
+        // Heading
+        const heading = document.createElement('h4');
+        heading.className = 'receipt-summary-heading';
+        heading.textContent = 'Receipt chain — plain-language summary';
+        container.appendChild(heading);
+
+        // Decision hash line
+        const decisionPara = document.createElement('p');
+        decisionPara.className = 'receipt-summary-decision';
+        decisionPara.appendChild(document.createTextNode('Decision hash: '));
+        const decisionCode = document.createElement('code');
+        decisionCode.className = 'hash';
+        decisionCode.title = decisionHash;
+        decisionCode.textContent = truncateHash(decisionHash);
+        decisionPara.appendChild(decisionCode);
+        container.appendChild(decisionPara);
+
+        // Outcome intro line
+        const outcomePara = document.createElement('p');
+        outcomePara.className = 'receipt-summary-outcome';
+        outcomePara.textContent = 'This decision produced:';
+        container.appendChild(outcomePara);
+
+        // Counts list
+        const list = document.createElement('ul');
+        list.className = 'receipt-summary-list';
+        const parts = [];
+        if (allocations.length) parts.push(`${allocations.length} allocation receipt${allocations.length === 1 ? '' : 's'}`);
+        if (intents.length) parts.push(`${intents.length} settlement intent${intents.length === 1 ? '' : 's'}`);
+        if (transactions.length) parts.push(`${transactions.length} ledger entr${transactions.length === 1 ? 'y' : 'ies'}`);
+        if (parts.length === 0) parts.push('nothing recorded under this decision yet');
+        for (const p of parts) {
+            const li = document.createElement('li');
+            li.textContent = p;
+            list.appendChild(li);
+        }
+        container.appendChild(list);
+
+        // Authority line
+        const authorityPara = document.createElement('p');
+        authorityPara.className = 'receipt-summary-authority';
+        if (scope) {
+            authorityPara.appendChild(document.createTextNode('Under governance scope '));
+            const scopeCode = document.createElement('code');
+            scopeCode.textContent = scope;
+            authorityPara.appendChild(scopeCode);
+            authorityPara.appendChild(document.createTextNode('.'));
+        } else {
+            authorityPara.textContent = 'Authority basis is not surfaced by the chain shape; consult the structured detail below.';
+        }
+        container.appendChild(authorityPara);
+
+        // Earliest timestamp line
+        const timePara = document.createElement('p');
+        timePara.className = 'receipt-summary-time';
+        if (earliest) {
+            timePara.appendChild(document.createTextNode('Earliest timestamp in this chain: '));
+            const strong = document.createElement('strong');
+            strong.textContent = formatTimestamp(earliest);
+            timePara.appendChild(strong);
+            timePara.appendChild(document.createTextNode('.'));
+        } else {
+            timePara.textContent = 'No timestamps surfaced.';
+        }
+        container.appendChild(timePara);
+
+        // Opaque-storage pinning explainer
+        const pinningPara = document.createElement('p');
+        pinningPara.className = 'receipt-summary-pinning';
+        pinningPara.appendChild(document.createTextNode('Receipt bytes are stored at the kernel as '));
+        const opaqueStrong = document.createElement('strong');
+        opaqueStrong.textContent = 'opaque records';
+        pinningPara.appendChild(opaqueStrong);
+        pinningPara.appendChild(document.createTextNode(' (per '));
+        const link = document.createElement('a');
+        link.href = 'https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/KERNEL_APP_SEPARATION.md';
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = 'Invariant 6';
+        pinningPara.appendChild(link);
+        pinningPara.appendChild(document.createTextNode('): the gateway pins each '));
+        const tupleCode = document.createElement('code');
+        tupleCode.textContent = '(class, record_hash)';
+        pinningPara.appendChild(tupleCode);
+        pinningPara.appendChild(document.createTextNode(' tuple atomically and refuses to remap a hash to a different secondary-index location, so the audit chain rendered below cannot fan out across timestamps after the fact.'));
+        container.appendChild(pinningPara);
+
+        // Steward note
+        const notePara = document.createElement('p');
+        notePara.className = 'receipt-summary-note';
+        notePara.textContent = 'The structured detail below shows the same data field-by-field for stewards and integrators.';
+        container.appendChild(notePara);
     }
 
     // Check if array is sorted

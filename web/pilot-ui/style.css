@@ -6357,3 +6357,95 @@ footer .sync-status.error {
     font-size: 0.85rem;
     border-radius: 3px;
 }
+
+/* ============================================================
+ * Receipt Plain-Language Summary (PR 4)
+ *
+ * Extends receipts.js with a plain-language framing block ABOVE
+ * the existing structured chain rendering. Reads only data the
+ * gateway already returns; no new endpoint. The structured chain
+ * detail is preserved below inside a <details> wrapper.
+ * ============================================================ */
+
+.receipt-plain-language-summary {
+    padding: 0.85rem 1rem;
+    margin: 0 0 1rem 0;
+    background: var(--bg-secondary, #f9fafb);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-left: 3px solid #2563eb;
+    border-radius: 6px;
+    line-height: 1.55;
+}
+
+.receipt-plain-language-summary .empty-state {
+    margin: 0;
+    color: var(--text-secondary, #6b7280);
+    font-style: italic;
+}
+
+.receipt-summary-heading {
+    margin: 0 0 0.6rem 0;
+    font-size: 1rem;
+}
+
+.receipt-summary-decision,
+.receipt-summary-outcome,
+.receipt-summary-authority,
+.receipt-summary-time,
+.receipt-summary-pinning,
+.receipt-summary-note {
+    margin: 0.4rem 0 0;
+}
+
+.receipt-summary-decision code.hash,
+.receipt-plain-language-summary code {
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+    font-size: 0.85rem;
+    background: var(--bg-primary, #fff);
+    padding: 0.05rem 0.4rem;
+    border-radius: 3px;
+    border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.receipt-summary-list {
+    margin: 0.25rem 0 0.5rem;
+    padding-left: 1.4rem;
+}
+
+.receipt-summary-list li {
+    margin-bottom: 0.15rem;
+}
+
+.receipt-summary-pinning {
+    font-size: 0.9rem;
+    color: var(--text-secondary, #4b5563);
+    border-top: 1px dashed var(--border-color, #e5e7eb);
+    padding-top: 0.5rem;
+    margin-top: 0.7rem;
+}
+
+.receipt-summary-note {
+    font-size: 0.85rem;
+    color: var(--text-secondary, #6b7280);
+    font-style: italic;
+}
+
+.receipt-structured-detail {
+    border-top: 1px solid var(--border-color, #e5e7eb);
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.receipt-structured-detail > summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-secondary, #4b5563);
+    padding: 0.4rem 0;
+    user-select: none;
+}
+
+.receipt-structured-detail > summary:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+    border-radius: 2px;
+}
