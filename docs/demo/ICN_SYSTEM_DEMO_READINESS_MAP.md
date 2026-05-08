@@ -44,9 +44,9 @@ The blocker is sharper than "no GUI":
 
 Concretely:
 
-- **Pilot UI is timebank-flavored.** It renders members, balances, proposals, votes, ledger, trust score, and an action-items list. It does not walk the §2 nine-step organizer narrative ([`docs/pilots/no-cli-organizer-member-rehearsal-workflow.md`](../pilots/no-cli-organizer-member-rehearsal-workflow.md)) as a guided flow.
-- **Action cards exist as data, not as cards.** [`GET /v1/gov/me/action-cards`](../api/) returns JSON; pilot-ui shows them as a flat list. There is no card-shaped UX surfacing authority basis, status, required decision, or reversibility window in the way the [`action-card.schema.json`](../contracts/institution-package/action-card.schema.json) supports.
-- **Receipts/provenance/evidence are JSON-only.** The opaque receipt storage stack (PRs #1755–#1759) lands `ProcessGateResultReceipt` durably; `GET /v1/receipts/chain/{decision_hash}` and the `/completion-receipt` endpoint return the data; no surface in pilot-ui renders them as plain-language status / authority / hash / timestamp.
+- **Pilot UI is timebank-flavored.** It renders members, balances, proposals, votes, ledger, trust score, and an Action Items tab driven by `loadActionItems()` (`web/pilot-ui/app.js:7040`) calling `/gov/domains/{domain_id}/action-items`. It does not walk the §2 nine-step organizer narrative ([`docs/pilots/no-cli-organizer-member-rehearsal-workflow.md`](../pilots/no-cli-organizer-member-rehearsal-workflow.md)) as a guided flow.
+- **Action cards are absent from pilot-ui entirely.** `GET /v1/gov/me/action-cards` returns JSON; **no pilot-ui code consumes that endpoint today** (verified by `grep -rn "action-cards" web/pilot-ui/`). Pilot-ui's "Action Items" tab is a different concept — it queries `/gov/domains/{domain_id}/action-items`, not the per-member action-cards stream. Card-shaped UX surfacing authority basis, status, required decision, or reversibility window per [`action-card.schema.json`](../contracts/institution-package/action-card.schema.json) does not exist in any pilot-ui surface.
+- **Receipts already have an HTML render surface; plain-language framing is the gap.** `web/pilot-ui/receipts.js` (~18 KB) queries `/v1/receipts/chain?decision_hash=...` and renders the chain + ledger as HTML via `renderResults()`. The opaque receipt storage stack (PRs #1755–#1759) lands `ProcessGateResultReceipt` durably under that surface. The remaining gap is **plain-language framing on top of the existing render** — status / authority / hash / timestamp summary stated *before* the structured chain — not absence of HTML rendering.
 - **No mode boundary.** Nothing on screen tells a viewer whether the data is fixture, demo-seed, devnet, or live. ICN [#1727](https://github.com/InterCooperative-Network/icn/issues/1727) (fixture-backed demo mode) is open and not implemented; no `--demo-mode` flag exists on `icnd`.
 - **Two web surfaces share a gateway.** `web/pilot-ui` and `web/dashboard` consume the same routes with different auth postures; there is no curated landing that explains which surface is "the demo."
 
@@ -58,9 +58,9 @@ Per the user-supplied scheme: **runtime implemented and GUI-visible / runtime im
 |---|---|---|
 | Identity / DID / standing | runtime + GUI-visible | `GET /v1/gov/me/standing` (#1627) consumed in pilot-ui dashboard |
 | Governance — proposals / voting / decision | runtime + GUI-visible | gateway routes; pilot-ui Governance tab |
-| Action cards | **runtime + only CLI/JSON-visible** | `GET /v1/gov/me/action-cards` (#1659) returns JSON; pilot-ui list, not card UX |
-| Receipts (governance / completion / attendance) | **runtime + only CLI/JSON-visible** | opaque storage stack #1755–#1759; `/v1/receipts/...` JSON; no HTML render |
-| Provenance / evidence | **runtime + only CLI/JSON-visible** | JSON only; no chain or timeline view |
+| Action cards | **runtime + missing in pilot-ui** | `GET /v1/gov/me/action-cards` (#1659) returns JSON; **no pilot-ui consumer** (the "Action Items" tab queries a different endpoint, `/gov/domains/{d}/action-items`) |
+| Receipts (governance / completion / attendance) | **runtime + GUI-visible (chain), plain-language framing absent** | opaque storage stack #1755–#1759; `web/pilot-ui/receipts.js` renders `/v1/receipts/chain` + ledger as HTML; raw structure shown without plain-language summary on top |
+| Provenance / evidence | **runtime + GUI-visible via receipts.js, plain-language framing absent** | same surface as receipts; chain HTML exists, status/authority/hash/timestamp summary not yet stated up front |
 | Obligations / allocations / settlement primitives | **runtime + only CLI/JSON-visible** | `/v1/receipts/allocations`, `/v1/receipts/intents` JSON; no UI |
 | Federation | runtime + only CLI/JSON-visible | `/v1/federation/peers` JSON; node-dashboard shows count only |
 | Private overlay / holder-label DID boundary | spec-only on substrate side | [`private-overlay-did-activation-flow.md`](../spec/private-overlay-did-activation-flow.md) is the substrate boundary; partner-package policy is required for activation; no runtime activation surface |
@@ -83,10 +83,10 @@ The pattern: **most ICN core functions are runtime-implemented and reachable thr
 |---|---|---|
 | 1 | Can a local ICN node/demo process run today? | **Yes.** `./demo/scripts/run-tool-library-demo.sh` boots icnd + gateway + pilot-ui in ~30 s. |
 | 2 | Can it serve standing? | **Yes.** `GET /v1/gov/me/standing`. Consumed in pilot-ui. |
-| 3 | Can it serve action cards? | **Yes (data).** `GET /v1/gov/me/action-cards` returns JSON. Pilot-ui shows as list, not card UX. |
+| 3 | Can it serve action cards? | **Yes (data); pilot-ui has no consumer.** `GET /v1/gov/me/action-cards` returns JSON. Pilot-ui's "Action Items" tab queries `/gov/domains/{d}/action-items` — a different endpoint and concept. The `action-cards` endpoint is not fetched by any pilot-ui code today. |
 | 4 | Can it show governance events / proposals? | **Yes.** Pilot-ui Governance tab; full create/vote flow. |
-| 5 | Can it produce or retrieve receipts? | **Yes (data).** Opaque receipt storage stack live (#1755–#1759); `GET /v1/receipts/...` returns JSON. **No HTML render.** |
-| 6 | Can it show provenance/evidence in plain language? | **No.** Only JSON; no plain-language renderer. |
+| 5 | Can it produce or retrieve receipts? | **Yes, with HTML rendering.** Opaque receipt storage stack live (#1755–#1759); `GET /v1/receipts/chain` returns JSON; `web/pilot-ui/receipts.js` already renders the chain + ledger as HTML. |
+| 6 | Can it show provenance/evidence in plain language? | **Partial.** `receipts.js` renders chain HTML; **plain-language framing on top** (status / authority / hash / timestamp summary stated before the structured detail) is the remaining gap. |
 | 7 | Can it distinguish fixture / local / demo / live state? | **No.** No mode indicator on any UI; gateway has no `--demo-mode` flag. |
 | 8 | Is there an organizer/member GUI connected to any of this? | **Partial.** Pilot-ui (timebank-flavored) consumes standing, proposals, transactions, action items. **Does not** implement the §2 narrative as a guided flow. |
 | 9 | What still requires CLI? | Initial keystore (`icnctl id init`), token generation, gateway start, devnet bring-up, `icnctl audit verify`, all icn-console operations. |
@@ -135,35 +135,38 @@ This sequence is the actionable output of the discovery. Each PR is **small** (s
   - `web/pilot-ui/tests/e2e/` — one Playwright test for landing → next-section flow
 - **Out of scope:** card-shaped action cards (PR 3), receipt/provenance plain-language render (PR 4), gateway-side fixture mode (PR 5).
 
-### PR 3 — pilot-ui action cards rendered as real cards (not flat list)
+### PR 3 — pilot-ui action cards: add the missing fetch and render as real cards
 
-- **What:** replace the current flat-list rendering of `/v1/gov/me/action-cards` with a card-shaped UX surfacing the fields the [`action-card.schema.json`](../contracts/institution-package/action-card.schema.json) supports: source kind, action kind, authority basis, status, required decision, reversibility window, plain-language summary.
-- **Why:** the §2 narrative talks about action *cards*; today's pilot-ui shows them as a list, which conflates them with action items. This is the smallest UX change that makes the no-CLI organizer narrative recognizable in pilot-ui.
-- **What runs after this PR:** the same gateway data is rendered with card layout, plain-language framing, and explicit authority basis / reversibility windows, matching the deck wireframes used in the NYCN-side rehearsal record ([NYCN PR #65](https://github.com/InterCooperative-Network/cooperative-network/pull/65)).
-- **Backend change required?** **No.** Data already exists at the route.
+- **What:** **Add a new pilot-ui consumer** for `GET /v1/gov/me/action-cards` (the per-member action-cards endpoint), separate from the existing "Action Items" tab (which calls `/gov/domains/{d}/action-items` — a different endpoint and concept). Render the action-cards stream as a card-shaped UX surfacing fields per [`action-card.schema.json`](../contracts/institution-package/action-card.schema.json): source kind, action kind, authority basis, status, required decision, reversibility window, plain-language summary.
+- **Why:** the §2 narrative talks about action *cards* as the per-member queue; pilot-ui today does not fetch `me/action-cards` from any code path (verified by `grep -rn "action-cards" web/pilot-ui/`). The "Action Items" tab is for the per-domain action-item ledger, a different surface. Without this PR, a viewer following the §2 narrative will look for "their action cards" in pilot-ui and find no surface that matches.
+- **What runs after this PR:** opening the new Action Cards section shows the per-member action-cards queue with card layout, plain-language framing, and explicit authority basis / reversibility windows — matching the deck wireframes used in the NYCN-side rehearsal record ([NYCN PR #65](https://github.com/InterCooperative-Network/cooperative-network/pull/65)). The existing Action Items tab is unchanged.
+- **Backend change required?** **No.** The endpoint already exists (#1659).
+- **Naming note:** name the new pilot-ui section "Action Cards" distinct from "Action Items" to preserve the conceptual split. Implementers should not collapse them.
 - **Non-claims:**
-  - Card rendering is a UI presentation choice; it does not change the gateway contract or the schema.
+  - Adds a new pilot-ui consumer for an existing gateway endpoint; does not change the gateway contract or schema.
+  - Does not modify or replace the existing Action Items tab.
   - RFC-gated source kinds (signal_rule, obligation_lifecycle per the schema's `x-icn-rfc-gated-source-kinds`) appear as **Not implemented** placeholders; no false RFC promotion.
 - **Files (estimated):**
-  - `web/pilot-ui/app.js` — replace list renderer with card renderer for the `actionItems` / `actionCards` sections
-  - `web/pilot-ui/index.html` — card template
-  - `web/pilot-ui/style.css` — card styling
-- **Out of scope:** new schema fields, new endpoint, mutation flows beyond what already exists.
+  - `web/pilot-ui/app.js` — new fetch (`loadActionCards()` paralleling `loadActionItems()`) + card renderer
+  - `web/pilot-ui/index.html` — new tab + card template
+  - `web/pilot-ui/style.css` — card styling (may share patterns with action-items styles but should not collide)
+- **Out of scope:** new schema fields, new endpoint, mutation flows, modifications to the existing Action Items tab.
 
-### PR 4 — plain-language receipt / provenance panel in pilot-ui
+### PR 4 — extend the existing receipts.js with plain-language framing
 
-- **What:** in pilot-ui's existing Receipts tab, render the chain / completion-receipt / attendance / allocation responses as plain-language status / authority / hash / timestamp summaries with raw JSON behind a disclosure (`<details>`-style fold) rather than as the primary surface.
-- **Why:** receipts are the audit-chain backbone of every ICN claim. Today they are JSON-only, which makes the demo unreadable for non-technical viewers and conflates "real receipt" with "API trace."
-- **What runs after this PR:** clicking a decision shows "Decision X passed on date Y under authority Z; receipt hash H pinned in opaque storage" *first*; the JSON sibling is one click away for stewards.
-- **Backend change required?** **No.** Data already exists at `/v1/receipts/chain/{decision_hash}` and the `/completion-receipt` endpoint.
+- **What:** extend the **existing** receipt rendering in `web/pilot-ui/receipts.js` (`renderResults()`, `query-chain` flow) to lead with a plain-language status / authority / hash / timestamp summary **before** the existing chain + ledger HTML; keep the structured chain + ledger view as the supporting detail. Implementers should work from `receipts.js` rather than introduce a parallel surface.
+- **Why:** receipts are the audit-chain backbone of every ICN claim. The chain renders as HTML today, which is good — but it leads with structure, not meaning. A non-technical viewer looking at the existing surface sees hashes and field names before they see "Decision X passed on date Y under authority Z." Adding plain-language framing on top of what's there closes that gap without parallel surfaces.
+- **What runs after this PR:** the same Receipts tab; same `query-chain` flow; same chain + ledger detail at the bottom — but the top of the rendered result is now a plain-language sentence stating outcome / authority / hash / timestamp. The structured detail remains visible (one scroll, not one click) for stewards.
+- **Backend change required?** **No.** Data already exists at `/v1/receipts/chain` and is already fetched by `receipts.js`.
 - **Non-claims:**
-  - Plain-language summaries do not replace the JSON record; both are visible.
+  - Extends existing rendering; does not replace or duplicate it.
+  - Plain-language summaries do not replace the JSON / chain record; both are visible on the same surface.
   - "Pinned in opaque storage" cites the [Invariant 6](../architecture/KERNEL_APP_SEPARATION.md) language verbatim — it is the kernel-blind storage primitive, not a trust claim.
 - **Files (estimated):**
-  - `web/pilot-ui/app.js` — receipt renderer
-  - `web/pilot-ui/index.html` — receipt panel template
-  - `web/pilot-ui/style.css` — disclosure styling
-- **Out of scope:** new receipt classes, new endpoints, structured proof verification (different runtime scope).
+  - `web/pilot-ui/receipts.js` — extend `renderResults()` with plain-language summary block
+  - `web/pilot-ui/index.html` — minor markup adjustment for the summary block above the existing chain results
+  - `web/pilot-ui/style.css` — summary styling
+- **Out of scope:** new receipt classes, new endpoints, structured proof verification (different runtime scope), parallel rendering surfaces.
 
 ### PR 5 — fixture-backed local demo mode / stable demo data loader (advances ICN #1727)
 
