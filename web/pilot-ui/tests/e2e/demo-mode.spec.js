@@ -45,13 +45,19 @@ test.describe('Demo Mode (PR 2)', () => {
         await expect(message).toContainText('labeling convention');
     });
 
-    test('?mode=demo → Demo Guide nav button is visible and clickable', async ({ page }) => {
+    test('?mode=demo → Demo Guide nav button has its hidden class removed (visible once main-screen shows post-login)', async ({ page }) => {
         await page.goto('/?mode=demo');
         await page.waitForLoadState('networkidle');
 
+        // The nav button lives inside #main-screen, which carries the
+        // .hidden class until login completes. We assert the button's
+        // OWN .hidden class was removed by applyDemoMode() — that is
+        // what determines whether the button will be visible once
+        // #main-screen unhides post-login. We do not drive the full
+        // login flow here because PR 2 must not require a working
+        // gateway for these e2e checks.
         const navBtn = page.locator('#demo-guide-nav-btn');
         await expect(navBtn).not.toHaveClass(/hidden/);
-        await expect(navBtn).toBeVisible();
     });
 
     test('Demo Guide section contains required content blocks (no fetch)', async ({ page }) => {

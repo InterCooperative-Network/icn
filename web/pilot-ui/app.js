@@ -3088,6 +3088,20 @@ elements.navBtns.forEach(btn => {
 // happens at refreshDemoGuideContext() call sites in the login flow.
 applyDemoMode();
 
+// PR 2 — Demo Guide "Available now" links route to existing tabs via
+// switchTab(). Anchors have href="#tabId" for keyboard / accessibility
+// (focus, screen-reader announcement) but the hash navigation does not
+// itself activate a tab — switchTab() owns that. preventDefault() to
+// avoid a no-op hash change.
+document.addEventListener('click', (e) => {
+    const link = e.target.closest && e.target.closest('[data-demo-target]');
+    if (!link) return;
+    const target = link.dataset.demoTarget;
+    if (!target) return;
+    e.preventDefault();
+    switchTab(target);
+});
+
 // Enter key on login form
 elements.token.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') login();
