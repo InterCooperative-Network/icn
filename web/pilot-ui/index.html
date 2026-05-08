@@ -658,7 +658,7 @@
                 <button class="nav-btn" data-tab="member-profile">
                     <span aria-label="Your profile">Profile</span>
                 </button>
-                <button class="nav-btn" data-tab="my-standing">
+                <button class="nav-btn" data-tab="my-standing" id="tab-my-standing">
                     <span aria-label="My standing in this institution and my pending action cards">My Standing &amp; Action Cards</span>
                 </button>
                 <button class="nav-btn" data-tab="governance">
@@ -1738,10 +1738,10 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
                 <section class="member-action-cards-section" aria-labelledby="member-action-cards-heading">
                     <h2 id="member-action-cards-heading">Action Cards</h2>
                     <p class="member-action-cards-intro">
-                        Your queue of actions across all governance domains. Each card surfaces who has authority, what is required, and whether completing the action produces a receipt. This view reads the per-member <code>/v1/gov/me/action-cards</code> read-model (#1659) and is <strong>distinct</strong> from the per-domain <a href="#governance" data-target="governance">Action Items tab</a>, which uses a different endpoint and concept.
+                        Your queue of actions across all governance domains. Each card surfaces who has authority, what is required, and whether completing the action produces a receipt. This view reads the per-member <code>/v1/gov/me/action-cards</code> read-model (#1659) and is <strong>distinct</strong> from the per-domain <a href="#governance" data-demo-target="governance">Action Items tab</a>, which uses a different endpoint and concept.
                     </p>
                     <div id="member-action-cards-list" class="member-action-cards-list" role="list" aria-live="polite">
-                        <p class="empty-state">Loading action cards&hellip;</p>
+                        <p class="empty-state" role="listitem">Loading action cards&hellip;</p>
                     </div>
                 </section>
             </main>

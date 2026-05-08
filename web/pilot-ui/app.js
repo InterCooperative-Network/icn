@@ -7348,6 +7348,9 @@ function renderMemberActionCards() {
     if (cards.length === 0) {
         const empty = document.createElement('p');
         empty.className = 'empty-state';
+        // The container has role="list", so non-card children must
+        // carry role="listitem" to keep AT semantics consistent.
+        empty.setAttribute('role', 'listitem');
         empty.textContent = 'No action cards in your queue.';
         container.appendChild(empty);
         return;

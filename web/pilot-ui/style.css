@@ -6302,17 +6302,18 @@ footer .sync-status.error {
     color: #6d28d9;
 }
 
+/* Per action-card.schema.json, risk_level enum is `low | normal | elevated`. */
 .member-action-card .badge-risk-low {
     background: rgba(22, 163, 74, 0.14);
     color: #15803d;
 }
 
-.member-action-card .badge-risk-medium {
+.member-action-card .badge-risk-normal {
     background: rgba(245, 158, 11, 0.14);
     color: #b45309;
 }
 
-.member-action-card .badge-risk-high {
+.member-action-card .badge-risk-elevated {
     background: rgba(220, 38, 38, 0.14);
     color: #b91c1c;
 }
