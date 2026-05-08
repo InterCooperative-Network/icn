@@ -658,6 +658,9 @@
                 <button class="nav-btn" data-tab="member-profile">
                     <span aria-label="Your profile">Profile</span>
                 </button>
+                <button class="nav-btn" data-tab="my-standing" id="tab-my-standing">
+                    <span aria-label="My standing in this institution and my pending action cards">My Standing &amp; Action Cards</span>
+                </button>
                 <button class="nav-btn" data-tab="governance">
                     <span aria-label="Governance and proposals">Governance</span>
                 </button>
@@ -1719,6 +1722,28 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
                         </div>
                     </div>
                 </div>
+            </main>
+
+            <!-- My Standing & Action Cards (PR 3 — answers "Who am I, what is my standing, what can I do?") -->
+            <main id="my-standing" class="tab-content" role="tabpanel" aria-labelledby="tab-my-standing">
+                <section class="member-standing-section" aria-labelledby="member-standing-heading">
+                    <h2 id="member-standing-heading">My Standing</h2>
+                    <p class="member-standing-intro">
+                        Who you are in this institution: domain memberships, role assignments, and the union of authority scopes that follow from those roles. This view reads the per-member <code>/v1/gov/me/standing</code> read-model (#1627). The trust graph is the source of truth for trust-threshold memberships; rows marked <strong>unverified</strong> indicate the read-model deferred to the trust graph rather than evaluating membership here.
+                    </p>
+                    <div id="member-standing-content" class="member-standing-content" aria-live="polite">
+                        <p class="empty-state">Loading standing&hellip;</p>
+                    </div>
+                </section>
+                <section class="member-action-cards-section" aria-labelledby="member-action-cards-heading">
+                    <h2 id="member-action-cards-heading">Action Cards</h2>
+                    <p class="member-action-cards-intro">
+                        Your queue of actions across all governance domains. Each card surfaces who has authority, what is required, and whether completing the action produces a receipt. This view reads the per-member <code>/v1/gov/me/action-cards</code> read-model (#1659) and is <strong>distinct</strong> from the per-domain <a href="#governance" data-demo-target="governance">Action Items tab</a>, which uses a different endpoint and concept.
+                    </p>
+                    <div id="member-action-cards-list" class="member-action-cards-list" role="list" aria-live="polite">
+                        <p class="empty-state" role="listitem">Loading action cards&hellip;</p>
+                    </div>
+                </section>
             </main>
 
             <!-- Governance Tab -->

@@ -6106,3 +6106,254 @@ footer .sync-status.error {
 .demo-guide-non-claims li:last-child {
     margin-bottom: 0;
 }
+
+/* ============================================================
+ * My Standing & Action Cards (PR 3)
+ *
+ * Combined member surface — answers the organizer/member
+ * question: "Who am I, what's my standing, what can I do?".
+ * Standing renders as the framing context above the action-cards
+ * queue. Distinct from the per-domain "Action Items" tab.
+ * ============================================================ */
+
+.member-standing-section,
+.member-action-cards-section {
+    max-width: 80ch;
+    padding: 0.5rem 0 1.5rem;
+}
+
+.member-standing-section h2,
+.member-action-cards-section h2 {
+    margin: 0 0 0.5rem 0;
+}
+
+.member-standing-section h3 {
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    padding-bottom: 0.25rem;
+    font-size: 1.05rem;
+}
+
+.member-standing-intro,
+.member-action-cards-intro {
+    color: var(--text-secondary, #4b5563);
+    line-height: 1.55;
+    margin-bottom: 0.75rem;
+}
+
+.member-standing-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.standing-id-block {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.4rem 1rem;
+    padding: 0.6rem 0.9rem;
+    background: var(--bg-secondary, #f9fafb);
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    margin: 0;
+}
+
+.standing-id-block dt {
+    font-weight: 600;
+}
+
+.standing-id-block dd {
+    margin: 0;
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+    font-size: 0.9rem;
+}
+
+.standing-id-block .did-display {
+    word-break: break-all;
+}
+
+.standing-domain-list,
+.standing-role-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.standing-domain,
+.standing-role {
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary, #f9fafb);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 6px;
+    line-height: 1.5;
+}
+
+.standing-domain-id,
+.standing-role-structure,
+.standing-source {
+    color: var(--text-secondary, #6b7280);
+    font-size: 0.9rem;
+    margin-left: 0.4rem;
+}
+
+.standing-status {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.standing-status-member {
+    background: rgba(22, 163, 74, 0.14);
+    color: #15803d;
+}
+
+.standing-status-unverified {
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+}
+
+.standing-role-scope {
+    margin-top: 0.35rem;
+    font-size: 0.9rem;
+}
+
+.standing-role-scope-label {
+    color: var(--text-secondary, #6b7280);
+}
+
+.standing-scope-badge {
+    display: inline-block;
+    margin: 0.1rem 0.25rem 0.1rem 0;
+    padding: 0.05rem 0.45rem;
+    background: rgba(37, 99, 235, 0.10);
+    color: #1d4ed8;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+}
+
+.standing-scope-union {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+/* Action card list */
+.member-action-cards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.member-action-card {
+    padding: 0.85rem 1rem;
+    background: var(--bg-secondary, #f9fafb);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 8px;
+    line-height: 1.5;
+}
+
+.member-action-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.member-action-card-header h4 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.member-action-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.member-action-card .badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.member-action-card .badge-source {
+    background: rgba(37, 99, 235, 0.14);
+    color: #1d4ed8;
+}
+
+.member-action-card .badge-action {
+    background: rgba(124, 58, 237, 0.14);
+    color: #6d28d9;
+}
+
+/* Per action-card.schema.json, risk_level enum is `low | normal | elevated`. */
+.member-action-card .badge-risk-low {
+    background: rgba(22, 163, 74, 0.14);
+    color: #15803d;
+}
+
+.member-action-card .badge-risk-normal {
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+}
+
+.member-action-card .badge-risk-elevated {
+    background: rgba(220, 38, 38, 0.14);
+    color: #b91c1c;
+}
+
+.member-action-card-summary {
+    margin: 0.5rem 0 0;
+}
+
+.member-action-card-authority {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.3rem 1rem;
+    margin: 0.6rem 0 0;
+    padding: 0.4rem 0.7rem;
+    background: var(--bg-primary, #fff);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.member-action-card-authority dt {
+    font-weight: 600;
+    color: var(--text-secondary, #4b5563);
+}
+
+.member-action-card-authority dd {
+    margin: 0;
+}
+
+.member-action-card-accessibility {
+    margin: 0.4rem 0 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary, #4b5563);
+}
+
+.member-action-card-receipt-expected {
+    margin: 0.4rem 0 0;
+    padding: 0.25rem 0.55rem;
+    background: rgba(22, 163, 74, 0.08);
+    border-left: 3px solid #15803d;
+    color: #15803d;
+    font-size: 0.85rem;
+    border-radius: 3px;
+}

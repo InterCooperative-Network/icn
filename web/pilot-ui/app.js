@@ -89,6 +89,12 @@ const state = {
     wsConnected: false,
     nameCache: new Map(),
     userName: null,
+    // PR 3 — Member standing read-model + per-member action cards.
+    // Both endpoints exist on the gateway; pilot-ui consumes them via
+    // the "My Standing & Action Cards" tab. Distinct from `actionItems`
+    // above (per-domain ledger via /gov/domains/{d}/action-items).
+    memberStanding: null,
+    memberActionCards: [],
 };
 
 // DOM Elements
@@ -3082,6 +3088,21 @@ elements.logHoursForm.addEventListener('submit', logHours);
 elements.navBtns.forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
+
+// PR 3 — Lazy-load /me/standing and /me/action-cards when the user
+// opens the "My Standing & Action Cards" tab for the first time per
+// session. Subsequent opens re-fetch (cheap) so the user sees current
+// state. Hooked off the existing nav-btn click rather than added to
+// switchTab() because switchTab() is also called programmatically
+// (e.g. PR 2's auto-activate-on-?mode=demo) and we don't want that
+// path to trigger fetches for the wrong tab.
+const myStandingNavBtn = document.querySelector('[data-tab="my-standing"]');
+if (myStandingNavBtn) {
+    myStandingNavBtn.addEventListener('click', () => {
+        loadMemberStanding();
+        loadMemberActionCards();
+    });
+}
 
 // PR 2 — paint the demo-mode banner and Demo Guide nav button as soon
 // as the DOM has the elements wired. Idempotent; refresh of DID/gateway
@@ -7140,6 +7161,302 @@ async function loadActionItems() {
             elements.actionItemsList.appendChild(emptyState);
         }
     }
+}
+
+// =====================================================================
+// PR 3 — Member Standing + Action Cards
+//
+// Adds two new pilot-ui consumers:
+//   - GET /v1/gov/me/standing       (#1627)  -> state.memberStanding
+//   - GET /v1/gov/me/action-cards   (#1659)  -> state.memberActionCards
+//
+// Renders them as one combined member surface answering the organizer
+// /member question: "Who am I, what's my standing, what can I do?"
+//
+// Distinct from the existing "Action Items" tab (per-domain ledger via
+// /gov/domains/{d}/action-items) — different endpoint, different
+// concept. Card rendering uses the actual fields in
+// docs/contracts/institution-package/action-card.schema.json: title,
+// summary, source_kind, action_kind, authority_basis,
+// required_authority_scope, deadline (optional), risk_level,
+// accessibility_hint, receipt_expected.
+// =====================================================================
+
+async function loadMemberStanding() {
+    try {
+        const response = await apiRequest('GET', '/gov/me/standing');
+        state.memberStanding = response || null;
+    } catch (error) {
+        console.error('Failed to load member standing:', error);
+        state.memberStanding = null;
+    }
+    renderMemberStanding();
+}
+
+async function loadMemberActionCards() {
+    try {
+        const response = await apiRequest('GET', '/gov/me/action-cards');
+        state.memberActionCards = Array.isArray(response)
+            ? response
+            : (response && Array.isArray(response.cards) ? response.cards : []);
+    } catch (error) {
+        console.error('Failed to load member action cards:', error);
+        state.memberActionCards = [];
+    }
+    renderMemberActionCards();
+}
+
+function renderMemberStanding() {
+    const container = document.getElementById('member-standing-content');
+    if (!container) return;
+    container.textContent = '';
+
+    const standing = state.memberStanding;
+    if (!standing) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-state';
+        empty.textContent = 'Standing not yet loaded — sign in and visit this tab to fetch /v1/gov/me/standing.';
+        container.appendChild(empty);
+        return;
+    }
+
+    // DID + display label header
+    const didBlock = document.createElement('dl');
+    didBlock.className = 'standing-id-block';
+    const didDt = document.createElement('dt');
+    didDt.textContent = 'DID';
+    const didDd = document.createElement('dd');
+    didDd.className = 'did-display';
+    didDd.textContent = standing.did || state.did || '—';
+    didBlock.appendChild(didDt);
+    didBlock.appendChild(didDd);
+    if (standing.display_label) {
+        const labelDt = document.createElement('dt');
+        labelDt.textContent = 'Display label';
+        const labelDd = document.createElement('dd');
+        labelDd.textContent = standing.display_label;
+        didBlock.appendChild(labelDt);
+        didBlock.appendChild(labelDd);
+    }
+    container.appendChild(didBlock);
+
+    // Domains
+    const domainsHeading = document.createElement('h3');
+    domainsHeading.textContent = 'Domain memberships';
+    container.appendChild(domainsHeading);
+    const domains = Array.isArray(standing.domains) ? standing.domains : [];
+    if (domains.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-state';
+        empty.textContent = 'No domain memberships recorded.';
+        container.appendChild(empty);
+    } else {
+        const domainList = document.createElement('ul');
+        domainList.className = 'standing-domain-list';
+        domains.forEach((d) => {
+            const li = document.createElement('li');
+            li.className = 'standing-domain';
+            const name = document.createElement('strong');
+            name.textContent = d.domain_name || d.domain_id || '(unnamed domain)';
+            li.appendChild(name);
+            const id = document.createElement('span');
+            id.className = 'standing-domain-id';
+            id.textContent = ` (${d.domain_id || ''})`;
+            li.appendChild(id);
+            const status = document.createElement('span');
+            status.className = `standing-status standing-status-${d.status || 'unknown'}`;
+            status.textContent = d.status || 'unknown';
+            li.appendChild(status);
+            const source = document.createElement('span');
+            source.className = 'standing-source';
+            source.textContent = `via ${d.membership_source || 'unknown'}`;
+            li.appendChild(source);
+            domainList.appendChild(li);
+        });
+        container.appendChild(domainList);
+    }
+
+    // Roles
+    const rolesHeading = document.createElement('h3');
+    rolesHeading.textContent = 'Role assignments';
+    container.appendChild(rolesHeading);
+    const roles = Array.isArray(standing.roles) ? standing.roles : [];
+    if (roles.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-state';
+        empty.textContent = 'No role assignments recorded.';
+        container.appendChild(empty);
+    } else {
+        const roleList = document.createElement('ul');
+        roleList.className = 'standing-role-list';
+        roles.forEach((r) => {
+            const li = document.createElement('li');
+            li.className = 'standing-role';
+            const role = document.createElement('strong');
+            role.textContent = r.role || '(unnamed role)';
+            li.appendChild(role);
+            if (r.structure_name || r.structure_id) {
+                const structure = document.createElement('span');
+                structure.className = 'standing-role-structure';
+                structure.textContent = ` in ${r.structure_name || r.structure_id}`;
+                li.appendChild(structure);
+            }
+            if (Array.isArray(r.authority_scope) && r.authority_scope.length > 0) {
+                const scopeWrap = document.createElement('div');
+                scopeWrap.className = 'standing-role-scope';
+                const label = document.createElement('span');
+                label.className = 'standing-role-scope-label';
+                label.textContent = 'Authority scope: ';
+                scopeWrap.appendChild(label);
+                r.authority_scope.forEach((s) => {
+                    const badge = document.createElement('span');
+                    badge.className = 'standing-scope-badge';
+                    badge.textContent = s;
+                    scopeWrap.appendChild(badge);
+                });
+                li.appendChild(scopeWrap);
+            }
+            roleList.appendChild(li);
+        });
+        container.appendChild(roleList);
+    }
+
+    // Authority scopes union
+    const scopes = Array.isArray(standing.authority_scopes) ? standing.authority_scopes : [];
+    if (scopes.length > 0) {
+        const scopesHeading = document.createElement('h3');
+        scopesHeading.textContent = 'Authority scopes (union)';
+        container.appendChild(scopesHeading);
+        const scopeWrap = document.createElement('div');
+        scopeWrap.className = 'standing-scope-union';
+        scopes.forEach((s) => {
+            const badge = document.createElement('span');
+            badge.className = 'standing-scope-badge';
+            badge.textContent = s;
+            scopeWrap.appendChild(badge);
+        });
+        container.appendChild(scopeWrap);
+    }
+}
+
+function renderMemberActionCards() {
+    const container = document.getElementById('member-action-cards-list');
+    if (!container) return;
+    container.textContent = '';
+
+    const cards = Array.isArray(state.memberActionCards) ? state.memberActionCards : [];
+    if (cards.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-state';
+        // The container has role="list", so non-card children must
+        // carry role="listitem" to keep AT semantics consistent.
+        empty.setAttribute('role', 'listitem');
+        empty.textContent = 'No action cards in your queue.';
+        container.appendChild(empty);
+        return;
+    }
+
+    cards.forEach((card) => {
+        container.appendChild(buildMemberActionCardElement(card));
+    });
+}
+
+function buildMemberActionCardElement(card) {
+    const article = document.createElement('article');
+    article.className = 'member-action-card';
+    article.setAttribute('role', 'listitem');
+    const titleId = `member-action-card-${(card.id || 'untitled').replace(/[^a-z0-9-]/gi, '_')}`;
+    article.setAttribute('aria-labelledby', titleId);
+
+    // Header — title + source / action / risk badges
+    const header = document.createElement('header');
+    header.className = 'member-action-card-header';
+    const title = document.createElement('h4');
+    title.id = titleId;
+    title.textContent = card.title || '(untitled action)';
+    header.appendChild(title);
+
+    const badges = document.createElement('div');
+    badges.className = 'member-action-card-badges';
+    if (card.source_kind) {
+        const b = document.createElement('span');
+        b.className = 'badge badge-source';
+        b.textContent = card.source_kind;
+        badges.appendChild(b);
+    }
+    if (card.action_kind) {
+        const b = document.createElement('span');
+        b.className = 'badge badge-action';
+        b.textContent = card.action_kind;
+        badges.appendChild(b);
+    }
+    if (card.risk_level) {
+        const b = document.createElement('span');
+        b.className = `badge badge-risk badge-risk-${String(card.risk_level).toLowerCase()}`;
+        b.textContent = `risk: ${card.risk_level}`;
+        badges.appendChild(b);
+    }
+    header.appendChild(badges);
+    article.appendChild(header);
+
+    // Plain-language summary
+    if (card.summary) {
+        const summary = document.createElement('p');
+        summary.className = 'member-action-card-summary';
+        summary.textContent = card.summary;
+        article.appendChild(summary);
+    }
+
+    // Authority basis + scope + deadline
+    const authority = document.createElement('dl');
+    authority.className = 'member-action-card-authority';
+    if (card.authority_basis) {
+        const dt = document.createElement('dt'); dt.textContent = 'Authority';
+        const dd = document.createElement('dd'); dd.textContent = card.authority_basis;
+        authority.appendChild(dt); authority.appendChild(dd);
+    }
+    if (Array.isArray(card.required_authority_scope) && card.required_authority_scope.length > 0) {
+        const dt = document.createElement('dt'); dt.textContent = 'Required scope';
+        const dd = document.createElement('dd'); dd.textContent = card.required_authority_scope.join(', ');
+        authority.appendChild(dt); authority.appendChild(dd);
+    }
+    if (card.deadline !== undefined && card.deadline !== null) {
+        const dt = document.createElement('dt'); dt.textContent = 'Deadline';
+        const dd = document.createElement('dd');
+        // formatDateTime exists elsewhere in app.js; fall back to a Date conversion
+        // when it is not in scope yet (defensive — shouldn't happen in practice).
+        const t = Number(card.deadline);
+        if (Number.isFinite(t) && typeof formatDateTime === 'function') {
+            dd.textContent = formatDateTime(t);
+        } else {
+            dd.textContent = String(card.deadline);
+        }
+        authority.appendChild(dt); authority.appendChild(dd);
+    }
+    if (authority.children.length > 0) {
+        article.appendChild(authority);
+    }
+
+    // Accessibility hint (schema field — surface explicitly)
+    if (card.accessibility_hint) {
+        const hint = document.createElement('p');
+        hint.className = 'member-action-card-accessibility';
+        const label = document.createElement('strong');
+        label.textContent = 'Accessibility: ';
+        hint.appendChild(label);
+        hint.appendChild(document.createTextNode(card.accessibility_hint));
+        article.appendChild(hint);
+    }
+
+    // Receipt-expected indicator
+    if (card.receipt_expected) {
+        const r = document.createElement('p');
+        r.className = 'member-action-card-receipt-expected';
+        r.textContent = 'Completing this action will produce a receipt.';
+        article.appendChild(r);
+    }
+
+    return article;
 }
 
 function renderActionItems() {
