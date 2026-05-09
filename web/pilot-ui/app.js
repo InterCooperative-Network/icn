@@ -29,7 +29,7 @@ const DEMO_MODE = (() => {
     }
 })();
 const DEMO_MODE_MESSAGES = {
-    demo:    'Local organizer/member demo. Standing and action cards are fixture-backed; governance, receipts, ledger, members, trust, and federation are not fixture-backed yet.',
+    demo:    'Local organizer/member demo. Only Standing and Action Cards are fixture-backed today.',
     fixture: 'UI is in FIXTURE mode — committed test data only; not real participant state.',
     devnet:  'UI is in DEVNET mode — local 3-node Docker cluster; not production.',
     local:   'UI is in LOCAL mode — single-node local gateway.',
@@ -70,6 +70,10 @@ function applyDemoMode() {
     // direct hash-link still works for adjacent tools.
     if (DEMO_MODE === 'demo') {
         try { document.title = DEMO_TITLE; } catch (_) { /* noop */ }
+        // Mark body so demo-mode-only CSS (wider main, action-cards
+        // grid, etc.) can target the right scope without leaking
+        // into non-demo pages.
+        if (document.body) document.body.setAttribute('data-demo-mode', 'true');
         const headerTitle = document.getElementById('app-title-header');
         if (headerTitle) headerTitle.textContent = DEMO_TITLE;
         const loginTitle = document.getElementById('app-title-login');
@@ -86,6 +90,79 @@ function applyDemoMode() {
             el.removeAttribute('aria-current');
         });
     }
+}
+
+// Build a "this surface is gateway-backed and not fixture-backed in this
+// demo" placeholder for tabs whose default UI (Loading… spinners, sign-in
+// hints, hash-query forms) is honest only when a real gateway is present.
+// Demo mode hides those default chunks and shows this card instead so the
+// page reads as intentional rather than broken.
+function makeDemoTabPlaceholder(displayName) {
+    const wrapper = document.createElement('section');
+    wrapper.className = 'demo-tab-placeholder';
+    wrapper.setAttribute('aria-label', `Demo placeholder for ${displayName}`);
+
+    const card = document.createElement('div');
+    card.className = 'demo-tab-placeholder-card';
+
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'demo-tab-placeholder-eyebrow';
+    eyebrow.textContent = 'Demo mode · Gateway-backed';
+
+    const heading = document.createElement('h2');
+    heading.textContent = displayName;
+
+    const lead = document.createElement('p');
+    lead.className = 'demo-tab-placeholder-lead';
+    lead.textContent = `${displayName} is visible in pilot-ui but is not fixture-backed in this demo.`;
+
+    const body = document.createElement('p');
+    body.textContent = `With a running gateway and the right token, this surface would render real ${displayName.toLowerCase()} state. The committed local-demo fixtures cover Standing and Action Cards only.`;
+
+    const note = document.createElement('p');
+    note.className = 'demo-tab-placeholder-note';
+    note.appendChild(document.createTextNode('See the '));
+    const a = document.createElement('a');
+    a.href = '#';
+    a.dataset.demoTarget = 'demo-guide';
+    a.textContent = 'Demo Guide';
+    note.appendChild(a);
+    note.appendChild(document.createTextNode(' for the full label of what is and is not fixture-backed today.'));
+
+    card.appendChild(eyebrow);
+    card.appendChild(heading);
+    card.appendChild(lead);
+    card.appendChild(body);
+    card.appendChild(note);
+    wrapper.appendChild(card);
+    return wrapper;
+}
+
+function injectDemoTabPlaceholders() {
+    if (DEMO_MODE !== 'demo') return;
+    const targets = [
+        ['governance', 'Governance'],
+        ['federation', 'Federation'],
+        ['receipts',   'Receipts'],
+    ];
+    for (const [tabId, displayName] of targets) {
+        const tab = document.getElementById(tabId);
+        if (!tab) continue;
+        if (tab.dataset.demoPlaceholderInjected === 'true') continue;
+        // Hide every existing child of the tab so default content
+        // (sub-tab navigation, Loading spinners, sign-in hints, hash
+        // query forms) does not render in demo mode.
+        Array.from(tab.children).forEach((child) => { child.style.display = 'none'; });
+        tab.appendChild(makeDemoTabPlaceholder(displayName));
+        tab.dataset.demoPlaceholderInjected = 'true';
+    }
+    // Wire the "Demo Guide" anchors inside the placeholders to switchTab.
+    document.querySelectorAll('.demo-tab-placeholder a[data-demo-target="demo-guide"]').forEach((a) => {
+        a.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (typeof switchTab === 'function') switchTab('demo-guide');
+        });
+    });
 }
 
 // Update the per-session fields in the Demo Guide ("Where you are")
@@ -3215,6 +3292,7 @@ function bootstrapDemoMode() {
     if (typeof switchTab === 'function') {
         switchTab('demo-guide');
     }
+    injectDemoTabPlaceholders();
 }
 bootstrapDemoMode();
 

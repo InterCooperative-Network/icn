@@ -5675,6 +5675,9 @@ footer .sync-status.error {
     padding: 0.5rem;
     background: var(--background);
     border-radius: 4px;
+}
+
+/* ============================================================================
    Inline Receipt Chain (Proposal Detail Sidebar) — P0-T11
    ============================================================================ */
 
@@ -5976,135 +5979,1032 @@ footer .sync-status.error {
     min-width: 0;
 }
 
-/* Demo Guide tab content */
+/* ============================================================
+ * Demo mode typography
+ *
+ * The default app uses a system font stack on body but native
+ * <button>/<input> elements fall back to Arial — visible mismatch
+ * across the nav. Force inheritance globally so every interactive
+ * element matches the body. Then establish a clean 5-step type
+ * scale for the demo surfaces (12 / 14 / 16 / 18 / 24 / 28 px) so
+ * titles, body text, badges, and metadata read as a hierarchy
+ * instead of as ten near-equal sizes.
+ * ============================================================ */
+
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+}
+
+body[data-demo-mode="true"] {
+    font-feature-settings: "kern" 1, "ss01" 0, "ss02" 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* App title in the main shell — a touch larger so the hero h2
+   below doesn't dwarf it, but still smaller than a page title. */
+body[data-demo-mode="true"] #app-title-header {
+    font-size: 1.125rem;     /* 18px */
+    line-height: 1.4;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+}
+
+/* Banner message: 14px; the badge to its left is uppercase 12px
+   tracked, so the sentence beside it reads as supporting copy. */
+body[data-demo-mode="true"] #demo-mode-message {
+    font-size: 0.875rem;     /* 14px */
+    line-height: 1.5;
+}
+
+/* Nav: 14px, slightly increased weight when active so the
+   selected tab doesn't fight the body text for attention. */
+body[data-demo-mode="true"] .nav-btn {
+    font-size: 0.875rem;     /* 14px */
+    font-weight: 500;
+    letter-spacing: 0;
+}
+body[data-demo-mode="true"] .nav-btn.active {
+    font-weight: 600;
+}
+
+/* Hero h2: a real page title (28px), tightened line-height. */
+body[data-demo-mode="true"] #demo-guide-heading {
+    font-size: 1.75rem;      /* 28px */
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    font-weight: 700;
+}
+
+/* Card titles: 18px so they read as titles, not body. */
+body[data-demo-mode="true"] .demo-guide-card-header h3,
+body[data-demo-mode="true"] .demo-tab-placeholder-card h2 {
+    font-size: 1.125rem;     /* 18px */
+    line-height: 1.35;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+}
+
+body[data-demo-mode="true"] .demo-tab-placeholder-card h2 {
+    font-size: 1.5rem;       /* 24px — placeholder is the only thing on the page */
+    line-height: 1.25;
+}
+
+/* Eyebrow + section badge: align both to 12px tracked uppercase
+   so they read as the same visual category instead of two
+   different small-caps treatments. */
+body[data-demo-mode="true"] .demo-guide-eyebrow,
+body[data-demo-mode="true"] .demo-tab-placeholder-eyebrow {
+    font-size: 0.75rem;      /* 12px */
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+}
+
+body[data-demo-mode="true"] .demo-guide-card-badge {
+    font-size: 0.75rem;      /* 12px — was 0.7rem */
+    line-height: 1.3;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+}
+
+/* Status pills on list items: also 12px, distinct via color */
+body[data-demo-mode="true"] .demo-status {
+    font-size: 0.7rem;       /* 11.2px — slightly smaller because they sit inline with body */
+    letter-spacing: 0.05em;
+    font-weight: 700;
+}
+
+/* Body text inside cards: 16px / 1.5 — readable, no surprises */
+body[data-demo-mode="true"] .demo-guide-intro,
+body[data-demo-mode="true"] .demo-tab-placeholder-card p,
+body[data-demo-mode="true"] .demo-guide-card .demo-guide-list li,
+body[data-demo-mode="true"] .demo-guide-card .demo-guide-non-claims li {
+    font-size: 1rem;         /* 16px */
+    line-height: 1.55;
+}
+
+/* Lead paragraph on placeholder cards: 18px, slightly larger than
+   the secondary explanatory paragraph below. */
+body[data-demo-mode="true"] .demo-tab-placeholder-lead {
+    font-size: 1.125rem;     /* 18px */
+    line-height: 1.5;
+}
+
+/* Notes + metadata: 14px, muted — clear secondary tier */
+body[data-demo-mode="true"] .demo-guide-list .demo-note,
+body[data-demo-mode="true"] .demo-guide-card-note,
+body[data-demo-mode="true"] .demo-tab-placeholder-note,
+body[data-demo-mode="true"] .demo-guide-where dt,
+body[data-demo-mode="true"] .demo-guide-where dd {
+    font-size: 0.875rem;     /* 14px */
+    line-height: 1.5;
+}
+
+/* "Where you are" values stay monospace but at the consistent
+   14px size rather than 14.4. */
+body[data-demo-mode="true"] .demo-guide-where dd {
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+}
+
+/* ============================================================
+ * Demo mode global layout
+ *
+ * The default `main { max-width: 800px }` is too narrow for the
+ * Demo Guide's 2-col card grid and for the action-cards surface.
+ * Widen main only when ?mode=demo flagged the body, so non-demo
+ * pages stay at their original 800px reading width.
+ * ============================================================ */
+
+body[data-demo-mode="true"] main {
+    max-width: 1200px;
+    padding: 1.5rem 1.75rem;
+}
+
+body[data-demo-mode="true"] main#main-content {
+    max-width: 1200px;
+}
+
+/* ============================================================
+ * Demo-mode My Standing & Action Cards layout redesign
+ *
+ * The default rendering put DID/label in a dl, memberships in a
+ * single line each ("name (id) MEMBER via static_list"), and
+ * action cards as a flex column with title and 3 badges fighting
+ * inside one header row. Result: dense, mushy, low scannability.
+ *
+ * Redesigned (demo-only) so each piece has its own visual region:
+ *  - Standing → identity hero + memberships table + roles cards +
+ *    authority chip cloud
+ *  - Action cards → grid of cards with hierarchy:
+ *      kind & scope (eyebrow)  ·  risk (right pill)
+ *      Title (prominent)
+ *      Summary (body)
+ *      Metadata row (Authority / Scope / Deadline as 3 cells)
+ *      Accessibility callout
+ *      Receipt-expected footer
+ * ============================================================ */
+
+/* Let the section escape the 80ch reading clamp */
+body[data-demo-mode="true"] .member-standing-section,
+body[data-demo-mode="true"] .member-action-cards-section {
+    max-width: none;
+}
+
+/* Section headings ("My Standing", "Action Cards") become real
+   page titles instead of small h2 mixed with body text. */
+body[data-demo-mode="true"] .member-standing-section > h2,
+body[data-demo-mode="true"] .member-action-cards-section > h2 {
+    font-size: 1.5rem;          /* 24px */
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.4rem 0;
+}
+
+body[data-demo-mode="true"] .member-standing-intro,
+body[data-demo-mode="true"] .member-action-cards-intro {
+    max-width: 65ch;
+    font-size: 0.9375rem;       /* 15px */
+    line-height: 1.55;
+    color: var(--text-secondary);
+    margin: 0 0 1.25rem 0;
+}
+
+/* === Standing identity hero === */
+body[data-demo-mode="true"] .standing-id-block {
+    display: block;
+    background: linear-gradient(135deg,
+        rgba(37, 99, 235, 0.07) 0%,
+        rgba(37, 99, 235, 0.02) 100%);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--primary);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+}
+
+body[data-demo-mode="true"] .standing-id-block dt {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary-dark);
+    margin-top: 0.6rem;
+}
+
+body[data-demo-mode="true"] .standing-id-block dt:first-of-type {
+    margin-top: 0;
+}
+
+body[data-demo-mode="true"] .standing-id-block dd {
+    display: block;
+    margin: 0.15rem 0 0 0;
+    font-size: 1rem;
+    line-height: 1.4;
+    color: var(--text-primary);
+}
+
+body[data-demo-mode="true"] .standing-id-block dd.did-display {
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+/* === Section group heading inside standing ("Domain memberships",
+       "Role assignments", "Authority scopes (union)") === */
+body[data-demo-mode="true"] .member-standing-content > h3 {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin: 1.25rem 0 0.6rem 0;
+    padding: 0;
+    border: none;
+}
+
+/* === Domain memberships: tabular row layout === */
+body[data-demo-mode="true"] .standing-domain-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+body[data-demo-mode="true"] .standing-domain {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "name   status"
+        "id     source";
+    gap: 0.15rem 1rem;
+    padding: 0.85rem 1.15rem;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    line-height: 1.4;
+}
+
+body[data-demo-mode="true"] .standing-domain + .standing-domain {
+    border-top: 1px solid var(--border-color);
+}
+
+body[data-demo-mode="true"] .standing-domain > strong {
+    grid-area: name;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+body[data-demo-mode="true"] .standing-domain-id {
+    grid-area: id;
+    margin-left: 0;
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+}
+
+body[data-demo-mode="true"] .standing-domain .standing-status {
+    grid-area: status;
+    align-self: center;
+    margin-left: 0;
+    padding: 0.22rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+}
+
+body[data-demo-mode="true"] .standing-status-member {
+    background: rgba(22, 163, 74, 0.12);
+    color: #15803d;
+    border-color: rgba(22, 163, 74, 0.30);
+}
+
+body[data-demo-mode="true"] .standing-status-unverified {
+    background: rgba(245, 158, 11, 0.12);
+    color: #b45309;
+    border-color: rgba(245, 158, 11, 0.30);
+}
+
+body[data-demo-mode="true"] .standing-domain .standing-source {
+    grid-area: source;
+    margin-left: 0;
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+/* === Role assignments: card grid === */
+body[data-demo-mode="true"] .standing-role-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 0.75rem;
+}
+
+body[data-demo-mode="true"] .standing-role {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--primary);
+    border-radius: 10px;
+    padding: 1rem 1.15rem;
+    box-shadow: var(--shadow-sm);
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+body[data-demo-mode="true"] .standing-role > strong {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary-dark);
+}
+
+body[data-demo-mode="true"] .standing-role-structure {
+    margin-left: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    /* Strip the leading " in " prefix the renderer adds */
+    color: var(--text-primary);
+}
+
+body[data-demo-mode="true"] .standing-role-scope {
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+body[data-demo-mode="true"] .standing-role-scope-label {
+    color: var(--text-tertiary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-right: 0.15rem;
+}
+
+/* === Authority chip styling (used in roles + union) === */
+body[data-demo-mode="true"] .standing-scope-badge {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    padding: 0.18rem 0.55rem;
+    background: rgba(37, 99, 235, 0.10);
+    color: #1d4ed8;
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+}
+
+/* Authority union: chip cloud */
+body[data-demo-mode="true"] .standing-scope-union {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.85rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+
+/* === Action cards: redesigned card layout === */
+body[data-demo-mode="true"] .member-action-cards-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+    gap: 1rem;
+    align-items: stretch;
+}
+
+body[data-demo-mode="true"] .member-action-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem 1.4rem 1.4rem 1.4rem;
+    box-shadow: var(--shadow-sm);
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    border-top: 4px solid var(--card-accent, var(--gray-300));
+}
+
+/* Per-card accent on the top stripe — driven by risk level by default,
+   set on the article via a CSS attribute selector */
+body[data-demo-mode="true"] .member-action-card:has(.badge-risk-low) {
+    --card-accent: #16a34a;
+}
+body[data-demo-mode="true"] .member-action-card:has(.badge-risk-normal) {
+    --card-accent: #2563eb;
+}
+body[data-demo-mode="true"] .member-action-card:has(.badge-risk-elevated) {
+    --card-accent: #dc2626;
+}
+
+/* Header: kind/scope eyebrow on left, risk pill on right */
+body[data-demo-mode="true"] .member-action-card-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem 1rem;
+    align-items: start;
+    margin: 0;
+}
+
+body[data-demo-mode="true"] .member-action-card-header h4 {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 0;
+    font-size: 1.0625rem;        /* 17px — prominent title */
+    line-height: 1.35;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--text-primary);
+}
+
+body[data-demo-mode="true"] .member-action-card-badges {
+    grid-row: 1;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* Kind / source = small-caps eyebrow, no background; risk = colored
+   pill, on the right of the row. */
+body[data-demo-mode="true"] .member-action-card .badge {
+    padding: 0.18rem 0.55rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    border-radius: 999px;
+    border: 1px solid transparent;
+}
+
+body[data-demo-mode="true"] .member-action-card .badge-source,
+body[data-demo-mode="true"] .member-action-card .badge-action {
+    background: transparent;
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+body[data-demo-mode="true"] .member-action-card .badge-risk-low {
+    background: rgba(22, 163, 74, 0.12);
+    color: #15803d;
+    border-color: rgba(22, 163, 74, 0.30);
+    margin-left: auto;
+}
+body[data-demo-mode="true"] .member-action-card .badge-risk-normal {
+    background: rgba(37, 99, 235, 0.12);
+    color: #1d4ed8;
+    border-color: rgba(37, 99, 235, 0.30);
+    margin-left: auto;
+}
+body[data-demo-mode="true"] .member-action-card .badge-risk-elevated {
+    background: rgba(220, 38, 38, 0.12);
+    color: #b91c1c;
+    border-color: rgba(220, 38, 38, 0.30);
+    margin-left: auto;
+}
+
+body[data-demo-mode="true"] .member-action-card-summary {
+    margin: 0;
+    font-size: 0.9375rem;        /* 15px — body slightly smaller than title */
+    color: var(--text-secondary);
+    line-height: 1.55;
+}
+
+/* Authority metadata: 3-cell row instead of dl pairs */
+body[data-demo-mode="true"] .member-action-card-authority {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: 0.65rem 1rem;
+    margin: 0;
+    padding: 0.85rem 0;
+    background: transparent;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+}
+
+body[data-demo-mode="true"] .member-action-card-authority dt {
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+}
+
+body[data-demo-mode="true"] .member-action-card-authority dd {
+    margin: 0.2rem 0 0 0;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+/* Accessibility callout: distinct quote-like block */
+body[data-demo-mode="true"] .member-action-card-accessibility {
+    margin: 0;
+    padding: 0.65rem 0.85rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+body[data-demo-mode="true"] .member-action-card-accessibility strong {
+    color: var(--text-primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* Receipt-expected footer: full-width subtle pill */
+body[data-demo-mode="true"] .member-action-card-receipt-expected {
+    margin: 0;
+    padding: 0.6rem 0.85rem;
+    background: rgba(22, 163, 74, 0.08);
+    border: 1px solid rgba(22, 163, 74, 0.25);
+    border-left-width: 3px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    color: #15803d;
+    font-weight: 500;
+}
+
+/* Dark-theme adjustments for the redesigned standing/action layouts */
+[data-theme="dark"] body[data-demo-mode="true"] .standing-id-block {
+    background: linear-gradient(135deg,
+        rgba(59, 130, 246, 0.12) 0%,
+        rgba(59, 130, 246, 0.04) 100%);
+}
+[data-theme="dark"] body[data-demo-mode="true"] .standing-domain-list,
+[data-theme="dark"] body[data-demo-mode="true"] .standing-role,
+[data-theme="dark"] body[data-demo-mode="true"] .member-action-card {
+    background: var(--bg-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Demo-only "this surface is gateway-backed and not fixture-backed"
+   placeholder used in Governance, Federation, and Receipts tabs.
+   Same visual language as the Demo Guide's gateway-backed card so
+   the page reads as deliberately scoped, not broken. */
+.demo-tab-placeholder {
+    max-width: 64rem;
+    margin: 1.5rem auto;
+    padding: 0 0.5rem;
+}
+
+.demo-tab-placeholder-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid #f59e0b;
+    border-radius: 10px;
+    padding: 2rem 2.25rem 2.25rem 2.25rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.demo-tab-placeholder-eyebrow {
+    margin: 0 0 0.4rem 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #b45309;
+}
+
+.demo-tab-placeholder-card h2 {
+    margin: 0 0 1rem 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.25;
+}
+
+.demo-tab-placeholder-lead {
+    margin: 0 0 0.85rem 0;
+    font-size: 1.05rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.demo-tab-placeholder-card p {
+    line-height: 1.65;
+    color: var(--text-secondary);
+    max-width: 62ch;
+    margin: 0 0 0.85rem 0;
+}
+
+.demo-tab-placeholder-note {
+    margin: 1.25rem 0 0 0 !important;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    color: var(--text-tertiary);
+}
+
+.demo-tab-placeholder-note a {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: 1px dotted var(--primary);
+}
+
+.demo-tab-placeholder-note a:hover,
+.demo-tab-placeholder-note a:focus {
+    border-bottom-style: solid;
+    color: var(--primary-dark);
+}
+
+[data-theme="dark"] .demo-tab-placeholder-card {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================
+ * Demo Guide visual hierarchy
+ *
+ * Card-based layout for ?mode=demo's organizing-committee landing.
+ * Each section is a self-contained card with a colored accent and a
+ * section badge so the eye can scan: Live / Fixture / Gateway-backed /
+ * Out of scope / Planned / Read-carefully. Light + dark theme aware
+ * via the existing CSS variables.
+ * ============================================================ */
+
 .demo-guide-section {
-    max-width: 80ch;
-    padding: 1rem 0;
+    max-width: 76rem;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 2.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
 }
 
-.demo-guide-section h2 {
-    margin: 0 0 0.5rem 0;
+/* Hero block */
+.demo-guide-hero {
+    background: linear-gradient(135deg,
+        rgba(37, 99, 235, 0.07) 0%,
+        rgba(37, 99, 235, 0.02) 100%);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--primary);
+    border-radius: 10px;
+    padding: 1.5rem 1.75rem;
 }
 
-.demo-guide-section h3 {
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
-    padding-bottom: 0.25rem;
+.demo-guide-eyebrow {
+    margin: 0 0 0.4rem 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--primary);
+}
+
+.demo-guide-section h2#demo-guide-heading {
+    margin: 0 0 0.6rem 0;
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
 }
 
 .demo-guide-intro {
-    font-size: 1.05rem;
-    line-height: 1.6;
-    margin-bottom: 1rem;
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    max-width: 75ch;
 }
 
+/* Section card — shared shell */
+.demo-guide-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--shadow-sm);
+    --section-accent: var(--gray-400);
+    border-left: 4px solid var(--section-accent);
+}
+
+.demo-guide-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 0 0.85rem 0;
+    flex-wrap: wrap;
+}
+
+.demo-guide-card-header h3 {
+    margin: 0;
+    padding: 0;
+    border: none;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.demo-guide-card-badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    background: var(--section-accent-bg, var(--bg-tertiary));
+    color: var(--section-accent-text, var(--text-secondary));
+    border: 1px solid var(--section-accent-border, var(--border-color));
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.demo-guide-card-note {
+    margin: 0.85rem 0 0 0;
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+    font-style: italic;
+}
+
+/* Per-section accents */
+.demo-guide-card[data-section="context"] {
+    --section-accent: var(--primary);
+    --section-accent-bg: rgba(37, 99, 235, 0.10);
+    --section-accent-text: var(--primary-dark);
+    --section-accent-border: rgba(37, 99, 235, 0.25);
+}
+
+.demo-guide-card[data-section="available"] {
+    --section-accent: #16a34a;
+    --section-accent-bg: rgba(22, 163, 74, 0.10);
+    --section-accent-text: #15803d;
+    --section-accent-border: rgba(22, 163, 74, 0.30);
+}
+
+.demo-guide-card[data-section="fixture"] {
+    --section-accent: #7c3aed;
+    --section-accent-bg: rgba(124, 58, 237, 0.10);
+    --section-accent-text: #6d28d9;
+    --section-accent-border: rgba(124, 58, 237, 0.30);
+}
+
+.demo-guide-card[data-section="gateway-backed"] {
+    --section-accent: #f59e0b;
+    --section-accent-bg: rgba(245, 158, 11, 0.10);
+    --section-accent-text: #b45309;
+    --section-accent-border: rgba(245, 158, 11, 0.30);
+}
+
+.demo-guide-card[data-section="not-implemented"] {
+    --section-accent: var(--gray-400);
+    --section-accent-bg: var(--gray-100);
+    --section-accent-text: var(--text-tertiary);
+    --section-accent-border: var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.demo-guide-card[data-section="future"] {
+    --section-accent: #0891b2;
+    --section-accent-bg: rgba(8, 145, 178, 0.10);
+    --section-accent-text: #0e7490;
+    --section-accent-border: rgba(8, 145, 178, 0.30);
+}
+
+.demo-guide-card[data-section="non-claims"] {
+    --section-accent: var(--gray-500);
+    --section-accent-bg: var(--gray-100);
+    --section-accent-text: var(--text-secondary);
+    --section-accent-border: var(--border-color);
+    background: var(--bg-secondary);
+}
+
+/* Where-you-are panel: 2-col definition list inside the context card */
 .demo-guide-where {
     display: grid;
     grid-template-columns: max-content 1fr;
-    gap: 0.5rem 1rem;
-    margin: 0.75rem 0;
-    padding: 0.75rem 1rem;
-    background: var(--bg-secondary, #f9fafb);
-    border-radius: 6px;
-    border: 1px solid var(--border-color, #e5e7eb);
+    gap: 0.5rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
 }
 
 .demo-guide-where dt {
     font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
 }
 
 .demo-guide-where dd {
     margin: 0;
     font-family: var(--mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
     font-size: 0.9rem;
+    color: var(--text-primary);
 }
 
 .demo-guide-where .did-display {
     word-break: break-all;
 }
 
-.demo-guide-note {
-    font-size: 0.9rem;
-    color: var(--text-secondary, #6b7280);
-    font-style: italic;
+/* Two-column responsive grid for the section cards */
+.demo-guide-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+    gap: 1rem;
+    align-items: stretch;
 }
 
-.demo-guide-list {
-    padding-left: 0;
+.demo-guide-grid > .demo-guide-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.demo-guide-grid > .demo-guide-card > ul {
+    flex: 1 0 auto;
+}
+
+/* Lists inside the cards: clean separators, no dashed borders */
+.demo-guide-card .demo-guide-list,
+.demo-guide-card .demo-guide-non-claims {
+    margin: 0;
+    padding: 0;
     list-style: none;
-    margin: 0.5rem 0;
 }
 
-.demo-guide-list li {
-    padding: 0.4rem 0;
-    border-bottom: 1px dashed var(--border-color, #e5e7eb);
-    line-height: 1.5;
+.demo-guide-card .demo-guide-list li,
+.demo-guide-card .demo-guide-non-claims li {
+    padding: 0.45rem 0;
+    line-height: 1.55;
+    color: var(--text-primary);
+    border: none;
+    margin: 0;
 }
 
-.demo-guide-list li:last-child {
-    border-bottom: none;
+.demo-guide-card .demo-guide-list li + li,
+.demo-guide-card .demo-guide-non-claims li + li {
+    border-top: 1px solid var(--border-color);
 }
 
-.demo-guide-list a {
-    color: var(--link-color, #2563eb);
-    text-decoration: underline;
+.demo-guide-card .demo-guide-list a {
+    color: var(--primary);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--primary);
 }
 
-.demo-guide-available .demo-status,
-.demo-guide-coming .demo-status {
+.demo-guide-card .demo-guide-list a:hover,
+.demo-guide-card .demo-guide-list a:focus {
+    border-bottom-style: solid;
+    color: var(--primary-dark);
+}
+
+/* Status pills on individual list items */
+.demo-status {
     display: inline-block;
     margin-left: 0.4rem;
-    padding: 0.1rem 0.5rem;
-    border-radius: 3px;
-    font-size: 0.78rem;
-    font-weight: 600;
+    padding: 0.12rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
+    line-height: 1.4;
+    vertical-align: 0.05em;
+    border: 1px solid transparent;
+    white-space: nowrap;
 }
 
-.demo-guide-available .demo-status {
+.demo-status--live {
     background: rgba(22, 163, 74, 0.14);
     color: #15803d;
+    border-color: rgba(22, 163, 74, 0.25);
 }
 
-.demo-guide-coming .demo-status {
-    background: rgba(245, 158, 11, 0.14);
-    color: #b45309;
+.demo-status--fixture {
+    background: rgba(124, 58, 237, 0.14);
+    color: #6d28d9;
+    border-color: rgba(124, 58, 237, 0.25);
 }
 
-.demo-guide-not-implemented {
-    color: var(--text-secondary, #6b7280);
-}
-
-.demo-guide-not-implemented li::before {
-    content: "✕ ";
-    color: #9ca3af;
-    margin-right: 0.25rem;
-    font-weight: 700;
-}
-
+/* Inline note below an item */
 .demo-guide-list .demo-note {
     display: block;
     font-size: 0.85rem;
-    color: var(--text-secondary, #6b7280);
-    margin-top: 0.15rem;
+    color: var(--text-tertiary);
+    margin-top: 0.2rem;
+    line-height: 1.5;
 }
 
+/* "Not implemented" items — quieter without being illegible */
+.demo-guide-not-implemented li {
+    color: var(--text-secondary);
+}
+
+.demo-guide-not-implemented li::before {
+    content: "—  ";
+    color: var(--gray-400);
+    font-weight: 600;
+}
+
+/* Non-claims list: keep disc bullets but inside the card */
 .demo-guide-non-claims {
-    background: var(--bg-secondary, #f9fafb);
-    border-left: 3px solid var(--demo-banner-color, #2563eb);
-    padding: 0.75rem 1rem 0.75rem 1.25rem;
-    margin-top: 1rem;
-    list-style: disc;
+    list-style: none;
+    padding: 0;
+    margin: 0;
 }
 
 .demo-guide-non-claims li {
-    margin-bottom: 0.5rem;
+    position: relative;
+    padding-left: 1.25rem;
 }
 
-.demo-guide-non-claims li:last-child {
-    margin-bottom: 0;
+.demo-guide-non-claims li::before {
+    content: "•";
+    position: absolute;
+    left: 0.25rem;
+    top: 0.45rem;
+    color: var(--gray-500);
+    font-weight: 700;
+}
+
+/* Inline code inside the demo guide */
+.demo-guide-section code {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.85em;
+    color: var(--text-primary);
+}
+
+/* Dark mode tweaks: lift the card backgrounds away from the page bg */
+[data-theme="dark"] .demo-guide-card {
+    background: var(--bg-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .demo-guide-card[data-section="not-implemented"],
+[data-theme="dark"] .demo-guide-card[data-section="non-claims"] {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .demo-guide-hero {
+    background: linear-gradient(135deg,
+        rgba(59, 130, 246, 0.10) 0%,
+        rgba(59, 130, 246, 0.03) 100%);
+}
+
+/* Narrow-screen tightening */
+@media (max-width: 720px) {
+    .demo-guide-section {
+        padding: 1rem 0.75rem 2rem 0.75rem;
+        gap: 1rem;
+    }
+    .demo-guide-hero {
+        padding: 1.25rem 1rem;
+    }
+    .demo-guide-section h2#demo-guide-heading {
+        font-size: 1.35rem;
+    }
+    .demo-guide-card {
+        padding: 1rem 1.1rem;
+    }
+    .demo-guide-grid {
+        grid-template-columns: 1fr;
+    }
+    .demo-guide-where {
+        grid-template-columns: 1fr;
+        gap: 0.15rem 0;
+    }
+    .demo-guide-where dt {
+        margin-top: 0.4rem;
+    }
 }
 
 /* ============================================================

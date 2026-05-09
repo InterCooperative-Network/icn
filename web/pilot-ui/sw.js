@@ -3,7 +3,11 @@
  * Provides offline support, caching, and background sync
  */
 
-const CACHE_VERSION = 'icn-timebank-v1.0';
+// Bump CACHE_VERSION whenever a static asset (style.css, app.js, index.html)
+// changes meaningfully so existing installs reliably pick up the new bundle.
+// The activate event purges any cache whose name doesn't match the current
+// CACHE_VERSION, which forces clients off the old asset set.
+const CACHE_VERSION = 'icn-timebank-v1.2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const API_CACHE = `${CACHE_VERSION}-api`;
@@ -13,6 +17,7 @@ const STATIC_ASSETS = [
     '/',
     '/index.html',
     '/style.css',
+    '/style.css?v=2026050802',
     '/app.js',
     '/offline-storage.js',
     '/manifest.json',
