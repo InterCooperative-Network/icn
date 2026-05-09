@@ -1,7 +1,7 @@
 ---
 Status: operational
 Canonical: no
-Last Reviewed: 2026-04-29
+Last Reviewed: 2026-05-09
 ---
 
 # ICN Project Index
@@ -30,16 +30,17 @@ This directory is a **show-ready orientation layer** for the ICN repository. Its
 | **Organizer / cooperative evaluator** | [`show-readiness-map.md`](show-readiness-map.md) | [`current-truth-map.md`](current-truth-map.md), [`pilot-and-nycn-map.md`](pilot-and-nycn-map.md) |
 | **Cooperative developer** (e.g. evaluating ICN as substrate for a coop's tooling) | [`current-truth-map.md`](current-truth-map.md) | [`runtime-surface-map.md`](runtime-surface-map.md), [`pilot-and-nycn-map.md`](pilot-and-nycn-map.md), [`docs/strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md`](../../strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md) |
 | **Technical contributor** (writing code) | [`source-tree-map.md`](source-tree-map.md) | [`rust-workspace-map.md`](rust-workspace-map.md), [`AGENTS.md`](../../../AGENTS.md), [`docs/GETTING_STARTED.md`](../../GETTING_STARTED.md) |
-| **Documentation contributor** | [`docs-control-map.md`](docs-control-map.md) | [`docs/INDEX.md`](../../INDEX.md), [`docs/DOCUMENTATION_CONTROL_SYSTEM.md`](../../DOCUMENTATION_CONTROL_SYSTEM.md) |
+| **Documentation contributor** | [`docs-control-map.md`](docs-control-map.md) | [`source-of-truth-map.md`](source-of-truth-map.md), [`docs/INDEX.md`](../../INDEX.md), [`docs/DOCUMENTATION_CONTROL_SYSTEM.md`](../../DOCUMENTATION_CONTROL_SYSTEM.md) |
 | **Designer / accessibility reviewer** | [`runtime-surface-map.md`](runtime-surface-map.md) | [`docs/design-language/brief-v0.md`](../../design-language/brief-v0.md), [`docs/architecture/MEMBER_STANDING.md`](../../architecture/MEMBER_STANDING.md) |
 | **Operator / infra person** | [`ci-ops-deploy-map.md`](ci-ops-deploy-map.md) | [`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`](../../operations/deployment/HOMELAB_DEPLOYMENT.md), [`deploy/README.md`](../../../deploy/README.md) |
-| **Agent / Claude Code session** | [`current-truth-map.md`](current-truth-map.md) | [`docs/ai/ICN_CONSTITUTIONAL_CORE.md`](../../ai/ICN_CONSTITUTIONAL_CORE.md), [`AGENTS.md`](../../../AGENTS.md), [`CLAUDE.md`](../../../CLAUDE.md) |
+| **Agent / Claude Code session** | [`current-truth-map.md`](current-truth-map.md) | [`source-of-truth-map.md`](source-of-truth-map.md), [`docs/ai/ICN_CONSTITUTIONAL_CORE.md`](../../ai/ICN_CONSTITUTIONAL_CORE.md), [`AGENTS.md`](../../../AGENTS.md), [`CLAUDE.md`](../../../CLAUDE.md) |
 
 ## All maps
 
 | Map | Purpose |
 |---|---|
 | [`current-truth-map.md`](current-truth-map.md) | What is real, what is not, what gates remain — pointing at `STATE.md` / `PHASE_PROGRESS.md` for the per-PR record. |
+| [`source-of-truth-map.md`](source-of-truth-map.md) | Which sources outrank which when repo material disagrees; conflict rules, overclaim guardrails, and status labels. |
 | [`source-tree-map.md`](source-tree-map.md) | Top-level repo surfaces and what each is for. |
 | [`rust-workspace-map.md`](rust-workspace-map.md) | The Rust workspace under `icn/` grouped by rough layer (kernel/identity/networking/ledger/governance/etc.). |
 | [`docs-control-map.md`](docs-control-map.md) | How `docs/INDEX.md`, `docs/registry.toml`, `DOCUMENT_REGISTRY.md`, and `doc_control_check.py` relate; truth classes; how to add a doc. |
