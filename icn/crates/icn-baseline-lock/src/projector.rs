@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::capsule::{build_capsule, StateResolutionCapsule};
 use crate::constants::{PROCESS_ID, TARGET_REF};
-use crate::receipt_types::{BaselineReceipt, BaselineReceiptBody};
+use crate::receipt_types::{BaselineReceipt, BaselineReceiptBody, FixtureKeys};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProjectorError {
@@ -36,6 +36,30 @@ pub enum ProjectorError {
     AllocationMismatch,
     #[error("vote threshold not met")]
     ThresholdNotMet,
+    #[error("receipt {0}: signer is not authorized for this receipt type in the baseline fixture")]
+    UnauthorizedReceiptSigner(usize),
+}
+
+/// Expected verifying keys for non-vote baseline fixture receipts (narrow test harness).
+#[derive(Debug, Clone, Copy)]
+pub struct BaselineFixtureAuthority {
+    pub process_session_opener: [u8; 32],
+    pub standing_snapshot_signer: [u8; 32],
+    pub notice_signer: [u8; 32],
+    pub allocation_signer: [u8; 32],
+    pub reservation_signer: [u8; 32],
+}
+
+impl BaselineFixtureAuthority {
+    pub fn from_fixture_keys(keys: &FixtureKeys) -> Self {
+        Self {
+            process_session_opener: keys.coop.verifying_key().to_bytes(),
+            standing_snapshot_signer: keys.host.verifying_key().to_bytes(),
+            notice_signer: keys.coop.verifying_key().to_bytes(),
+            allocation_signer: keys.coop.verifying_key().to_bytes(),
+            reservation_signer: keys.host.verifying_key().to_bytes(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -57,7 +81,13 @@ fn hash_postcard<T: Serialize>(domain: &[u8], v: &T) -> Hash {
 }
 
 /// Project receipts (genesis-to-tip order) into canonical facts.
-pub fn project(receipts: &[BaselineReceipt]) -> Result<ProjectedState, ProjectorError> {
+///
+/// `authority` fixes which verifying keys may sign each non-vote receipt type for this fixture
+/// (in addition to cryptographic `verify` on each receipt).
+pub fn project(
+    receipts: &[BaselineReceipt],
+    authority: &BaselineFixtureAuthority,
+) -> Result<ProjectedState, ProjectorError> {
     if receipts.is_empty() {
         return Err(ProjectorError::EmptyChain);
     }
@@ -87,12 +117,21 @@ pub fn project(receipts: &[BaselineReceipt]) -> Result<ProjectedState, Projector
                 allocation_limit,
                 required_approvals,
             } => {
+                if r.signer != authority.process_session_opener {
+                    return Err(ProjectorError::UnauthorizedReceiptSigner(i));
+                }
                 session = Some((*eligible_members, *allocation_limit, *required_approvals));
             }
             BaselineReceiptBody::StandingContextSnapshot { member_pubkeys } => {
+                if r.signer != authority.standing_snapshot_signer {
+                    return Err(ProjectorError::UnauthorizedReceiptSigner(i));
+                }
                 members = member_pubkeys.clone();
             }
             BaselineReceiptBody::NoticeDelivered { member_pubkey } => {
+                if r.signer != authority.notice_signer {
+                    return Err(ProjectorError::UnauthorizedReceiptSigner(i));
+                }
                 notices.push(*member_pubkey);
             }
             BaselineReceiptBody::DeliberationEntryRecorded {
@@ -111,9 +150,15 @@ pub fn project(receipts: &[BaselineReceipt]) -> Result<ProjectedState, Projector
                 votes.push((*member_pubkey, *approve));
             }
             BaselineReceiptBody::AllocationRequested { amount } => {
+                if r.signer != authority.allocation_signer {
+                    return Err(ProjectorError::UnauthorizedReceiptSigner(i));
+                }
                 allocation_amount = Some(*amount);
             }
             BaselineReceiptBody::ReservationState { not_consumed } => {
+                if r.signer != authority.reservation_signer {
+                    return Err(ProjectorError::UnauthorizedReceiptSigner(i));
+                }
                 reservation_ok = Some(*not_consumed);
             }
         }

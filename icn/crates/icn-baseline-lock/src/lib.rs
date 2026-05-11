@@ -15,7 +15,7 @@ pub use capsule::{build_capsule, StateResolutionCapsule};
 pub use constants::*;
 pub use evidence::{action_card_allocation_authorized, ActionCardView, EvidencePacket};
 pub use host::{evaluate_guest, validate_hostile_output, HostError};
-pub use projector::{project, ProjectedState, ProjectorError};
+pub use projector::{project, BaselineFixtureAuthority, ProjectedState, ProjectorError};
 pub use receipt_emit::BaselineProcessGateResultReceipt;
 pub use receipt_types::{
     build_receipt_chain, signing_key_for_label, BaselineReceipt, BaselineReceiptBody, FixtureKeys,

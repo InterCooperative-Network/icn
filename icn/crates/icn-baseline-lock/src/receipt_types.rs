@@ -165,6 +165,12 @@ pub struct FixtureOptions {
     pub double_reservation_consumed: bool,
     pub allocation_over_limit: bool,
     pub threshold_fail: bool,
+    /// Use an unauthorized key to sign `ProcessSessionOpened` (still valid signature over body).
+    pub unauthorized_process_session_signer: bool,
+    pub unauthorized_standing_snapshot_signer: bool,
+    pub unauthorized_notice_signer: bool,
+    pub unauthorized_allocation_signer: bool,
+    pub unauthorized_reservation_signer: bool,
 }
 
 fn append_signed(
@@ -232,6 +238,8 @@ pub fn build_receipt_chain(keys: &FixtureKeys, opt: &FixtureOptions) -> Vec<Base
     let mut prior = [0u8; 32];
     let mut out = Vec::new();
 
+    let stranger = signing_key_for_label(b"unauthorized-fixture-stranger");
+
     append_signed(
         &mut out,
         &mut prior,
@@ -244,7 +252,11 @@ pub fn build_receipt_chain(keys: &FixtureKeys, opt: &FixtureOptions) -> Vec<Base
             allocation_limit: 1000,
             required_approvals: 2,
         },
-        &keys.coop,
+        if opt.unauthorized_process_session_signer {
+            &stranger
+        } else {
+            &keys.coop
+        },
     );
 
     if !opt.omit_standing {
@@ -262,7 +274,11 @@ pub fn build_receipt_chain(keys: &FixtureKeys, opt: &FixtureOptions) -> Vec<Base
                     keys.member_c.verifying_key().to_bytes(),
                 ],
             },
-            &keys.host,
+            if opt.unauthorized_standing_snapshot_signer {
+                &stranger
+            } else {
+                &keys.host
+            },
         );
     }
 
@@ -283,7 +299,11 @@ pub fn build_receipt_chain(keys: &FixtureKeys, opt: &FixtureOptions) -> Vec<Base
             BaselineReceiptBody::NoticeDelivered {
                 member_pubkey: k.verifying_key().to_bytes(),
             },
-            &keys.coop,
+            if opt.unauthorized_notice_signer {
+                &stranger
+            } else {
+                &keys.coop
+            },
         );
     }
 
@@ -365,7 +385,11 @@ pub fn build_receipt_chain(keys: &FixtureKeys, opt: &FixtureOptions) -> Vec<Base
         process_id,
         target_ref,
         BaselineReceiptBody::AllocationRequested { amount },
-        &keys.coop,
+        if opt.unauthorized_allocation_signer {
+            &stranger
+        } else {
+            &keys.coop
+        },
     );
 
     if !opt.omit_reservation {
@@ -378,7 +402,11 @@ pub fn build_receipt_chain(keys: &FixtureKeys, opt: &FixtureOptions) -> Vec<Base
             process_id,
             target_ref,
             BaselineReceiptBody::ReservationState { not_consumed },
-            &keys.host,
+            if opt.unauthorized_reservation_signer {
+                &stranger
+            } else {
+                &keys.host
+            },
         );
     }
 
