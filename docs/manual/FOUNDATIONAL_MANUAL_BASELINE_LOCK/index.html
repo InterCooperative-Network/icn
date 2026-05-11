@@ -1,0 +1,389 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Foundational Manual Baseline Lock | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>manual</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>FOUNDATIONAL MANUAL BASELINE LOCK</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/manual/FOUNDATIONAL_MANUAL_BASELINE_LOCK.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: draft
+Canonical: no
+Last Reviewed: 2026-05-11</h2>
+<h1>Foundational Manual Baseline Lock</h1>
+<p>This note captures the current drafting doctrine for the ICN Foundational Manual.</p>
+<p>It is not a production-readiness claim.</p>
+<p>It is not a Phase 2 completion claim.</p>
+<p>It is not formal partner authorization.</p>
+<p>It is not an implementation issue.</p>
+<p>It exists to keep the manual aligned with the architecture ICN is actually trying to build: receipt-backed institutional process, governance by affectedness and agreement, compute subordinate to mandate, and Rust/WASM execution boundaries that preserve the Meaning Firewall.</p>
+<h2>Baseline lock doctrine</h2>
+<p>ICN does not ship half a government.</p>
+<p>Human testing is not a substitute for protocol completeness.</p>
+<p>A field demonstration begins only after the core loop can execute, verify, challenge, recover, export, and federate without founder magic.</p>
+<p>The purpose of a field demonstration is not to discover whether ICN works.</p>
+<p>The purpose is to demonstrate that a completed loop can survive real institutional conditions.</p>
+<p>Baseline lock means the protocol vocabulary, authority model, receipt model, rights floor, governance-scope model, role lifecycle, evidence model, and first complete institutional process loop are internally coherent before human-facing field demonstration.</p>
+<p>Baseline lock does not mean every future feature is complete.</p>
+<p>It means the system&#39;s core claims are not still mush.</p>
+<h2>First baseline-lock target</h2>
+<p>The first lockable primitive is the Institutional Process Substrate.</p>
+<p>The baseline target is one generic institutional process that can move from preview to deliberation to decision to activation to mutation to receipt to evidence export to challenge path, while remaining legible to a nontechnical member through standing and Action Cards.</p>
+<p>The minimum receipt-backed loop is:</p>
+<ol>
+<li>A process opens.</li>
+<li>A target object is identified.</li>
+<li>Standing and authority are resolved.</li>
+<li>Required notice is generated.</li>
+<li>A preview/review packet is produced.</li>
+<li>Deliberation attaches to the object.</li>
+<li>A human or institutional decision is recorded.</li>
+<li>Activation crosses the required gate.</li>
+<li>A mutation plan is produced.</li>
+<li>An Action Card is triggered where member action is required.</li>
+<li>Execution occurs under mandate.</li>
+<li>A process-transition receipt is emitted and persisted.</li>
+<li>An evidence packet is produced.</li>
+<li>Privacy boundaries and redaction rules are applied.</li>
+<li>Accessibility gates are checked as real process constraints, not decorative compliance notes.</li>
+<li>A challenge path opens, closes, or is explicitly out of scope for the bounded demonstration.</li>
+<li>Proof can be exported.</li>
+<li>The process can be reviewed by someone who was not in the room.</li>
+</ol>
+<p>Without this spine, ICN risks becoming a pile of individually correct primitives that do not yet form an institution.</p>
+<h2>Governance scaling doctrine</h2>
+<p>Subsidiarity is a governance doctrine.</p>
+<p>It is not a compute scheduler.</p>
+<p>It is not a service-placement rule.</p>
+<p>It is not one universal territorial ladder where every decision climbs from local to regional to global.</p>
+<p>Governance scales according to affectedness, domain, consequence, competence, rights, and agreement.</p>
+<p>A neighborhood community may coordinate by block, neighborhood, municipality, watershed, region, or public consequence.</p>
+<p>A cooperative may coordinate by industry, trade, labor market, production standard, supply chain, shared bargaining need, or market condition.</p>
+<p>A housing institution may coordinate by building, tenant class, city, legal jurisdiction, repair network, financing need, or regional federation.</p>
+<p>A food system may coordinate through growers, distributors, kitchens, retailers, land stewards, logistics routes, regional food sheds, or nutrition programs.</p>
+<p>A care network may coordinate across households, neighborhoods, disability support, elder care, childcare, clinics, transportation, emergency response, and mutual-aid bodies.</p>
+<p>A commons institution may coordinate around a shared resource: compute, storage, land, water, energy, knowledge, tools, transport, translation, repair capacity, or care capacity.</p>
+<p>There is no single natural ladder.</p>
+<p>There are consequences.</p>
+<p>There are affected parties.</p>
+<p>There are institutions competent to govern those consequences.</p>
+<p>There are agreements that define how those institutions coordinate.</p>
+<p>A federation is not inherently territorial.</p>
+<p>A federation is an agreement layer.</p>
+<p>It can be place-based, sector-based, market-based, industry-based, supply-chain-based, resource-based, care-based, legal-jurisdiction-based, or any other logical grouping the affected institutions legitimately adopt through agreement.</p>
+<p>Governance rises, federates, or bridges only as far as the consequence requires and the agreement authorizes.</p>
+<p>No farther.</p>
+<h2>Meaning Firewall application</h2>
+<p>The Meaning Firewall applies to governance topology.</p>
+<p>The kernel does not know what municipal, regional, industry, market, watershed, food shed, care network, or supply chain means politically.</p>
+<p>The kernel does not decide which grouping is legitimate.</p>
+<p>The kernel sees signed agreements, authority references, standing proofs, capability scopes, state transitions, replication rules, notice requirements, challenge windows, and receipts.</p>
+<p>The institution supplies the political meaning.</p>
+<p>The agreements supply the coordination topology.</p>
+<p>The substrate enforces the constraints.</p>
+<h2>Compute and service topology remain separate</h2>
+<p>Compute locality is not subsidiarity.</p>
+<p>Service topology is not governance authority.</p>
+<p>Execution locality is not mandate.</p>
+<p>A commons compute service may run an authorized workload without gaining governance authority over the institution that authorized it.</p>
+<p>A federation may host a shared service without owning the member institution&#39;s decision.</p>
+<p>A support institution may assist a process without becoming the source of legitimacy.</p>
+<p>A cell may provide continuity without becoming politically sovereign.</p>
+<p>Correct doctrine:</p>
+<blockquote>
+<p>Subsidiarity governs authority.</p>
+<p>Service topology governs where capacity lives.</p>
+<p>Execution locality governs where work runs.</p>
+<p>Receipts prove the relationship between them.</p>
+</blockquote>
+<p>Compute executes where it is authorized to execute.</p>
+<p>Governance decides whether that execution is legitimate.</p>
+<p>Receipts prove the chain.</p>
+<h2>Rust host, WASM guest</h2>
+<p>Rust is the authority-bearing host.</p>
+<p>WASM is constrained execution.</p>
+<p>A WASM module may compute a result, validation, recommendation, or proposed mutation geometry.</p>
+<p>It may not authorize institutional action.</p>
+<p>It may not mutate institutional state.</p>
+<p>It may not write receipts.</p>
+<p>It may not query arbitrary institutional memory.</p>
+<p>It may not discover private overlays.</p>
+<p>It may not become the lawgiver.</p>
+<p>Correct rule:</p>
+<blockquote>
+<p>WASM may compute the proposed shape of a transition.</p>
+<p>Rust decides whether that transition is authorized.</p>
+<p>Receipts prove what happened.</p>
+</blockquote>
+<p>Code may enforce a lawfully adopted constraint.</p>
+<p>Code does not become the lawgiver.</p>
+<h2>ABI capsule doctrine</h2>
+<p>The WASM guest should never receive the institution.</p>
+<p>It should receive a bounded, canonical, schema-versioned context capsule.</p>
+<p>That capsule says:</p>
+<ul>
+<li>here are the exact facts you are allowed to evaluate;</li>
+<li>here is the exact rule you are allowed to run;</li>
+<li>here is the exact output shape you may return;</li>
+<li>everything else is outside your universe.</li>
+</ul>
+<p>The ABI should not expose rich Rust domain objects directly.</p>
+<p>No raw <code>ProcessSession</code> object.</p>
+<p>No database handle.</p>
+<p>No callback that says <code>fetch proposal</code>.</p>
+<p>No host function that says <code>write receipt</code>.</p>
+<p>No magical context object.</p>
+<p>The interface should be brutally small:</p>
+<pre><code class="language-text">evaluate(input_bytes) -&gt; output_bytes
+</code></pre>
+<p>The input bytes are a canonical serialized execution input envelope.</p>
+<p>The output bytes are a canonical serialized execution output envelope.</p>
+<p>The guest gets bytes.</p>
+<p>The host owns meaning.</p>
+<h2>Execution input envelope</h2>
+<p>A governance-grade input envelope should include only bounded facts and references:</p>
+<pre><code class="language-text">ExecutionInputEnvelopeV1
+  abi_version
+  schema_id
+  workload_id
+  module_hash
+  process_id
+  target_ref
+  authority_context_hash
+  standing_context_hash
+  mandate_ref
+  rule_ref
+  determinism_class
+  privacy_class
+  fuel_limit
+  input_artifact_refs
+  canonical_facts
+  expected_output_schema
+</code></pre>
+<p><code>canonical_facts</code> is not the database.</p>
+<p>It is the smallest set of pre-validated facts the host chose to disclose.</p>
+<p>For example, a quorum-validation workload may receive:</p>
+<pre><code class="language-text">quorum_required
+eligible_voters
+votes_cast
+approvals
+rejections
+abstentions
+notice_delivered
+challenge_window_days
+</code></pre>
+<p>That lets WASM answer whether this decision satisfied the adopted rule.</p>
+<p>It does not let WASM discover members, inspect unrelated proposals, query private evidence, or mutate state.</p>
+<h2>Execution output envelope</h2>
+<p>The guest returns a proposed evaluation result:</p>
+<pre><code class="language-text">ExecutionOutputEnvelopeV1
+  abi_version
+  schema_id
+  workload_id
+  process_id
+  result_kind
+  passed
+  output_artifact_refs
+  diagnostics
+  proposed_transition_ref
+  consumed_fuel
+</code></pre>
+<p>A proposed transition is not a state transition.</p>
+<p>It is the computed geometry of a possible transition.</p>
+<p>Rust still has to bind it to authority, mandate, receipt, persistence, evidence, and challenge path.</p>
+<h2>Determinism and versioning</h2>
+<p>For governance-grade workloads, serialization must be deterministic.</p>
+<p>Same input envelope bytes plus same module hash plus same runtime profile must produce the same output envelope bytes.</p>
+<p>That means:</p>
+<ul>
+<li>no unordered maps unless canonically sorted;</li>
+<li>no floating point for governance-grade execution;</li>
+<li>no locale-dependent formatting;</li>
+<li>no host clock inside the guest;</li>
+<li>no random numbers;</li>
+<li>no network;</li>
+<li>no filesystem;</li>
+<li>no ambient environment variables;</li>
+<li>no current-state queries.</li>
+</ul>
+<p>Governance-grade arithmetic should use integers or fixed-point arithmetic.</p>
+<p>Floating point belongs in advisory compute, not receipt-bearing governance validation.</p>
+<p>The ABI should version four things separately:</p>
+<pre><code class="language-text">ABI version       — host/guest calling convention
+schema id         — input/output payload shape
+module hash       — executable identity
+runtime profile   — fuel, determinism, host capabilities
+</code></pre>
+<p>Historical workloads remain auditable only if those versions remain explicit.</p>
+<h2>Host validation sequence</h2>
+<p>Rust treats WASM output as hostile until proven otherwise.</p>
+<p>The host sequence is:</p>
+<ol>
+<li>Resolve process session.</li>
+<li>Resolve target object.</li>
+<li>Resolve standing.</li>
+<li>Resolve authority basis.</li>
+<li>Resolve mandate if institutional effects are possible.</li>
+<li>Select the rule or workload.</li>
+<li>Build the minimal input envelope.</li>
+<li>Hash and persist the input envelope reference.</li>
+<li>Execute WASM under fuel and runtime limits.</li>
+<li>Parse the output envelope.</li>
+<li>Validate the output schema.</li>
+<li>Verify output matches the expected process, target, workload, and transition kind.</li>
+<li>Reject unexpected fields or unauthorized transition kinds.</li>
+<li>Bind the result to a process-transition receipt.</li>
+<li>Persist the receipt.</li>
+<li>Only then allow downstream state mutation, if separately authorized.</li>
+</ol>
+<p>The guest computes.</p>
+<p>The host authorizes.</p>
+<p>The receipt remembers.</p>
+<h2>Receipt fields for baseline-lock execution</h2>
+<p>Every execution that participates in baseline lock should feed a receipt containing:</p>
+<pre><code class="language-text">process_id
+target_ref
+workload_id
+module_hash
+abi_version
+input_schema_id
+output_schema_id
+input_envelope_hash
+output_envelope_hash
+determinism_class
+privacy_class
+fuel_limit
+fuel_used
+runner_identity
+authority_context_hash
+mandate_ref
+result_kind
+prior_receipt_hash
+record_hash
+signature
+</code></pre>
+<p>That lets a later auditor ask:</p>
+<ul>
+<li>What rule ran?</li>
+<li>Against what facts?</li>
+<li>Under what mandate?</li>
+<li>With what module?</li>
+<li>Producing what result?</li>
+<li>Bound to what process transition?</li>
+</ul>
+<p>That is how execution becomes memory instead of vibes.</p>
+<h2>Manual insertion points</h2>
+<p>When integrating this into the full Foundational Manual:</p>
+<ol>
+<li>Replace ladder-only subsidiarity with affectedness, domain, competence, and agreement.</li>
+<li>Keep compute locality in the compute or service-topology section, not in the subsidiarity section.</li>
+<li>Define federation as an agreement layer, not a territorial level.</li>
+<li>Put the Meaning Firewall directly inside governance-topology language.</li>
+<li>Replace pilot/MVP language with baseline-lock and field-demonstration language.</li>
+<li>Make Institutional Process Substrate the first baseline-lock build target.</li>
+<li>Treat <code>/me/standing</code> and Action Cards as the human-legibility layer immediately downstream of the process spine.</li>
+<li>Treat Rust as the authority-bearing host and WASM as constrained execution.</li>
+<li>Preserve the no-overclaim rule: this document is doctrine and drafting guidance, not a claim that the runtime is complete.</li>
+</ol>
+<h2>Closing doctrine</h2>
+<p>Governance scales by affectedness, domain, competence, and agreement.</p>
+<p>Compute executes under mandate.</p>
+<p>Services provide capacity without becoming sovereign.</p>
+<p>Receipts prove the chain.</p>
+<p>Rust owns authority, persistence, evidence, and state transition.</p>
+<p>WASM computes over bounded facts.</p>
+<p>The kernel enforces constraints.</p>
+<p>Institutions supply meaning.</p>
+<p>Field demonstration waits for baseline lock.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
