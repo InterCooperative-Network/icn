@@ -48,14 +48,14 @@ Last Reviewed: 2026-05-11</h2>
 <p>It is not a Phase 2 completion claim.</p>
 <p>It is not formal partner authorization.</p>
 <p>It is not an implementation issue.</p>
-<p>It exists to keep the manual aligned with the architecture ICN is actually trying to build: receipt-backed institutional process, governance by affectedness and agreement, compute subordinate to mandate, and Rust/WASM execution boundaries that preserve the Meaning Firewall.</p>
+<p>It exists to keep the manual aligned with the architecture ICN is actually trying to build: receipt-backed institutional process, governance by affectedness and agreement, compute subordinate to mandate, Rust/WASM execution boundaries that preserve the Meaning Firewall, and state resolution based on receipted causal frontiers rather than ambient database state.</p>
 <h2>Baseline lock doctrine</h2>
 <p>ICN does not ship half a government.</p>
 <p>Human testing is not a substitute for protocol completeness.</p>
 <p>A field demonstration begins only after the core loop can execute, verify, challenge, recover, export, and federate without founder magic.</p>
 <p>The purpose of a field demonstration is not to discover whether ICN works.</p>
 <p>The purpose is to demonstrate that a completed loop can survive real institutional conditions.</p>
-<p>Baseline lock means the protocol vocabulary, authority model, receipt model, rights floor, governance-scope model, role lifecycle, evidence model, and first complete institutional process loop are internally coherent before human-facing field demonstration.</p>
+<p>Baseline lock means the protocol vocabulary, authority model, receipt model, rights floor, governance-scope model, state-resolution model, role lifecycle, evidence model, and first complete institutional process loop are internally coherent before human-facing field demonstration.</p>
 <p>Baseline lock does not mean every future feature is complete.</p>
 <p>It means the system&#39;s core claims are not still mush.</p>
 <h2>First baseline-lock target</h2>
@@ -131,6 +131,176 @@ Last Reviewed: 2026-05-11</h2>
 <p>Compute executes where it is authorized to execute.</p>
 <p>Governance decides whether that execution is legitimate.</p>
 <p>Receipts prove the chain.</p>
+<h2>State resolution doctrine</h2>
+<p>The Rust host does not build execution envelopes from ambient current state.</p>
+<p>Ambient current state is not a serious concept in a distributed institutional system.</p>
+<p>The host builds execution envelopes from a sealed State Resolution Capsule: a bounded, receipted, causally-located snapshot of the facts required by one process under one authority.</p>
+<p>If the frontier is stale, disputed, insufficient, or outside the agreement&#39;s finality rule, the host does not seal the envelope.</p>
+<p>Correct doctrine:</p>
+<blockquote>
+<p>CRDTs can help people collaborate.</p>
+<p>Merkle roots can prove sets.</p>
+<p>Receipts prove transitions.</p>
+<p>Causal frontiers locate the snapshot.</p>
+<p>Agreements define what frontier is sufficient.</p>
+<p>Rust seals the facts.</p>
+<p>WASM evaluates them.</p>
+<p>Receipts remember the act.</p>
+</blockquote>
+<p>The host does not ask:</p>
+<blockquote>
+<p>What does the database say right now?</p>
+</blockquote>
+<p>The host asks:</p>
+<blockquote>
+<p>What receipted facts are available at this process frontier, and are they sufficient to evaluate this rule?</p>
+</blockquote>
+<h2>State classes</h2>
+<p>ICN should distinguish three classes of state.</p>
+<h3>Governance-grade transition state</h3>
+<p>Governance-grade transition state is append-only, receipt-backed, and Merkle-linked where set membership matters.</p>
+<p>Examples:</p>
+<ul>
+<li>membership admitted;</li>
+<li>role accepted;</li>
+<li>decision recorded;</li>
+<li>mandate issued;</li>
+<li>allocation approved;</li>
+<li>settlement recorded;</li>
+<li>emergency authority activated;</li>
+<li>challenge resolved.</li>
+</ul>
+<p>These records are not merged like a text document.</p>
+<p>Reversal is a counter-record, not mutation.</p>
+<h3>Collaborative deliberation state</h3>
+<p>Collaborative deliberation state may use CRDTs or CRDT-like structures where concurrent edits are legitimate.</p>
+<p>Examples:</p>
+<ul>
+<li>notes;</li>
+<li>comments;</li>
+<li>collaborative proposal drafts;</li>
+<li>meeting annotations;</li>
+<li>working documents;</li>
+<li>argument maps.</li>
+</ul>
+<p>The CRDT is the workspace.</p>
+<p>The receipt is the institutional memory.</p>
+<p>Once deliberation becomes part of the process record, the relevant state is snapshotted, hashed, and receipted.</p>
+<h3>Derived read models</h3>
+<p>Derived read models exist for speed, legibility, and UX.</p>
+<p>Examples:</p>
+<ul>
+<li><code>/me/standing</code>;</li>
+<li>Action Cards;</li>
+<li>pending work;</li>
+<li>eligible voter counts;</li>
+<li>proposal summaries;</li>
+<li>quorum previews.</li>
+</ul>
+<p>These are not authority.</p>
+<p>They are cached views over authority-bearing records.</p>
+<p>If a read model conflicts with the receipt chain, the receipt chain wins.</p>
+<h2>State Resolution Capsule</h2>
+<p>Before the host builds an execution input envelope, it resolves a State Resolution Capsule.</p>
+<p>The capsule locates the proposed execution at a known causal frontier.</p>
+<pre><code class="language-text">StateResolutionCapsule
+  process_id
+  target_ref
+  requested_rule_ref
+  required_authority_class
+  required_scope_or_agreement
+  causal_frontier
+  receipt_frontier
+  membership_frontier
+  deliberation_frontier
+  vote_frontier
+  notice_frontier
+  privacy_frontier
+  conflict_frontier
+  freshness_policy
+  reconciliation_policy
+  source_receipt_refs
+  unresolved_conflicts
+  resolution_status
+</code></pre>
+<p>Only if <code>resolution_status = sealed</code> can the host build a governance-grade WASM execution envelope.</p>
+<p>The capsule does not claim eternal truth.</p>
+<p>It says:</p>
+<blockquote>
+<p>I evaluated this process at this known causal boundary.</p>
+</blockquote>
+<p>A local process may need only an institution-local frontier.</p>
+<p>A federation process may require member-entity attestations, quorum of institutional receipts, clearing period receipts, notice delivery receipts, reconciliation state, and the federation agreement&#39;s own authority reference.</p>
+<p>The kernel does not know what federation legitimacy means.</p>
+<p>The agreement defines the required frontier.</p>
+<p>The host enforces the constraint.</p>
+<h2>Canonical Fact Snapshot</h2>
+<p>The host derives canonical facts from the sealed State Resolution Capsule.</p>
+<p>Internally, the snapshot should carry provenance:</p>
+<pre><code class="language-text">CanonicalFactSnapshot
+  process_id
+  target_ref
+  state_frontier_id
+  membership_snapshot_root
+  eligible_voter_set_root
+  vote_set_root
+  notice_receipt_root
+  deliberation_thread_root
+  authority_context_hash
+  agreement_context_hash
+  facts
+  freshness_policy
+  conflict_policy
+  unresolved_conflicts
+  source_receipts
+</code></pre>
+<p>The WASM guest does not need the full snapshot.</p>
+<p>The guest receives only bounded facts and relevant hashes.</p>
+<p>The host keeps the provenance.</p>
+<h2>Seal rule and fail-closed conditions</h2>
+<p>The host refuses to seal the execution envelope when the fact snapshot is not clean enough for the process type.</p>
+<p>Fail-closed conditions include:</p>
+<ul>
+<li>missing authority receipt;</li>
+<li>missing mandate reference where institutional effects are possible;</li>
+<li>disputed membership snapshot;</li>
+<li>unresolved vote-set fork;</li>
+<li>incomplete notice receipts;</li>
+<li>unresolved privacy boundary;</li>
+<li>stale federation agreement;</li>
+<li>required peer state unavailable;</li>
+<li>challenge window still open when closure requires finality;</li>
+<li>state frontier older than the process freshness policy;</li>
+<li>unresolved conflict outside the process&#39;s allowed conflict policy.</li>
+</ul>
+<p>Partition does not magically become legitimacy.</p>
+<p>Local continuity is allowed, but its authority class must be explicit.</p>
+<p>A local institution can keep functioning during a network partition, but the receipt must say what kind of finality is actually being claimed.</p>
+<p>Example:</p>
+<pre><code class="language-text">frontier_status = local_complete
+federation_visibility = pending_reconciliation
+external_finality = not_claimed
+</code></pre>
+<p>No fake global certainty.</p>
+<h2>Finality classes</h2>
+<p>ICN does not need global consensus.</p>
+<p>It does need explicit finality classes.</p>
+<p>Candidate classes:</p>
+<pre><code class="language-text">LocalFinal
+InstitutionFinal
+FederationPending
+FederationReconciled
+CommonsVisible
+Disputed
+Expired
+Revoked
+</code></pre>
+<p>The host can evaluate a rule against whatever finality class the process allows.</p>
+<p>A neighborhood mutual-aid decision may only need <code>InstitutionFinal</code>.</p>
+<p>A federation clearing decision may require <code>FederationReconciled</code>.</p>
+<p>An emergency action may allow <code>LocalFinal</code> with mandatory later review.</p>
+<p>A public commons standard may require broader agreement roots.</p>
+<p>This prevents both brittle global-consensus machinery and local chaos pretending to be universal truth.</p>
 <h2>Rust host, WASM guest</h2>
 <p>Rust is the authority-bearing host.</p>
 <p>WASM is constrained execution.</p>
@@ -181,19 +351,23 @@ Last Reviewed: 2026-05-11</h2>
   module_hash
   process_id
   target_ref
+  state_resolution_capsule_hash
+  canonical_fact_snapshot_hash
   authority_context_hash
   standing_context_hash
+  agreement_context_hash
   mandate_ref
   rule_ref
   determinism_class
   privacy_class
+  finality_class
   fuel_limit
   input_artifact_refs
   canonical_facts
   expected_output_schema
 </code></pre>
 <p><code>canonical_facts</code> is not the database.</p>
-<p>It is the smallest set of pre-validated facts the host chose to disclose.</p>
+<p>It is the smallest set of pre-validated facts the host chose to disclose from the sealed fact snapshot.</p>
 <p>For example, a quorum-validation workload may receive:</p>
 <pre><code class="language-text">quorum_required
 eligible_voters
@@ -256,13 +430,17 @@ runtime profile   — fuel, determinism, host capabilities
 <li>Resolve standing.</li>
 <li>Resolve authority basis.</li>
 <li>Resolve mandate if institutional effects are possible.</li>
+<li>Resolve the governing agreement or scope rule.</li>
+<li>Resolve the distributed state frontier.</li>
+<li>Seal the State Resolution Capsule.</li>
+<li>Derive the Canonical Fact Snapshot.</li>
 <li>Select the rule or workload.</li>
 <li>Build the minimal input envelope.</li>
 <li>Hash and persist the input envelope reference.</li>
 <li>Execute WASM under fuel and runtime limits.</li>
 <li>Parse the output envelope.</li>
 <li>Validate the output schema.</li>
-<li>Verify output matches the expected process, target, workload, and transition kind.</li>
+<li>Verify output matches the expected process, target, workload, finality class, and transition kind.</li>
 <li>Reject unexpected fields or unauthorized transition kinds.</li>
 <li>Bind the result to a process-transition receipt.</li>
 <li>Persist the receipt.</li>
@@ -280,14 +458,18 @@ module_hash
 abi_version
 input_schema_id
 output_schema_id
+state_resolution_capsule_hash
+canonical_fact_snapshot_hash
 input_envelope_hash
 output_envelope_hash
 determinism_class
 privacy_class
+finality_class
 fuel_limit
 fuel_used
 runner_identity
 authority_context_hash
+agreement_context_hash
 mandate_ref
 result_kind
 prior_receipt_hash
@@ -298,12 +480,35 @@ signature
 <ul>
 <li>What rule ran?</li>
 <li>Against what facts?</li>
+<li>At what causal frontier?</li>
+<li>Under what finality class?</li>
 <li>Under what mandate?</li>
+<li>Under what agreement or scope rule?</li>
 <li>With what module?</li>
 <li>Producing what result?</li>
 <li>Bound to what process transition?</li>
 </ul>
 <p>That is how execution becomes memory instead of vibes.</p>
+<h2>First implementation slice</h2>
+<p>Do not start by solving universal distributed truth.</p>
+<p>Start by proving one bounded institutional truth can be sealed, executed, receipted, exported, and later challenged.</p>
+<p>Recommended first slice:</p>
+<pre><code class="language-text">single-institution proposal decision
+with membership snapshot
+with notice receipts
+with vote set root
+with decision receipt
+with one ProcessGateResultReceipt
+with evidence export
+</code></pre>
+<p>Then expand to:</p>
+<pre><code class="language-text">same process across two institutions
+with federation agreement receipt
+with member-entity attestations
+with reconciliation frontier
+with federation provenance
+</code></pre>
+<p>Baseline lock is earned by one honest loop, not by a theory of everything.</p>
 <h2>Manual insertion points</h2>
 <p>When integrating this into the full Foundational Manual:</p>
 <ol>
@@ -315,6 +520,7 @@ signature
 <li>Make Institutional Process Substrate the first baseline-lock build target.</li>
 <li>Treat <code>/me/standing</code> and Action Cards as the human-legibility layer immediately downstream of the process spine.</li>
 <li>Treat Rust as the authority-bearing host and WASM as constrained execution.</li>
+<li>Add State Resolution Capsule before Execution Input Envelope.</li>
 <li>Preserve the no-overclaim rule: this document is doctrine and drafting guidance, not a claim that the runtime is complete.</li>
 </ol>
 <h2>Closing doctrine</h2>
@@ -322,7 +528,9 @@ signature
 <p>Compute executes under mandate.</p>
 <p>Services provide capacity without becoming sovereign.</p>
 <p>Receipts prove the chain.</p>
-<p>Rust owns authority, persistence, evidence, and state transition.</p>
+<p>Causal frontiers locate the snapshot.</p>
+<p>Agreements define what frontier is sufficient.</p>
+<p>Rust owns authority, persistence, evidence, state resolution, and state transition.</p>
 <p>WASM computes over bounded facts.</p>
 <p>The kernel enforces constraints.</p>
 <p>Institutions supply meaning.</p>
