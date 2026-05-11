@@ -26,6 +26,26 @@ It complements:
 
 The goal is to turn the Foundational Manual from doctrine into an executable proof.
 
+## Proposed first PR
+
+Recommended PR title:
+
+```text
+test(runtime): add executable baseline-lock loop fixture
+```
+
+Purpose:
+
+> Prove one institution-local process can move from receipted history to sealed facts to WASM validation to Rust authorization to new receipts to evidence export to member-legible Action Card state.
+
+This PR should not attempt the whole system.
+
+It should not include live federation, live gossip, production mobile routing, real bridge execution, or production readiness claims.
+
+It should prove one spine.
+
+If the test does not pass, the doctrine is not yet real.
+
 ## Core target
 
 The first executable proof should deliberately ignore the network.
@@ -53,6 +73,49 @@ The goal:
 > Prove that ICN can move one institution-local process from receipted history to canonical facts to WASM validation to Rust authorization to new receipts to evidence export to member-legible Action Card state.
 
 If that loop works, the manual has a runtime spine.
+
+## Runtime sequence
+
+```mermaid
+sequenceDiagram
+    participant DAG as Receipt DAG Fixture
+    participant Host as Rust Host / Process Substrate
+    participant Projector as State Projector
+    participant WASM as WASM Guest
+    participant Receipts as Receipt Store
+    participant UX as Action Card Projection
+
+    DAG->>Host: Load signed process receipts
+    Host->>Projector: Resolve process frontier
+    Projector->>Projector: Verify signatures, standing, notice, votes
+    Projector-->>Host: Sealed StateResolutionCapsule
+    Projector-->>Host: CanonicalFacts
+
+    Host->>Host: Build ExecutionInputEnvelope
+    Host->>WASM: evaluate(input_bytes)
+    WASM->>WASM: Validate bounded facts only
+    WASM-->>Host: ExecutionOutputEnvelope
+
+    Host->>Host: Validate output as hostile
+    Host->>Host: Check process_id, target_ref, schema, transition kind
+    Host->>Receipts: Emit ProcessGateResultReceipt
+    Host->>Receipts: Emit AllocationAuthorizedReceipt
+    Host->>Receipts: Emit economic receipt if applicable
+
+    Receipts-->>Host: Updated receipt frontier
+    Host->>UX: Export evidence packet
+    UX-->>Host: ActionCard: Allocation Authorized
+```
+
+The Meaning Firewall is enforced at the narrowest point:
+
+```text
+WASM receives facts.
+WASM returns evaluation.
+Rust owns authority.
+Rust emits receipts.
+The institution supplies meaning.
+```
 
 ## Test fixture: build the receipt DAG
 
@@ -460,6 +523,30 @@ That is the first runtime spine.
 If this passes in a terminal, the manual is no longer only a manual.
 
 It is documentation for a functioning digital constitution.
+
+## Suggested first implementation tasks
+
+The first code PR should stay small enough to review.
+
+Suggested task breakdown:
+
+1. Add or reuse typed test-only receipt structs for the fixture.
+2. Add deterministic hashing helpers for the fixture receipts.
+3. Add test key generation and signing helpers.
+4. Build a fixture receipt DAG for one institution-local proposal.
+5. Implement a pure projection function that derives `CanonicalFacts`.
+6. Add deterministic envelope serialization.
+7. Add a tiny WASM guest crate with `evaluate(input_bytes) -> output_bytes`.
+8. Add host-side WASM execution with no WASI imports.
+9. Add output-envelope validation and hostile-output rejection.
+10. Emit `ProcessGateResultReceipt` and `AllocationAuthorizedReceipt` in the test harness.
+11. Export a minimal evidence packet.
+12. Project a minimal Action Card JSON object.
+13. Add negative tests before expanding scope.
+
+Review rule:
+
+> Any change that requires live networking, federation, bridge execution, production persistence, or real mobile routing is out of scope for the first PR.
 
 ## Manual insertion points
 
