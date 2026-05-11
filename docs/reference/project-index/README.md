@@ -1,7 +1,7 @@
 ---
 Status: operational
 Canonical: no
-Last Reviewed: 2026-05-09
+Last Reviewed: 2026-05-11
 ---
 
 # ICN Project Index
@@ -48,6 +48,16 @@ This directory is a **show-ready orientation layer** for the ICN repository. Its
 | [`pilot-and-nycn-map.md`](pilot-and-nycn-map.md) | The ICN ↔ NYCN boundary — what lives in this repo, what lives in the separate `InterCooperative-Network/nycn` repo, and what the next gates are. |
 | [`ci-ops-deploy-map.md`](ci-ops-deploy-map.md) | CI workflows, deploy paths, K3s smoke runbooks — routing only. |
 | [`show-readiness-map.md`](show-readiness-map.md) | What can be shown now, what should not be shown as finished, the suggested demo narrative, and red lines. |
+| [`project-coverage-matrix.md`](project-coverage-matrix.md) | Coverage-style matrix: subsystem → anchors → drift and show risks. |
+| [`identity-crypto-map.md`](identity-crypto-map.md) | Identity, keys, DIDs, signing — where code and docs live. |
+| [`network-gossip-map.md`](network-gossip-map.md) | QUIC, gossip, discovery — runtime surfaces and overclaim guardrails. |
+| [`ccl-map.md`](ccl-map.md) | Cooperative Contract Language interpreter and governance wiring. |
+| [`service-hosting-map.md`](service-hosting-map.md) | Service hosting design direction vs runtime (no finished “hosting product” claim). |
+| [`tool-commons-map.md`](tool-commons-map.md) | Tool Commons framing vs what exists in-tree today. |
+| [`pilot-ui-current-state-map.md`](pilot-ui-current-state-map.md) | What pilot-ui proves in demo mode tab-by-tab. |
+| [`stale-and-archived-map.md`](stale-and-archived-map.md) | Stale public or archived paths and how to repair drift. |
+| [`website-truth-map.md`](website-truth-map.md) | Website pages vs truth boundaries and review prompts. |
+| [`remote-work-plan.md`](remote-work-plan.md) | **Superseded pointer** — remote coordination backlog folded into this index + handoffs. |
 
 ## Vocabulary the maps use
 

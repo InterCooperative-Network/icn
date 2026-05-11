@@ -1,7 +1,7 @@
 {
-  "name": "icn-timebank-pilot-ui",
+  "name": "icn-pilot-ui",
   "version": "1.0.0",
-  "description": "ICN Timebank Pilot UI - Progressive Web App for cooperative time banking",
+  "description": "ICN Pilot UI - organizer/member demo surface for standing, action cards, governance, receipts, and provenance",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
@@ -15,9 +15,10 @@
     "test:a11y:ci": "playwright test tests/e2e/accessibility.spec.js --project=chromium"
   },
   "keywords": [
-    "timebank",
     "cooperative",
-    "mutual-credit",
+    "governance",
+    "receipts",
+    "provenance",
     "pwa"
   ],
   "author": "ICN Project",
