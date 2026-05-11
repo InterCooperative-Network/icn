@@ -1,0 +1,307 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Foundational Manual: Deterministic Boundary Types | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>manual</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>FOUNDATIONAL MANUAL BOUNDARY TYPES</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/manual/FOUNDATIONAL_MANUAL_BOUNDARY_TYPES.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: draft
+Canonical: no
+Last Reviewed: 2026-05-11</h2>
+<h1>Foundational Manual: Deterministic Boundary Types</h1>
+<p>This note captures the current drafting doctrine for the deterministic boundary crate used by the first executable baseline-lock loop.</p>
+<p>It is not a production-readiness claim.</p>
+<p>It is not a Phase 2 completion claim.</p>
+<p>It is not formal partner authorization.</p>
+<p>It is not an implementation issue.</p>
+<p>It complements:</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FOUNDATIONAL_MANUAL_EXECUTABLE_BASELINE_LOOP">`FOUNDATIONAL_MANUAL_EXECUTABLE_BASELINE_LOOP.md`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FOUNDATIONAL_MANUAL_BASELINE_LOCK">`FOUNDATIONAL_MANUAL_BASELINE_LOCK.md`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FOUNDATIONAL_MANUAL_STATE_PROJECTION_AND_COMPACTION">`FOUNDATIONAL_MANUAL_STATE_PROJECTION_AND_COMPACTION.md`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FOUNDATIONAL_MANUAL_ECONOMIC_STATE_RESOLUTION">`FOUNDATIONAL_MANUAL_ECONOMIC_STATE_RESOLUTION.md`</a></li>
+</ul>
+<p>The boundary crate is the first code seam for the proposed PR:</p>
+<pre><code class="language-text">test(runtime): add executable baseline-lock loop fixture
+</code></pre>
+<h2>Core doctrine</h2>
+<p>The boundary crate defines only the data that is allowed to cross the Meaning Firewall between the Rust authority-bearing host and the WASM constrained-execution guest.</p>
+<p>It must be shared by host and guest.</p>
+<p>It must be deterministic.</p>
+<p>It must be boring.</p>
+<p>It must not contain rich institutional meaning.</p>
+<p>It must not import runtime state.</p>
+<p>It must not expose database handles.</p>
+<p>It must not expose host callbacks.</p>
+<p>It must not contain floats.</p>
+<p>It must not contain unordered maps.</p>
+<p>It must not know cooperatives, democracy, money, membership, roles, or personhood.</p>
+<p>The boundary crate is where the Meaning Firewall becomes type checking.</p>
+<h2>Candidate crate</h2>
+<p>Candidate name:</p>
+<pre><code class="language-text">icn-boundary
+</code></pre>
+<p>Candidate responsibility:</p>
+<pre><code class="language-text">Hash
+ExecutionInputEnvelopeV1
+CanonicalFacts
+ExecutionOutputEnvelopeV1
+DeterminismClass
+PrivacyClass
+FinalityClass
+ResultKind
+</code></pre>
+<h2>Boundary structs</h2>
+<p>Initial shape:</p>
+<pre><code class="language-rust">use serde::{Deserialize, Serialize};
+
+/// A strict 32-byte array to ensure content-addressable hashes
+/// are passed deterministically across the ABI boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Hash(pub [u8; 32]);
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutionInputEnvelopeV1 {
+    pub abi_version: u32,
+    pub schema_id: String,
+    pub workload_id: String,
+    pub module_hash: Hash,
+    pub process_id: String,
+    pub target_ref: String,
+
+    // Hashes proving the host sealed the causal frontier.
+    pub state_resolution_capsule_hash: Hash,
+    pub canonical_fact_snapshot_hash: Hash,
+    pub authority_context_hash: Hash,
+    pub standing_context_hash: Hash,
+    pub agreement_context_hash: Hash,
+
+    pub mandate_ref: Option&lt;String&gt;,
+    pub rule_ref: String,
+    pub determinism_class: DeterminismClass,
+    pub privacy_class: PrivacyClass,
+    pub finality_class: FinalityClass,
+    pub fuel_limit: u64,
+    pub input_artifact_refs: Vec&lt;Hash&gt;,
+
+    // The only part of reality the WASM guest is allowed to see.
+    pub canonical_facts: CanonicalFacts,
+    pub expected_output_schema: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CanonicalFacts {
+    pub eligible_voters: u32,
+    pub votes_cast: u32,
+    pub approvals: u32,
+    pub rejections: u32,
+    pub abstentions: u32,
+    pub required_approvals: u32,
+    pub notice_delivered: bool,
+    pub allocation_requested: u64,
+    pub allocation_limit: u64,
+    pub reservation_not_consumed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutionOutputEnvelopeV1 {
+    pub abi_version: u32,
+    pub schema_id: String,
+    pub workload_id: String,
+    pub process_id: String,
+    pub result_kind: ResultKind,
+    pub passed: bool,
+    pub output_artifact_refs: Vec&lt;Hash&gt;,
+    pub diagnostics: Vec&lt;String&gt;,
+
+    // A proposed geometry, not an executed state transition.
+    pub proposed_transition_ref: Option&lt;Hash&gt;,
+    pub consumed_fuel: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeterminismClass {
+    Strict,
+    Advisory,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PrivacyClass {
+    Public,
+    EncryptedOverlay,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FinalityClass {
+    InstitutionLocal,
+    FederationPending,
+    BridgeExecuted,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ResultKind {
+    GateValidation,
+    MutationProposal,
+}
+</code></pre>
+<h2>Serialization rule</h2>
+<p>Governance-grade envelope serialization must be deterministic.</p>
+<p>Do not use ad hoc JSON.</p>
+<p>Do not rely on default serialization settings that may drift across crate versions.</p>
+<p>Use a pinned canonical binary configuration.</p>
+<p>The rule:</p>
+<blockquote>
+<p>Same envelope fields plus same serialization version plus same module hash must produce the same bytes and the same hash.</p>
+</blockquote>
+<p>Required constraints:</p>
+<pre><code class="language-text">pinned crate version
+explicit encoding configuration
+no unordered maps
+no f32/f64
+stable field ordering
+versioned schema ids
+fixture tests that assert stable hashes
+</code></pre>
+<p>The host serializes:</p>
+<pre><code class="language-text">ExecutionInputEnvelopeV1 -&gt; input_bytes
+</code></pre>
+<p>The guest deserializes:</p>
+<pre><code class="language-text">input_bytes -&gt; ExecutionInputEnvelopeV1
+</code></pre>
+<p>The guest serializes:</p>
+<pre><code class="language-text">ExecutionOutputEnvelopeV1 -&gt; output_bytes
+</code></pre>
+<p>The host deserializes and validates:</p>
+<pre><code class="language-text">output_bytes -&gt; ExecutionOutputEnvelopeV1
+</code></pre>
+<p>This physically enforces:</p>
+<pre><code class="language-text">evaluate(input_bytes) -&gt; output_bytes
+</code></pre>
+<h2>Fail-closed rule</h2>
+<p>If the WASM guest needs information that is not inside <code>CanonicalFacts</code>, it cannot reach out and get it.</p>
+<p>It cannot query the network.</p>
+<p>It cannot query the receipt DAG.</p>
+<p>It cannot ask the host whether someone has authority.</p>
+<p>It cannot write a receipt.</p>
+<p>It fails closed.</p>
+<h2>Build direction</h2>
+<p>After the boundary crate exists, build the WASM validation guest next.</p>
+<p>The guest is smaller than the host orchestrator and proves the negative shape of the Meaning Firewall first.</p>
+<p>The first guest should do only this:</p>
+<pre><code class="language-text">deserialize ExecutionInputEnvelopeV1
+check approvals &gt;= required_approvals
+check notice_delivered == true
+check allocation_requested &lt;= allocation_limit
+check reservation_not_consumed == true
+serialize ExecutionOutputEnvelopeV1
+</code></pre>
+<p>No WASI.</p>
+<p>No host imports.</p>
+<p>No filesystem.</p>
+<p>No network.</p>
+<p>No clock.</p>
+<p>No randomness.</p>
+<p>No authority.</p>
+<p>Then build the host orchestrator around that inert guest.</p>
+<h2>Closing doctrine</h2>
+<p>The boundary crate is not plumbing.</p>
+<p>It is constitutional machinery.</p>
+<p>The guest only sees facts.</p>
+<p>The host owns authority.</p>
+<p>The institution supplies meaning.</p>
+<p>If it is not in the envelope, the guest cannot know it.</p>
+<p>That is the firewall.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
