@@ -1,0 +1,453 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Foundational Manual: Trustless Client Boundary | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>manual</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>FOUNDATIONAL MANUAL TRUSTLESS CLIENT BOUNDARY</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/manual/FOUNDATIONAL_MANUAL_TRUSTLESS_CLIENT_BOUNDARY.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: draft
+Canonical: no
+Last Reviewed: 2026-05-11</h2>
+<h1>Foundational Manual: Trustless Client Boundary</h1>
+<p>This note captures the current drafting doctrine for the ICN Foundational Manual around mobile clients, relays, light-node verification, outbound censorship, inbound withholding, and relay liability.</p>
+<p>It is not a production-readiness claim.</p>
+<p>It is not a Phase 2 completion claim.</p>
+<p>It is not formal partner authorization.</p>
+<p>It is not an implementation issue.</p>
+<p>It complements:</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FOUNDATIONAL_MANUAL_BASELINE_LOCK">`FOUNDATIONAL_MANUAL_BASELINE_LOCK.md`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FOUNDATIONAL_MANUAL_STATE_PROJECTION_AND_COMPACTION">`FOUNDATIONAL_MANUAL_STATE_PROJECTION_AND_COMPACTION.md`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FOUNDATIONAL_MANUAL_IDENTITY_RECOVERY_AND_CAPABILITIES">`FOUNDATIONAL_MANUAL_IDENTITY_RECOVERY_AND_CAPABILITIES.md`</a></li>
+</ul>
+<p>The core doctrine is simple:</p>
+<blockquote>
+<p>The operator routes; the operator does not filter.</p>
+<p>A mobile client cannot hold the whole institutional memory, but it must never blindly trust the relay that provides it.</p>
+<p>Submission requires cryptographic liability.</p>
+<p>State resolution requires multipath verification and cell-signed attestations.</p>
+<p>If an operator drops an action or hides a frontier, the protocol ensures the client holds the mathematical proof of their censorship.</p>
+</blockquote>
+<h2>Problem statement</h2>
+<p>The mobile edge is where peer-to-peer infrastructure stops being theory.</p>
+<p>Most people will not run a full institutional node in their pocket.</p>
+<p>A phone cannot hold the entire Merkle-DAG.</p>
+<p>A mobile client cannot maintain continuous gossip liveness.</p>
+<p>A member shell will often reach ICN through gateways, relays, cooperative infrastructure, commons utilities, or other service providers.</p>
+<p>That creates an asymmetry.</p>
+<p>If the relay controls the mobile shell&#39;s view of the network, the relay can quietly become a monarch by technical default.</p>
+<p>ICN must not allow that.</p>
+<p>Relays are not trusted oracles.</p>
+<p>Relays are cryptographically liable routing tubes.</p>
+<p>The operator routes.</p>
+<p>The operator does not filter.</p>
+<p>The operator does not decide what the member sees.</p>
+<p>The operator does not become the source of institutional memory.</p>
+<p>The mobile shell cannot hold the whole institution, but it must never blindly trust the relay that serves it.</p>
+<p>That is the trustless client boundary.</p>
+<h2>Outbound censorship and relay liability</h2>
+<p>Outbound censorship is the first mobile-edge attack.</p>
+<p>A member submits a vote, objection, deliberation entry, recovery challenge, or other signed receipt through a relay.</p>
+<p>The relay quietly drops it.</p>
+<p>The member thinks they acted.</p>
+<p>The institution never sees it.</p>
+<p>That cannot be treated as ordinary network failure.</p>
+<p>Submission must create cryptographic liability.</p>
+<p>When the Commons Shell sends an outbound receipt to a relay, the relay must immediately return a signed acceptance receipt.</p>
+<p>Candidate receipt:</p>
+<pre><code class="language-text">RelayAcceptanceReceipt
+  relay_node_id
+  relay_operator_ref
+  submitting_identity_anchor
+  submitting_device_or_key
+  submitted_receipt_hash
+  target_process_id
+  target_scope_or_agreement
+  accepted_at
+  relay_liveness_policy
+  gossip_obligation
+  inclusion_deadline
+  signature
+</code></pre>
+<p>This receipt says:</p>
+<blockquote>
+<p>I received this signed action and accept the obligation to gossip it according to this service rule.</p>
+</blockquote>
+<p>If the relay refuses to provide acceptance, the shell treats the relay as hostile or degraded.</p>
+<p>It drops the route.</p>
+<p>It tries another discovered peer.</p>
+<p>Relay acceptance is not finality.</p>
+<p>It is liability.</p>
+<p>The member-facing Action Card should move into:</p>
+<pre><code class="language-text">Pending Network Inclusion
+</code></pre>
+<p>The shell later requests a proof that the submitted receipt entered the relevant causal frontier.</p>
+<p>Candidate proof:</p>
+<pre><code class="language-text">GossipInclusionProof
+  submitted_receipt_hash
+  relay_acceptance_receipt_hash
+  included_frontier_hash
+  inclusion_path
+  cell_or_scope_attestation
+  observed_at
+  signature_set
+</code></pre>
+<p>If inclusion is proven, the Action Card resolves.</p>
+<p>If inclusion is missing after the liveness window, the shell now holds the relay&#39;s signed acceptance receipt.</p>
+<p>That becomes a censorship fraud proof.</p>
+<p>Candidate proof:</p>
+<pre><code class="language-text">CensorshipFraudProof
+  relay_acceptance_receipt_hash
+  submitted_receipt_hash
+  expected_inclusion_deadline
+  observed_frontier_hashes
+  missing_inclusion_evidence
+  reporter_identity_anchor
+  report_timestamp
+  signature
+</code></pre>
+<p>The network can verify that the relay accepted an obligation and failed to perform it.</p>
+<p>Consequences may include service deprecation, routing avoidance, operator standing challenge, federation service review, or other institution-defined sanctions.</p>
+<p>The point is not revenge.</p>
+<p>The point is that the relay cannot censor quietly.</p>
+<p>If it drops the member&#39;s action, it leaves fingerprints.</p>
+<h2>Inbound withholding and frontier attestations</h2>
+<p>Inbound withholding is the second mobile-edge attack.</p>
+<p>A member asks a relay for the latest state needed to process an Action Card.</p>
+<p>The relay serves an old frontier.</p>
+<p>Maybe it hides a <code>LostKeyRevokedReceipt</code>.</p>
+<p>Maybe it hides a challenge.</p>
+<p>Maybe it hides a new vote receipt.</p>
+<p>Maybe it hides the fact that a process already closed.</p>
+<p>The member makes a decision against manipulated memory.</p>
+<p>ICN must not let a single relay declare reality.</p>
+<p>A relay should not send &quot;the state.&quot;</p>
+<p>It should send a signed frontier attestation and the proofs required to verify it.</p>
+<p>Candidate attestation:</p>
+<pre><code class="language-text">StateFrontierAttestation
+  scope_or_agreement_ref
+  frontier_hash
+  latest_receipt_hashes
+  membership_root
+  authority_root
+  revocation_root
+  capability_root
+  process_roots
+  snapshot_refs
+  finality_class
+  produced_at
+  liveness_window
+  signer_set
+  signature_threshold
+  signatures
+</code></pre>
+<p>For governance-grade frontiers, a single relay signature is not enough.</p>
+<p>A cell, institution, federation, or commons service should define the required attestation threshold.</p>
+<p>A cooperative cell may require three of five service nodes.</p>
+<p>A federation clearing process may require member-entity attestations.</p>
+<p>A high-risk identity or treasury action may require a fresh revocation frontier.</p>
+<p>The mobile shell verifies the signatures and finality class before treating the frontier as usable.</p>
+<p>If the relay serves a stale but valid old frontier, that is still not enough.</p>
+<p>The shell performs multipath cross-checking.</p>
+<p>It asks multiple discovered endpoints:</p>
+<blockquote>
+<p>What is your highest known frontier attestation hash for this scope or process?</p>
+</blockquote>
+<p>If one relay reports frontier <code>A</code>, but other unrelated endpoints report frontier <code>B</code>, the shell detects divergence.</p>
+<p>The shell requests the missing DAG segments, checkpoint proofs, or frontier attestations from other peers.</p>
+<p>A withholding attempt fails unless the attacker controls every route the client can reach.</p>
+<p>This is why service discovery must not collapse to one backend URL.</p>
+<p>The Commons Shell needs a multiplexer.</p>
+<h2>Commons Shell as ephemeral light node</h2>
+<p>The Commons Shell cannot be built like a normal web app talking to a backend server.</p>
+<p>A normal web app trusts the backend.</p>
+<p>ICN cannot.</p>
+<p>The Commons Shell must behave as an ephemeral light node.</p>
+<p>It does not hold the whole institutional memory.</p>
+<p>It does not maintain full gossip.</p>
+<p>It does not become a full node.</p>
+<p>But it does verify what it is shown.</p>
+<p>Minimum mobile shell responsibilities:</p>
+<ol>
+<li><strong>Local key enclave</strong> — keys are generated, stored, and used locally where possible; the relay does not hold signing authority.</li>
+<li><strong>Local fact store</strong> — the shell caches verified frontier attestations, capability tokens, revocation roots, Action Card state, and recent receipts.</li>
+<li><strong>Proof verifier</strong> — the shell verifies frontier attestations, inclusion proofs, receipt chains, and relevant Merkle paths.</li>
+<li><strong>Local WASM execution</strong> — the shell can run <code>evaluate(input_bytes) -&gt; output_bytes</code> for bounded checks so the relay cannot simply lie about rule evaluation.</li>
+<li><strong>Multiplexer</strong> — the shell routes requests across multiple relays, cells, gateways, commons utilities, and public service endpoints.</li>
+<li><strong>Route suspicion memory</strong> — the shell tracks relay failures, stale-frontier patterns, refusal-to-accept events, and fraud proofs.</li>
+<li><strong>User-legible status</strong> — the shell explains whether an action is drafted, signed, relay-accepted, frontier-included, final, disputed, stale, or pending reconciliation.</li>
+</ol>
+<p>The user should not have to understand all of this.</p>
+<p>But the shell must.</p>
+<p>A mobile shell that cannot distinguish relay accepted, network included, and institution final is not safe enough for governance.</p>
+<h2>Mobile Action finality states</h2>
+<p>Action Cards need more than complete/incomplete.</p>
+<p>They need network-aware finality states.</p>
+<p>Candidate states:</p>
+<pre><code class="language-text">DraftLocal
+SignedLocal
+RelayAccepted
+PendingNetworkInclusion
+IncludedAtFrontier
+InstitutionFinal
+FederationPending
+FederationReconciled
+StaleFrontierWarning
+DivergentFrontierDetected
+CensorshipSuspected
+CensorshipProofAvailable
+RejectedAtFrontier
+ChallengeOpen
+Expired
+</code></pre>
+<p>This makes mobile participation honest.</p>
+<p>A user should know the difference between:</p>
+<blockquote>
+<p>I signed this.</p>
+</blockquote>
+<p>and:</p>
+<blockquote>
+<p>A relay accepted this.</p>
+</blockquote>
+<p>and:</p>
+<blockquote>
+<p>The institution included this.</p>
+</blockquote>
+<p>and:</p>
+<blockquote>
+<p>This is final under the relevant agreement.</p>
+</blockquote>
+<p>Those are different states.</p>
+<p>Conflating them recreates platform trust.</p>
+<h2>Relay and frontier receipts</h2>
+<p>Trustless client operation needs its own receipt classes.</p>
+<p>Candidate receipts and proofs:</p>
+<pre><code class="language-text">RelayAcceptanceReceipt
+RelayRefusalReceipt
+RelayDeliveryAttemptReceipt
+GossipInclusionProof
+StateFrontierAttestation
+FrontierDivergenceReport
+CensorshipFraudProof
+StateWithholdingProof
+RelayDeprecationReceipt
+ServiceDiscoveryUpdateReceipt
+ClientRouteAuditReceipt
+</code></pre>
+<p>A <code>RelayRefusalReceipt</code> may be useful when a relay refuses for a legitimate reason:</p>
+<pre><code class="language-text">rate_limited
+unsupported_scope
+invalid_signature
+expired_capability
+stale_client_frontier
+policy_denied
+service_degraded
+</code></pre>
+<p>That distinction matters.</p>
+<p>Not every failed submission is censorship.</p>
+<p>But every failure should become legible.</p>
+<h2>Service discovery must be anti-capture</h2>
+<p>A trustless client boundary fails if the client only knows one relay.</p>
+<p>The Commons Shell needs signed service discovery lists.</p>
+<p>Candidate structure:</p>
+<pre><code class="language-text">ServiceDiscoveryList
+  scope_or_institution_ref
+  relay_endpoints
+  gateway_endpoints
+  archive_endpoints
+  frontier_attestation_endpoints
+  public_utility_endpoints
+  operator_refs
+  service_capabilities
+  freshness_policy
+  deprecation_list
+  produced_at
+  expires_at
+  signature_set
+</code></pre>
+<p>The shell should cache multiple routes.</p>
+<p>It should prefer diversity across operators, networks, geographies, infrastructure providers, and institutional roles.</p>
+<p>For high-risk actions, the shell should cross-check frontiers through multiple unrelated endpoints before presenting an action as safe to execute.</p>
+<p>The point is not maximum paranoia for every tap.</p>
+<p>The point is risk-scaled verification.</p>
+<p>Reading a public bulletin is one thing.</p>
+<p>Signing a federation vote, treasury action, emergency authority, role revocation, or identity recovery finalization is another.</p>
+<h2>Local WASM verification at the edge</h2>
+<p>The relay may provide the Canonical Fact Snapshot.</p>
+<p>The relay may provide the State Resolution Capsule.</p>
+<p>The relay may provide the Execution Input Envelope.</p>
+<p>But the phone should be able to verify and re-run the bounded rule where practical.</p>
+<p>The same rule applies at the edge:</p>
+<pre><code class="language-text">evaluate(input_bytes) -&gt; output_bytes
+</code></pre>
+<p>The phone does not need the whole institution.</p>
+<p>It needs enough facts, hashes, frontier attestations, and proofs to verify the specific Action Card it is being asked to display or sign.</p>
+<p>If the relay says:</p>
+<blockquote>
+<p>This vote is open and you are eligible.</p>
+</blockquote>
+<p>The shell should be able to verify:</p>
+<pre><code class="language-text">process frontier is attested
+membership/standing root includes the member or credential proof
+capability is fresh enough
+notice rule is satisfied
+challenge/finality state is as claimed
+rule evaluation output matches the provided result
+</code></pre>
+<p>The relay can help compute.</p>
+<p>It cannot be the only witness.</p>
+<h2>Field demonstration implication</h2>
+<p>Baseline lock cannot be evaluated only from server-side correctness.</p>
+<p>The mobile/member shell path must prove that a nontechnical member can:</p>
+<ul>
+<li>sign locally;</li>
+<li>receive relay acceptance;</li>
+<li>distinguish acceptance from inclusion;</li>
+<li>verify or receive verified frontier attestations;</li>
+<li>detect stale or divergent frontiers where risk requires it;</li>
+<li>route around a bad relay;</li>
+<li>export fraud proof when censorship occurs;</li>
+<li>understand the status of their Action Card.</li>
+</ul>
+<p>A field demonstration that requires members to trust one hosted backend has not demonstrated ICN.</p>
+<p>It has demonstrated a platform-shaped prototype.</p>
+<h2>First implementation slice</h2>
+<p>Do not begin with a universal mobile anti-censorship mesh.</p>
+<p>Begin with one bounded flow:</p>
+<pre><code class="language-text">single-institution Action Card
+mobile/light client local signature
+RelayAcceptanceReceipt
+PendingNetworkInclusion status
+GossipInclusionProof
+StateFrontierAttestation from institution cell
+multipath hash check against at least two endpoints
+CensorshipFraudProof test fixture
+</code></pre>
+<p>Then expand to:</p>
+<pre><code class="language-text">high-risk capability frontier checks
+identity recovery finalization on mobile
+federation vote Action Card
+service discovery rotation
+relay deprecation path
+public utility relay support
+</code></pre>
+<p>The first proof is not every mobile feature.</p>
+<p>The first proof is that a relay cannot quietly lie to the member.</p>
+<h2>Manual insertion points</h2>
+<p>When integrating this into the full Foundational Manual:</p>
+<ol>
+<li>Add the trustless client boundary after capability/frontier doctrine and before field-demonstration readiness.</li>
+<li>Treat the Commons Shell as an ephemeral light node, not a web frontend.</li>
+<li>Add RelayAcceptanceReceipt and GossipInclusionProof to the outbound action lifecycle.</li>
+<li>Add StateFrontierAttestation and multipath cross-checking to inbound state resolution.</li>
+<li>Add network-aware Action Card states.</li>
+<li>Require service discovery diversity for high-risk actions.</li>
+<li>Add local WASM verification where practical.</li>
+<li>Preserve the no-overclaim rule: this document is doctrine and drafting guidance, not a claim that the runtime is complete.</li>
+</ol>
+<h2>Closing doctrine</h2>
+<p>Relays route.</p>
+<p>They do not rule.</p>
+<p>Operators carry packets.</p>
+<p>They do not own memory.</p>
+<p>The mobile shell cannot hold the whole institution.</p>
+<p>It can still refuse to be lied to.</p>
+<p>Submission creates liability.</p>
+<p>Inclusion requires proof.</p>
+<p>Frontiers require attestation.</p>
+<p>High-risk state requires multipath verification.</p>
+<p>The Meaning Firewall must reach all the way to the glass.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
