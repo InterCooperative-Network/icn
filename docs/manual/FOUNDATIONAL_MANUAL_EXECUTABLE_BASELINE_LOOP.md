@@ -354,9 +354,17 @@ It computes over bounded facts.
 
 That is all.
 
-## Host orchestrator
+## Paranoid host orchestrator
 
 The Rust host runs the WASM module as untrusted code.
+
+This is the final execution bridge in the single-node baseline-lock loop.
+
+The host is not a convenience wrapper around WASM.
+
+It is the authority boundary.
+
+It must place the guest in a silent vacuum, inject the sealed input envelope, read the output envelope, and validate every identity-bearing field before any receipt can be emitted.
 
 The runtime must disable ambient authority.
 
@@ -386,31 +394,93 @@ expected input schema
 expected output schema
 module hash
 runtime profile
+maximum output length
 ```
 
-The host passes the serialized input envelope into the guest and receives output bytes.
+The host must validate the WASM module before execution:
 
-Then the host treats those bytes as hostile until validated.
+```text
+hash wasm_bytes
+compare to input.module_hash
+reject mismatch before instantiation or execution
+```
 
-It must check more than `process_id`:
+The host then serializes the input envelope, allocates guest memory through a narrow guest ABI, writes the input bytes into guest memory, and calls:
+
+```text
+evaluate(input_ptr, input_len) -> packed_result
+```
+
+The result must include both output pointer and output length.
+
+A naked pointer is not sufficient.
+
+Candidate packed return:
+
+```text
+high 32 bits = output_ptr
+low 32 bits  = output_len
+```
+
+The host must reject outputs that exceed the configured maximum size before reading the guest memory.
+
+Then the host reads output bytes, deserializes the output envelope, records consumed fuel, and treats the result as hostile until validation succeeds.
+
+Hostile-output validation must check more than `process_id`:
 
 ```text
 abi_version
-schema_id
-expected_output_schema
+schema_id == expected_output_schema
 workload_id
 process_id
-target_ref when present
 result_kind
-finality_class where encoded
+proposed_transition_ref allowed for this workload
 module_hash binding
-allowed proposed_transition_ref
-consumed_fuel within limit
+fuel consumed <= fuel limit
+output length <= max output length
+no unauthorized transition kind
 ```
 
-Only after that should the host consider `passed` meaningful.
+Only after those checks should the host consider `passed` meaningful.
 
 Only after that should the host emit receipts.
+
+Candidate orchestrator shape:
+
+```text
+WasmOrchestrator::execute_workload_safely(
+  wasm_bytes,
+  ExecutionInputEnvelopeV1
+) -> Result<ExecutionOutputEnvelopeV1, HostExecutionError>
+```
+
+The orchestrator sequence is:
+
+1. Hash and verify the WASM module against `module_hash`.
+2. Configure `wasmtime` with fuel consumption enabled.
+3. Instantiate without WASI.
+4. Extract `memory`, `alloc`, and `evaluate` exports.
+5. Serialize the input envelope with deterministic encoding.
+6. Allocate guest memory.
+7. Write input bytes.
+8. Execute the guest.
+9. Unpack output pointer and length.
+10. Reject oversized output.
+11. Read output bytes.
+12. Deserialize output envelope.
+13. Record consumed fuel.
+14. Validate ABI, schema, workload, process, result kind, and transition permissions.
+15. Return output to the Rust Process Substrate for receipt emission.
+
+This closes the execution loop.
+
+The guest computes.
+
+The host validates.
+
+The host authorizes.
+
+The host emits receipts.
 
 ## Receipt emitter
 
@@ -555,6 +625,8 @@ stale state frontier prevents envelope sealing where freshness is required
 wrong process_id in fixture receipt is rejected
 wrong target_ref in fixture receipt is rejected
 broken prior_receipt link is rejected
+oversized WASM output is rejected
+module hash mismatch is rejected before execution
 ```
 
 The negative tests matter as much as the happy path.
