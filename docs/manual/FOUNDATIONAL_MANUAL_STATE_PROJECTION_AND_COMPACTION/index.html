@@ -1,0 +1,510 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Foundational Manual: State Projection and Compaction | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>manual</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>FOUNDATIONAL MANUAL STATE PROJECTION AND COMPACTION</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/manual/FOUNDATIONAL_MANUAL_STATE_PROJECTION_AND_COMPACTION.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: draft
+Canonical: no
+Last Reviewed: 2026-05-11</h2>
+<h1>Foundational Manual: State Projection and Compaction</h1>
+<p>This note captures the current drafting doctrine for the ICN Foundational Manual around state projection, canonical facts, snapshotting, and compaction.</p>
+<p>It is not a production-readiness claim.</p>
+<p>It is not a Phase 2 completion claim.</p>
+<p>It is not formal partner authorization.</p>
+<p>It is not an implementation issue.</p>
+<p>It complements <a href="https://github.com/InterCooperative-Network/icn/blob/main/FOUNDATIONAL_MANUAL_BASELINE_LOCK">`FOUNDATIONAL_MANUAL_BASELINE_LOCK.md`</a> by specifying how a Rust host can derive canonical facts for governance-grade execution without relying on global consensus, a central database, or ambient current state.</p>
+<h2>Core doctrine</h2>
+<p>The Rust host must never compile <code>canonical_facts</code> from ambient current state.</p>
+<p>It must compile facts from a receipted causal frontier.</p>
+<p>For governance-grade execution, state is not a mutable table row.</p>
+<p>State is the deterministic projection of an append-only receipt graph up to a known frontier.</p>
+<p>Correct doctrine:</p>
+<blockquote>
+<p>CRDTs are for collaborative deliberation.</p>
+<p>ProcessTransitionReceipts are for institutional state.</p>
+<p>Merkle roots prove relevant sets.</p>
+<p>Causal frontiers locate what was known.</p>
+<p>Charters and agreements define what frontier is sufficient.</p>
+<p>Snapshots accelerate projection without replacing receipts.</p>
+<p>Compaction never destroys auditability.</p>
+</blockquote>
+<h2>Split state doctrine</h2>
+<p>ICN should not use the same data structure for institutional chatter and institutional spine.</p>
+<h3>CRDTs are for deliberation</h3>
+<p>CRDTs are appropriate for advisory and collaborative surfaces where concurrent edits are legitimate:</p>
+<ul>
+<li>proposal drafts;</li>
+<li>meeting notes;</li>
+<li>comments;</li>
+<li>argument maps;</li>
+<li>preview packet workspaces;</li>
+<li>collaborative educational materials;</li>
+<li>shared working documents.</li>
+</ul>
+<p>CRDTs resolve data convergence.</p>
+<p>They do not resolve authority.</p>
+<p>Once a deliberation artifact becomes part of an institutional process, it must be snapshotted, hashed, and attached to a receipt.</p>
+<p>The CRDT is the workspace.</p>
+<p>The receipt is the institutional memory.</p>
+<h3>Merkle-DAG receipts are for decision</h3>
+<p>Governance-grade institutional state is a Merkle-DAG of <code>ProcessTransitionReceipt</code> records.</p>
+<p>Examples:</p>
+<ul>
+<li><code>ProcessSessionOpenedReceipt</code>;</li>
+<li><code>DeliberationEntryRecordedReceipt</code>;</li>
+<li><code>DecisionRecordedReceipt</code>;</li>
+<li><code>ActivationCrossedReceipt</code>;</li>
+<li><code>MutationPlanRecordedReceipt</code>;</li>
+<li><code>MutationAppliedReceipt</code>;</li>
+<li><code>EvidencePacketProducedReceipt</code>;</li>
+<li><code>ProcessGateResultReceipt</code>.</li>
+</ul>
+<p>A budget allocation, role activation, final vote tally, emergency authority activation, or settlement record is not merged like a text document.</p>
+<p>Reversal is a counter-record, not mutation.</p>
+<p>The institutional state at a point in time is the deterministic projection of the receipt graph from genesis or from a trusted checkpoint to the current causal frontier.</p>
+<h2>Causal frontier pinning</h2>
+<p>Before assembling canonical facts, the host pins the exact frontier for the target process.</p>
+<p>The frontier should identify:</p>
+<pre><code class="language-text">process_id
+target_ref
+latest_process_receipt_hash
+membership_frontier_hash
+standing_context_hash
+deliberation_frontier_hash
+vote_set_root
+notice_receipt_root
+privacy_frontier_hash
+conflict_frontier_hash
+agreement_context_hash
+finality_class
+</code></pre>
+<p>The host does not claim eternal truth.</p>
+<p>It claims:</p>
+<blockquote>
+<p>This process was evaluated at this known causal boundary.</p>
+</blockquote>
+<p>For a single-institution process, the frontier may be institution-local.</p>
+<p>For a federation process, the frontier may require member-entity receipts, federation agreement receipts, reconciliation state, clearing period receipts, and notice receipts across the agreed boundary.</p>
+<p>The kernel does not know what that boundary means politically.</p>
+<p>The charter or agreement defines the sufficient frontier.</p>
+<p>The host enforces the constraint.</p>
+<h2>Canonical fact projection</h2>
+<p>Canonical facts are produced by pure reduction over receipted state.</p>
+<p>The host does not query a mutable database and trust the answer.</p>
+<p>The host walks or indexes the receipt graph and reduces only the receipts relevant to the process, target, authority context, and frontier.</p>
+<p>Example membership-vote projection:</p>
+<ol>
+<li>Read <code>ProcessSessionOpenedReceipt</code> to identify process rules.</li>
+<li>Read <code>StandingContextHash</code> to identify who had standing at the process frontier.</li>
+<li>Collect valid signed vote receipts causally linked to the process.</li>
+<li>Exclude revoked, superseded, duplicate, invalid, late, or out-of-scope receipts.</li>
+<li>Verify notice receipts satisfy the process rule.</li>
+<li>Verify the liveness/freshness rule in the charter or agreement.</li>
+<li>Compute counts.</li>
+<li>Seal the canonical fact snapshot.</li>
+</ol>
+<p>The projected fact values may be small:</p>
+<pre><code class="language-text">quorum_required = 0.66
+eligible_voters = 42
+votes_cast = 31
+approvals = 24
+rejections = 5
+abstentions = 2
+notice_delivered = true
+sync_constraint_met = true
+</code></pre>
+<p>But those values must be backed by roots and receipts:</p>
+<pre><code class="language-text">membership_snapshot_root
+eligible_voter_set_root
+vote_set_root
+notice_receipt_root
+state_frontier_id
+source_receipt_refs
+</code></pre>
+<p>The WASM guest receives bounded facts.</p>
+<p>The Rust host keeps provenance.</p>
+<h2>Partition and liveness constraints</h2>
+<p>ICN does not halt the world to obtain global consensus.</p>
+<p>That does not mean a partitioned view gets to pretend it is final.</p>
+<p>Each process type must define what freshness, liveness, and reconciliation conditions are required before a fact snapshot can seal.</p>
+<p>Those rules come from the charter, agreement, scope rule, or emergency authority rule.</p>
+<p>Examples:</p>
+<ul>
+<li>A household-local action may require only local finality.</li>
+<li>A cooperative budget decision may require institution finality plus notice receipts.</li>
+<li>A federation clearing decision may require member-entity receipts and federation reconciliation.</li>
+<li>An emergency action may allow local finality with mandatory later review.</li>
+<li>A public commons standard may require broader agreement roots.</li>
+</ul>
+<p>If the required frontier is unavailable, stale, forked, or disputed, the host fails closed.</p>
+<p>WASM is never invoked for a governance-grade transition when the fact frontier is insufficient.</p>
+<h2>Fork handling</h2>
+<p>A Merkle-DAG can reveal causal divergence.</p>
+<p>If two conflicting branches appear, the host does not silently merge them.</p>
+<p>The host records the divergence and routes it according to the process rule.</p>
+<p>Possible paths:</p>
+<ul>
+<li>reject sealing until the fork is resolved;</li>
+<li>produce a <code>fork_detected = true</code> fact for a charter-defined conflict workload;</li>
+<li>trigger a conflict-resolution Action Card;</li>
+<li>open a relational or governance challenge path;</li>
+<li>allow local provisional continuity with explicit non-final receipt status.</li>
+</ul>
+<p>The rule is simple:</p>
+<blockquote>
+<p>Forks are not bugs to hide. They are institutional facts to route.</p>
+</blockquote>
+<p>No fake finality.</p>
+<p>No invisible merge of authority-bearing decisions.</p>
+<p>No treating eventual consistency as legitimacy.</p>
+<h2>Snapshotting doctrine</h2>
+<p>New nodes should not need to replay an institution&#39;s entire history from genesis to evaluate one process gate.</p>
+<p>But snapshotting must not become database amnesia.</p>
+<p>A snapshot is a receipted checkpoint of a deterministic projection.</p>
+<p>It is not a replacement for the receipt graph.</p>
+<p>It is not an editable state dump.</p>
+<p>It is not a new source of authority.</p>
+<p>A valid governance-grade snapshot should include:</p>
+<pre><code class="language-text">snapshot_id
+institution_or_scope_id
+snapshot_kind
+covered_receipt_range
+base_frontier_hash
+resulting_state_root
+included_set_roots
+excluded_receipt_policy
+projection_function_id
+projection_function_version
+schema_id
+created_by
+created_at
+authority_context_hash
+agreement_context_hash
+signature_set
+challenge_window
+retention_policy
+</code></pre>
+<p>The snapshot says:</p>
+<blockquote>
+<p>Applying this known projection function to these receipts at this frontier produced this state root.</p>
+</blockquote>
+<p>That is the only legitimate shortcut.</p>
+<h2>Snapshot kinds</h2>
+<p>Different state surfaces need different snapshot types.</p>
+<p>Candidate snapshot kinds:</p>
+<h3>Membership snapshot</h3>
+<p>Captures members with standing at a frontier.</p>
+<p>Used for:</p>
+<ul>
+<li>eligibility;</li>
+<li>quorum;</li>
+<li>representation;</li>
+<li>notice requirements;</li>
+<li>member-facing standing.</li>
+</ul>
+<h3>Role and authority snapshot</h3>
+<p>Captures active roles, grants, mandates, expirations, revocations, and typed scopes at a frontier.</p>
+<p>Used for:</p>
+<ul>
+<li>authority resolution;</li>
+<li>execution gating;</li>
+<li>steward review;</li>
+<li>operator/non-operator separation;</li>
+<li>mandate validation.</li>
+</ul>
+<h3>Vote set snapshot</h3>
+<p>Captures valid votes for a process at a frontier.</p>
+<p>Used for:</p>
+<ul>
+<li>tallying;</li>
+<li>quorum validation;</li>
+<li>decision receipts;</li>
+<li>challenge review.</li>
+</ul>
+<h3>Notice snapshot</h3>
+<p>Captures delivered, failed, waived, translated, or accessibility-adapted notices.</p>
+<p>Used for:</p>
+<ul>
+<li>due process;</li>
+<li>appeal windows;</li>
+<li>meeting validity;</li>
+<li>emergency authority review.</li>
+</ul>
+<h3>Deliberation snapshot</h3>
+<p>Captures the receipted deliberation record or hashed CRDT-derived artifact at a process frontier.</p>
+<p>Used for:</p>
+<ul>
+<li>preview/review packets;</li>
+<li>evidence export;</li>
+<li>challenge review;</li>
+<li>institutional learning.</li>
+</ul>
+<h3>Agreement frontier snapshot</h3>
+<p>Captures the governing agreement, compact, charter rule, or federation coordination boundary relevant to the process.</p>
+<p>Used for:</p>
+<ul>
+<li>federation reconciliation;</li>
+<li>cross-institution authority;</li>
+<li>shared services;</li>
+<li>clearing;</li>
+<li>finality rules.</li>
+</ul>
+<h2>Compaction doctrine</h2>
+<p>Compaction is not deletion.</p>
+<p>Compaction is the replacement of repeated full replay with trusted checkpoints while preserving the ability to audit, challenge, and reconstruct.</p>
+<p>The system may compact hot operational state.</p>
+<p>It must not compact away legitimacy.</p>
+<p>A compacted segment must retain:</p>
+<ul>
+<li>segment root;</li>
+<li>first and last receipt hash;</li>
+<li>receipt count;</li>
+<li>projection function id;</li>
+<li>resulting state root;</li>
+<li>signature set;</li>
+<li>retention rule;</li>
+<li>challenge status;</li>
+<li>archival location or proof of durable preservation.</li>
+</ul>
+<p>If an old segment cannot be replayed locally, the node must still be able to verify the segment root and retrieve or request the evidence when needed.</p>
+<p>The local hot store can be small.</p>
+<p>The audit chain cannot be fake.</p>
+<h2>Checkpoint authority</h2>
+<p>Not every node can mint a governance-grade checkpoint for everyone else.</p>
+<p>Checkpoint authority must be scoped.</p>
+<p>Possible checkpoint issuers:</p>
+<ul>
+<li>the institution&#39;s own cell;</li>
+<li>a federation archive service authorized by agreement;</li>
+<li>a commons archival body with scoped authority;</li>
+<li>a steward review process;</li>
+<li>a quorum of member entities;</li>
+<li>an operator only when authorized by institutional rule and never as political authority.</li>
+</ul>
+<p>A checkpoint signed only by an operator key is an operational artifact.</p>
+<p>A checkpoint signed under institutional authority is an institutional artifact.</p>
+<p>Do not confuse them.</p>
+<p>Running the node is not ruling the memory.</p>
+<h2>New-node bootstrap</h2>
+<p>A new node joining a cell should bootstrap from layered checkpoints, not genesis replay.</p>
+<p>Safe bootstrap path:</p>
+<ol>
+<li>Fetch trusted institution identity and charter root.</li>
+<li>Fetch latest accepted checkpoint manifest for the relevant scope.</li>
+<li>Verify checkpoint signatures against the charter/agreement authority rule.</li>
+<li>Verify segment roots and state roots.</li>
+<li>Fetch hot receipt tail after the checkpoint frontier.</li>
+<li>Replay only the tail.</li>
+<li>Recompute state roots.</li>
+<li>Compare with advertised frontier.</li>
+<li>Mark local state as usable only after verification.</li>
+<li>Preserve the ability to request archived receipts for audit or challenge.</li>
+</ol>
+<p>A node may be operationally synced before it is governance-authoritative.</p>
+<p>That distinction should be explicit.</p>
+<h2>Evidence retention and challenge windows</h2>
+<p>Snapshotting and compaction must respect challenge windows.</p>
+<p>No state segment should be compacted beyond practical review while an appeal, challenge, audit, or dispute window remains open.</p>
+<p>Retention policy must be tied to:</p>
+<ul>
+<li>rights floor;</li>
+<li>process type;</li>
+<li>privacy class;</li>
+<li>evidence sensitivity;</li>
+<li>legal bridge requirements;</li>
+<li>federation agreement;</li>
+<li>institutional archive policy;</li>
+<li>member export rights.</li>
+</ul>
+<p>Privacy matters too.</p>
+<p>Some evidence should not be globally replicated forever.</p>
+<p>The system must distinguish:</p>
+<ul>
+<li>public receipt hash;</li>
+<li>redacted evidence packet;</li>
+<li>sealed private evidence;</li>
+<li>access-controlled archive;</li>
+<li>deletion or minimization rule;</li>
+<li>counter-record proving deletion/minimization occurred where allowed.</li>
+</ul>
+<p>Receipts prove that the process happened.</p>
+<p>They do not justify turning every harm process into a permanent public trauma archive.</p>
+<h2>Snapshot receipts</h2>
+<p>Snapshot creation should itself be receipted.</p>
+<p>Candidate receipt:</p>
+<pre><code class="language-text">StateSnapshotProducedReceipt
+  snapshot_id
+  snapshot_kind
+  institution_or_scope_id
+  covered_receipt_range
+  base_frontier_hash
+  resulting_state_root
+  projection_function_id
+  projection_function_version
+  schema_id
+  produced_by
+  authority_context_hash
+  agreement_context_hash
+  signature_set
+  challenge_window
+  retention_policy
+  record_hash
+</code></pre>
+<p>Compaction should also be receipted.</p>
+<p>Candidate receipt:</p>
+<pre><code class="language-text">StateSegmentCompactedReceipt
+  segment_id
+  covered_receipt_range
+  segment_root
+  checkpoint_snapshot_id
+  archival_location_ref
+  retention_policy
+  compaction_authority
+  challenge_status
+  record_hash
+</code></pre>
+<p>These receipt classes keep operational efficiency from becoming institutional amnesia.</p>
+<h2>Relationship to WASM execution</h2>
+<p>The WASM guest never receives the receipt graph.</p>
+<p>The WASM guest never receives the checkpoint authority model.</p>
+<p>The WASM guest never receives raw institutional memory.</p>
+<p>The Rust host resolves and seals state first.</p>
+<p>Then it passes only bounded facts and relevant hashes into the execution envelope.</p>
+<p>Execution input should therefore include:</p>
+<pre><code class="language-text">state_resolution_capsule_hash
+canonical_fact_snapshot_hash
+snapshot_refs
+frontier_hash
+finality_class
+canonical_facts
+</code></pre>
+<p>WASM evaluates the static fact capsule.</p>
+<p>Rust binds the result to the process transition receipt.</p>
+<h2>First implementation slice</h2>
+<p>Do not begin with universal distributed state compaction.</p>
+<p>Begin with one bounded institution-local process.</p>
+<p>Recommended first slice:</p>
+<pre><code class="language-text">single-institution proposal decision
+membership snapshot
+notice receipt root
+vote set root
+decision receipt
+ProcessGateResultReceipt
+StateSnapshotProducedReceipt for membership/vote frontier
+evidence export
+</code></pre>
+<p>Then expand to:</p>
+<pre><code class="language-text">two-institution federation process
+federation agreement receipt
+member-entity attestations
+reconciliation frontier
+federation provenance
+checkpoint signed by agreement-defined authority
+</code></pre>
+<p>Baseline lock is not a theory of all possible state.</p>
+<p>Baseline lock is one honest process whose facts can be projected, sealed, executed, receipted, snapshotted, exported, and challenged.</p>
+<h2>Closing doctrine</h2>
+<p>State is not whatever the database says right now.</p>
+<p>State is a receipted projection at a causal frontier.</p>
+<p>Snapshots are acceleration, not authority.</p>
+<p>Compaction is operational hygiene, not amnesia.</p>
+<p>The audit chain survives.</p>
+<p>The rights floor survives.</p>
+<p>The challenge path survives.</p>
+<p>The institution can move forward without forgetting what made the movement legitimate.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
