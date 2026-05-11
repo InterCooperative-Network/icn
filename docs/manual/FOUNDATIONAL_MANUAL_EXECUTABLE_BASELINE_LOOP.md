@@ -123,6 +123,8 @@ Before the host can resolve state, there must be state to resolve.
 
 The first test fixture should manually instantiate a hardcoded Merkle-DAG of process receipts.
 
+The fixture should fake history, not final state.
+
 The fixture should create:
 
 ```text
@@ -163,6 +165,35 @@ No ambient state.
 
 Just receipts.
 
+## Fixture safety notes
+
+Toy cryptography is acceptable only for an early smoke-test sketch.
+
+The actual PR should use deterministic test helpers backed by the project's real hash/signature primitives where possible.
+
+Avoid collision-prone helpers like:
+
+```text
+Hash([data.len() as u8; 32])
+```
+
+That proves nothing about content addressing.
+
+Use a stable hash over canonical bytes.
+
+Mock signers may be test-only, but they should still bind:
+
+```text
+receipt type
+receipt fields
+prior receipt hash
+process_id
+target_ref
+signer id
+```
+
+Otherwise the test can pass while the causal chain is fake.
+
 ## Rust projector and envelope builder
 
 The Rust host then runs a pure projection function against the fixture.
@@ -180,13 +211,20 @@ It verifies:
 
 ```text
 receipt signatures
+receipt hashes
 causal links
-standing context
+process_id matches the target process
+receipt target_ref matches the target object where relevant
+standing snapshot exists
 eligible voter set
 notice receipts
 vote receipt validity
-no duplicate votes
-no revoked or out-of-scope signer
+vote signers are eligible at the standing frontier
+notice was delivered to every eligible voter
+no duplicate votes unless an explicit rule resolves replacement
+vote receipts belong to the process window
+allocation request is linked to the target object
+reservation has not already been consumed
 frontier sufficiency for this mocked institution-local process
 ```
 
@@ -206,7 +244,17 @@ CanonicalFacts
   reservation_not_consumed = true
 ```
 
-The host then wraps those facts in an `ExecutionInputEnvelope`:
+The projector should fail before WASM if the institutional history is insufficient.
+
+Missing notice should not merely become a polite `false` unless the process rule explicitly allows the guest to evaluate that condition.
+
+For baseline lock, the stronger rule is:
+
+> If a required due-process fact is missing, the host does not seal the envelope.
+
+This keeps civil-rights constraints out of the guest's discretion.
+
+The host then wraps sealed facts in an `ExecutionInputEnvelope`:
 
 ```text
 ExecutionInputEnvelopeV1
@@ -263,6 +311,10 @@ It should expose one function:
 ```text
 evaluate(input_bytes) -> output_bytes
 ```
+
+The actual ABI must return both output pointer and output length, either through a packed return, an out-parameter, or an allocation ABI.
+
+A naked output pointer is not sufficient.
 
 It deserializes the input envelope, performs bounded checks, and returns an output envelope.
 
@@ -340,7 +392,25 @@ The host passes the serialized input envelope into the guest and receives output
 
 Then the host treats those bytes as hostile until validated.
 
-It parses the output envelope, verifies the schema, checks that the output refers to the expected process, target, workload, finality class, and transition kind, and rejects any unexpected field or unauthorized transition.
+It must check more than `process_id`:
+
+```text
+abi_version
+schema_id
+expected_output_schema
+workload_id
+process_id
+target_ref when present
+result_kind
+finality_class where encoded
+module_hash binding
+allowed proposed_transition_ref
+consumed_fuel within limit
+```
+
+Only after that should the host consider `passed` meaningful.
+
+Only after that should the host emit receipts.
 
 ## Receipt emitter
 
@@ -482,6 +552,9 @@ allocation above limit is rejected
 double reservation is rejected
 changed module hash invalidates expected execution
 stale state frontier prevents envelope sealing where freshness is required
+wrong process_id in fixture receipt is rejected
+wrong target_ref in fixture receipt is rejected
+broken prior_receipt link is rejected
 ```
 
 The negative tests matter as much as the happy path.
@@ -547,6 +620,46 @@ Suggested task breakdown:
 Review rule:
 
 > Any change that requires live networking, federation, bridge execution, production persistence, or real mobile routing is out of scope for the first PR.
+
+## Immediate next priority
+
+After the boundary crate and fixture/projector skeleton exist, build the `wasmtime` host orchestrator before CI polish.
+
+CI should run the test once it exists.
+
+But the next architectural risk is not whether CI can execute `cargo test`.
+
+The next architectural risk is whether the Rust host can run the WASM guest in a silent vacuum:
+
+```text
+no WASI
+no filesystem
+no network
+no host clock
+no random source
+no environment variables
+no database handle
+no authority callback
+no receipt-writing callback
+```
+
+The build order is:
+
+```text
+boundary crate
+receipt DAG fixture
+state projector
+WASM guest
+wasmtime host orchestrator
+full integration test
+CI gate
+```
+
+CI is the enforcement layer.
+
+The host orchestrator is the firewall layer.
+
+Build the firewall first.
 
 ## Manual insertion points
 
