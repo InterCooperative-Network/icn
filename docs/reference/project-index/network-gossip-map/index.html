@@ -1,0 +1,365 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Network and Gossip Map | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>project index</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>network gossip map</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/project-index/network-gossip-map.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: descriptive
+Canonical: no
+Last Reviewed: 2026-05-09</h2>
+<h1>Network and Gossip Map</h1>
+<blockquote>
+<p>For current project truth, defer to <a href="/docs/STATE">`docs/STATE.md`</a>, <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>, <a href="/docs/ARCHITECTURE">`docs/ARCHITECTURE.md`</a>, and <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a>. This map routes the distributed-systems substrate; it is not a production-readiness claim.</p>
+</blockquote>
+<h2>Purpose</h2>
+<p>ICN&#39;s distributed substrate has several layers that are easy to collapse by accident. This map keeps them separate.</p>
+<p>Core distinction:</p>
+<pre><code class="language-text">transport = connection
+gossip = state propagation
+federation = institutional relationship
+</code></pre>
+<p>A node connection is not a federation. A gossip topic is not a governance agreement. A federation is a governed institutional relationship that may use transport and gossip underneath it.</p>
+<h2>Source paths</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Transport, peer sessions, discovery, topology, NAT/relay support</td>
+<td><code>icn/crates/icn-net/</code></td>
+</tr>
+<tr>
+<td>Topic gossip, anti-entropy, partition handling, storage messages</td>
+<td><code>icn/crates/icn-gossip/</code></td>
+</tr>
+<tr>
+<td>Time / clock / replay-adjacent support</td>
+<td><code>icn/crates/icn-time/</code></td>
+</tr>
+<tr>
+<td>Store, replicas, proof-of-storage related state</td>
+<td><code>icn/crates/icn-store/</code></td>
+</tr>
+<tr>
+<td>Snapshot and distributed snapshot support</td>
+<td><code>icn/crates/icn-snapshot/</code></td>
+</tr>
+<tr>
+<td>Observability</td>
+<td><code>icn/crates/icn-obs/</code>, <code>monitoring/</code></td>
+</tr>
+<tr>
+<td>Deployment and ports</td>
+<td><code>deploy/</code>, <code>docs/reference/project-index/ci-ops-deploy-map.md</code></td>
+</tr>
+<tr>
+<td>Federation layer</td>
+<td><code>icn/crates/icn-federation/</code>, governance/entity docs</td>
+</tr>
+</tbody></table>
+<h2>Layer model</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Question answered</th>
+<th>Status</th>
+<th>Drift risk</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Transport</td>
+<td>Can this node connect to that peer?</td>
+<td>implemented but partial</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>Peer discovery</td>
+<td>How are peers found?</td>
+<td>implemented but partial</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>Identity-bound transport</td>
+<td>Is a peer connection bound to node identity?</td>
+<td>implemented but needs precise claims</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>Topology / fanout</td>
+<td>Which peers should this node prioritize?</td>
+<td>implemented but partial</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>NAT / relay support</td>
+<td>Can peers connect across difficult networks?</td>
+<td>implemented but partial</td>
+<td>high if described as production-reliable</td>
+</tr>
+<tr>
+<td>Gossip topics</td>
+<td>What state classes are exchanged?</td>
+<td>implemented but partial</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>Anti-entropy sync</td>
+<td>How does state converge after missed messages?</td>
+<td>implemented but partial</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>Partition detection/healing</td>
+<td>What happens after network splits?</td>
+<td>implemented but partial</td>
+<td>high</td>
+</tr>
+<tr>
+<td>Replica/storage messages</td>
+<td>How does storage durability propagate?</td>
+<td>implemented but partial</td>
+<td>medium-high</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>How do operators see network/gossip health?</td>
+<td>implemented but partial</td>
+<td>medium</td>
+</tr>
+<tr>
+<td>Federation</td>
+<td>What institutional relationships authorize exchange?</td>
+<td>implemented but partial; not live production</td>
+<td>high</td>
+</tr>
+</tbody></table>
+<h2>Transport map</h2>
+<p>The transport layer belongs primarily to <code>icn-net</code>.</p>
+<p>It includes or routes toward:</p>
+<ul>
+<li>peer sessions;</li>
+<li>discovery and bootstrap paths;</li>
+<li>identity-bound connection semantics;</li>
+<li>signed or authenticated message envelopes;</li>
+<li>replay protection and sequencing concerns;</li>
+<li>rate limiting;</li>
+<li>topology-aware neighbor selection;</li>
+<li>NAT traversal and relay-related support;</li>
+<li>version/capability negotiation;</li>
+<li>blob location support.</li>
+</ul>
+<p>Public claim boundary:</p>
+<ul>
+<li>Safe: ICN has a real peer-networking substrate.</li>
+<li>Unsafe without more evidence: ICN is production-ready across arbitrary real-world networks.</li>
+</ul>
+<h2>Gossip map</h2>
+<p>The gossip layer belongs primarily to <code>icn-gossip</code>.</p>
+<p>It includes or routes toward:</p>
+<ul>
+<li>topic-based state propagation;</li>
+<li>topic access controls;</li>
+<li>causal/version tracking;</li>
+<li>Bloom-filter and digest-style sync;</li>
+<li>push/pull exchange;</li>
+<li>anti-entropy repair;</li>
+<li>partition detection and healing;</li>
+<li>storage and replica status messages;</li>
+<li>service-discovery and key-rotation related topics.</li>
+</ul>
+<p>Public claim boundary:</p>
+<ul>
+<li>Safe: ICN has a real gossip/synchronization substrate.</li>
+<li>Unsafe without more evidence: all distributed conflict cases are solved automatically.</li>
+</ul>
+<h2>Federation is higher than networking</h2>
+<p>Federation should not be described as the same thing as peer connectivity.</p>
+<p>Correct model:</p>
+<pre><code class="language-text">secure transport
+  -&gt; gossip/sync
+  -&gt; institutional relationship
+  -&gt; governance/agreements/receipts
+</code></pre>
+<p>A live federation claim requires more than working network and gossip code. It requires a governed inter-institutional relationship and evidence that the relationship is active in the claimed context.</p>
+<p>Current public boundary:</p>
+<ul>
+<li>Federation primitives exist.</li>
+<li>Live production federation should not be claimed.</li>
+<li>NYCN should not be described as a live federation member or formal pilot.</li>
+</ul>
+<h2>Storage and durability connection</h2>
+<p>Network and gossip intersect with storage through:</p>
+<ul>
+<li>blob announcement and retrieval;</li>
+<li>replica status and requests;</li>
+<li>storage challenges and proofs;</li>
+<li>snapshot and recovery paths;</li>
+<li>maintenance and health checks.</li>
+</ul>
+<p>These are substrate capabilities. They do not by themselves prove production durability for a public deployment.</p>
+<h2>Observability connection</h2>
+<p>Operators need visibility into:</p>
+<ul>
+<li>peer count and session health;</li>
+<li>gossip throughput and lag;</li>
+<li>partition events;</li>
+<li>retry/backoff behavior;</li>
+<li>replica health;</li>
+<li>storage amplification;</li>
+<li>metrics and alerts.</li>
+</ul>
+<p>The observability layer exists, but specific dashboard/alert coverage should be checked before making operational-readiness claims.</p>
+<h2>Safe claims</h2>
+<p>Safe, current claims:</p>
+<ul>
+<li>ICN has a real peer-networking crate and a real gossip/synchronization crate.</li>
+<li>Transport, gossip, federation, and governance are separate layers.</li>
+<li>Network and gossip primitives are substantial but are not the current organizer/member demo proof.</li>
+<li>The current demo proves member/institutional proof-loop concepts, not production network readiness.</li>
+</ul>
+<h2>Claims to avoid</h2>
+<p>Avoid claiming:</p>
+<ul>
+<li>production-ready networking across arbitrary environments;</li>
+<li>live federation deployment;</li>
+<li>NYCN as a live federation member;</li>
+<li>automatic resolution of all distributed conflicts;</li>
+<li>complete durability guarantees without storage/replica evidence;</li>
+<li>that peer connectivity alone equals institutional federation.</li>
+</ul>
+<h2>Related maps</h2>
+<table>
+<thead>
+<tr>
+<th>Map</th>
+<th>Relationship</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>identity-crypto-map.md</code></td>
+<td>Node identity, signed messages, and network trust depend on identity/crypto.</td>
+</tr>
+<tr>
+<td><code>runtime-surface-map.md</code></td>
+<td>Runtime surfaces sit above networking/gossip.</td>
+</tr>
+<tr>
+<td><code>pilot-and-nycn-map.md</code></td>
+<td>NYCN rehearsal currently avoids live federation mutation.</td>
+</tr>
+<tr>
+<td><code>ci-ops-deploy-map.md</code></td>
+<td>Ports, deploy paths, K3s/devnet, and monitoring live there.</td>
+</tr>
+<tr>
+<td><code>show-readiness-map.md</code></td>
+<td>Defines what can and cannot be claimed externally.</td>
+</tr>
+</tbody></table>
+<h2>Follow-ups</h2>
+<ul>
+<li>Verify current production posture of NAT/relay paths before any public reliability claim.</li>
+<li>Review monitoring dashboards/alerts for network and gossip health.</li>
+<li>Add a storage/durability map if proof-of-storage and replica operations become public-facing.</li>
+<li>Keep federation described as an institutional relationship, not as network adjacency.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
