@@ -2,6 +2,38 @@
 
 Scratch note for queue inspection, #1787 verification, docs fan-in disposition, and validation record.
 
+## Important operating rule (two passes)
+
+Work in **two passes**. Do not collapse them into one chaotic session.
+
+**Pass A — only #1787**
+
+- Inspect the PR and CI.
+- Reproduce validation (fmt, clippy, targeted tests, guest WASM check).
+- Diagnose the benchmark “Compare Against Base” failure (fix workflow, document false positives, or policy label).
+- Confirm review-thread invariants remain intact (no weakening).
+- **Stop** with a clean summary.
+
+**Do not start Pass B** until Pass A is done: #1787 is either green, fixed, or explicitly documented as blocked only by a benchmark-policy decision you accept.
+
+**Pass B — #1780–#1786 only after Pass A**
+
+- Docs fan-in, truth alignment, handoff notes.
+- This handoff’s Phase 3 validation and fan-in branch describe Pass B work already executed in-repo; **new** sessions should still treat Pass A as the gate if #1787 is not yet merged or benchmark-disposition is unsettled.
+
+## No mega-PR (branch hygiene)
+
+Unless there is literally no alternative, **do not** mix runtime changes (#1787 / `icn-baseline-lock`, boundary, lockfile) with the docs fan-in on one PR.
+
+Prefer separate branches (and commits), for example:
+
+1. **#1787** — runtime stabilization and benchmark disposition only.
+2. **Docs** — `docs(project-index): fan in coverage and subsystem maps`.
+3. **Public surfaces** — `docs(web,pilot-ui): align public demo truth boundaries` (or equivalent scope).
+4. **Handoff** — disposition / queue note (`docs/handoffs/…`).
+
+The fan-in branch `docs/open-pr-fanin-1780-1786` in this repo follows that split: it is **docs-only** relative to `main`; #1787 stays on `baseline-lock-loop`.
+
 ## PR disposition table
 
 | PR | Branch | Draft | Category | Files touched | Recommended action |
@@ -13,7 +45,7 @@ Scratch note for queue inspection, #1787 verification, docs fan-in disposition, 
 | 1785 | `docs/drift-control-maps` | yes | docs-only | `pilot-ui-current-state-map.md`, `stale-and-archived-map.md`, `website-truth-map.md` | **Consolidate** |
 | 1781 | `docs/public-surface-truth-sync` | yes | **docs + website + pilot-ui** | `website/...`, `web/pilot-ui/README.md`, `web/pilot-ui/package.json` | **Consolidate** after project-index maps; run npm checks |
 | 1786 | `docs/demo-fixture-handoff` | yes | docs-only | `docs/demo/GOVERNANCE_PROPOSAL_FIXTURE_HANDOFF.md` | **Update** vs #1787 + pilot fixture scope; merge or keep draft |
-| 1780 | `docs/remote-work-plan` | yes | docs-only | `docs/reference/project-index/remote-work-plan.md` | **Supersede / shorten** or **close** if subsumed by fan-in + maps |
+| 1780 | `docs/remote-work-plan` | yes | docs-only | `docs/reference/project-index/remote-work-plan.md` | **Suspect by default** — remote-work coordination artifact that may be superseded by the concrete PRs it spawned (#1781–#1786). **Preserve only** if it still adds clear operational value after those are reviewed. Otherwise **close as superseded**; do not merge long stale planning text. (This fan-in replaced it with a short pointer in `remote-work-plan.md`.) |
 
 ### #1787 file list (runtime)
 
@@ -78,7 +110,8 @@ Branch: `baseline-lock-loop` (local matches PR #1787).
 | PR | Recommendation |
 |----|----------------|
 | **#1787** | **Merge** when maintainers accept benchmark disposition (PR comment + optional `perf-regression-ok`, or workflow fix follow-up). Runtime verification passed locally on `baseline-lock-loop`. |
-| **#1782–#1785, #1781, #1786, #1780** | **Close as superseded** by single PR from branch `docs/open-pr-fanin-1780-1786` after review (link this handoff + new PR). #1780 content folded into short `remote-work-plan.md` pointer. |
+| **#1782–#1785, #1781, #1786** | **Close as superseded** by a single docs PR from branch `docs/open-pr-fanin-1780-1786` after review (link this handoff + new PR). |
+| **#1780** | Default **close as superseded** (coordination artifact); only keep/reopen if you still need its operational checklist after reading #1781–#1786. Here: folded into a short `remote-work-plan.md` pointer. |
 | **Fan-in PR (new)** | Open from `docs/open-pr-fanin-1780-1786` against `main` with four commits (see git log). Do **not** push until you run `/push` or your usual gate. |
 
 **Merge order suggestion:** land **#1787** first if you want demo docs to cite merged baseline-lock on `main`; otherwise merge fan-in first and rebase #1787 doc links—either order works because links use PR URL for #1787 until merged.
