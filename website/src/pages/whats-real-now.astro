@@ -2,12 +2,10 @@
 import Layout from '../layouts/Layout.astro';
 import MaturityGrid from '../components/MaturityGrid.astro';
 import MaturityCard from '../components/MaturityCard.astro';
-import ProvenanceTrail from '../components/ProvenanceTrail.astro';
-import ScopeModel from '../components/ScopeModel.astro';
 import ReadingLadder from '../components/ReadingLadder.astro';
 ---
 
-<Layout title="What's Real Now" activeNav="whats-real-now" description="An honest account of which parts of ICN are strongest today, which are advancing, which are still maturing, and which are not yet built.">
+<Layout title="What's Real Now" activeNav="whats-real-now" description="An honest account of which parts of ICN are strongest today, which are advancing, which are still maturing, and which are not yet complete.">
 
   <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
     <div class="container narrow">
@@ -15,21 +13,20 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         <span class="badge badge-amber">Maturity Anchor</span>
         <h1>What's Real Now</h1>
         <p class="lead">
-          ICN has uneven maturity across its subsystems.
-          This page states what is proven, what is advancing, and what is not yet complete.
-          Every other page on this site should be readable against what is here without contradiction.
+          ICN has uneven maturity across its subsystems. This page states what is proven,
+          what is advancing, and what is not yet complete. Every other page on this site
+          should be readable against what is here without contradiction.
         </p>
       </div>
 
       <div class="status-anchor">
-        <span class="status-anchor-label">Reviewed 2026-04-26</span>
+        <span class="status-anchor-label">Reviewed 2026-05-09</span>
         <p>
-          As of April 26, 2026, the institutional activation chain — live charter activation, role binding with typed authority scope,
-          a person-directory overlay for binding real members to package definitions, and a member-facing
-          standing read model — has landed. Federation provenance now persists across restart.
-          Provenance and institutional memory are still the strongest parts of the system.
-          The member-facing surface, broader execution coverage, and full governance-to-economics integration
-          are still being built.
+          ICN is in Phase 2 — Pilot Launch — and Phase 2 is not complete. Phase 0 and Phase 1 are complete.
+          NYCN is the intended first cooperative partner and active partnership track, not yet a formally committed pilot.
+          The strongest current path is institutional coordination: member standing, action cards, governance actions,
+          receipts, and retrievable provenance. The member-facing demo surface is real enough to show the shape of the system,
+          but it is still maturing and must not be presented as a finished product.
         </p>
       </div>
     </div>
@@ -40,8 +37,7 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <h2>How to read this page</h2>
       <p>
         ICN is large, and different parts of the system are at different levels of maturity.
-        We describe maturity in four bands. Every capability claim on this site
-        is placed in one of them.
+        We describe maturity in four bands. Every capability claim on this site belongs in one of them.
       </p>
 
       <MaturityGrid>
@@ -49,10 +45,10 @@ import ReadingLadder from '../components/ReadingLadder.astro';
           <p>Implemented, integrated, and load-bearing. These are capabilities we are prepared to stand behind in public.</p>
         </MaturityCard>
         <MaturityCard band="advancing">
-          <p>Actively under development with visible progress. Not yet something to rely on, but moving.</p>
+          <p>Actively under development with visible progress. Not finished, but moving.</p>
         </MaturityCard>
         <MaturityCard band="maturing">
-          <p>Serious implementation exists. Surfaces and integrations are still being finished. Implementation is often ahead of the public-facing story.</p>
+          <p>Serious implementation exists. Surfaces and integrations are still being finished.</p>
         </MaturityCard>
         <MaturityCard band="notyet">
           <p>Scoped, but not where work is concentrated right now. We would rather say that directly than imply a schedule.</p>
@@ -66,125 +62,102 @@ import ReadingLadder from '../components/ReadingLadder.astro';
       <h2>Strong today</h2>
       <p>
         <strong>Provenance and institutional memory.</strong>
-        The deepest mature part of ICN is the chain that carries an outcome back through the rule that shaped it,
-        the decision that authorized it, and the members who held standing. Proposals, votes, receipts,
-        and the decision-to-outcome chain are the most mature path in the current system.
+        The strongest mature part of ICN is the chain that carries an outcome back through the rule that shaped it,
+        the decision that authorized it, and the member standing that made action legitimate.
       </p>
       <p>
-        <strong>Auditable coordination.</strong>
-        The paths that carry a decision into a recorded outcome are where the most implementation effort and
-        the most hardening have gone. These are the capabilities we are most willing to stand behind today.
+        <strong>Member standing.</strong>
+        A member-facing read model can answer the basic institutional question: who am I here, what domains do I belong to,
+        what roles do I hold, and what authority scopes are currently available to me?
+      </p>
+      <p>
+        <strong>Action cards.</strong>
+        Action cards now exist as a member-facing read model and have begun appearing in the pilot UI demo path.
+        The currently exercised source paths are proposal/vote, action_item/complete, and meeting/attend.
+        Other source paths remain gated and should not be presented as complete.
       </p>
       <p>
         <strong>Institutional activation.</strong>
-        An institution package — a manifest of entities, structures, activities, and roles — can be applied to a node,
-        a charter can be activated against that node, real members can be bound to package definitions through a private overlay,
-        and a member can ask the substrate "what am I currently authorized to do?" and get a typed, auditable answer.
-        This activation chain landed in April 2026.
-      </p>
-      <p>
-        <strong>Cryptographic identity and membership primitives.</strong>
-        Self-held identity for members and institutions is in place, and is the foundation the rest of the system builds on.
+        An institution package can describe entities, structures, activities, and roles; a charter can be activated against a node;
+        members can be bound to package definitions through a private overlay; and member standing can be surfaced through the gateway.
       </p>
       <p>
         <strong>Structural discipline.</strong>
-        The separation between the enforcement layer (which enforces constraints without understanding
-        their domain meaning) and the application layer (which interprets institutional concepts)
-        is enforced in the codebase architecture. This is how the system stays coherent as it grows.
+        The enforcement layer handles generic constraints while the application layer interprets institutional meaning.
+        This meaning firewall is one of the core design lines that keeps the system coherent as it grows.
       </p>
-
-      <ProvenanceTrail title="What 'strongest today' means, concretely" />
 
       <h2>Advancing now</h2>
       <p>
-        <strong>Execution coverage.</strong>
-        The mechanism that carries accepted decisions into operational effect already exists.
-        Expanding the range of decision types it handles — so that more of what an institution
-        decides actually becomes operationally real — is where active development is concentrated.
+        <strong>The guided organizer/member demo.</strong>
+        The pilot UI can open a guided demo mode and render fixture-backed member standing and action cards without requiring
+        a live gateway login. That is not full demo mode for the entire system. It is the first narrow slice of the human-facing path.
       </p>
       <p>
-        <strong>Policy binding practice.</strong>
-        The mechanisms that let shared rules bind what happens, rather than just describe what is supposed to happen,
-        are advancing alongside execution coverage. This is one of the most consequential active fronts in the project.
+        <strong>Governance fixture coverage.</strong>
+        The next useful demo slice is a governance proposal/vote fixture so the local story can move from standing to action cards
+        to a visible governance action. Receipt/provenance fixtures should follow after that.
+      </p>
+      <p>
+        <strong>Receipt storage and retrieval.</strong>
+        ICN is hardening the path by which app-level receipt records can be stored and retrieved while preserving the boundary between
+        generic infrastructure and institution-specific meaning.
+      </p>
+      <p>
+        <strong>NYCN rehearsal path.</strong>
+        NYCN is the intended first cooperative partner and active rehearsal track. The next human gate is organizer presentation,
+        then pilot formalization, then first operator rehearsal. That sequence has not completed.
       </p>
 
       <h2>Real but maturing</h2>
       <p>
         <strong>Federation.</strong>
-        Inter-institutional coordination is a serious, active subsystem with real implementation behind it:
-        formal agreements, attestations, typed inter-institutional channels, and cross-scope clearing.
-        It is not yet at the level where its public-facing story is complete, and some integrations remain partial.
-        We would rather say that directly than paper over it.
+        Inter-institutional coordination is a serious subsystem with real implementation behind it, but no two cooperatives are
+        federating in production over ICN today. Federation must not be confused with peer connectivity or local demo fixtures.
       </p>
       <p>
         <strong>Commons and compute.</strong>
-        Shared infrastructure participating in the same institutional loop as governance and accounting.
-        Implementation includes trust-aware task placement, cross-participant clearing, checkpointing, and dispute resolution.
-        This is one of the areas where the implementation is ahead of what the documentation
-        and public surfaces currently convey.
+        Shared infrastructure participates in the same institutional loop as governance and accounting. Compute can produce evidence
+        and support deliberation, but it does not decide governance outcomes.
       </p>
       <p>
         <strong>Economic semantics.</strong>
-        Obligations, treasury with budgets and approvals, patronage settlement, mutual-credit positions,
-        progressive credit limits, and usage-rights accounting all have implementation behind them.
-        The governed-social-accounting framing is real; the cross-scope integration story is still being completed.
+        ICN uses settlement, unit, position, obligation, allocation, receipt, and provenance language. The governed-social-accounting
+        framing is real; the cross-scope integration story is still being completed.
       </p>
       <p>
         <strong>Member-facing experience.</strong>
-        Identity, participation, and institutional interaction are converging toward a coherent member surface,
-        but that surface is not yet where the underlying system is. This is the gap a cooperative adopting ICN today
-        will feel most directly.
+        Identity, participation, standing, action cards, and receipts are converging toward a coherent member surface.
+        The surface exists, but it still needs more demo coverage, accessibility verification, and organizer rehearsal.
       </p>
 
       <h2>Not yet, or not yet publicly surfaced</h2>
       <p>
-        Some parts of the system are real but not yet worth highlighting to outsiders because their
-        public-facing story is thin. <strong>Privacy primitives</strong> and <strong>zero-knowledge proof components</strong>
-        exist as dedicated subsystems, and a <strong>steward network</strong> for trust distribution is implemented —
-        but none of them are ready to be described in public without risking overclaim. We would rather wait
-        than paint pictures we cannot yet stand behind.
+        ICN is not a finished production network, NYCN is not yet a formal pilot, and there is no live federation deployment.
+        The current demo mode has fixture-backed standing and action cards, but governance, receipts, ledger, members, trust,
+        and federation are not yet fully fixture-backed.
       </p>
       <p>
-        <strong>Action cards</strong> — the member-facing nervous system that surfaces what a holder needs to attend to —
-        are designed and named, with a contract written down, but not yet implemented. The standing read model
-        they will derive from is in place; the cards themselves are the next surface to ship.
+        ICN has design direction for governed services, service identities, tool manifests, tool bindings, and institution-owned tool state.
+        That is not the same thing as implemented service hosting or a live tool ecosystem.
       </p>
       <p>
-        <strong>Conflict resolution</strong> beyond compute is a first-class architectural goal but
-        not yet a complete runtime surface. ICN distinguishes conflicts about effects, conflicts about decisions,
-        and relational conflicts between members; runtime support today covers compute disputes only,
-        with institutional resolution paths still in the design layer.
+        Privacy, zero-knowledge proofs, steward networks, and post-quantum cryptography exist as dedicated subsystems or source-level primitives.
+        They should not be turned into broad public claims until their runtime integration, user-facing role, and production posture are verified
+        for the specific claim being made.
       </p>
       <p>
-        <strong>Accessibility</strong> is treated as a participation floor, not a feature.
-        The layered model — sensory, cognitive, linguistic, economic, temporal — is recognized at the architectural level;
-        the runtime contract that ties every member-facing surface to a measurable floor is still being built,
-        with the glossary endpoint and locale-aware standing among the named pieces in flight.
-      </p>
-      <p>
-        Other parts of the system are scoped but not where active work is concentrated right now.
-        When outsiders ask "does ICN do X," the honest answer is sometimes <em>not yet, and we are not pretending otherwise</em>.
+        Accessibility is a participation floor, not a feature. The design doctrine is clear; the runtime and demo acceptance gates still need
+        continued enforcement across real member-facing surfaces.
       </p>
 
       <h2>What this page commits to</h2>
       <p>
         Every capability claim on this site is grounded in the maturity bands above.
-        If something is described as "strong today," it is implemented and in use.
-        If something is described as "advancing," it is under active development but not finished.
-        If you find a claim elsewhere on this site that contradicts what is here, please let us know.
+        If something is described as strong today, it is implemented and in use.
+        If something is described as advancing, it is under active development but not finished.
+        If something is described as maturing, serious implementation exists but surfaces, integrations, or public story remain incomplete.
       </p>
-
-      <h2>The scopes the bands above apply across</h2>
-      <p>
-        The maturity bands above describe <em>capabilities</em>. ICN runs those capabilities
-        across five distinct contexts of action — five scopes. The substrate is at <strong>different
-        levels of maturity inside each scope</strong>. Provenance and identity are strongest at the
-        cooperative scope today; federation and commons are real but maturing; the
-        member-facing surface trails the substrate underneath. The scopes diagram below is the
-        map the bands apply across — not a claim that ICN is uniformly strong everywhere on it.
-      </p>
-
-      <ScopeModel title="The contexts the maturity bands apply across" />
 
       <h2>Where to look directly</h2>
       <ul>
@@ -232,12 +205,8 @@ import ReadingLadder from '../components/ReadingLadder.astro';
   line-height: 1.7;
   color: var(--text-secondary);
 }
-
 .prose h2 { margin-top: var(--space-2xl); margin-bottom: var(--space-md); }
 .prose p { margin: 0 0 var(--space-md); line-height: 1.7; }
 .prose ul { margin: var(--space-md) 0; padding-left: var(--space-lg); }
 .prose li { margin-bottom: var(--space-xs); line-height: 1.6; }
-
-/* Band grid styles moved to MaturityGrid/MaturityCard components. */
-/* Bottom CTA styles moved to ReadingLadder component. */
 </style>
