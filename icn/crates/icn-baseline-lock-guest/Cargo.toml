@@ -1,0 +1,23 @@
+[package]
+name = "icn-baseline-lock-guest"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/InterCooperative-Network/icn"
+description = "Minimal WASM guest for baseline-lock gate validation (no WASI)"
+
+# Intentionally **not** a member of the root `icn/` workspace so this crate can
+# stay `#![no_std]` + `alloc` on `wasm32-unknown-unknown` without serde/`std`
+# feature unification against the rest of the workspace.
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+icn-boundary = { path = "../icn-boundary", default-features = false }
+postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+
+[workspace]
+members = ["."]
+resolver = "2"

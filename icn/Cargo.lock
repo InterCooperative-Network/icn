@@ -2829,6 +2829,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-baseline-lock"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek",
+ "icn-boundary",
+ "icn-encoding",
+ "icn-kernel-api",
+ "postcard",
+ "serde",
+ "thiserror 2.0.18",
+ "wasmtime",
+]
+
+[[package]]
+name = "icn-boundary"
+version = "0.1.0"
+dependencies = [
+ "postcard",
+ "serde",
+]
+
+[[package]]
 name = "icn-ccl"
 version = "0.1.0"
 dependencies = [

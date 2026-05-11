@@ -1,0 +1,21 @@
+[package]
+name = "icn-baseline-lock"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Single-node baseline-lock loop fixture: receipt DAG, projector, WASM host, evidence"
+
+[dependencies]
+blake3 = "1.8"
+ed25519-dalek.workspace = true
+icn-boundary.workspace = true
+icn-encoding.workspace = true
+icn-kernel-api.workspace = true
+postcard = { workspace = true, features = ["alloc"] }
+serde = { workspace = true }
+thiserror.workspace = true
+wasmtime = "36.0.8"
+
+[lints]
+workspace = true

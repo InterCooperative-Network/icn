@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+exclude = ["crates/icn-baseline-lock-guest"]
 members = [
     "crates/icn-kernel-api",
     "crates/icn-core",
@@ -35,6 +36,8 @@ members = [
     "crates/icn-api",
     "crates/icn-naming",
     "crates/icn-authz",
+    "crates/icn-baseline-lock",
+    "crates/icn-boundary",
     "apps/charter",
     "apps/governance",
     "apps/membership",
@@ -149,6 +152,8 @@ icn-coop = { path = "crates/icn-coop" }
 icn-api = { path = "crates/icn-api" }
 icn-naming = { path = "crates/icn-naming" }
 icn-authz = { path = "crates/icn-authz" }
+icn-baseline-lock = { path = "crates/icn-baseline-lock" }
+icn-boundary = { path = "crates/icn-boundary" }
 icn-commons = { path = "crates/icn-commons" }
 
 [workspace.lints.clippy]
