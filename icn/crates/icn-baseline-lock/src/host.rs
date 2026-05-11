@@ -9,8 +9,10 @@ const MAX_MEMORY_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Debug, Error)]
 pub enum HostError {
-    #[error("module hash mismatch")]
+    #[error("module hash mismatch (wasm bytes vs expected)")]
     ModuleHashMismatch,
+    #[error("input envelope module_hash does not match executed module")]
+    InputModuleHashMismatch,
     #[error("wasm compile: {0}")]
     Compile(String),
     #[error("instantiate: {0}")]
@@ -57,6 +59,9 @@ pub fn evaluate_guest(
     let digest = *blake3::hash(wasm_bytes).as_bytes();
     if digest != expected_module_hash.0 {
         return Err(HostError::ModuleHashMismatch);
+    }
+    if input.module_hash.0 != expected_module_hash.0 {
+        return Err(HostError::InputModuleHashMismatch);
     }
 
     let mut cfg = wasmtime::Config::new();

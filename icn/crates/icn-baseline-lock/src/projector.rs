@@ -20,10 +20,12 @@ pub enum ProjectorError {
     MissingSession,
     #[error("missing standing snapshot")]
     MissingStanding,
-    #[error("missing reservation state")]
+    #[error("missing reservation receipt")]
     MissingReservation,
-    #[error("ineligible voter at receipt {0}")]
-    IneligibleVoter(usize),
+    #[error("reservation already consumed")]
+    ReservationConsumed,
+    #[error("vote receipt signer does not match declared member_pubkey (receipt {0})")]
+    VoteSignerMismatch(usize),
     #[error("duplicate vote from member")]
     DuplicateVote,
     #[error("non-member vote")]
@@ -100,6 +102,9 @@ pub fn project(receipts: &[BaselineReceipt]) -> Result<ProjectedState, Projector
                 if !members.contains(member_pubkey) {
                     return Err(ProjectorError::NonMemberVote);
                 }
+                if r.signer != *member_pubkey {
+                    return Err(ProjectorError::VoteSignerMismatch(i));
+                }
                 if votes.iter().any(|(m, _)| m == member_pubkey) {
                     return Err(ProjectorError::DuplicateVote);
                 }
@@ -120,7 +125,7 @@ pub fn project(receipts: &[BaselineReceipt]) -> Result<ProjectedState, Projector
     }
     let reservation_not_consumed = reservation_ok.ok_or(ProjectorError::MissingReservation)?;
     if !reservation_not_consumed {
-        return Err(ProjectorError::MissingReservation);
+        return Err(ProjectorError::ReservationConsumed);
     }
 
     for m in &members {

@@ -157,6 +157,8 @@ pub struct FixtureOptions {
     pub invalid_signature_receipt_index: Option<usize>,
     pub skip_notice_index: Option<usize>,
     pub duplicate_vote_member: Option<usize>,
+    /// Second deliberation receipt: body names `member_a`, signed by a non-member key (spoof).
+    pub spoof_vote_signer: bool,
     pub non_member_vote: bool,
     pub omit_standing: bool,
     pub omit_reservation: bool,
@@ -181,6 +183,37 @@ fn append_signed(
     }
     *prior = r.receipt_hash;
     out.push(r);
+}
+
+/// Which standing member (0 = A, 1 = B, 2 = C) is named in vote slot `i` when duplicating member `d`.
+fn vote_member_index_for_slot(i: usize, dup_member: usize) -> usize {
+    if dup_member == 2 {
+        if i == 0 {
+            0
+        } else {
+            2
+        }
+    } else if i <= dup_member {
+        i
+    } else if i == dup_member + 1 {
+        dup_member
+    } else {
+        i
+    }
+}
+
+fn vote_approve_for_slot(i: usize, dup_member: usize, votes: &[(&SigningKey, bool); 3]) -> bool {
+    if dup_member == 2 {
+        if i == 0 {
+            votes[0].1
+        } else {
+            votes[2].1
+        }
+    } else if i == dup_member + 1 && dup_member < 2 {
+        votes[dup_member].1
+    } else {
+        votes[i].1
+    }
 }
 
 /// Build the canonical receipt chain (plus optional faults).
@@ -268,35 +301,49 @@ pub fn build_receipt_chain(keys: &FixtureKeys, opt: &FixtureOptions) -> Vec<Base
         ]
     };
 
-    for (i, &(sk, approve)) in votes.iter().enumerate() {
-        let (body, signer): (BaselineReceiptBody, &SigningKey) =
-            if opt.duplicate_vote_member == Some(0) && i == 1 {
-                (
-                    BaselineReceiptBody::DeliberationEntryRecorded {
-                        member_pubkey: keys.member_a.verifying_key().to_bytes(),
-                        approve: true,
-                    },
-                    &keys.member_a,
-                )
-            } else if opt.non_member_vote && i == 2 {
-                (
-                    BaselineReceiptBody::DeliberationEntryRecorded {
-                        member_pubkey: signing_key_for_label(b"non-member-stranger")
-                            .verifying_key()
-                            .to_bytes(),
-                        approve,
-                    },
-                    &signing_key_for_label(b"non-member-stranger"),
-                )
-            } else {
-                (
-                    BaselineReceiptBody::DeliberationEntryRecorded {
-                        member_pubkey: sk.verifying_key().to_bytes(),
-                        approve,
-                    },
-                    sk,
-                )
-            };
+    let member_sk = [&keys.member_a, &keys.member_b, &keys.member_c];
+
+    for i in 0..3 {
+        let (body, signer): (BaselineReceiptBody, &SigningKey) = if opt.non_member_vote && i == 2 {
+            let approve = votes[i].1;
+            (
+                BaselineReceiptBody::DeliberationEntryRecorded {
+                    member_pubkey: signing_key_for_label(b"non-member-stranger")
+                        .verifying_key()
+                        .to_bytes(),
+                    approve,
+                },
+                &signing_key_for_label(b"non-member-stranger"),
+            )
+        } else if opt.spoof_vote_signer && i == 1 {
+            (
+                BaselineReceiptBody::DeliberationEntryRecorded {
+                    member_pubkey: keys.member_a.verifying_key().to_bytes(),
+                    approve: votes[1].1,
+                },
+                &signing_key_for_label(b"vote-signer-spoof-stranger"),
+            )
+        } else if let Some(dup) = opt.duplicate_vote_member {
+            let idx = vote_member_index_for_slot(i, dup);
+            let sk = member_sk[idx];
+            let approve = vote_approve_for_slot(i, dup, &votes);
+            (
+                BaselineReceiptBody::DeliberationEntryRecorded {
+                    member_pubkey: sk.verifying_key().to_bytes(),
+                    approve,
+                },
+                sk,
+            )
+        } else {
+            let (sk, approve) = votes[i];
+            (
+                BaselineReceiptBody::DeliberationEntryRecorded {
+                    member_pubkey: sk.verifying_key().to_bytes(),
+                    approve,
+                },
+                sk,
+            )
+        };
         append_signed(
             &mut out,
             &mut prior,

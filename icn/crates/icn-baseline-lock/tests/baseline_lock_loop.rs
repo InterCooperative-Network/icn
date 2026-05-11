@@ -12,8 +12,7 @@ use icn_baseline_lock::{
 };
 use icn_boundary::{DeterminismClass, FinalityClass, Hash, PrivacyClass, ResultKind};
 use icn_encoding::encode;
-use icn_kernel_api::receipts::CanonicalReceipt;
-use icn_kernel_api::{AllocationReceipt, ScopeLevel};
+use icn_kernel_api::{AllocationReceipt, CanonicalReceipt, ScopeLevel};
 
 const WASM_BYTES: &[u8] = include_bytes!("fixtures/icn_baseline_lock_guest.wasm");
 const MAX_OUT: usize = 64 * 1024;
@@ -80,7 +79,7 @@ fn test_baseline_lock_loop() {
     let _gate_sig = gate.sign(&keys.host);
 
     let alloc = AllocationReceipt::new(gate_record_hash.0, ScopeLevel::Org);
-    let allocation_canonical = alloc.canonical_hash();
+    let allocation_canonical = CanonicalReceipt::canonical_hash(&alloc);
 
     let evidence = EvidencePacket {
         input_envelope_hash,
@@ -126,10 +125,46 @@ fn negative_non_member_vote() {
 }
 
 #[test]
+fn negative_vote_signer_cannot_spoof_member_pubkey() {
+    let keys = FixtureKeys::default();
+    let mut opt = FixtureOptions::default();
+    opt.spoof_vote_signer = true;
+    let receipts = build_receipt_chain(&keys, &opt);
+    assert!(matches!(
+        project(&receipts),
+        Err(ProjectorError::VoteSignerMismatch(_))
+    ));
+}
+
+#[test]
 fn negative_duplicate_vote() {
     let keys = FixtureKeys::default();
     let mut opt = FixtureOptions::default();
     opt.duplicate_vote_member = Some(0);
+    let receipts = build_receipt_chain(&keys, &opt);
+    assert!(matches!(
+        project(&receipts),
+        Err(ProjectorError::DuplicateVote)
+    ));
+}
+
+#[test]
+fn negative_duplicate_vote_member_index_one() {
+    let keys = FixtureKeys::default();
+    let mut opt = FixtureOptions::default();
+    opt.duplicate_vote_member = Some(1);
+    let receipts = build_receipt_chain(&keys, &opt);
+    assert!(matches!(
+        project(&receipts),
+        Err(ProjectorError::DuplicateVote)
+    ));
+}
+
+#[test]
+fn negative_duplicate_vote_member_index_two() {
+    let keys = FixtureKeys::default();
+    let mut opt = FixtureOptions::default();
+    opt.duplicate_vote_member = Some(2);
     let receipts = build_receipt_chain(&keys, &opt);
     assert!(matches!(
         project(&receipts),
@@ -203,8 +238,16 @@ fn negative_double_reservation() {
     let receipts = build_receipt_chain(&keys, &opt);
     assert!(matches!(
         project(&receipts),
-        Err(ProjectorError::MissingReservation)
+        Err(ProjectorError::ReservationConsumed)
     ));
+}
+
+#[test]
+fn negative_input_module_hash_must_match_executed_module() {
+    let (mut input, mh) = happy_input();
+    input.module_hash = Hash([0xAB; 32]);
+    let err = evaluate_guest(WASM_BYTES, &mh, &input, MAX_OUT).unwrap_err();
+    assert!(matches!(err, HostError::InputModuleHashMismatch));
 }
 
 #[test]
