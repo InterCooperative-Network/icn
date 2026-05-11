@@ -11,7 +11,7 @@
 schema_version = 1
 allowlisted_docs_subdirs = [
   "adr", "ai", "api", "architecture", "archive", "ci", "contracts", "crate-manifests", "demo", "deployment",
-  "design", "design-language", "dev", "development", "examples", "features", "guides", "internal",
+  "design", "design-language", "dev", "development", "examples", "features", "guides", "handoffs", "internal",
   "maintenance", "manual", "migration-guides", "mobile", "observability", "onboarding", "operations",
   "ops", "performance", "phases", "pilots", "planning", "plans", "reference", "rfcs", "scripts", "sdis",
   "security", "spec", "sprints", "state", "status", "strategy", "summit", "superpowers",
@@ -2013,7 +2013,7 @@ category = "reference"
 status = "living"
 title = "ICN Project Index"
 description = "Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to STATE.md and PHASE_PROGRESS.md for current truth."
-last_updated = "2026-04-29"
+last_updated = "2026-05-11"
 owner = "matt"
 audiences = ["all"]
 truth_class = "operational"
@@ -2022,7 +2022,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation"]
 recommended_action = "keep"
-last_reviewed = "2026-04-29"
+last_reviewed = "2026-05-11"
 
 [docs."docs/reference/project-index/current-truth-map.md"]
 category = "reference"
