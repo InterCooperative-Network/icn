@@ -143,11 +143,9 @@ jobs:
             exit 1
           fi
 
-          # Extract regressions - Criterion outputs various indicators:
-          # - "Performance has regressed" (explicit message)
-          # - "regressed" in change analysis
-          # - Positive percentage changes like "change: +15.234%"
-          REGRESSION_COUNT=$(grep -ciE "(Performance has regressed|regressed|change:.*\+[0-9]+\.[0-9]+%)" bench_output.txt || echo "0")
+          # Count only Criterion's explicit regression verdict. Do not match confidence-interval
+          # lines like `change: [-0.5% -0.2% +0.03%]` — the positive upper bound is not a regression.
+          REGRESSION_COUNT=$(grep -ciF "Performance has regressed" bench_output.txt || echo "0")
 
           if [ "$REGRESSION_COUNT" -gt 0 ]; then
             echo "has_regressions=true" >> $GITHUB_OUTPUT
@@ -163,7 +161,7 @@ jobs:
               echo "<summary>Regression Details</summary>"
               echo ""
               echo '```'
-              REGRESSION_OUTPUT=$(grep -B3 -A1 -iE "(Performance has regressed|regressed|change:.*\+[0-9]+\.[0-9]+%)" bench_output.txt)
+              REGRESSION_OUTPUT=$(grep -B3 -A1 -iF "Performance has regressed" bench_output.txt)
               REGRESSION_LINES=$(echo "$REGRESSION_OUTPUT" | wc -l)
               echo "$REGRESSION_OUTPUT" | head -100
               if [ "$REGRESSION_LINES" -gt 100 ]; then
