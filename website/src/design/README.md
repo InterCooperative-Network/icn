@@ -13,6 +13,17 @@ The design system itself does not live in the website. It lives in the repo's `d
 - [docs/design/CONTENT_STYLE_GUIDE.md](../../../docs/design/CONTENT_STYLE_GUIDE.md) — voice and vocabulary
 - [docs/design/CLAUDE_DESIGN_CONTEXT.md](../../../docs/design/CLAUDE_DESIGN_CONTEXT.md) — paste-ready collaborator context
 
+### Visual explainers and assets
+
+Before building or revising any visual on the site — a diagram, an infographic, a homepage figure, a new Astro/SVG component, a generated-image sketch — read the visual explainer control plane:
+
+- [docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md](../../../docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md) — doctrine (source hierarchy, truth labels, vocabulary rules, accessibility floor, brief gate, generated-image workflow, production-source rule)
+- [docs/design/assets/ASSET_REGISTER.md](../../../docs/design/assets/ASSET_REGISTER.md) — live register of planned and tracked visual assets
+- [docs/design/assets/VISUAL_REVIEW_CHECKLIST.md](../../../docs/design/assets/VISUAL_REVIEW_CHECKLIST.md) — pre-ship review
+- [docs/design/assets/briefs/](../../../docs/design/assets/briefs/) — per-asset briefs
+
+The canonical Astro primitives that ground the bible — `ClosureLoop`, `ScopeModel`, `ProvenanceTrail`, `MemberSurface` — live in [`src/components/`](../components/). New explainers should extend or reference them rather than invent a parallel grammar.
+
 ## What goes in this directory
 
 Currently nothing. This directory exists as a documented anchor for future work:

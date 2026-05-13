@@ -58,6 +58,16 @@ The ICN public website is the first implementation surface of the universal civi
 - **[design-language/concept-map.md](design-language/concept-map.md)** — canonical → public plain-language label → localization notes for every ICN concept
 - **[design-language/accessibility.md](design-language/accessibility.md)** — WCAG rules, contrast requirements, the review checklist every PR must pass
 
+### Visual explainers and assets
+
+Control plane for ICN's visual explainer system — the doctrine, asset register, briefs, and review gate that govern every diagram, infographic, generated image, and source asset:
+
+- **[design/ICN_VISUAL_EXPLAINER_BIBLE.md](design/ICN_VISUAL_EXPLAINER_BIBLE.md)** — purpose, source hierarchy, truth labels, vocabulary rules, accessibility floor, core explainer models, brief gate, generated-image workflow, production-source rule
+- **[design/assets/README.md](design/assets/README.md)** — directory orientation: where production assets live, where sketches live, the asset lifecycle
+- **[design/assets/ASSET_REGISTER.md](design/assets/ASSET_REGISTER.md)** — live register of planned and tracked visual assets (VE-001…VE-012 initial rows)
+- **[design/assets/VISUAL_REVIEW_CHECKLIST.md](design/assets/VISUAL_REVIEW_CHECKLIST.md)** — the gate every visual explainer clears before shipping
+- **[design/assets/briefs/](design/assets/briefs/)** — per-asset briefs (closure loop, scope model, decision-to-receipt, member shell concept, kernel/app separation)
+
 ---
 
 ## 📚 Core Documentation
