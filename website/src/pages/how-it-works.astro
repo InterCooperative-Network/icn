@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import MaturityBadge from '../components/MaturityBadge.astro';
+import HowIcnWorksExplainer from '../components/HowIcnWorksExplainer.astro';
 import ScopeModel from '../components/ScopeModel.astro';
 import ProvenanceTrail from '../components/ProvenanceTrail.astro';
 import MemberSurface from '../components/MemberSurface.astro';
@@ -42,6 +43,15 @@ import ReadingLadder from '../components/ReadingLadder.astro';
     </div>
   </section>
 
+  <section class="section section-explainer">
+    <div class="container narrow">
+      <HowIcnWorksExplainer
+        title="The closure loop, end-to-end"
+        id="how-it-works-closure-loop"
+      />
+    </div>
+  </section>
+
   <section class="section-alt section-pre-ladder">
     <div class="container narrow prose">
       <p>
@@ -51,8 +61,10 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         rather than as seven disconnected systems that staff have to reconcile by hand.
       </p>
       <p>
-        This page walks through the pieces of that substrate one at a time,
-        and then shows how they close a single loop.
+        The explainer above is the model. The rest of this page walks the same loop in more depth —
+        grouping stations where it helps and adding the cross-cutting pieces (scope, federation,
+        commons and compute) where they belong — so you can see what each piece actually does,
+        where the substrate is strongest today, and where work is still concentrated.
       </p>
 
       <h2><span class="station-number">01 · 02</span>Identity and membership <MaturityBadge band="strong" /></h2>
