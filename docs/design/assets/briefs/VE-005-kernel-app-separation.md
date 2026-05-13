@@ -11,13 +11,14 @@ Purpose: Brief for VE-005 — Kernel / App Separation. The canonical architectur
 
 ## Truth label
 
-**`repo-grounded architecture explainer`** for the meaning firewall and the `PolicyOracle` → `ConstraintSet` boundary. Specific oracles depicted (e.g. the `TrustPolicyOracle`) are `implemented / current UI` for the existing ones in `apps/trust` / `icn-trust` and `future-state / roadmap` for any oracle not yet built.
+**`repo-grounded architecture explainer`** for the meaning firewall and the `PolicyOracle` → `ConstraintSet` boundary. Specific oracles depicted (e.g. the `TrustPolicyOracle`) are `implemented / current UI` for the existing ones (the trust oracle implementation lives at `icn/crates/icn-gateway/src/trust_mgr.rs`; the trust app package lives at `apps/trust/`) and `future-state / roadmap` for any oracle not yet built.
 
 ## Source anchors
 
 - [`docs/architecture/KERNEL_APP_SEPARATION.md`](../../../architecture/KERNEL_APP_SEPARATION.md) — canonical doc, including the existing mermaid sequence diagram for TrustPolicyOracle
 - `icn/crates/icn-kernel-api/` — kernel API surface (PolicyOracle, ConstraintSet, PolicyDecision)
-- `icn/apps/governance/`, `icn/apps/trust` (where applicable) — app-side oracles
+- `icn/apps/governance/`, `apps/trust/` — app-side packages
+- `icn/crates/icn-gateway/src/trust_mgr.rs` — current `TrustPolicyOracle` implementation site (note: this crate is a runtime/edge adapter, not a kernel example for the diagram)
 - [`docs/architecture/THE_COMMONS.md`](../../../architecture/THE_COMMONS.md) — substrate doctrine
 - [`CLAUDE.md`](../../../../CLAUDE.md) — *"The Meaning Firewall"* section
 - `icn/crates/icn-trust/` — trust graph types that must **not** appear inside kernel boxes
@@ -42,7 +43,7 @@ Apps translate domain semantics (trust scores, governance rules, membership crit
 - Examples of what the kernel **never sees**: trust scores, trust classes, governance rules, membership criteria, charter clauses.
 - The `PolicyOracle` trait implemented on the app side — including at least `TrustPolicyOracle` as a real example.
 - The flow: `PolicyRequest` enters → app computes domain-specific value → app converts to generic constraints → returns `PolicyDecision` → kernel enforces.
-- Two example crate names per region: kernel-side (`icn-kernel-api`, `icn-core`, `icn-net`, `icn-gateway`, `icn-gossip`) and app-side (`apps/governance`, `apps/trust`, future `apps/membership`).
+- Example crate names per region: kernel-side (`icn-kernel-api`, `icn-core`, `icn-net`, `icn-gossip`, `icn-store`) and app-side (`icn/apps/governance`, `apps/trust`, `icn/apps/membership`). `icn-gateway` is a runtime / edge adapter — not a kernel example for this diagram.
 
 ## Must avoid
 
@@ -65,7 +66,7 @@ These strings come from [`KERNEL_APP_SEPARATION.md`](../../../architecture/KERNE
 - Kernel box subtitle: *"Domain-blind. Enforces constraints without understanding meaning."*
 - Allowed-across-boundary list: `ConstraintSet`, `PolicyDecision { Allow, Deny }`, capability tokens.
 - Forbidden-in-kernel list: trust scores, trust classes, governance rules, membership criteria, charter clauses, scope semantics.
-- Example oracle: `TrustPolicyOracle` — translates trust score → `ConstraintSet { rate_limit, credit_multiplier, max_topics, trust_score (custom field) }`.
+- Example oracle: `TrustPolicyOracle` — translates trust score → `ConstraintSet` whose real top-level fields are `rate_limit`, `max_topics`, `max_message_size`, `max_connections`, `max_subscriptions`, `max_outstanding_requests`, and `custom`. Trust-specific values such as `credit_multiplier` and `trust_score` are placed inside the `custom` map (e.g. `.with_custom("credit_multiplier", ...)`), not as top-level constraints. The diagram must not invent top-level fields.
 
 ## Visual grammar
 
@@ -96,4 +97,4 @@ Run [VISUAL_REVIEW_CHECKLIST.md](../VISUAL_REVIEW_CHECKLIST.md). Per-brief notes
 
 ## Status
 
-`briefed`. Brief gate satisfied. Source-asset build (SVG-in-docs or Astro component) may begin.
+`gate-open`. Brief gate satisfied. Source-asset build (SVG-in-docs or Astro component) may begin.

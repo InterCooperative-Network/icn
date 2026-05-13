@@ -35,7 +35,7 @@ The bible exists to keep every visual explainer aligned to:
 
 When a visual makes a claim, the claim is checked against this order (highest wins):
 
-1. **Per-PR truth and current state** — [`docs/STATE.md`](../STATE.md), [`docs/PHASE_PROGRESS.md`](../PHASE_PROGRESS.md), and the gateway / app source itself (`icn-gateway`, `apps/governance/src/http/`, the relevant crate code).
+1. **Per-PR truth and current state** — [`docs/STATE.md`](../STATE.md), [`docs/PHASE_PROGRESS.md`](../PHASE_PROGRESS.md), and the gateway / app source itself (`icn-gateway`, `icn/apps/governance/src/http/`, the relevant crate code).
 2. **Project-index truth maps** — [`docs/reference/project-index/current-truth-map.md`](../reference/project-index/current-truth-map.md), [`docs/reference/project-index/show-readiness-map.md`](../reference/project-index/show-readiness-map.md), and [`docs/reference/project-index/runtime-surface-map.md`](../reference/project-index/runtime-surface-map.md).
 3. **Architecture canon** — [`docs/architecture/THE_COMMONS.md`](../architecture/THE_COMMONS.md), [`docs/architecture/KERNEL_APP_SEPARATION.md`](../architecture/KERNEL_APP_SEPARATION.md), [`docs/architecture/MEMBER_STANDING.md`](../architecture/MEMBER_STANDING.md), [`docs/genesis.md`](../genesis.md), and the rest of `docs/architecture/`.
 4. **Design canon** — this bible plus the documents listed in §1 point 2.
@@ -209,7 +209,7 @@ A new visual that becomes load-bearing (homepage, what-is-ICN, doc front-matter,
 A brief moves to image generation **only after** every gate item below is satisfied:
 
 1. **Source anchors listed.** Every claim in the brief points to a file path under §2.
-2. **Truth label assigned.** One of the six labels in §3.
+2. **Truth label assigned.** One of the seven labels in §3.
 3. **Audience named.** Member, organizer, developer, grant reviewer, or "first-conversation reader."
 4. **Core question stated.** One sentence the visual answers.
 5. **Message stated.** One sentence the viewer should walk away with.
@@ -225,7 +225,7 @@ Until all ten items are present, the brief is closed to generation. The brief li
 
 Generated images (image models, AI tools, external collaborators) are permitted as **sketches** under tight rules:
 
-- **Always labeled `illustrative direction` or `sketch`.** Never `implemented / current UI`. Never `repo-grounded`. Never `verified`. The label travels with the image — in the filename, the figure caption, the alt text, and the brief.
+- **Truth label is `illustrative direction`** — never `implemented / current UI`, never `repo-grounded`, never `verified`. `sketch` is **not** a truth label; it is a workflow / storage marker used in filenames, figure captions, and folder names (e.g. `member-shell.sketch.png`, `sketches/`, a "SKETCH — not for ship" chip) to make the exploration status visible at a glance. Every generated image carries the truth label `illustrative direction` in the brief and on the asset, with the `sketch` marker layered on top wherever it lives.
 - **Hard rule: generated images are sketches only, until rebuilt as Astro / SVG / source assets** under §12. There is no path on which a generated PNG becomes a load-bearing asset by being upgraded or polished. The path is always: sketch → brief → source asset → ship the source asset, not the sketch.
 - **Never shipped as a final asset.** A sketch can inform a class 1 (Astro/SVG) or class 2 (SVG-in-docs) build. It cannot become the asset itself.
 - **Never load-bearing.** A sketch may sit in an internal brief, an internal slide, or an exploration doc. It does not sit on the public website, in canonical docs, in a deck shown outside the project, or in a member-facing surface.

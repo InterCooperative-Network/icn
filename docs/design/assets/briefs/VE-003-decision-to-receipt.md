@@ -21,7 +21,7 @@ Purpose: Brief for VE-003 — Decision to Receipt / Provenance Trail. The canoni
 - [`docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md`](../../../dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md) — local HTTP proof loop
 - [`docs/dev/NYCN_K3S_PROOF_PATH.md`](../../../dev/NYCN_K3S_PROOF_PATH.md) — K3s smoke proof loop
 - [`docs/architecture/MEMBER_STANDING.md`](../../../architecture/MEMBER_STANDING.md) — member-standing contract
-- `apps/governance/src/http/` — gateway handlers for action cards and receipts
+- `icn/apps/governance/src/http/` — gateway handlers for action cards and receipts
 
 ## Audience
 
@@ -100,4 +100,4 @@ Run [VISUAL_REVIEW_CHECKLIST.md](../VISUAL_REVIEW_CHECKLIST.md). Per-brief notes
 
 ## Status
 
-`briefed`. Brief gate satisfied. Source-asset variants beyond the existing `ProvenanceTrail.astro` may be built when needed.
+`gate-open`. Brief gate satisfied. Source-asset variants beyond the existing `ProvenanceTrail.astro` may be built when needed.

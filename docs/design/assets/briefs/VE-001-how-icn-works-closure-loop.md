@@ -103,4 +103,4 @@ Run [VISUAL_REVIEW_CHECKLIST.md](../VISUAL_REVIEW_CHECKLIST.md) end-to-end befor
 
 ## Status
 
-`briefed`. Brief gate (bible §10) satisfied. Source-asset variants beyond the existing `ClosureLoop.astro` may be built when needed.
+`gate-open`. Brief gate (bible §10) satisfied. Source-asset variants beyond the existing `ClosureLoop.astro` may be built when needed.

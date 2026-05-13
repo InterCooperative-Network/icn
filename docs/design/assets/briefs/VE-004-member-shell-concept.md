@@ -109,4 +109,4 @@ Run [VISUAL_REVIEW_CHECKLIST.md](../VISUAL_REVIEW_CHECKLIST.md). Per-brief notes
 
 ## Status
 
-`briefed`. Brief gate satisfied. The existing `MemberSurface.astro` is the source asset; new variants extend it under this brief.
+`gate-open`. Brief gate satisfied. The existing `MemberSurface.astro` is the source asset; new variants extend it under this brief.

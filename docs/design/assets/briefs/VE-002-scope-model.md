@@ -100,4 +100,4 @@ Run [VISUAL_REVIEW_CHECKLIST.md](../VISUAL_REVIEW_CHECKLIST.md). Per-brief notes
 
 ## Status
 
-`briefed`. Brief gate satisfied. Source-asset variants beyond the existing `ScopeModel.astro` may be built when needed.
+`gate-open`. Brief gate satisfied. Source-asset variants beyond the existing `ScopeModel.astro` may be built when needed.
