@@ -1,0 +1,204 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>VE-004 — Member Shell Concept | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>assets</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>briefs</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>VE 004 member shell concept</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/assets/briefs/VE-004-member-shell-concept.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: draft
+Canonical: no
+Owner: Matt Faherty
+Last Reviewed: 2026-05-13
+Last Updated: 2026-05-13
+Purpose: Brief for VE-004 — Member Shell Concept. The illustrative-direction visual for the unified member-facing surface ICN is designed to produce.</h2>
+<h1>VE-004 — Member Shell Concept</h1>
+<h2>Truth label</h2>
+<p><strong><code>illustrative direction</code></strong>. The capabilities beneath each panel (<code>/me/standing</code>, <code>/me/action-cards</code>, action-item completion-receipt retrieval, governance domains) are real. The unified product surface tying them together is <strong>not yet shipped</strong>. Every variant of this asset declares &quot;illustrative&quot; visibly.</p>
+<p>This brief is also a guardrail: any depiction of the member shell that softens this label, hides it, or implies the shell is a shipped product violates the bible (§3, §8) and the show-readiness map.</p>
+<h2>Source anchors</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/src/components/MemberSurface.astro">`website/src/components/MemberSurface.astro`</a> — canonical illustrative implementation</li>
+<li><a href="/docs/architecture/MEMBER_STANDING">`docs/architecture/MEMBER_STANDING.md`</a> — member-standing contract</li>
+<li><a href="/docs/reference/project-index/runtime-surface-map">`docs/reference/project-index/runtime-surface-map.md`</a> — actual gateway surfaces beneath the shell</li>
+<li><a href="/docs/reference/project-index/show-readiness-map">`docs/reference/project-index/show-readiness-map.md`</a> — <em>&quot;complete mobile / member app&quot;</em> is on the do-not-show list</li>
+<li><a href="/docs/mobile/icn-mobile-ux-spec-v1">`docs/mobile/icn-mobile-ux-spec-v1.md`</a> — mobile member UX spec (build-facing, not shipped)</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTENT_STYLE_GUIDE">`docs/design/CONTENT_STYLE_GUIDE.md`</a> — vocabulary rules</li>
+</ul>
+<h2>Audience</h2>
+<p>Public website visitor wanting to picture what ICN feels like. Member or organizer who can read &quot;this is the direction&quot; honestly. Grant reviewer who needs to see the substrate&#39;s intended surface without being misled into thinking it ships today.</p>
+<h2>Core question</h2>
+<blockquote>
+<p><em>&quot;What would it feel like to inhabit ICN as a member?&quot;</em></p>
+</blockquote>
+<h2>One-sentence message</h2>
+<p>A member sees one coherent surface — who they are, where they hold standing, their position in governed social accounting, the decisions waiting on them, and the receipts that prove the chain — and it is grounded in real gateway capabilities, but the unified surface itself is not yet shipped.</p>
+<h2>Must show</h2>
+<ul>
+<li>Five panels on a &quot;civic screen frame&quot; (not a phone bezel):<ol>
+<li><strong>Acting as</strong> — self + the scopes the member is currently inside (fictional names).</li>
+<li><strong>Standing</strong> — recognized member status inside a fictional cooperative, with chips for &quot;recognized since&quot; and role.</li>
+<li><strong>Position</strong> — governed social accounting: contributions recorded, allocations drawn, open obligations, patronage status. <strong>Never</strong> a balance.</li>
+<li><strong>Open decision</strong> — a pending proposal with vote pending, close window, scope.</li>
+<li><strong>Recent receipts</strong> — three receipts with id, plain description, stamped date, scope label.</li>
+</ol>
+</li>
+<li>A visible &quot;MEMBER SURFACE · CONCEPT&quot; eyebrow on the device frame.</li>
+<li>A dashed &quot;what we are building toward&quot; footer making the illustrative-direction label explicit.</li>
+<li>All icons from the canonical symbol family (identity, authority, accounting, governance, provenance).</li>
+</ul>
+<h2>Must avoid</h2>
+<ul>
+<li>The words <code>wallet</code>, <code>balance</code>, <code>currency</code>, <code>coin</code>, <code>payment</code>, <code>transaction</code> anywhere on the surface.</li>
+<li>A currency symbol next to a number.</li>
+<li>Any &quot;send&quot; or &quot;receive&quot; affordance.</li>
+<li>Any &quot;stake / mint / burn / swap.&quot;</li>
+<li>A phone bezel or device-mockup chrome implying app-store readiness.</li>
+<li>Real cooperative names, real member names, real federations.</li>
+<li>NYCN / Summit / any institution-package vocabulary or fixtures.</li>
+<li>Push notifications, app-store badges, in-app purchase chrome.</li>
+<li>Fixture data that could plausibly be read as a real member&#39;s record.</li>
+</ul>
+<h2>Canonical copy</h2>
+<p>From <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/src/components/MemberSurface.astro">`MemberSurface.astro`</a>. Fictional entity and member names are approved per bible §8.</p>
+<ul>
+<li>Frame label: <code>Member surface · concept</code></li>
+<li>Acting as: <code>Self</code> — your cryptographic identity. Inside <code>Brightworks Collective (cooperative)</code>. Inside <code>Northeast Worker Federation (federation)</code>.</li>
+<li>Standing: <code>Recognized member · Brightworks Collective</code>. Chips: <code>Recognized since 2024-11</code>, <code>Role: Member</code>.</li>
+<li>Position (panel title): <code>Mutual-credit position inside Brightworks</code>. Stats: <code>Contributions recorded — 142 hours</code>, <code>Allocations drawn — 38 hours</code>, <code>Open obligations — 2 outstanding</code>, <code>Patronage (Q3) — pending approval</code>.</li>
+<li>Open decision: <code>Proposal: Extend the commons compute pool cap for the next quarter</code>. Chips: <code>Your vote: pending</code>, <code>Closes in 3 days</code>, <code>Scope: Federation</code>.</li>
+<li>Recent receipts:<ul>
+<li><code>#482 — Patronage settlement Q3 — scope: Cooperative — stamped 2024-10-31</code></li>
+<li><code>#481 — Shared room booking approved — scope: Community — stamped 2024-10-28</code></li>
+<li><code>#479 — Federation cross-clearing complete — scope: Federation — stamped 2024-10-24</code></li>
+</ul>
+</li>
+<li>Footer: <em>&quot;This is an illustration of how governance, economics, scope, and provenance could come together as a coherent member surface. The capabilities beneath each panel are real; the unified interface that ties them together is still being built.&quot;</em></li>
+</ul>
+<p>If a variant changes any string above, the new strings live in the brief — not in source — until reviewed.</p>
+<h2>Visual grammar</h2>
+<ul>
+<li><strong>Extends</strong> the canonical <code>MemberSurface.astro</code>. Variants are layout / framing changes on the same component grammar; they do not introduce new panel types without an updated brief.</li>
+<li>Civic &quot;screen frame&quot; with a labeled top bar — <strong>not</strong> a phone bezel.</li>
+<li>Stacked panels with subtle hairlines; no left accent stripes (icons + labels carry the meaning).</li>
+<li>Chip pattern from the design language (<code>.ms-chip</code>).</li>
+<li>Token-grounded.</li>
+<li>Receipt list uses a 2-column grid (id on the left, text + stamp on the right).</li>
+</ul>
+<h2>Accessibility requirements</h2>
+<ul>
+<li><code>aria-label</code> on the figure makes the illustrative status explicit: <em>&quot;An illustrative member-facing surface… This is a design illustration, not a claim to a shipped app.&quot;</em></li>
+<li>Each panel has an <code>&lt;h*&gt;</code> or <code>aria-labelledby</code> semantic; the eyebrow text is not the only heading.</li>
+<li>Stats use <code>&lt;dl&gt;</code> with <code>&lt;dt&gt;</code>/<code>&lt;dd&gt;</code> (already implemented).</li>
+<li>Icons <code>aria-hidden=&quot;true&quot;</code> next to visible text.</li>
+<li>Grayscale-safe — no signal carried by color alone.</li>
+<li>WCAG 2.2 AA contrast in both themes.</li>
+<li>No motion required.</li>
+<li>Renders usefully at 360 px and above; stat grid collapses to one column under 520 px (already implemented).</li>
+</ul>
+<h2>Review checklist</h2>
+<p>Run <a href="https://github.com/InterCooperative-Network/icn/blob/main/VISUAL_REVIEW_CHECKLIST">VISUAL_REVIEW_CHECKLIST.md</a>. Per-brief notes:</p>
+<ul>
+<li>§2 truth label — <code>illustrative direction</code> is visible on every variant. A version that hides the label is rejected.</li>
+<li>§3 vocabulary — <code>wallet</code> / <code>balance</code> / <code>currency</code> are the trap. Scan every chip, every stat label, every receipt line.</li>
+<li>§5 substrate honesty — no &quot;complete member app&quot; claim. The unified surface is not shipped.</li>
+<li>§9 generated-image rules — a generated-image sketch of this surface is <strong>not</strong> load-bearing; if a variant ships, it is rebuilt as Astro / SVG with verified strings.</li>
+<li>§10 production-source — the canonical form is <code>MemberSurface.astro</code>. Static raster exports are not load-bearing.</li>
+</ul>
+<h2>Status</h2>
+<p><code>gate-open</code>. Brief gate satisfied. The existing <code>MemberSurface.astro</code> is the source asset; new variants extend it under this brief.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

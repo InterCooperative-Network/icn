@@ -1,0 +1,453 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Visual Explainer Bible — v0 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN VISUAL EXPLAINER BIBLE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
+<h2>Status: draft
+Canonical: no
+Owner: Matt Faherty
+Last Reviewed: 2026-05-13
+Last Updated: 2026-05-13
+Purpose: Control-plane doctrine for every ICN visual explainer — diagrams, infographics, generated images, Astro/SVG components, and concept art. Defines what may be depicted, how it must be sourced, how truth is labeled, and how generated images are gated before becoming production assets.</h2>
+<h1>ICN Visual Explainer Bible — v0</h1>
+<blockquote>
+<p><strong>One sentence.</strong> Visuals are part of the institutional interface; they must be source-grounded, truth-labeled, accessibility-floored, and aligned with the <a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_DESIGN_SYSTEM">ICN Commons Design System</a> — or they do not ship.</p>
+</blockquote>
+<p>This bible is the control plane for the visual explainer system. It is read before any new explainer is drafted and before any generated image is treated as a candidate asset. It does not produce visuals; it governs how visuals are produced.</p>
+<h2>1. Purpose</h2>
+<p>ICN keeps growing surfaces that try to explain it — homepage diagrams, doc figures, deck slides, social cards, talk material, member-shell concepts. Without a control plane:</p>
+<ul>
+<li>visuals drift away from what the substrate actually does</li>
+<li>vocabulary slides into payment/wallet/token framing</li>
+<li>accessibility becomes a polish phase</li>
+<li>generated images become quoted &quot;as if real&quot; without becoming source assets</li>
+<li>institution-specific (NYCN, Summit) material leaks into generic ICN explainers</li>
+<li>briefs lose their connection to the <a href="/docs/reference/project-index/current-truth-map">current truth map</a> and the <a href="/docs/reference/project-index/show-readiness-map">show-readiness map</a></li>
+</ul>
+<p>The bible exists to keep every visual explainer aligned to:</p>
+<ol>
+<li><strong>The substrate&#39;s actual state</strong> — what exists in main today.</li>
+<li><strong>The design language</strong> — the <a href="/docs/design-language/brief-v0">brief</a>, <a href="/docs/design-language/concept-map">concept map</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_SYSTEM">visual system</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/ACCESSIBILITY_BASELINE">accessibility baseline</a>, and <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTENT_STYLE_GUIDE">content style guide</a>.</li>
+<li><strong>Regulatory framing</strong> — ICN is digital public infrastructure, not a payment system, not a token economy, not a wallet app.</li>
+<li><strong>The truth labels</strong> — every visual carries a label declaring what kind of claim it is making.</li>
+</ol>
+<h2>2. Source hierarchy</h2>
+<p>When a visual makes a claim, the claim is checked against this order (highest wins):</p>
+<ol>
+<li><strong>Per-PR truth and current state</strong> — <a href="/docs/STATE">`docs/STATE.md`</a>, <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>, and the gateway / app source itself (<code>icn-gateway</code>, <code>icn/apps/governance/src/http/</code>, the relevant crate code).</li>
+<li><strong>Project-index truth maps</strong> — <a href="/docs/reference/project-index/current-truth-map">`docs/reference/project-index/current-truth-map.md`</a>, <a href="/docs/reference/project-index/show-readiness-map">`docs/reference/project-index/show-readiness-map.md`</a>, and <a href="/docs/reference/project-index/runtime-surface-map">`docs/reference/project-index/runtime-surface-map.md`</a>.</li>
+<li><strong>Architecture canon</strong> — <a href="/docs/architecture/THE_COMMONS">`docs/architecture/THE_COMMONS.md`</a>, <a href="/docs/architecture/KERNEL_APP_SEPARATION">`docs/architecture/KERNEL_APP_SEPARATION.md`</a>, <a href="/docs/architecture/MEMBER_STANDING">`docs/architecture/MEMBER_STANDING.md`</a>, <a href="/docs/genesis">`docs/genesis.md`</a>, and the rest of <code>docs/architecture/</code>.</li>
+<li><strong>Design canon</strong> — this bible plus the documents listed in §1 point 2.</li>
+<li><strong>Existing implementation surfaces</strong> — the Astro primitives <code>ClosureLoop</code>, <code>ScopeModel</code>, <code>ProvenanceTrail</code>, and <code>MemberSurface</code>. A new explainer must not contradict an already-implemented primitive; it either extends it or replaces it with an explicit migration.</li>
+<li><strong>Strategy / planning material</strong> — used only for direction, never as a claim of present capability.</li>
+</ol>
+<p>A visual that asserts something at level 4 or below while level 1–3 says otherwise is wrong, regardless of how clean the visual is.</p>
+<h2>3. Truth labels</h2>
+<p>Every visual explainer carries one truth label. The label is required in the brief and on the asset itself (figure caption, alt text, or visible chip) wherever it lands.</p>
+<p>These labels are written for the <strong>visual-explainer use case</strong> — they describe what kind of claim a <em>visual</em> is making about ICN, not what <code>truth_class</code> a doc carries in <code>registry.toml</code>. The two systems overlap but are not the same; the registry labels concern document-level provenance, the labels below concern asset-level claim type.</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Meaning</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>implemented / current UI</code></td>
+<td>Depicts a surface that exists in <code>main</code> and is exercised today — a real gateway response, a real Astro component, a real CLI output.</td>
+<td>A screenshot of <code>ClosureLoop.astro</code>. A diagram of <code>/me/standing</code> shaped to its actual response. The K3s proof-loop runbook visualized as it actually runs.</td>
+</tr>
+<tr>
+<td><code>repo-grounded public explainer</code></td>
+<td>An explainer of the ICN model, grounded directly in repo material (canonical docs, source code, runtime surfaces). May abstract for clarity, but never contradict the source.</td>
+<td>The nine-station closure loop as a concept diagram. The five-scope model. The decision-to-receipt provenance flow as a public-facing story.</td>
+</tr>
+<tr>
+<td><code>repo-grounded architecture explainer</code></td>
+<td>An explainer for a developer or architect audience, grounded in architecture docs and crate code. Reads at a different abstraction level than the public explainer.</td>
+<td>The kernel/app meaning-firewall diagram. PolicyOracle request flow. Per-crate responsibilities.</td>
+</tr>
+<tr>
+<td><code>illustrative direction</code></td>
+<td>Concept art for a surface, flow, or member experience that is not yet shipped end-to-end. Communicates intent and grammar; capabilities beneath may be real, but the unified surface is not.</td>
+<td><code>MemberSurface</code> content. Action-card anatomy at member-app scale. Steward / operator cockpit concepts.</td>
+</tr>
+<tr>
+<td><code>future-state / roadmap</code></td>
+<td>Depicts a capability the project is moving toward but has not built yet. Implementation does not exist; spec or direction does.</td>
+<td>Live multi-coop federation. One-command per-coop deployment. Charter customization workflow as a member-facing surface. Commons compute economy at federation scale.</td>
+</tr>
+<tr>
+<td><code>historical</code></td>
+<td>Snapshot from an earlier phase, kept for trajectory, archive, or teaching. Not the current state.</td>
+<td>Earlier closure-loop drafts. Pre-Phase-1 architecture diagrams. Old member-shell sketches kept for comparison.</td>
+</tr>
+<tr>
+<td><code>do not use</code></td>
+<td>The visual is recognized as wrong, misleading, or against doctrine, and is preserved only as a counter-example or to mark something removed. Never embedded, never shipped, never used as a starting point without an explicit migration brief.</td>
+<td>Crypto / token / wallet-styled drafts. Glowing-globe network maps. Old material that violates §5 or §11.</td>
+</tr>
+</tbody></table>
+<p>Labels are <strong>not</strong> marketing copy. Do not soften, blur, or skip them. If a visual sits between two labels, it carries the <strong>less optimistic</strong> one.</p>
+<p>A visual without a label is <strong>not shippable</strong>.</p>
+<h2>4. Visual doctrine (compact)</h2>
+<p>The <a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_SYSTEM">visual system</a> and the <a href="/docs/design-language/brief-v0">brief</a> are the long-form doctrine. The bible reuses those rules in compact form:</p>
+<ol>
+<li><strong>Make the invisible visible.</strong> Authority, scope, mandates, and receipts are legible without expert knowledge.</li>
+<li><strong>Member-first, not institution-first.</strong> The person persists; the institution is the changing context.</li>
+<li><strong>Scope coequality.</strong> Cooperatives, communities, and federations are co-equal forms — never a hierarchy, never a ladder.</li>
+<li><strong>Proof must be understandable.</strong> Provenance reveals through progressive disclosure.</li>
+<li><strong>Civic seriousness without bureaucratic deadness.</strong> Calm, capable, trustworthy.</li>
+<li><strong>Mobile-first and low-bandwidth.</strong> Five-year-old phone on a slow link is the design target.</li>
+<li><strong>No fake futurism.</strong> No glassmorphism, neon, AI sheen, glowing network globes, fake coins.</li>
+<li><strong>Plain language is required.</strong> Jargon links to a glossary entry.</li>
+<li><strong>Receipts are first-class UI.</strong> Always exportable, always shareable, never buried.</li>
+<li><strong>Reduced motion and large tap targets are defaults.</strong> Accessibility is the floor.</li>
+</ol>
+<p>A visual that visibly violates any of these is rejected at review, not revised in-place.</p>
+<h2>5. Vocabulary rules (binding)</h2>
+<p>ICN-native primitives use ICN-native vocabulary. The <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTENT_STYLE_GUIDE">content style guide</a> is the long-form rule; here is the short form for visuals:</p>
+<table>
+<thead>
+<tr>
+<th>Use</th>
+<th>Do not use for ICN primitives</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>identity</td>
+<td>account, login</td>
+</tr>
+<tr>
+<td>standing</td>
+<td>member status, account level, rank, reputation</td>
+</tr>
+<tr>
+<td>mandate / authority</td>
+<td>permission (UI-only), admin role</td>
+</tr>
+<tr>
+<td>obligation</td>
+<td>debt, IOU, balance owed</td>
+</tr>
+<tr>
+<td>allocation</td>
+<td>budget line, payment plan</td>
+</tr>
+<tr>
+<td>settlement</td>
+<td>payment, transfer, payout, transaction</td>
+</tr>
+<tr>
+<td>unit</td>
+<td>currency, token, coin, money</td>
+</tr>
+<tr>
+<td>position</td>
+<td>balance, wallet, account, holdings</td>
+</tr>
+<tr>
+<td>receipt</td>
+<td>confirmation, transaction record</td>
+</tr>
+<tr>
+<td>provenance</td>
+<td>log, audit log, history</td>
+</tr>
+</tbody></table>
+<p>Hard prohibitions on ICN-native visuals:</p>
+<ul>
+<li><strong>no crypto / web3 / token / wallet / payment / balance / currency framing</strong></li>
+<li><strong>no coin imagery, no wallet icons, no exchange chrome</strong></li>
+<li><strong>no &quot;transaction success&quot; affordances styled like fintech apps</strong></li>
+<li><strong>no &quot;stake,&quot; &quot;mint,&quot; &quot;burn,&quot; &quot;swap&quot;</strong></li>
+</ul>
+<p>External systems may be named for what they are (bank transfer, ACH, currency) when the visual is specifically describing the external system. The boundary is: ICN-native primitives use ICN-native vocabulary; external systems can be named as themselves.</p>
+<h2>6. Accessibility floor</h2>
+<p>Every visual explainer must, before being treated as a candidate asset:</p>
+<ul>
+<li><strong>Carry meaning in structure + label + icon silhouette, not color alone.</strong> A grayscale pass must remain readable.</li>
+<li><strong>Meet WCAG 2.2 AA contrast for text and meaningful graphics</strong> (4.5:1 body, 3:1 large text / UI). Both dark and light theme variants.</li>
+<li><strong>Be readable at small sizes.</strong> Icons designed for 16–22px must remain silhouette-distinct at 16px.</li>
+<li><strong>Carry alt text or <code>aria-label</code> describing the claim, not the chrome.</strong> A screen reader user must learn the same thing a sighted reader does.</li>
+<li><strong>Avoid auto-playing motion.</strong> Reduced-motion preference is honored. No motion as the sole carrier of state change.</li>
+<li><strong>Respect tap-target minimums</strong> (44×44 CSS px) for any interactive surface depicted at near-real scale.</li>
+<li><strong>Not require expert vocabulary</strong> in the first reading layer. Glossary-linked terms are fine; unlinked jargon is not.</li>
+<li><strong>Render usefully on a 2 Mbps connection on a low-end device.</strong> No 4MB PNG hero images, no hero videos.</li>
+</ul>
+<p>Accessibility is a release blocker, not polish. A non-accessible visual is treated as not done.</p>
+<h2>7. Core ICN explainer models</h2>
+<p>These are the canonical models. Every visual explainer either belongs to one of them or proposes a new model under §10 (brief gate).</p>
+<h3>7.1 The closure loop (nine stations)</h3>
+<p><code>identity → standing → authority → governance → policy → accounting → execution → receipts/provenance → member experience</code>, with the loop closing back into the next round of standing.</p>
+<ul>
+<li><strong>Canonical surface:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/src/components/ClosureLoop.astro">`website/src/components/ClosureLoop.astro`</a></li>
+<li><strong>Concept anchor:</strong> <a href="/docs/design-language/concept-map">`concept-map.md`</a> — Closure-loop stations</li>
+<li><strong>Truth label:</strong> <code>repo-grounded public explainer</code> for the model. A screenshot or rendering of the live Astro component is <code>implemented / current UI</code>. Per-surface capabilities depicted by the model carry their own labels (see §3).</li>
+</ul>
+<h3>7.2 The scope model (five scopes)</h3>
+<p><code>commons → federation → community → cooperative → self</code>. Five scopes of action, co-equal, not a hierarchy. A single action can touch several scopes at once. The receipt it produces is tagged with every scope it passed through.</p>
+<ul>
+<li><strong>Canonical surface:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/src/components/ScopeModel.astro">`website/src/components/ScopeModel.astro`</a></li>
+<li><strong>Concept anchor:</strong> <a href="/docs/design-language/concept-map">`concept-map.md`</a> — Scope concepts</li>
+<li><strong>Truth label:</strong> <code>repo-grounded public explainer</code> for the model. Concrete scope surfaces (e.g. live federation between two coops) carry their own labels and may be <code>future-state / roadmap</code>.</li>
+</ul>
+<h3>7.3 The provenance trail (decision → receipt)</h3>
+<p><code>proposal → decision → execution → effect → receipt</code>. The chain a decision walks to become a durable institutional fact.</p>
+<ul>
+<li><strong>Canonical surface:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/src/components/ProvenanceTrail.astro">`website/src/components/ProvenanceTrail.astro`</a></li>
+<li><strong>Live anchors:</strong> <code>/v1/gov/me/action-cards</code> (cards), <code>/v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt</code> (receipt retrieval), three currently emitted source paths.</li>
+<li><strong>Truth label:</strong> <code>repo-grounded public explainer</code> for the model. A visual that depicts the <em>three currently emitted</em> source paths is <code>implemented / current UI</code>. A visual that depicts all five source paths is <code>future-state / roadmap</code> until the two RFC-gated paths land.</li>
+</ul>
+<h3>7.4 The kernel/app separation</h3>
+<p>The meaning firewall: apps translate domain semantics into generic constraints; the kernel enforces constraints without understanding meaning.</p>
+<ul>
+<li><strong>Canonical doc:</strong> <a href="/docs/architecture/KERNEL_APP_SEPARATION">`docs/architecture/KERNEL_APP_SEPARATION.md`</a></li>
+<li><strong>Truth label:</strong> <code>repo-grounded architecture explainer</code>. Specific oracles that are not yet implemented carry <code>future-state / roadmap</code> where shown alongside live ones.</li>
+</ul>
+<h3>7.5 The member surface (illustrative)</h3>
+<p>The unified member-facing surface — identity, standing, position, governance, receipts in one coherent view.</p>
+<ul>
+<li><strong>Canonical surface:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/src/components/MemberSurface.astro">`website/src/components/MemberSurface.astro`</a></li>
+<li><strong>Truth label:</strong> <code>illustrative direction</code>. The capabilities beneath each panel are real; the unified product surface tying them together is not yet shipped.</li>
+</ul>
+<h3>7.6 Federation without centralization</h3>
+<p>Distinct institutions coordinating through shared infrastructure without disappearing into one sovereign center.</p>
+<ul>
+<li><strong>Canonical anchors:</strong> <a href="/docs/architecture/FEDERATION_INTEROP_CONTRACT">`docs/architecture/FEDERATION_INTEROP_CONTRACT.md`</a>, <code>icn-federation</code> crate.</li>
+<li><strong>Truth label:</strong> <code>repo-grounded architecture explainer</code> for the primitives that exist in <code>icn-federation</code>; <code>future-state / roadmap</code> for any depiction of two real cooperatives federating in production. <strong>No live-federation claim</strong> — see show-readiness map.</li>
+</ul>
+<h3>7.7 Commons and compute</h3>
+<p>Trust-gated distributed task execution and shared resources governed by participating institutions.</p>
+<ul>
+<li><strong>Canonical anchors:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/compute-substrate-design">`docs/design/compute-substrate-design.md`</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/COMMONS_EVOLUTION">`docs/design/COMMONS_EVOLUTION.md`</a>, <code>icn-compute</code> crate.</li>
+<li><strong>Truth label:</strong> <code>repo-grounded architecture explainer</code> for the primitives that exist; <code>future-state / roadmap</code> for commons-credit accounting flows or federation-scale compute coordination that exceed current state.</li>
+</ul>
+<h2>8. Product-surface concept rules</h2>
+<p>Visuals that depict a product surface (member shell, action card at app scale, receipt detail, steward cockpit, operator console) must:</p>
+<ul>
+<li>be labeled <code>illustrative direction</code> unless the surface is shipped end-to-end as one coherent product;</li>
+<li>show only capabilities that exist beneath the surface, even when the surface itself is illustrative;</li>
+<li>not introduce a navigation pattern not validated by an existing primitive or an accepted spec;</li>
+<li>name fictional entities and members clearly (no real cooperative, no real person, no institution-package name);</li>
+<li>avoid NYCN, Summit, or any specific package&#39;s branding, copy, vocabulary, or fixtures (see §11);</li>
+<li>not depict push notifications, transaction popups, currency totals, balance widgets, or any chrome that contradicts §5.</li>
+</ul>
+<p>Sample fictional entity names approved for use in generic ICN visuals: <code>Brightworks Collective</code>, <code>Northeast Worker Federation</code>, <code>Riverbend Community</code>, <code>Open Commons Compute Pool</code>. Sample fictional member names: <code>Avery Smoke</code>, <code>Robin Placeholder</code>, <code>Sam Example</code>. Use these or invent equivalents; do not reach for real names.</p>
+<h2>9. Image / visual asset plan</h2>
+<p>The bible recognizes four asset classes. Each has a distinct production path.</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Examples</th>
+<th>Production path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Astro/SVG component</strong></td>
+<td><code>ClosureLoop</code>, <code>ScopeModel</code>, <code>ProvenanceTrail</code>, <code>MemberSurface</code></td>
+<td>Live source in <code>website/src/components/</code>. Tokenized, themable, grayscale-tested, integrated with <code>Icon.astro</code>. This is the <strong>canonical</strong> form.</td>
+</tr>
+<tr>
+<td><strong>SVG-in-docs figure</strong></td>
+<td>Inline SVG inside a doc that explains a model</td>
+<td>Hand-authored SVG using design tokens; never raster.</td>
+</tr>
+<tr>
+<td><strong>Diagram from text</strong></td>
+<td>Mermaid sequence/flow diagrams inside markdown</td>
+<td>Mermaid sources only when the diagram is purely structural and not a member-facing visual.</td>
+</tr>
+<tr>
+<td><strong>Generated image sketch</strong></td>
+<td>Mood / scene / illustrative concept produced by an image model</td>
+<td>Treated as a <strong>sketch</strong> under §11. Never shipped as a final asset.</td>
+</tr>
+</tbody></table>
+<p>A new visual that becomes load-bearing (homepage, what-is-ICN, doc front-matter, deck hero) must be authored as class 1 or class 2. Class 4 cannot be load-bearing.</p>
+<h2>10. The &quot;do not generate yet&quot; brief gate</h2>
+<p>A brief moves to image generation <strong>only after</strong> every gate item below is satisfied:</p>
+<ol>
+<li><strong>Source anchors listed.</strong> Every claim in the brief points to a file path under §2.</li>
+<li><strong>Truth label assigned.</strong> One of the seven labels in §3.</li>
+<li><strong>Audience named.</strong> Member, organizer, developer, grant reviewer, or &quot;first-conversation reader.&quot;</li>
+<li><strong>Core question stated.</strong> One sentence the visual answers.</li>
+<li><strong>Message stated.</strong> One sentence the viewer should walk away with.</li>
+<li><strong>Must-show / must-avoid lists complete.</strong> Including vocabulary, including iconography.</li>
+<li><strong>Canonical copy drafted.</strong> The exact words that will appear on the visual.</li>
+<li><strong>Visual grammar named.</strong> Which existing primitive does it extend, replace, or reference?</li>
+<li><strong>Accessibility requirements written.</strong> Contrast, label, alt text, motion, and grayscale plan.</li>
+<li><strong>Review checklist run.</strong> See <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/assets/VISUAL_REVIEW_CHECKLIST">`assets/VISUAL_REVIEW_CHECKLIST.md`</a>.</li>
+</ol>
+<p>Until all ten items are present, the brief is closed to generation. The brief lives; the image does not.</p>
+<h2>11. Generated-image workflow</h2>
+<p>Generated images (image models, AI tools, external collaborators) are permitted as <strong>sketches</strong> under tight rules:</p>
+<ul>
+<li><strong>Truth label is <code>illustrative direction</code></strong> — never <code>implemented / current UI</code>, never <code>repo-grounded</code>, never <code>verified</code>. <code>sketch</code> is <strong>not</strong> a truth label; it is a workflow / storage marker used in filenames, figure captions, and folder names (e.g. <code>member-shell.sketch.png</code>, <code>sketches/</code>, a &quot;SKETCH — not for ship&quot; chip) to make the exploration status visible at a glance. Every generated image carries the truth label <code>illustrative direction</code> in the brief and on the asset, with the <code>sketch</code> marker layered on top wherever it lives.</li>
+<li><strong>Hard rule: generated images are sketches only, until rebuilt as Astro / SVG / source assets</strong> under §12. There is no path on which a generated PNG becomes a load-bearing asset by being upgraded or polished. The path is always: sketch → brief → source asset → ship the source asset, not the sketch.</li>
+<li><strong>Never shipped as a final asset.</strong> A sketch can inform a class 1 (Astro/SVG) or class 2 (SVG-in-docs) build. It cannot become the asset itself.</li>
+<li><strong>Never load-bearing.</strong> A sketch may sit in an internal brief, an internal slide, or an exploration doc. It does not sit on the public website, in canonical docs, in a deck shown outside the project, or in a member-facing surface.</li>
+<li><strong>No fake UIs.</strong> A sketch must not generate a fake member shell, a fake receipt, a fake action card with plausible-looking real data, a fake email, or a fake notification — those create the impression of capability that is not shipped.</li>
+<li><strong>No member personal data.</strong> Including fixture data that could plausibly be read as real.</li>
+<li><strong>No regulated-financial imagery.</strong> No coins, no wallets, no bank ledgers, no payment popups.</li>
+<li><strong>No real cooperative names, real members, real partners.</strong> Including NYCN.</li>
+<li><strong>Stored separately from production assets.</strong> Sketches live in brief folders or scratch directories; they do not enter <code>website/src/assets/</code> or any registered location.</li>
+</ul>
+<h3>11.1 Generated text inside images is unreliable</h3>
+<p>This is a separate, load-bearing warning.</p>
+<p>Image-generation models routinely produce text that is <strong>wrong, garbled, hallucinated, or invented</strong>, even when given exact strings. They will misspell ICN, invent endpoints, render gibberish in UI chrome, substitute plausible-looking jargon for canonical vocabulary, and produce numbers that look authoritative but came from nowhere.</p>
+<p>For the ICN visual explainer system this means:</p>
+<ul>
+<li><strong>Every glyph of text in a generated image must be manually verified against its source</strong> before the image is used anywhere — internal brief, exploration doc, slide, anything.</li>
+<li><strong>Any text that cannot be verified must be removed or covered</strong>, not &quot;left in as direction.&quot; Direction does not justify shipping a wrong endpoint name or a hallucinated receipt schema.</li>
+<li><strong>If the message of the visual depends on the text being correct</strong> — a labeled diagram, a UI mock, an annotated screenshot — the only acceptable path is to rebuild the visual as a source asset (Astro, SVG, hand-authored) with the real strings. Do not ship the generated text image.</li>
+<li><strong>Numbers, dates, identifiers, vote counts, balances, hash strings, and any &quot;screenshot-like&quot; text in a generated image are presumed false</strong> until checked against the substrate.</li>
+</ul>
+<p>The rule, restated: <strong>generated text inside generated images is not evidence, not copy, and not source. It is a placeholder that must be replaced with verified strings in a source asset.</strong></p>
+<p>The bible&#39;s stance is: <strong>a generated image is a way of thinking about a future asset, not the asset itself.</strong></p>
+<h2>12. Production-source rule</h2>
+<p>Any visual that becomes load-bearing — homepage, doc front-matter, public-facing diagram, deck hero, social card, in-product surface — must be a <strong>source asset</strong>: Astro/SVG component, hand-authored SVG, or token-grounded design file with an editable export path.</p>
+<p>PNG-only assets are not acceptable as load-bearing. The reasons:</p>
+<ul>
+<li>they cannot be themed (dark/light, accessibility palettes)</li>
+<li>they cannot inherit tokens</li>
+<li>they cannot be diffed in review</li>
+<li>they encode a single layout choice that goes stale</li>
+<li>they tend to outlast the truth they were drawn against</li>
+</ul>
+<p>The rule:</p>
+<blockquote>
+<p><strong>An important visual must be re-built as source before it ships. The sketch is permitted upstream; the source is what ships.</strong></p>
+</blockquote>
+<h2>13. Cross-references and see-also</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_DESIGN_SYSTEM">docs/design/ICN_DESIGN_SYSTEM.md</a> — top-level entry point for the ICN Commons Design System</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_SYSTEM">docs/design/ICN_VISUAL_SYSTEM.md</a> — stable visual doctrine</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTENT_STYLE_GUIDE">docs/design/CONTENT_STYLE_GUIDE.md</a> — voice and vocabulary</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ACCESSIBILITY_BASELINE">docs/design/ACCESSIBILITY_BASELINE.md</a> — accessibility floor</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_PROMPT_LIBRARY">docs/design/ICN_PROMPT_LIBRARY.md</a> — image-generation prompt patterns</li>
+<li><a href="/docs/design-language/brief-v0">docs/design-language/brief-v0.md</a> — canonical design language brief</li>
+<li><a href="/docs/design-language/concept-map">docs/design-language/concept-map.md</a> — canonical → public terminology</li>
+<li><a href="/docs/design-language/accessibility">docs/design-language/accessibility.md</a> — component-level accessibility patterns</li>
+<li><a href="/docs/architecture/THE_COMMONS">docs/architecture/THE_COMMONS.md</a> — substrate doctrine</li>
+<li><a href="/docs/architecture/KERNEL_APP_SEPARATION">docs/architecture/KERNEL_APP_SEPARATION.md</a> — meaning-firewall architecture</li>
+<li><a href="/docs/reference/project-index/current-truth-map">docs/reference/project-index/current-truth-map.md</a> — what is real now</li>
+<li><a href="/docs/reference/project-index/show-readiness-map">docs/reference/project-index/show-readiness-map.md</a> — what may be shown</li>
+<li><a href="/docs/reference/project-index/runtime-surface-map">docs/reference/project-index/runtime-surface-map.md</a> — actual gateway surfaces</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/assets/ASSET_REGISTER">docs/design/assets/ASSET_REGISTER.md</a> — the live register of visual assets</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/assets/VISUAL_REVIEW_CHECKLIST">docs/design/assets/VISUAL_REVIEW_CHECKLIST.md</a> — pre-ship review</li>
+</ul>
+<h2>14. Non-goals</h2>
+<ul>
+<li>Not a brand kit for any institution package (NYCN, Summit, future federations).</li>
+<li>Not a CSS framework or token system; those live in <code>website/src/styles/global.css</code> and the design language.</li>
+<li>Not a substitute for accessibility testing on real devices with real members.</li>
+<li>Not a doctrine that freezes navigation models or component APIs.</li>
+<li>Not a generator. It governs production; it does not produce.</li>
+</ul>
+<h2>15. How this bible evolves</h2>
+<ul>
+<li>Updates to the bible follow the same review path as the design system: design review + one technical reviewer + truth-map cross-check.</li>
+<li>Adding a new core model (§7) requires a brief, an implementation surface or a clear path to one, and a review against §10.</li>
+<li>Changing a vocabulary rule (§5) requires sign-off from the same reviewers and a sweep of existing briefs.</li>
+<li>Truth-label changes propagate down to every asset that carries the label and every brief that uses it.</li>
+</ul>
+<p>The bible is <code>Last Reviewed</code> quarterly at minimum, and after any phase transition in <code>PHASE_PROGRESS.md</code>.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
