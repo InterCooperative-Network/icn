@@ -45,8 +45,13 @@ export interface Props {
    * alt text, or visible chip). The chip is the strongest pattern
    * because it survives screenshots and re-use in decks, so the
    * default is true and the chip cannot be silently dropped without
-   * an explicit override at the call site. Aria-label always carries
-   * the label regardless.
+   * an explicit override at the call site.
+   *
+   * When this is false the chip is hidden visually, but a
+   * visually-hidden span carrying "Truth label: <label>" is still
+   * rendered inside the section so the label remains exposed to
+   * assistive technology and to anyone reading the source. The label
+   * is never silently dropped.
    */
   showTruthLabelChip?: boolean;
   /**
@@ -62,6 +67,15 @@ export interface Props {
    * surrounding page already states the loop is closed.
    */
   showReturn?: boolean;
+  /**
+   * Optional explicit DOM id used for the heading and the section's
+   * `aria-labelledby`. Provide this when more than one instance of
+   * the explainer renders on the same page, or when a page needs
+   * deep links to anchor to a known id. If omitted, a deterministic
+   * id is derived from `title` so the rendered HTML stays stable
+   * across builds and SSR/SSG passes.
+   */
+  id?: string;
 }
 
 const {
@@ -70,14 +84,20 @@ const {
   showTruthLabelChip = true,
   variant = "full",
   showReturn = true,
+  id,
 } = Astro.props;
 
 const HeadingTag = headingLevel;
 
-// Stable id for the heading so the wrapping section can be the labelled
-// region. Astro generates unique ids per component instance via the
-// generator below.
-const headingId = `how-icn-works-${Math.random().toString(36).slice(2, 8)}`;
+// Deterministic id derived from the title so rendered HTML is stable
+// across builds and SSR/SSG passes. Pages can override via the `id`
+// prop when they need a specific anchor or when multiple instances of
+// the explainer share a page.
+const titleSlug = title
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+|-+$/g, "");
+const headingId = id ?? `how-icn-works-${titleSlug || "default"}`;
 
 const truthLabel = "repo-grounded public explainer";
 
@@ -93,7 +113,7 @@ const oneSentenceMessage =
     <HeadingTag id={headingId} class="hiw-title">{title}</HeadingTag>
 
     {
-      showTruthLabelChip && (
+      showTruthLabelChip ? (
         <p
           class="hiw-truth"
           role="note"
@@ -102,6 +122,11 @@ const oneSentenceMessage =
           <span class="hiw-truth-label">Truth label</span>
           <span class="hiw-truth-value">{truthLabel}</span>
         </p>
+      ) : (
+        // Chip hidden, but the label must still travel with the asset
+        // per bible §3. Rendered visually-hidden so assistive
+        // technology and source readers still see it.
+        <span class="hiw-sr-only">Truth label: {truthLabel}</span>
       )
     }
 
@@ -220,6 +245,21 @@ const oneSentenceMessage =
   .hiw-truth-value {
     font-weight: 600;
     color: var(--text-heading);
+  }
+
+  /* Visually-hidden but exposed to assistive technology. Component-
+     scoped so we don't introduce a global utility class in this PR;
+     pattern follows the WAI sr-only convention. */
+  .hiw-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .hiw-lede {
