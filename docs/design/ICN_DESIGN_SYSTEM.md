@@ -47,7 +47,9 @@ Living docs that make up the system. Read in order on first pass:
 | 4 | [docs/design/ACCESSIBILITY_BASELINE.md](ACCESSIBILITY_BASELINE.md) | Floor for every member-facing surface (WCAG 2.2 AA, plus ICN-specific obligations) |
 | 5 | [docs/design-language/accessibility.md](../design-language/accessibility.md) | Detailed accessibility patterns, copy, and component-level guidance |
 | 6 | [docs/design/CONTENT_STYLE_GUIDE.md](CONTENT_STYLE_GUIDE.md) | Plain language, vocabulary, dangerous-action copy, formal-record markers |
-| 7 | [docs/design/CLAUDE_DESIGN_CONTEXT.md](CLAUDE_DESIGN_CONTEXT.md) | Ready-to-paste design context for Claude Design / external collaborators |
+| 7 | [docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md](ICN_VISUAL_EXPLAINER_BIBLE.md) | Control plane for every visual explainer — source hierarchy, truth labels, brief gate, generated-image workflow |
+| 8 | [docs/design/assets/ASSET_REGISTER.md](assets/ASSET_REGISTER.md) | Live register of planned and tracked visual assets (one row per asset, briefs in `assets/briefs/`) |
+| 9 | [docs/design/CLAUDE_DESIGN_CONTEXT.md](CLAUDE_DESIGN_CONTEXT.md) | Ready-to-paste design context for Claude Design / external collaborators |
 
 ADRs that bind this work:
 
@@ -101,6 +103,9 @@ Each surface has a non-negotiable floor. Detail lives in the accessibility basel
 
 ## See also
 
+- [docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md](ICN_VISUAL_EXPLAINER_BIBLE.md) — visual explainer control plane (doctrine for diagrams, infographics, generated images, source assets)
+- [docs/design/assets/ASSET_REGISTER.md](assets/ASSET_REGISTER.md) — live register of planned and tracked visual assets
+- [docs/design/assets/VISUAL_REVIEW_CHECKLIST.md](assets/VISUAL_REVIEW_CHECKLIST.md) — pre-ship review for every visual explainer
 - [docs/strategy/ICN_CONSTITUTIONAL_ROADMAP.md](../strategy/ICN_CONSTITUTIONAL_ROADMAP.md)
 - [docs/architecture/KERNEL_APP_SEPARATION.md](../architecture/KERNEL_APP_SEPARATION.md)
 - [docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md](../architecture/INSTITUTION_PACKAGE_BOUNDARY.md)

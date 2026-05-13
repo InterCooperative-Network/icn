@@ -1291,6 +1291,70 @@ domain_tags = ["design", "prompt-library"]
 recommended_action = "keep"
 last_reviewed = "2026-04-22"
 
+[docs."docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md"]
+category = "design"
+status = "draft"
+title = "ICN Visual Explainer Bible"
+description = "Control-plane doctrine for every ICN visual explainer — source hierarchy, truth labels, vocabulary rules, accessibility floor, core explainer models, brief gate, generated-image workflow, production-source rule. Governs diagrams, infographics, generated images, and source assets across website, docs, decks, and product surfaces."
+last_updated = "2026-05-13"
+owner = "matt"
+audiences = ["architects", "developers", "designers", "stakeholders"]
+truth_class = "normative"
+role = "design"
+canonical = "no"
+freshness = "current"
+domain_tags = ["design", "visual-system", "visual-explainer", "accessibility"]
+recommended_action = "keep"
+last_reviewed = "2026-05-13"
+
+[docs."docs/design/assets/README.md"]
+category = "design"
+status = "draft"
+title = "ICN Visual Assets — Directory README"
+description = "Orientation for the visual-asset planning layer — where production assets live, where sketches live, asset lifecycle, and what does not go in this directory."
+last_updated = "2026-05-13"
+owner = "matt"
+audiences = ["architects", "developers", "designers"]
+truth_class = "descriptive"
+role = "design"
+canonical = "no"
+freshness = "current"
+domain_tags = ["design", "visual-explainer"]
+recommended_action = "keep"
+last_reviewed = "2026-05-13"
+
+[docs."docs/design/assets/ASSET_REGISTER.md"]
+category = "design"
+status = "draft"
+title = "ICN Visual Asset Register"
+description = "Live register of planned and tracked visual assets for ICN. One row per asset (VE-NNN). Indexes briefs in docs/design/assets/briefs/. Initial rows cover the closure loop, scope model, decision-to-receipt, member shell concept, kernel/app separation, federation, commons/compute, action card anatomy, receipt anatomy, steward cockpit, regulatory-safe state, and what ICN is / is not."
+last_updated = "2026-05-13"
+owner = "matt"
+audiences = ["architects", "developers", "designers", "stakeholders"]
+truth_class = "descriptive"
+role = "design"
+canonical = "no"
+freshness = "current"
+domain_tags = ["design", "visual-explainer"]
+recommended_action = "keep"
+last_reviewed = "2026-05-13"
+
+[docs."docs/design/assets/VISUAL_REVIEW_CHECKLIST.md"]
+category = "design"
+status = "draft"
+title = "ICN Visual Review Checklist"
+description = "Pre-ship gate for every ICN visual explainer. Source grounding, truth label, vocabulary, accessibility floor, substrate honesty, kernel/app boundary, scope/package boundary, visual grammar, generated-image rules, production-source rule."
+last_updated = "2026-05-13"
+owner = "matt"
+audiences = ["architects", "developers", "designers"]
+truth_class = "normative"
+role = "design"
+canonical = "no"
+freshness = "current"
+domain_tags = ["design", "visual-explainer", "accessibility", "review"]
+recommended_action = "keep"
+last_reviewed = "2026-05-13"
+
 # ============================================================================
 # STRATEGY DOCUMENTS
 # ============================================================================
