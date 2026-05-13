@@ -38,27 +38,7 @@
 </script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0027 action card contract</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0027-action-card-contract.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><hr>
-<p>id: &quot;0027&quot;
-title: &quot;Action Card Contract&quot;
-status: &quot;proposed&quot;
-date: &quot;2026-04-26&quot;
-deciders: []
-tags: [&quot;action-cards&quot;, &quot;member-shell&quot;, &quot;standing&quot;, &quot;derived-views&quot;, &quot;forward-direction&quot;]
-supersedes: []
-superseded_by: []
-amends: []
-implementation_status: &quot;partially implemented (vertical slice; proof-loop verified for all three currently-emitted source paths: proposal/vote, action_item/complete, meeting/attend; signal_rule and obligation_lifecycle remain RFC-gated on icn#1631 and icn#1634)&quot;
-references:</p>
-<ul>
-<li>&quot;ADR-0020 (Bootstrap Activation and Standing Read Model)&quot;</li>
-<li>&quot;ADR-0025 (Institutional Effect Record Canonical Schema)&quot;</li>
-<li>&quot;ADR-0028 (Accessibility Baseline for Member Interfaces)&quot;</li>
-<li>&quot;GitHub #1608 (GET /me/action-cards)&quot;</li>
-<li>&quot;GitHub #1646 (action card implementation)&quot;</li>
-</ul>
-<hr>
-<h1>ADR 0027: Action Card Contract</h1>
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ADR 0027: Action Card Contract</h1>
 <h2>Status</h2>
 <p><strong>Proposed (2026-04-26).</strong> Names what action cards will be. ADR-0020 promised the surface; this ADR records the contract so issue <a href="https://github.com/InterCooperative-Network/icn/issues/1608" target="_blank" rel="noopener">#1608</a> plugs into a written shape rather than re-deriving one.</p>
 <h2>Context</h2>
