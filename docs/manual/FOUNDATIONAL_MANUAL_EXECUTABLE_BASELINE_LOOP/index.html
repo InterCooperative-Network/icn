@@ -257,6 +257,7 @@ frontier sufficiency for this mocked institution-local process
 </code></pre>
 <p>The actual ABI must return both output pointer and output length, either through a packed return, an out-parameter, or an allocation ABI.</p>
 <p>A naked output pointer is not sufficient.</p>
+<p><strong>Fixture implementation (<code>icn-baseline-lock-guest</code>):</strong> The reference guest is <code>#![no_std]</code> + <code>alloc</code> on <code>wasm32-unknown-unknown</code>. It is excluded from the root <code>icn/</code> workspace and ships its own <code>Cargo.lock</code> so workspace dependency feature unification cannot pull <code>serde</code>/<code>postcard</code> defaults (and thus <code>std</code>) onto the WASM target. <code>icn-boundary</code> likewise pins <code>serde</code> and <code>postcard</code> with explicit <code>default-features = false</code> instead of inheriting them from <code>[workspace.dependencies]</code>. The checked-in <code>icn_baseline_lock_guest.wasm</code> is produced by <code>./scripts/build-baseline-lock-guest.sh</code> (uses <code>cargo … --locked</code>) and must match sources in PRs that touch the guest.</p>
 <p>It deserializes the input envelope, performs bounded checks, and returns an output envelope.</p>
 <p>For the first test, it checks:</p>
 <pre><code class="language-text">approvals &gt;= required_approvals
