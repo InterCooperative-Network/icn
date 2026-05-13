@@ -39,19 +39,27 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          ALL_CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || true)
+          # Use the merge base, not the base branch tip, so a PR that is merely
+          # behind main does not get credited with every upstream commit since
+          # divergence. Falls back to the base SHA if no common ancestor exists
+          # (shouldn't happen for a normal PR).
+          MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "$BASE_SHA")
+          ALL_CHANGED=$(git diff --name-only "$MERGE_BASE" "$HEAD_SHA" 2>/dev/null || true)
           # Truncate to 60 paths for domain-hint matching; track the real total separately.
           CHANGED=$(printf '%s' "$ALL_CHANGED" | head -60)
-          TOTAL=$(printf '%s' "$ALL_CHANGED" | grep -c . || echo 0)
+          # `grep -c` always prints a number and exits 1 on zero matches. Use
+          # `|| true` (not `|| echo 0`) so we don't get duplicate "0\n0" output
+          # that would break the numeric tests below.
+          TOTAL=$(printf '%s' "$ALL_CHANGED" | grep -c . || true)
 
           # Identify low-signal paths (generated, lockfiles, archived docs, binary fixtures).
           # SIGNAL_FILES = total minus those — used to decide whether the diff is purely noise.
           SIGNAL_FILES=$(printf '%s' "$ALL_CHANGED" \
             | grep -vE '(^|/)Cargo\.lock$|(^|/)package-lock\.json$|(^|/)yarn\.lock$|(^|/)pnpm-lock\.yaml$|/generated/|/api-types\.ts$|\.wasm$|^docs/archive/' \
-            | grep -c . || echo 0)
+            | grep -c . || true)
 
           # Approximate total diff size (added + removed lines). Used only for the skip threshold.
-          DIFF_LOC=$(git diff --shortstat "$BASE_SHA" "$HEAD_SHA" 2>/dev/null \
+          DIFF_LOC=$(git diff --shortstat "$MERGE_BASE" "$HEAD_SHA" 2>/dev/null \
             | awk '{
                 ins = 0; del = 0;
                 for (i = 1; i <= NF; i++) {
@@ -151,9 +159,14 @@ jobs:
             DOMAIN_HINTS="No specific domain detected. Apply general ICN review: check 5 invariants."
           fi
 
-          # Write outputs (escape newlines for GitHub Actions).
-          HINTS_ESCAPED="${DOMAIN_HINTS//$'\n'/%0A}"
-          echo "domain_hints=$HINTS_ESCAPED" >> "$GITHUB_OUTPUT"
+          # Write outputs. domain_hints is multiline, so use the file-mode
+          # heredoc syntax — the older `%0A` escape was for the deprecated
+          # `::set-output` command and is NOT decoded by $GITHUB_OUTPUT.
+          {
+            echo "domain_hints<<DOMAIN_HINTS_EOF"
+            printf '%s\n' "$DOMAIN_HINTS"
+            echo "DOMAIN_HINTS_EOF"
+          } >> "$GITHUB_OUTPUT"
           echo "changed_files=${TOTAL}" >> "$GITHUB_OUTPUT"
           echo "signal_files=${SIGNAL_FILES}" >> "$GITHUB_OUTPUT"
           echo "diff_loc=${DIFF_LOC}" >> "$GITHUB_OUTPUT"
