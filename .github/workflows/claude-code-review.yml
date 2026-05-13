@@ -13,7 +13,13 @@ jobs:
   claude-review:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Advisory only — never blocks merge
+    # Advisory layer — never blocks merge.
+    # Job-level continue-on-error is defense for runner-death scenarios.
+    # The per-step continue-on-error on the review action below is the
+    # primary mechanism that keeps the JOB conclusion (= PR check status)
+    # green when the SDK fails for auth, rate-limit, plugin, or model
+    # availability reasons. Without step-level continue-on-error, a failing
+    # SDK call produces a red "claude-review" check on every PR.
     continue-on-error: true
     permissions:
       contents: read
@@ -27,15 +33,51 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect change scope
+      - name: Detect change scope and skip thresholds
         id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          BASE="${{ github.event.pull_request.base.sha }}"
-          HEAD="${{ github.event.pull_request.head.sha }}"
-          ALL_CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
+          ALL_CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || true)
           # Truncate to 60 paths for domain-hint matching; track the real total separately.
           CHANGED=$(printf '%s' "$ALL_CHANGED" | head -60)
           TOTAL=$(printf '%s' "$ALL_CHANGED" | grep -c . || echo 0)
+
+          # Identify low-signal paths (generated, lockfiles, archived docs, binary fixtures).
+          # SIGNAL_FILES = total minus those — used to decide whether the diff is purely noise.
+          SIGNAL_FILES=$(printf '%s' "$ALL_CHANGED" \
+            | grep -vE '(^|/)Cargo\.lock$|(^|/)package-lock\.json$|(^|/)yarn\.lock$|(^|/)pnpm-lock\.yaml$|/generated/|/api-types\.ts$|\.wasm$|^docs/archive/' \
+            | grep -c . || echo 0)
+
+          # Approximate total diff size (added + removed lines). Used only for the skip threshold.
+          DIFF_LOC=$(git diff --shortstat "$BASE_SHA" "$HEAD_SHA" 2>/dev/null \
+            | awk '{
+                ins = 0; del = 0;
+                for (i = 1; i <= NF; i++) {
+                  if ($i ~ /^[0-9]+$/) {
+                    if ($(i+1) ~ /^insertion/) ins = $i;
+                    else if ($(i+1) ~ /^deletion/) del = $i;
+                  }
+                }
+                print ins + del
+              }')
+          DIFF_LOC=${DIFF_LOC:-0}
+
+          # Advisory skip thresholds. Required CI gates are unaffected.
+          # These cap the prompt/diff size we hand to the SDK so the review
+          # stays within rate-limit/token budget and finishes well under the
+          # 20-minute job timeout.
+          SKIP_REASON=""
+          if [ "$TOTAL" -eq 0 ]; then
+            SKIP_REASON="diff is empty"
+          elif [ "$TOTAL" -gt 500 ]; then
+            SKIP_REASON="changed file count ($TOTAL) exceeds advisory threshold (500)"
+          elif [ "$DIFF_LOC" -gt 20000 ]; then
+            SKIP_REASON="diff size (${DIFF_LOC} added+removed lines) exceeds advisory threshold (20000)"
+          elif [ "$SIGNAL_FILES" -eq 0 ]; then
+            SKIP_REASON="diff consists exclusively of generated files / lockfiles / archived docs"
+          fi
 
           DOMAIN_HINTS=""
 
@@ -109,13 +151,43 @@ jobs:
             DOMAIN_HINTS="No specific domain detected. Apply general ICN review: check 5 invariants."
           fi
 
-          # Write to output (escape newlines for GitHub Actions)
+          # Write outputs (escape newlines for GitHub Actions).
           HINTS_ESCAPED="${DOMAIN_HINTS//$'\n'/%0A}"
           echo "domain_hints=$HINTS_ESCAPED" >> "$GITHUB_OUTPUT"
           echo "changed_files=${TOTAL}" >> "$GITHUB_OUTPUT"
+          echo "signal_files=${SIGNAL_FILES}" >> "$GITHUB_OUTPUT"
+          echo "diff_loc=${DIFF_LOC}" >> "$GITHUB_OUTPUT"
+          echo "skip_reason=${SKIP_REASON}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip notice (advisory review skipped)
+        if: steps.scope.outputs.skip_reason != ''
+        env:
+          SKIP_REASON: ${{ steps.scope.outputs.skip_reason }}
+          TOTAL_FILES: ${{ steps.scope.outputs.changed_files }}
+          SIGNAL_FILES: ${{ steps.scope.outputs.signal_files }}
+          DIFF_LOC: ${{ steps.scope.outputs.diff_loc }}
+        run: |
+          {
+            echo "## Claude review skipped (advisory)"
+            echo ""
+            echo "**Reason:** ${SKIP_REASON}"
+            echo ""
+            echo "Claude code review is an advisory layer. It is skipped on diffs that exceed advisory thresholds or consist entirely of generated content."
+            echo ""
+            echo "- Total files changed: ${TOTAL_FILES}"
+            echo "- Signal files (non-generated, non-lockfile): ${SIGNAL_FILES}"
+            echo "- Diff size (added+removed lines): ${DIFF_LOC}"
+            echo ""
+            echo "This is not a failure. Required CI gates are unaffected."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run Claude Code Review
         id: claude-review
+        if: steps.scope.outputs.skip_reason == ''
+        # Step-level continue-on-error keeps the JOB conclusion (= the PR
+        # check status) green when the SDK fails. Without this, every
+        # auth / rate-limit / plugin error produces a red advisory check.
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -136,3 +208,43 @@ jobs:
 
             High signal-to-noise: only surface issues that genuinely matter (bugs, security, invariant violations).
             Skip style nits. Skip issues already caught by clippy.
+
+      - name: Summarize review outcome
+        if: always() && steps.scope.outputs.skip_reason == ''
+        env:
+          REVIEW_OUTCOME: ${{ steps.claude-review.outcome }}
+        run: |
+          case "$REVIEW_OUTCOME" in
+            success)
+              {
+                echo "## Claude review completed"
+                echo ""
+                echo "Advisory review ran. See PR conversation for any inline comments."
+              } >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            failure)
+              {
+                echo "## Claude review unavailable (advisory)"
+                echo ""
+                echo "The advisory review step did not complete. This repo uses Claude **subscription** OAuth auth via the \`CLAUDE_CODE_OAUTH_TOKEN\` Actions secret — not direct Anthropic API billing. Common causes, in order of likelihood:"
+                echo ""
+                echo "- **Subscription OAuth token stale, expired, or generated under the wrong account/org context.** Fix: regenerate the token locally with \`claude setup-token\` while authenticated as the intended Claude subscription account, then update the GitHub Actions secret \`CLAUDE_CODE_OAUTH_TOKEN\` (repo or org level)."
+                echo "- **Organization-managed subscription disables Claude Code access for this workspace/account.** Fix: confirm Claude Code subscription access is enabled for the org/workspace/account whose token is in use."
+                echo "- Rate limit or transient SDK error."
+                echo "- Plugin marketplace or model availability issue."
+                echo ""
+                echo "Switching to \`anthropic_api_key\` / \`ANTHROPIC_API_KEY\` is an alternate path **only** if we intentionally decide to bill through direct API access instead of subscription. Do not flip to it as a quick fix — subscription auth is the intended default for this repo."
+                echo ""
+                echo "This is not a failure of the PR. Required CI gates are unaffected. A red \`claude-review\` check now indicates workflow/config breakage worth investigating, not a normal timeout."
+              } >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            cancelled)
+              echo "## Claude review cancelled (advisory)" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            skipped)
+              echo "## Claude review skipped (advisory)" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo "## Claude review outcome: ${REVIEW_OUTCOME} (advisory)" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+          esac
