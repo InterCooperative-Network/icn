@@ -24,6 +24,10 @@ Before building or revising any visual on the site — a diagram, an infographic
 
 The canonical Astro primitives that ground the bible — `ClosureLoop`, `ScopeModel`, `ProvenanceTrail`, `MemberSurface` — live in [`src/components/`](../components/). New explainers should extend or reference them rather than invent a parallel grammar.
 
+### Source-controlled visual explainers
+
+- **`HowIcnWorksExplainer.astro`** ([`src/components/HowIcnWorksExplainer.astro`](../components/HowIcnWorksExplainer.astro)) — first source asset for **VE-001** (How ICN Works / Closure Loop). Composes the canonical `ClosureLoop` primitive with a visible truth-label chip, the brief's one-sentence message, and a substrate-honesty footer. See [`docs/design/assets/briefs/VE-001-how-icn-works-closure-loop.md`](../../../docs/design/assets/briefs/VE-001-how-icn-works-closure-loop.md) and the [asset register](../../../docs/design/assets/ASSET_REGISTER.md) for status.
+
 ## What goes in this directory
 
 Currently nothing. This directory exists as a documented anchor for future work:

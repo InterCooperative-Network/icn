@@ -1,0 +1,354 @@
+---
+// HowIcnWorksExplainer.astro — VE-001 source-controlled visual explainer.
+//
+// This is the first production-source visual explainer built under the
+// ICN Visual Explainer Bible (docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md).
+// It is the source asset for VE-001 "How ICN Works / Closure Loop"; per
+// the VE-001 brief it EXTENDS the existing ClosureLoop primitive rather
+// than re-implementing the loop layout.
+//
+// Truth label: repo-grounded public explainer.
+//
+// Source anchors:
+//   - docs/design/assets/briefs/VE-001-how-icn-works-closure-loop.md
+//   - docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md
+//   - docs/design-language/concept-map.md (closure-loop stations)
+//   - website/src/components/ClosureLoop.astro (canonical primitive)
+//   - docs/reference/project-index/show-readiness-map.md (substrate honesty)
+//
+// Doctrine:
+//   - Visible truth-label chip travels with the asset.
+//   - One-sentence message quoted from the VE-001 brief, verbatim.
+//   - Substrate-honesty footer states what is real today and what is not,
+//     so the loop reads as a model rather than a shipped product.
+//   - No payment / wallet / token / currency vocabulary.
+//   - No NYCN, Summit, or institution-package content.
+//   - No motion as the sole carrier of state; static layout, hover-only
+//     transitions inherited from ClosureLoop.
+
+import ClosureLoop from "./ClosureLoop.astro";
+
+export interface Props {
+  /**
+   * The heading text rendered above the explainer. Default: "How ICN Works".
+   */
+  title?: string;
+  /**
+   * Heading level used for the explainer title. Default: "h2".
+   * Composing pages should pass "h3" when the explainer sits below an
+   * existing h2.
+   */
+  headingLevel?: "h2" | "h3";
+  /**
+   * Whether to render the visible truth-label chip on the asset.
+   * Bible §3 requires the label to travel with the asset (caption,
+   * alt text, or visible chip). The chip is the strongest pattern
+   * because it survives screenshots and re-use in decks, so the
+   * default is true and the chip cannot be silently dropped without
+   * an explicit override at the call site.
+   *
+   * When this is false the chip is hidden visually, but a
+   * visually-hidden span carrying "Truth label: <label>" is still
+   * rendered inside the section so the label remains exposed to
+   * assistive technology and to anyone reading the source. The label
+   * is never silently dropped.
+   */
+  showTruthLabelChip?: boolean;
+  /**
+   * Pass-through to the underlying ClosureLoop primitive. Default
+   * "full" (with station notes). Use "compact" for inline chip-row
+   * placement when the page already explains the stations.
+   */
+  variant?: "full" | "compact";
+  /**
+   * Pass-through to the underlying ClosureLoop primitive. Controls
+   * whether the "the loop closes" return card is rendered. Default
+   * true. Hiding it removes the closure mark — only do that when the
+   * surrounding page already states the loop is closed.
+   */
+  showReturn?: boolean;
+  /**
+   * Optional explicit DOM id used for the heading and the section's
+   * `aria-labelledby`. Provide this when more than one instance of
+   * the explainer renders on the same page, or when a page needs
+   * deep links to anchor to a known id. If omitted, a deterministic
+   * id is derived from `title` so the rendered HTML stays stable
+   * across builds and SSR/SSG passes.
+   */
+  id?: string;
+}
+
+const {
+  title = "How ICN Works",
+  headingLevel = "h2",
+  showTruthLabelChip = true,
+  variant = "full",
+  showReturn = true,
+  id,
+} = Astro.props;
+
+const HeadingTag = headingLevel;
+
+// Deterministic id derived from the title so rendered HTML is stable
+// across builds and SSR/SSG passes. Pages can override via the `id`
+// prop when they need a specific anchor or when multiple instances of
+// the explainer share a page.
+const titleSlug = title
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+|-+$/g, "");
+const headingId = id ?? `how-icn-works-${titleSlug || "default"}`;
+
+const truthLabel = "repo-grounded public explainer";
+
+// One-sentence message quoted verbatim from VE-001 brief §"One-sentence message".
+const oneSentenceMessage =
+  "ICN turns the work of an institution — identity, standing, authority, governance, policy, accounting, execution, receipts and provenance, and the member experience — into one closed loop, and every round closes back into the next.";
+---
+
+<section class="hiw" aria-labelledby={headingId} data-truth-label={truthLabel}>
+  <header class="hiw-head">
+    <p class="hiw-eyebrow" aria-hidden="true">VE-001 · Closure Loop</p>
+
+    <HeadingTag id={headingId} class="hiw-title">{title}</HeadingTag>
+
+    {
+      showTruthLabelChip ? (
+        <p
+          class="hiw-truth"
+          role="note"
+          aria-label={`Truth label: ${truthLabel}`}
+        >
+          <span class="hiw-truth-label">Truth label</span>
+          <span class="hiw-truth-value">{truthLabel}</span>
+        </p>
+      ) : (
+        // Chip hidden, but the label must still travel with the asset
+        // per bible §3. Rendered visually-hidden so assistive
+        // technology and source readers still see it.
+        <span class="hiw-sr-only">Truth label: {truthLabel}</span>
+      )
+    }
+
+    <p class="hiw-lede">{oneSentenceMessage}</p>
+  </header>
+
+  <ClosureLoop variant={variant} showReturn={showReturn} />
+
+  <footer class="hiw-foot" aria-label="What is real today and what is not">
+    <p class="hiw-foot-eyebrow">What this explainer is — and what it is not</p>
+    <p>
+      The closure loop is the <strong>model</strong> for how ICN works as an institution
+      — not a claim that every station is shipped end-to-end. The diagram above is
+      grounded in the substrate's source and canonical docs; the substrate itself
+      is a work in progress.
+    </p>
+    <ul class="hiw-foot-list">
+      <li>
+        <strong>Real today:</strong> a member's standing, action cards, and completion
+        receipts run end-to-end for three currently emitted source paths (proposal/vote,
+        action-item/complete, meeting/attend).
+      </li>
+      <li>
+        <strong>Not yet real:</strong> a complete member app, live federation between
+        two cooperatives in production, and a formal cooperative pilot. These are
+        direction, not capability.
+      </li>
+      <li>
+        <strong>What we say:</strong> ICN is digital public infrastructure for cooperatives,
+        communities, and federations. It is not a payment system, not a token economy,
+        not a wallet.
+      </li>
+    </ul>
+    <p class="hiw-foot-cite">
+      For current state, read
+      <a href="/docs/STATE">STATE</a>
+      and the
+      <a href="/docs/reference/project-index/show-readiness-map"
+        >show-readiness map</a
+      >.
+    </p>
+  </footer>
+</section>
+
+<style>
+  .hiw {
+    --hiw-accent: var(--accent-teal);
+    --hiw-accent-amber: var(--accent-amber);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    margin: 0;
+    padding: 0;
+  }
+
+  .hiw-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin: 0;
+  }
+
+  .hiw-eyebrow {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-muted);
+  }
+
+  .hiw-title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 1.75rem;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    color: var(--text-heading);
+  }
+
+  @media (min-width: 720px) {
+    .hiw-title {
+      font-size: 2rem;
+    }
+  }
+
+  /* Truth-label chip — meaning travels with the asset. Uses both colour
+     AND text so it stays distinguishable in grayscale (per bible §6 and
+     the visual review checklist §4). */
+  .hiw-truth {
+    margin: 0;
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.35em 0.85em;
+    align-self: flex-start;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-left: 3px solid var(--hiw-accent);
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    color: var(--text-secondary);
+  }
+
+  .hiw-truth-label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+  }
+
+  .hiw-truth-value {
+    font-weight: 600;
+    color: var(--text-heading);
+  }
+
+  /* Visually-hidden but exposed to assistive technology. Component-
+     scoped so we don't introduce a global utility class in this PR;
+     pattern follows the WAI sr-only convention. */
+  .hiw-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .hiw-lede {
+    margin: 0;
+    font-size: 1.0625rem;
+    line-height: 1.55;
+    color: var(--text-primary);
+    max-width: 60ch;
+  }
+
+  /* Substrate-honesty footer — mirrors the dashed civic-honesty pattern
+     used elsewhere (ClosureLoop return card, ScopeModel footer,
+     MemberSurface footer) so the visual-explainer family shares
+     grammar. */
+  .hiw-foot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-surface);
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  .hiw-foot p {
+    margin: 0;
+  }
+
+  .hiw-foot-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--hiw-accent-amber);
+  }
+
+  .hiw-foot strong {
+    color: var(--text-heading);
+    font-weight: 600;
+  }
+
+  .hiw-foot-list {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    list-style: none;
+  }
+
+  .hiw-foot-list li {
+    position: relative;
+    padding-left: 1.25em;
+  }
+
+  /* Plain bullet using a typographic mark so the indicator survives in
+     screen readers (the surrounding text already names the category). */
+  .hiw-foot-list li::before {
+    content: "·";
+    position: absolute;
+    left: 0.3em;
+    top: 0;
+    color: var(--text-muted);
+    font-weight: 700;
+  }
+
+  .hiw-foot-cite {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  .hiw-foot-cite a {
+    color: var(--text-heading);
+    text-decoration: underline;
+    text-decoration-color: var(--hiw-accent);
+    text-underline-offset: 2px;
+  }
+
+  .hiw-foot-cite a:hover,
+  .hiw-foot-cite a:focus-visible {
+    color: var(--hiw-accent);
+  }
+
+  /* Reduced motion: the explainer has no auto-animation, but inherited
+     hover transitions in ClosureLoop are already reduced-motion aware
+     via that component's own styles. No transition rules added here. */
+</style>
