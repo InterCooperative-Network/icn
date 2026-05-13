@@ -822,4 +822,4 @@ Specialized agents in `.claude/agents/` auto-activate based on crate scope. Invo
 - **Stacked PRs**: Before merging a PR that is the base branch of another open PR, retarget the stacked PR first:
   `gh pr edit <stacked-pr-number> --base main`
   If you forget, GitHub leaves the stacked PR open but its base is gone — it shows as open with a stale diff. Verify with `gh pr view <pr> --json baseRefName`.
-- **Branch cleanup**: `delete_branch_on_merge` is not enabled in repo settings (GitHub UI: Settings → General → Pull Requests). Until enabled, merged branches must be deleted manually or by Dependabot. Run `git fetch --prune` periodically to clean local refs.
+- **Branch cleanup**: `delete_branch_on_merge` is enabled — remote branches are auto-deleted when a PR merges. No manual remote cleanup needed. Local refs still go stale, so run `git fetch --prune` periodically and delete local branches with `git branch -d <name>` after pulling the squash commit into `main`.
