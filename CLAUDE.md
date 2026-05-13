@@ -440,7 +440,7 @@ Common CI failures and their minimal fixes:
 | **non-exhaustive patterns** | Enum variant added in shared crate | Add match arm in consumer crate, map to closest existing semantics |
 | **Clippy** | Lint regression in changed code | Fix the warning — never suppress with `#[allow]` unless pre-existing |
 | **Compare Against Base** | Benchmark compare flaky | If not required: ignore. If required: `gh run rerun <run-id> --failed` once before touching code |
-| **claude-review** | 15-min job timeout (infra flake) | Never blocks merge |
+| **claude-review** | Advisory review using Claude **subscription** OAuth via the `CLAUDE_CODE_OAUTH_TOKEN` Actions secret (not direct API billing). Step-level `continue-on-error` keeps the check green on SDK errors, and oversized diffs (>500 files or >20k LOC) skip cleanly. A red `claude-review` now means workflow/config breakage worth investigating — see the run's job summary. If the failure is "organization has disabled Claude subscription access," regenerate the token with `claude setup-token` from the intended Claude subscription account and update the GitHub secret `CLAUDE_CODE_OAUTH_TOKEN`; if org-managed, confirm Claude Code subscription access is enabled for that workspace. Never blocks merge regardless. |
 
 **Full drift chain**: shared crate change → gateway/API match updates → OpenAPI regen → TS type regen → CI passes. Don't skip the second half.
 
@@ -815,7 +815,7 @@ Specialized agents in `.claude/agents/` auto-activate based on crate scope. Invo
 - Use `--admin` sparingly (prefer fixing flake sources rather than normalizing bypass).
 - `gh pr checks` exits code 8 on mixed results — always capture with `|| true`.
 - `gh pr checks` output is tab-separated; multi-word check names (e.g. "Test Coverage") need `awk -F'\t' '{print $2}'`, not `awk '{print $2}'`.
-- `claude-review` failure = 15-min job timeout (infra flake). Never blocks merge.
+- `claude-review` is advisory and never blocks merge. The workflow authenticates via Claude **subscription** OAuth using the `CLAUDE_CODE_OAUTH_TOKEN` Actions secret (not direct Anthropic API billing). Step-level `continue-on-error` keeps the check green on SDK errors; oversized diffs are skipped cleanly with a job summary. A red check now means workflow/config breakage — most commonly a stale/wrong-account `CLAUDE_CODE_OAUTH_TOKEN` (regenerate with `claude setup-token` from the correct subscription account and update the secret) or an org-managed subscription that has disabled Claude Code access for the workspace. Flipping to `ANTHROPIC_API_KEY` is an alternate path only if we intentionally choose direct API billing — not a default fix.
 - "Test Coverage" at `pending / 0s` = queue-stalled, not running. Safe to `--admin` merge when all other required gates are green.
 - When merging multiple PRs in dependency order, expect compilation errors from struct field changes across crates — fix forward, don't over-investigate.
 - Prefer merge strategy over rebase for subtree commits (subtree squash commits do not rebase cleanly).
