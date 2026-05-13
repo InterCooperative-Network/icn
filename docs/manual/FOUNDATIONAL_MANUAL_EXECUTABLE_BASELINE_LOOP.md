@@ -316,6 +316,8 @@ The actual ABI must return both output pointer and output length, either through
 
 A naked output pointer is not sufficient.
 
+**Fixture implementation (`icn-baseline-lock-guest`):** The reference guest is `#![no_std]` + `alloc` on `wasm32-unknown-unknown`. It is excluded from the root `icn/` workspace and ships its own `Cargo.lock` so workspace dependency feature unification cannot pull `serde`/`postcard` defaults (and thus `std`) onto the WASM target. `icn-boundary` likewise pins `serde` and `postcard` with explicit `default-features = false` instead of inheriting them from `[workspace.dependencies]`. The checked-in `icn_baseline_lock_guest.wasm` is produced by `./scripts/build-baseline-lock-guest.sh` (uses `cargo … --locked`) and must match sources in PRs that touch the guest.
+
 It deserializes the input envelope, performs bounded checks, and returns an output envelope.
 
 For the first test, it checks:
