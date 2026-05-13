@@ -5,12 +5,32 @@ import { marked } from "marked";
 import { resolveRepoDocsRoot } from "./paths";
 
 /**
+ * Strip a leading YAML frontmatter block from a markdown source.
+ *
+ * Many ICN docs carry doc-control frontmatter (Status, Canonical,
+ * Last Reviewed, Owner, Purpose) consumed by docs/scripts/doc_control_check.py.
+ * Without stripping, the marked renderer treats the second `---` as a setext
+ * underline and renders the YAML keys as body text on the public docs
+ * explorer (e.g. /docs/design/ICN_VISUAL_EXPLAINER_BIBLE previously leaked
+ * "Status: draft", "Canonical: no", "Owner: Matt Faherty", etc. as the first
+ * thing a visitor saw).
+ *
+ * The regex anchors at the very start of the source (`^`) and only matches a
+ * paired delimiter on its own line, so `---` inside body content (e.g. a
+ * thematic break or a code fence) is unaffected.
+ */
+function stripFrontmatter(content: string): string {
+  return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+}
+
+/**
  * Render markdown to HTML with link rewriting.
  * Relative .md links are resolved to /docs/ paths on this site,
  * or fall back to GitHub links for files we don't sync.
  */
 export function renderMarkdown(content: string): string {
   const docsRoot = resolveRepoDocsRoot();
+  const body = stripFrontmatter(content);
 
   // Build slug inventory
   const allSlugs = new Set<string>();
@@ -71,5 +91,5 @@ export function renderMarkdown(content: string): string {
     return `<a href="${cleanHref}${anchor}"${titleAttr}>${text}</a>`;
   };
 
-  return marked(content, { gfm: true, breaks: false, renderer }) as string;
+  return marked(body, { gfm: true, breaks: false, renderer }) as string;
 }
