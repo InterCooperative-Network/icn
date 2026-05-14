@@ -2,7 +2,7 @@
 
 **Status**: DRAFT
 **Date**: 2026-04-14
-**Supersedes**: Committee-as-Community pattern in NYCN-Institutional-Design.md
+**Supersedes**: the prior Committee-as-Community pattern from the earlier NYCN institutional design draft (superseded by the layered ontology).
 
 ## Problem
 

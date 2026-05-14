@@ -40,7 +40,7 @@ test -f Cargo.toml && echo "Rust root" || echo "Not Rust root"
 | `docs/adr/` | Architecture decision records. | [`docs/INDEX.md`](../../INDEX.md) §"Architecture Decision Records" |
 | `docs/rfcs/` | Proposals not yet decided. | [`docs/INDEX.md`](../../INDEX.md) |
 | `institutions/` | In-monorepo institution packages. Boundary-clean for later extraction. | `institutions/README.md` |
-| `institutions/nycn/` | The in-monorepo NYCN institution package (`bootstrap.yaml`, `charter/`, `config/`, `definitions/`, `seed/`, etc.). **Distinct from the separate operator repo at `InterCooperative-Network/nycn`** — see [`pilot-and-nycn-map.md`](pilot-and-nycn-map.md). | `institutions/nycn/README.md` |
+| `institutions/nycn/` | The in-monorepo NYCN institution package (`bootstrap.yaml`, `charter/`, `config/`, `definitions/`, `seed/`, etc.). **Distinct from the separate operator repo at `InterCooperative-Network/nycn`** — the partner NYCN repo owns operator material, organizer rehearsals, and pilot-readiness docs. | `institutions/nycn/README.md` |
 | `contracts/` | CCL contract templates and policies. | `contracts/templates/` (worker-coop, consumer-coop, housing-coop, community-org, federation) |
 | `demo/` | Demo orchestration: scripts, runbooks, fixtures. | `demo/RUNBOOK.md` |
 

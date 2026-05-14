@@ -203,7 +203,6 @@ Show-ready orientation layer — routes outside readers, contributors, and agent
 - [rust-workspace-map.md](reference/project-index/rust-workspace-map.md) - The `icn/` Rust workspace grouped by rough layer
 - [docs-control-map.md](reference/project-index/docs-control-map.md) - INDEX, registry, validator, truth classes, how to add a doc
 - [runtime-surface-map.md](reference/project-index/runtime-surface-map.md) - Real runtime surfaces (member standing, action cards, completion-receipt retrieval)
-- [pilot-and-nycn-map.md](reference/project-index/pilot-and-nycn-map.md) - The ICN ↔ NYCN boundary; intended-first-partner framing
 - [ci-ops-deploy-map.md](reference/project-index/ci-ops-deploy-map.md) - Workflows, deploy paths, K3s smoke runbooks
 - [show-readiness-map.md](reference/project-index/show-readiness-map.md) - What can be shown now, what should not be shown as finished, red lines
 
@@ -369,10 +368,6 @@ Contributor onboarding materials:
 
 Organizer-facing pilot materials. Honest scope-of-now framing; not pitch decks. Defer to [STATE.md](STATE.md) and [PHASE_PROGRESS.md](PHASE_PROGRESS.md) for current truth.
 
-- [nycn-boundary-brief.md](pilots/nycn-boundary-brief.md) - What ICN can demonstrate now, what it cannot honestly claim yet, what NYCN organizers would need to validate, what is explicitly not being asked
-- [nycn-demo-script.md](pilots/nycn-demo-script.md) - Step-by-step organizer-facing demo flow against a localhost ICN gateway
-- [nycn-organizer-asks.md](pilots/nycn-organizer-asks.md) - Bounded set of validation questions for NYCN organizers; includes explicit non-asks
-- [nycn-organizer-user-readiness.md](pilots/nycn-organizer-user-readiness.md) - ICN-side organizer/member readiness: standing, action cards, receipts, gated paths; links NYCN rehearsal gate
 - [pilot-proposal-template.md](pilots/pilot-proposal-template.md) - Template for approaching potential pilot communities
 - [hosted-approach.md](pilots/hosted-approach.md) - Approach for hosted cooperative pilot deployments
 - [decision_registry_treasury_vote.md](pilots/decision_registry_treasury_vote.md) - Economic receipt chain implementation in pilot
@@ -432,17 +427,6 @@ Strategic direction and gap analysis (March 2026):
 - [ICN-Pitch.md](strategy/ICN-Pitch.md) - Cooperative organizer pitch
 - [ICN-Scenarios.md](strategy/ICN-Scenarios.md) - Six working scenarios with API calls
 - [ICN-Evolution-Arc.md](strategy/ICN-Evolution-Arc.md) - Two-year project history
-- [NYCN-Institutional-Strategy.md](strategy/NYCN-Institutional-Strategy.md) - NYCN as first real ICN institution (2026-04-13)
-- [NYCN-Institutional-Design.md](strategy/NYCN-Institutional-Design.md) - NYCN entity/structure/activity topology, governance model, and ICN primitive mapping (2026-04-13; Entity Structure section corrected 2026-04-15 to match layered ontology from #1540)
-- [NYCN-Implementation-Plan.md](strategy/NYCN-Implementation-Plan.md) - 5-phase platform feature plan: decision→action bridge, consent mode, meetings, digests, documents (2026-04-13)
-- [NYCN-Sprint-Plan.md](strategy/NYCN-Sprint-Plan.md) - 3-lane sprint plan: platform closure, institutional model, migration prep (2026-04-13)
-- [NYCN-Charter-Draft.yaml](strategy/NYCN-Charter-Draft.yaml) - NYCN federation charter draft in CCL YAML (2026-04-14)
-- [NYCN-Repo-Architecture-Spec.md](strategy/NYCN-Repo-Architecture-Spec.md) - Repo-shaped architectural map grounded in current code: bounded domains, canonical objects, authority model, Program/cycle design (2026-04-14)
-- [NYCN-Implementation-Matrix.md](strategy/NYCN-Implementation-Matrix.md) - Execution ledger: per-object status (main/open_pr/branch_only/spec_only), touch points, bootstrap seed, ny-coop-net import crosswalk, phase-gated open questions (2026-04-14)
-- [NYCN-Execution-Tranches.md](strategy/NYCN-Execution-Tranches.md) - Merge-order + dependency plan across 7 tranches, rollback strategy, agent assignments (2026-04-14)
-- [NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md](strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md) - Organizer/operator gate before a formal NYCN Phase 2 pilot begins (2026-05-02)
-- [../institutions/nycn/README.md](../institutions/nycn/README.md) - NYCN institution package boundary, ownership rules, and package scaffold (2026-04-22)
-- [../institutions/nycn/docs/INDEX.md](../institutions/nycn/docs/INDEX.md) - NYCN package-local docs, bootstrap runbook, summit materials, and seed entrypoints (2026-04-22)
 
 ### Current Status Reports (`status/`)
 

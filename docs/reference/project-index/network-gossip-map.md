@@ -167,7 +167,6 @@ Avoid claiming:
 |---|---|
 | `identity-crypto-map.md` | Node identity, signed messages, and network trust depend on identity/crypto. |
 | `runtime-surface-map.md` | Runtime surfaces sit above networking/gossip. |
-| `pilot-and-nycn-map.md` | NYCN rehearsal currently avoids live federation mutation. |
 | `ci-ops-deploy-map.md` | Ports, deploy paths, K3s/devnet, and monitoring live there. |
 | `show-readiness-map.md` | Defines what can and cannot be claimed externally. |
 

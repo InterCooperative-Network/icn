@@ -2,7 +2,7 @@
 title: "Institution-in-a-Box: A Live Demo"
 description: "What it looks like when a cooperative actually runs on ICN. A walk-through of the four governance flows that make up our demo."
 pubDate: 2026-03-21
-tags: ["demo", "governance", "cooperative", "summit"]
+tags: ["demo", "governance", "cooperative"]
 ---
 
 The most common question we get is: "What does it actually do?"
@@ -60,6 +60,6 @@ bash demo/scripts/present-governance.sh --port 9080
 
 The demo runs on your laptop. No cloud required. No account required. The cryptographic infrastructure is local, real, and auditable.
 
-The summit is in October. The demo will run there. If you want to be part of building what it demonstrates, the issues are labeled, the codebase is open, and we have a Matrix room.
+If you want to be part of building what it demonstrates, the issues are labeled, the codebase is open, and we have a Matrix room.
 
 The infrastructure is not theoretical anymore.

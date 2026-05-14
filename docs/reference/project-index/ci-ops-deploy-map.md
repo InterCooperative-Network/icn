@@ -59,8 +59,8 @@ make logs                                # tail logs
 
 | Runbook | Path |
 |---|---|
-| Local HTTP proof loop (action-item completion receipt) | [`docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md`](../../dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md) |
-| K3s smoke proof closure (operator-authorized) | [`docs/dev/NYCN_K3S_PROOF_PATH.md`](../../dev/NYCN_K3S_PROOF_PATH.md) |
+| Local HTTP proof loop (action-item completion receipt) | Closure recorded under PR #1676; proof-path runbook lives in the partner NYCN repo. |
+| K3s smoke proof closure (operator-authorized) | Closure recorded under PR #1677; proof-path runbook lives in the partner NYCN repo. |
 | Pilot smoke runbook | [`docs/guides/operations/pilot-smoke.md`](../../guides/operations/pilot-smoke.md) |
 | Backup and recovery | [`docs/guides/operations/backup-and-recovery.md`](../../guides/operations/backup-and-recovery.md) |
 | Replication operations | [`docs/guides/operations/replication-operations.md`](../../guides/operations/replication-operations.md) |

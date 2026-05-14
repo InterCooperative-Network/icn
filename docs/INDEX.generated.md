@@ -1350,30 +1350,6 @@ Approach for hosted cooperative pilot deployments
 
 **For:** `team` | **Updated:** 2026-03-10
 
-### 📝 **Living** [NYCN Boundary Brief](/docs/pilots/nycn-boundary-brief.md)
-
-Honest scope-of-now brief for NYCN organizers and ICN-side preparers: what ICN can demonstrate today, what it cannot honestly claim yet, what NYCN organizers would need to validate, and what is explicitly not being asked. Defers to STATE.md and PHASE_PROGRESS.md for current truth.
-
-**For:** `team`, `organizers` | **Updated:** 2026-04-29
-
-### 📝 **Living** [NYCN Demo Script](/docs/pilots/nycn-demo-script.md)
-
-Step-by-step organizer-facing demo flow against a localhost ICN gateway: action cards, proof loop, receipts, provenance, and explicit limit-naming. Not a pitch.
-
-**For:** `team` | **Updated:** 2026-04-29
-
-### 📝 **Living** [NYCN Organizer Asks](/docs/pilots/nycn-organizer-asks.md)
-
-Bounded set of questions to ask NYCN organizers — workflow validation, source/data validation, pilot-readiness — without assuming any partnership commitment. Includes explicit non-asks.
-
-**For:** `team`, `organizers` | **Updated:** 2026-04-29
-
-### 📝 **Living** [NYCN Organizer User Readiness (ICN side)](/docs/pilots/nycn-organizer-user-readiness.md)
-
-ICN-side pilot readiness: /me/standing, /me/action-cards, completion-receipt retrieval, proof loops, generic vs package-local material, gated paths, and accessible participation. Links to STATE, phase progress, runtime map, member standing, and NYCN Phase 2 rehearsal gate.
-
-**For:** `team`, `organizers` | **Updated:** 2026-05-04
-
 ### 📋 **Draft** [Agent Knowledge Architecture](/docs/planning/agent-knowledge-architecture.md)
 
 Design for AI agent knowledge bases and context management
@@ -1475,12 +1451,6 @@ How INDEX.md, registry.toml, DOCUMENT_REGISTRY.md, and doc_control_check.py rela
 Protocol for recording every tracked file and directory across InterCooperative-Network/icn (and adjacent repos) as a mechanical record plus an interpretive atlas. Defines outputs, generator, classification vocabulary, and privacy boundary.
 
 **For:** `contributors`, `architects` | **Updated:** 2026-05-01
-
-### 📝 **Living** [Pilot and NYCN Map](/docs/reference/project-index/pilot-and-nycn-map.md)
-
-The ICN ↔ NYCN boundary — what lives in this repo, what lives in the separate InterCooperative-Network/nycn repo, the mutation boundary, and what the next gates are.
-
-**For:** `all` | **Updated:** 2026-04-29
 
 ### 📋 **Draft** [ICN Repo Atlas](/docs/reference/project-index/repo-atlas.md)
 
@@ -1706,12 +1676,6 @@ Formal technical specification for grants, regulatory review, and architectural 
 Planning artifact only. Component-by-component licensing/autonomy matrix and option families (permissive / AGPL / CAL / policy-layer / hybrid) for a future maintainer/legal review. Not legal advice; not a relicensing decision; no metadata changes.
 
 **For:** `maintainers`, `legal-review` | **Updated:** 2026-05-01
-
-### 📋 **Draft** [NYCN Phase 2 pilot rehearsal gate](/docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md)
-
-Organizer-safe control-plane gate for moving from Phase 2 machinery exists to formal NYCN pilot rehearsal: organizer presentation, pilot formalization, first operator rehearsal. Descriptive planning only; not production readiness or Phase 2 completion.
-
-**For:** `maintainers`, `organizers`, `operators` | **Updated:** 2026-05-03
 
 ### 📋 **Draft** [ICN Compliance Architecture](/docs/strategy/grants/compliance-architecture.md)
 

@@ -12,7 +12,7 @@ Last Reviewed: 2026-05-07
      no Rust code, no contract field changes, no new contract URN, no
      new schema, no new ADR, no new RFC. Phase 2 status remains ⏳
      (still partner-bound) — the next concrete human gate remains the
-     partner-bound sequence in `docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md`.
+     partner-bound sequence in the NYCN rehearsal gate (in the partner repo).
      Landings since the previous sync edit (2026-05-07 mid-day, the
      opaque receipt storage stack post-#1755/#1756/#1757/#1758/#1759
      captured in #1762):
@@ -86,7 +86,7 @@ Last Reviewed: 2026-05-07
      `icn-gateway` and `apps/governance`. Phase 2 status remains
      ⏳ (still partner-bound) — the next concrete human gate
      remains the partner-bound sequence in
-     `docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md`.
+     the NYCN rehearsal gate (in the partner repo).
      Landings since the previous sync edit (2026-05-05 evening,
      post-#1753):
        - #1755 feat(governance): add first process-transition
@@ -404,7 +404,7 @@ Last Reviewed: 2026-05-07
      Phase 2 framing unchanged: NYCN remains the intended first
      cooperative partner, not a formally committed pilot. The
      concrete next gate remains the partner-bound sequence in
-     `docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md`:
+     the NYCN rehearsal gate (in the partner repo):
      organizer presentation -> pilot formalization -> first
      operator rehearsal. This sync does not claim production
      readiness, live federation integration, implemented service
@@ -463,7 +463,7 @@ Last Reviewed: 2026-05-07
      Phase 2 framing unchanged: NYCN remains the intended first
      cooperative partner, not a formally committed pilot. The
      concrete next gate remains the partner-bound sequence in
-     `docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md`:
+     the NYCN rehearsal gate (in the partner repo):
      organizer presentation -> pilot formalization -> first
      operator rehearsal. This sync does not claim production
      readiness, live federation integration, implemented service
@@ -522,7 +522,7 @@ Last Reviewed: 2026-05-07
      Phase 2 framing unchanged: NYCN remains the intended first
      cooperative partner, not a formally committed pilot. The
      concrete next gate remains the partner-bound sequence in
-     `docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md`:
+     the NYCN rehearsal gate (in the partner repo):
      organizer presentation -> pilot formalization -> first
      operator rehearsal. This sync does not claim production
      readiness, live federation integration, implemented service
@@ -571,7 +571,7 @@ Last Reviewed: 2026-05-07
      state sync (#1701). Open PR queue is empty at this sync. Phase 2
      remains in progress. NYCN remains the intended first cooperative
      partner, not a formally committed pilot. The exact next gate is
-     defined in docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md:
+     defined in the NYCN rehearsal gate (in the partner repo):
      organizer presentation -> pilot formalization -> first operator
      rehearsal. Do not read this sync as production readiness, live
      federation integration, implemented service hosting, K3s/DNS/
@@ -651,7 +651,7 @@ Last Reviewed: 2026-05-07
 
 ## Current status (2026-05-07 snapshot)
 
-**Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate is defined in [NYCN Phase 2 Pilot Rehearsal Gate](strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md). The Phase 2 *machinery* is in place end-to-end; what remains is the human procedure — present, formalize, rehearse — and recording each step.
+**Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate definition lives in the partner NYCN repo. The Phase 2 *machinery* is in place end-to-end; what remains is the human procedure — present, formalize, rehearse — and recording each step.
 
 The May-7 close-out cycle landed: #1761 closed the surfaced sled-flusher race (#1760), #1762 truth-synced STATE.md and PHASE_PROGRESS.md for the opaque receipt storage stack, #1763 / #1735 bumped Dependabot dev dependencies, and #1764 published the generic ActionCard contract surface for institution packages (bundled fictional example + draft-2020-12 validator script + expanded README mirroring the convention used by `validate-preview-review.py` and `validate-rehearsal-evidence.py`). #1764 closed #1713 with all six acceptance criteria met. No schema fields changed; the schema's `$id` remains DNS-backed under the schema-id audit's retain-temporarily decision (#1742 tracks the 2026-06-30 review). Phase 2 status is unchanged.
 
@@ -823,7 +823,7 @@ May-cycle repo governance and strategy documentation (added 2026-05-01 → 2026-
 - Licensing/autonomy strategy matrix added — #1693. Planning only; no relicensing happened.
 - Sovereign service hosting stack added — #1694. Design direction only; no Forgejo deployment, DNS mutation, K3s mutation, hosted-service rollout, or GitHub cutover happened.
 - Follow-up maintenance/state queue merged — #1695-#1701. This includes CI action bumps, a wasmtime security bump, unified bootstrap setup, and a prior state sync; none of these changes starts a NYCN pilot or completes Phase 2.
-- NYCN organizer/operator rehearsal gate defined — [docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md](strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md). The gate remains organizer presentation -> pilot formalization -> first operator rehearsal.
+- NYCN organizer/operator rehearsal gate defined (lives in the partner NYCN repo). The gate remains organizer presentation -> pilot formalization -> first operator rehearsal.
 
 Action-card runtime (added 2026-04-27 → 2026-04-29, all currently emitted source paths now proof-bearing — issue #1646 remains open for the two RFC-gated paths):
 - `GET /v1/gov/me/action-cards` member endpoint with closed source/action enums — #1659
@@ -831,8 +831,8 @@ Action-card runtime (added 2026-04-27 → 2026-04-29, all currently emitted sour
 - `action_item`/`complete` source path emits append-only `ActionItemCompletionReceipt` (ADR-0026 Layer 2); persist-before-commit semantics; full-update handler routes status changes through receipt-bearing path — #1661
 - `meeting`/`attend` source path emits append-only `MeetingAttendanceReceipt` (ADR-0026 Layer 2) keyed by `(meeting_id, attendee_did)`; `Present` and `Remote` are receipt-bearing transitions, `Absent` is not; `recorded_by` is the authenticated caller (distinct from `attendee_did` for steward-recorded attendance); persist-before-commit semantics — #1663
 - `GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt` retrieval endpoint — #1675; closes the proof loop on the read side so a holder shell that completed an `action_item`/`complete` action card can fetch the persisted `ActionItemCompletionReceipt` over HTTP instead of relying on in-process tests or on-disk Sled inspection. Authorization mirrors the rest of the action-item read surface (`governance:read` scope plus domain membership; the receipt's bound `domain_id` is asserted to match the path parameter so cross-domain probes are rejected).
-- Local HTTP proof loop closure recorded in `docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md` — #1676.
-- K3s smoke proof closure (operator-authorized, against deployed image `91a63eec`) recorded in `docs/dev/NYCN_K3S_PROOF_PATH.md` — #1677. K3s smoke records remain durable devnet proof artifacts; full namespaced teardown semantics are not yet specified (tracking issue planned).
+- Local HTTP proof loop closure recorded — #1676.
+- K3s smoke proof closure (operator-authorized, against deployed image `91a63eec`) recorded — #1677. K3s smoke records remain durable devnet proof artifacts; full namespaced teardown semantics are not yet specified (tracking issue planned).
 - Source paths currently emitted by `/me/action-cards`: `proposal`/`vote`, `meeting`/`attend`, `action_item`/`complete`
 - **Proof loop verified end-to-end for all three currently emitted source paths, both locally and on K3s.**
 - Pending under #1646 (RFC-gated): `signal_rule` source path (gated on #1631); `obligation_lifecycle` source path (gated on #1634)
@@ -851,7 +851,7 @@ NYCN drive-ingest operator ladder (added 2026-04-29; lives in `fahertym/nycn`):
 - One-command local preflight runner (`local_preflight_runner` orchestrating the full chain in a single deterministic, no-network run; preserves both human-review boundaries) — NYCN #31
 - Whole-NYCN operating-surfaces inventory + Google-Groups boundary policy + repo-safe communication-groups fixture (no live sync, no private data committed) — NYCN #32
 - Steward-facing communication-groups directory tool (`tools/nycn-ops`; pure file-in / file-out validator + renderer) — NYCN #33 (open at last sync; verify status before reading)
-- The ladder defends a hard mutation boundary: every layer is either pure (no network) or localhost-only operator-gated. K3s mutation is never allowed by NYCN-side tools. ICN-side K3s exercise lives in `docs/dev/NYCN_K3S_PROOF_PATH.md` (#1677), not in the NYCN repo.
+- The ladder defends a hard mutation boundary: every layer is either pure (no network) or localhost-only operator-gated. K3s mutation is never allowed by NYCN-side tools. The ICN-side K3s exercise (#1677) sits on the ICN repo side of the boundary, not in the NYCN repo.
 
 Institutional-operability runtime (added 2026-04-22 → 2026-04-26):
 - Generic institution bootstrap package path — #1586
@@ -889,7 +889,7 @@ Infrastructure:
 ### Architectural decisions in force
 
 - **Layered ontology (locked 2026-04-14):** Entities (sovereign) / Structures (non-sovereign, entity-owned) / Activities (time-bounded, entity-owned). Committees are Structures. Summit is Activity.
-- **Program is a separate primitive** (not Activity extension): Milestones with machine-readable checks, parent_program_id for cycle-handoff. Spec in NYCN-Repo-Architecture-Spec.md §5.
+- **Program is a separate primitive** (not Activity extension): Milestones with machine-readable checks, parent_program_id for cycle-handoff. Spec lives in the partner NYCN repo.
 - **Authority is capability-string based today, typed model frozen for migration:** `RoleAssignment.authority_scope: Vec<String>` remains the shipped surface; the constitutional object model (`AuthorityClass`, `AuthorityGrant`, `TypedScope`, `Mandate`) is frozen in [ADR-0014](adr/ADR-0014-constitutional-object-model.md) and is the target of a subsequent additive migration. No behavior change has shipped yet.
 - **Sled key convention:** primary `<thing>:{id}`; secondary `<thing>_by_<scope>:{scope_id}:{id}`.
 - **Gateway event naming:** `Governance<Thing><Verb>`.
@@ -939,9 +939,6 @@ Infrastructure:
 - ops/ideas/framing/democratic-authority-primitives.md — `idea-0020` framing brief (#1751)
 - ops/ideas/dogfood/democratic-authority-primitives-mvp.md — read-model fixture-walk dogfood slice for `idea-0020` (#1753)
 - ops/ideas/README.md § "Dogfood slice variants" — read-model fixture-walk variant convention (#1749)
-- docs/strategy/NYCN-Repo-Architecture-Spec.md — NYCN institutional architecture
-- docs/strategy/NYCN-Execution-Tranches.md — NYCN 7-tranche execution plan
-- docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md — exact Phase 2 organizer/operator gate before a formal NYCN pilot begins
 - docs/dev/handoff-2026-05-07-a.md — latest session handoff (post-#1764 sync)
 - docs/dev/handoff-2026-05-07.md — prior same-day handoff (post-opaque receipt storage stack sync)
 - deploy/README.md — deployment options
