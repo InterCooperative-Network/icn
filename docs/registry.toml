@@ -1411,22 +1411,6 @@ domain_tags = ["strategy", "partner-discovery"]
 recommended_action = "keep"
 last_reviewed = "2026-04-29"
 
-[docs."docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md"]
-category = "strategy"
-status = "draft"
-title = "NYCN Phase 2 pilot rehearsal gate"
-description = "Organizer-safe control-plane gate for moving from Phase 2 machinery exists to formal NYCN pilot rehearsal: organizer presentation, pilot formalization, first operator rehearsal. Descriptive planning only; not production readiness or Phase 2 completion."
-last_updated = "2026-05-03"
-owner = "matt"
-audiences = ["maintainers", "organizers", "operators"]
-truth_class = "descriptive"
-role = "strategy"
-canonical = "no"
-freshness = "current"
-domain_tags = ["strategy", "nycn", "pilot", "phase-2"]
-recommended_action = "keep"
-last_reviewed = "2026-05-03"
-
 [docs."docs/strategy/LICENSING_STRATEGY_MATRIX.md"]
 category = "strategy"
 status = "draft"
@@ -2165,22 +2149,6 @@ role = "reference"
 canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "runtime", "api"]
-recommended_action = "keep"
-last_reviewed = "2026-04-29"
-
-[docs."docs/reference/project-index/pilot-and-nycn-map.md"]
-category = "reference"
-status = "living"
-title = "Pilot and NYCN Map"
-description = "The ICN ↔ NYCN boundary — what lives in this repo, what lives in the separate InterCooperative-Network/nycn repo, the mutation boundary, and what the next gates are."
-last_updated = "2026-04-29"
-owner = "matt"
-audiences = ["all"]
-truth_class = "descriptive"
-role = "reference"
-canonical = "no"
-freshness = "current"
-domain_tags = ["project-index", "navigation", "pilot", "nycn"]
 recommended_action = "keep"
 last_reviewed = "2026-04-29"
 
@@ -3191,70 +3159,6 @@ description = "Template for approaching potential pilot communities"
 last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["team"]
-
-[docs."docs/pilots/nycn-boundary-brief.md"]
-category = "reference"
-status = "living"
-title = "NYCN Boundary Brief"
-description = "Honest scope-of-now brief for NYCN organizers and ICN-side preparers: what ICN can demonstrate today, what it cannot honestly claim yet, what NYCN organizers would need to validate, and what is explicitly not being asked. Defers to STATE.md and PHASE_PROGRESS.md for current truth."
-last_updated = "2026-04-29"
-owner = "matt"
-audiences = ["team", "organizers"]
-truth_class = "descriptive"
-role = "reference"
-canonical = "no"
-freshness = "current"
-domain_tags = ["pilot", "nycn", "boundary", "communications"]
-recommended_action = "keep"
-last_reviewed = "2026-04-29"
-
-[docs."docs/pilots/nycn-demo-script.md"]
-category = "reference"
-status = "living"
-title = "NYCN Demo Script"
-description = "Step-by-step organizer-facing demo flow against a localhost ICN gateway: action cards, proof loop, receipts, provenance, and explicit limit-naming. Not a pitch."
-last_updated = "2026-04-29"
-owner = "matt"
-audiences = ["team"]
-truth_class = "operational"
-role = "reference"
-canonical = "no"
-freshness = "current"
-domain_tags = ["pilot", "nycn", "demo", "communications"]
-recommended_action = "keep"
-last_reviewed = "2026-04-29"
-
-[docs."docs/pilots/nycn-organizer-asks.md"]
-category = "reference"
-status = "living"
-title = "NYCN Organizer Asks"
-description = "Bounded set of questions to ask NYCN organizers — workflow validation, source/data validation, pilot-readiness — without assuming any partnership commitment. Includes explicit non-asks."
-last_updated = "2026-04-29"
-owner = "matt"
-audiences = ["team", "organizers"]
-truth_class = "descriptive"
-role = "reference"
-canonical = "no"
-freshness = "current"
-domain_tags = ["pilot", "nycn", "discovery", "communications"]
-recommended_action = "keep"
-last_reviewed = "2026-04-29"
-
-[docs."docs/pilots/nycn-organizer-user-readiness.md"]
-category = "reference"
-status = "living"
-title = "NYCN Organizer User Readiness (ICN side)"
-description = "ICN-side pilot readiness: /me/standing, /me/action-cards, completion-receipt retrieval, proof loops, generic vs package-local material, gated paths, and accessible participation. Links to STATE, phase progress, runtime map, member standing, and NYCN Phase 2 rehearsal gate."
-last_updated = "2026-05-04"
-owner = "matt"
-audiences = ["team", "organizers"]
-truth_class = "descriptive"
-role = "reference"
-canonical = "no"
-freshness = "current"
-domain_tags = ["pilot", "nycn", "communications", "action-cards"]
-recommended_action = "keep"
-last_reviewed = "2026-05-04"
 
 [docs."docs/pilots/no-cli-organizer-member-rehearsal-workflow.md"]
 category = "reference"

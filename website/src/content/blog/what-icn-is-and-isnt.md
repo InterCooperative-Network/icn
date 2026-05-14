@@ -49,6 +49,6 @@ The cooperative sector is large, growing, and technically underserved. There are
 
 ICN is the attempt to fix that. Not by disrupting the cooperative sector with technology, but by building the tools the sector has always needed and never had time or money to build itself.
 
-The summit is in October. The demo is getting sharper every sprint. The infrastructure is real.
+The demo is getting sharper every sprint. The infrastructure is real.
 
 Come build with us.

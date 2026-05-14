@@ -18,8 +18,8 @@ Purpose: Brief for VE-003 — Decision to Receipt / Provenance Trail. The canoni
 - [`website/src/components/ProvenanceTrail.astro`](../../../../website/src/components/ProvenanceTrail.astro) — canonical Astro implementation
 - [`docs/reference/project-index/runtime-surface-map.md`](../../../reference/project-index/runtime-surface-map.md) — actual gateway surfaces and action-card source paths
 - [`docs/reference/project-index/current-truth-map.md`](../../../reference/project-index/current-truth-map.md) — three of five currently emitted source paths
-- [`docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md`](../../../dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md) — local HTTP proof loop
-- [`docs/dev/NYCN_K3S_PROOF_PATH.md`](../../../dev/NYCN_K3S_PROOF_PATH.md) — K3s smoke proof loop
+- `docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md` — local HTTP proof loop
+- `docs/dev/NYCN_K3S_PROOF_PATH.md` — K3s smoke proof loop
 - [`docs/architecture/MEMBER_STANDING.md`](../../../architecture/MEMBER_STANDING.md) — member-standing contract
 - `icn/apps/governance/src/http/` — gateway handlers for action cards and receipts
 

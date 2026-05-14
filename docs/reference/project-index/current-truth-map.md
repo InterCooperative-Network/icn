@@ -67,4 +67,4 @@ These surfaces exist and are exercised:
 | The phase model | [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md) |
 | What surfaces exist today | [`runtime-surface-map.md`](runtime-surface-map.md) |
 | What is or isn't show-ready | [`show-readiness-map.md`](show-readiness-map.md) |
-| The NYCN boundary | [`pilot-and-nycn-map.md`](pilot-and-nycn-map.md) |
+| The NYCN boundary | `pilot-and-nycn-map.md` |

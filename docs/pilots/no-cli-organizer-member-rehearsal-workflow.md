@@ -33,7 +33,7 @@ It complements operator runbooks and ladder checkers: those remain **steward/ope
 | Who am I; where may I act? | **Standing** — `GET /v1/gov/me/standing` | Join point for accessible shells; see [MEMBER_STANDING.md](../architecture/MEMBER_STANDING.md) |
 | What needs my attention now? | **Action cards** — `GET /v1/gov/me/action-cards` | Derived rows only; cards do not define a separate mutation API ([ADR-0027](../adr/ADR-0027-action-card-contract.md)); contract [action-card.schema.json](../contracts/institution-package/action-card.schema.json) |
 | Governed work units from decisions | **Action items** | Created and updated through governance HTTP surfaces for the domain |
-| Completing an action item | **Action item** status change + **ActionItemCompletionReceipt** | Proof loop; read-side retrieval where documented ([nycn-organizer-user-readiness.md](nycn-organizer-user-readiness.md), runtime maps) |
+| Completing an action item | **Action item** status change + **ActionItemCompletionReceipt** | Proof loop; read-side retrieval where documented (nycn-organizer-user-readiness.md, runtime maps) |
 | Votes and meetings | **Proposals**, **meetings**, linked **receipts** | Emitted action-card pairs include `proposal`/`vote`, `meeting`/`attend`, `action_item`/`complete` |
 | Durable attestations | **Receipts** (governance, attendance, completion, per path) | Append-only records; HTTP retrieval is **not** uniform across every receipt kind today — shells must not over-promise |
 | Audit narrative | **Provenance** / **evidence** | Human procedure + **repo-safe** artifacts; not private spreadsheets in the ICN tree |
@@ -94,7 +94,7 @@ Track as discrete work items (GitHub issues welcome; not all may exist yet):
 
 ## 8. See also
 
-- [nycn-organizer-user-readiness.md](nycn-organizer-user-readiness.md) — ICN runtime surfaces for organizers (NYCN-oriented bridge)
-- [NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md](../strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md) — Human gate: presentation → formalization → rehearsal
+- nycn-organizer-user-readiness.md — ICN runtime surfaces for organizers (NYCN-oriented bridge)
+- NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md — Human gate: presentation → formalization → rehearsal
 - [Institution package ActionCard notes](../contracts/institution-package/README.md)
 - [STATE.md](../STATE.md), [PHASE_PROGRESS.md](../PHASE_PROGRESS.md)

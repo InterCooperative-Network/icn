@@ -651,7 +651,7 @@ Last Reviewed: 2026-05-07
 
 ## Current status (2026-05-07 snapshot)
 
-**Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate is defined in [NYCN Phase 2 Pilot Rehearsal Gate](strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md). The Phase 2 *machinery* is in place end-to-end; what remains is the human procedure — present, formalize, rehearse — and recording each step.
+**Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate is defined in NYCN Phase 2 Pilot Rehearsal Gate. The Phase 2 *machinery* is in place end-to-end; what remains is the human procedure — present, formalize, rehearse — and recording each step.
 
 The May-7 close-out cycle landed: #1761 closed the surfaced sled-flusher race (#1760), #1762 truth-synced STATE.md and PHASE_PROGRESS.md for the opaque receipt storage stack, #1763 / #1735 bumped Dependabot dev dependencies, and #1764 published the generic ActionCard contract surface for institution packages (bundled fictional example + draft-2020-12 validator script + expanded README mirroring the convention used by `validate-preview-review.py` and `validate-rehearsal-evidence.py`). #1764 closed #1713 with all six acceptance criteria met. No schema fields changed; the schema's `$id` remains DNS-backed under the schema-id audit's retain-temporarily decision (#1742 tracks the 2026-06-30 review). Phase 2 status is unchanged.
 
@@ -823,7 +823,7 @@ May-cycle repo governance and strategy documentation (added 2026-05-01 → 2026-
 - Licensing/autonomy strategy matrix added — #1693. Planning only; no relicensing happened.
 - Sovereign service hosting stack added — #1694. Design direction only; no Forgejo deployment, DNS mutation, K3s mutation, hosted-service rollout, or GitHub cutover happened.
 - Follow-up maintenance/state queue merged — #1695-#1701. This includes CI action bumps, a wasmtime security bump, unified bootstrap setup, and a prior state sync; none of these changes starts a NYCN pilot or completes Phase 2.
-- NYCN organizer/operator rehearsal gate defined — [docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md](strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md). The gate remains organizer presentation -> pilot formalization -> first operator rehearsal.
+- NYCN organizer/operator rehearsal gate defined — docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md. The gate remains organizer presentation -> pilot formalization -> first operator rehearsal.
 
 Action-card runtime (added 2026-04-27 → 2026-04-29, all currently emitted source paths now proof-bearing — issue #1646 remains open for the two RFC-gated paths):
 - `GET /v1/gov/me/action-cards` member endpoint with closed source/action enums — #1659

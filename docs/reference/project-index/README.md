@@ -27,8 +27,8 @@ This directory is a **show-ready orientation layer** for the ICN repository. Its
 
 | If you are... | Start with... | Then... |
 |---|---|---|
-| **Organizer / cooperative evaluator** | [`show-readiness-map.md`](show-readiness-map.md) | [`current-truth-map.md`](current-truth-map.md), [`pilot-and-nycn-map.md`](pilot-and-nycn-map.md) |
-| **Cooperative developer** (e.g. evaluating ICN as substrate for a coop's tooling) | [`current-truth-map.md`](current-truth-map.md) | [`runtime-surface-map.md`](runtime-surface-map.md), [`pilot-and-nycn-map.md`](pilot-and-nycn-map.md), [`docs/strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md`](../../strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md) |
+| **Organizer / cooperative evaluator** | [`show-readiness-map.md`](show-readiness-map.md) | [`current-truth-map.md`](current-truth-map.md), `pilot-and-nycn-map.md` |
+| **Cooperative developer** (e.g. evaluating ICN as substrate for a coop's tooling) | [`current-truth-map.md`](current-truth-map.md) | [`runtime-surface-map.md`](runtime-surface-map.md), `pilot-and-nycn-map.md`, [`docs/strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md`](../../strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md) |
 | **Technical contributor** (writing code) | [`source-tree-map.md`](source-tree-map.md) | [`rust-workspace-map.md`](rust-workspace-map.md), [`AGENTS.md`](../../../AGENTS.md), [`docs/GETTING_STARTED.md`](../../GETTING_STARTED.md) |
 | **Documentation contributor** | [`docs-control-map.md`](docs-control-map.md) | [`source-of-truth-map.md`](source-of-truth-map.md), [`docs/INDEX.md`](../../INDEX.md), [`docs/DOCUMENTATION_CONTROL_SYSTEM.md`](../../DOCUMENTATION_CONTROL_SYSTEM.md) |
 | **Designer / accessibility reviewer** | [`runtime-surface-map.md`](runtime-surface-map.md) | [`docs/design-language/brief-v0.md`](../../design-language/brief-v0.md), [`docs/architecture/MEMBER_STANDING.md`](../../architecture/MEMBER_STANDING.md) |
@@ -45,7 +45,7 @@ This directory is a **show-ready orientation layer** for the ICN repository. Its
 | [`rust-workspace-map.md`](rust-workspace-map.md) | The Rust workspace under `icn/` grouped by rough layer (kernel/identity/networking/ledger/governance/etc.). |
 | [`docs-control-map.md`](docs-control-map.md) | How `docs/INDEX.md`, `docs/registry.toml`, `DOCUMENT_REGISTRY.md`, and `doc_control_check.py` relate; truth classes; how to add a doc. |
 | [`runtime-surface-map.md`](runtime-surface-map.md) | Real runtime surfaces a member or app actually touches today (`/me/standing`, `/me/action-cards`, completion-receipt retrieval, etc.). |
-| [`pilot-and-nycn-map.md`](pilot-and-nycn-map.md) | The ICN ↔ NYCN boundary — what lives in this repo, what lives in the separate `InterCooperative-Network/nycn` repo, and what the next gates are. |
+| `pilot-and-nycn-map.md` | The ICN ↔ NYCN boundary — what lives in this repo, what lives in the separate `InterCooperative-Network/nycn` repo, and what the next gates are. |
 | [`ci-ops-deploy-map.md`](ci-ops-deploy-map.md) | CI workflows, deploy paths, K3s smoke runbooks — routing only. |
 | [`show-readiness-map.md`](show-readiness-map.md) | What can be shown now, what should not be shown as finished, the suggested demo narrative, and red lines. |
 | [`project-coverage-matrix.md`](project-coverage-matrix.md) | Coverage-style matrix: subsystem → anchors → drift and show risks. |
