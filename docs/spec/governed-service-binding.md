@@ -13,7 +13,7 @@ Last Reviewed: 2026-05-14
 
 The spine doc names three primitives — `GovernedServiceBinding`, `WorkloadManifest`, `RuntimeProvider` — as the missing-middle concept that ties together hosted services, installable tools, compute jobs, CCL evaluators, and future container or microVM workloads under one envelope. Today the canon has separate models:
 
-- `ComputeTask` (ADR-0030, implemented in `icn-compute/src/task.rs`) defines the compute-side workload manifest.
+- `ComputeTask` (ADR-0030, defined in `icn/crates/icn-compute/src/types.rs`) defines the compute-side workload manifest.
 - `ToolManifest` and `ToolBinding` (RFC-0017) define the tool-install-side manifest and binding.
 - `EvaluatorBinding` (`docs/spec/ccl-policy-registry.md`, named but not yet typed) defines the CCL-evaluator-side binding.
 - `SERVICE_HOSTING_MODEL.md` names the hosted → governed → native stages a service moves through.
@@ -192,7 +192,7 @@ This spec generalizes — it does not replace.
 
 | Existing surface | Relationship to this spec |
 |---|---|
-| `ComputeTask` (ADR-0030, implemented in `icn-compute/src/task.rs`) | Specialized projection of `WorkloadManifest` for the **Deterministic legitimacy compute** and **Utility computation** classes. ADR-0030's fields populate `WorkloadManifest`'s abstract slots. The compute layer continues to operate on `ComputeTask`; the abstract `WorkloadManifest` is the integrating envelope for the rest of the system. |
+| `ComputeTask` (ADR-0030, defined in `icn/crates/icn-compute/src/types.rs`; task lifecycle in `task.rs`) | Specialized projection of `WorkloadManifest` for the **Deterministic legitimacy compute** and **Utility computation** classes. ADR-0030's fields populate `WorkloadManifest`'s abstract slots. The compute layer continues to operate on `ComputeTask`; the abstract `WorkloadManifest` is the integrating envelope for the rest of the system. |
 | `ToolManifest` / `ToolBinding` (RFC-0017) | Specialized projection of `WorkloadManifest` and `GovernedServiceBinding` for the tool-install case. RFC-0017's per-institution configuration is the same `GovernedServiceBinding` shape, with tool-specific fields populated. |
 | `Executor` trait (`icn-compute/src/executor.rs`) | Compute-specific `RuntimeProvider` implementation. Other runtime classes implement analogous traits at the same level. |
 | `EvaluatorBinding` (`docs/spec/ccl-policy-registry.md`) | Specialized projection of `GovernedServiceBinding` for CCL evaluators. CCL evaluators are workloads in the **Deterministic legitimacy compute** class; their binding is a `GovernedServiceBinding` whose `Runtime class` is fixed and whose `Authority context` derives from the CCL adoption decision. |
@@ -211,7 +211,7 @@ This spec generalizes — it does not replace.
 | **Manifest version is pinned at adoption.** | Upgrade is a governance act. Silent swap to a newer manifest version is forbidden. (Symmetric with `ccl-policy-registry.md` §"Evaluator selection contract" step 8: registry-level supersession is informational; only governance adoption changes the version a binding uses.) |
 | **The kernel does not consult `GovernedServiceBinding`.** | Per `KERNEL_APP_SEPARATION.md`: the kernel sees only `KernelEffect`s. Bindings live at the governance app layer; runtime providers convert the binding's policy into `KernelEffect`s the kernel can enforce blindly. |
 | **Package vocabulary stays in packages.** | ICN core defines the abstract types and the closed runtime-class taxonomy. Institution packages bring their own role identifiers, ceremony markers, and proposal kinds; these translate to the generic shapes at the package boundary before any binding lands. |
-| **A binding never widens what the manifest declared.** | Capability scope, custody class, runtime class — all are tightened by the binding, never expanded. The manifest is the upper bound; the binding is the actual grant. |
+| **A binding never widens what the manifest declared.** | Capability scope, custody class, resource allocation, disclosure policy, operator scope, dispatch policy, and exit/backup requirements — all are tightened by the binding, never expanded. The manifest is the upper bound; the binding is the actual grant. **Runtime class is exact-match-only** between manifest and binding (see also "Runtime class mismatch" in §"Failure and safety rules"); moving from one runtime class to another requires a new manifest version or a governed upgrade with its own receipts. The binding does not narrow runtime class. |
 
 ## Failure and safety rules
 
@@ -325,8 +325,8 @@ RFCs:
 
 Code surface (existing types this spec references):
 
-- `icn/crates/icn-compute/src/task.rs` — `ComputeTask` (the compute-specific projection of `WorkloadManifest`).
-- `icn/crates/icn-compute/src/types.rs` — `FuelLimit`, `TaskHash`, `ExecutorCapability`, `TaskPriority`, `ExecutionOutcome`, `ComputeResult`.
+- `icn/crates/icn-compute/src/types.rs` — `ComputeTask` (the compute-specific projection of `WorkloadManifest`), `FuelLimit`, `TaskHash`, `ExecutorCapability`, `TaskPriority`, `ExecutionOutcome`, `ComputeResult`, `PrivacyClass`.
+- `icn/crates/icn-compute/src/task.rs` — task lifecycle and storage built on top of the `ComputeTask` type from `types.rs`.
 - `icn/crates/icn-compute/src/executor.rs` — `Executor` trait (the compute-specific projection of `RuntimeProvider`).
 - `icn/crates/icn-compute/src/commons_pool.rs` — `CommonsPool` (admission per ADR-0031).
 - `icn/crates/icn-compute/src/receipt.rs` — `ComputeReceipt` (settlement per ADR-0031).

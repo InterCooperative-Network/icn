@@ -19,13 +19,13 @@ Can a downstream implementer — looking only at this spec plus the canon it har
 ### Open PRs
 | PR | Branch | State | CI Status | Blocker |
 |----|--------|-------|-----------|---------|
-| (this session's) | `spec/governed-service-binding` | local; PR opens after push | Initial CI runs on PR creation | Awaiting initial CI |
+| #1822 | `spec/governed-service-binding` | OPEN | All required checks passed on commits `2e0512b35` (initial) and `03da6fbea` (Codex P2 privacy-class fix); a Copilot review-feedback fix commit follows this handoff edit and must re-run CI before merge | Awaiting CI re-run on the Copilot fix commit, then mergeability re-check |
 | #1790 | dependabot (pilot-ui dev deps) | OPEN | n/a | Out of session scope |
 | #1791 | dependabot (ts-sdk dev deps) | OPEN | n/a | Out of session scope |
 
 ### Branches
-- `spec/governed-service-binding` — local at head pending push. Initial spec commit forthcoming after this handoff is committed.
-- Local `main` synced to `ca4bc683f` (unchanged this session beyond branching).
+- `spec/governed-service-binding` — pushed to origin. Last verified head before this fix: `03da6fbea`. The head moves with each push; check `git rev-parse HEAD` on the branch after the next push for the current SHA.
+- Local `main` synced to `ca4bc683f` (unchanged this session).
 
 ### Issues
 - `#1815` — OPEN. This session writes the candidate spec doc. PR will use `Refs:`, not `Closes:`.
@@ -83,14 +83,21 @@ Per the established pattern. See §"Next Move" below.
 ## What's Open
 <!-- TRUTH TYPE: Execution truth — known incomplete work -->
 
-- [x] Run validation suite. *(doc_control_check pass with 54 pre-existing/generated-doc warnings; lint-arch CLEAN; compliance_linter clean; freshness exit 1 from pre-existing `docs/ARCHITECTURE.md` staleness.)*
+- [x] Branch created (`spec/governed-service-binding`).
 - [x] Spec doc drafted; registry updated; INDEX.md updated; DOCUMENT_REGISTRY.md regenerated.
-- [ ] Commit + push.
-- [ ] Open PR.
-- [ ] Watch CI on the initial head.
-- [ ] Address any valid AI-reviewer feedback (Copilot/Codex) using the verified-rebuttal pattern from #1819 / #1820 / #1821.
-- [ ] User decides whether to merge; the prompt says "Apply valid feedback only. Stop and summarize" — merge is not part of this session's instructions.
-- [ ] Decide whether to file the follow-up issue drafts listed in §"Next Move §5" (deferred to user).
+- [x] Validation suite passed locally. *(doc_control_check pass with 54 pre-existing/generated-doc warnings; lint-arch CLEAN; compliance_linter clean; freshness exit 1 from pre-existing `docs/ARCHITECTURE.md` staleness.)*
+- [x] Initial commit (`2e0512b35`) + push.
+- [x] PR #1822 opened.
+- [x] Initial CI passed on `2e0512b35`.
+- [x] Codex P2 privacy-class fix applied in `03da6fbea` and CI re-passed.
+- [x] Copilot review-feedback fix (four items: ComputeTask source path, handoff Final State staleness, runtime-class contradiction, handoff checklist staleness) applied in this session's pending commit.
+- [ ] Push the Copilot fix commit and re-run CI.
+- [ ] Recheck `mergeStateStatus` after CI returns green.
+- [ ] Reply to / resolve the open Copilot threads with the fix commit SHA.
+- [ ] Squash-merge if clean.
+- [ ] Sync local `main` and prune the branch (squash-merge requires `git branch -D`).
+- [ ] Leave `#1815` closure to human review (PR uses `Refs:`, not `Closes:`).
+- [ ] Decide whether to file the follow-up issue drafts (six titles named in §"Next Move" below).
 - [ ] After `#1815` lands, the natural next architecture spec is `#1816` (backup, replication, recovery, archive policies) per the spine doc's recommended ladder.
 
 ### Carried forward (not addressed in this PR)
@@ -115,18 +122,19 @@ Per the established pattern. See §"Next Move" below.
 ## Next Move
 <!-- TRUTH TYPE: Execution truth — the exact sequence for the next session -->
 
-1. Commit and push.
-2. Open PR with `Refs: #1815` (not `Closes:`).
-3. Watch CI on the initial head. Expected: all required checks pass; non-required jobs skip (docs-only).
-4. Reply to any AI-reviewer threads using the verified-rebuttal pattern. For each comment: confirm or disconfirm against the live repo before applying.
-5. Per the user's `#1815` prompt: **"Apply valid feedback only. Stop and summarize."** Merging is not directed in the same prompt.
-6. **Follow-up issue drafts (deferred; not filed in this PR):**
+1. Push the Copilot fix commit currently being prepared. Watch CI to settle.
+2. Reply to / resolve each open Copilot thread on PR #1822 with the new fix commit SHA. The four open Copilot comments are: ComputeTask source path, handoff Final State staleness, runtime-class contradiction, handoff checklist staleness.
+3. Re-check `mergeStateStatus` after CI returns green.
+4. Squash-merge if clean. Sync local `main`; force-delete the branch (`git branch -D spec/governed-service-binding`) since squash-merge invalidates the ancestor check for `-d`.
+5. **Follow-up issue drafts (deferred; not filed in this PR):**
    - `schema(runtime): define GovernedServiceBinding, WorkloadManifest, and RuntimeProvider persisted records` — the wire-stable schema deliberately omitted.
    - `spec(runtime): define generic RuntimeProvider trait` — the cross-class generalization of `Executor` as a Rust trait.
    - `spec(runtime-container): define container workload provider envelope` — container-class provider specification.
    - `spec(runtime-microvm): define stronger-isolation provider envelope` — microVM-class provider specification.
    - `spec(governance): define service-binding stage promotion contract` — the hosted→governed→adapted→native acceptance gates.
-7. **Separate process cleanup recommendation (carried from #1820 review):** `docs(agents): reconcile handoff path with HANDOFF_TEMPLATE.md`. Not in this PR's scope.
+   - `spec(privacy): reconcile PrivacyClass naming between ADR-0030 and icn-compute implementation` — added in response to the Codex P2 review on this PR.
+6. After `#1815` is closed by the user (if they decide closure is warranted), the next safe architecture spec is `#1816` (backup, replication, recovery, archive policies). Do NOT start `#1816` until the user directs.
+7. **Separate process cleanup recommendation (carried from #1820 review):** `docs(agents): reconcile handoff path with HANDOFF_TEMPLATE.md`. AGENTS.md still says `docs/dev-journal/`; HANDOFF_TEMPLATE.md and 15+ merged PRs use `docs/dev/`. One-line edit. Not in this PR's scope.
 
 ---
 
