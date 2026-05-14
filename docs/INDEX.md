@@ -154,6 +154,7 @@ Formal protocol and contract specifications:
 - [effect-dispatch-contract.md](spec/effect-dispatch-contract.md) - Accepted-proposal effect dispatch contract (governance decision → mandate → effect plan → dispatch → application + evidence)
 - [institutional-domain.md](spec/institutional-domain.md) - `InstitutionalDomain` and `DomainPolicy` primitive (the governed operating jurisdiction)
 - [ccl-policy-registry.md](spec/ccl-policy-registry.md) - CCL policy registry, versioning, adoption contract, and governance-effect hook contract
+- [governed-service-binding.md](spec/governed-service-binding.md) - `GovernedServiceBinding`, `WorkloadManifest`, and `RuntimeProvider` (the integrating envelope for hosted services, tools, compute jobs, and CCL evaluators)
 
 ---
 
