@@ -19,13 +19,13 @@ Can a downstream implementer — looking only at this spec plus the existing can
 ### Open PRs
 | PR | Branch | State | CI Status | Blocker |
 |----|--------|-------|-----------|---------|
-| (new this session) | `spec/institutional-domain-policy` | local; PR not yet open | n/a | About to push and open |
+| #1820 | `spec/institutional-domain-policy` | OPEN | All required checks pass after the initial push at commit `880d06105`; a review-feedback fix commit followed and must re-run CI before merge | Awaiting CI re-run on the fix commit, then mergeability re-check |
 | #1790 | dependabot (pilot-ui dev deps) | OPEN | n/a | Out of session scope |
 | #1791 | dependabot (ts-sdk dev deps) | OPEN | n/a | Out of session scope |
 
 ### Branches
-- `spec/institutional-domain-policy` — local, head pending commit.
-- Local `main` synced to `494dce9fa`.
+- `spec/institutional-domain-policy` — pushed to origin. Initial head `880d06105` (spec doc, registry, handoff). A review-feedback commit lands after the initial PR and changes the head; check `git rev-parse HEAD` on the branch for the current SHA after that commit.
+- Local `main` synced to `494dce9fa` (unchanged this session).
 
 ### Issues
 - #1794 — OPEN. This session writes the candidate spec doc. PR will use `Refs:`, not `Closes:`.
@@ -74,13 +74,16 @@ Per the user's instruction: drafts in handoff only, not auto-filed. See "Next Mo
 ## What's Open
 <!-- TRUTH TYPE: Execution truth — known incomplete work -->
 
-- [ ] Run validation suite.
-- [ ] Commit with scoped message.
-- [ ] Push branch.
-- [ ] Open PR with non-claims body.
-- [ ] Watch CI; address any valid review feedback (apply same pattern as #1819).
+- [x] Run validation suite. *(All four scripts: doc_control_check pass with 53 pre-existing unrelated warnings; lint-arch CLEAN; compliance_linter clean; freshness-check exit 1 from pre-existing `docs/ARCHITECTURE.md` staleness.)*
+- [x] Commit with scoped message. *(Initial commit `880d06105`; review-feedback commit follows.)*
+- [x] Push branch.
+- [x] Open PR with non-claims body. *(PR #1820.)*
+- [x] Watch CI on the initial head — all required checks pass; non-required skip (docs-only).
+- [ ] Re-run CI on the review-feedback fix commit and recheck `mergeStateStatus`.
+- [ ] Reply to the two valid Copilot review threads (handoff "Final State" staleness; spec doc Federation row casing) with the fix commit SHA.
+- [ ] Codex thread (handoff-removal) — already replied with verification chain; no further edit since `docs/dev-journal/` does not exist and the user's PR instructions explicitly directed the `docs/dev/` path. Leave as is; carry the AGENTS.md / HANDOFF_TEMPLATE.md drift as a separate follow-up.
 - [ ] Squash-merge if clean.
-- [ ] Decide whether to file the follow-up issue drafts listed in §"Follow-up issue drafts" (deferred to user).
+- [ ] Decide whether to file the follow-up issue drafts listed in §"Next Move §5" (deferred to user).
 - [ ] After #1794 lands, the next safe spec is `#1817` (CCL policy registry). #1817 operationalizes the §"DomainPolicy evaluation" hook and the §"Stage 2 / Stage 3" CCL hook points named in `effect-dispatch-contract.md`.
 
 ---
