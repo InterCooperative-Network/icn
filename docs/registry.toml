@@ -883,6 +883,23 @@ domain_tags = ["architecture", "process", "contracts", "governance", "accessibil
 recommended_action = "keep"
 last_reviewed = "2026-05-04"
 
+[docs."docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md"]
+category = "architecture"
+status = "draft"
+truth_class = "descriptive"
+title = "ICN Integrated System Model"
+description = "Forward-direction integrating spine across substrate, governance, CCL contract layer, service hosting, governed workloads, storage as custody, backup and recovery doctrine, networking, member shell, and steward cockpit. Locates every subsystem inside one civic loop (identity → standing → authority → action card → authorized action → CCL/runtime evaluation → storage/compute/governance/economic transition → receipt → sync/federation → member shell + steward cockpit → challenge/repair). Preserves the meaning firewall, separates substrate from app from institution package from teaching surface, and marks forward-direction objects (InstitutionalDomain, DomainPolicy, GovernedServiceBinding, WorkloadManifest, RuntimeProvider, StorageSpec, BackupPolicy, ReplicationPolicy, RecoveryPolicy, ArchivePolicy, IntegrityPolicy) as forward-direction. Names CCL as the executable institutional rule layer inside governance; not sovereign. Names Cooperative OS as packaging direction, not current implementation scope. Advances #1793 — does not by itself close it."
+last_updated = "2026-05-14"
+last_reviewed = "2026-05-14"
+owner = "matt"
+audiences = ["developers", "architects", "contributors"]
+role = "architecture"
+canonical = "no"
+freshness = "current"
+domain_tags = ["architecture", "integration", "governance", "ccl", "service-hosting", "storage", "compute", "member-shell", "steward-cockpit"]
+depends_on = ["docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md", "docs/architecture/SERVICE_HOSTING_MODEL.md", "docs/architecture/COOPERATIVE_TOOL_COMMONS.md", "docs/architecture/DOMAIN_ROUTING_AND_DNS_BINDINGS.md", "docs/architecture/MODEL_WORKLOADS_AND_DELIBERATION.md", "docs/state/storage-governance-spec.md", "docs/design/deterministic-core.md", "docs/design/compute-classes.md", "docs/rfcs/RFC-0017-tool-install-infrastructure.md"]
+recommended_action = "keep"
+
 [docs."docs/architecture/CELLS_AND_SCOPES.md"]
 category = "architecture"
 status = "living"
