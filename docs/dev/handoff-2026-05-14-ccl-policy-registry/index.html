@@ -1,0 +1,279 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-05-14 (CCL policy registry and hook contract) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>handoff 2026 05 14 ccl policy registry</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/handoff-2026-05-14-ccl-policy-registry.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-05-14 (CCL policy registry and hook contract)</h1>
+<h2>Session Goal</h2>
+<p>Define the CCL policy registry, versioning convention, adoption contract, and evaluator-selection contract — the design-level bridge between <code>DomainPolicy</code> (adopted CCL policy references, per the merged institutional-domain spec) and the Stage 2 / Stage 3 CCL hook points (per the merged effect dispatch spec).</p>
+<h2>Decisive Test</h2>
+<p>Can a downstream implementer — looking only at this spec plus the canon it harmonizes with — name (1) what a policy registry entry vs a policy version is, (2) how a domain adopts a specific version through governance, (3) how the runtime resolves a proposal kind to exactly one evaluator (and what fail-closed states exist), (4) what shape an evaluator returns and how that flows into Stage 2/3 of the dispatch chain? If yes, the spec has done its job.</p>
+<hr>
+<h2>Final State (Verified)</h2>
+<!-- TRUTH TYPE: Implementation truth — only facts confirmed by commands or code inspection -->
+
+<h3><code>main</code> HEAD</h3>
+<p><code>100ecdbf7</code> — <code>docs(spec): define institutional domain and policy primitive (#1820)</code> (merged earlier today).</p>
+<h3>Open PRs</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Branch</th>
+<th>State</th>
+<th>CI Status</th>
+<th>Blocker</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1821</td>
+<td><code>spec/ccl-policy-registry-hooks</code></td>
+<td>OPEN</td>
+<td>All required checks passed on commit <code>bfba3ce8b</code> (the Codex P1 silent-supersession fix); a review-feedback fix commit follows and must re-run CI before merge</td>
+<td>Awaiting CI re-run on the fix commit, then mergeability re-check</td>
+</tr>
+<tr>
+<td>#1790</td>
+<td>dependabot (pilot-ui dev deps)</td>
+<td>OPEN</td>
+<td>n/a</td>
+<td>Out of session scope</td>
+</tr>
+<tr>
+<td>#1791</td>
+<td>dependabot (ts-sdk dev deps)</td>
+<td>OPEN</td>
+<td>n/a</td>
+<td>Out of session scope</td>
+</tr>
+</tbody></table>
+<h3>Branches</h3>
+<ul>
+<li><code>spec/ccl-policy-registry-hooks</code> — pushed to origin. Last verified head before this fix: <code>bfba3ce8b</code>. The head moves with each push; check <code>git rev-parse HEAD</code> on the branch for the current SHA after the next push.</li>
+<li>Local <code>main</code> synced to <code>100ecdbf7</code> (unchanged this session).</li>
+</ul>
+<h3>Issues</h3>
+<ul>
+<li><code>#1817</code> — OPEN. This session writes the candidate spec doc. PR will use <code>Refs:</code>, not <code>Closes:</code>.</li>
+<li><code>#1794</code>, <code>#1815</code>, <code>#1816</code>, <code>#1818</code> — sibling spec issues, all OPEN.</li>
+<li><code>#1797</code> — closed (merged via #1819).</li>
+<li><code>#1793</code> — closed (merged via #1814).</li>
+</ul>
+<hr>
+<h2>What Changed</h2>
+<!-- TRUTH TYPE: Execution truth — actions taken this session -->
+
+<h3>1. Spec doc landed locally (<code>docs/spec/ccl-policy-registry.md</code>, ~290 lines)</h3>
+<p>The doc:</p>
+<ul>
+<li><strong>Names the bridge problem.</strong> ADR-0021 froze CCL safety properties, ADR-0022 froze the schema-bridge doctrine, the merged dispatch and domain specs say <em>where</em> CCL evaluators participate. What was missing — and what <code>#1817</code> exists to define — is the bridge between <code>DomainPolicy</code> (adopted policy refs) and the Stage 2/3 hook points: a registry, an adoption contract, and an evaluator-selection contract.</li>
+<li><strong>Establishes seven boundary lines.</strong> CCL document vs adopted CCL policy version; draft policy vs adopted policy; policy registry vs <code>DomainPolicy</code>; CCL evaluator vs runtime dispatcher; CCL output vs authoritative mutation; model/agent-drafted text vs governance-adopted policy; institution-package vocabulary vs ICN core grammar.</li>
+<li><strong>Specifies the policy registry at object granularity.</strong> Identity (policy id + stable address), descriptive metadata (title / summary / class), lifecycle status (draft / proposed / adopted / superseded / deprecated), versioning (version list + per-version metadata), review and audit fields, bindings (adopting domains, linked proposal kinds, evaluator binding references), output expectations (receipt classes, audit/export visibility).</li>
+<li><strong>Specifies the policy version model.</strong> Stable version id combining existing <code>ContentHash</code> and <code>SemanticVersion</code> types from <code>icn-ccl/src/registry.rs</code>; authorship/review provenance; adoption proposal reference; effective date / activation condition; supersession/deprecation relation; compatibility with <code>DomainPolicy</code>; rollback/reversal/challenge relation; receipt/provenance references.</li>
+<li><strong>Specifies an eight-step adoption contract</strong> that maps onto the existing dispatch chain (proposal created → review path → vote/decision → <code>GovernanceDecisionReceipt</code> → <code>DomainPolicy</code> update → adoption receipt → member/operator visibility → challenge/reversal path). Every step references an existing stage in <code>effect-dispatch-contract.md</code>.</li>
+<li><strong>Specifies a deterministic evaluator-selection contract.</strong> Selection input: <code>(domain_id, proposal_kind, current DomainPolicy snapshot)</code>. Selection output: a single <code>EvaluatorBinding</code>. Eight-step procedure with explicit fail-closed semantics for zero bindings, multiple bindings, deprecated versions, and superseded-without-hold cases. <strong>Kernel never consults the registry.</strong></li>
+<li><strong>Specifies evaluator output → effect plan shape.</strong> Structured envelope: decision suggestion (advisory), reasons / rule references, structured effect plan candidate, disclosure policy, receipt expectations, challengeability metadata, required authority basis, unresolved questions / review gates. Names how each piece flows into Stage 2 (mandate composition) and Stage 3 (effect plan) hook points; reaffirms that CCL runs in neither Stage 4 nor Stage 5.</li>
+<li><strong>Specifies review and audit surfaces.</strong> Registry surfaces drafts, adopted, superseded, amendment history; members see plain-language rules; operators see evaluator bindings and failures; receipts show which policy version was applied; exports carry <code>(policy_id, version_id, evaluator_id, decision_hash)</code> provenance; accessibility and translation are legitimacy requirements.</li>
+<li><strong>Specifies a ten-row failure/safety table.</strong> Every failure mode named in the user&#39;s brief (unadopted policy, missing version, conflicting policies, unknown proposal kind, evaluator unavailable, nondeterministic output, model-generated unadopted text, package nouns leaking, private data in evaluator I/O, stale references) has a deterministic response. The cross-cutting rule: <strong>fail closed, surface honestly, never silently fall back.</strong></li>
+<li><strong>Cross-links every sibling future-work issue and ADR.</strong> No duplication.</li>
+<li><strong>Names nine open questions</strong> with their forward homes.</li>
+</ul>
+<h3>2. Registered the doc (<code>docs/registry.toml</code>, +13 lines before the <code>institutional-domain.md</code> entry)</h3>
+<p>Same registry pattern as PR #1819 / PR #1820: <code>category = &quot;architecture&quot;</code>, <code>status = &quot;draft&quot;</code>, no <code>truth_class</code> / <code>role</code> overrides (lets the <code>docs/spec/</code> prefix default supply <code>truth_class = &quot;normative&quot;</code>, <code>role = &quot;spec&quot;</code>). Carries <code>description</code>, <code>last_updated</code>, <code>last_reviewed</code>, <code>owner</code>, <code>audiences</code>, <code>domain_tags</code>, <code>depends_on</code>, <code>recommended_action</code>.</p>
+<h3>3. Followed the #1819 / #1820 review lessons proactively</h3>
+<ul>
+<li>YAML frontmatter <code>Status: normative</code> (matches prefix default).</li>
+<li>Doc opening labeled &quot;spec, work-in-progress&quot; — honest about which clauses are forward-direction.</li>
+<li>MUST claims are limited to what existing types + behaviors can support today. Where a stronger contract requires schema fields that do not exist (e.g., <code>EvaluatorBinding</code> as a wire-stable record, <code>Adopting domains</code> index on registry entries), the spec marks the gap as forward-direction.</li>
+<li>Handoff written in <code>docs/dev/HANDOFF_TEMPLATE.md</code> structure with truthful Final State (no &quot;PR not yet open&quot; or &quot;head pending commit&quot; rows that age the moment the PR opens).</li>
+<li>Used canon vocabulary verbatim (<code>ContentHash</code>, <code>SemanticVersion</code>, <code>CclDocument</code>, <code>SchemaVersion</code>, <code>Capability</code>, <code>ConstraintSet</code>, <code>GovernanceDecisionReceipt</code>, <code>GovernanceProof</code>, <code>GovernanceDecisionAttestation</code>, <code>Mandate</code>, <code>AuthorityGrant</code>, <code>AuthorityClass</code>, <code>TypedScope</code>, <code>EffectManifest</code>, <code>KernelEffect</code>, <code>EffectOutcome</code>, <code>InstitutionalEffectRecord</code>, <code>EffectDispatchEvidence</code>, <code>DomainPolicy</code>).</li>
+</ul>
+<h3>4. Drafted follow-up issues (not filed)</h3>
+<p>Per the user&#39;s instruction. See &quot;Next Move&quot; §5.</p>
+<hr>
+<h2>What&#39;s Open</h2>
+<!-- TRUTH TYPE: Execution truth — known incomplete work -->
+
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Run validation suite. <em>(All four scripts: doc_control_check pass with 53 pre-existing unrelated warnings; lint-arch CLEAN; compliance_linter clean; freshness-check exit 1 from pre-existing <code>docs/ARCHITECTURE.md</code> staleness.)</em></li>
+<li><input checked="" disabled="" type="checkbox"> Branch + initial commit (<code>ad13e0c0a</code>).</li>
+<li><input checked="" disabled="" type="checkbox"> Push branch and open PR — PR #1821 opened.</li>
+<li><input checked="" disabled="" type="checkbox"> Watch CI on the initial head — all required checks passed.</li>
+<li><input checked="" disabled="" type="checkbox"> First Codex P1 review (silent-supersession backdoor) — accepted and fixed in <code>bfba3ce8b</code>; reply posted.</li>
+<li><input checked="" disabled="" type="checkbox"> Copilot review pass — four valid comments (handoff staleness; DOCUMENT_REGISTRY regen; missing INDEX.md links; positive <code>token</code> usage) — applied in the review-feedback fix commit; replies posted.</li>
+<li><input disabled="" type="checkbox"> Re-run CI on the review-feedback fix commit and re-check <code>mergeStateStatus</code>.</li>
+<li><input disabled="" type="checkbox"> Squash-merge if clean.</li>
+<li><input disabled="" type="checkbox"> Decide whether to file the follow-up issue drafts listed in §&quot;Next Move §5&quot; (deferred to user).</li>
+<li><input disabled="" type="checkbox"> After <code>#1817</code> lands, the next safe spec is <code>#1815</code> (governed service binding / workload manifest / runtime provider). The user explicitly asked not to start it this session.</li>
+</ul>
+<h3>Carried forward (not addressed in this PR)</h3>
+<p><strong>AGENTS.md vs <code>docs/dev/HANDOFF_TEMPLATE.md</code> drift.</strong> Surfaced by Codex on PR #1820 (#1820&#39;s earlier handoff discussion). AGENTS.md lines 281–313 say handoffs go to <code>docs/dev-journal/session-YYYY-MM-DD.md</code>; HANDOFF_TEMPLATE.md lines 10 / 109–111 say <code>docs/dev/handoff-YYYY-MM-DD.md</code>. The <code>docs/dev-journal/</code> directory does not exist. The de-facto canon (this template + 10+ merged PRs) is <code>docs/dev/handoff-*.md</code>. Suggested separate scoped fix: <code>docs(agents): reconcile handoff path with HANDOFF_TEMPLATE.md</code>. <strong>Not addressed in this PR</strong> to keep scope tight; flagged here so the user can decide whether to file the cleanup PR.</p>
+<hr>
+<h2>Unsafe Assumptions</h2>
+<!-- Explicitly name anything this session relied on that was not verified -->
+
+<ul>
+<li><strong><code>icn-ccl/src/registry.rs</code> carries <code>ContentHash</code> (blake3, 32 bytes) and <code>SemanticVersion</code>.</strong> Confirmed by Explore agent reading the file headers. I did not exhaustively read both types&#39; implementations; if either has changed shape since the agent&#39;s read this session, the spec&#39;s &quot;reuse the existing types&quot; framing is wrong.</li>
+<li><strong>No <code>CCLPolicy</code> / <code>PolicyVersion</code> / <code>PolicyRegistry</code> / <code>EvaluatorBinding</code> types exist in code today.</strong> Verified by Explore agent grep of <code>icn/</code>. If a parallel in-flight PR is adding any of these, the spec&#39;s &quot;forward-direction&quot; framing for those names is wrong.</li>
+<li><strong>The current <code>Capability</code> enum in <code>icn-ccl/src/types.rs</code> covers what evaluators need.</strong> Spec references <code>Capability</code> as a fact in code; I did not exhaustively check whether every capability the evaluator-selection contract names is enumerated.</li>
+<li><strong>The merged <code>effect-dispatch-contract.md</code> and <code>institutional-domain.md</code> are unchanged on <code>main</code> as of session start.</strong> I read them post-merge but did not diff against the most recent main HEAD. If an in-flight follow-up amended either, the spec&#39;s cross-links may point at moved sections.</li>
+<li><strong>ADR-0021 / ADR-0022 / ADR-0023 are still <code>accepted</code> and not amended.</strong> The Explore agent reported all three as accepted-with-implementation; I did not check for in-flight amendment PRs.</li>
+<li><strong>The 29 cross-link targets (12 docs + 9 ADRs + 8 source files) all exist at session start.</strong> Verified by file-existence sweep before committing. If a downstream PR renames or removes one of them before <code>#1817</code> lands, the spec&#39;s link will rot.</li>
+</ul>
+<hr>
+<h2>Next Move</h2>
+<!-- TRUTH TYPE: Execution truth — the exact sequence for the next session -->
+
+<ol>
+<li>Push the branch and open PR. Body must explicitly state <code>Refs: #1817</code> and &quot;does not start runtime/schema/grammar implementation.&quot;</li>
+<li>Watch CI on the initial head. Expected: all required checks pass; non-required jobs skip (docs-only).</li>
+<li>Reply to any AI reviewer threads using the verified-rebuttal pattern from #1819 / #1820. For each comment: confirm or disconfirm against the live repo before applying.</li>
+<li>Per the user&#39;s <code>#1817</code> prompt: <strong>&quot;Stop and summarize&quot;</strong> after the post-CI review pass. The user did not direct merge in the same prompt. Wait for merge instruction.</li>
+<li><strong>Follow-up issue drafts (deferred; not filed in this PR):</strong><ul>
+<li><code>schema(ccl): define CCLPolicyRegistry and PolicyVersion records</code> — the wire-stable schema this spec deliberately omits.</li>
+<li><code>spec(ccl): define evaluator binding and deterministic execution envelope</code> — fuel budget per evaluator class, capability set per evaluator class, in-process evaluator lifecycle.</li>
+<li><code>spec(governance): define policy adoption / amendment proposal lifecycle</code> — the closed taxonomy of proposal classes that adopt or amend CCL policy versions.</li>
+<li><code>ux(member): surface adopted policy versions and plain-language rule explanations</code> — possibly within <code>#1818</code> scope; flagged for triage.</li>
+</ul>
+</li>
+<li><strong>Separate process cleanup recommendation (carried from #1820 review):</strong> <code>docs(agents): reconcile handoff path with HANDOFF_TEMPLATE.md</code> — one-line edit to <code>AGENTS.md</code> § &quot;Agent handoff protocol.&quot; Not in this PR&#39;s scope.</li>
+</ol>
+<hr>
+<h2>Architectural Decisions</h2>
+<!-- TRUTH TYPE: Declared project truth changes (if any were made or ratified) -->
+
+<ol>
+<li><strong>No new primitives introduced by this spec.</strong> Every type the spec references already exists in <code>icn-ccl</code> or <code>icn-governance</code>. New names (<code>CCLPolicyRegistry</code>, <code>PolicyVersion</code>, <code>EvaluatorBinding</code>) are explicitly marked as forward-direction.</li>
+<li><strong>Selection fails closed.</strong> No silent default evaluator, no silent &quot;latest version&quot; fallback, no silent execution of deprecated policy. Each failure mode has a named, deterministic response.</li>
+<li><strong>CCL runs in Stages 2 and 3 only.</strong> Stage 1 (decision recording), Stage 4 (kernel dispatch), and Stage 5 (application + evidence) do not invoke CCL evaluators. The meaning firewall stays intact.</li>
+<li><strong>Adoption is a governance act with full receipt provenance.</strong> Adoption never happens silently; the registry&#39;s <code>Adoption history</code> is the institutional record.</li>
+<li><strong>Model output is never authoritative.</strong> Models or agents may draft CCL text; adoption is a governance act; the registry treats drafts and adopted versions as fundamentally distinct.</li>
+<li><strong>Determinism is non-negotiable.</strong> Per ADR-0021, non-deterministic evaluator output is a bug, not a tunable. Quarantine + deprecate is the response.</li>
+</ol>
+<hr>
+<h2>Verification Commands</h2>
+<!-- Commands the next session should run to confirm starting state -->
+
+<pre><code class="language-bash">cd /home/matt/projects/icn
+
+# Branch + PR state
+git branch --show-current
+gh pr view &lt;pr-number&gt; --json state,mergeable,mergeStateStatus
+
+# Validation suite
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict
+python3 docs/scripts/lint-arch.py docs/spec/ccl-policy-registry.md --cargo icn/Cargo.toml
+python3 .github/scripts/compliance_linter.py
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+
+# Review thread state
+gh api repos/InterCooperative-Network/icn/pulls/&lt;pr-number&gt;/comments \
+  --jq &#39;.[] | {id, user: .user.login, line, in_reply_to_id, created_at}&#39;
+</code></pre>
+<p>Expected at session start before push: doc_control_check pass with 53 pre-existing unrelated warnings; lint-arch CLEAN (already verified); compliance_linter no violations; freshness-check exit 1 from pre-existing <code>docs/ARCHITECTURE.md</code> staleness (recorded honestly, not in this PR&#39;s scope).</p>
+<hr>
+<h2>Truth-Plane Notes</h2>
+<!-- Which truth types were relied on? Any known conflicts between layers? -->
+
+<ul>
+<li><strong>Declared project truth:</strong> loaded from <code>docs/STATE.md</code> and <code>docs/PHASE_PROGRESS.md</code>. No conflict surfaced.</li>
+<li><strong>Implementation truth:</strong> verified by Explore agent reading <code>icn-ccl/src/registry.rs</code>, <code>schema/mod.rs</code>, <code>schema/version.rs</code>, <code>schema/bridge.rs</code>, <code>types.rs</code>; spot-confirmed by the session-start file-existence sweep. No <code>CCLPolicy</code> / <code>PolicyVersion</code> / <code>PolicyRegistry</code> / <code>EvaluatorBinding</code> types exist in code today.</li>
+<li><strong>Execution truth:</strong> confirmed <code>main</code> HEAD <code>100ecdbf7</code>, two dependabot PRs open, no other open PRs. <code>#1817</code> confirmed OPEN with the body that matches the user&#39;s prompt.</li>
+<li><strong>Known truth-plane conflict:</strong> <code>freshness-check.py</code> reports <code>docs/ARCHITECTURE.md</code> as carrying stale sections (06-identity-cryptography, 10-state-ledger, 11-contract-execution, 12-governance, 14-federation). CI workflow treats this as informational and reports SUCCESS; the script itself exits 1. This PR does not broaden scope to address it.</li>
+<li><strong>Known process drift (carried, not in this PR):</strong> AGENTS.md vs <code>docs/dev/HANDOFF_TEMPLATE.md</code> disagree on handoff path. De-facto canon is <code>docs/dev/handoff-*.md</code>. Recommend separate scoped fix.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
