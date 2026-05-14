@@ -1860,6 +1860,19 @@ domain_tags = ["governance", "ccl", "effect-dispatch", "mandate", "receipts", "k
 depends_on = ["docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/GOVERNANCE_STATE_MACHINE.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0027-action-card-contract.md", "docs/adr/ADR-0029-conflict-resolution-object-model.md", "docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md", "docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md"]
 recommended_action = "keep"
 
+[docs."docs/spec/ccl-policy-registry.md"]
+category = "architecture"
+status = "draft"
+title = "CCL Policy Registry and Hook Contract"
+description = "Defines the CCL policy registry, policy-version model, adoption contract, evaluator-selection contract, evaluator-output → effect-plan contract, review/audit surfaces, and failure/safety rules. Bridges DomainPolicy (adopted CCL policy references) and the Stage 2/3 CCL hook points in the effect dispatch chain. Reuses existing types from icn-ccl (ContentHash, SemanticVersion, CclDocument, SchemaVersion, Capability) and icn-governance (GovernanceDecisionReceipt, GovernanceProof, Mandate, AuthorityGrant, EffectManifest). Specifies eight-step adoption contract, deterministic evaluator selection with fail-closed semantics for missing/conflicting/deprecated bindings, structured evaluator output (decision suggestion / reasons / effect plan / disclosure policy / receipt expectations / authority basis), audit surfaces (registry shows drafts and adopted versions; receipts carry policy_version_id provenance), and a complete failure/safety table. Extends ADR-0021 (CCL safety), ADR-0022 (schema bridge), and ADR-0023 (institutional process language) without redefining them. Advances #1817 — does not by itself close it. Defers wire-stable schema, evaluator execution envelope, adoption proposal lifecycle, federation mandate recognition, and other forward-direction items to named follow-ups."
+last_updated = "2026-05-14"
+last_reviewed = "2026-05-14"
+owner = "matt"
+audiences = ["architects", "developers", "contributors"]
+domain_tags = ["governance", "ccl", "policy-registry", "policy-versioning", "evaluator", "effect-dispatch", "kernel-app-boundary", "spec"]
+depends_on = ["docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/spec/institutional-domain.md", "docs/spec/effect-dispatch-contract.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0021-ccl-determinism-fuel-and-capability-safety.md", "docs/adr/ADR-0022-ccl-schema-bridge-and-constraint-compilation.md", "docs/adr/ADR-0023-ccl-institutional-process-language.md", "docs/adr/ADR-0024-institution-package-manifest-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md"]
+recommended_action = "keep"
+
 [docs."docs/spec/institutional-domain.md"]
 category = "architecture"
 status = "draft"
