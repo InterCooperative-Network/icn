@@ -1,13 +1,13 @@
 ---
-Status: descriptive
-Authority: spec (forward-direction; harmonizes existing types and ADRs into a single end-to-end contract)
+Status: normative
+Authority: spec (harmonizes existing types and ADRs into a single end-to-end behavior contract; some clauses are explicitly forward-direction and named as such)
 Canonical: no
 Last Reviewed: 2026-05-14
 ---
 
 # Effect Dispatch Contract
 
-> **Status: design direction.** This spec names the end-to-end contract for turning an accepted governance decision into bounded operational effects with receipts. It harmonizes existing types and ADRs (ADR-0014, ADR-0019, ADR-0025, ADR-0026, ADR-0027, ADR-0030, ADR-0031) into one document. It is **not** an implementation report. Where the text names objects, lifecycle stages, or behaviors that are not yet enforced at the kernel boundary, those are explicitly marked. Advances #1797 without claiming closure.
+> **Status: spec, work-in-progress.** This document names the end-to-end behavior contract for turning an accepted governance decision into bounded operational effects with receipts. It harmonizes existing types and ADRs (ADR-0014, ADR-0019, ADR-0025, ADR-0026, ADR-0027, ADR-0030, ADR-0031) into one chain. Clauses that depend on schema fields or kernel behavior that have not yet landed are split into a "current contract" half and a "future schema work" half, marked explicitly per stage. The PR introducing this doc advances #1797 without closing it.
 
 ## Purpose
 
@@ -73,13 +73,14 @@ The contract glues these objects into one chain.
 
 **Input:** an accepted proposal at the terminal state of the governance state machine (per [`../architecture/GOVERNANCE_STATE_MACHINE.md`](../architecture/GOVERNANCE_STATE_MACHINE.md)).
 
-**Action:** the governance app produces a `GovernanceDecisionReceipt`. The receipt is signed by the deciding domain and persisted in the gateway receipt store.
+**Action:** the governance app records the decision as a `GovernanceDecisionReceipt` (`icn-governance/src/proof.rs`). The receipt anchors the canonical `decision_hash`; it is the institutional-memory record that the decision occurred. The receipt itself is not the signature carrier — signatures live on the companion `GovernanceProof` artifact, and per-attester signatures live on `GovernanceDecisionAttestation`. The receipt and its proof / attestation evidence are persisted in the gateway receipt store together.
 
 **Output:** a content-addressed `decision_hash`. This hash is the load-bearing identifier for the rest of the chain.
 
 **Invariants:**
 
 - Exactly one `GovernanceDecisionReceipt` per accepted proposal.
+- Authenticity is established by the companion `GovernanceProof` (and, where applicable, `GovernanceDecisionAttestation`). A receipt without a verifiable proof is institutional memory of a decision the system cannot vouch for; the chain MUST surface that state honestly rather than silently treat the receipt as authoritative.
 - The receipt is immutable. Subsequent challenge/reversal does not edit the receipt; it produces a separate decision and a separate counter-effect (see Stage 5 and "Challenge / reversal / counter-receipt" below).
 - `decision_hash` is the canonical key the rest of the chain references. No stage may reference a proposal without its decision hash.
 
@@ -169,19 +170,33 @@ A non-goal: preview is not authorization to dispatch. A reviewer who likes the p
 
 ## Idempotency
 
-Every dispatched effect carries the idempotency key:
+The doctrine: a re-dispatch of the same effect must not produce a second mutation. How strictly that can be enforced today depends on what the current schema can store. This section is split into the current contract (using fields that exist) and forward schema work (using fields that do not yet exist).
 
-```text
-(decision_hash, manifest_hash, effect_index)
-```
+### Current contract
 
-**Contract:**
+Today's persisted records carry enough institutional memory to detect duplicate dispatch at the institution-level granularity. The contract is:
 
-- Subsystems MUST be idempotent on this key. Re-dispatch of the same `(decision_hash, manifest_hash, effect_index)` MUST return the prior outcome, not produce a second mutation.
-- The governance app MUST detect duplicate dispatch (e.g., on restart, on retry) using this key and short-circuit before sending to the subsystem when an `InstitutionalEffectRecord` for that key already exists.
-- Where a subsystem cannot guarantee internal idempotency, the `EffectDispatchEvidence` for that subsystem MUST record `subsystem` as not-idempotent and the manifest's retry policy MUST be explicit. The honest fallback is to dispatch once and record `Partial` or `Failed` on retry rather than risk a second mutation.
+- The governance app SHOULD short-circuit before dispatching to the subsystem when an `InstitutionalEffectRecord` for the same `(proposal_id, effect_kind)` already exists with `decision_hash` populated. This blocks the obvious replay-on-restart class of duplicate dispatch using `InstitutionalEffectRecord`'s existing `proposal_id` index and `decision_hash` field.
+- Where the subsystem itself is naturally idempotent (steward registration by content-addressed `StewardId`, charter deploy by `decision_hash` keying, etc.), the governance-app short-circuit is a defense-in-depth check, not the sole guard.
+- Where the subsystem is not naturally idempotent, the chain SHOULD prefer to dispatch once and record `Partial` or `Failed` on retry rather than risk a second mutation. `EffectDispatchEvidence`'s existing `success` field plus `EffectOutcome` is the surface that surfaces this state.
 
-This rule does not require all subsystems to be idempotent at the storage layer. It requires that *the contract observes idempotency at the dispatch boundary*. Subsystems that are not naturally idempotent must surface that fact in their evidence.
+This contract is observably enforceable with current schema. It is **not** a kernel-side gate; per ADR-0019, kernel dispatch does not consult mandates or institutional effect records.
+
+### Future schema work (deferred)
+
+The stronger idempotency contract — keying every dispatch by a stable tuple and recording per-effect idempotency intent in the manifest — requires schema fields that do not yet exist:
+
+- A stable idempotency key of shape `(decision_hash, manifest_hash, effect_index)`. `decision_hash` exists; `manifest_hash` exists on `EffectManifest`; `effect_index` and a per-effect persisted record keyed by that tuple do not.
+- A retry-policy field on `EffectManifest` (or on per-effect entries within it) naming whether retry is allowed and under what conditions. No such field exists today.
+- A `not-idempotent` flag or equivalent on `EffectDispatchEvidence` (or the subsystem's own record) so consumers can detect subsystems whose internal contract is weaker than the dispatcher's expectation. The current `EffectDispatchEvidence` carries `subsystem`, `receipt_ref`, `success`, and `EffectOutcome`; no idempotency-intent field exists.
+
+These fields are net-new schema. This PR does not introduce schema changes, and #1797 is a spec PR not an implementation PR. The stronger contract is intentionally left as forward-direction work, to be filed as one or more follow-up implementation issues only after this spec is accepted (per #1797's sixth acceptance criterion).
+
+When the schema lands, the contract becomes: subsystems MUST be idempotent on `(decision_hash, manifest_hash, effect_index)`; re-dispatch MUST return the prior outcome; the governance app MUST short-circuit on this key before any subsystem call. The behavioral doctrine does not change — only its enforceability widens.
+
+### What the contract observes today
+
+Regardless of schema state: the contract observes idempotency at the institutional-memory boundary. Records and evidence already in storage make duplicate dispatch detectable in the obvious cases. Where they do not, the chain MUST surface the gap honestly through evidence rather than paper over it.
 
 ## Partial failure semantics
 
