@@ -30,20 +30,24 @@ import Icon from './Icon.astro';
 export interface Props {
   /**
    * Whether to render the visible truth-label chip on the asset.
-   * Bible §3 requires the label to travel with the asset. The
-   * primitive already signals its illustrative nature via the
-   * "Member surface · concept" device-bar label and the
-   * "What we are building toward" footer eyebrow, so the default
-   * is false to preserve current rendered behavior; when true, a
-   * visible "Truth label: illustrative direction" chip is shown
-   * above the device. When false, a visually-hidden span carrying
-   * the same label is still rendered so assistive technology and
-   * source readers always see it.
+   * Default is true for MemberSurface specifically because the
+   * VE-004 brief (docs/design/assets/briefs/VE-004-member-shell-concept.md
+   * §2) requires `illustrative direction` to be visible on every variant
+   * — "A version that hides the label is rejected" — so that
+   * screenshots and reuse of the member shell never imply a shipped
+   * product. The other repo-grounded primitives (ClosureLoop,
+   * ScopeModel, ProvenanceTrail) keep showTruthLabelChip default
+   * false because their truth labels do not carry the same mandatory-
+   * visibility requirement.
+   *
+   * Even when set to false, a visually-hidden span carrying
+   * "Truth label: illustrative direction" is still rendered so the
+   * label is never silently dropped from assistive technology.
    */
   showTruthLabelChip?: boolean;
 }
 
-const { showTruthLabelChip = false } = Astro.props;
+const { showTruthLabelChip = true } = Astro.props;
 
 // VE-004 truth label per docs/design/assets/ASSET_REGISTER.md.
 const truthLabel = 'illustrative direction';

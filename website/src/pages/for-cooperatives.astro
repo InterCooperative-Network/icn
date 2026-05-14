@@ -128,7 +128,9 @@ import ReadingLadder from '../components/ReadingLadder.astro';
         that keeps enforcement and institutional meaning cleanly separated is real and enforced in the codebase.
       </p>
 
-      <ProvenanceTrail title="The chain a decision walks" showTruthLabelChip />
+      <div class="trail-wrap">
+        <ProvenanceTrail title="The chain a decision walks" showTruthLabelChip />
+      </div>
 
       <p>
         <strong>Execution coverage</strong> — how broadly an accepted decision translates into operational effect —
@@ -230,4 +232,11 @@ import ReadingLadder from '../components/ReadingLadder.astro';
 .prose p { margin: 0 0 var(--space-md); line-height: 1.7; }
 .prose ul { margin: var(--space-md) 0; padding-left: var(--space-lg); }
 .prose li { margin-bottom: var(--space-sm); line-height: 1.7; }
+
+/* Spacing wrapper around the ProvenanceTrail placement. The trail
+   component itself uses margin: 0; this wrapper preserves the
+   prose-rhythm breathing room that the previous .page-visual figure
+   provided, so the paragraph that follows the trail does not sit
+   flush against the dashed proof-flow footer. */
+.trail-wrap { margin: var(--space-md) 0 var(--space-lg); }
 </style>
