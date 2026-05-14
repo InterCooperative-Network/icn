@@ -51,7 +51,7 @@ These distinctions are load-bearing. Conflating them is exactly the failure mode
 | **CCL evaluator vs runtime dispatcher** | A CCL evaluator runs a policy expression deterministically under ADR-0021 properties and returns structured output. The runtime dispatcher turns governance decisions into `KernelEffect`s under kernel-enforced constraints. The evaluator informs the dispatcher; the dispatcher invokes the kernel. |
 | **CCL output vs authoritative mutation** | Per ADR-0022: CCL output is `ConstraintSet` plus structured outputs the host consumes. CCL never mutates state directly. Mutation happens via the effect dispatch chain (`docs/spec/effect-dispatch-contract.md`) and its emitted receipts. |
 | **Model- or agent-drafted text vs governance-adopted policy** | A model may produce CCL text. Governance adopts it. The text becomes authoritative only after the adoption decision lands and the registry records the binding. Model output is never authoritative by virtue of being persuasive. |
-| **Institution-package vocabulary vs ICN core grammar** | A package may name proposal kinds, role identifiers, and ceremony tokens in its own vocabulary. ICN core CCL grammar carries the generic shapes (expression, rule, capability, constraint). Package nouns translate to generic kernel-side outputs before they leave the package boundary. |
+| **Institution-package vocabulary vs ICN core grammar** | A package may name proposal kinds, role identifiers, and ceremony markers in its own vocabulary. ICN core CCL grammar carries the generic shapes (expression, rule, capability, constraint). Package nouns translate to generic kernel-side outputs before they leave the package boundary. |
 
 In short:
 

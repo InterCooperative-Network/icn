@@ -19,15 +19,13 @@ Can a downstream implementer — looking only at this spec plus the canon it har
 ### Open PRs
 | PR | Branch | State | CI Status | Blocker |
 |----|--------|-------|-----------|---------|
-| #1821 (this session's, expected number after `gh pr create`) | `spec/ccl-policy-registry-hooks` | OPEN after push | About to be opened; CI runs on PR creation | Awaiting initial CI |
+| #1821 | `spec/ccl-policy-registry-hooks` | OPEN | All required checks passed on commit `bfba3ce8b` (the Codex P1 silent-supersession fix); a review-feedback fix commit follows and must re-run CI before merge | Awaiting CI re-run on the fix commit, then mergeability re-check |
 | #1790 | dependabot (pilot-ui dev deps) | OPEN | n/a | Out of session scope |
 | #1791 | dependabot (ts-sdk dev deps) | OPEN | n/a | Out of session scope |
 
-(The PR number above is **provisional** until `gh pr create` returns. After creation, the row reflects truth.)
-
 ### Branches
-- `spec/ccl-policy-registry-hooks` — local; about to be pushed. Initial head is the single spec-commit on this branch; check `git rev-parse HEAD` after push for the SHA.
-- Local `main` synced to `100ecdbf7` (unchanged this session beyond branching).
+- `spec/ccl-policy-registry-hooks` — pushed to origin. Last verified head before this fix: `bfba3ce8b`. The head moves with each push; check `git rev-parse HEAD` on the branch for the current SHA after the next push.
+- Local `main` synced to `100ecdbf7` (unchanged this session).
 
 ### Issues
 - `#1817` — OPEN. This session writes the candidate spec doc. PR will use `Refs:`, not `Closes:`.
@@ -78,11 +76,13 @@ Per the user's instruction. See "Next Move" §5.
 <!-- TRUTH TYPE: Execution truth — known incomplete work -->
 
 - [x] Run validation suite. *(All four scripts: doc_control_check pass with 53 pre-existing unrelated warnings; lint-arch CLEAN; compliance_linter clean; freshness-check exit 1 from pre-existing `docs/ARCHITECTURE.md` staleness.)*
-- [x] Branch + initial commit.
-- [ ] Push branch and open PR.
-- [ ] Watch CI on the initial head.
-- [ ] Reply to any AI-reviewer threads (Copilot / Codex) using the verified-rebuttal pattern from #1819 / #1820.
-- [ ] Recheck `mergeStateStatus` and merge if clean. *(The user's prompt for #1817 says "After opening PR ... Stop and summarize." Merging is not directed in the same prompt.)*
+- [x] Branch + initial commit (`ad13e0c0a`).
+- [x] Push branch and open PR — PR #1821 opened.
+- [x] Watch CI on the initial head — all required checks passed.
+- [x] First Codex P1 review (silent-supersession backdoor) — accepted and fixed in `bfba3ce8b`; reply posted.
+- [x] Copilot review pass — four valid comments (handoff staleness; DOCUMENT_REGISTRY regen; missing INDEX.md links; positive `token` usage) — applied in the review-feedback fix commit; replies posted.
+- [ ] Re-run CI on the review-feedback fix commit and re-check `mergeStateStatus`.
+- [ ] Squash-merge if clean.
 - [ ] Decide whether to file the follow-up issue drafts listed in §"Next Move §5" (deferred to user).
 - [ ] After `#1817` lands, the next safe spec is `#1815` (governed service binding / workload manifest / runtime provider). The user explicitly asked not to start it this session.
 
