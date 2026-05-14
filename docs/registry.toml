@@ -1860,6 +1860,19 @@ domain_tags = ["governance", "ccl", "effect-dispatch", "mandate", "receipts", "k
 depends_on = ["docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/GOVERNANCE_STATE_MACHINE.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0027-action-card-contract.md", "docs/adr/ADR-0029-conflict-resolution-object-model.md", "docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md", "docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md"]
 recommended_action = "keep"
 
+[docs."docs/spec/governed-service-binding.md"]
+category = "architecture"
+status = "draft"
+title = "Governed Service Binding, Workload Manifest, and Runtime Provider"
+description = "Defines GovernedServiceBinding (institutional record binding a workload to a domain), WorkloadManifest (declared shape of what a workload does), and RuntimeProvider (substrate-side executor interface) as the integrating envelope for hosted services, installable tools, compute jobs, CCL evaluators, and future container or microVM workloads. Generalizes existing types: ComputeTask (ADR-0030, implemented in icn-compute) is the compute-specific projection of WorkloadManifest; ToolManifest/ToolBinding (RFC-0017) is the tool-install projection; Executor (icn-compute) is the compute-specific RuntimeProvider; EvaluatorBinding (ccl-policy-registry.md) is a specialized GovernedServiceBinding for CCL evaluators. Names seven closed runtime classes (deterministic legitimacy compute, utility computation, container, microVM, accelerator, local device, external bridge), a ten-state lifecycle (declare → authorize → allocate → bind → run → observe → upgrade → suspend → remove → export), the five-stage hosted→governed→adapted→native maturity progression as binding-state requirements, eight boundary rules, and an eleven-row failure/safety table. Advances #1815 — does not by itself close it. Defers wire-stable schema, generic RuntimeProvider Rust trait, per-class provider specs, stage acceptance gates, BackupPolicy data model, and federation-side binding recognition to named follow-ups."
+last_updated = "2026-05-14"
+last_reviewed = "2026-05-14"
+owner = "matt"
+audiences = ["architects", "developers", "contributors"]
+domain_tags = ["governance", "compute", "service-hosting", "tool-install", "workload-manifest", "runtime-provider", "kernel-app-boundary", "spec"]
+depends_on = ["docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md", "docs/architecture/SERVICE_HOSTING_MODEL.md", "docs/architecture/COOPERATIVE_TOOL_COMMONS.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/spec/institutional-domain.md", "docs/spec/effect-dispatch-contract.md", "docs/spec/ccl-policy-registry.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0021-ccl-determinism-fuel-and-capability-safety.md", "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md", "docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md", "docs/rfcs/RFC-0017-tool-install-infrastructure.md"]
+recommended_action = "keep"
+
 [docs."docs/spec/ccl-policy-registry.md"]
 category = "architecture"
 status = "draft"
