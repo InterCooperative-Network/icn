@@ -36,7 +36,7 @@ It is intentionally generic. It does not pin any institution-specific vocabulary
 - Not a redefinition of the meaning firewall, the policy-oracle pattern, or the kernel/app boundary.
 - Not the design home for any specific institution package. Institution package nouns live in their own repositories.
 
-The forbidden vocabulary lists in §11 are a discipline reminder; they are not introduced into the model.
+The vocabulary discipline reminders below (see the "Vocabulary discipline" section) are not introduced into the model — they live there as anti-claims.
 
 ## Repository boundaries
 
@@ -292,7 +292,7 @@ The member shell is the primary participation surface. A forthcoming UX specific
 - present safe signing confirmations before any authorized action;
 - meet the accessibility commitments codified in [`ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`](../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md): large tap targets, plain language, screen-reader compatibility, color-independent affordances, captions where audio is present, keyboard accessibility, low cognitive load.
 
-The member shell does not use the financial-product framing of consumer apps. It does not present participation as account management. The forbidden vocabulary in §11 applies here in full.
+The member shell does not use the financial-product framing of consumer apps. It does not present participation as account management. The vocabulary discipline captured under "Vocabulary discipline" below applies here in full.
 
 ### Steward cockpit
 
@@ -331,7 +331,7 @@ The discipline is captured by explicit anti-claims rather than by listing the fo
 - ICN does not issue tokens as proxies for participation.
 - The model layer assists; it does not adopt rules.
 
-The same discipline applies to the member shell: framing participation as account management or product usage misrepresents the institution. The institutional vocabulary the system actually uses lives in §13.
+The same discipline applies to the member shell: framing participation as account management or product usage misrepresents the institution. The institutional vocabulary the system actually uses lives in the "Safe vocabulary" section below.
 
 ## Safe vocabulary
 
@@ -433,5 +433,5 @@ Issue backlog (parent and siblings):
 - It does not claim live inter-cooperative federation.
 - It does not mutate deployed infrastructure.
 - It does not introduce institution-package vocabulary into ICN core.
-- It does not use payment, wallet, balance, currency, token, or blockchain as ICN-native framing; those words appear only inside the discipline list and the explicit anti-claim sentences in §11.
+- It does not use payment, wallet, balance, currency, token, or blockchain as ICN-native framing; those words appear only inside the explicit anti-claim sentences in the "Vocabulary discipline" section.
 - It does not close issue #1793 by itself; the parent issue's acceptance criteria are evaluated separately.

@@ -339,7 +339,7 @@ This handoff and the PR it documents:
 
   *(Note for the record: an earlier draft of §11 enumerated the hard-forbidden terms by name in a discipline reminder; `lint-arch.py` correctly rejected that with three errors because hard-forbidden terms are never allowed in any context. The section was reshaped to capture the discipline through explicit anti-claim sentences instead, which is the convention used by the other architecture docs in this repository.)*
 
-- **`freshness-check.py --repo . --registry docs/registry.toml`** → exit 0.
+- **`python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .`** → exit 1. *(Corrected from an earlier incorrect record in this handoff. The script does not accept `--registry`; the original line captured a piped `grep`'s exit code rather than the script's, which is why the impossible "exit 0" was recorded. Codex caught this during PR #1814 review.)* The non-zero exit reflects **pre-existing staleness** in `docs/ARCHITECTURE.md` sections (06-identity-cryptography, 10-state-ledger, 11-contract-execution, 12-governance, 14-federation), not anything introduced by this PR's new file. The corresponding GitHub Actions "Check Documentation Freshness" job in this PR's CI reports SUCCESS, indicating the workflow treats staleness as informational. The pre-existing staleness is recorded here honestly; this PR does not broaden scope to address it.
 
 - **`compliance_linter.py`** → exit 0. `Scanned 107 files. ✅ No compliance violations detected!`.
 
