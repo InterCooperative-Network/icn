@@ -1860,6 +1860,19 @@ domain_tags = ["governance", "ccl", "effect-dispatch", "mandate", "receipts", "k
 depends_on = ["docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/GOVERNANCE_STATE_MACHINE.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0027-action-card-contract.md", "docs/adr/ADR-0029-conflict-resolution-object-model.md", "docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md", "docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md"]
 recommended_action = "keep"
 
+[docs."docs/spec/institutional-domain.md"]
+category = "architecture"
+status = "draft"
+title = "InstitutionalDomain and DomainPolicy"
+description = "Defines InstitutionalDomain as the governed operating jurisdiction and DomainPolicy as the persistent rule bundle a domain adopts. Specifies the design-level object outline for both, the boundary lines (domain is not a DNS name, node, federation, package, app, member account, storage bucket, CCL document, or tenant), placement in the civic loop, DomainPolicy evaluation rules (consulted at decision admission, mandate composition, effect plan generation, binding adoption; never in the kernel), the nine-stage domain lifecycle (declare → adopt charter/policy → initialize standing → bind routes/services/tools → operate → amend → federate → suspend/repair → export/exit/archive), and the relationship to the effect dispatch chain (#1797). Harmonizes with COOPERATIVE_DOMAIN_INFRASTRUCTURE.md (design-direction overview), DOMAIN_ROUTING_AND_DNS_BINDINGS.md, INSTITUTION_PACKAGE_BOUNDARY.md, KERNEL_APP_SEPARATION.md, and ADR-0014's constitutional object model. Identifies adjacent named-only concepts (DomainSession, DeviceIdentity/DeviceEnrollment, ServiceIdentity, Workspace, AgreementRegistry, ToolRegistry, DnsBinding) and defers their full specification to named follow-ups. Advances #1794 — does not by itself close it. No runtime, no schema, no wire format."
+last_updated = "2026-05-14"
+last_reviewed = "2026-05-14"
+owner = "matt"
+audiences = ["architects", "developers", "contributors"]
+domain_tags = ["governance", "domain", "policy", "authority", "membership", "kernel-app-boundary", "spec"]
+depends_on = ["docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md", "docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/DOMAIN_ROUTING_AND_DNS_BINDINGS.md", "docs/architecture/SERVICE_HOSTING_MODEL.md", "docs/architecture/COOPERATIVE_TOOL_COMMONS.md", "docs/spec/effect-dispatch-contract.md", "docs/state/storage-governance-spec.md", "docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0023-ccl-institutional-process-language.md", "docs/adr/ADR-0024-institution-package-manifest-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md", "docs/rfcs/RFC-0017-tool-install-infrastructure.md"]
+recommended_action = "keep"
+
 # ============================================================================
 # DESIGN — Compute, Entity, Misc
 # ============================================================================
