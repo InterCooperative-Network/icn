@@ -19,9 +19,27 @@ export interface Props {
   variant?: 'full' | 'compact';
   title?: string;
   showReturn?: boolean;
+  /**
+   * Whether to render the visible truth-label chip on the asset.
+   * Bible §3 requires the label to travel with the asset. Default
+   * is false so existing placements render unchanged; when true,
+   * a visible "Truth label: repo-grounded public explainer" chip is
+   * shown above the loop. When false, a visually-hidden span carrying
+   * the same label is still rendered so assistive technology and
+   * source readers always see it.
+   */
+  showTruthLabelChip?: boolean;
 }
 
-const { variant = 'full', title, showReturn = true } = Astro.props;
+const {
+  variant = 'full',
+  title,
+  showReturn = true,
+  showTruthLabelChip = false,
+} = Astro.props;
+
+// VE-001 truth label per docs/design/assets/ASSET_REGISTER.md.
+const truthLabel = 'repo-grounded public explainer';
 
 interface Station {
   n: string;
@@ -88,8 +106,17 @@ const stations: Station[] = [
 ];
 ---
 
-<figure class="closure-loop" data-variant={variant} aria-label="ICN's nine-station institutional closure loop">
+<figure class="closure-loop" data-variant={variant} aria-label="ICN's nine-station institutional closure loop" data-truth-label={truthLabel}>
   {title && <figcaption class="loop-title">{title}</figcaption>}
+
+  {showTruthLabelChip ? (
+    <p class="loop-truth" role="note" aria-label={`Truth label: ${truthLabel}`}>
+      <span class="loop-truth-label">Truth label</span>
+      <span class="loop-truth-value">{truthLabel}</span>
+    </p>
+  ) : (
+    <span class="loop-sr-only">Truth label: {truthLabel}</span>
+  )}
 
   <ol class="loop-list">
     {stations.map((s, i) => (
@@ -150,6 +177,54 @@ const stations: Station[] = [
     letter-spacing: 0.14em;
     color: var(--loop-muted);
     text-align: left;
+  }
+
+  /* Truth-label chip — bible §3. Color is paired with text so the
+     chip stays distinguishable in grayscale. Hidden by default; pages
+     opt in via the showTruthLabelChip prop. */
+  .loop-truth {
+    margin: 0;
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.35em 0.85em;
+    align-self: flex-start;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-left: 3px solid var(--loop-accent);
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    color: var(--text-secondary);
+  }
+
+  .loop-truth-label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--loop-muted);
+  }
+
+  .loop-truth-value {
+    font-weight: 600;
+    color: var(--loop-text);
+  }
+
+  /* Visually-hidden fallback — the truth label always travels with
+     the asset even when the visible chip is hidden, per bible §3 and
+     the visual review checklist accessibility section. */
+  .loop-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .loop-list {

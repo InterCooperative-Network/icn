@@ -26,13 +26,44 @@
 // docs/design-language/accessibility.md §3.11.
 
 import Icon from './Icon.astro';
+
+export interface Props {
+  /**
+   * Whether to render the visible truth-label chip on the asset.
+   * Bible §3 requires the label to travel with the asset. The
+   * primitive already signals its illustrative nature via the
+   * "Member surface · concept" device-bar label and the
+   * "What we are building toward" footer eyebrow, so the default
+   * is false to preserve current rendered behavior; when true, a
+   * visible "Truth label: illustrative direction" chip is shown
+   * above the device. When false, a visually-hidden span carrying
+   * the same label is still rendered so assistive technology and
+   * source readers always see it.
+   */
+  showTruthLabelChip?: boolean;
+}
+
+const { showTruthLabelChip = false } = Astro.props;
+
+// VE-004 truth label per docs/design/assets/ASSET_REGISTER.md.
+const truthLabel = 'illustrative direction';
 ---
 
 <figure
   class="member-surface"
   aria-label="An illustrative member-facing surface showing what it could look like to inhabit ICN on a personal device. This is a design illustration, not a claim to a shipped app."
+  data-truth-label={truthLabel}
 >
   <figcaption class="ms-title">What a member would see</figcaption>
+
+  {showTruthLabelChip ? (
+    <p class="ms-truth" role="note" aria-label={`Truth label: ${truthLabel}`}>
+      <span class="ms-truth-label">Truth label</span>
+      <span class="ms-truth-value">{truthLabel}</span>
+    </p>
+  ) : (
+    <span class="ms-sr-only">Truth label: {truthLabel}</span>
+  )}
 
   <p class="ms-intro">
     What does it look like to inhabit ICN as a member? This concept shows how
@@ -200,6 +231,56 @@ import Icon from './Icon.astro';
     letter-spacing: 0.14em;
     color: var(--text-muted);
     text-align: left;
+  }
+
+  /* Truth-label chip — bible §3. Uses the amber accent to match the
+     illustrative-direction grammar already established by the
+     "What we are building toward" footer eyebrow on this primitive.
+     Hidden by default; pages opt in via the showTruthLabelChip prop.
+     Color paired with text so the chip stays distinguishable in
+     grayscale. */
+  .ms-truth {
+    margin: 0;
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.35em 0.85em;
+    align-self: flex-start;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-left: 3px solid var(--accent-amber);
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    color: var(--text-secondary);
+  }
+
+  .ms-truth-label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+  }
+
+  .ms-truth-value {
+    font-weight: 600;
+    color: var(--text-heading);
+  }
+
+  /* Visually-hidden fallback so the truth label always travels with
+     the asset, per bible §3, even when the visible chip is hidden. */
+  .ms-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .ms-intro {
