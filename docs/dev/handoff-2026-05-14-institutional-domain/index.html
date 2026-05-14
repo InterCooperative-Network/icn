@@ -1,0 +1,282 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-05-14 (institutional domain spec) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>handoff 2026 05 14 institutional domain</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/handoff-2026-05-14-institutional-domain.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-05-14 (institutional domain spec)</h1>
+<h2>Session Goal</h2>
+<p>Define <code>InstitutionalDomain</code> and <code>DomainPolicy</code> as design-level forward-direction primitives so that the next layer of work — schemas, identity recovery, agreement registry, route-binding contracts — can be filed safely against a clear authority model.</p>
+<h2>Decisive Test</h2>
+<p>Can a downstream implementer — looking only at this spec plus the existing canon it harmonizes with — name (1) what a domain is and what it is not, (2) which fields the domain object carries vs which adjacent concepts are deferred, (3) where <code>DomainPolicy</code> is evaluated and where it is forbidden to run, (4) which lifecycle stage requires which authority basis and which receipt class? If yes, the spec has done its job.</p>
+<hr>
+<h2>Final State (Verified)</h2>
+<!-- TRUTH TYPE: Implementation truth — only facts confirmed by commands or code inspection -->
+
+<h3><code>main</code> HEAD</h3>
+<p><code>494dce9fa</code> — <code>docs(spec): add accepted-proposal effect dispatch contract (#1819)</code> (merged earlier today).</p>
+<h3>Open PRs</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Branch</th>
+<th>State</th>
+<th>CI Status</th>
+<th>Blocker</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1820</td>
+<td><code>spec/institutional-domain-policy</code></td>
+<td>OPEN</td>
+<td>All required checks pass after the initial push at commit <code>880d06105</code>; a review-feedback fix commit followed and must re-run CI before merge</td>
+<td>Awaiting CI re-run on the fix commit, then mergeability re-check</td>
+</tr>
+<tr>
+<td>#1790</td>
+<td>dependabot (pilot-ui dev deps)</td>
+<td>OPEN</td>
+<td>n/a</td>
+<td>Out of session scope</td>
+</tr>
+<tr>
+<td>#1791</td>
+<td>dependabot (ts-sdk dev deps)</td>
+<td>OPEN</td>
+<td>n/a</td>
+<td>Out of session scope</td>
+</tr>
+</tbody></table>
+<h3>Branches</h3>
+<ul>
+<li><code>spec/institutional-domain-policy</code> — pushed to origin. Initial head <code>880d06105</code> (spec doc, registry, handoff). A review-feedback commit lands after the initial PR and changes the head; check <code>git rev-parse HEAD</code> on the branch for the current SHA after that commit.</li>
+<li>Local <code>main</code> synced to <code>494dce9fa</code> (unchanged this session).</li>
+</ul>
+<h3>Issues</h3>
+<ul>
+<li>#1794 — OPEN. This session writes the candidate spec doc. PR will use <code>Refs:</code>, not <code>Closes:</code>.</li>
+<li>#1793 — closed (merged via #1814).</li>
+<li>#1797 — closed (merged via #1819, user closed manually).</li>
+<li>#1815, #1816, #1817, #1818 — sibling spec issues, all OPEN.</li>
+</ul>
+<hr>
+<h2>What Changed</h2>
+<!-- TRUTH TYPE: Execution truth — actions taken this session -->
+
+<h3>1. Spec doc drafted (<code>docs/spec/institutional-domain.md</code>, ~310 lines)</h3>
+<p>The doc:</p>
+<ul>
+<li><strong>Names what a domain is and what it is not.</strong> Boundary table separating domain from DNS name, node, federation, institution package, app/tool, member account, storage bucket, CCL document, and tenant.</li>
+<li><strong>Places <code>InstitutionalDomain</code> in the civic loop at the Authority stage.</strong> Every later stage derives legitimacy from a decision rooted in some domain.</li>
+<li><strong>Outlines <code>InstitutionalDomain</code> fields at design granularity.</strong> Identity (DID + owning entity class), constitutional inputs (charter refs, adopted CCL policy refs), membership/standing/role-authority, device/service identities, workspace/tool/agreement registries, storage/compute/routing policy refs, receipt policy, accessibility/translation policy, export/backup/recovery policy, federation agreements, challenge/repair/exit paths. No Rust types, no JSON schemas, no field order fixed.</li>
+<li><strong>Outlines <code>DomainPolicy</code> rule bundle.</strong> Storage / replication / backup / privacy / compute / receipt retention / tool install authority / route authority / service identity authority / member recovery / accessibility / language / authority class / amendment / versioning / inertness rule. Adopted via governance; unadopted policy is inert.</li>
+<li><strong>Specifies <code>DomainPolicy</code> evaluation rules.</strong> Consulted at decision admission, mandate composition (Stage 2 of effect dispatch), effect plan generation (Stage 3), and binding adoption. Never consulted inside the kernel. Cross-link to <code>effect-dispatch-contract.md</code> and <code>KERNEL_APP_SEPARATION.md</code>.</li>
+<li><strong>Specifies a nine-stage domain lifecycle table.</strong> Declare → adopt charter/policy → initialize standing/membership → bind routes/services/tools → operate → amend → federate → suspend/repair → export/exit/archive. Each row names the authority required and the receipt class emitted. Lifecycle invariants: no transition without authority basis, no transition without receipt expectation, no silent transition, reversal is a separate transition (chain is append-only), exit is constitutional and unblockable.</li>
+<li><strong>Maps the relationship to effect dispatch.</strong> Five-row table aligning <code>DomainPolicy</code>&#39;s role to the five dispatch stages.</li>
+<li><strong>Cross-links every sibling future-work issue.</strong> #1815, #1816, #1817, #1818, #1798, #1801, #1799, #1795. No duplication.</li>
+<li><strong>Names adjacent concepts as deferred.</strong> <code>DomainSession</code>, <code>DeviceIdentity</code>/<code>DeviceEnrollment</code>, <code>ServiceIdentity</code>, <code>Workspace</code>, <code>AgreementRegistry</code>, <code>ToolRegistry</code>, <code>DnsBinding</code> — each named, none redefined.</li>
+<li><strong>Lists open questions and deferred decisions.</strong> Nine items, each with a named follow-up location.</li>
+</ul>
+<h3>2. Registered the doc (<code>docs/registry.toml</code>, +14 lines after the effect-dispatch entry)</h3>
+<p><code>category = &quot;architecture&quot;</code>, <code>status = &quot;draft&quot;</code>, <code>title</code>, <code>description</code>, <code>last_updated</code>, <code>last_reviewed</code>, <code>owner</code>, <code>audiences</code>, <code>domain_tags</code>, <code>depends_on</code>, <code>recommended_action</code>. <strong>No <code>truth_class</code> or <code>role</code> overrides</strong> — the <code>docs/spec/</code> prefix default applies (<code>truth_class = &quot;normative&quot;</code>, <code>role = &quot;spec&quot;</code>, <code>canonical = &quot;no&quot;</code>, <code>freshness = &quot;unknown&quot;</code>), matching the convention the #1819 review settled on.</p>
+<h3>3. Followed the #1819 review lessons proactively</h3>
+<ul>
+<li>YAML frontmatter is <code>Status: normative</code> (matches the prefix default; matches the doc&#39;s tone).</li>
+<li>Doc opening labeled &quot;spec, work-in-progress&quot; — honest about which clauses are forward-direction.</li>
+<li>Handoff written in <code>docs/dev/HANDOFF_TEMPLATE.md</code> structure from the start (not after review). Unsafe Assumptions section is concrete and lists five things.</li>
+<li>Used canon vocabulary verbatim (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>, <code>ServiceIdentity</code>, <code>ToolBinding</code>, <code>DnsBinding</code>, <code>StorageClass</code>, <code>DataLocality</code>, <code>EffectManifest</code>, <code>GovernanceDecisionReceipt</code>, etc.).</li>
+<li>No schema, no wire format, no MUST that requires fields the existing canon does not yet declare.</li>
+</ul>
+<h3>4. Drafted follow-up issues (not filed)</h3>
+<p>Per the user&#39;s instruction: drafts in handoff only, not auto-filed. See &quot;Next Move&quot; §5.</p>
+<hr>
+<h2>What&#39;s Open</h2>
+<!-- TRUTH TYPE: Execution truth — known incomplete work -->
+
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Run validation suite. <em>(All four scripts: doc_control_check pass with 53 pre-existing unrelated warnings; lint-arch CLEAN; compliance_linter clean; freshness-check exit 1 from pre-existing <code>docs/ARCHITECTURE.md</code> staleness.)</em></li>
+<li><input checked="" disabled="" type="checkbox"> Commit with scoped message. <em>(Initial commit <code>880d06105</code>; review-feedback commit follows.)</em></li>
+<li><input checked="" disabled="" type="checkbox"> Push branch.</li>
+<li><input checked="" disabled="" type="checkbox"> Open PR with non-claims body. <em>(PR #1820.)</em></li>
+<li><input checked="" disabled="" type="checkbox"> Watch CI on the initial head — all required checks pass; non-required skip (docs-only).</li>
+<li><input disabled="" type="checkbox"> Re-run CI on the review-feedback fix commit and recheck <code>mergeStateStatus</code>.</li>
+<li><input disabled="" type="checkbox"> Reply to the two valid Copilot review threads (handoff &quot;Final State&quot; staleness; spec doc Federation row casing) with the fix commit SHA.</li>
+<li><input disabled="" type="checkbox"> Codex thread (handoff-removal) — already replied with verification chain; no further edit since <code>docs/dev-journal/</code> does not exist and the user&#39;s PR instructions explicitly directed the <code>docs/dev/</code> path. Leave as is; carry the AGENTS.md / HANDOFF_TEMPLATE.md drift as a separate follow-up.</li>
+<li><input disabled="" type="checkbox"> Squash-merge if clean.</li>
+<li><input disabled="" type="checkbox"> Decide whether to file the follow-up issue drafts listed in §&quot;Next Move §5&quot; (deferred to user).</li>
+<li><input disabled="" type="checkbox"> After #1794 lands, the next safe spec is <code>#1817</code> (CCL policy registry). #1817 operationalizes the §&quot;DomainPolicy evaluation&quot; hook and the §&quot;Stage 2 / Stage 3&quot; CCL hook points named in <code>effect-dispatch-contract.md</code>.</li>
+</ul>
+<hr>
+<h2>Unsafe Assumptions</h2>
+<!-- Explicitly name anything this session relied on that was not verified -->
+
+<ul>
+<li><strong><code>COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code> is the canonical home for the domain-infrastructure overview.</strong> I treated it as design-direction and extended it without superseding. If a more recent doc has been written that I did not catch, my &quot;harmonize, don&#39;t duplicate&quot; framing may need revisiting.</li>
+<li><strong><code>InstitutionalDomain</code> and <code>DomainPolicy</code> are not yet defined in Rust types.</strong> I assumed both are forward-direction primitives based on <code>ICN_INTEGRATED_SYSTEM_MODEL.md</code> line 106&#39;s explicit &quot;tracked under #1794&quot; framing. If types named <code>InstitutionalDomain</code> or <code>DomainPolicy</code> have landed in <code>icn-governance</code> or another crate since the spine merged, my &quot;no Rust types defined&quot; framing is wrong.</li>
+<li><strong><code>ADR-0014</code>&#39;s three <code>AuthorityClass</code> variants are still authoritative.</strong> I cited <code>Representation</code> / <code>Execution</code> / <code>Attestation</code> as the closed set. If a later ADR has amended that enum, the spec needs adjustment.</li>
+<li><strong><code>DnsBinding</code> is already adequately specified by <code>DOMAIN_ROUTING_AND_DNS_BINDINGS.md</code>.</strong> I cross-linked rather than re-specified. If reviewers find that doc inadequate for the contract this spec implies, a <code>spec(routing): …</code> follow-up is needed.</li>
+<li><strong>The <code>docs/spec/</code> prefix default in the registry sets <code>truth_class = &quot;normative&quot;</code> and <code>role = &quot;spec&quot;</code>.</strong> Confirmed via <code>grep</code> against <code>docs/registry.toml</code>&#39;s <code>[[doc_path_defaults]]</code> block during the #1819 review. If that default has been amended since, the YAML <code>Status: normative</code> may produce a mismatch warning.</li>
+<li><strong>The 25 cross-link targets I cite all exist at session start.</strong> Verified by file-existence sweep before committing. If a downstream PR renames or removes one of them before #1794 lands, the spec&#39;s link will rot.</li>
+</ul>
+<hr>
+<h2>Next Move</h2>
+<!-- TRUTH TYPE: Execution truth — the exact sequence for the next session -->
+
+<ol>
+<li>Run the validation suite:<pre><code class="language-bash">cd /home/matt/projects/icn
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict
+python3 docs/scripts/lint-arch.py docs/spec/institutional-domain.md --cargo icn/Cargo.toml
+python3 .github/scripts/compliance_linter.py
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+</code></pre>
+</li>
+<li>Commit with the scoped message <code>docs(spec): define institutional domain and policy primitive</code>.</li>
+<li>Push the branch and open the PR with the non-claims body.</li>
+<li>Monitor CI; reply to any AI-reviewer threads using the same pattern as #1819.</li>
+<li><strong>Follow-up issue drafts (deferred; not filed in this PR):</strong><ul>
+<li><code>schema(domain): define InstitutionalDomain and DomainPolicy persisted records</code> — the wire-stable schema that this spec deliberately does not introduce.</li>
+<li><code>spec(identity): define ServiceIdentity and DeviceIdentity issuance, rotation, recovery inside domains</code> — the full lifecycle for the identity primitives this spec only names.</li>
+<li><code>spec(agreement): define federation/domain AgreementRegistry shape and lifecycle</code> — the registry shape <code>COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code> named eight classes for.</li>
+<li><code>spec(routing): clarify DomainRouteBinding authority and receipt contract</code> — <em>optional;</em> <code>DOMAIN_ROUTING_AND_DNS_BINDINGS.md</code> may already be sufficient. Flagged for human triage.</li>
+</ul>
+</li>
+<li>After #1794 lands, the recommended next spec PR is #1817 (CCL policy registry / versioning / governance-effect hook contract). It operationalizes the §&quot;DomainPolicy evaluation&quot; hook this spec names.</li>
+</ol>
+<hr>
+<h2>Architectural Decisions</h2>
+<!-- TRUTH TYPE: Declared project truth changes (if any were made or ratified) -->
+
+<ol>
+<li><strong>Domain object stays at design granularity.</strong> The spec deliberately does not name Rust types, JSON schemas, or wire formats. Schema work is a separate follow-up.</li>
+<li><strong><code>DomainPolicy</code> evaluation never runs in the kernel.</strong> Confirms and extends the meaning firewall (per <code>KERNEL_APP_SEPARATION.md</code>). Evaluation happens at decision admission, mandate composition, effect plan generation, and binding adoption — all in the app layer.</li>
+<li><strong>Unadopted <code>DomainPolicy</code> is inert.</strong> Mirrors the rule already established for CCL documents (per <code>effect-dispatch-contract.md</code> §&quot;CCL hook points&quot;) and for <code>Mandate</code>s (per ADR-0019 conservative-broadening invariants).</li>
+<li><strong>The nine-stage lifecycle is the canonical sequence.</strong> Each transition requires authority basis and emits a receipt; reversal is a separate transition; exit is constitutional and unblockable.</li>
+<li><strong>Adjacent concepts (DomainSession, DeviceIdentity, ServiceIdentity, Workspace, AgreementRegistry, ToolRegistry, DnsBinding) are named, not redefined.</strong> Where they have existing canonical sources, the spec cross-links and notes deferrals.</li>
+<li><strong>Tenant is rejected as an analog.</strong> A domain is a self-governing jurisdiction, not a billing entity inside someone else&#39;s product.</li>
+</ol>
+<hr>
+<h2>Verification Commands</h2>
+<!-- Commands the next session should run to confirm starting state -->
+
+<pre><code class="language-bash">cd /home/matt/projects/icn
+
+# Branch + PR state
+git branch --show-current
+gh pr view &lt;pr-number&gt; --json state,mergeable,mergeStateStatus
+
+# Validation suite
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict
+python3 docs/scripts/lint-arch.py docs/spec/institutional-domain.md --cargo icn/Cargo.toml
+python3 .github/scripts/compliance_linter.py
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+
+# Review thread state
+gh api repos/InterCooperative-Network/icn/pulls/&lt;pr-number&gt;/comments \
+  --jq &#39;.[] | {id, user: .user.login, line, in_reply_to_id, created_at}&#39;
+</code></pre>
+<p>Expected: doc_control passes with 53 pre-existing unrelated warnings, none on the new doc; lint-arch CLEAN (already verified); compliance_linter no violations; freshness-check exit 1 from pre-existing <code>docs/ARCHITECTURE.md</code> staleness (recorded honestly, not in this PR&#39;s scope).</p>
+<hr>
+<h2>Truth-Plane Notes</h2>
+<!-- Which truth types were relied on? Any known conflicts between layers? -->
+
+<ul>
+<li><strong>Declared project truth:</strong> loaded from <code>docs/STATE.md</code> (last reviewed 2026-05-07, current as of the #1819 merge earlier today). No conflict surfaced.</li>
+<li><strong>Implementation truth:</strong> verified by reading <code>icn-governance/src/proof.rs</code>, <code>mandate.rs</code>, <code>authority.rs</code> for the constitutional types (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>) the spec leans on; checked that <code>InstitutionalDomain</code> and <code>DomainPolicy</code> do not yet have Rust types (consistent with the &quot;forward-direction&quot; framing).</li>
+<li><strong>Execution truth:</strong> confirmed <code>main</code> HEAD <code>494dce9fa</code>, two dependabot PRs open, no other open PRs.</li>
+<li><strong>Known truth-plane conflict:</strong> <code>freshness-check.py</code> reports <code>docs/ARCHITECTURE.md</code> as carrying stale sections. CI workflow treats this as informational and reports SUCCESS; the script itself exits 1. This PR does not broaden scope to address it (same pattern recorded in #1814 and #1819 handoffs).</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

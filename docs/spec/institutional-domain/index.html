@@ -1,0 +1,604 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>InstitutionalDomain and DomainPolicy | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>institutional domain</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/institutional-domain.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>InstitutionalDomain and DomainPolicy</h1>
+<blockquote>
+<p><strong>Status: spec, work-in-progress.</strong> Defines <code>InstitutionalDomain</code> and <code>DomainPolicy</code> as the design-level forward-direction primitives that the integrated system model already names. The spec stays at object/lifecycle granularity; it deliberately does not introduce schemas, wire formats, or runtime implementation. Clauses that depend on objects, schema fields, or kernel behavior that have not yet landed are marked as forward-direction. The PR introducing this doc advances #1794 without closing it.</p>
+</blockquote>
+<h2>Purpose</h2>
+<p><code>InstitutionalDomain</code> is the <strong>governed operating jurisdiction</strong> in ICN. It is the boundary inside which a sovereign entity decides what is legitimate: who its members are, what charters and policies bind them, which services and tools may act, where data lives, which receipts close the loop. <code>DomainPolicy</code> is the bundle of rules a domain adopts to make those decisions repeatable.</p>
+<p>These two objects are already named by the canon. <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> says: <em>&quot;<code>InstitutionalDomain</code> — the addressable scope of a federation, cooperative, community, or other institution. Owns its own members, charters, agreements, services, storage, and routing decisions&quot;</em> and <em>&quot;<code>DomainPolicy</code> — the live set of rules adopted by a domain. Bound to versioned charter text. The first input to every authority decision.&quot;</em> The same section flags both as forward-direction primitives &quot;tracked under #1794.&quot; <code>docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code> adds the operating context — domains, sessions, devices, services, workspaces, agreements, vaults — without specifying the objects themselves.</p>
+<p>This spec is that specification. It does not invent new vocabulary; it details the objects already named and locates them precisely inside the existing architecture, the effect dispatch chain (<code>docs/spec/effect-dispatch-contract.md</code>), and the institution-package boundary.</p>
+<h2>What this spec is not</h2>
+<ul>
+<li>Not runtime implementation. No code lands here.</li>
+<li>Not schema migration. No Rust types, JSON schemas, or wire formats are introduced.</li>
+<li>Not authority to mutate DNS, K3s, Forgejo, identity-bridge, or any deployed infrastructure.</li>
+<li>Not a production readiness claim.</li>
+<li>Not a live federation claim.</li>
+<li>Not a formal pilot claim for any partner institution.</li>
+<li>Not a package vocabulary surface. Institution-package nouns (a specific federation&#39;s role names, ceremonies, fixtures) stay in their own repositories.</li>
+<li>Not a redefinition of the meaning firewall, the policy-oracle pattern, the kernel/app boundary, or the effect dispatch chain. Where this spec touches those areas, the existing canon remains authoritative.</li>
+<li>Not closure of #1794. The PR introducing this doc uses <code>Refs:</code>; closure is left for separate review against the issue&#39;s acceptance criteria.</li>
+</ul>
+<h2>Boundary lines (what a domain is NOT)</h2>
+<p>Many things sit near <code>InstitutionalDomain</code> in the architecture; none of them are equivalent to it.</p>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Distinct from a domain in this way</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>DNS name / public route</strong></td>
+<td>DNS routes people; it does not define authority. A domain may move nodes, change routes, lose a name on the public internet, and still be itself. See <code>docs/architecture/DOMAIN_ROUTING_AND_DNS_BINDINGS.md</code>: <em>&quot;An institutional domain is not a DNS domain. The institutional domain is the ICN object/scope; the DNS domain is a routable address.&quot;</em></td>
+</tr>
+<tr>
+<td><strong>Node</strong></td>
+<td>A node runs infrastructure. A node is operationally responsible for what it hosts. A node does not own institutional truth. A single domain may be served by many nodes; a single node may serve many domains.</td>
+</tr>
+<tr>
+<td><strong>Federation</strong></td>
+<td>A federation is an agreement among domains. Federation coordinates; it does not subsume. A federation has no charter, no members, no standing model of its own — it has signatories, treaties, and a routing surface. (Where a federation does have its own membership and charter, that is itself a domain whose owning-entity class is <code>Federation</code>, distinct from the relational federation graph.)</td>
+</tr>
+<tr>
+<td><strong>Institution package</strong></td>
+<td>A package provides local vocabulary and workflows: this federation&#39;s role names, this cooperative&#39;s intake form, this community&#39;s repair ceremony. The domain is the jurisdiction the package runs inside. ICN core defines the generic domain shape; packages bring the local nouns. See <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code>.</td>
+</tr>
+<tr>
+<td><strong>App / tool</strong></td>
+<td>Apps and tools act inside domains under explicit binding. The domain authorizes; the tool acts. A <code>ToolBinding</code> (per RFC-0017) is the relationship; the domain is the authority that adopts the binding.</td>
+</tr>
+<tr>
+<td><strong>Member account</strong></td>
+<td>A member holds standing inside a domain. The member is identified by a DID that survives any single domain; the standing is bounded by the domain that recognizes it.</td>
+</tr>
+<tr>
+<td><strong>Storage bucket</strong></td>
+<td>Storage is custody under the domain&#39;s policy. The bucket is the byte container; the domain decides what custody class applies and which authority is required to read, modify, or export.</td>
+</tr>
+<tr>
+<td><strong>CCL document</strong></td>
+<td>CCL is the executable rule layer adopted <em>by</em> a domain (per <code>docs/spec/effect-dispatch-contract.md</code> §&quot;CCL hook points&quot;). The CCL document expresses rules; the domain is the body that adopted them. CCL never owns authority.</td>
+</tr>
+<tr>
+<td><strong>Tenant</strong></td>
+<td>A tenant is a billing entity inside someone else&#39;s product. A domain is a self-governing jurisdiction with its own charter, its own membership, its own evidence trail, and its own right to leave.</td>
+</tr>
+</tbody></table>
+<p>The shorthand the canon already uses, repeated here so the rest of the spec can lean on it:</p>
+<blockquote>
+<p>DNS routes people. Nodes run infrastructure. Domains hold institutional authority under charter, policy, standing, and receipts. Federations coordinate domains by agreement. Packages express local vocabulary and workflows. ICN core provides the generic institutional grammar.</p>
+</blockquote>
+<h2>Placement in the civic loop</h2>
+<p>In the civic loop named by <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code>, <code>InstitutionalDomain</code> sits at the <strong>Authority</strong> stage. Every later stage — action card, authorized action, CCL evaluation, dispatched transition, receipt, sync/federation, member shell, challenge/repair — derives its legitimacy from a decision rooted in some domain. <code>DomainPolicy</code> is what makes those decisions repeatable; it is the persistent shape of the domain&#39;s rule set, separate from the proposal-by-proposal acceptances that mutate it.</p>
+<p><code>InstitutionalDomain</code> is also the load-bearing object the institution-package boundary turns on. ICN core defines the generic shape here; packages provide the populated vocabulary for a specific federation. A package that tried to redefine <code>InstitutionalDomain</code> would breach the boundary; a package that bound a <code>DomainPolicy</code> instance to its local charter is doing exactly what the boundary requires.</p>
+<h2>InstitutionalDomain (object outline)</h2>
+<p>The object is defined at design granularity. Each field below is named and explained; no Rust type, no serialization format, no field order is fixed here. The forthcoming schema work (drafted as a follow-up in this PR&#39;s handoff) will turn the design into a wire-stable form.</p>
+<p><strong>Identity</strong></p>
+<ul>
+<li><strong>Canonical identifier.</strong> A stable DID-style identifier for the domain. Survives node migrations, route changes, route loss, and operator turnover. Distinct from any DNS name that may currently route to it. Pluggable into the identity layer the rest of ICN already uses.</li>
+<li><strong>Owning entity class.</strong> One of <code>Individual</code> / <code>Cooperative</code> / <code>Community</code> / <code>Federation</code>, or another governed entity class where domain policy explicitly permits. The class shapes which adopted-charter forms are permitted and what authority classes the entity may grant.</li>
+</ul>
+<p><strong>Constitutional inputs (refs, not embedded content)</strong></p>
+<ul>
+<li><strong>Charter references.</strong> Pointers to the versioned charter(s) the domain has adopted, including their amendment history. The domain does not own charter text; it owns the adoption record.</li>
+<li><strong>Adopted CCL policy references.</strong> Pointers to the versioned CCL policy documents the domain currently runs against. Adoption is via governance decision; an unadopted CCL document is inert. This connects directly to <code>docs/spec/effect-dispatch-contract.md</code> §&quot;CCL hook points&quot; — Stage 2 (mandate composition) and Stage 3 (effect plan) consume the adopted CCL policy.</li>
+</ul>
+<p><strong>Membership and standing</strong></p>
+<ul>
+<li><strong>Membership policy reference.</strong> Who may join, by what process, with what evidence, and what disqualifies.</li>
+<li><strong>Standing model reference.</strong> How active a member is, how that activity decays, how disputes affect it, what membership tiers (if any) the domain recognizes. Standing is what the member shell shows the member; it derives from policy plus history.</li>
+<li><strong>Role / authority model reference.</strong> Which roles exist, how they are filled, how they are revoked, which authority classes (per ADR-0014 — <code>Representation</code>, <code>Execution</code>, <code>Attestation</code>) each role can hold.</li>
+</ul>
+<p><strong>Devices and services</strong></p>
+<ul>
+<li><strong>Device identity &amp; enrollment policy reference.</strong> Which devices may speak for which members and services, how enrollment is approved, how recovery works, when revocation fires. <code>DeviceIdentity</code> and <code>DeviceEnrollment</code> are named in <code>COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code> as forward primitives; their full lifecycle is the subject of a deferred follow-up (see &quot;Open questions&quot; below).</li>
+<li><strong>Service identity registry.</strong> The set of services the domain has issued long-lived identities to (forge, status page, identity bridge, registry, hosted tool, model runner, import adapter). <code>ServiceIdentity</code> per <code>SERVICE_HOSTING_MODEL.md</code> and RFC-0017. Issuance, rotation, and revocation are forward work.</li>
+</ul>
+<p><strong>Workspaces, tools, agreements</strong></p>
+<ul>
+<li><strong>Workspace registry.</strong> Bounded collaboration scopes inside the domain. A workspace inherits the domain&#39;s policy by default; explicit per-workspace policy is allowed when permitted by the domain&#39;s charter.</li>
+<li><strong>Tool registry / <code>ToolBinding</code> set.</strong> Tools installed under the domain (per RFC-0017). Each <code>ToolBinding</code> carries scoped capability, custody class, audit trail, and exit policy. The domain authorizes the binding; the tool acts only within its bound capability.</li>
+<li><strong>Agreement registry.</strong> Treaties, MoUs, federation memberships, partner exchanges, custodian arrangements. The eight agreement classes named in <code>COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code> populate this registry. Agreements bind one domain to another (or to a third-party custodian) under explicit, receipted terms.</li>
+</ul>
+<p><strong>Storage, compute, routing</strong></p>
+<ul>
+<li><strong>Storage / vault policy reference.</strong> The storage taxonomy from <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> §&quot;Storage as custody&quot; — canonical, service state, artifact, volume, scoped vault, secret, cache. The domain owns the policy that classifies each class and binds it to backup/recovery (cross-link <code>#1816</code>).</li>
+<li><strong>Compute policy reference.</strong> Placement (local / cooperative / federation / commons), runtime class allowances (deterministic legitimacy compute, utility compute, container, microVM, accelerator, local device, external bridge), and the authority required for each. Cross-link <code>#1801</code>.</li>
+<li><strong>Routing / DNS bindings.</strong> The current set of <code>DnsBinding</code>s the domain has bound to public routes. Bindings are governed objects (per <code>DOMAIN_ROUTING_AND_DNS_BINDINGS.md</code>); changing one is a governance act. The route is a binding to authority, never the source of authority.</li>
+</ul>
+<p><strong>Receipts</strong></p>
+<ul>
+<li><strong>Receipt policy reference.</strong> Retention defaults per receipt class (see <code>effect-dispatch-contract.md</code> §&quot;Receipt class summary&quot;), export policy, archive policy, integrity verification cadence. Cross-link <code>#1816</code>.</li>
+</ul>
+<p><strong>Accessibility and translation</strong></p>
+<ul>
+<li><strong>Accessibility policy reference.</strong> The domain&#39;s binding to the accessibility commitments codified in <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code>. Accessibility is treated as an architecture commitment, not a polish layer.</li>
+<li><strong>Translation policy reference.</strong> Languages the domain supports for member-facing surfaces, review process for translations, fallbacks where translation has not been completed.</li>
+</ul>
+<p><strong>Backup, recovery, exit</strong></p>
+<ul>
+<li><strong>Export / backup / recovery policy reference.</strong> What can be exported, by whom, under what authority, on what cadence; what restoration looks like; what disaster recovery proves. Cross-link <code>#1816</code>.</li>
+<li><strong>Exit policy.</strong> The right to leave is constitutional. The exit path includes export of authoritative state, custody handoff (where third parties hold material under agreement), reversal of <code>DnsBinding</code>s, and termination of <code>ToolBinding</code>s.</li>
+</ul>
+<p><strong>Federation</strong></p>
+<ul>
+<li><strong>Federation agreement registry.</strong> The treaties and memberships that bind this domain to others. Per <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code>: a federation is a coordination layer over signatory domains, not a parent of them.</li>
+</ul>
+<p><strong>Challenge, repair, exit</strong></p>
+<ul>
+<li><strong>Challenge / repair paths.</strong> Every domain transition must be challengeable. Challenges are themselves governance acts (per <code>docs/spec/effect-dispatch-contract.md</code> §&quot;Challenge / reversal / counter-receipt&quot;). The domain registers the paths and the authority required to invoke each.</li>
+</ul>
+<p>The whole object is referenced by a single canonical identifier and reified by the references it carries. The domain does not embed the content of its charter, its CCL policy, its membership rolls, its tool bindings; it carries the pointers and the adoption history. This keeps the domain object small, versionable, and exportable.</p>
+<h2>DomainPolicy (rule bundle outline)</h2>
+<p><code>DomainPolicy</code> is the persistent shape of the rules a domain has adopted. It is not the proposal that adopted them; it is the resulting policy state. Every entry is a default, a gate, or both.</p>
+<p><strong>Storage defaults and gates</strong></p>
+<ul>
+<li><strong>Storage defaults.</strong> Which <code>StorageClass</code> applies to which kind of object by default, which <code>DataLocality</code> is permitted (per <code>docs/state/storage-governance-spec.md</code>).</li>
+<li><strong>Replication defaults.</strong> Number of replicas, placement constraints, anti-entropy expectations (cross-link <code>#1799</code>).</li>
+<li><strong>Backup / recovery / archive defaults.</strong> Frequency, target, integrity verification, retention; restore-test cadence; archive immutability requirements (cross-link <code>#1816</code>).</li>
+</ul>
+<p><strong>Privacy and disclosure</strong></p>
+<ul>
+<li><strong>Privacy / disclosure defaults.</strong> Which fields are public-by-policy, which are scope-restricted, which are vault-stored. Disclosure boundaries (cross-link <code>#1792</code>); scoped-vault rules (cross-link <code>#1767</code>).</li>
+<li><strong>Public / private surface policy.</strong> Which member-facing and operator-facing surfaces are publicly indexable, which are auth-gated, which are private-overlay-only.</li>
+</ul>
+<p><strong>Compute placement and review</strong></p>
+<ul>
+<li><strong>Compute placement defaults.</strong> Per the pools named in <code>#1801</code> and the runtime classes named in the spine doc.</li>
+<li><strong>Model / agent workload review policy.</strong> Where the domain permits model-assisted drafting or summarization (utility compute), the policy names the review surface and the receipt class that records human ratification. Models propose; governance adopts.</li>
+</ul>
+<p><strong>Receipts</strong></p>
+<ul>
+<li><strong>Receipt retention defaults.</strong> Per receipt class, the retention horizon, the export surface, the archive transition (cross-link <code>effect-dispatch-contract.md</code> §&quot;Receipt class summary&quot;).</li>
+<li><strong>Receipt export defaults.</strong> Who can export, under what authority, in what form, with what redactions.</li>
+</ul>
+<p><strong>Tools, services, routes</strong></p>
+<ul>
+<li><strong>Tool install authority.</strong> Which roles can adopt a new <code>ToolBinding</code>, which can suspend one, which can revoke. Cross-link RFC-0017 and <code>#1815</code>.</li>
+<li><strong>Service identity authority.</strong> Which roles can issue or revoke a <code>ServiceIdentity</code>.</li>
+<li><strong>Route / DNS binding authority.</strong> Which roles can propose a <code>DnsBinding</code> change, what the review path looks like, what receipt class the change emits.</li>
+</ul>
+<p><strong>Devices and recovery</strong></p>
+<ul>
+<li><strong>Member / device recovery policy.</strong> How a member regains access after device loss; how the domain authenticates a recovery; what protections prevent social-engineering recovery; what backup-of-last-resort the domain accepts.</li>
+</ul>
+<p><strong>Accessibility and language</strong></p>
+<ul>
+<li><strong>Accessibility gates.</strong> Bound to <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code>. The policy names which surfaces must pass which categories.</li>
+<li><strong>Language gates.</strong> Required languages, optional languages, fallback language, translation review process.</li>
+</ul>
+<p><strong>Authority — ordinary and emergency</strong></p>
+<ul>
+<li><strong>Ordinary authority rules.</strong> Mapped onto <code>AuthorityClass</code> (<code>Representation</code> / <code>Execution</code> / <code>Attestation</code>) per ADR-0014, with <code>TypedScope</code> per ADR-0014.</li>
+<li><strong>Emergency / temporary authority rules.</strong> When a domain may grant time-bounded extraordinary authority (response to incident, federation request, custodian disability), under what review, with what reversal expectation. Emergency grants are receipted and time-bounded; no authority is ever silent.</li>
+</ul>
+<p><strong>Adoption, versioning, evaluation</strong></p>
+<ul>
+<li><strong>Authorship and adoption history.</strong> Every policy version names who drafted it, who reviewed it, who adopted it, and against which charter clauses.</li>
+<li><strong>Amendment path.</strong> How the policy is amended: which proposal class, which threshold, which review window, which receipt class records the amendment.</li>
+<li><strong>Stable version identifier.</strong> A content-addressed reference so other systems (the effect dispatch chain, the steward cockpit, the member shell, federation peers) can name the exact policy version that was in force at a given moment.</li>
+<li><strong>Inertness rule.</strong> An unadopted <code>DomainPolicy</code> is inert — referencing it produces no authority, no constraint, no effect. Only the adopted version binds.</li>
+</ul>
+<p>The domain may carry multiple <code>DomainPolicy</code> versions in history (for audit) but exactly one current version. Transitions between current versions are governance acts with receipts.</p>
+<h2>DomainPolicy evaluation</h2>
+<p><code>DomainPolicy</code> is consumed at well-defined points in the dispatch chain. It does not run inside the kernel.</p>
+<p><strong>Where policy is consulted:</strong></p>
+<ul>
+<li><strong>At decision admission.</strong> When a proposal is considered for admission to the process substrate, the relevant <code>DomainPolicy</code> evaluates whether the proposal class is permitted, who may sponsor it, what threshold applies.</li>
+<li><strong>At mandate composition (Stage 2 of effect dispatch).</strong> Per <code>docs/spec/effect-dispatch-contract.md</code> §&quot;CCL hook points&quot;, a CCL evaluator informed by adopted <code>DomainPolicy</code> produces structured grant sets (or returns empty, triggering <code>Mandate::new_pending_grants</code>).</li>
+<li><strong>At effect plan generation (Stage 3).</strong> For proposal kinds CCL governs, the evaluator produces a structured <code>EffectManifest</code> whose contents the kernel later enforces blindly.</li>
+<li><strong>At binding adoption.</strong> A new <code>ToolBinding</code>, <code>DnsBinding</code>, or agreement is validated against the relevant <code>DomainPolicy</code> clauses before adoption.</li>
+</ul>
+<p><strong>Where policy is NOT consulted:</strong></p>
+<ul>
+<li><strong>Inside the kernel.</strong> The kernel sees <code>ConstraintSet</code> values, not <code>DomainPolicy</code> semantics. Per <code>docs/architecture/KERNEL_APP_SEPARATION.md</code>, semantic interpretation is forbidden in kernel crates.</li>
+<li><strong>Inside packages, beyond their bound domain.</strong> A package can read its bound domain&#39;s policy; it does not read another domain&#39;s policy unless an agreement makes that explicit.</li>
+</ul>
+<p><strong>Determinism and reviewability:</strong></p>
+<ul>
+<li>Policy evaluation must be deterministic for any given (policy version, input). Non-deterministic evaluation is a bug.</li>
+<li>Policy text is reviewable. The adopted version is human-readable; the amendment history is queryable; the rationale is on record.</li>
+</ul>
+<p>This spec does not specify the CCL grammar that expresses policy clauses. CCL policy registry, versioning, and the evaluator-selection contract belong to <code>#1817</code>.</p>
+<h2>Domain lifecycle</h2>
+<p>A domain moves through named stages. Each transition requires an authority basis and emits a receipt. Skipping a stage breaks the chain.</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Transition</th>
+<th>Authority required</th>
+<th>Receipt class</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Declare</strong></td>
+<td>A founding decision establishes the domain&#39;s canonical identifier and owning entity class.</td>
+<td>Founding decision in whatever forum the owning entity considers sovereign.</td>
+<td>Decision receipt + domain-creation record.</td>
+</tr>
+<tr>
+<td><strong>Adopt charter / policy</strong></td>
+<td>The domain binds versioned charter text and an initial <code>DomainPolicy</code>.</td>
+<td>Founding decision plus ratification per the charter&#39;s process.</td>
+<td>Decision receipt + adopted-policy record.</td>
+</tr>
+<tr>
+<td><strong>Initialize standing / membership</strong></td>
+<td>Initial members are admitted and their standing recorded.</td>
+<td>Adopted membership policy.</td>
+<td>Membership effect records (per ADR-0025 forward direction).</td>
+</tr>
+<tr>
+<td><strong>Bind routes / services / tools</strong></td>
+<td>The domain adopts initial <code>DnsBinding</code>s, <code>ServiceIdentity</code>s, and <code>ToolBinding</code>s.</td>
+<td>Authority per <code>DomainPolicy</code>.</td>
+<td>Binding-creation effect records.</td>
+</tr>
+<tr>
+<td><strong>Operate</strong></td>
+<td>Day-to-day acceptance of proposals, dispatch of effects, emission of receipts.</td>
+<td>Adopted policy + ongoing governance acts.</td>
+<td>The full effect-dispatch chain (per <code>effect-dispatch-contract.md</code>).</td>
+</tr>
+<tr>
+<td><strong>Amend</strong></td>
+<td>The domain mutates its charter, policy, or registry.</td>
+<td>Amendment authority per the charter.</td>
+<td>Decision receipt + amendment record.</td>
+</tr>
+<tr>
+<td><strong>Federate</strong></td>
+<td>The domain enters or exits a federation agreement.</td>
+<td>Agreement-class authority per <code>DomainPolicy</code>.</td>
+<td>Agreement record + counter-signatures from peer domains.</td>
+</tr>
+<tr>
+<td><strong>Suspend / repair</strong></td>
+<td>A challenge produces a temporary suspension, a remediation, or both.</td>
+<td>Challenge-resolution path per the charter.</td>
+<td>Reversal mandate + counter-effects per <code>effect-dispatch-contract.md</code> §&quot;Challenge / reversal / counter-receipt&quot;.</td>
+</tr>
+<tr>
+<td><strong>Export / exit / archive</strong></td>
+<td>The domain exports authoritative state, terminates <code>DnsBinding</code>s and <code>ToolBinding</code>s, hands off custody where applicable, and archives.</td>
+<td>Exit policy.</td>
+<td>Export receipt + archive transition record.</td>
+</tr>
+</tbody></table>
+<p><strong>Lifecycle invariants:</strong></p>
+<ul>
+<li>No transition without authority basis.</li>
+<li>No transition without receipt expectation.</li>
+<li>No silent transition. A transition the member shell and steward cockpit cannot see did not happen, institutionally.</li>
+<li>Reversal is a separate transition, not a retroactive edit. The chain is append-only.</li>
+<li>The right to exit is constitutional. A domain may always leave; the exit path is governed but unblockable.</li>
+</ul>
+<h2>Relationship to effect dispatch</h2>
+<p><code>DomainPolicy</code> is the upstream input to multiple stages of the effect dispatch chain specified in <code>docs/spec/effect-dispatch-contract.md</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Effect dispatch stage</th>
+<th>DomainPolicy role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Decision admission (pre-Stage 1)</td>
+<td>Determines whether a proposal class is permitted, who can sponsor, what threshold applies.</td>
+</tr>
+<tr>
+<td>Stage 1 (Decision recording)</td>
+<td>Policy version in force at acceptance time is named in the <code>GovernanceDecisionReceipt</code> provenance.</td>
+</tr>
+<tr>
+<td>Stage 2 (Mandate minting)</td>
+<td>CCL evaluator (per <code>#1817</code>) reads the adopted policy to compose grants conservatively; informs whether the seam mints <code>AuthorityGrant</code>s or falls through to <code>Mandate::new_pending_grants</code>.</td>
+</tr>
+<tr>
+<td>Stage 3 (Effect plan)</td>
+<td>CCL evaluator produces a structured <code>EffectManifest</code>; the manifest&#39;s deterministic translation depends on the adopted policy version.</td>
+</tr>
+<tr>
+<td>Stage 4 (Effect dispatch)</td>
+<td>Kernel sees only <code>KernelEffect</code>; policy is not consulted in the kernel.</td>
+</tr>
+<tr>
+<td>Stage 5 (Application + evidence)</td>
+<td><code>InstitutionalEffectRecord</code> and dispatch evidence reference the policy version (forward direction; depends on the schema work tracked under <code>#1817</code> and the deferred-schema items named in <code>effect-dispatch-contract.md</code> §&quot;Future schema work&quot;).</td>
+</tr>
+</tbody></table>
+<p><code>DomainPolicy</code> is also where the adjacent specs land their content: storage defaults from <code>#1816</code>, compute placement from <code>#1801</code>, scoped vault custody from <code>#1767</code>/<code>#1792</code>, action-card rendering from <code>#1818</code>/<code>#1795</code>, accessibility commitments from <code>ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code>.</p>
+<h2>Relationship to future work</h2>
+<p>This spec cross-links existing canon and forward issues rather than duplicating them.</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Where it lives</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Service binding, workload manifest, runtime provider</td>
+<td><code>#1815</code>.</td>
+</tr>
+<tr>
+<td>Backup, replication, recovery, archive policies</td>
+<td><code>#1816</code>.</td>
+</tr>
+<tr>
+<td>CCL policy registry, versioning, evaluator-selection contract</td>
+<td><code>#1817</code>.</td>
+</tr>
+<tr>
+<td>Member shell v0 UX</td>
+<td><code>#1818</code>.</td>
+</tr>
+<tr>
+<td>ArtifactRegistry / ScopedVault</td>
+<td><code>#1798</code>.</td>
+</tr>
+<tr>
+<td>Compute placement policy</td>
+<td><code>#1801</code>.</td>
+</tr>
+<tr>
+<td>Network anti-entropy proof loops</td>
+<td><code>#1799</code>.</td>
+</tr>
+<tr>
+<td>Steward cockpit v0</td>
+<td><code>#1795</code>.</td>
+</tr>
+<tr>
+<td>Tool install lifecycle</td>
+<td><code>RFC-0017</code>.</td>
+</tr>
+<tr>
+<td>Constitutional object model (AuthorityClass, AuthorityGrant, TypedScope, Mandate)</td>
+<td><code>ADR-0014</code>.</td>
+</tr>
+<tr>
+<td>Accepted-proposal effect dispatch contract</td>
+<td><code>docs/spec/effect-dispatch-contract.md</code> (<code>#1797</code>, merged).</td>
+</tr>
+<tr>
+<td>Integrated cooperative operating model</td>
+<td><code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> (<code>#1793</code>, merged).</td>
+</tr>
+</tbody></table>
+<h2>Adjacent concepts (named, not specified here)</h2>
+<p>These objects appear in the field outline above. Some are already partly specified; some are named only. None are fully specified in this document.</p>
+<ul>
+<li><strong><code>DomainSession</code></strong> — bounded session inside a domain for a member or service. Already named in <code>COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code>. Full specification is forward work.</li>
+<li><strong><code>DeviceIdentity</code> / <code>DeviceEnrollment</code></strong> — hardware identity and enrollment chain. Named in <code>COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code>. Recovery semantics are a candidate follow-up issue (see &quot;Open questions&quot;).</li>
+<li><strong><code>ServiceIdentity</code></strong> — long-lived service-side identity issued by a domain. Partially specified by <code>SERVICE_HOSTING_MODEL.md</code> and RFC-0017. Full issuance / rotation / revocation lifecycle is forward work.</li>
+<li><strong><code>Workspace</code></strong> — bounded collaboration scope. Named in <code>COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code>. Ownership and scoping model are forward work.</li>
+<li><strong><code>AgreementRegistry</code></strong> — registry of treaties, MoUs, and federation memberships. Eight agreement classes are named in <code>COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code>. The registry shape is forward work.</li>
+<li><strong><code>ToolRegistry</code></strong> — set of installed <code>ToolBinding</code>s. Tool install lifecycle is RFC-0017.</li>
+<li><strong><code>DnsBinding</code></strong> — binding between a domain and a routable name. Specified in <code>DOMAIN_ROUTING_AND_DNS_BINDINGS.md</code>.</li>
+</ul>
+<p>This spec names these so the field outline is honest about what it references; it does not redefine any of them.</p>
+<h2>Open questions and deferred decisions</h2>
+<p>Each is named so future readers know where this spec stops.</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Deferred to</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Wire-stable schema for <code>InstitutionalDomain</code> and <code>DomainPolicy</code> records</td>
+<td>Follow-up <code>schema(domain): …</code> issue drafted in this PR&#39;s handoff.</td>
+</tr>
+<tr>
+<td><code>DeviceIdentity</code> enrollment and recovery flow</td>
+<td>Follow-up <code>spec(identity): …</code> issue drafted in this PR&#39;s handoff.</td>
+</tr>
+<tr>
+<td><code>ServiceIdentity</code> issuance, rotation, and revocation lifecycle</td>
+<td>Follow-up <code>spec(identity): …</code> and RFC-0017 implementation.</td>
+</tr>
+<tr>
+<td><code>Workspace</code> ownership and cross-domain scoping rules</td>
+<td>Follow-up <code>spec(workspace): …</code> issue, optional.</td>
+</tr>
+<tr>
+<td>Federation <code>AgreementRegistry</code> schema and lifecycle</td>
+<td>Follow-up <code>spec(agreement): …</code> issue, drafted in this PR&#39;s handoff.</td>
+</tr>
+<tr>
+<td><code>DnsBinding</code> authority and receipt contract (already partially specified)</td>
+<td>Either a follow-up <code>spec(routing): …</code> issue or an extension of <code>DOMAIN_ROUTING_AND_DNS_BINDINGS.md</code>; flagged for human triage in the handoff.</td>
+</tr>
+<tr>
+<td>CCL policy registry, versioning, evaluator selection</td>
+<td><code>#1817</code>.</td>
+</tr>
+<tr>
+<td>Effect dispatch deferred-schema work</td>
+<td><code>effect-dispatch-contract.md</code> §&quot;Future schema work&quot; and follow-ups after <code>#1797</code> spec acceptance.</td>
+</tr>
+<tr>
+<td>Member shell v0 surfacing of domain state</td>
+<td><code>#1818</code>.</td>
+</tr>
+<tr>
+<td>Steward cockpit v0 surfacing of policy state</td>
+<td><code>#1795</code>.</td>
+</tr>
+<tr>
+<td>Kernel-side mandate enforcement</td>
+<td>ADR-0019 &quot;Non-decisions&quot;; future ADR.</td>
+</tr>
+</tbody></table>
+<h2>Non-claims (repeated for clarity)</h2>
+<ul>
+<li>This document does not introduce any of the forward-direction primitives it names. They remain forward-direction.</li>
+<li>It does not introduce schema, wire format, or contract changes.</li>
+<li>It does not authorize the kernel to consult <code>DomainPolicy</code> directly.</li>
+<li>It does not authorize mutation of any deployed infrastructure (DNS, K3s, Forgejo, identity-bridge, gateway).</li>
+<li>It does not claim production readiness for any subsystem.</li>
+<li>It does not claim live inter-cooperative federation.</li>
+<li>It does not claim that any partner federation is operating under these primitives today. Where this spec gives examples, the examples are generic; institution-package vocabulary stays in institution packages.</li>
+<li>It does not use payment, wallet, balance, currency, or blockchain as ICN-native framing. The discipline list in <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> §&quot;Vocabulary discipline&quot; applies in full.</li>
+<li>It does not by itself close <code>#1794</code>. The PR uses <code>Refs:</code>.</li>
+</ul>
+<h2>Related documents and issues</h2>
+<p>Architecture and spine:</p>
+<ul>
+<li><code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> — §&quot;Authority — InstitutionalDomain and DomainPolicy&quot; (the section this spec details).</li>
+<li><code>docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code> — the design-direction overview of cooperative domain infrastructure.</li>
+<li><code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> — generic shapes vs. package vocabulary.</li>
+<li><code>docs/architecture/KERNEL_APP_SEPARATION.md</code> — meaning firewall.</li>
+<li><code>docs/architecture/DOMAIN_ROUTING_AND_DNS_BINDINGS.md</code> — DNS routes, authority does not.</li>
+<li><code>docs/architecture/SERVICE_HOSTING_MODEL.md</code> — hosted → governed → native service maturity.</li>
+<li><code>docs/architecture/COOPERATIVE_TOOL_COMMONS.md</code> — tool commons doctrine.</li>
+</ul>
+<p>Specs and state:</p>
+<ul>
+<li><code>docs/spec/effect-dispatch-contract.md</code> — accepted-proposal effect dispatch (<code>#1797</code>, merged).</li>
+<li><code>docs/spec/KERNEL_CONTRACTS.md</code> — kernel contract primitives.</li>
+<li><code>docs/state/storage-governance-spec.md</code> — storage classes and locality.</li>
+</ul>
+<p>Design and accessibility:</p>
+<ul>
+<li><code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> — accessibility commitments treated as architecture.</li>
+<li><code>docs/design/compute-classes.md</code> — runtime class taxonomy.</li>
+<li><code>docs/design/deterministic-core.md</code> — determinism for legitimacy compute.</li>
+</ul>
+<p>ADRs:</p>
+<ul>
+<li>ADR-0014 — Constitutional Object Model (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>).</li>
+<li>ADR-0019 — Authority Grant Minting and Mandate Persistence Seam.</li>
+<li>ADR-0020 — Institutional Bootstrap Activation and Standing Read Model.</li>
+<li>ADR-0023 — CCL Institutional Process Language.</li>
+<li>ADR-0024 — Institution Package Manifest Schema.</li>
+<li>ADR-0025 — Institutional Effect Record Canonical Schema (proposed).</li>
+<li>ADR-0026 — Receipt and Provenance Proof Envelope.</li>
+<li>ADR-0027 — Action Card Contract.</li>
+<li>ADR-0030 — Compute Workload Manifest and Authority Boundary.</li>
+</ul>
+<p>RFCs:</p>
+<ul>
+<li>RFC-0017 — Tool Install Infrastructure.</li>
+<li>RFC-0016 — Relationship Surface.</li>
+<li>RFC-0001 — Obligation, allocation, settlement primitives.</li>
+</ul>
+<p>Issues:</p>
+<ul>
+<li><code>#1794</code> — this spec.</li>
+<li><code>#1793</code> — integrated cooperative operating model (parent; merged).</li>
+<li><code>#1797</code> — accepted-proposal effect dispatch contract (sibling; merged).</li>
+<li><code>#1815</code> — service binding / workload manifest / runtime provider.</li>
+<li><code>#1816</code> — backup / replication / recovery / archive policies.</li>
+<li><code>#1817</code> — CCL policy registry / versioning / governance-effect hook contract.</li>
+<li><code>#1818</code> — member shell v0 UX.</li>
+<li><code>#1792</code>, <code>#1767</code> — private data disclosure boundary and encrypted private overlay storage.</li>
+<li><code>#1798</code> — ArtifactRegistry and ScopedVault.</li>
+<li><code>#1801</code> — compute placement.</li>
+<li><code>#1799</code> — network routing, redundancy, anti-entropy proof loops.</li>
+<li><code>#1795</code> — steward cockpit.</li>
+<li><code>#1748</code> — institutional process substrate.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
