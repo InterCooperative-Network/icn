@@ -1847,6 +1847,19 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/spec/effect-dispatch-contract.md"]
+category = "architecture"
+status = "draft"
+title = "Effect Dispatch Contract"
+description = "End-to-end behavior contract for turning an accepted governance decision into bounded effects with receipts. Names the five-stage chain (decision recording → mandate minting → effect plan → dispatch → application + evidence) and harmonizes existing types (GovernanceDecisionReceipt, GovernanceProof, GovernanceDecisionAttestation, Mandate, AuthorityGrant, EffectManifest, KernelEffect, EffectOutcome, InstitutionalEffectRecord, EffectDispatchEvidence) with ADRs 0014, 0019, 0025, 0026, 0027, 0029, 0030, 0031. Splits idempotency, partial-failure, challenge/reversal, CCL hook, privacy/redaction, action-card, and package-boundary rules into current contract vs forward schema work. Identifies #1748 process-transition receipts as the first safe runtime dogfood slice. Advances #1797 — does not by itself close it. Defers kernel-side mandate enforcement, federation mandate recognition, EffectRecord taxonomy implementation, stable idempotency-key schema, and other future-direction items to named follow-ups."
+last_updated = "2026-05-14"
+last_reviewed = "2026-05-14"
+owner = "matt"
+audiences = ["architects", "developers", "contributors"]
+domain_tags = ["governance", "ccl", "effect-dispatch", "mandate", "receipts", "kernel-app-boundary", "privacy", "spec"]
+depends_on = ["docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/GOVERNANCE_STATE_MACHINE.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0027-action-card-contract.md", "docs/adr/ADR-0029-conflict-resolution-object-model.md", "docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md", "docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md"]
+recommended_action = "keep"
+
 # ============================================================================
 # DESIGN — Compute, Entity, Misc
 # ============================================================================
