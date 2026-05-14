@@ -19,13 +19,13 @@ Can a downstream implementer — looking only at this spec plus the canon it har
 ### Open PRs
 | PR | Branch | State | CI Status | Blocker |
 |----|--------|-------|-----------|---------|
-| (this session's) | `spec/storage-durability-policies` | local at head pending push | Initial CI runs on PR creation | Awaiting initial CI |
+| #1823 | `spec/storage-durability-policies` | OPEN | All required checks passed on commit `e375687b3` (initial spec push). Two Copilot threads landed after the initial no-feedback polling window; a fix commit follows this handoff edit and must re-run CI before merge. | Awaiting CI re-run on the Copilot fix commit, then mergeability re-check |
 | #1790 | dependabot (pilot-ui dev deps) | OPEN | n/a | Out of session scope |
 | #1791 | dependabot (ts-sdk dev deps) | OPEN | n/a | Out of session scope |
 
 ### Branches
-- `spec/storage-durability-policies` — local; about to be pushed. Initial spec commit forthcoming after this handoff is committed.
-- Local `main` synced to `09331622d` (unchanged this session beyond branching).
+- `spec/storage-durability-policies` — pushed to origin. Last verified head before this fix: `e375687b3`. The head moves with each push; check `git rev-parse HEAD` on the branch after the next push for the current SHA.
+- Local `main` synced to `09331622d` (unchanged this session).
 
 ### Issues
 - `#1816` — OPEN. This session writes the candidate spec doc. PR will use `Refs:`, not `Closes:`.
@@ -86,13 +86,19 @@ Per the established pattern. Six titles named in §"Next Move" below.
 - [x] Branch created (`spec/storage-durability-policies`).
 - [x] Spec doc drafted; registry updated; INDEX.md updated; DOCUMENT_REGISTRY.md regenerated.
 - [x] Validation suite passed locally. *(doc_control_check pass with 54 pre-existing/generated-doc warnings; lint-arch CLEAN; compliance_linter clean; freshness exit 1 from pre-existing `docs/ARCHITECTURE.md` staleness — same pattern as #1814 / #1819 / #1820 / #1821 / #1822.)*
-- [ ] Commit + push.
-- [ ] Open PR.
-- [ ] Watch CI on the initial head.
-- [ ] Address any valid AI-reviewer feedback (Copilot/Codex) using the verified-rebuttal pattern from #1819 / #1820 / #1821 / #1822.
-- [ ] Per the user's prompt: **"Apply valid feedback only. Stop and summarize unless the user explicitly tells you to merge after clean review."** Merge is NOT directed in the same prompt.
+- [x] Initial commit (`e375687b3`) and push.
+- [x] PR #1823 opened.
+- [x] Initial CI passed on `e375687b3` (all required checks green; non-required skip).
+- [x] Two Copilot review threads landed after the initial no-feedback polling window: (1) opening-paragraph internal inconsistency about "wire-stable form" and sibling-spec list; (2) handoff Final State stale recording the branch as local/pending push.
+- [x] Copilot review-feedback fix applied in this session's pending commit.
+- [ ] Push the Copilot fix commit and re-run CI.
+- [ ] Recheck `mergeStateStatus` after CI returns green.
+- [ ] Reply to / resolve the two Copilot threads with the fix commit SHA.
+- [ ] Per the user's current prompt: "If checks are green, mergeability is clean, and no valid unresolved feedback remains, squash-merge PR #1823." Squash-merge if clean.
+- [ ] Sync local `main` and prune the branch (squash-merge requires `git branch -D`).
+- [ ] Leave `#1816` closure to human review (PR uses `Refs:`, not `Closes:`).
 - [ ] Decide whether to file the follow-up issue drafts listed in §"Next Move §5" (deferred to user).
-- [ ] After `#1816` lands, the architectural foundation is complete enough that implementation work (per the spec's deferred follow-ups) can begin. The user explicitly asked not to start `#1798` / `#1799` / `#1801` / `#1818` / implementation in this session.
+- [ ] After `#1816` is closed by the user (if they decide closure is warranted), the recommended next PR is `#1798` (`ArtifactRegistry` v0 and `ScopedVault` boundary). The user explicitly asked not to start `#1798` / `#1799` / `#1801` / `#1818` / implementation in this session.
 
 ### Carried forward (not addressed in this PR)
 
@@ -116,11 +122,10 @@ Per the established pattern. Six titles named in §"Next Move" below.
 ## Next Move
 <!-- TRUTH TYPE: Execution truth — the exact sequence for the next session -->
 
-1. Commit and push.
-2. Open PR with `Refs: #1816` (not `Closes:`).
-3. Watch CI on the initial head. Expected: all required checks pass; non-required jobs skip (docs-only).
-4. Reply to any AI-reviewer threads using the verified-rebuttal pattern. For each comment: confirm or disconfirm against the live repo before applying.
-5. Per the user's prompt: **"Apply valid feedback only. Stop and summarize unless the user explicitly tells you to merge after clean review."** Wait for explicit merge instruction.
+1. Push the Copilot fix commit prepared in this session. Watch CI to settle.
+2. Reply to / resolve each open Copilot thread on PR #1823 with the new fix commit SHA. The two open Copilot comments are: (a) opening-paragraph "wire-stable form" / sibling-spec list conflation; (b) handoff Final State staleness.
+3. Re-check `mergeStateStatus` after CI returns green.
+4. Per the user's current prompt: squash-merge PR #1823 if clean. Sync local `main`; force-delete the branch (`git branch -D spec/storage-durability-policies`) since squash-merge invalidates the ancestor check for `-d`.
 6. **Follow-up issue drafts (deferred; not filed in this PR):**
    - `schema(storage): define StorageSpec and durability policy records` — the wire-stable schema deliberately omitted.
    - `spec(storage): define restore-test receipt envelope` — the Rust type, persistence, and audit-query surface.

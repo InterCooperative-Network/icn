@@ -13,16 +13,16 @@ Last Reviewed: 2026-05-14
 
 ICN's storage layer already enforces two kernel-level constraints: `StorageClass` (Canonical / ServiceState / Blobs, per `icn-kernel-api/src/storage.rs:53`) and `DataLocality` (CellLocal / CoopReplicated / FederationMirrored / CommonsPublic, per the same file at line 155). Those constraints establish what the kernel can refuse. They do not, by themselves, establish how storage stays durable, how a backup is taken or restored, what counts as a verified replica, what an archive owes the institution years from now, or what authority a restore requires.
 
-The spine doc names six policy objects for the missing durability layer — `StorageSpec`, `BackupPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy` — and explicitly marks them as forward-direction tracked under #1816. The four merged architecture specs each defer to this spec for the wire-stable form of those objects:
+The spine doc names six policy objects for the missing durability layer — `StorageSpec`, `BackupPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy` — and explicitly marks them as forward-direction tracked under #1816. The four merged sibling architecture specs each defer to this spec for the **design-level policy contract** for those objects:
 
 - `docs/spec/governed-service-binding.md` (#1822, merged): "Backup policy reference. Pointer to the `BackupPolicy` the binding inherits (forward-direction, per `#1816`)."
 - `docs/spec/institutional-domain.md` (#1820, merged): "Backup / recovery / archive defaults … (cross-link `#1816`)."
 - `docs/spec/effect-dispatch-contract.md` (#1819, merged): "Backups inherit the disclosure policy of the source (see … the forthcoming backup spec under #1816)."
-- `docs/state/storage-governance-spec.md`: names `StorageSpec` and `validate_storage_access()` as required follow-ups.
+- `docs/spec/ccl-policy-registry.md` (#1821, merged): names `#1816` as the home for "backup / replication / recovery / archive policies" and for export-receipt provenance.
 
-This spec defines those objects at design granularity and names the rules that bind them to the institution's authority and receipt model.
+Foundational storage canon is **separate from the merged sibling specs above**. `docs/state/storage-governance-spec.md` is the existing foundational doc for `StorageClass`, `DataLocality`, and storage-access enforcement vocabulary; it independently names `StorageSpec` and `validate_storage_access()` as required follow-ups. This spec gives those names design-level shape without redefining the existing kernel-level types.
 
-This spec **does not** introduce schema, wire format, or runtime implementation. It explicitly defers vendor choices, replication algorithms, SLA commitments, and storage-backend selection. It does not redefine `StorageClass` or `DataLocality`; both remain canonical per the kernel-level enums.
+This spec defines those objects at **object granularity** — fields, lifecycle stages, authority bindings, receipt expectations, hard rules — and names the institutional rules that bind them to authority and receipts. **It does not introduce schema, wire format, Rust types, or storage-backend implementation.** It explicitly defers vendor choices, replication algorithms, SLA commitments, and storage-backend selection. It does not redefine `StorageClass` or `DataLocality`; both remain canonical per the kernel-level enums.
 
 ## What this spec is not
 
