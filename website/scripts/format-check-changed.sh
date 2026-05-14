@@ -32,7 +32,7 @@ fi
 # expanding the script's surface area.
 allowed_re='\.(astro|css|ts|tsx|js|jsx|mjs|cjs|json|md|yml|yaml)$'
 
-changed_files="$(git diff --name-only --diff-filter=d "${base_ref}"...HEAD -- 'website/' \
+changed_files="$(git -C "$repo_root" diff --name-only --diff-filter=d "${base_ref}"...HEAD -- 'website/' \
   | sed 's#^website/##' \
   | grep -E "$allowed_re" || true)"
 
