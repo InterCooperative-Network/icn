@@ -155,6 +155,7 @@ Formal protocol and contract specifications:
 - [institutional-domain.md](spec/institutional-domain.md) - `InstitutionalDomain` and `DomainPolicy` primitive (the governed operating jurisdiction)
 - [ccl-policy-registry.md](spec/ccl-policy-registry.md) - CCL policy registry, versioning, adoption contract, and governance-effect hook contract
 - [governed-service-binding.md](spec/governed-service-binding.md) - `GovernedServiceBinding`, `WorkloadManifest`, and `RuntimeProvider` (the integrating envelope for hosted services, tools, compute jobs, and CCL evaluators)
+- [storage-durability-policies.md](spec/storage-durability-policies.md) - `StorageSpec`, `BackupPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy`, restore-test receipts, locality + privacy inheritance, restore authority
 
 ---
 
