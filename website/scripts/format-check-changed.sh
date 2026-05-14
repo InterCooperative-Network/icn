@@ -45,4 +45,4 @@ file_count="$(printf '%s\n' "$changed_files" | wc -l | tr -d ' ')"
 echo "format-check-changed: checking ${file_count} file(s) against base '${base_ref}'..."
 
 printf '%s\n' "$changed_files" \
-  | xargs npx prettier --check --plugin=prettier-plugin-astro
+  | xargs -d '\n' npx prettier --check --plugin=prettier-plugin-astro
