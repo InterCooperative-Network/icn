@@ -1860,6 +1860,19 @@ domain_tags = ["governance", "ccl", "effect-dispatch", "mandate", "receipts", "k
 depends_on = ["docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/GOVERNANCE_STATE_MACHINE.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0027-action-card-contract.md", "docs/adr/ADR-0029-conflict-resolution-object-model.md", "docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md", "docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md"]
 recommended_action = "keep"
 
+[docs."docs/spec/storage-durability-policies.md"]
+category = "architecture"
+status = "draft"
+title = "Storage Durability Policies — Backup, Replication, Recovery, Archive, Integrity"
+description = "Defines six forward-direction policy objects that bind storage classes to durability commitments: StorageSpec (binding between a workload/service/domain and storage), BackupPolicy (frequency, target, integrity, retention), ReplicationPolicy (replicas, placement, anti-entropy), RecoveryPolicy (restore objective class, drill cadence, restore authority), ArchivePolicy (long-term retention, immutability, access), and IntegrityPolicy (verification cadence, repair path). Reuses existing kernel-level types (StorageClass and DataLocality from icn/crates/icn-kernel-api/src/storage.rs) verbatim and acknowledges the drift between the 3-variant kernel enum and the 7-class spine-doc custody taxonomy (canonical store / service state / artifact-blob / volume-block / scoped vault / secret-key / cache-derived) — reconciliation deferred to a named follow-up. Names restore-test receipts as their own concept; mandates that backups, replicas, archives, and exports inherit source locality and disclosure constraints and MUST NOT broaden them. Specifies authority rules tying restore of authoritative state to ADR-0014 mandates and the effect dispatch chain (Stage 5 evidence). Provides a sixteen-row failure/safety table covering missing spec, locality boundary crossing, restore without authority, cache treated as canonical, secret material in ordinary backup, archive quiet deletion, etc. Advances #1816 — does not by itself close it. Defers wire-stable schema, restore-test receipt envelope, locality/privacy inheritance checks, archive verification contract, backup-provider interface, and anti-entropy integration to named follow-ups."
+last_updated = "2026-05-14"
+last_reviewed = "2026-05-14"
+owner = "matt"
+audiences = ["architects", "developers", "contributors"]
+domain_tags = ["storage", "backup", "replication", "recovery", "archive", "integrity", "locality", "privacy", "spec"]
+depends_on = ["docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/architecture/SERVICE_HOSTING_MODEL.md", "docs/spec/institutional-domain.md", "docs/spec/effect-dispatch-contract.md", "docs/spec/ccl-policy-registry.md", "docs/spec/governed-service-binding.md", "docs/state/storage-governance-spec.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md"]
+recommended_action = "keep"
+
 [docs."docs/spec/governed-service-binding.md"]
 category = "architecture"
 status = "draft"
