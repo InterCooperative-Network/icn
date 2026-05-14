@@ -52,8 +52,8 @@ The action-card runtime emits closed source/action pairs. Currently emitted sour
 | Surface | Method + path | Notes |
 |---|---|---|
 | Action-item completion-receipt retrieval | `GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt` | Closes the proof loop on the read side. `governance:read` scope + domain membership; receipt's bound `domain_id` is asserted to match the path parameter so cross-domain probes are rejected. |
-| Local HTTP proof loop runbook | (local script) | `docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md` |
-| K3s smoke proof loop runbook | (operator-authorized) | `docs/dev/NYCN_K3S_PROOF_PATH.md` — recorded against deployed image `91a63eec` |
+| Local HTTP proof loop runbook | (local script) | Closure recorded under PR #1676; proof-path runbook lives in the partner NYCN repo. |
+| K3s smoke proof loop runbook | (operator-authorized) | Closure recorded under PR #1677 against deployed image `91a63eec`; proof-path runbook lives in the partner NYCN repo. |
 
 ## Governance primitives (data surface)
 

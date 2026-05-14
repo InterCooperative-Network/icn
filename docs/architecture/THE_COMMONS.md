@@ -245,7 +245,7 @@ A **federation** (`Entity::Federation(FederationProfile)`) is a coordination lay
 
 > **Crucial rule**: a federation must not govern the internals of a member entity unless the member entity's own charter explicitly grants the federation scoped authority over that internal matter. The default is subsidiarity.
 
-NYCN is a federation (see `docs/strategy/NYCN-Repo-Architecture-Spec.md`). GreenStar Cooperative is one of its sovereign members. NYCN does not decide how GreenStar organizes labor; GreenStar decides how it participates in NYCN.
+NYCN is a federation (institutional spec lives in the partner NYCN repo). GreenStar Cooperative is one of its sovereign members. NYCN does not decide how GreenStar organizes labor; GreenStar decides how it participates in NYCN.
 
 ### Subsidiarity as Doctrine
 
@@ -590,8 +590,7 @@ The following items are *not* authorized for implementation here. They are expli
 - `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md` — Authoritative routing between ICN platform and institution packages.
 - `docs/architecture/CELLS_AND_SCOPES.md` — Scope primitives at the substrate layer.
 - `docs/design/ICN_VISUAL_SYSTEM.md` — Visual doctrine; human participation, scope-aware membership, proof-backed coordination.
-- `docs/strategy/NYCN-Repo-Architecture-Spec.md` — Repo-shaped NYCN institutional spec.
-- `docs/strategy/NYCN-Institutional-Design.md` — NYCN-as-native-institution design (with 2026-04-15 correction to layered ontology).
+- Partner NYCN repo (`InterCooperative-Network/nycn`) — NYCN-as-native-institution design and repo-shaped institutional spec (with the 2026-04-15 layered-ontology correction).
 - `docs/strategy/ADR-001-What-ICN-Is.md` — ADR on ICN's definition.
 - `docs/adr/ADR-0014-constitutional-object-model.md` — Typed authority model (`AuthorityClass`, `AuthorityGrant`, `TypedScope`, `Mandate`).
 - `docs/mobile/icn-mobile-ux-spec-v1.md` — Current mobile UX spec.

@@ -365,7 +365,4 @@ Every decision, vote, and financial event is recorded with full provenance. The 
 
 ## Reference: NYCN as Worked Example
 
-The NYCN federation is the reference implementation of this guide. See:
-
-- NYCN Institutional Strategy — Why NYCN lives on ICN
-- NYCN Institutional Design — Full entity tree, governance model, and ICN primitive mapping
+The NYCN federation is the reference implementation of this guide. The partner-specific institutional strategy, entity tree, governance model, and ICN primitive mapping live in the partner NYCN repo (`InterCooperative-Network/nycn`).
