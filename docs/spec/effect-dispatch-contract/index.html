@@ -1,0 +1,584 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Effect Dispatch Contract | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>effect dispatch contract</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/effect-dispatch-contract.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Effect Dispatch Contract</h1>
+<blockquote>
+<p><strong>Status: spec, work-in-progress.</strong> This document names the end-to-end behavior contract for turning an accepted governance decision into bounded operational effects with receipts. It harmonizes existing types and ADRs (ADR-0014, ADR-0019, ADR-0025, ADR-0026, ADR-0027, ADR-0030, ADR-0031) into one chain. Clauses that depend on schema fields or kernel behavior that have not yet landed are split into a &quot;current contract&quot; half and a &quot;future schema work&quot; half, marked explicitly per stage. The PR introducing this doc advances #1797 without closing it.</p>
+</blockquote>
+<h2>Purpose</h2>
+<p>Governance acceptance is necessary but not sufficient. Without a written contract for what happens after acceptance, every dispatch path drifts in isolation — and acceptance becomes documented consent without operational consequence.</p>
+<p>This spec answers a single question:</p>
+<blockquote>
+<p>Once a proposal is accepted, what is the contract for turning the decision into bounded effects, with provable receipts, while preserving the meaning firewall?</p>
+</blockquote>
+<p>The constraint:</p>
+<blockquote>
+<p>Governance authorizes. CCL expresses adopted rules. The runtime executes bounded effects. Receipts prove transitions. The kernel never understands meaning.</p>
+</blockquote>
+<p>This document does not invent new primitives. The repository already holds most of the pieces — <code>EffectManifest</code>, <code>Mandate</code>, <code>KernelEffect</code>, <code>InstitutionalEffectRecord</code>, <code>EffectDispatchEvidence</code>, <code>GovernanceDecisionReceipt</code>. The job here is to name the contract those pieces collectively implement, surface the seams that are not yet written down, and identify the first safe runtime slice.</p>
+<h2>What this spec is not</h2>
+<ul>
+<li>Not implementation. No code or schema lands here.</li>
+<li>Not authority to expand the supported proposal-class set beyond what <code>apps/governance/src/grant_minting.rs</code> already mints (ADR-0019&#39;s conservative-broadening invariants stand unchanged).</li>
+<li>Not a redefinition of any existing ADR. Where this spec describes ADR-0014/0019/0025/0026/0030/0031 behavior, the ADRs remain canonical for their respective decisions.</li>
+<li>Not authorization to gate kernel dispatch on mandates. Per ADR-0019, that is a separate future decision.</li>
+<li>Not a federation mandate-recognition contract. Per ADR-0019, also separate.</li>
+<li>Not a CCL grammar specification. CCL hook points are named here; CCL syntax and adoption live in the (forthcoming) CCL policy registry spec (#1817).</li>
+<li>Not closure of #1797. The PR introducing this doc uses <code>Refs:</code>; closure is left for separate review against the issue&#39;s six acceptance criteria.</li>
+</ul>
+<h2>The dispatch chain</h2>
+<p>Every legitimate effect of an accepted proposal moves through five named stages. Each stage produces a durable artifact. Skipping a stage breaks the chain.</p>
+<pre><code class="language-text">Stage 1: Decision recording          → GovernanceDecisionReceipt   (ADR-0026 Layer 1)
+Stage 2: Mandate minting             → Mandate + zero-or-more AuthorityGrants  (ADR-0014, ADR-0019)
+Stage 3: Effect plan                 → EffectManifest              (deterministic; manifest_hash)
+Stage 4: Effect dispatch             → KernelEffect per target subsystem
+Stage 5: Application + evidence      → EffectOutcome + receipt_ref → InstitutionalEffectRecord + EffectDispatchEvidence
+</code></pre>
+<p>The chain is sequential. Stage N cannot begin without the artifact from Stage N-1.</p>
+<h3>The chain inside the civic loop</h3>
+<p>The chain is the substrate-side half of one segment of the civic loop named in <a href="/docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL">`../architecture/ICN_INTEGRATED_SYSTEM_MODEL.md`</a>. Specifically: it covers <code>authorized action → CCL/runtime evaluation → storage/compute/governance/economic transition → receipt</code>. The stages before (identity, standing, authority, action card) and after (sync, federation, member shell, challenge/repair) sit outside this spec but are cross-linked.</p>
+<h2>Canonical objects (already implemented)</h2>
+<p>The contract uses the following types, all of which exist in the repository today. This spec does not redefine them.</p>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>Crate / File</th>
+<th>Purpose</th>
+<th>Provenance</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GovernanceDecisionReceipt</code></td>
+<td><code>icn-governance/src/proof.rs</code></td>
+<td>Signed, persisted proof a decision was reached under canonical process. Keyed by <code>proposal_id</code>; carries <code>decision_hash</code>.</td>
+<td>ADR-0026 Layer 1</td>
+</tr>
+<tr>
+<td><code>Mandate</code></td>
+<td><code>icn-governance/src/mandate.rs</code></td>
+<td>Bounded institutional authorization issued per decision (or per charter clause). First-class institutional-memory record.</td>
+<td>ADR-0014</td>
+</tr>
+<tr>
+<td><code>AuthorityGrant</code> / <code>AuthorityClass</code> / <code>TypedScope</code></td>
+<td><code>icn-governance/src/authority.rs</code></td>
+<td>The grant the mandate composes (or <code>new_pending_grants</code> if the seam cannot truthfully derive one).</td>
+<td>ADR-0014, ADR-0019</td>
+</tr>
+<tr>
+<td><code>EffectManifest</code></td>
+<td><code>icn-governance/src/effect_manifest.rs</code></td>
+<td>Normalized, deterministic, hashable description of governance mutations. Versioned. Carries capability/economic/membership/protocol effects.</td>
+<td>(intrinsic; referenced by ADR-0014 Implementation Update)</td>
+</tr>
+<tr>
+<td><code>KernelEffect</code></td>
+<td><code>icn-kernel-api/src/effects.rs</code></td>
+<td>Aggregate kernel-safe effect enum (Treasury / Membership / Protocol / Control / Federation / Dispute / Resource / SDIS / NoOp). Primitive-only.</td>
+<td>(intrinsic; meaning-firewall contract)</td>
+</tr>
+<tr>
+<td><code>EffectOutcome</code></td>
+<td><code>icn-kernel-api/src/governance.rs</code> (re-exported)</td>
+<td>Result class returned by an executor: <code>Applied</code>, <code>NoOp</code>, <code>Partial</code>, <code>Failed</code>.</td>
+<td>(intrinsic)</td>
+</tr>
+<tr>
+<td><code>InstitutionalEffectRecord</code></td>
+<td><code>apps/governance/src/institutional_effect.rs</code></td>
+<td>Persisted artifact of the translated effect at acceptance time. Keyed by <code>record_id</code>; indexed by <code>proposal_id</code>; carries <code>decision_hash</code>.</td>
+<td>(intrinsic; ADR-0026 Layer 2 placement)</td>
+</tr>
+<tr>
+<td><code>EffectDispatchEvidence</code></td>
+<td><code>apps/governance/src/dispatch_evidence.rs</code></td>
+<td>Append-only log of downstream subsystem reporting back synchronously, with <code>EffectOutcome</code> and opaque <code>receipt_ref</code>.</td>
+<td>(intrinsic)</td>
+</tr>
+<tr>
+<td><code>EffectRecord</code> (proposed)</td>
+<td>per ADR-0025 (no crate yet)</td>
+<td>Closed-taxonomy institutional outcome record (<code>RoleAssigned</code>, <code>AllocationMade</code>, <code>EffectReversed</code>, …). Spec-stage.</td>
+<td>ADR-0025 (proposed)</td>
+</tr>
+</tbody></table>
+<p>The contract glues these objects into one chain.</p>
+<h2>Stage 1: Decision recording</h2>
+<p><strong>Input:</strong> an accepted proposal at the terminal state of the governance state machine (per <a href="/docs/architecture/GOVERNANCE_STATE_MACHINE">`../architecture/GOVERNANCE_STATE_MACHINE.md`</a>).</p>
+<p><strong>Action:</strong> the governance app records the decision as a <code>GovernanceDecisionReceipt</code> (<code>icn-governance/src/proof.rs</code>). The receipt anchors the canonical <code>decision_hash</code>; it is the institutional-memory record that the decision occurred. The receipt itself is not the signature carrier — signatures live on the companion <code>GovernanceProof</code> artifact, and per-attester signatures live on <code>GovernanceDecisionAttestation</code>. The receipt and its proof / attestation evidence are persisted in the gateway receipt store together.</p>
+<p><strong>Output:</strong> a content-addressed <code>decision_hash</code>. This hash is the load-bearing identifier for the rest of the chain.</p>
+<p><strong>Invariants:</strong></p>
+<ul>
+<li>Exactly one <code>GovernanceDecisionReceipt</code> per accepted proposal.</li>
+<li>Authenticity is established by the companion <code>GovernanceProof</code> (and, where applicable, <code>GovernanceDecisionAttestation</code>). A receipt without a verifiable proof is institutional memory of a decision the system cannot vouch for; the chain MUST surface that state honestly rather than silently treat the receipt as authoritative.</li>
+<li>The receipt is immutable. Subsequent challenge/reversal does not edit the receipt; it produces a separate decision and a separate counter-effect (see Stage 5 and &quot;Challenge / reversal / counter-receipt&quot; below).</li>
+<li><code>decision_hash</code> is the canonical key the rest of the chain references. No stage may reference a proposal without its decision hash.</li>
+</ul>
+<h2>Stage 2: Mandate minting</h2>
+<p><strong>Input:</strong> the accepted proposal&#39;s payload and the <code>GovernanceDecisionReceipt</code>.</p>
+<p><strong>Action:</strong> the seam in <code>apps/governance/src/grant_minting.rs</code> (ADR-0019) produces:</p>
+<ol>
+<li>Zero or more <code>AuthorityGrant</code>s — minted only when the payload truthfully names grantee, class, and a time bound.</li>
+<li>Exactly one <code>Mandate</code> — composing those grants if any, or falling through to <code>Mandate::new_pending_grants</code> when the seam cannot derive a coherent grant set.</li>
+</ol>
+<p><strong>Output:</strong> a persisted <code>Mandate</code>, keyed to the decision.</p>
+<p><strong>Invariants (ADR-0019, restated here for the chain&#39;s contract):</strong></p>
+<ul>
+<li><strong>No fabricated grants.</strong> If the payload does not directly name grantee + class + time bound, the mint returns the empty set for that proposal.</li>
+<li><strong><code>new_pending_grants</code> is the truthful fall-through.</strong> The mandate exists; the grants are explicitly pending. This is more honest than a &quot;synthetic grant for everything&quot; record.</li>
+<li><strong>The grantor is the sovereign entity.</strong> The platform, runtime, gateway, and shared services are never grantors.</li>
+<li><strong>The supported proposal-class set is small on purpose.</strong> Today: steward-appointment and steward-reconfirmation only. Expansion is by ADR amendment; silent broadening is forbidden.</li>
+</ul>
+<p><strong>Non-enforcement (ADR-0019):</strong> the kernel dispatcher does not consult mandates as a precondition for <code>KernelEffect</code> execution. Mandates are institutional memory at this layer. Future enforcement is a separate ADR.</p>
+<h2>Stage 3: Effect plan (<code>EffectManifest</code>)</h2>
+<p><strong>Input:</strong> the <code>Mandate</code>, the accepted payload, and the baseline state snapshot.</p>
+<p><strong>Action:</strong> the governance app translates the payload into a deterministic <code>EffectManifest</code>. Translation is pure: same payload + same baseline → same manifest, byte-equal.</p>
+<p><strong>Output:</strong> an <code>EffectManifest</code> containing zero or more typed effects (capability, economic, membership, protocol) plus <code>change_hash</code>, <code>baseline_snapshot_hash</code>, <code>ratification_block</code>, <code>activation_block</code>, and <code>manifest_hash</code>.</p>
+<p><strong>Invariants:</strong></p>
+<ul>
+<li>Determinism is mandatory. The manifest must be replayable: re-running translation on the same payload and baseline must produce the same <code>manifest_hash</code>.</li>
+<li>The <code>EffectManifest</code> is the dispatch unit. Stage 4 dispatches every effect in the manifest, in order, against the named targets.</li>
+<li>The manifest is content-addressed. <code>manifest_hash</code> together with <code>decision_hash</code> and <code>effect_index</code> is the idempotency key (see &quot;Idempotency&quot; below).</li>
+<li>A manifest with zero effects is valid. Text proposals, attestation-only acceptances, and process-only transitions all produce empty or <code>NoOp</code>-only manifests, and that is the correct shape.</li>
+<li>The manifest is the seam where domain semantics end. Capability, economic, membership, protocol effects are primitive-only by ADR-0014. Domain meaning lives in the translation, not in the manifest.</li>
+</ul>
+<h2>Stage 4: Effect dispatch</h2>
+<p><strong>Input:</strong> the <code>EffectManifest</code>.</p>
+<p><strong>Action:</strong> the governance app converts each manifest effect into a <code>KernelEffect</code> and dispatches it to the target subsystem (treasury, membership, protocol, control, federation, dispute, resource, or SDIS executor). The kernel executes the effect under the constraints it already enforces; it does not consult mandates or domain types.</p>
+<p><strong>Output:</strong> for each dispatched effect, an <code>EffectOutcome</code> (<code>Applied</code>, <code>NoOp</code>, <code>Partial</code>, <code>Failed</code>) plus an opaque <code>receipt_ref</code> from the downstream subsystem.</p>
+<p><strong>Invariants:</strong></p>
+<ul>
+<li><strong>Kernel sees only <code>KernelEffect</code>.</strong> No domain crate is imported by kernel crates. No pattern-matching on custom keys. This is the meaning firewall.</li>
+<li><strong>Dispatch is per-effect, not per-manifest.</strong> Each <code>KernelEffect</code> returns its own outcome. The manifest succeeds as a unit only if every dispatched effect returns <code>Applied</code> or <code>NoOp</code>.</li>
+<li><strong>Dispatch is synchronous from the governance app&#39;s perspective.</strong> &quot;Evidenced&quot; means the downstream subsystem reported back synchronously; it does not mean the action is externally observable or that downstream side effects are durable beyond what the subsystem itself guarantees.</li>
+<li><strong>Executors do not interpret governance meaning.</strong> A treasury executor sees an allocation; it does not see &quot;this allocation came from a steward-reconfirmation proposal.&quot;</li>
+</ul>
+<h2>Stage 5: Application + evidence</h2>
+<p><strong>Input:</strong> the dispatched effect and the subsystem&#39;s <code>EffectOutcome</code> + <code>receipt_ref</code>.</p>
+<p><strong>Action:</strong> the governance app persists:</p>
+<ol>
+<li>One <code>InstitutionalEffectRecord</code> per accepted proposal that translates to a structured effect (keyed by <code>record_id</code>, indexed by <code>proposal_id</code>, carrying <code>decision_hash</code>).</li>
+<li>One <code>EffectDispatchEvidence</code> entry per dispatched effect (keyed by <code>evidence_id</code>, attached to the <code>effect_record_id</code>, carrying <code>subsystem</code>, <code>receipt_ref</code>, <code>success</code>, <code>EffectOutcome</code>).</li>
+<li>(Forward direction, per ADR-0025) one <code>EffectRecord</code> per institutional outcome inside the closed-taxonomy schema (<code>RoleAssigned</code>, <code>AllocationMade</code>, <code>EffectReversed</code>, etc.) — pending the implementation tranche named by that ADR.</li>
+</ol>
+<p><strong>Output:</strong> durable institutional memory keyed back to <code>decision_hash</code>. The chain is complete.</p>
+<p><strong>Invariants:</strong></p>
+<ul>
+<li>The <code>decision → mandate → manifest → effect → receipt</code> chain is auditable post-restart. Any consumer holding a <code>decision_hash</code> can walk forward to every effect and back to the originating decision.</li>
+<li>Reversal does not delete. Reversal is a counter-effect (<code>EffectReversed</code>, ADR-0025) that emits a fresh record pointing at the original.</li>
+<li><code>Partial</code> outcomes are first-class. They are not silently retried.</li>
+<li>Records without dispatch evidence are valid states. ADR-0019&#39;s <code>Mandate::new_pending_grants</code> path, and dispatch paths whose downstream hook returns <code>()</code> today, produce records that are <code>emitted_only</code> (per <code>EffectDispatchEvidence</code> module doc). The chain admits this state; it does not pretend otherwise.</li>
+</ul>
+<h2>Dry-run / preview</h2>
+<p>A proposal in deliberation may render a preview manifest. Preview is what authors and reviewers see before they accept.</p>
+<p><strong>Contract:</strong></p>
+<ul>
+<li>Preview is a pure derivation from <code>(draft_payload, baseline_snapshot)</code>. It produces a candidate <code>EffectManifest</code> and a candidate effect list rendered in plain language.</li>
+<li>Preview must not mint mandates, must not dispatch, must not emit institutional receipts. Specifically: no <code>GovernanceDecisionReceipt</code>, no <code>Mandate</code>, no <code>EffectDispatchEvidence</code>, no <code>InstitutionalEffectRecord</code> is written from a preview.</li>
+<li>Preview output is advisory. If the preview is shown to members, it must carry a label indicating it is a preview and that no transition has occurred.</li>
+<li>Preview rendering belongs on member-facing surfaces (the member shell, #1818) and operator surfaces (the steward cockpit, #1795). Both must be able to show the same preview from the same input.</li>
+<li>Preview must be content-equivalent to the live manifest the system would produce if the proposal were accepted at the same baseline. If preview and live diverge for the same input, that is a bug.</li>
+</ul>
+<p>A non-goal: preview is not authorization to dispatch. A reviewer who likes the preview still has to accept the proposal through the governance state machine.</p>
+<h2>Idempotency</h2>
+<p>The doctrine: a re-dispatch of the same effect must not produce a second mutation. How strictly that can be enforced today depends on what the current schema can store. This section is split into the current contract (using fields that exist) and forward schema work (using fields that do not yet exist).</p>
+<h3>Current contract</h3>
+<p>Today&#39;s persisted records carry enough institutional memory to detect duplicate dispatch at the institution-level granularity. The contract is:</p>
+<ul>
+<li>The governance app SHOULD short-circuit before dispatching to the subsystem when an <code>InstitutionalEffectRecord</code> for the same <code>(proposal_id, effect_kind)</code> already exists with <code>decision_hash</code> populated. This blocks the obvious replay-on-restart class of duplicate dispatch using <code>InstitutionalEffectRecord</code>&#39;s existing <code>proposal_id</code> index and <code>decision_hash</code> field.</li>
+<li>Where the subsystem itself is naturally idempotent (steward registration by content-addressed <code>StewardId</code>, charter deploy by <code>decision_hash</code> keying, etc.), the governance-app short-circuit is a defense-in-depth check, not the sole guard.</li>
+<li>Where the subsystem is not naturally idempotent, the chain SHOULD prefer to dispatch once and record <code>Partial</code> or <code>Failed</code> on retry rather than risk a second mutation. <code>EffectDispatchEvidence</code>&#39;s existing <code>success</code> field plus <code>EffectOutcome</code> is the surface that surfaces this state.</li>
+</ul>
+<p>This contract is observably enforceable with current schema. It is <strong>not</strong> a kernel-side gate; per ADR-0019, kernel dispatch does not consult mandates or institutional effect records.</p>
+<h3>Future schema work (deferred)</h3>
+<p>The stronger idempotency contract — keying every dispatch by a stable tuple and recording per-effect idempotency intent in the manifest — requires schema fields that do not yet exist:</p>
+<ul>
+<li>A stable idempotency key of shape <code>(decision_hash, manifest_hash, effect_index)</code>. <code>decision_hash</code> exists; <code>manifest_hash</code> exists on <code>EffectManifest</code>; <code>effect_index</code> and a per-effect persisted record keyed by that tuple do not.</li>
+<li>A retry-policy field on <code>EffectManifest</code> (or on per-effect entries within it) naming whether retry is allowed and under what conditions. No such field exists today.</li>
+<li>A <code>not-idempotent</code> flag or equivalent on <code>EffectDispatchEvidence</code> (or the subsystem&#39;s own record) so consumers can detect subsystems whose internal contract is weaker than the dispatcher&#39;s expectation. The current <code>EffectDispatchEvidence</code> carries <code>subsystem</code>, <code>receipt_ref</code>, <code>success</code>, and <code>EffectOutcome</code>; no idempotency-intent field exists.</li>
+</ul>
+<p>These fields are net-new schema. This PR does not introduce schema changes, and #1797 is a spec PR not an implementation PR. The stronger contract is intentionally left as forward-direction work, to be filed as one or more follow-up implementation issues only after this spec is accepted (per #1797&#39;s sixth acceptance criterion).</p>
+<p>When the schema lands, the contract becomes: subsystems MUST be idempotent on <code>(decision_hash, manifest_hash, effect_index)</code>; re-dispatch MUST return the prior outcome; the governance app MUST short-circuit on this key before any subsystem call. The behavioral doctrine does not change — only its enforceability widens.</p>
+<h3>What the contract observes today</h3>
+<p>Regardless of schema state: the contract observes idempotency at the institutional-memory boundary. Records and evidence already in storage make duplicate dispatch detectable in the obvious cases. Where they do not, the chain MUST surface the gap honestly through evidence rather than paper over it.</p>
+<h2>Partial failure semantics</h2>
+<p>The four-valued <code>EffectOutcome</code> makes partial failure first-class:</p>
+<table>
+<thead>
+<tr>
+<th>Outcome</th>
+<th>Meaning</th>
+<th>What the chain does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Applied</code></td>
+<td>The subsystem mutated state successfully.</td>
+<td>Persist evidence; chain proceeds.</td>
+</tr>
+<tr>
+<td><code>NoOp</code></td>
+<td>The dispatch was legal but produced no state change (e.g., a revoke on an already-revoked record).</td>
+<td>Persist evidence; chain proceeds.</td>
+</tr>
+<tr>
+<td><code>Partial</code></td>
+<td>Real mutation occurred; a later step inside the subsystem failed.</td>
+<td>Persist evidence with <code>success=false</code>. The mandate is marked partially executed. The chain does NOT auto-retry. The institution must reach a decision about closure.</td>
+</tr>
+<tr>
+<td><code>Failed</code></td>
+<td>No mutation occurred; the subsystem rejected the effect.</td>
+<td>Persist evidence with <code>success=false</code>. The manifest may be abandoned, retried under a fresh manifest, or escalated as a challenge.</td>
+</tr>
+</tbody></table>
+<p><strong>Contract:</strong></p>
+<ul>
+<li>A <code>Partial</code> outcome is institutional information. It tells members and stewards that the system is in a state the institution did not fully authorize. The member shell and steward cockpit must surface it.</li>
+<li>A <code>Partial</code> outcome must not be silently retried. The same idempotency key would either succeed (no-op-ing the partial mutation) or compound the partial state. Either way, the next decision must be human.</li>
+<li>Reversal of a <code>Partial</code> outcome is a separate decision. It produces a fresh <code>GovernanceDecisionReceipt</code>, a fresh <code>Mandate</code>, and a reversal manifest. See &quot;Challenge / reversal / counter-receipt.&quot;</li>
+</ul>
+<h2>Challenge / reversal / counter-receipt</h2>
+<p>An accepted decision can be challenged. The challenge is itself a governance act.</p>
+<p><strong>Contract:</strong></p>
+<ul>
+<li>A challenge proposal references the original <code>decision_hash</code> and proposes one of: full reversal, partial reversal of named effects, or a corrective superseding decision.</li>
+<li>If the challenge proposal is itself accepted, it produces:<ol>
+<li>A new <code>GovernanceDecisionReceipt</code> (the challenge&#39;s own decision).</li>
+<li>A new <code>Mandate</code> (the reversal mandate).</li>
+<li>A new <code>EffectManifest</code> whose effects are counter-effects keyed by the original <code>decision_hash</code> and <code>effect_record_id</code>.</li>
+<li>New <code>InstitutionalEffectRecord</code> and <code>EffectDispatchEvidence</code> entries for the counter-effects.</li>
+<li>(Forward direction, per ADR-0025) a fresh <code>EffectRecord</code> of kind <code>EffectReversed</code> pointing at the original record.</li>
+</ol>
+</li>
+<li>Counter-effects do not delete original records. They emit reversal records. The chain is append-only; audit logs do not lie about history.</li>
+<li>A <code>Partial</code> outcome on the original may produce a counter-effect that completes the failed step, reverses the successful step, or both. The reversal manifest names each counter-effect explicitly.</li>
+</ul>
+<p>This is the same chain, applied to itself. The reversal proposal is not privileged. It runs through the governance state machine like any other proposal.</p>
+<h2>CCL hook points</h2>
+<p>CCL (the executable institutional rule layer) participates in the dispatch chain at three named points. CCL never runs inside the kernel.</p>
+<p><strong>Stage 2 hook — Mandate composition:</strong></p>
+<ul>
+<li>A CCL evaluator may inform whether the seam mints <code>AuthorityGrant</code>s or falls through to <code>Mandate::new_pending_grants</code>. The evaluator reads the accepted payload and the current <code>DomainPolicy</code> and returns a structured grant set (or empty).</li>
+<li>The seam&#39;s conservative-broadening invariants (ADR-0019) still apply. A CCL evaluator that proposes a grant the payload does not name MUST be ignored. CCL informs; it does not fabricate.</li>
+</ul>
+<p><strong>Stage 3 hook — Effect plan generation:</strong></p>
+<ul>
+<li>For proposal kinds CCL governs, the evaluator may produce a structured <code>EffectManifest</code> (or the inputs from which the manifest is derived). This is where CCL &quot;produces effect plans, not unilateral mutations&quot; (per <a href="/docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL">`../architecture/ICN_INTEGRATED_SYSTEM_MODEL.md`</a>, &quot;CCL — the executable institutional rule layer&quot;).</li>
+<li>Determinism is mandatory: same CCL document, same payload, same baseline → same manifest. Non-deterministic CCL output is a bug.</li>
+</ul>
+<p><strong>Stage 4 (no hook):</strong></p>
+<ul>
+<li>CCL does not run inside the kernel. The kernel enforces constraints; the constraint set was already produced by a policy oracle earlier in the chain (per <a href="/docs/architecture/KERNEL_APP_SEPARATION">`../architecture/KERNEL_APP_SEPARATION.md`</a>). CCL output is never executed in the kernel.</li>
+</ul>
+<p><strong>Contract:</strong></p>
+<ul>
+<li>CCL must not bypass governance acceptance. A CCL evaluator output that contradicts the accepted decision (or runs without one) is a bug.</li>
+<li>CCL is governed itself. Adopted versions are bound to a domain by governance; unadopted versions are inert. The CCL policy registry and versioning contract are specified separately under #1817.</li>
+</ul>
+<h2>Privacy and redaction</h2>
+<p>Effects touching scoped vaults or private overlays carry additional contract.</p>
+<p><strong>Contract:</strong></p>
+<ul>
+<li>Every dispatched effect MUST carry an explicit disclosure policy. The policy names which fields are publicly readable, which are scope-restricted, and which are vault-stored.</li>
+<li><code>InstitutionalEffectRecord.payload</code> stores only the public-by-policy fields plus pointers to vault entries for restricted material.</li>
+<li>Vault access produces its own receipt. Disclosure is a governed event; reading is not free.</li>
+<li>Backups inherit the disclosure policy of the source (see &quot;Backup, redundancy, recovery, archive&quot; in the spine doc, and the forthcoming backup spec under #1816). A backup that crosses a locality boundary violates the same policy the source enforces.</li>
+</ul>
+<p>Cross-link: #1792 (private data disclosure boundary), #1767 (encrypted distributed private-overlay storage).</p>
+<h2>Action-card trigger rules</h2>
+<p>Some effect outcomes imply action cards for affected DIDs.</p>
+<p><strong>Contract:</strong></p>
+<ul>
+<li>Action cards are derived views, not stored entities (ADR-0027). Derivation reads the holder&#39;s standing plus <code>InstitutionalEffectRecord</code> plus <code>EffectDispatchEvidence</code> plus pending governance objects.</li>
+<li>Effect kinds that imply action cards include (provisional, package-specific names live in packages):<ul>
+<li><code>RoleAssigned</code> → an action card for the assigned DID confirming the role and naming next steps.</li>
+<li><code>MembershipAdmitted</code> → an action card for the new member with orientation steps.</li>
+<li><code>AllocationMade</code> → an action card for the recipient confirming the allocation and naming any acknowledgement step.</li>
+<li><code>SanctionIssued</code> / <code>RepairAgreed</code> (placeholder per ADR-0029) → action cards for the affected parties surfacing the repair path.</li>
+</ul>
+</li>
+<li>Action-card derivation rules belong in the gateway; the contract here is that the rules read effect records, never raw kernel state.</li>
+</ul>
+<p>Cross-link: #1608, #1646, #1711, #1712, #1818 (member shell).</p>
+<h2>Package boundary</h2>
+<p>ICN core knows generic effect families. Institution packages carry local vocabulary.</p>
+<p><strong>Contract:</strong></p>
+<ul>
+<li>ICN core&#39;s effect families are the closed taxonomy named by <code>KernelEffect</code> (Treasury / Membership / Protocol / Control / Federation / Dispute / Resource / SDIS / NoOp) and the proposed <code>EffectRecord</code> kinds (ADR-0025).</li>
+<li>Package payloads (e.g. a federation&#39;s domain-specific proposal kinds) MUST translate to generic kernel effects at the governance-app boundary BEFORE dispatch.</li>
+<li>Kernel never sees package nouns. Cross-link <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`../architecture/INSTITUTION_PACKAGE_BOUNDARY.md`</a>.</li>
+<li>Where a package needs a new effect family, the right path is to amend the generic taxonomy (ADR), not to leak package nouns into core.</li>
+</ul>
+<h2>First safe runtime dogfood slice</h2>
+<p>The acceptance criterion in #1797 calls out the first safe runtime dogfood slice. The candidate is #1748 — the institutional process substrate&#39;s <code>ProcessTransitionReceipt</code> flow.</p>
+<p><strong>Why this slice first:</strong></p>
+<ul>
+<li>The process substrate produces transition receipts that already align with Stage 1 (decision recording) and Stage 5 (application + evidence) of this contract.</li>
+<li>A process-transition acceptance can produce an empty <code>EffectManifest</code> (no domain effects) or a <code>NoOp</code>-only manifest. The dispatch chain runs end-to-end with no kernel-side mutation required.</li>
+<li>The <code>Mandate</code> for a non-grant-minting acceptance falls through to <code>Mandate::new_pending_grants</code> (ADR-0019). The chain exercises the truthful fall-through, not the synthetic-grant path.</li>
+<li>The chain exercises preview, idempotency on replay, and evidence persistence without depending on kernel mandate enforcement (which is deferred per ADR-0019).</li>
+</ul>
+<p><strong>What this slice does not require:</strong></p>
+<ul>
+<li>It does not require kernel-side gating on mandates (deferred, per ADR-0019).</li>
+<li>It does not require expansion of the supported proposal-class set for grant minting (ADR-0019&#39;s conservative-broadening invariants stand).</li>
+<li>It does not require ADR-0025&#39;s <code>EffectRecord</code> implementation to land before the slice runs. The chain works with <code>InstitutionalEffectRecord</code> + <code>EffectDispatchEvidence</code> as today.</li>
+<li>It does not require new ADRs.</li>
+</ul>
+<p><strong>What this slice teaches:</strong></p>
+<ul>
+<li>Whether the contract&#39;s stage boundaries hold against a real flow.</li>
+<li>Whether dispatch evidence + records together provide enough institutional memory for the member shell and steward cockpit to render legibly.</li>
+<li>Where partial-outcome handling is under-specified once a real subsystem returns <code>Partial</code>.</li>
+</ul>
+<p>Subsequent slices (steward appointment, allocation, capability grants, etc.) layer in more effect kinds. Each new slice is its own implementation tranche; this spec does not authorize the order.</p>
+<h2>Receipt class summary</h2>
+<p>The chain emits receipts at multiple layers, all of which are already specified by ADR-0026 except where noted.</p>
+<table>
+<thead>
+<tr>
+<th>Receipt</th>
+<th>Where emitted</th>
+<th>Provenance</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GovernanceDecisionReceipt</code> (Layer 1)</td>
+<td>Stage 1</td>
+<td>ADR-0026 §1</td>
+</tr>
+<tr>
+<td><code>Mandate</code> (institutional-memory record, not strictly a receipt)</td>
+<td>Stage 2</td>
+<td>ADR-0014, ADR-0019</td>
+</tr>
+<tr>
+<td><code>AuthorityGrant</code> (audit record)</td>
+<td>Stage 2</td>
+<td>ADR-0014, ADR-0019</td>
+</tr>
+<tr>
+<td><code>ArtifactReceipt</code> (Layer 2 wrapper binding L1 to institutional context)</td>
+<td>Stage 5</td>
+<td>ADR-0026 §2</td>
+</tr>
+<tr>
+<td><code>InstitutionalEffectRecord</code> (governance-app artifact)</td>
+<td>Stage 5</td>
+<td>(intrinsic; sits at Layer 2 placement)</td>
+</tr>
+<tr>
+<td><code>EffectDispatchEvidence</code> (append-only dispatch log)</td>
+<td>Stage 5</td>
+<td>(intrinsic)</td>
+</tr>
+<tr>
+<td><code>EffectRecord</code> (closed-taxonomy institutional outcome)</td>
+<td>Stage 5 (forward direction)</td>
+<td>ADR-0025 (proposed)</td>
+</tr>
+<tr>
+<td><code>FederationProvenance</code> (Layer 3, cross-coop)</td>
+<td>post-Stage 5; out of scope here</td>
+<td>ADR-0026 §3</td>
+</tr>
+<tr>
+<td><code>ProvenanceQuery</code> (Layer 4 surface)</td>
+<td>not yet implemented; tracked under #1438</td>
+<td>ADR-0026 §4</td>
+</tr>
+</tbody></table>
+<p>This spec introduces no new receipt class. It names which classes each stage emits.</p>
+<h2>Open questions and deferred decisions</h2>
+<p>The following are explicitly out of scope here. Each is named so future readers know where the contract stops.</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Deferred to</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>When (if ever) the kernel dispatcher consults <code>Mandate</code>s as a gate.</td>
+<td>ADR-0019 &quot;Non-decisions&quot;; future ADR.</td>
+</tr>
+<tr>
+<td>Kernel <code>Capability</code> issuance from <code>AuthorityGrant</code>s (per ADR-0014&#39;s deferred tranche).</td>
+<td>ADR-0014; future ADR.</td>
+</tr>
+<tr>
+<td>Federation-side mandate recognition.</td>
+<td>ADR-0019; future ADR.</td>
+</tr>
+<tr>
+<td>Authority revocation end-to-end.</td>
+<td>Partial in code (<code>grant_minting.rs:343</code>); future ADR.</td>
+</tr>
+<tr>
+<td><code>ProvenanceQuery</code> (Layer 4) surface.</td>
+<td>ADR-0026 §4; tracked under #1438.</td>
+</tr>
+<tr>
+<td><code>EffectRecord</code> Rust type + closed taxonomy implementation.</td>
+<td>ADR-0025 (proposed).</td>
+</tr>
+<tr>
+<td>CCL policy registry, versioning, and evaluator-selection contract.</td>
+<td>#1817.</td>
+</tr>
+<tr>
+<td>Backup, replication, recovery policy objects (incl. restore-test receipts).</td>
+<td>#1816.</td>
+</tr>
+<tr>
+<td><code>GovernedServiceBinding</code> / <code>WorkloadManifest</code> / <code>RuntimeProvider</code> model.</td>
+<td>#1815.</td>
+</tr>
+<tr>
+<td>Member shell version zero UX specification.</td>
+<td>#1818.</td>
+</tr>
+</tbody></table>
+<h2>Non-claims</h2>
+<ul>
+<li>Does not claim production readiness for any of the named stages.</li>
+<li>Does not claim kernel-side mandate enforcement; that remains deferred.</li>
+<li>Does not claim federation mandate recognition.</li>
+<li>Does not expand the supported proposal-class set for grant minting beyond ADR-0019.</li>
+<li>Does not introduce new ADR-0025 <code>EffectRecord</code> kinds.</li>
+<li>Does not specify CCL grammar.</li>
+<li>Does not define the backup, replication, or recovery policy objects.</li>
+<li>Does not by itself close #1797. The PR introducing this doc uses <code>Refs:</code>.</li>
+</ul>
+<h2>Related documents and issues</h2>
+<p>Architecture and spine:</p>
+<ul>
+<li><a href="/docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL">`../architecture/ICN_INTEGRATED_SYSTEM_MODEL.md`</a> — civic loop and the governance / effect-dispatch section.</li>
+<li><a href="/docs/architecture/KERNEL_APP_SEPARATION">`../architecture/KERNEL_APP_SEPARATION.md`</a> — meaning firewall.</li>
+<li><a href="/docs/architecture/GOVERNANCE_STATE_MACHINE">`../architecture/GOVERNANCE_STATE_MACHINE.md`</a> — proposal lifecycle.</li>
+<li><a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`../architecture/INSTITUTION_PACKAGE_BOUNDARY.md`</a> — generic shapes vs. package vocabulary.</li>
+</ul>
+<p>ADRs:</p>
+<ul>
+<li>ADR-0014 — Constitutional Object Model (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>).</li>
+<li>ADR-0019 — Authority Grant Minting and Mandate Persistence Seam.</li>
+<li>ADR-0025 — Institutional Effect Record Canonical Schema (proposed).</li>
+<li>ADR-0026 — Receipt and Provenance Proof Envelope.</li>
+<li>ADR-0027 — Action Card Contract.</li>
+<li>ADR-0029 — Conflict Resolution Object Model.</li>
+<li>ADR-0030 — Compute Workload Manifest and Authority Boundary.</li>
+<li>ADR-0031 — Commons Compute Admission and Settlement Policy.</li>
+</ul>
+<p>Issues:</p>
+<ul>
+<li>#1797 — accepted-proposal effect dispatch contract (this spec).</li>
+<li>#1793 — integrated cooperative operating model (parent of this work, merged via PR #1814).</li>
+<li>#1748 — institutional process substrate (first dogfood slice).</li>
+<li>#1817 — CCL policy registry / versioning / governance-effect hook contract.</li>
+<li>#1815 — <code>GovernedServiceBinding</code> / <code>WorkloadManifest</code> / <code>RuntimeProvider</code>.</li>
+<li>#1816 — backup, replication, recovery, archive policies.</li>
+<li>#1818 — member shell version zero.</li>
+<li>#1792 — private data disclosure boundary.</li>
+<li>#1767 — encrypted distributed private-overlay storage.</li>
+<li>#1646, #1711, #1712, #1608 — action-card source paths.</li>
+<li>#1438 — <code>ProvenanceQuery</code> Layer 4 surface.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
