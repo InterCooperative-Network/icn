@@ -1,0 +1,297 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-05-14 (storage durability policies spec) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>handoff 2026 05 14 storage durability policies</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/handoff-2026-05-14-storage-durability-policies.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-05-14 (storage durability policies spec)</h1>
+<h2>Session Goal</h2>
+<p>Define <code>StorageSpec</code>, <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, and <code>IntegrityPolicy</code> as design-level forward-direction policy objects so the storage-durability half of the operating model is precise enough for later schema, provider, and proof-loop work to be filed safely.</p>
+<h2>Decisive Test</h2>
+<p>Can a downstream implementer — looking only at this spec plus the canon it harmonizes with — name (1) what each of the six policy objects carries at design granularity, (2) how <code>StorageSpec</code> ties to the merged <code>GovernedServiceBinding</code> and <code>DomainPolicy</code>, (3) what the locality / privacy inheritance rule is and why it cannot be silently broadened, (4) what a restore-test receipt MUST record, (5) which authority class covers a restore of authoritative state? If yes, the spec has done its job.</p>
+<hr>
+<h2>Final State (Verified)</h2>
+<!-- TRUTH TYPE: Implementation truth — only facts confirmed by commands or code inspection -->
+
+<h3><code>main</code> HEAD</h3>
+<p><code>09331622d</code> — <code>docs(spec): define governed service binding, workload manifest, and runtime provider (#1822)</code> (merged earlier today).</p>
+<h3>Open PRs</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Branch</th>
+<th>State</th>
+<th>CI Status</th>
+<th>Blocker</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1823</td>
+<td><code>spec/storage-durability-policies</code></td>
+<td>OPEN</td>
+<td>All required checks passed on commit <code>e375687b3</code> (initial spec push). Two Copilot threads landed after the initial no-feedback polling window; a fix commit follows this handoff edit and must re-run CI before merge.</td>
+<td>Awaiting CI re-run on the Copilot fix commit, then mergeability re-check</td>
+</tr>
+<tr>
+<td>#1790</td>
+<td>dependabot (pilot-ui dev deps)</td>
+<td>OPEN</td>
+<td>n/a</td>
+<td>Out of session scope</td>
+</tr>
+<tr>
+<td>#1791</td>
+<td>dependabot (ts-sdk dev deps)</td>
+<td>OPEN</td>
+<td>n/a</td>
+<td>Out of session scope</td>
+</tr>
+</tbody></table>
+<h3>Branches</h3>
+<ul>
+<li><code>spec/storage-durability-policies</code> — pushed to origin. Last verified head before this fix: <code>e375687b3</code>. The head moves with each push; check <code>git rev-parse HEAD</code> on the branch after the next push for the current SHA.</li>
+<li>Local <code>main</code> synced to <code>09331622d</code> (unchanged this session).</li>
+</ul>
+<h3>Issues</h3>
+<ul>
+<li><code>#1816</code> — OPEN. This session writes the candidate spec doc. PR will use <code>Refs:</code>, not <code>Closes:</code>.</li>
+<li><code>#1815</code> — OPEN (your manual closure decision deferred; PR #1822 used <code>Refs:</code> not <code>Closes:</code>).</li>
+<li><code>#1767</code>, <code>#1792</code>, <code>#1798</code>, <code>#1799</code>, <code>#1801</code>, <code>#1818</code> — sibling storage / privacy / network / compute / mobile issues, all OPEN.</li>
+<li><code>#1797</code>, <code>#1793</code>, <code>#1817</code> — closed previously.</li>
+<li><code>#1794</code> — OPEN (deferred closure decision).</li>
+</ul>
+<hr>
+<h2>What Changed</h2>
+<!-- TRUTH TYPE: Execution truth — actions taken this session -->
+
+<h3>1. Spec doc drafted (<code>docs/spec/storage-durability-policies.md</code>, ~490 lines)</h3>
+<p>The doc:</p>
+<ul>
+<li><strong>Defines six policy objects at design granularity.</strong> <code>StorageSpec</code> (binding identifier, custody class, kernel <code>StorageClass</code>, <code>DataLocality</code>, privacy class, capacity, six policy references, export requirement, deletion expectation, receipt expectations). <code>BackupPolicy</code> (cadence class, target locality + custody, privacy inheritance, encryption / key custody, retention window, integrity check, restore-test cadence, authority, receipt classes). <code>ReplicationPolicy</code> (replica count class, placement constraints, anti-entropy expectation, divergence detection, repair authority, replica lifecycle authority, receipt classes). <code>RecoveryPolicy</code> (restore objective class — NOT SLA, restore authority, drill cadence, restore-target constraints, full / partial / point-in-time, challenge / reversal / audit, receipt classes). <code>ArchivePolicy</code> (long-term retention class, immutability expectation, access path, redaction, institutional hold, export, verification cadence, expiration authority, receipt classes). <code>IntegrityPolicy</code> (verification cadence, proof shape, repair path, relationships to replication and recovery and anti-entropy, receipt classes).</li>
+<li><strong>Maps the seven-class custody taxonomy</strong> (canonical store / service state / artifact-blob / volume-block / scoped vault / secret-key material / cache-derived) to the implemented kernel-level <code>StorageClass</code> (3 variants) verbatim. Per-class design expectations cover custody, locality, privacy, backup, replication, archive, restore authority, export, receipts.</li>
+<li><strong>Surfaces the drift honestly.</strong> The 7-class taxonomy (spine doc) and the 3-variant kernel enum (<code>icn/crates/icn-kernel-api/src/storage.rs</code> line 53) overlap but do not align 1:1. Reconciliation is deferred to a named follow-up; both stand today.</li>
+<li><strong>Restore-test receipts in their own section.</strong> What a drill is, what triggers, what constraints (no silent mutation of authoritative state), what the receipt records (source, target, authority, verification outcome, convergence time), what failure means (governance-relevant event surfaced in the steward cockpit), how it surfaces in the member shell.</li>
+<li><strong>The single load-bearing inheritance rule</strong> in §&quot;Locality and privacy inheritance&quot;, stated three ways: backups, replicas, archives, exports, and restore targets inherit the source&#39;s <code>DataLocality</code> and privacy / disclosure constraints; policy MAY narrow disclosure; policy MAY NOT broaden locality or disclosure without an explicit governance act.</li>
+<li><strong>Backup / export / restore authority</strong> mapped to ADR-0014 (<code>AuthorityClass</code>, <code>Mandate</code>) and the effect dispatch chain. Routine backup execution is operational; restore of authoritative state is governed; emergency authority is bounded, reviewable, receipt-backed.</li>
+<li><strong>Cross-links every sibling issue.</strong> <code>#1767</code> (encrypted private overlay), <code>#1792</code> (disclosure boundary), <code>#1798</code> (ArtifactRegistry / ScopedVault), <code>#1799</code> (anti-entropy proof loops), <code>#1801</code> (compute placement), <code>#1818</code> (member shell), <code>#1795</code> (steward cockpit). No duplication.</li>
+<li><strong>Sixteen-row failure / safety table.</strong> Each failure mode has a deterministic response. Cross-cutting rule: fail closed, surface honestly, never silently fall back.</li>
+<li><strong>Eleven open questions</strong> with named forward homes.</li>
+</ul>
+<h3>2. Registered the doc (<code>docs/registry.toml</code>, +13 lines before the <code>governed-service-binding.md</code> entry)</h3>
+<p>Same registry pattern as #1819 / #1820 / #1821 / #1822: <code>category = &quot;architecture&quot;</code>, <code>status = &quot;draft&quot;</code>, no <code>truth_class</code> / <code>role</code> overrides (lets the <code>docs/spec/</code> prefix default supply <code>truth_class = &quot;normative&quot;</code>, <code>role = &quot;spec&quot;</code>). Carries description, last_updated / last_reviewed, owner, audiences, domain_tags, depends_on, recommended_action.</p>
+<h3>3. Added the spec to <code>docs/INDEX.md</code> Specifications section</h3>
+<p>Proactively added before any reviewer surfaces it. INDEX.md&#39;s Specifications section now lists all five recent specs (KERNEL_CONTRACTS, effect-dispatch, institutional-domain, ccl-policy-registry, governed-service-binding, storage-durability-policies).</p>
+<h3>4. Regenerated <code>docs/DOCUMENT_REGISTRY.md</code></h3>
+<p>Ran <code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict --write-document-registry docs/DOCUMENT_REGISTRY.md</code>. Diff is small (corpus 804 → 805 markdown files; explicit rows updated; <code>Last Reviewed</code> 2026-05-14).</p>
+<h3>5. Followed prior review-cycle lessons proactively</h3>
+<ul>
+<li>YAML frontmatter <code>Status: normative</code>; matches <code>docs/spec/</code> prefix default.</li>
+<li>Doc opening labeled &quot;spec, work-in-progress&quot; — honest about which clauses are forward-direction.</li>
+<li>MUST claims gated on existing types. Where the abstract model adds new names, those are explicitly forward-direction.</li>
+<li>Verified all 23 cross-link targets exist before commit.</li>
+<li>Used canonical vocabulary verbatim: <code>StorageClass</code> (with <code>Canonical</code> / <code>ServiceState</code> / <code>Blobs</code>), <code>DataLocality</code> (with <code>CellLocal</code> / <code>CoopReplicated</code> / <code>FederationMirrored</code> / <code>CommonsPublic</code>), <code>GovernanceProof</code> / <code>GovernanceDecisionReceipt</code> / <code>ArtifactReceipt</code> / <code>FederationProvenance</code>, <code>Mandate</code> / <code>AuthorityGrant</code> / <code>AuthorityClass</code>, <code>EffectManifest</code> / <code>KernelEffect</code>, <code>DomainPolicy</code>, <code>GovernedServiceBinding</code>, <code>WorkloadManifest</code>. Forbidden vocabulary only in the explicit anti-claim sentence.</li>
+<li>Acknowledged the 7-class vs 3-variant <code>StorageClass</code> taxonomy drift explicitly (lesson from the Codex P2 catch on #1822 about ADR-0030&#39;s privacy-class names vs the implemented <code>PrivacyClass</code> enum).</li>
+</ul>
+<h3>6. Drafted follow-up issues (not filed)</h3>
+<p>Per the established pattern. Six titles named in §&quot;Next Move&quot; below.</p>
+<hr>
+<h2>What&#39;s Open</h2>
+<!-- TRUTH TYPE: Execution truth — known incomplete work -->
+
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Branch created (<code>spec/storage-durability-policies</code>).</li>
+<li><input checked="" disabled="" type="checkbox"> Spec doc drafted; registry updated; INDEX.md updated; DOCUMENT_REGISTRY.md regenerated.</li>
+<li><input checked="" disabled="" type="checkbox"> Validation suite passed locally. <em>(doc_control_check pass with 54 pre-existing/generated-doc warnings; lint-arch CLEAN; compliance_linter clean; freshness exit 1 from pre-existing <code>docs/ARCHITECTURE.md</code> staleness — same pattern as #1814 / #1819 / #1820 / #1821 / #1822.)</em></li>
+<li><input checked="" disabled="" type="checkbox"> Initial commit (<code>e375687b3</code>) and push.</li>
+<li><input checked="" disabled="" type="checkbox"> PR #1823 opened.</li>
+<li><input checked="" disabled="" type="checkbox"> Initial CI passed on <code>e375687b3</code> (all required checks green; non-required skip).</li>
+<li><input checked="" disabled="" type="checkbox"> Two Copilot review threads landed after the initial no-feedback polling window: (1) opening-paragraph internal inconsistency about &quot;wire-stable form&quot; and sibling-spec list; (2) handoff Final State stale recording the branch as local/pending push.</li>
+<li><input checked="" disabled="" type="checkbox"> Copilot review-feedback fix applied in this session&#39;s pending commit.</li>
+<li><input disabled="" type="checkbox"> Push the Copilot fix commit and re-run CI.</li>
+<li><input disabled="" type="checkbox"> Recheck <code>mergeStateStatus</code> after CI returns green.</li>
+<li><input disabled="" type="checkbox"> Reply to / resolve the two Copilot threads with the fix commit SHA.</li>
+<li><input disabled="" type="checkbox"> Per the user&#39;s current prompt: &quot;If checks are green, mergeability is clean, and no valid unresolved feedback remains, squash-merge PR #1823.&quot; Squash-merge if clean.</li>
+<li><input disabled="" type="checkbox"> Sync local <code>main</code> and prune the branch (squash-merge requires <code>git branch -D</code>).</li>
+<li><input disabled="" type="checkbox"> Leave <code>#1816</code> closure to human review (PR uses <code>Refs:</code>, not <code>Closes:</code>).</li>
+<li><input disabled="" type="checkbox"> Decide whether to file the follow-up issue drafts listed in §&quot;Next Move §5&quot; (deferred to user).</li>
+<li><input disabled="" type="checkbox"> After <code>#1816</code> is closed by the user (if they decide closure is warranted), the recommended next PR is <code>#1798</code> (<code>ArtifactRegistry</code> v0 and <code>ScopedVault</code> boundary). The user explicitly asked not to start <code>#1798</code> / <code>#1799</code> / <code>#1801</code> / <code>#1818</code> / implementation in this session.</li>
+</ul>
+<h3>Carried forward (not addressed in this PR)</h3>
+<p><strong><code>docs(agents): reconcile handoff path with HANDOFF_TEMPLATE.md</code></strong> — <code>AGENTS.md</code> lines 281–313 still say <code>docs/dev-journal/</code>; <code>docs/dev/HANDOFF_TEMPLATE.md</code> (lines 10, 109–111) and 15+ merged PRs use <code>docs/dev/</code>. The <code>docs/dev-journal/</code> directory does not exist. Surfaced in #1820 review; carried through #1821, #1822, and now this PR. Recommended one-line edit. <strong>Not addressed in this PR</strong> to keep scope tight.</p>
+<hr>
+<h2>Unsafe Assumptions</h2>
+<!-- Explicitly name anything this session relied on that was not verified -->
+
+<ul>
+<li><strong><code>StorageClass</code> and <code>DataLocality</code> definitions in <code>icn/crates/icn-kernel-api/src/storage.rs</code> are stable.</strong> Verified by reading the file (line 53 + line 155). If a follow-up PR has amended the variant set since the Explore agent&#39;s read this session, my &quot;reuse verbatim&quot; framing may need adjustment.</li>
+<li><strong>No <code>StorageSpec</code> / <code>BackupPolicy</code> / <code>ReplicationPolicy</code> / <code>RecoveryPolicy</code> / <code>ArchivePolicy</code> / <code>IntegrityPolicy</code> types exist in code.</strong> Verified by Explore-agent grep (no matches). If a parallel in-flight PR is adding any of these, my &quot;forward-direction&quot; framing for those names is wrong.</li>
+<li><strong><code>storage-governance-spec.md</code> is the foundational storage doc.</strong> I treated it as the canonical source for <code>StorageClass</code> and <code>DataLocality</code>. If a follow-up doc has been written or it has been deprecated, my harmonization framing may need revisiting.</li>
+<li><strong>The 7-class custody taxonomy from the spine doc is current canon.</strong> Mapped to the kernel-level <code>StorageClass</code> enum with an explicit drift note. If the spine has been amended to align the taxonomies, the drift note is unnecessary; otherwise it stays.</li>
+<li><strong><code>#1767</code>&#39;s <code>PrivateOverlay</code> + <code>SecretCredential</code> privacy classes are still the forward-direction names.</strong> I referenced them via <code>#1792</code>&#39;s <code>PrivacyClass</code> taxonomy. If those names have changed in an in-flight draft of <code>#1767</code> or <code>#1792</code>, my privacy-inheritance section needs a re-read.</li>
+<li><strong>The 23 cross-link targets exist at session start.</strong> Verified by file-existence sweep before committing. If a downstream PR renames or removes one before <code>#1816</code> lands, the spec&#39;s link will rot.</li>
+<li><strong>The Codex P2 lesson from #1822 (ADR text vs implementation drift) was correctly internalized.</strong> The spec acknowledges the 7-class vs 3-variant <code>StorageClass</code> drift explicitly and names reconciliation as forward work. If a reviewer disagrees with the framing, the reword pattern from #1822 applies.</li>
+</ul>
+<hr>
+<h2>Next Move</h2>
+<!-- TRUTH TYPE: Execution truth — the exact sequence for the next session -->
+
+<ol>
+<li>Push the Copilot fix commit prepared in this session. Watch CI to settle.</li>
+<li>Reply to / resolve each open Copilot thread on PR #1823 with the new fix commit SHA. The two open Copilot comments are: (a) opening-paragraph &quot;wire-stable form&quot; / sibling-spec list conflation; (b) handoff Final State staleness.</li>
+<li>Re-check <code>mergeStateStatus</code> after CI returns green.</li>
+<li>Per the user&#39;s current prompt: squash-merge PR #1823 if clean. Sync local <code>main</code>; force-delete the branch (<code>git branch -D spec/storage-durability-policies</code>) since squash-merge invalidates the ancestor check for <code>-d</code>.</li>
+<li><strong>Follow-up issue drafts (deferred; not filed in this PR):</strong><ul>
+<li><code>schema(storage): define StorageSpec and durability policy records</code> — the wire-stable schema deliberately omitted.</li>
+<li><code>spec(storage): define restore-test receipt envelope</code> — the Rust type, persistence, and audit-query surface.</li>
+<li><code>spec(storage): define locality/privacy inheritance checks</code> — the <code>validate_storage_access()</code>-style enforcement function named as TBD in <code>storage-governance-spec.md</code>.</li>
+<li><code>spec(storage): define archive verification and export contract</code> — per-archive proof shape, hand-off protocol, custodian agreement.</li>
+<li><code>spec(storage): define backup provider / runtime provider interface</code> — how a <code>BackupPolicy</code> is executed by a <code>RuntimeProvider</code> per <code>#1815</code>.</li>
+<li><code>spec(anti-entropy): connect IntegrityPolicy receipts to network proof loops</code> — the integration with <code>#1799</code>.</li>
+<li>Optional: <code>spec(storage): reconcile 7-class custody taxonomy with kernel StorageClass enum</code> — if the user wants the drift formally resolved.</li>
+</ul>
+</li>
+<li><strong>Separate process cleanup recommendation (carried from #1820 review):</strong> <code>docs(agents): reconcile handoff path with HANDOFF_TEMPLATE.md</code>. Not in this PR&#39;s scope.</li>
+</ol>
+<hr>
+<h2>Architectural Decisions</h2>
+<!-- TRUTH TYPE: Declared project truth changes (if any were made or ratified) -->
+
+<ol>
+<li><strong>Six policy objects at design granularity.</strong> <code>StorageSpec</code> is the binding; the other five are referenced policies. None introduces a Rust type; all are forward-direction.</li>
+<li><strong>Reuse kernel <code>StorageClass</code> and <code>DataLocality</code> verbatim.</strong> The 3-variant kernel enum and the 4-level locality enum from <code>icn/crates/icn-kernel-api/src/storage.rs</code> are canonical. The spec does not redefine them.</li>
+<li><strong>Acknowledge the 7-class custody taxonomy as a richer design-level grouping.</strong> Reconciliation with the 3-variant kernel enum is forward work, not a hidden assumption.</li>
+<li><strong>Locality and privacy inheritance is mandatory.</strong> Backups, replicas, archives, exports, and restore targets MUST inherit source constraints. Policy MAY narrow disclosure; policy MAY NOT broaden locality or disclosure without explicit governance.</li>
+<li><strong>Restore of authoritative state is governed.</strong> The restore-execution receipt is the institutional record; emergency restore authority is bounded, reviewable, receipt-backed.</li>
+<li><strong>Restore drills produce real receipts.</strong> A failed restore test is a governance-relevant event, not a hidden warning. The steward cockpit surfaces it; member shell summarizes the recovery posture (not the data).</li>
+<li><strong>Replication is not backup.</strong> Both share a verification surface (<code>#1799</code>&#39;s anti-entropy proof loops) but answer different institutional questions.</li>
+<li><strong>Archive is not quiet deletion.</strong> Archive expiration is a governance act with a named authority and an expiration receipt.</li>
+<li><strong>Integrity verification reuses existing hash / proof vocabulary</strong> (<code>blake3</code> content hashes per <code>icn-ccl/src/registry.rs</code>, Merkle proofs per <code>icn-store/src/lib.rs</code>). The spec does not introduce new hash algorithms or proof formats.</li>
+</ol>
+<hr>
+<h2>Verification Commands</h2>
+<!-- Commands the next session should run to confirm starting state -->
+
+<pre><code class="language-bash">cd /home/matt/projects/icn
+
+# Branch + PR state
+git branch --show-current
+gh pr view &lt;pr-number&gt; --json state,mergeable,mergeStateStatus
+
+# Validation suite
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict
+python3 docs/scripts/lint-arch.py docs/spec/storage-durability-policies.md --cargo icn/Cargo.toml
+python3 .github/scripts/compliance_linter.py
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+
+# Review thread state
+gh api repos/InterCooperative-Network/icn/pulls/&lt;pr-number&gt;/comments \
+  --jq &#39;.[] | {id, user: .user.login, line, in_reply_to_id, created_at}&#39;
+</code></pre>
+<p>Expected at session start before push: doc_control_check pass with 54 enforcement warnings (none on the new doc); lint-arch CLEAN (already verified); compliance_linter no violations; freshness-check exit 1 from pre-existing <code>docs/ARCHITECTURE.md</code> staleness.</p>
+<hr>
+<h2>Truth-Plane Notes</h2>
+<!-- Which truth types were relied on? Any known conflicts between layers? -->
+
+<ul>
+<li><strong>Declared project truth:</strong> loaded from <code>docs/STATE.md</code> and <code>docs/PHASE_PROGRESS.md</code>. No conflict surfaced.</li>
+<li><strong>Implementation truth:</strong> verified by reading <code>icn-kernel-api/src/storage.rs</code> (lines 53, 155, 272) for the canonical <code>StorageClass</code>, <code>DataLocality</code>, <code>StorageValidationError</code> enums. Verified that none of the six policy objects exist as Rust types today. Verified that <code>RestoreReceipt</code> / <code>BackupReceipt</code> / <code>IntegrityReceipt</code> do not exist; spec defers their wire-stable form to follow-up.</li>
+<li><strong>Execution truth:</strong> confirmed <code>main</code> HEAD <code>09331622d</code>, two dependabot PRs open, no other open PRs. <code>#1816</code> confirmed OPEN with the body matching the user&#39;s prompt.</li>
+<li><strong>Known truth-plane conflict #1:</strong> <code>freshness-check.py</code> reports <code>docs/ARCHITECTURE.md</code> as carrying stale sections (06-identity-cryptography, 10-state-ledger, 11-contract-execution, 12-governance, 14-federation). CI workflow treats this as informational and reports SUCCESS; the script itself exits 1. Same pattern as #1814, #1819, #1820, #1821, #1822.</li>
+<li><strong>Known truth-plane conflict #2 (the spec surfaces honestly):</strong> The 7-class custody taxonomy in the spine doc vs the 3-variant <code>StorageClass</code> kernel enum. Both stand today; reconciliation is named as forward work.</li>
+<li><strong>Known process drift (carried, not in this PR):</strong> AGENTS.md vs <code>docs/dev/HANDOFF_TEMPLATE.md</code> disagree on handoff path. De-facto canon is <code>docs/dev/handoff-*.md</code>. Recommend separate scoped fix.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

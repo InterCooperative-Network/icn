@@ -1,0 +1,789 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Storage Durability Policies — Backup, Replication, Recovery, Archive, Integrity | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>storage durability policies</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/storage-durability-policies.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Storage Durability Policies — Backup, Replication, Recovery, Archive, Integrity</h1>
+<blockquote>
+<p><strong>Status: spec, work-in-progress.</strong> Defines the design-level policy objects that bind storage classes to durability, recoverability, locality, privacy, integrity, archival, and exit commitments. Names <code>StorageSpec</code>, <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, <code>IntegrityPolicy</code> as the six forward-direction objects the spine doc tracks under #1816 and the merged specs (#1819, #1820, #1821, #1822) defer to. Reuses existing kernel-level types (<code>StorageClass</code>, <code>DataLocality</code>, <code>StorageValidationError</code> from <code>icn/crates/icn-kernel-api/src/storage.rs</code>) verbatim where they apply. Clauses that depend on schema fields or kernel behavior that have not yet landed are marked as forward-direction. The PR introducing this doc advances <code>#1816</code> without closing it.</p>
+</blockquote>
+<h2>Purpose</h2>
+<p>ICN&#39;s storage layer already enforces two kernel-level constraints: <code>StorageClass</code> (Canonical / ServiceState / Blobs, per <code>icn-kernel-api/src/storage.rs:53</code>) and <code>DataLocality</code> (CellLocal / CoopReplicated / FederationMirrored / CommonsPublic, per the same file at line 155). Those constraints establish what the kernel can refuse. They do not, by themselves, establish how storage stays durable, how a backup is taken or restored, what counts as a verified replica, what an archive owes the institution years from now, or what authority a restore requires.</p>
+<p>The spine doc names six policy objects for the missing durability layer — <code>StorageSpec</code>, <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, <code>IntegrityPolicy</code> — and explicitly marks them as forward-direction tracked under #1816. The four merged sibling architecture specs each defer to this spec for the <strong>design-level policy contract</strong> for those objects:</p>
+<ul>
+<li><code>docs/spec/governed-service-binding.md</code> (#1822, merged): &quot;Backup policy reference. Pointer to the <code>BackupPolicy</code> the binding inherits (forward-direction, per <code>#1816</code>).&quot;</li>
+<li><code>docs/spec/institutional-domain.md</code> (#1820, merged): &quot;Backup / recovery / archive defaults … (cross-link <code>#1816</code>).&quot;</li>
+<li><code>docs/spec/effect-dispatch-contract.md</code> (#1819, merged): &quot;Backups inherit the disclosure policy of the source (see … the forthcoming backup spec under #1816).&quot;</li>
+<li><code>docs/spec/ccl-policy-registry.md</code> (#1821, merged): names <code>#1816</code> as the home for &quot;backup / replication / recovery / archive policies&quot; and for export-receipt provenance.</li>
+</ul>
+<p>Foundational storage canon is <strong>separate from the merged sibling specs above</strong>. <code>docs/state/storage-governance-spec.md</code> is the existing foundational doc for <code>StorageClass</code>, <code>DataLocality</code>, and storage-access enforcement vocabulary; it independently names <code>StorageSpec</code> and <code>validate_storage_access()</code> as required follow-ups. This spec gives those names design-level shape without redefining the existing kernel-level types.</p>
+<p>This spec defines those objects at <strong>object granularity</strong> — fields, lifecycle stages, authority bindings, receipt expectations, hard rules — and names the institutional rules that bind them to authority and receipts. <strong>It does not introduce schema, wire format, Rust types, or storage-backend implementation.</strong> It explicitly defers vendor choices, replication algorithms, SLA commitments, and storage-backend selection. It does not redefine <code>StorageClass</code> or <code>DataLocality</code>; both remain canonical per the kernel-level enums.</p>
+<h2>What this spec is not</h2>
+<ul>
+<li>Not a storage backend implementation. No code lands here.</li>
+<li>Not a backup-job implementation. The spec names what a backup is in institutional terms; the schedule, the worker, the wire format are forward work.</li>
+<li>Not a replication algorithm choice. The spec names what a replica owes; the algorithm is engineering choice deferred to implementation.</li>
+<li>Not a vendor-specific integration. Where the institution chooses an external custodian, that is a governed agreement (per <code>docs/spec/institutional-domain.md</code> §&quot;Agreement registry&quot;), not a spec-level coupling.</li>
+<li>Not a schema migration. No Rust types, JSON schemas, or wire formats are introduced.</li>
+<li>Not an SLA commitment. The spec names <em>objective classes</em> (e.g., &quot;bounded restore time&quot;) rather than numerical SLAs; concrete numbers belong to per-domain <code>DomainPolicy</code> adoptions.</li>
+<li>Not a redefinition of <code>StorageClass</code> (3-variant kernel enum) or <code>DataLocality</code> (4-level kernel enum). Both remain canonical per <code>icn-kernel-api/src/storage.rs</code>.</li>
+<li>Not authority to mutate DNS, K3s, Forgejo, identity-bridge, gateway, backup jobs, replication targets, archive targets, or any deployed infrastructure.</li>
+<li>Not a production-readiness claim. No partner federation is operating under these primitives today.</li>
+<li>Not closure of <code>#1816</code>. The PR introducing this doc uses <code>Refs:</code>; closure is left for separate review against the issue&#39;s scope.</li>
+</ul>
+<h2>Storage class model</h2>
+<p>ICN canon currently carries <strong>two related but distinct</strong> storage taxonomies. The spec uses both and names the relationship between them.</p>
+<p><strong>Kernel-level <code>StorageClass</code> (3 variants, implemented):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Canonical</code></td>
+<td>Immutable, replicated, authoritative. Ledger entries, governance receipts, trust edges. Cannot be modified after creation.</td>
+</tr>
+<tr>
+<td><code>ServiceState</code></td>
+<td>Mutable, scope-default. Application state. Updated via CAS. Default for general compute tasks.</td>
+</tr>
+<tr>
+<td><code>Blobs</code></td>
+<td>Content-addressed, locality-flexible binary data. Documents, media files, WASM modules. Addressed by content hash; immutable by reference.</td>
+</tr>
+</tbody></table>
+<p>These three variants are what the kernel can pattern-match on. Per the meaning firewall (<code>docs/architecture/KERNEL_APP_SEPARATION.md</code>), the kernel never enumerates a richer taxonomy.</p>
+<p><strong>Design-level seven-class custody taxonomy</strong> (per <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> §&quot;Storage as custody&quot;):</p>
+<table>
+<thead>
+<tr>
+<th>Custody class</th>
+<th>Kernel-level mapping</th>
+<th>Per-class design expectations</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Canonical store</strong></td>
+<td><code>Canonical</code></td>
+<td>Custody: canonical. Locality: usually <code>CoopReplicated</code> or wider, per <code>DomainPolicy</code>. Privacy: typically <code>MembersOnly</code>+ except where intentionally public. Backup: mandatory. Replication: mandatory. Archive: mandatory. Restore authority: governed. Export: per domain exit policy. Receipts: every transition emits a receipt.</td>
+</tr>
+<tr>
+<td><strong>Service state</strong></td>
+<td><code>ServiceState</code></td>
+<td>Custody: service state. Locality: per service. Privacy: per service binding. Backup: per-service <code>BackupPolicy</code>; some services accept lossy state. Replication: per-service <code>ReplicationPolicy</code>. Archive: usually not required. Restore authority: per service binding; routine for non-authoritative state. Export: per binding exit policy. Receipts: institutionally relevant transitions only.</td>
+</tr>
+<tr>
+<td><strong>Artifact / blob store</strong></td>
+<td><code>Blobs</code> (tracked under #1798)</td>
+<td>Custody: artifact. Locality: flexible; usually content-addressed. Privacy: per artifact registry classification. Backup: per artifact retention policy. Replication: per artifact class. Archive: per long-term retention class. Restore authority: per registry policy. Export: per content visibility. Receipts: significant artifact lifecycle transitions.</td>
+</tr>
+<tr>
+<td><strong>Volume / block store</strong></td>
+<td>(typically <code>ServiceState</code> underlying; access via runtime provider)</td>
+<td>Custody: volume. Locality: per binding. Privacy: usually private-to-binding. Backup: per workload <code>BackupPolicy</code>. Replication: per <code>ReplicationPolicy</code> of the underlying provider. Archive: usually not. Restore authority: per binding. Export: per binding exit policy. Receipts: provisioning + destruction.</td>
+</tr>
+<tr>
+<td><strong>Scoped vault / private storage</strong></td>
+<td>(extends Blobs + access policy, tracked under #1767 / #1792)</td>
+<td>Custody: vault. Locality: typically <code>CellLocal</code> or <code>CoopReplicated</code>. Privacy: <code>PrivateOverlay</code> / <code>ScopeRestricted</code> / <code>SecretCredential</code> per <code>#1792</code>. Backup: encrypted; must not broaden disclosure. Replication: bounded by privacy. Archive: per retention; honoring disclosure throughout. Restore authority: stricter than ordinary state; named explicitly. Export: per disclosure boundary; redaction may apply. Receipts: access produces an <code>AccessReceipt</code> (per <code>#1792</code>).</td>
+</tr>
+<tr>
+<td><strong>Secret / key material</strong></td>
+<td>(canonical / sealed, often outside ICN&#39;s direct storage)</td>
+<td>Custody: secret. Locality: as narrow as the institution can tolerate. Privacy: <code>SecretCredential</code>. Backup: stricter than ordinary; rotation and recovery are governed. Replication: only via key-rotation / recovery protocols. Archive: only by explicit policy; usually rotated rather than archived. Restore authority: top-level governed events. Export: forbidden except by explicit policy. Receipts: rotation, recovery, revocation.</td>
+</tr>
+<tr>
+<td><strong>Cache / derived state</strong></td>
+<td>(<code>ServiceState</code> or <code>Blobs</code>; reconstructible)</td>
+<td>Custody: derived. Locality: per the source. Privacy: inherits source. Backup: usually not required (regenerate from source). Replication: opportunistic. Archive: not applicable. Restore authority: trivial; rebuild from source. Export: not applicable. Receipts: not required. <strong>Cache treated as canonical is a bug.</strong></td>
+</tr>
+</tbody></table>
+<p><strong>Drift note (honest):</strong> the seven-class custody taxonomy is broader than the three-variant kernel enum. They overlap but do not align 1:1 today. Reconciliation — whether to widen the kernel enum or to keep the kernel coarse and treat the seven classes as an app-layer projection — is forward work, tracked as a follow-up in this PR&#39;s handoff. This spec uses the <strong>seven-class custody taxonomy</strong> at design level and the <strong>three-variant kernel enum</strong> at kernel-enforcement level; the difference is explicit, not hand-waved.</p>
+<h2><code>StorageSpec</code></h2>
+<p><code>StorageSpec</code> is the binding between a workload, service, or domain object and the storage it touches. Today it does not exist as a Rust type; <code>storage-governance-spec.md</code> names it as a required follow-up. This spec defines its shape at design granularity.</p>
+<p><strong>Identity and references</strong></p>
+<ul>
+<li><strong>Spec identifier.</strong> A stable identifier for the storage binding inside the adopting domain.</li>
+<li><strong>Binding reference.</strong> The <code>GovernedServiceBinding</code> (per <code>docs/spec/governed-service-binding.md</code>) that owns this storage spec, or the <code>InstitutionalDomain</code> that owns it directly for domain-level state.</li>
+<li><strong>Storage object reference.</strong> What this spec governs: an artifact in the registry, a volume, a vault entry, a service state store. References to objects in <code>#1798</code> (<code>ArtifactRegistry</code>) and <code>#1767</code> (encrypted private-overlay store) when those land.</li>
+</ul>
+<p><strong>Classification</strong></p>
+<ul>
+<li><strong>Custody class.</strong> One of the seven design-level classes named above.</li>
+<li><strong>Kernel <code>StorageClass</code>.</strong> One of <code>Canonical</code> / <code>ServiceState</code> / <code>Blobs</code> per <code>icn-kernel-api/src/storage.rs</code>.</li>
+<li><strong><code>DataLocality</code>.</strong> One of <code>CellLocal</code> / <code>CoopReplicated</code> / <code>FederationMirrored</code> / <code>CommonsPublic</code>. The spec&#39;s locality is the <strong>upper bound</strong> for replicas, backups, archives, and exports (see §&quot;Locality and privacy inheritance&quot;).</li>
+<li><strong>Privacy / disclosure class.</strong> Per the forthcoming <code>#1792</code> taxonomy (<code>Public</code> / <code>MembersOnly</code> / <code>ScopeRestricted</code> / <code>PrivateOverlay</code> / <code>SecretCredential</code> / <code>ExternalCustodian</code> / <code>SealedUntil</code>). The privacy class is the <strong>upper bound</strong> for all derived copies.</li>
+</ul>
+<p><strong>Capacity and growth</strong></p>
+<ul>
+<li><strong>Capacity expectation.</strong> Maximum size, growth rate envelope, and the threshold at which the domain expects to review.</li>
+<li><strong>Quota / allocation pointer.</strong> The resource budget per the domain&#39;s compute placement policy (cross-link <code>#1801</code>).</li>
+</ul>
+<p><strong>Policy references</strong></p>
+<ul>
+<li><strong><code>BackupPolicy</code> reference.</strong> Pointer to the adopted backup policy, or explicit acknowledgement that no backup applies (e.g., for <code>cache / derived state</code>).</li>
+<li><strong><code>ReplicationPolicy</code> reference.</strong> Pointer to the adopted replication policy, or explicit acknowledgement of <code>single-copy</code> for opportunistic state.</li>
+<li><strong><code>RecoveryPolicy</code> reference.</strong> Pointer to the adopted recovery policy.</li>
+<li><strong><code>ArchivePolicy</code> reference.</strong> Pointer to the adopted archive policy, where the class warrants long-term retention.</li>
+<li><strong><code>IntegrityPolicy</code> reference.</strong> Pointer to the adopted integrity policy.</li>
+</ul>
+<p><strong>Lifecycle and exit</strong></p>
+<ul>
+<li><strong>Export / exit requirement.</strong> What happens to this storage when the domain exits or the binding is removed (per <code>docs/spec/institutional-domain.md</code> §&quot;Domain lifecycle&quot; → Export).</li>
+<li><strong>Deletion / retention expectation.</strong> Whether deletion is allowed, who authorizes it, what receipt class records it.</li>
+</ul>
+<p><strong>Receipt expectations</strong></p>
+<ul>
+<li><strong>Per-policy receipt classes.</strong> Each referenced policy names which receipt classes the chain emits at its lifecycle transitions (per <code>docs/spec/effect-dispatch-contract.md</code> §&quot;Receipt class summary&quot;). The spec carries those expectations forward; it does not invent new classes here.</li>
+</ul>
+<p><strong>Invariants:</strong></p>
+<ul>
+<li>A workload&#39;s <code>WorkloadManifest</code> declared storage requirement; the <code>StorageSpec</code> is the actual grant. The spec never widens what the manifest declared.</li>
+<li>A storage binding without a custody class is rejected (per <code>storage-governance-spec.md</code>).</li>
+<li>A storage binding without a backup, replication, and exit policy is <strong>incomplete</strong>; the chain should refuse adoption until the gap is named (even explicitly to record that the class warrants none).</li>
+<li><code>DataLocality</code> is upper-bound, not exact. A spec at <code>CoopReplicated</code> may host data in <code>CellLocal</code>; it may not host data in <code>FederationMirrored</code>.</li>
+</ul>
+<h2><code>BackupPolicy</code></h2>
+<p>A backup is an institutional record of what was true at a moment, kept for the institution to recover from loss. Today <code>BackupPolicy</code> does not exist as a type. This spec defines its design shape.</p>
+<p><strong>Frequency and schedule</strong></p>
+<ul>
+<li><strong>Cadence class.</strong> Continuous (e.g., write-ahead log shadow), periodic (e.g., hourly / daily / weekly), governance-triggered (taken on demand under authority), or threshold-triggered (taken when state crosses a defined risk threshold).</li>
+<li><strong>Schedule reference.</strong> Pointer to the per-domain operational schedule. The cadence is a class; the schedule is the concrete plan.</li>
+</ul>
+<p><strong>Target</strong></p>
+<ul>
+<li><strong>Target locality.</strong> One of <code>DataLocality</code> levels. <strong>MUST be equal to or narrower than the source&#39;s <code>DataLocality</code>.</strong> Backups never broaden locality (see §&quot;Locality and privacy inheritance&quot;).</li>
+<li><strong>Target custody class.</strong> Often the same as the source; sometimes narrower (e.g., a <code>Service state</code> backup may land in a <code>Scoped vault</code> if disclosure must tighten).</li>
+<li><strong>Storage location.</strong> Reference to a physical or logical storage location; named in the per-domain operational plan.</li>
+</ul>
+<p><strong>Privacy inheritance</strong></p>
+<ul>
+<li><strong>Privacy class.</strong> <strong>MUST be equal to or narrower than the source&#39;s privacy class.</strong> Backup never broadens disclosure. Where the backup target reduces disclosure (e.g., scoped vault for what was members-only), the policy names the narrowing.</li>
+<li><strong>Encryption / key custody expectation.</strong> For privacy classes that require encryption (<code>PrivateOverlay</code>, <code>SecretCredential</code>, <code>ExternalCustodian</code>), the policy names the key custody model. <strong>Key custody specifics are deferred to <code>#1767</code>.</strong> This spec names that backups inherit the source&#39;s encryption posture; it does not specify the cipher or key model.</li>
+</ul>
+<p><strong>Retention</strong></p>
+<ul>
+<li><strong>Retention window.</strong> How long the backup is kept before it expires or migrates to archive. Class options: short-horizon (operational rollback), institutional-horizon (months to a few years), archival (handed off to <code>ArchivePolicy</code>).</li>
+<li><strong>Cleanup / expiration authority.</strong> Who authorizes deletion at expiry; what receipt class records the deletion.</li>
+</ul>
+<p><strong>Integrity verification</strong></p>
+<ul>
+<li><strong>Integrity check.</strong> How the backup proves it is what it claims to be (content hash, signed manifest). Cross-link <code>IntegrityPolicy</code> below.</li>
+<li><strong>Verification cadence.</strong> How often the backup is re-verified.</li>
+</ul>
+<p><strong>Restore-test cadence</strong></p>
+<ul>
+<li><strong>Drill frequency.</strong> How often the institution proves it can restore (see §&quot;Restore-test receipts&quot;).</li>
+</ul>
+<p><strong>Authority</strong></p>
+<ul>
+<li><strong>Adoption authority.</strong> Who can adopt or amend this policy (governance act per <code>docs/spec/ccl-policy-registry.md</code>).</li>
+<li><strong>Operational authority.</strong> Who can execute the backup job under the policy. Operational backup is routine; deletion / restore is not.</li>
+</ul>
+<p><strong>Receipt classes</strong></p>
+<ul>
+<li>Backup creation receipt.</li>
+<li>Backup verification receipt.</li>
+<li>Backup expiration / deletion receipt.</li>
+<li>Backup failure receipt (a failed backup is a governance-relevant event, not a silent log line).</li>
+</ul>
+<p><strong>Hard rule:</strong></p>
+<blockquote>
+<p>A backup inherits the source&#39;s locality and disclosure rules unless a governance decision explicitly narrows access further. It MUST NOT broaden locality or disclosure.</p>
+</blockquote>
+<h2><code>ReplicationPolicy</code></h2>
+<p>Replication keeps the service alive. It is <em>not</em> the same as backup; it shares only the verification surface with <code>IntegrityPolicy</code> and the anti-entropy proof loops tracked under <code>#1799</code>.</p>
+<p><strong>Replica count and placement</strong></p>
+<ul>
+<li><strong>Minimum viable copies.</strong> At design level, a class (e.g., <code>single-copy</code>, <code>dual-coop</code>, <code>quorum-of-3</code>, <code>federation-quorum</code>). Concrete numbers belong to the domain&#39;s operational adoption.</li>
+<li><strong>Placement constraints.</strong> Diversity across cells, cooperatives, federations, or commons pools. The placement constraint inherits the spec&#39;s <code>DataLocality</code> upper bound.</li>
+</ul>
+<p><strong>Convergence</strong></p>
+<ul>
+<li><strong>Anti-entropy expectation.</strong> How replicas reconcile. Convergence semantics defer to <code>#1799</code> (network anti-entropy proof loops); this spec names that the policy declares an expectation, and the proof loops carry the verification surface.</li>
+<li><strong>Divergence detection.</strong> How the policy detects that replicas have diverged. Cross-link <code>IntegrityPolicy</code> below.</li>
+<li><strong>Repair authority.</strong> Who can authorize repair when replicas diverge in a way the proof loops cannot resolve automatically. Repair is a governed act for <code>Canonical</code> storage; routine for <code>ServiceState</code> per binding policy.</li>
+</ul>
+<p><strong>Replica lifecycle authority</strong></p>
+<ul>
+<li><strong>Replica promotion / demotion.</strong> When a replica becomes primary (e.g., for read load or failover) or steps down. For <code>Canonical</code> storage, promotion is institutionally significant and emits a receipt; for <code>ServiceState</code>, it may be routine.</li>
+</ul>
+<p><strong>Receipt classes</strong></p>
+<ul>
+<li>Replication-completed receipt (per replica).</li>
+<li>Anti-entropy check receipt.</li>
+<li>Divergence-detected receipt.</li>
+<li>Repair receipt.</li>
+</ul>
+<p><strong>Boundary:</strong></p>
+<ul>
+<li><strong>Replication is not backup.</strong> A replica is a current copy; a backup is a record of past state. The two share a verification surface but answer different institutional questions.</li>
+<li><strong>Cross-reference:</strong> <code>#1799</code> defines the substrate-side proof loops; this spec defines the institution-side policy that consumes them.</li>
+</ul>
+<h2><code>RecoveryPolicy</code></h2>
+<p>Recovery is what the institution promises to itself when something goes wrong. The policy names what restoring authoritative state means and who can do it.</p>
+<p><strong>Restore objective</strong></p>
+<ul>
+<li><strong>Restore objective class</strong> (not SLA). Class options: best-effort (no commitment beyond &quot;we try&quot;), bounded (recovery within a named horizon), strict (recovery within a named horizon with named authority), disaster-only (recovery exercised only on declared incident). Concrete numerical objectives (RTO / RPO equivalents) belong to per-domain adoption.</li>
+</ul>
+<p><strong>Authority</strong></p>
+<ul>
+<li><strong>Restore authority.</strong> Which <code>AuthorityClass</code> (per ADR-0014) and which <code>Mandate</code> (per ADR-0019) covers a restore of this storage class. Restoring authoritative state is a governed event; the policy names which proposal class is required to authorize it.</li>
+<li><strong>Approval path.</strong> How a restore is proposed, reviewed, decided, and dispatched. Maps onto the effect dispatch chain (<code>docs/spec/effect-dispatch-contract.md</code>) at each stage.</li>
+<li><strong>Witness authority.</strong> Who validates that the restore matches the expected state. The witness need not be the actor that proposed or executed the restore; separation of duties is the institutional safeguard.</li>
+</ul>
+<p><strong>Restore drills</strong></p>
+<ul>
+<li><strong>Drill cadence.</strong> How often the institution proves it can restore without waiting for an incident.</li>
+<li><strong>Drill scope.</strong> Test scope: full / partial / point-in-time. Drill targets a non-authoritative environment by default.</li>
+</ul>
+<p><strong>Restore-target constraints</strong></p>
+<ul>
+<li><strong>Target class.</strong> Where a restore is allowed to land — staging, sandbox, production. A drill that restores into the production environment is a <code>live restore</code>, not a <code>test</code>; the policy names which authority covers each.</li>
+<li><strong>Locality and disclosure.</strong> The restore target inherits the source&#39;s locality and disclosure constraints (see §&quot;Locality and privacy inheritance&quot;).</li>
+</ul>
+<p><strong>Restore type</strong></p>
+<ul>
+<li><strong>Full restore.</strong> Authoritative state replaced from backup. Always governed.</li>
+<li><strong>Partial restore.</strong> A subset of state restored. Always governed; the policy names which subsets are allowed.</li>
+<li><strong>Point-in-time restore.</strong> Restore to a named historical state. Always governed; the policy names which historical horizons are accessible.</li>
+</ul>
+<p><strong>Challenge, reversal, audit</strong></p>
+<ul>
+<li><strong>Challenge path.</strong> A restore can be challenged. Challenge is itself a governance act with its own receipt (per <code>docs/spec/effect-dispatch-contract.md</code> §&quot;Challenge / reversal / counter-receipt&quot;).</li>
+<li><strong>Reversal.</strong> Reversal of a restore is a separate governance act, not a retroactive edit. The audit log is append-only.</li>
+</ul>
+<p><strong>Receipt classes</strong></p>
+<ul>
+<li>Restore-test receipt (drill; see §&quot;Restore-test receipts&quot; below).</li>
+<li>Restore-execution receipt (live restore).</li>
+<li>Restore-failure receipt.</li>
+<li>Restore-challenge receipt.</li>
+</ul>
+<p><strong>Hard rule:</strong></p>
+<blockquote>
+<p>Restoring authoritative state is a governed event. It MUST produce receipts and preserve provenance.</p>
+</blockquote>
+<h2><code>ArchivePolicy</code></h2>
+<p>Archives keep the institution accountable to itself and to its partners. An archive is not a backup; a backup may eventually become an archive when retention crosses an archival horizon.</p>
+<p><strong>Retention</strong></p>
+<ul>
+<li><strong>Long-term retention class.</strong> Decades-horizon, generations-horizon, indefinite. The policy names the class; the concrete horizon belongs to per-domain adoption.</li>
+<li><strong>Immutability expectation.</strong> Archives are write-once at the policy level. The implementation may use append-only storage, content-addressed snapshots, or external custodians; the policy names the expectation, not the mechanism.</li>
+</ul>
+<p><strong>Access</strong></p>
+<ul>
+<li><strong>Access path.</strong> Who can read the archive, under what authority, with what receipt.</li>
+<li><strong>Redaction.</strong> Per <code>#1792</code>, archived material that contains private data may require redaction on access. The policy names the redaction class.</li>
+<li><strong>Institutional hold.</strong> Where the institution has a legal or governance obligation to preserve specific records past their default expiry, the policy names the hold class. <strong>The detailed hold protocol is deferred to a follow-up issue</strong> (drafted in this PR&#39;s handoff).</li>
+</ul>
+<p><strong>Verification</strong></p>
+<ul>
+<li><strong>Archive verification cadence.</strong> How often the archive proves its content has not silently rotted.</li>
+<li><strong>Integrity proof.</strong> Cross-link <code>IntegrityPolicy</code> below.</li>
+</ul>
+<p><strong>Export</strong></p>
+<ul>
+<li><strong>Archive export.</strong> Conditions under which archive material may be exported to another institution or external custodian. Always governed.</li>
+</ul>
+<p><strong>Deletion / expiration</strong></p>
+<ul>
+<li><strong>Expiration authority.</strong> Who can authorize deletion at the archival horizon. The default is <strong>never</strong> for <code>Canonical</code> storage; archives that hold canonical state do not expire silently.</li>
+<li><strong>Receipt of expiration.</strong> A deliberate, governed expiration produces a receipt naming what was retired, under whose authority, against which retention class.</li>
+</ul>
+<p><strong>Receipt classes</strong></p>
+<ul>
+<li>Archive-creation receipt.</li>
+<li>Archive-verification receipt.</li>
+<li>Archive-access receipt (per <code>#1792</code> access-receipt pattern).</li>
+<li>Archive-export receipt.</li>
+<li>Archive-expiration receipt.</li>
+</ul>
+<p><strong>Hard rule:</strong></p>
+<blockquote>
+<p>Archives keep the institution accountable. <code>ArchivePolicy</code> MUST NOT become a quiet deletion policy. Expiration of archival material is a governance act with its own receipt.</p>
+</blockquote>
+<h2><code>IntegrityPolicy</code></h2>
+<p>Integrity is the institution&#39;s assertion that storage has not silently changed. The policy names how that assertion is produced and how often.</p>
+<p><strong>Verification cadence</strong></p>
+<ul>
+<li><strong>Verification frequency.</strong> Continuous (cryptographic structure), periodic (scheduled check), event-driven (on access or transition), drill (during restore tests).</li>
+</ul>
+<p><strong>Proof shape</strong></p>
+<ul>
+<li><strong>Hash / proof vocabulary.</strong> Where the canon already names a hash type (e.g., <code>blake3</code> content hashes per <code>icn-ccl/src/registry.rs</code>, Merkle proofs per <code>icn-store/src/lib.rs</code>), the policy reuses it. <strong>The policy does not introduce new hash algorithms or proof formats.</strong></li>
+<li><strong>Content / proof reference.</strong> What the integrity check records: content hash, signed manifest, Merkle root, or a combination per the underlying storage type.</li>
+</ul>
+<p><strong>Repair path</strong></p>
+<ul>
+<li><strong>On failure.</strong> What happens when integrity verification fails. For <code>Canonical</code> storage: a governed event with a named repair authority. For <code>ServiceState</code> or <code>Cache</code>: per-binding policy; often a re-replicate or rebuild from source.</li>
+<li><strong>Evidence class.</strong> A failed integrity check is itself evidence (per <code>docs/spec/effect-dispatch-contract.md</code> §&quot;Stage 5: Application + evidence&quot;). It is institutional information, not a hidden log line.</li>
+</ul>
+<p><strong>Relationships</strong></p>
+<ul>
+<li><strong>To <code>ReplicationPolicy</code>.</strong> Replication divergence is one source of integrity verification failures; the policies share the substrate-side proof loops in <code>#1799</code>.</li>
+<li><strong>To <code>RecoveryPolicy</code>.</strong> Restore tests are integrity events; restore-test receipts include the integrity verification outcome.</li>
+<li><strong>To anti-entropy</strong> (<code>#1799</code>). The substrate provides the verification surface; <code>IntegrityPolicy</code> is the institutional consumer.</li>
+</ul>
+<p><strong>Receipt classes</strong></p>
+<ul>
+<li>Integrity-check receipt (passed).</li>
+<li>Integrity-failure receipt.</li>
+<li>Integrity-repair receipt.</li>
+</ul>
+<h2>Restore-test receipts</h2>
+<p>Restore-test receipts deserve their own section. A backup that has never been restored is hope, not durability.</p>
+<p><strong>What a restore-test is</strong></p>
+<p>A restore-test is a deliberate, scheduled or governance-triggered drill that exercises the recovery path without putting authoritative state at risk. The drill produces a receipt naming what was attempted, where it landed, who authorized it, and what was verified.</p>
+<p><strong>Triggers</strong></p>
+<ul>
+<li><strong>Scheduled drill.</strong> Per the cadence named in <code>RecoveryPolicy</code>. The default is &quot;at least annually, more often for <code>Canonical</code> storage.&quot;</li>
+<li><strong>Governance-triggered drill.</strong> A proposal accepted under the domain&#39;s authority for the storage class. Useful when policy changes, when a major incident has been resolved, or before adopting a new backup target.</li>
+<li><strong>Incident-aftermath drill.</strong> Following a real incident, to confirm the recovery path is intact.</li>
+</ul>
+<p><strong>Constraints</strong></p>
+<ul>
+<li><strong>Test scope.</strong> Drills restore into a <strong>non-authoritative</strong> environment by default. A drill that restores into production is a <code>live restore</code>, not a <code>test</code>, and requires the strict authority class for that storage.</li>
+<li><strong>No silent mutation.</strong> Test restores MUST NOT mutate authoritative state. Where a drill does require touching authoritative state (e.g., a destructive recovery rehearsal), the policy names the proposal class that authorizes it.</li>
+</ul>
+<p><strong>What the receipt records</strong></p>
+<p>The restore-test receipt MUST name:</p>
+<ul>
+<li>What was restored (source <code>StorageSpec</code>, version / point-in-time, content hash where applicable).</li>
+<li>Where it was restored to (target environment, locality, custody class, privacy class).</li>
+<li>Under whose authority (mandate reference, <code>GovernanceDecisionReceipt</code> reference for governance-triggered drills).</li>
+<li>What was verified (integrity check outcome, content equivalence, schema compatibility for typed state).</li>
+<li>What failed (per check; not a single boolean).</li>
+<li>Convergence time, where the drill measured it.</li>
+</ul>
+<p><strong>Failure</strong></p>
+<blockquote>
+<p>A failed restore test is not a warning to hide. It is a governance-relevant event.</p>
+</blockquote>
+<p>The failure produces a receipt with <code>success = false</code>. The steward cockpit (<code>#1795</code>) surfaces it. Where the failure indicates a real recoverability gap, the policy names which proposal class is required to address it.</p>
+<p><strong>Member visibility</strong></p>
+<p>For storage classes whose loss would affect members directly (canonical state, scoped vaults), the restore-test result is summarized for affected members at a member-shell-appropriate cadence (per <code>#1818</code>). The summary does not expose the underlying data; it asserts the institution&#39;s recovery posture.</p>
+<h2>Locality and privacy inheritance</h2>
+<p>The single most load-bearing rule in this spec. Stated three ways for emphasis.</p>
+<p><strong>Inheritance rule:</strong></p>
+<blockquote>
+<p>Backups, replicas, archives, exports, and restore targets inherit the source&#39;s <code>DataLocality</code> and privacy / disclosure constraints.</p>
+<p>Policy MAY narrow disclosure (e.g., a <code>MembersOnly</code> source backed up into a <code>ScopeRestricted</code> target).</p>
+<p>Policy MAY NOT broaden locality or disclosure without an explicit governance act that names the broadening.</p>
+</blockquote>
+<p><strong>Why:</strong></p>
+<ul>
+<li>A backup that lands in a wider locality than the source effectively re-publishes data the source&#39;s authority did not authorize.</li>
+<li>A replica in a wider locality is institutional disclosure by the back door.</li>
+<li>An archive in a wider disclosure class is silent declassification.</li>
+<li>An export to an external custodian is governed precisely because it crosses the boundary.</li>
+</ul>
+<p><strong>Per-class application:</strong></p>
+<ul>
+<li><strong>Scoped vault / private overlay storage</strong> (<code>#1767</code>). Backups and replicas remain encrypted; access requires the same authority as access to the source; export requires explicit governance.</li>
+<li><strong>Secret / key material.</strong> Backups exist only via key rotation or recovery protocols; ordinary backup mechanisms MUST NOT copy secret material. (See §&quot;Failure and safety rules&quot;: &quot;Secret material copied into ordinary backup.&quot;)</li>
+<li><strong>Cache / derived state.</strong> Backup is usually neither required nor appropriate; the source is reconstructible. Where a derived cache <em>is</em> backed up (e.g., to accelerate recovery), the backup inherits the privacy of the source it was derived from.</li>
+</ul>
+<p><strong>Cross-link:</strong></p>
+<ul>
+<li><code>#1767</code> — encrypted private-overlay storage, including key custody for backups of vault material.</li>
+<li><code>#1792</code> — disclosure boundary and <code>AccessReceipt</code> class for backup access.</li>
+</ul>
+<h2>Backup / export / restore authority</h2>
+<p>The authority rules tie this spec to ADR-0014 (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>) and to <code>docs/spec/effect-dispatch-contract.md</code>.</p>
+<p><strong>Policy adoption and amendment</strong></p>
+<ul>
+<li>Adopting or amending <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, <code>IntegrityPolicy</code> is a governance act per <code>docs/spec/ccl-policy-registry.md</code> §&quot;Adoption contract.&quot; The receipt chain is the dispatch chain.</li>
+<li>Unadopted policy is inert; the domain runs against its currently adopted versions.</li>
+</ul>
+<p><strong>Operational backup execution</strong></p>
+<ul>
+<li>Routine backup execution may be operational, not governed per backup. The domain&#39;s operational backup operator runs the schedule the policy authorizes; the policy is the standing authority.</li>
+<li>Every backup execution emits evidence regardless. A backup with no evidence is institutional opacity.</li>
+</ul>
+<p><strong>Restore of authoritative state</strong></p>
+<ul>
+<li>Restoring <code>Canonical</code> storage MUST be governed per restore. The proposal class is named in <code>RecoveryPolicy</code>; the dispatch chain runs end-to-end; the restore-execution receipt is the institutional record.</li>
+<li>Restoring <code>ServiceState</code> may be per-binding; not every routine rollback needs a full proposal.</li>
+</ul>
+<p><strong>Export and exit</strong></p>
+<ul>
+<li>Export of canonical or vault material to another institution requires either a federation agreement (per <code>institutional-domain.md</code> §&quot;Federation&quot;) or the domain&#39;s explicit exit policy.</li>
+<li>Exit is constitutional. A domain may always leave; the exit path produces export receipts and custody handoffs.</li>
+</ul>
+<p><strong>Emergency authority</strong></p>
+<ul>
+<li>Where <code>RecoveryPolicy</code> permits emergency restore (e.g., to recover from a disaster faster than the ordinary proposal class allows), the emergency authority MUST be: bounded in time, named in the policy, reviewable after the fact, and receipt-backed. No emergency-restore authority is silent.</li>
+</ul>
+<p><strong>Failure visibility</strong></p>
+<ul>
+<li>Failed backup integrity, failed restore tests, divergent replicas, missing archives — all surface in the steward cockpit (<code>#1795</code>). They are first-class institutional facts, not buried operational alerts.</li>
+</ul>
+<h2>Relationship to sibling work</h2>
+<p>Cross-link, do not duplicate.</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Where it lives</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Governed service binding, workload manifest, runtime provider</td>
+<td><code>docs/spec/governed-service-binding.md</code> (<code>#1815</code>, merged via PR #1822).</td>
+</tr>
+<tr>
+<td><code>InstitutionalDomain</code> and <code>DomainPolicy</code> (storage / backup / recovery / archive defaults)</td>
+<td><code>docs/spec/institutional-domain.md</code> (<code>#1794</code>, merged via PR #1820).</td>
+</tr>
+<tr>
+<td>Effect dispatch contract (Stage 5 application + evidence; disclosure inheritance)</td>
+<td><code>docs/spec/effect-dispatch-contract.md</code> (<code>#1797</code>, merged via PR #1819).</td>
+</tr>
+<tr>
+<td>CCL policy registry, adoption contract (policy adoption produces receipts)</td>
+<td><code>docs/spec/ccl-policy-registry.md</code> (<code>#1817</code>, merged via PR #1821).</td>
+</tr>
+<tr>
+<td>Storage classes (<code>StorageClass</code>, <code>DataLocality</code>) and access enforcement</td>
+<td><code>docs/state/storage-governance-spec.md</code> + <code>icn/crates/icn-kernel-api/src/storage.rs</code>.</td>
+</tr>
+<tr>
+<td>Integrated cooperative operating model (storage as custody + backup doctrine)</td>
+<td><code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> (<code>#1793</code>, merged via PR #1814).</td>
+</tr>
+<tr>
+<td><code>ArtifactRegistry</code> v0 and <code>ScopedVault</code> boundary</td>
+<td><code>#1798</code>.</td>
+</tr>
+<tr>
+<td>Encrypted distributed private-overlay storage (key custody for vault backups)</td>
+<td><code>#1767</code>.</td>
+</tr>
+<tr>
+<td>Private data disclosure boundary (<code>PrivacyClass</code>, <code>DisclosurePolicy</code>, <code>AccessReceipt</code>)</td>
+<td><code>#1792</code>.</td>
+</tr>
+<tr>
+<td>Network anti-entropy proof loops (verification surface for replication / integrity)</td>
+<td><code>#1799</code>.</td>
+</tr>
+<tr>
+<td>Compute placement (resource allocation for storage-providing workloads)</td>
+<td><code>#1801</code>.</td>
+</tr>
+<tr>
+<td>Member shell v0 (member-facing restore-test summary)</td>
+<td><code>#1818</code>.</td>
+</tr>
+<tr>
+<td>Steward cockpit v0 (operator-facing failure surface)</td>
+<td><code>#1795</code>.</td>
+</tr>
+<tr>
+<td>Receipt and provenance proof envelope (existing receipt layer model)</td>
+<td>ADR-0026.</td>
+</tr>
+<tr>
+<td>Constitutional object model (<code>AuthorityClass</code>, <code>AuthorityGrant</code>, <code>Mandate</code>)</td>
+<td>ADR-0014.</td>
+</tr>
+<tr>
+<td>Authority Grant Minting and Mandate Persistence Seam</td>
+<td>ADR-0019.</td>
+</tr>
+</tbody></table>
+<h2>Failure and safety rules</h2>
+<p>Each failure mode has a deterministic response. Cross-cutting rule: <strong>fail closed, surface honestly, never silently fall back.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Response</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Missing <code>StorageSpec</code></strong> (a binding declares storage but no spec is bound).</td>
+<td>Adoption MUST fail. The domain cannot govern what it has not classified.</td>
+</tr>
+<tr>
+<td><strong>Storage binding without a custody class.</strong></td>
+<td>Refused at adoption (per <code>storage-governance-spec.md</code>).</td>
+</tr>
+<tr>
+<td><strong><code>BackupPolicy</code> missing for non-discardable state.</strong></td>
+<td>Adoption MUST fail unless the spec explicitly declares the storage class is discardable (e.g., cache). Silence is not &quot;no backup needed&quot;; absence is a contract gap.</td>
+</tr>
+<tr>
+<td><strong>Backup crosses locality boundary</strong> (target locality wider than source).</td>
+<td>Backup refused. The runtime provider rejects; the failure is recorded as institutional evidence.</td>
+</tr>
+<tr>
+<td><strong>Replica violates locality / privacy policy.</strong></td>
+<td>Replica placement refused. The provider rejects; the steward cockpit surfaces the gap.</td>
+</tr>
+<tr>
+<td><strong>Restore without authority.</strong></td>
+<td>Restore refused. Where the attempt mutates state, the mutation MUST NOT proceed. The attempt is recorded with the would-be actor and the missing authority.</td>
+</tr>
+<tr>
+<td><strong>Restore drill never run.</strong></td>
+<td>The steward cockpit MUST surface the gap. After a policy-defined horizon, the binding is at-risk and the domain&#39;s emergency-review path applies.</td>
+</tr>
+<tr>
+<td><strong>Archive quietly deleted.</strong></td>
+<td>Forbidden. Archival material expires only via the governed-expiration path with a named authority and an expiration receipt. Any deletion without those records is a bug and a governance-relevant incident.</td>
+</tr>
+<tr>
+<td><strong>Integrity check fails.</strong></td>
+<td>The policy&#39;s repair path applies. The failure produces a receipt with <code>success = false</code>; the steward cockpit surfaces it; for <code>Canonical</code> storage, the repair authority is named and emergency review applies.</td>
+</tr>
+<tr>
+<td><strong>Anti-entropy divergence found.</strong></td>
+<td>Per <code>#1799</code>&#39;s proof loops + <code>ReplicationPolicy.Repair authority</code>. For <code>Canonical</code> storage, the divergence is a governance-relevant event; for routine <code>ServiceState</code>, it may be auto-repairable.</td>
+</tr>
+<tr>
+<td><strong>Cache treated as canonical.</strong></td>
+<td>The class mismatch is a bug. The spec MUST refuse a <code>StorageSpec</code> that names cache custody but operates on <code>Canonical</code> storage class.</td>
+</tr>
+<tr>
+<td><strong>Secret material copied into ordinary backup.</strong></td>
+<td>The backup path MUST refuse. Secret material follows key-rotation / recovery protocols (<code>#1767</code>), not ordinary backups.</td>
+</tr>
+<tr>
+<td><strong>Export path missing</strong> for a binding that may exit.</td>
+<td>Adoption MUST fail. A binding without an export path is not safely adoptable.</td>
+</tr>
+<tr>
+<td><strong>Recovery objective overclaimed as SLA.</strong></td>
+<td>The policy names <em>classes</em>, not numerical SLAs. A policy that asserts a numerical commitment without naming the operational mechanism that delivers it is incomplete; review MUST surface the gap.</td>
+</tr>
+<tr>
+<td><strong>Provider unavailable</strong> (storage backend or backup target down).</td>
+<td>Spec stays valid; the workload may suspend per the governed-service-binding lifecycle. Operator must restore or governance must amend the policy.</td>
+</tr>
+<tr>
+<td><strong>Stale policy reference</strong> (spec points at a deprecated <code>BackupPolicy</code> version).</td>
+<td>The domain MUST amend its <code>DomainPolicy</code> via a governance act before evaluation continues. References pointing at deprecated versions cause selection to fail closed (mirrors <code>ccl-policy-registry.md</code> §&quot;Failure / safety rules&quot;).</td>
+</tr>
+</tbody></table>
+<h2>Open questions and deferred decisions</h2>
+<p>Each is named so future readers know where this spec stops.</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Deferred to</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Wire-stable schema for <code>StorageSpec</code>, <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, <code>IntegrityPolicy</code> records</td>
+<td>Follow-up <code>schema(storage): …</code> issue drafted in this PR&#39;s handoff.</td>
+</tr>
+<tr>
+<td>Restore-test receipt envelope (Rust type, persistence, audit-query surface)</td>
+<td>Follow-up <code>spec(storage): define restore-test receipt envelope</code> drafted in this PR&#39;s handoff.</td>
+</tr>
+<tr>
+<td>Locality / privacy inheritance check (the <code>validate_storage_access()</code>-style enforcement function named as TBD in <code>storage-governance-spec.md</code>)</td>
+<td>Follow-up <code>spec(storage): define locality/privacy inheritance checks</code>.</td>
+</tr>
+<tr>
+<td>Archive verification and export contract (the per-archive proof shape, hand-off protocol, custodian agreement)</td>
+<td>Follow-up <code>spec(storage): define archive verification and export contract</code>.</td>
+</tr>
+<tr>
+<td>Backup provider / runtime provider interface (how a <code>BackupPolicy</code> is executed by a <code>RuntimeProvider</code> per <code>#1815</code>)</td>
+<td>Follow-up <code>spec(storage): define backup provider / runtime provider interface</code>.</td>
+</tr>
+<tr>
+<td>Connection between <code>IntegrityPolicy</code> receipts and <code>#1799</code>&#39;s anti-entropy proof loops</td>
+<td>Follow-up <code>spec(anti-entropy): connect IntegrityPolicy receipts to network proof loops</code>.</td>
+</tr>
+<tr>
+<td>Institutional hold protocol (legal / institutional holds beyond default expiry)</td>
+<td>Forward; named as a hold class in <code>ArchivePolicy</code> above but the protocol is deferred.</td>
+</tr>
+<tr>
+<td>Reconciliation of the 7-class custody taxonomy with the 3-variant kernel <code>StorageClass</code> enum</td>
+<td>Forward; both stand today, named explicitly in §&quot;Storage class model.&quot;</td>
+</tr>
+<tr>
+<td>Concrete numerical objectives for per-domain <code>RecoveryPolicy</code> adoption</td>
+<td>Domain-side, not spec-side. Each domain&#39;s <code>DomainPolicy</code> adoption names the concrete RTO/RPO-equivalents.</td>
+</tr>
+<tr>
+<td>Federation-side recognition of one domain&#39;s backup / archive material</td>
+<td>Federation agreement (per <code>institutional-domain.md</code> §&quot;Agreement registry&quot;); not in this spec.</td>
+</tr>
+<tr>
+<td>Kernel-side enforcement of inheritance rules beyond what <code>StorageValidationError</code> already covers</td>
+<td>Future ADR / extension to <code>icn-kernel-api/src/storage.rs</code>.</td>
+</tr>
+</tbody></table>
+<h2>Non-claims (repeated for clarity)</h2>
+<ul>
+<li>This document does not introduce any of the forward-direction policy objects it names. They remain forward-direction.</li>
+<li>It does not introduce schema, wire format, or contract changes.</li>
+<li>It does not redefine <code>StorageClass</code> (3-variant kernel enum) or <code>DataLocality</code> (4-level kernel enum). Both remain canonical per <code>icn/crates/icn-kernel-api/src/storage.rs</code>.</li>
+<li>It does not commit to a storage backend, a replication algorithm, a backup vendor, or an SLA numerical commitment.</li>
+<li>It does not authorize mutation of any deployed infrastructure (DNS, K3s, Forgejo, identity-bridge, gateway, backup jobs).</li>
+<li>It does not claim production readiness.</li>
+<li>It does not claim live inter-cooperative federation.</li>
+<li>It does not claim any partner federation is operating under these primitives today. NYCN appears nowhere in the spec; institution-package vocabulary stays in institution packages.</li>
+<li>It does not use payment, wallet, balance, currency, or blockchain as ICN-native framing. The discipline list in <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> §&quot;Vocabulary discipline&quot; applies in full.</li>
+<li>It does not by itself close <code>#1816</code>. The PR uses <code>Refs:</code>.</li>
+</ul>
+<h2>Related documents and issues</h2>
+<p>Architecture and spine:</p>
+<ul>
+<li><code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> — §&quot;Storage as custody&quot; and §&quot;Backup, redundancy, recovery, archive.&quot;</li>
+<li><code>docs/architecture/KERNEL_APP_SEPARATION.md</code> — meaning firewall; the kernel never imports policy objects.</li>
+<li><code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> — generic shapes vs. package vocabulary.</li>
+<li><code>docs/architecture/SERVICE_HOSTING_MODEL.md</code> — hosted → governed → native; storage durability is a binding-state requirement.</li>
+<li><code>docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code> — design-direction overview.</li>
+</ul>
+<p>Specs (siblings and parent):</p>
+<ul>
+<li><code>docs/spec/institutional-domain.md</code> — <code>DomainPolicy</code> adopts the policy objects this spec defines.</li>
+<li><code>docs/spec/effect-dispatch-contract.md</code> — Stage 5 receipts; disclosure inheritance.</li>
+<li><code>docs/spec/ccl-policy-registry.md</code> — policy adoption is a CCL-evaluated governance act.</li>
+<li><code>docs/spec/governed-service-binding.md</code> — <code>StorageSpec</code> and <code>BackupPolicy</code> reference live inside the binding.</li>
+<li><code>docs/spec/KERNEL_CONTRACTS.md</code> — kernel primitive contracts.</li>
+</ul>
+<p>State and design:</p>
+<ul>
+<li><code>docs/state/storage-governance-spec.md</code> — <code>StorageClass</code>, <code>DataLocality</code>, <code>StorageSpec</code> (named as TBD), <code>validate_storage_access()</code> (named as TBD).</li>
+<li><code>docs/design/compute-classes.md</code> — runtime class taxonomy that workloads consume storage under.</li>
+<li><code>docs/design/deterministic-core.md</code> — determinism for legitimacy-compute workloads that read or write <code>Canonical</code> storage.</li>
+</ul>
+<p>ADRs:</p>
+<ul>
+<li>ADR-0014 — Constitutional Object Model (authority primitives referenced by <code>RecoveryPolicy</code>).</li>
+<li>ADR-0019 — Authority Grant Minting and Mandate Persistence Seam.</li>
+<li>ADR-0026 — Receipt and Provenance Proof Envelope (existing receipt-layer model).</li>
+<li>ADR-0008 — Receipt-chain vertical slice and <code>audit verify</code> CLI.</li>
+</ul>
+<p>Code surface (existing types this spec references):</p>
+<ul>
+<li><code>icn/crates/icn-kernel-api/src/storage.rs</code> — <code>StorageClass</code> (line 53), <code>DataLocality</code> (line 155), <code>StorageValidationError</code> (line 272).</li>
+<li><code>icn/crates/icn-store/src/blob_store.rs</code> — hybrid blob store (sled metadata + filesystem blobs).</li>
+<li><code>icn/crates/icn-store/src/lib.rs</code> — persistent key-value abstraction; re-exports <code>StorageChallenge</code>, <code>MerkleProof</code>, <code>PeerCache</code>, <code>MaintenanceManager</code>.</li>
+<li><code>icn/crates/icn-store/src/pos.rs</code> — proof-of-storage challenge system.</li>
+<li><code>icn/crates/icn-snapshot/src/lib.rs</code> — state snapshot (Chandy-Lamport) for graceful restarts.</li>
+<li><code>icn/crates/icn-governance/src/proof.rs</code> — <code>GovernanceProof</code>, <code>GovernanceDecisionReceipt</code>, <code>GovernanceDecisionAttestation</code>.</li>
+</ul>
+<p>Issues:</p>
+<ul>
+<li><code>#1816</code> — this spec.</li>
+<li><code>#1793</code> — integrated operating model (merged via PR #1814).</li>
+<li><code>#1794</code> — institutional domain (merged via PR #1820).</li>
+<li><code>#1797</code> — effect dispatch contract (merged via PR #1819).</li>
+<li><code>#1815</code> — governed service binding (merged via PR #1822).</li>
+<li><code>#1817</code> — CCL policy registry (merged via PR #1821).</li>
+<li><code>#1798</code> — <code>ArtifactRegistry</code> v0 and <code>ScopedVault</code> boundary.</li>
+<li><code>#1767</code> — encrypted distributed private-overlay storage.</li>
+<li><code>#1792</code> — private data disclosure boundary.</li>
+<li><code>#1799</code> — network routing, redundancy, and anti-entropy proof loops.</li>
+<li><code>#1801</code> — compute placement.</li>
+<li><code>#1818</code> — member shell v0.</li>
+<li><code>#1795</code> — steward cockpit.</li>
+<li><code>#1748</code> — institutional process substrate.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
