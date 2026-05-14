@@ -25,9 +25,25 @@ import type { IconName } from '../data/icons';
 
 export interface Props {
   title?: string;
+  /**
+   * Whether to render the visible truth-label chip on the asset.
+   * Bible §3 requires the label to travel with the asset. Default
+   * is false so existing placements render unchanged; when true,
+   * a visible "Truth label: repo-grounded public explainer" chip is
+   * shown above the diagram. When false, a visually-hidden span
+   * carrying the same label is still rendered so assistive technology
+   * and source readers always see it.
+   */
+  showTruthLabelChip?: boolean;
 }
 
-const { title = 'Five scopes of action' } = Astro.props;
+const {
+  title = 'Five scopes of action',
+  showTruthLabelChip = false,
+} = Astro.props;
+
+// VE-002 truth label per docs/design/assets/ASSET_REGISTER.md.
+const truthLabel = 'repo-grounded public explainer';
 
 interface Scope {
   id: string;
@@ -77,8 +93,18 @@ const scopes: Scope[] = [
 <figure
   class="scope-model"
   aria-label="ICN's five scopes of institutional action, from the most shared context to the most personal"
+  data-truth-label={truthLabel}
 >
   <figcaption class="scope-title">{title}</figcaption>
+
+  {showTruthLabelChip ? (
+    <p class="scope-truth" role="note" aria-label={`Truth label: ${truthLabel}`}>
+      <span class="scope-truth-label">Truth label</span>
+      <span class="scope-truth-value">{truthLabel}</span>
+    </p>
+  ) : (
+    <span class="scope-sr-only">Truth label: {truthLabel}</span>
+  )}
 
   <p class="scope-intro">
     Scope is <strong>context of action</strong>, not hierarchy.
@@ -128,6 +154,53 @@ const scopes: Scope[] = [
     letter-spacing: 0.14em;
     color: var(--text-muted);
     text-align: left;
+  }
+
+  /* Truth-label chip — bible §3. Hidden by default; pages opt in via
+     the showTruthLabelChip prop. Color paired with text so the chip
+     stays distinguishable in grayscale. */
+  .scope-truth {
+    margin: 0;
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.35em 0.85em;
+    align-self: flex-start;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-left: 3px solid var(--rail-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    color: var(--text-secondary);
+  }
+
+  .scope-truth-label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+  }
+
+  .scope-truth-value {
+    font-weight: 600;
+    color: var(--text-heading);
+  }
+
+  /* Visually-hidden fallback so the truth label always travels with
+     the asset, per bible §3, even when the visible chip is hidden. */
+  .scope-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .scope-intro {
