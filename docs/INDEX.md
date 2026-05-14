@@ -151,6 +151,9 @@ Feature designs, proposals, and evolution plans:
 Formal protocol and contract specifications:
 
 - [KERNEL_CONTRACTS.md](spec/KERNEL_CONTRACTS.md) - Kernel contract specifications
+- [effect-dispatch-contract.md](spec/effect-dispatch-contract.md) - Accepted-proposal effect dispatch contract (governance decision → mandate → effect plan → dispatch → application + evidence)
+- [institutional-domain.md](spec/institutional-domain.md) - `InstitutionalDomain` and `DomainPolicy` primitive (the governed operating jurisdiction)
+- [ccl-policy-registry.md](spec/ccl-policy-registry.md) - CCL policy registry, versioning, adoption contract, and governance-effect hook contract
 
 ---
 
