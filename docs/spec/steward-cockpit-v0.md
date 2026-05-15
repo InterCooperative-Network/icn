@@ -1,6 +1,6 @@
 ---
 Status: normative
-Authority: spec (defines the design-level rendering contract for the ICN steward cockpit at v0 as the operator-facing complement of the member shell; consumes the 8-field anti-entropy cockpit surface from `docs/spec/network-anti-entropy-proof-loops.md`, the 14-field operator/steward dashboard from `docs/spec/compute-placement-policy.md`, the storage durability policy objects from `docs/spec/storage-durability-policies.md`, and the merged sibling specs; some clauses are explicitly forward-direction)
+Authority: spec (defines the design-level rendering contract for the ICN steward cockpit at v0 as the operator-facing complement of the member shell; consumes the 9-field anti-entropy cockpit surface from `docs/spec/network-anti-entropy-proof-loops.md`, the 14-field operator/steward dashboard from `docs/spec/compute-placement-policy.md`, the storage durability policy objects from `docs/spec/storage-durability-policies.md`, and the merged sibling specs; some clauses are explicitly forward-direction)
 Canonical: no
 Last Reviewed: 2026-05-15
 ---
@@ -28,7 +28,7 @@ A node steward, a domain steward, and a federation steward show up to keep insti
 
 The cockpit makes stewardship legible **without turning stewards into rulers**. It surfaces obligations, warnings, receipts, authority basis, and repair paths. Every steward action runs through the same mandate / authority / receipt envelope as every other institutional action.
 
-The cockpit is the consumer side of: the 8-field steward-cockpit surface in `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" (merged #1829), the 14-field operator/steward dashboard in `docs/spec/compute-placement-policy.md` §"Operator / steward dashboard" (merged #1826), the storage durability policy objects in `docs/spec/storage-durability-policies.md` (merged #1823), the artifact registry / scoped-vault posture in `docs/spec/artifact-registry-and-scoped-vault.md` (merged #1824), the governed-service-binding lifecycle "Observe" state (merged #1822), the CCL policy registry adoption surface (merged #1821), the institutional-domain policy hooks (merged #1820), and the Stage 5 effect-dispatch evidence (merged #1819).
+The cockpit is the consumer side of: the 9-field steward-cockpit surface in `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" (merged #1829), the 14-field operator/steward dashboard in `docs/spec/compute-placement-policy.md` §"Operator / steward dashboard" (merged #1826), the storage durability policy objects in `docs/spec/storage-durability-policies.md` (merged #1823), the artifact registry / scoped-vault posture in `docs/spec/artifact-registry-and-scoped-vault.md` (merged #1824), the governed-service-binding lifecycle "Observe" state (merged #1822), the CCL policy registry adoption surface (merged #1821), the institutional-domain policy hooks (merged #1820), and the Stage 5 effect-dispatch evidence (merged #1819).
 
 ## Scope and non-goals
 
@@ -109,10 +109,10 @@ The v0 cockpit offers twelve surfaces. The list is the **minimum**; institution-
 
 | Surface | Purpose | Primary sources consumed |
 |---|---|---|
-| **Overview / Required Actions** | One-screen-at-a-glance: which conditions require steward action now, with priority. | All sub-surfaces feed this; ActionCards (per ADR-0027) drive the required-action queue. |
+| **Overview / Required Actions** | One-screen-at-a-glance: which conditions require steward action now, with priority. | All sub-surfaces feed this; steward required-action rendering analogs (per §"Required Actions / Steward Action Cards" below) drive the queue, pending a future steward required-action card contract. ADR-0027 member `ActionCard`s are not reused for operator-required-action scenarios. |
 | **Node Status** | Daemon health for the local node. | `icn-obs` metrics; `icn-core` supervisor surfaces. |
 | **Domain Status** | The `InstitutionalDomain` the steward is operating; policy version; standing read-model health. | `docs/spec/institutional-domain.md`; `/me/standing`; CCL policy registry. |
-| **Network / Federation** | Peer reachability, sync state, divergence, repair. | `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" (the 8 fields verbatim). |
+| **Network / Federation** | Peer reachability, sync state, divergence, repair. | `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" (the nine fields verbatim, including Escalation status). |
 | **Receipt Store** | Receipt persistence and read/write health. | Governance proof module; receipt-store backend (sibling of future ArtifactRegistry); ADR-0026 envelope. |
 | **Storage / Artifacts / ScopedVault** | Storage class / custody class posture; artifact and replica health; vault posture without content. | `docs/spec/storage-durability-policies.md`; `docs/spec/artifact-registry-and-scoped-vault.md`. |
 | **Governance / Process** | Proposals, decisions, mandates, effect dispatch evidence, policy adoption. | `docs/spec/effect-dispatch-contract.md`; `docs/spec/ccl-policy-registry.md`; `docs/spec/institutional-domain.md`. |
@@ -126,7 +126,9 @@ The cockpit may offer more surfaces; a v0-conformant cockpit offers at least the
 
 ## Required Actions / Steward Action Cards
 
-Steward action cards consume the same ADR-0027 ActionCard schema as the member shell. The cockpit renders them with operator-facing technical detail rather than member-facing plain language. Per `#1795` acceptance criteria, the cockpit defines steward-side action cards for at least the following operator scenarios. Each scenario is named, with its source class, its authority basis pattern, and its expected `RepairReceipt` or evidence outcome.
+**Schema status (forward-direction).** The member shell consumes ADR-0027's `ActionCard` schema (closed enums: `source_kind ∈ {proposal, meeting, action_item}` + two RFC-gated reserved values; `action_kind ∈ {vote, attend, complete}`). The fourteen operator scenarios named below — repair, backup, restore drill, key rotation, export review, stale peer, etc. — **cannot** be represented by that schema as it currently stands. ADR-0027 was not written to cover operator-required-action surfaces. This spec therefore **does not** claim the existing schema fits; it names the scenarios at design-level and **defers the schema question** to a follow-up `spec(contracts): define steward required-action card contract` that either (a) amends ADR-0027 with an operator-required-action superset, or (b) defines a separate `StewardRequiredActionCard` primitive alongside the member-facing `ActionCard`. Per this PR's non-claims, no schema, ADR, or wire format is introduced here.
+
+Per `#1795` acceptance criteria, the cockpit defines steward-side required-action scenarios for at least the following operator situations. Each scenario is named, with its source class, its authority basis pattern, and its expected `RepairReceipt` or evidence outcome. The **rendering needs** below are spec-level; the **wire-stable record shape** that carries them is forward-direction.
 
 | Operator scenario | Source class | Authority pattern | Expected outcome |
 |---|---|---|---|
@@ -145,7 +147,21 @@ Steward action cards consume the same ADR-0027 ActionCard schema as the member s
 | Key rotation needed | Key-status telemetry (per `icn-gossip` key rotation module) | `DomainPolicy` key-rotation cadence | Key-rotation evidence + new key adoption receipt. |
 | Policy conflict / challenge window open | Open challenge window on a `GovernanceDecisionReceipt` or `EffectDispatchEvidence` | Governance review authority | Decision affirmed, reversed, or amended per policy; corresponding receipt class. |
 
-Each action card includes the fourteen ADR-0027 schema fields (`id`, `source_kind`, `action_kind`, `scope`, `title`, `summary`, `authority_basis`, `required_authority_scope`, `deadline`, `risk_level`, `accessibility_hint`, `receipt_expected`, `source_id`, `domain_id`). The cockpit rendering augments them with the technical fields the member shell explicitly does not show.
+Each steward required-action row carries a **rendering analog** set — fields the cockpit needs in order to render the row honestly to a steward. These are **not** ADR-0027 `ActionCard` fields; ADR-0027 was written for member participation cards and its `source_kind` / `action_kind` enums do not extend to operator scenarios. The wire-stable record shape is forward-direction (see follow-up `spec(contracts): define steward required-action card contract`); until that lands, the cockpit may surface analogous concepts:
+
+- **Title** — short technical label naming the operator scenario.
+- **Summary** — one-line plain-technical description of what's happening.
+- **Source** — which cockpit surface raised it (Receipt Store, Network / Federation, Storage / Artifacts / ScopedVault, Compute / Commons, etc.).
+- **Authority basis** — the mandate, `DomainPolicy` clause, or federation agreement that authorizes a steward to act here.
+- **Scope** — `LocalDomain` / `Federation` / `Commons` / peer-pair, per the corrected scope vocabulary.
+- **Risk** — coarse severity (critical / high / medium / low; color-independent per ADR-0028).
+- **Deadline** — when the action must be taken, when known; otherwise "no time pressure encoded."
+- **Status** — current operator state from the closed v0 vocabulary in §"Status vocabulary."
+- **Expected evidence** — the `RepairReceipt` / `EffectDispatchEvidence` / restore-test receipt / etc. that the action will produce on completion.
+- **Action path** — the concrete next step (request governance review, run restore drill, re-replicate, rotate key, review export, etc.).
+- **Member-impact summary** — verbatim from the member-shell vocabulary mapping (Design principle 9).
+
+These are **rendering analogs**, not a schema definition. The cockpit renders them with operator-facing technical detail rather than member-facing plain language; the member shell does not show them at all (per §"Boundary lines" → "Member shell vs steward cockpit"). The forward-direction follow-up either amends ADR-0027 with an operator-required-action superset or defines a separate `StewardRequiredActionCard` primitive; this PR does neither.
 
 ## Node Status surface
 
@@ -175,7 +191,7 @@ Renders the `InstitutionalDomain` the steward is operating against.
 
 ## Network / Federation surface
 
-This surface **consumes** the 8-field cockpit surface from `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" verbatim. Each open `DivergenceEvidence` (per the 18-class taxonomy) renders with:
+This surface **consumes** the 9-field cockpit surface from `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" verbatim. Each open `DivergenceEvidence` (per the 18-class taxonomy) renders with:
 
 1. **Affected scope** — `LocalDomain`, `Federation`, `Commons`, or peer-pair.
 2. **State class** — one of the nine state classes (governance state, receipts, artifact metadata, scoped vault refs, storage replicas, compute receipts, settlement records, federation membership, CCL policy versions).
@@ -195,7 +211,7 @@ Each row carries the closed status terminology from `#1799` / `#1829` (direct / 
 
 Renders persistent receipt posture.
 
-- **Latest receipts** — by class (per ADR-0026 / ADR-0025 / merged sibling specs): `GovernanceDecisionReceipt`, `ActionItemCompletionReceipt`, `MeetingAttendanceReceipt`, `ArtifactReceipt`, `InstitutionalEffectRecord` + `EffectDispatchEvidence`, future `RatificationReceipt`, future `RepairReceipt`, etc.
+- **Latest receipts** — by ADR-0026 / ADR-0025 receipt class: `GovernanceDecisionReceipt` (Layer 1), `ActionItemCompletionReceipt`, `MeetingAttendanceReceipt`, `ArtifactReceipt` (Layer 2), `InstitutionalEffectRecord` + `EffectDispatchEvidence` (Stage 5), future `RatificationReceipt` (when ADR-0025 / `#1818` follow-ups land it as a top-level class).
 - **Failed writes** — receipt writes that did not persist; retry log; cause if known.
 - **Read / write health** — read latency, write latency, error rate per `icn-obs` metrics.
 - **Verification status** — most recent integrity verification per `IntegrityPolicy`.
@@ -203,6 +219,7 @@ Renders persistent receipt posture.
 - **Receipt class summary** — counts per class, retention horizon per `DomainPolicy` §"Receipt retention defaults."
 - **Missing receipt warnings** — `DivergenceEvidence` class "missing receipt" rows raised against peers.
 - **Evidence envelope references** — links to the Stage 5 `EffectDispatchEvidence` artifacts (per `docs/spec/effect-dispatch-contract.md`) the receipts belong to.
+- **Forward-direction proof / evidence artifacts (not receipt classes).** Several merged sibling specs name forward-direction artifact identifiers that travel **inside existing receipt envelopes** (Stage 5 `EffectDispatchEvidence` or Layer 2 `ArtifactReceipt` per ADR-0026), **not** as new ADR-0026 receipt classes. From `docs/spec/network-anti-entropy-proof-loops.md` §"Proof artifacts (forward-direction names)": `RepairReceipt`, `RoutingProof`, `RedundancyProof` (and the broader anti-entropy proof-artifact set). From `docs/spec/compute-placement-policy.md` §"Candidate outputs": `PlacementFallbackReceipt` (an attachment on its parent `PlacementDecision`, not a new top-level receipt class — see also the Compute / Commons surface below for the placement-side rendering). The cockpit surfaces these as attachments on their parent evidence record; they do **not** appear in the "Latest receipts — by class" list above.
 
 ## Storage / Artifacts / ScopedVault surface
 
@@ -248,7 +265,7 @@ This surface **consumes** the 14-field operator/steward dashboard from `docs/spe
 13. **Review requirement** — whether the output is awaiting human ratification.
 14. **Failure / fallback reason** — when the placement fell back or was `RejectedByPolicy`, the reason and authority basis.
 
-Rejected and fallback rows show the original preferred class, the chosen class (or rejection), and the policy clause invoked. `PlacementFallbackReceipt`s (per `docs/spec/network-anti-entropy-proof-loops.md` Stage 5 evidence) render as evidence attachments on their parent `PlacementDecision`.
+Rejected and fallback rows show the original preferred class, the chosen class (or rejection), and the policy clause invoked. `PlacementFallbackReceipt`s (per `docs/spec/compute-placement-policy.md` §"Candidate outputs") render as evidence attachments on their parent `PlacementDecision`. The Stage 5 envelope that carries the attachment is the `EffectDispatchEvidence` from `docs/spec/effect-dispatch-contract.md`.
 
 ## Participation Access surface
 
@@ -285,6 +302,32 @@ Consumes `docs/spec/storage-durability-policies.md`.
 - **Export authority** — open export-receipt queue; authority basis per export.
 - **Recovery drill cadence** — when the next drill is due per `DomainPolicy`.
 - **Locality / disclosure inheritance warnings** — any backup, replica, archive, or export that would broaden `DataLocality` or `privacy_class` is flagged before it can run (per `docs/spec/storage-durability-policies.md` §"Locality and privacy inheritance" and `docs/spec/network-anti-entropy-proof-loops.md` Boundary rule 4).
+
+## Warnings / Incidents / Repair surface
+
+Aggregates open warnings, active incidents, and repair flows across all surfaces. Distinct from the Overview / Required Actions surface: that one orders by required steward action; this one orders by warning / incident severity and life-cycle, and is the place to drill into the underlying evidence chain.
+
+Each row renders:
+
+- **Warning / incident id** — stable id derived from the source evidence (e.g., the `DivergenceEvidence` id, the failing `IntegrityPolicy` check id, the missing-restore-drill key). Not a member-facing id; technical detail.
+- **Severity** — one of `critical` / `high` / `medium` / `low`, derived from the source class + the affected scope + the policy's tolerance window. Color-independent (per ADR-0028 category 4): glyph + label always present, color reinforces.
+- **Affected scope** — `LocalDomain`, `Federation`, `Commons`, or peer-pair; same scope vocabulary as the Network / Federation surface.
+- **Source surface** — which of the other eleven cockpit surfaces raised this row (Network / Federation, Storage / Artifacts / ScopedVault, Compute / Commons, etc.). One-click navigation to the originating surface.
+- **Authority basis** — the mandate, `DomainPolicy` clause, or federation agreement that authorizes a steward to act on this row. If no current authority basis exists, the row renders as "review required" with a path to request the missing authority.
+- **Member-impact summary** — verbatim from the member-shell vocabulary mapping (e.g., "Members see: Sync delayed / degraded"). Required for every row that has member-facing impact (Design principle 9; the v0-violation row in the failure / safety table enforces this).
+- **Evidence / receipt refs** — links to the underlying `DivergenceEvidence`, `EffectDispatchEvidence`, `IntegrityPolicy` failure record, or other Stage 5 evidence per `docs/spec/effect-dispatch-contract.md`. Receipts (not raw bodies) are the path; private-artifact bodies never appear here.
+- **Repair plan ref** — when a `RepairPlan` (per `docs/spec/network-anti-entropy-proof-loops.md`) has been produced; otherwise blank with "no plan yet — escalate."
+- **Current state** — one of the closed v0 operator states (`healthy`, `degraded`, `syncing`, `stale`, `partitioned`, `relayed`, `verification pending`, `repair planned`, `repair applied`, `review required`, `blocked by policy`, `private content restricted`).
+- **Steward action required** — the specific operator action this row needs (request governance review, run restore drill, re-replicate, rotate key, review export, etc.). When the required-action shape lands per the forward-direction follow-up named in §"Required Actions / Steward Action Cards," the row links to it; until then the cockpit renders the action as a plain technical instruction with authority basis.
+- **Escalation / challenge path** — when the policy provides one (challenge window, governance review queue, federation arbiter). Deadline shown when applicable.
+- **Last updated** — freshness timestamp. Stale beyond a policy window renders the row as `stale` regardless of the underlying state class.
+
+The surface obeys the same boundary rules as the rest of the cockpit:
+
+- No private content preview. Body bytes of `PrivateEvidence` artifacts never reach this surface; existence + scope + access path only.
+- No surveillance aggregation. The surface aggregates by scope and severity, not by member identity. A row may name affected scope and counts; it does not enumerate member DIDs unless the steward holds an explicit receipted authority basis to see them and the policy has authorized that surfacing.
+- Degraded state must match member-shell status. Per Design principle 9, the Member-impact summary on every row must be honest; a cockpit row that says "degraded" while the member shell is showing "Synced" is a v0 violation per the failure / safety table.
+- Every repair action needs an authority basis and an evidence path. The row's Authority basis and Evidence / receipt refs columns are mandatory; an action lacking either is rendered as visibly blocked.
 
 ## Status vocabulary
 
@@ -360,7 +403,7 @@ Per `#1795` acceptance criteria and the session pattern from #1829 / #1830, the 
 - **One open `DivergenceEvidence`.** Class "missing receipt"; affected scope the fixture domain; peers named; digest mismatch surfaced as Bloom-filter set-difference.
 - **One `RepairPlan`.** Action "fetch missing receipt"; authority basis fixture clause; expected `RepairReceipt` class.
 - **One `RepairReceipt`.** `EffectOutcome::Applied`; before / after digests; signed by fixture steward.
-- **Cockpit fields rendered.** All eight from `#1829` plus escalation status. Member-impact summary attached: `Members see: Sync delayed → Receipt available`.
+- **Cockpit fields rendered.** All nine fields from `#1829` §"Steward cockpit surface" (Affected scope, State class, Peers, Digest mismatch, Last successful proof, Repair plan, Authority required, Receipts/evidence, Escalation status). Member-impact summary attached: `Members see: Sync delayed → Receipt available`.
 - **Accessibility checklist applied.** The twelve-category gate from ADR-0028 / `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` evaluated on the fixture rendering. Operator surfaces are accessible: keyboard reachable, screen-reader navigable, color-independent status, plain technical detail without surveillance-style aggregation.
 
 ### Slice B: Storage replica / backup overdue / restore-test receipt fixture
