@@ -1,6 +1,6 @@
-# Handoff — Network Anti-Entropy Proof Loops (#1799)
+# Session Handoff — 2026-05-15
 
-**Date:** 2026-05-15
+**Topic:** Network Anti-Entropy Proof Loops (#1799)
 **Branch:** `spec/network-anti-entropy-proof-loops`
 **Primary issue advanced:** [#1799](https://github.com/InterCooperative-Network/icn/issues/1799) (network routing, redundancy, and anti-entropy proof loops)
 **Refs (not closed):** `#1799`, `#1010`, `#1365`, `#1767`, `#1792`, `#1795`, `#1796`, `#1797`, `#1798`, `#1801`, `#1815`, `#1816`, `#1817`, `#1818`, `#1820`, `#1822`, `#1823`, `#1824`, `#1825`, `#1826`
@@ -9,7 +9,6 @@
 ---
 
 ## Session Goal
-<!-- TRUTH TYPE: Intent — what we set out to do -->
 
 Define `docs/spec/network-anti-entropy-proof-loops.md` as the design-level contract for ICN's anti-entropy proof loops: the institutional evidence loop sitting beneath compute placement, storage durability, artifact registry, receipt clearing, and federation settlement finality. The spec consumes existing primitives in `icn-gossip` (BloomFilter, VectorClock, PeerSyncManager, PartitionDetector, anti-entropy module) and `icn-core` (background anti-entropy task) without redefining them; it introduces design-level proof-artifact names (`AntiEntropyProbe`, `StateDigest`, `DivergenceEvidence`, `RepairPlan`, `RepairReceipt`, `QuorumSyncCheck`, `FederationSyncWindow`, `RoutingProof`, `RedundancyProof`, etc.) and names the closed sets of state classes, divergence classes, and boundary rules.
 
@@ -17,12 +16,41 @@ The spec advances #1799's acceptance criterion 1 ("Network proof-loop design doc
 
 ---
 
-## Current Repo State Reviewed
-<!-- TRUTH TYPE: Implementation truth — facts verified before drafting -->
+## Decisive Test
 
-### `main` HEAD
+The PR fails if any of these holds:
+
+1. The spec uses positive ICN-native payment / currency / balance / wallet / token / crypto / blockchain framing outside explicit negation context or outside verbatim quotation of existing legacy code identifiers.
+2. The spec redefines `ArtifactReceipt`, `GovernanceProof`, `MerkleProof`, `ClearingReceipt`, or any other receipt class already named in ADR-0026 / ADR-0031 / `docs/spec/federation-settlement-finality.md`.
+3. The spec introduces a new ADR-0026 receipt class.
+4. The spec touches Rust code in `icn/crates/icn-gossip`, `icn-net`, `icn-core`, `icn-federation`, `icn-protocol`, `icn-store`, or `icn-kernel-api`.
+5. The spec edits the `#1799` GitHub issue body.
+6. `python3 docs/scripts/doc_control_check.py --strict` introduces a new warning rooted in this PR.
+7. `python3 docs/scripts/lint-arch.py docs/spec/network-anti-entropy-proof-loops.md --cargo icn/Cargo.toml` returns errors (warnings in explicit negation context are acceptable).
+8. The commit uses `Closes: #1799` instead of `Refs:`.
+9. The PR claims production readiness, live federation, or any partner-pilot operating under this spec today.
+10. Anti-entropy boundary rules contradict the federation / commons fail-closed gates in `docs/spec/compute-placement-policy.md` §"Boundary rules" 4 and 6, or the finality conditions in `docs/spec/federation-settlement-finality.md` §"Finality."
+
+See §"Verification Commands" below for the exact commands used to check each item.
+
+---
+
+## Final State (Verified)
+<!-- TRUTH TYPE: Implementation truth — only facts confirmed by commands or code inspection -->
+
+### `main` HEAD before branching
 
 `2a5b75c58` — `docs(agents): reconcile handoff path with template (#1827)`
+
+### Branches
+
+- `spec/network-anti-entropy-proof-loops` — head SHA at first commit was `6439afb4a`. Branch head moves with each push to address review feedback; the latest head SHA is reflected in `gh pr view 1829 --json headRefOid`.
+
+### Open PRs
+
+| PR | Branch | State | CI Status | Blocker |
+|----|--------|-------|-----------|---------|
+| [#1829](https://github.com/InterCooperative-Network/icn/pull/1829) | `spec/network-anti-entropy-proof-loops` | OPEN | 23 pass / 6 skip / 0 fail at initial head | None |
 
 ### Recent merged PRs
 
@@ -47,14 +75,12 @@ The spec advances #1799's acceptance criterion 1 ("Network proof-loop design doc
 
 `AntiEntropyProbe`, `StateDigest`, `ReceiptDigest`, `ArtifactDigest`, `PeerSyncReport`, `DivergenceEvidence`, `RepairPlan`, `RepairReceipt`, `SyncDegradedStatus`, `QuorumSyncCheck`, `FederationSyncWindow`, `RoutingProof`, `RedundancyProof`. None lands as a Rust type in this PR.
 
----
+### Files Changed
 
-## Files Changed
-
-1. `docs/spec/network-anti-entropy-proof-loops.md` — new file (~470 lines).
+1. `docs/spec/network-anti-entropy-proof-loops.md` — new file (~470 lines, later +2 lines after review-feedback fix on the bonds:payments legacy-identifier carve-out).
 2. `docs/registry.toml` — new entry inserted before `[docs."docs/spec/compute-placement-policy.md"]`.
 3. `docs/INDEX.md` — Specifications section: one new line after the `compute-placement-policy.md` entry.
-4. `docs/DOCUMENT_REGISTRY.md` — regenerated via `--write-document-registry`. Corpus moves from 811 to 812 markdown files under `docs/`.
+4. `docs/DOCUMENT_REGISTRY.md` — regenerated via `--write-document-registry`. Corpus moves from 811 to 813 markdown files under `docs/` (the new spec + this handoff).
 5. `docs/dev/handoff-2026-05-15-network-anti-entropy-proof-loops.md` — this file.
 
 No Rust code touched. SDK untouched. Website untouched. Deploy scripts untouched. Existing specs not modified.
@@ -109,8 +135,22 @@ Filename uses the descriptive topic suffix convention now canonicalized by PR #1
 
 ---
 
-## What Explicitly Did NOT Change
-<!-- TRUTH TYPE: Execution truth — preserved boundaries -->
+## What's Open
+<!-- TRUTH TYPE: Execution truth — known incomplete work + preserved boundaries -->
+
+### Incomplete work this session deliberately did not start
+
+- [ ] Wire-stable schemas for any of the forward-direction proof-artifact names (`AntiEntropyProbe`, `StateDigest`, `DivergenceEvidence`, `RepairPlan`, etc.). Tracked as follow-ups #1 and #2 below.
+- [ ] Devnet fixture for Slice A (read-only receipt-index anti-entropy rehearsal). Tracked as follow-up #3 below.
+- [ ] Steward cockpit / member-shell rendering specs that consume this spec's surface vocabulary. Tracked as follow-ups #4 and #5 below.
+- [ ] Federation-side quorum sync window protocol detail. Tracked as follow-up #6 below.
+- [ ] Storage-side repair-receipt connector to `StorageSpec` / `RecoveryPolicy`. Tracked as follow-up #7 below.
+- [ ] Private-object digest proof contract (divergence class 16). Tracked as follow-up #8 below.
+- [ ] Per the established session pattern: **"Apply valid feedback only. Stop and summarize unless explicitly told to merge."** Wait for explicit merge instruction.
+- [ ] Decision on whether to file the eight follow-up issue drafts listed in §"Follow-up Issue Drafts" (deferred to user).
+- [ ] Closure of `#1799`. The PR uses `Refs: #1799`; closure is left to the user against the seven acceptance criteria. See §"Unsafe Assumptions" for the per-criterion coverage breakdown.
+
+### Preserved scope boundaries (explicitly NOT changed)
 
 - No Rust code in `icn/crates/icn-gossip`, `icn-net`, `icn-core`, `icn-federation`, `icn-protocol`, `icn-store`, `icn-kernel-api`, or anywhere else.
 - No new or modified gossip topic strings. The existing set (`services:announce`, `services:query`, `key:rotation`, `bonds:issuance`, `bonds:payments`, `network:candidates`, governance / contract topics) is preserved verbatim.
@@ -133,6 +173,18 @@ Filename uses the descriptive topic suffix convention now canonicalized by PR #1
 - **`gossip.anti_entropy_interval` is a real governance parameter.** Verified by `grep` against `icn-governance/src/protocol_defaults.rs`. The spec's §"Schedule / trigger" cites this name; if it's renamed in code before implementation work starts, the spec's anchor needs an update.
 - **The eighteen-class divergence taxonomy is closed but extensible.** The spec asserts "closed set" for clarity, but the failure-and-safety table also names a fallback ("Probe attempted on a state class with no canonical digest form") whose disposition is to track extending the state-class set as a follow-up. If reviewers prefer "open with rules for extension" over "closed with extension protocol," the wording can be adjusted in a follow-up commit.
 - **`#1799` acceptance criteria.** The spec satisfies criterion 1 ("Network proof-loop design doc or test plan merged") on merge, criterion 4 ("Dashboard/member status mapping is defined") via §"Steward cockpit surface" + §"Member shell surface", and offers a credible interpretation of criterion 6 ("first safe proof-loop or dogfood slice") via the three fixture slices. Criteria 2 ("proof scenarios classified by proof level using #1796 taxonomy") and 3 ("each scenario identifies required source paths/endpoints/tests and current gaps") are partially addressed via the §"Existing code surface" table and the §"First safe proof-loop / dogfood slice" section, but `#1796`'s taxonomy is itself forward work; full classification awaits #1796. Criterion 5 ("Follow-up implementation/test issues are opened only after the proof plan is accepted") is honored — this PR drafts follow-ups in the handoff but does not file them. **Closure of `#1799` is left to the user.**
+
+---
+
+## Next Move
+<!-- TRUTH TYPE: Execution truth — the exact sequence for the next session -->
+
+1. Wait for any further AI-reviewer feedback on PR #1829 beyond the initial three threads (Copilot bonds:payments + Copilot template alignment + Codex handoff-removal). Apply valid feedback in additional commits on the same branch.
+2. After all valid feedback is applied, **stop and summarize**. Do not merge until explicitly instructed.
+3. If the user instructs to merge: squash-merge with `--delete-branch`; sync local `main`; confirm working tree clean.
+4. Carry forward the eight follow-up issue drafts in §"Follow-up Issue Drafts" for separate user decision on filing.
+5. Do **not** carry forward the AGENTS.md handoff-path drift in future handoffs unless an AI reviewer surfaces it again; #1827 reconciled it.
+6. The natural next architecture-spec PR after `#1829` lands is `#1818` (member shell v0) or `#1795` (steward cockpit) — both are direct consumers of this spec's surface vocabulary. `#1767` (encrypted private overlay) is the alternative if the user prefers to push on the private-storage side instead of the operability side.
 
 ---
 
