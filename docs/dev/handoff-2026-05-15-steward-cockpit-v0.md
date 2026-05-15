@@ -105,7 +105,7 @@ No Rust code touched. No SDK changes. No website changes. No frontend changes. N
 
 Authority class: `normative`. Length: roughly 550 lines. Sections:
 
-- **Purpose** — ten plain-detail questions the cockpit must answer ("Is this node / domain healthy?" through "What evidence proves each claim?"). Names the consumer relationships with merged #1829 (8 fields), #1826 (14 fields), #1823, #1824, #1822, #1821, #1820, #1819.
+- **Purpose** — ten plain-detail questions the cockpit must answer ("Is this node / domain healthy?" through "What evidence proves each claim?"). Names the consumer relationships with merged #1829 (9 fields), #1826 (14 fields), #1823, #1824, #1822, #1821, #1820, #1819.
 - **Scope and non-goals** — twelve non-claim bullets covering frontend technology, endpoint definitions, role redefinition, `#1613` overlap, surveillance / admin / fintech framing, K3s / DNS / Forgejo mutation, NYCN-specific labels, production claims, closure of `#1795`.
 - **Boundary lines** — six hard boundaries: vs member shell, vs node operator civic-role surface (`#1613`), vs public website, vs institution-package skin, vs backend / runtime, vs surveillance / admin-control panel.
 - **Design principles** — ten v0 principles led by stewardship-not-domination. Others: proof-before-confidence, degraded-is-visible, privacy-posture-not-private-content, receipts-explain-state, required-actions-explicit, authority-basis-visible, scope-visible, member-impact-summary-always-present (the load-bearing honesty rule), no-financial-framing.
@@ -349,7 +349,7 @@ Implement Slice A from `docs/spec/steward-cockpit-v0.md` §"First safe proof-loo
 ## Scope
 
 - Same fixture stack as `docs/spec/network-anti-entropy-proof-loops.md` Slice A.
-- All 8 cockpit fields rendered.
+- All 9 cockpit fields rendered.
 - Member-impact summary attached: "Members see: Sync delayed → Receipt available."
 - The 12-category accessibility gate passed on the fixture rendering.
 

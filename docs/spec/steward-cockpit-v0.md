@@ -112,7 +112,7 @@ The v0 cockpit offers twelve surfaces. The list is the **minimum**; institution-
 | **Overview / Required Actions** | One-screen-at-a-glance: which conditions require steward action now, with priority. | All sub-surfaces feed this; ActionCards (per ADR-0027) drive the required-action queue. |
 | **Node Status** | Daemon health for the local node. | `icn-obs` metrics; `icn-core` supervisor surfaces. |
 | **Domain Status** | The `InstitutionalDomain` the steward is operating; policy version; standing read-model health. | `docs/spec/institutional-domain.md`; `/me/standing`; CCL policy registry. |
-| **Network / Federation** | Peer reachability, sync state, divergence, repair. | `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" (the 8 fields verbatim). |
+| **Network / Federation** | Peer reachability, sync state, divergence, repair. | `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" (the nine fields verbatim, including Escalation status). |
 | **Receipt Store** | Receipt persistence and read/write health. | Governance proof module; receipt-store backend (sibling of future ArtifactRegistry); ADR-0026 envelope. |
 | **Storage / Artifacts / ScopedVault** | Storage class / custody class posture; artifact and replica health; vault posture without content. | `docs/spec/storage-durability-policies.md`; `docs/spec/artifact-registry-and-scoped-vault.md`. |
 | **Governance / Process** | Proposals, decisions, mandates, effect dispatch evidence, policy adoption. | `docs/spec/effect-dispatch-contract.md`; `docs/spec/ccl-policy-registry.md`; `docs/spec/institutional-domain.md`. |
@@ -147,7 +147,21 @@ Per `#1795` acceptance criteria, the cockpit defines steward-side required-actio
 | Key rotation needed | Key-status telemetry (per `icn-gossip` key rotation module) | `DomainPolicy` key-rotation cadence | Key-rotation evidence + new key adoption receipt. |
 | Policy conflict / challenge window open | Open challenge window on a `GovernanceDecisionReceipt` or `EffectDispatchEvidence` | Governance review authority | Decision affirmed, reversed, or amended per policy; corresponding receipt class. |
 
-Each action card includes the fourteen ADR-0027 schema fields (`id`, `source_kind`, `action_kind`, `scope`, `title`, `summary`, `authority_basis`, `required_authority_scope`, `deadline`, `risk_level`, `accessibility_hint`, `receipt_expected`, `source_id`, `domain_id`). The cockpit rendering augments them with the technical fields the member shell explicitly does not show.
+Each steward required-action row carries a **rendering analog** set — fields the cockpit needs in order to render the row honestly to a steward. These are **not** ADR-0027 `ActionCard` fields; ADR-0027 was written for member participation cards and its `source_kind` / `action_kind` enums do not extend to operator scenarios. The wire-stable record shape is forward-direction (see follow-up `spec(contracts): define steward required-action card contract`); until that lands, the cockpit may surface analogous concepts:
+
+- **Title** — short technical label naming the operator scenario.
+- **Summary** — one-line plain-technical description of what's happening.
+- **Source** — which cockpit surface raised it (Receipt Store, Network / Federation, Storage / Artifacts / ScopedVault, Compute / Commons, etc.).
+- **Authority basis** — the mandate, `DomainPolicy` clause, or federation agreement that authorizes a steward to act here.
+- **Scope** — `LocalDomain` / `Federation` / `Commons` / peer-pair, per the corrected scope vocabulary.
+- **Risk** — coarse severity (critical / high / medium / low; color-independent per ADR-0028).
+- **Deadline** — when the action must be taken, when known; otherwise "no time pressure encoded."
+- **Status** — current operator state from the closed v0 vocabulary in §"Status vocabulary."
+- **Expected evidence** — the `RepairReceipt` / `EffectDispatchEvidence` / restore-test receipt / etc. that the action will produce on completion.
+- **Action path** — the concrete next step (request governance review, run restore drill, re-replicate, rotate key, review export, etc.).
+- **Member-impact summary** — verbatim from the member-shell vocabulary mapping (Design principle 9).
+
+These are **rendering analogs**, not a schema definition. The cockpit renders them with operator-facing technical detail rather than member-facing plain language; the member shell does not show them at all (per §"Boundary lines" → "Member shell vs steward cockpit"). The forward-direction follow-up either amends ADR-0027 with an operator-required-action superset or defines a separate `StewardRequiredActionCard` primitive; this PR does neither.
 
 ## Node Status surface
 
@@ -389,7 +403,7 @@ Per `#1795` acceptance criteria and the session pattern from #1829 / #1830, the 
 - **One open `DivergenceEvidence`.** Class "missing receipt"; affected scope the fixture domain; peers named; digest mismatch surfaced as Bloom-filter set-difference.
 - **One `RepairPlan`.** Action "fetch missing receipt"; authority basis fixture clause; expected `RepairReceipt` class.
 - **One `RepairReceipt`.** `EffectOutcome::Applied`; before / after digests; signed by fixture steward.
-- **Cockpit fields rendered.** All eight from `#1829` plus escalation status. Member-impact summary attached: `Members see: Sync delayed → Receipt available`.
+- **Cockpit fields rendered.** All nine fields from `#1829` §"Steward cockpit surface" (Affected scope, State class, Peers, Digest mismatch, Last successful proof, Repair plan, Authority required, Receipts/evidence, Escalation status). Member-impact summary attached: `Members see: Sync delayed → Receipt available`.
 - **Accessibility checklist applied.** The twelve-category gate from ADR-0028 / `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` evaluated on the fixture rendering. Operator surfaces are accessible: keyboard reachable, screen-reader navigable, color-independent status, plain technical detail without surveillance-style aggregation.
 
 ### Slice B: Storage replica / backup overdue / restore-test receipt fixture
