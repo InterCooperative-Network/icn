@@ -35,7 +35,12 @@ This spec defines that loop as the proof-layer beneath:
 
 ## Scope and non-goals
 
-This spec was originally introduced (PR #1829) as a design-level document that named the proof-loop phases, artifact identifiers, divergence classes, and boundary rules without landing implementation. As of issue `#1834` / PR `#1843`, the first two proof-artifact families — `AntiEntropyProbe` and the `StateDigest` family (with `ReceiptDigest` and `ArtifactDigest` specializations and the `StateClass` / `ProbeScope` / `TriggerSource` / `RequestedResponseClass` enums) — are wire-stable Rust shapes in `icn-kernel-api`. The remaining identifiers stay design-level / forward-direction.
+This spec was originally introduced (PR #1829) as a design-level document that named the proof-loop phases, artifact identifiers, divergence classes, and boundary rules without landing implementation. Wire-stable Rust shapes have landed incrementally in `icn-kernel-api`:
+
+- `#1834` / PR `#1843` — `AntiEntropyProbe`, the `StateDigest` family (`BloomProjection`, `MerkleRootProjection`, `VectorClockProjection`, `ShortDigestList`), the `ReceiptDigest` and `ArtifactDigest` specializations, and the `StateClass` / `ProbeScope` / `TriggerSource` / `RequestedResponseClass` enums.
+- `#1835` — `DivergenceEvidence`, `RepairPlan`, the eighteen-class `DivergenceClass` taxonomy (with `Unclassifiable` fallback), and supporting helpers (`PeerSet`, `DigestMismatch`, `PolicyClauseRef`, `RepairAction`, `AuthorityBasis`, `BoundaryRuleRef`, `BoundaryRuleSet`, `ExpectedRepairReceiptClass`).
+
+The remaining identifiers stay design-level / forward-direction.
 
 **In scope:**
 
@@ -44,12 +49,12 @@ This spec was originally introduced (PR #1829) as a design-level document that n
 - Defining steward and member surface vocabulary.
 - Naming the first safe proof-loop / dogfood slice.
 - Naming the privacy / custody rules that keep proof loops from leaking private data.
-- As of `#1834` / PR `#1843`: wire-stable record shapes for `AntiEntropyProbe` and the `StateDigest` family (see §"Proof artifacts (forward-direction names)" below for which identifiers are now wire-stable and which remain design-level).
+- As of `#1834` / PR `#1843`: wire-stable record shapes for `AntiEntropyProbe` and the `StateDigest` family. As of `#1835`: wire-stable record shapes for `DivergenceEvidence` (with the eighteen-class `DivergenceClass` taxonomy) and `RepairPlan`. See §"Proof artifacts (forward-direction names)" below for which identifiers are now wire-stable and which remain design-level.
 
-**Not in scope (preserved out of this spec and out of `#1834`):**
+**Not in scope (preserved out of this spec and out of `#1834` / `#1835`):**
 
-- Implementation of the remaining design-level artifact names. `PeerSyncReport`, `DivergenceEvidence`, `RepairPlan`, `RepairReceipt`, `SyncDegradedStatus`, `QuorumSyncCheck`, `FederationSyncWindow`, `RoutingProof`, and `RedundancyProof` remain forward-direction names; `DivergenceEvidence` and `RepairPlan` are tracked under `#1835` and the receipt-index anti-entropy fixture loop (Slice A) is tracked under `#1838`.
-- Live emission, classification, or repair. Even with the `AntiEntropyProbe` / `StateDigest` wire shapes now defined, no code path constructs, signs, gossips, classifies, or repairs them. The records are constructible and testable in isolation.
+- Implementation of the remaining design-level artifact names. `PeerSyncReport`, `RepairReceipt`, `SyncDegradedStatus`, `QuorumSyncCheck`, `FederationSyncWindow`, `RoutingProof`, and `RedundancyProof` remain forward-direction names. The receipt-index anti-entropy fixture loop (Slice A) is tracked under `#1838`.
+- Live emission, classification, or repair. Even with the `AntiEntropyProbe`, `StateDigest`, `DivergenceEvidence`, and `RepairPlan` wire shapes now defined, no code path constructs, signs, gossips, classifies, or repairs them. The records are constructible and testable in isolation.
 - Schema migration for existing types in `icn-gossip` / `icn-net` / `icn-federation`.
 - Network protocol mutation. No changes to gossip topic strings, message envelopes, or peer discovery.
 - Live federation rollout, devnet provisioning, K3s manifest changes, DNS changes, Forgejo or identity-bridge changes.
@@ -204,15 +209,20 @@ Anti-entropy proof loops apply to the following state classes. Each class names 
 
 The following identifiers are **design-level names** introduced by this spec. Each travels inside an existing receipt envelope (Stage 5 `EffectDispatchEvidence` per `docs/spec/effect-dispatch-contract.md`, or Layer 2 `ArtifactReceipt` per ADR-0026 for blob-transfer repair).
 
-Two of these now have wire-stable Rust shapes in `icn/crates/icn-kernel-api/src/proofs.rs` (per `#1834`): `AntiEntropyProbe` and the `StateDigest` family (`BloomProjection`, `MerkleRootProjection`, `VectorClockProjection`, `ShortDigestList`), together with the `ReceiptDigest` and `ArtifactDigest` newtype specializations and the `StateClass` / `ProbeScope` / `TriggerSource` / `RequestedResponseClass` enums. The Bloom projection is wire-equivalent to `icn_gossip::types::BloomFilterData` plus an explicit cardinality hint; cross-link helpers (`icn_gossip::to_bloom_projection` / `icn_gossip::to_bloom_filter_data`, re-exported from the crate root) preserve byte-level membership across the boundary. None of these wire shapes mutates protocol topics, emits probes, or adds a new ADR-0026 receipt class — the kernel record is an evidence envelope, not a top-level receipt. The remaining identifiers below remain design-level names; `DivergenceEvidence` / `RepairPlan` / `RepairReceipt` are tracked under `#1835`, the fixture loop under `#1838`.
+Several of these now have wire-stable Rust shapes in `icn/crates/icn-kernel-api/src/proofs.rs`:
+
+- Per `#1834` (PR `#1843`): `AntiEntropyProbe` and the `StateDigest` family (`BloomProjection`, `MerkleRootProjection`, `VectorClockProjection`, `ShortDigestList`), together with the `ReceiptDigest` and `ArtifactDigest` newtype specializations and the `StateClass` / `ProbeScope` / `TriggerSource` / `RequestedResponseClass` enums. The Bloom projection is wire-equivalent to `icn_gossip::types::BloomFilterData` plus an explicit cardinality hint; cross-link helpers (`icn_gossip::to_bloom_projection` / `icn_gossip::to_bloom_filter_data`, re-exported from the crate root) preserve byte-level membership across the boundary.
+- Per `#1835`: `DivergenceEvidence`, `RepairPlan`, the closed eighteen-class `DivergenceClass` taxonomy (with `Unclassifiable` fallback), and supporting helpers `PeerSet`, `DigestMismatch`, `PolicyClauseRef`, `RepairAction`, `AuthorityBasis`, `BoundaryRuleRef`, `BoundaryRuleSet`, `ExpectedRepairReceiptClass`. Both records follow the `#1843` self-authentication pattern (domain-tagged blake3 binding, `verify_binding()` fail-closed on unsupported `schema_version`, externally-tagged bincode-compatible enums, deserialize-time canonicalization for `PeerSet` / `BoundaryRuleSet`). `RepairPlan.divergence_evidence_hash` links a plan to the evidence it acts on for auditability.
+
+None of these wire shapes mutates protocol topics, emits probes, classifies divergences live, or adds a new ADR-0026 receipt class — the kernel records are evidence envelopes that travel inside an existing Stage 5 `EffectDispatchEvidence` per `docs/spec/effect-dispatch-contract.md`. The remaining identifiers below remain design-level names; `PeerSyncReport` and `RepairReceipt` are tracked under #1836 (forward), `SyncDegradedStatus` / `QuorumSyncCheck` / `FederationSyncWindow` / `RoutingProof` / `RedundancyProof` remain forward-direction, and the fixture loop is tracked under `#1838`.
 
 - **`AntiEntropyProbe`** — the probing message: state class, target scope, bounded digest, trigger source, freshness, signature. **Wire-stable** (`#1834`).
 - **`StateDigest`** — a bounded representation of a state class at a freshness instant; concrete forms include Bloom filter (existing `BloomFilter`), Merkle root, vector clock, or short digest list. **Wire-stable** (`#1834`).
 - **`ReceiptDigest`** — a `StateDigest` specialized to a receipt index. **Wire-stable** (`#1834`).
 - **`ArtifactDigest`** — a `StateDigest` specialized to an artifact-registry entry or scoped-vault reference; never the artifact body. **Wire-stable** (`#1834`).
 - **`PeerSyncReport`** — the comparison result: matching / missing on local / missing on remote / divergent / unknown.
-- **`DivergenceEvidence`** — classified non-matching outcome; records class, scope, peers, digest forms, policy clause, freshness, private-content implication flag.
-- **`RepairPlan`** — repair action, authority basis, scope, boundary rules, expected `RepairReceipt` class.
+- **`DivergenceEvidence`** — classified non-matching outcome; records class, scope, peers, digest forms, policy clause, freshness, private-content implication flag. **Wire-stable** (`#1835`).
+- **`RepairPlan`** — repair action, authority basis, scope, boundary rules, expected `RepairReceipt` class. **Wire-stable** (`#1835`).
 - **`RepairReceipt`** — evidence-artifact identifier for the repair outcome; carries before / after digests and the `EffectOutcome` value.
 - **`SyncDegradedStatus`** — the steward / member-facing status when the loop has detected divergence that has not yet been repaired within policy.
 - **`QuorumSyncCheck`** — proof that a quorum of named federation peers exchanged matching `StateDigest`s within a stated freshness window for a stated state class; the gate for federation-bound placement and federation settlement.

@@ -975,6 +975,886 @@ impl AntiEntropyProbe {
     }
 }
 
+// ============================================================================
+// DivergenceEvidence and RepairPlan records (issue #1835)
+//
+// Wire-stable record shapes for the next two design-level identifiers from
+// `docs/spec/network-anti-entropy-proof-loops.md` §"Proof artifacts
+// (forward-direction names)" beyond what #1834 / PR #1843 already landed.
+//
+// These records ride inside an existing Stage 5 `EffectDispatchEvidence`
+// envelope (per `docs/spec/effect-dispatch-contract.md`). No new top-level
+// ADR-0026 receipt class is introduced.
+//
+// Like `AntiEntropyProbe`, both records are self-authenticating: a
+// domain-tagged blake3 binding hash is computed at construction over a
+// canonical bincode encoding of the bound fields, and `verify_binding()`
+// recomputes and fails closed on unsupported schema versions.
+// ============================================================================
+
+/// Schema version for `DivergenceEvidence`. Increment on any wire-affecting
+/// change to the binding (field set, order, encoding).
+pub const DIVERGENCE_EVIDENCE_SCHEMA_VERSION: u32 = 1;
+
+/// Schema version for `RepairPlan`. Increment on any wire-affecting change
+/// to the binding (field set, order, encoding).
+pub const REPAIR_PLAN_SCHEMA_VERSION: u32 = 1;
+
+// ----------------------------------------------------------------------------
+// DivergenceClass — closed 18-class taxonomy
+// ----------------------------------------------------------------------------
+
+/// Closed taxonomy of divergence classes the policy oracle can record.
+///
+/// Matches `docs/spec/network-anti-entropy-proof-loops.md` §"Divergence
+/// classes" verbatim — eighteen classes with `Unclassifiable` as the
+/// fallback that triggers governance review rather than automatic repair.
+///
+/// The kernel does not interpret what each class *means* — classification
+/// is the policy-oracle phase per `docs/architecture/KERNEL_APP_SEPARATION.md`.
+/// The kernel only ensures that the recorded class round-trips deterministically
+/// and that no class outside this closed set can be expressed on the wire.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum DivergenceClass {
+    /// Class 1 — peer A has a receipt for an effect at a known content hash;
+    /// peer B does not.
+    MissingReceipt,
+    /// Class 2 — both peers claim a receipt at the same logical identifier
+    /// but the receipts have different content hashes.
+    ConflictingReceipt,
+    /// Class 3 — peer A has an `ArtifactRegistry` entry; peer B's index
+    /// does not include it.
+    MissingArtifactMetadata,
+    /// Class 4 — both peers have the artifact under the same logical name;
+    /// their content hashes differ.
+    ContentHashMismatch,
+    /// Class 5 — current replica count is below
+    /// `ReplicationPolicy.target_replicas` but the policy permits a grace
+    /// window before escalation.
+    ReplicaLag,
+    /// Class 6 — replica count has fallen outside the grace window; the
+    /// policy authorizes re-replication.
+    ReplicaMissing,
+    /// Class 7 — the most recent `BackupPolicy`-prescribed backup did not
+    /// verify (per `docs/spec/storage-durability-policies.md`).
+    BackupVerificationFailure,
+    /// Class 8 — the `RecoveryPolicy` cadence has elapsed without a
+    /// successful restore-test receipt.
+    RestoreDrillMissing,
+    /// Class 9 — peer's freshness timestamp falls outside the domain's
+    /// `FederationSyncWindow` for the state class in question.
+    PeerBehindSyncWindow,
+    /// Class 10 — peer is observed making inconsistent claims to different
+    /// peers about the same state at the same time. Treated as suspected
+    /// misbehavior; mandatory governance review.
+    PeerEquivocation,
+    /// Class 11 — both peers claim to be operating under the same
+    /// federation agreement but reference different `agreement_id`
+    /// content hashes or different adopted versions.
+    FederationAgreementMismatch,
+    /// Class 12 — peer's `policy_version_id` for a named policy disagrees
+    /// with the local adopted version
+    /// (per `docs/spec/ccl-policy-registry.md`).
+    CclPolicyVersionMismatch,
+    /// Class 13 — peer's `evaluator_binding_id` for a named evaluator
+    /// disagrees with the local binding
+    /// (per `docs/spec/ccl-policy-registry.md`).
+    EvaluatorBindingMismatch,
+    /// Class 14 — peer cannot produce the `PlacementDecision` evidence
+    /// (per `docs/spec/compute-placement-policy.md`) for a workload
+    /// that was claimed to have completed in scope.
+    PlacementEvidenceMissing,
+    /// Class 15 — peer's clearing-batch digest disagrees with the local
+    /// clearing manager's view
+    /// (per `docs/spec/federation-settlement-finality.md`).
+    SettlementRecordMismatch,
+    /// Class 16 — both peers have a scoped-vault reference at the same
+    /// logical identifier; the `ArtifactDigest`s disagree; the divergence
+    /// is recorded as existence-plus-scope-plus-affected-records, NEVER
+    /// as content. Per spec §"Privacy and custody rules."
+    PrivateObjectReferenceMismatchWithoutContentDisclosure,
+    /// Class 17 — the most recent `IntegrityPolicy`-prescribed
+    /// verification failed
+    /// (per `docs/spec/storage-durability-policies.md`).
+    IntegrityPolicyViolation,
+    /// Class 18 — the comparison is non-matching but does not fit any of
+    /// the above. Triggers governance review rather than automatic repair.
+    Unclassifiable,
+}
+
+// ----------------------------------------------------------------------------
+// Bounded helper records
+// ----------------------------------------------------------------------------
+
+/// Closed set of peers involved in a divergence observation.
+///
+/// Stored as `Vec<Did>` **sorted lexicographically and deduplicated**.
+/// Invariant enforced at construction (via [`Self::from_dids`]) AND on the
+/// deserialize path (via `#[serde(from = "RawPeerSet")]`) so two peers
+/// recording the same divergence compute the same `evidence_hash`
+/// regardless of how the DIDs arrived. Field private; use [`Self::dids`]
+/// for read access.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(from = "RawPeerSet")]
+pub struct PeerSet {
+    dids: Vec<Did>,
+}
+
+#[derive(Deserialize)]
+struct RawPeerSet {
+    dids: Vec<Did>,
+}
+
+impl From<RawPeerSet> for PeerSet {
+    fn from(raw: RawPeerSet) -> Self {
+        Self::from_dids(raw.dids)
+    }
+}
+
+impl PeerSet {
+    /// Construct from an unsorted iterator of DIDs.
+    ///
+    /// Entries are sorted lexicographically and deduplicated.
+    pub fn from_dids<I>(dids: I) -> Self
+    where
+        I: IntoIterator<Item = Did>,
+    {
+        let mut v: Vec<Did> = dids.into_iter().collect();
+        v.sort();
+        v.dedup();
+        Self { dids: v }
+    }
+
+    /// The canonical sorted, deduplicated DIDs.
+    pub fn dids(&self) -> &[Did] {
+        &self.dids
+    }
+}
+
+/// Reference to the policy clause under which a divergence was classified
+/// or a repair was planned.
+///
+/// Metadata only — the kernel does not interpret policy semantics. The
+/// policy oracle supplies the values; the kernel records them so an
+/// auditor can later look up the named policy version and clause.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct PolicyClauseRef {
+    /// Opaque policy identifier (e.g., `"compute-placement"`,
+    /// `"storage-durability"`). The kernel does not validate the value.
+    pub policy_id: String,
+    /// Opaque version identifier for the named policy at the time of
+    /// classification (e.g., a content hash hex, a semver string, or a
+    /// CCL `policy_version_id`). Free-form by design — the policy
+    /// registry, not the kernel, defines the value space.
+    pub policy_version_id: String,
+    /// Opaque clause identifier within the named policy version
+    /// (e.g., `"boundary-rules.4"`).
+    pub clause_id: String,
+}
+
+/// The digest-form mismatch observed between peers, if any.
+///
+/// Not every divergence class is a two-peer digest comparison. Replica-count
+/// classes, backup verification, restore drill, integrity policy, and CCL
+/// policy version mismatches are not digest-shaped; the divergence class
+/// still names what diverged. Use [`Self::NotApplicable`] for those.
+///
+/// # Privacy
+///
+/// For divergence class
+/// [`DivergenceClass::PrivateObjectReferenceMismatchWithoutContentDisclosure`],
+/// the embedded `StateDigest`s are bounded representations (Bloom over
+/// content hashes, Merkle root over an index, short list of reference
+/// hashes) — never object bodies. The privacy contract is documented and
+/// reviewable, not type-system-enforced.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DigestMismatch {
+    /// The local peer has a digest at the affected address; the remote
+    /// peer does not (the remote is "missing on remote" relative to local).
+    MissingOnRemote { local: StateDigest },
+    /// The remote peer has a digest at the affected address; the local
+    /// peer does not (the remote has entries the local responder
+    /// does not).
+    MissingOnLocal { remote: StateDigest },
+    /// Both peers claim digests at the same logical address, but the
+    /// digests differ.
+    Differs {
+        local: StateDigest,
+        remote: StateDigest,
+    },
+    /// No digest comparison applies (e.g., replica-count divergence,
+    /// missing restore drill, integrity-policy failure, policy-version
+    /// mismatch). The `DivergenceClass` still names what diverged.
+    NotApplicable,
+}
+
+// ----------------------------------------------------------------------------
+// DivergenceEvidence
+// ----------------------------------------------------------------------------
+
+/// Classified non-matching outcome of an anti-entropy proof loop.
+///
+/// Produced by the policy oracle in phase 4 ("Classify") of
+/// `docs/spec/network-anti-entropy-proof-loops.md`. Records the
+/// [`DivergenceClass`], the affected [`StateClass`], the [`ProbeScope`],
+/// the peers involved, the digest forms (if any) compared, the policy
+/// clause under which classification was made, the freshness window the
+/// evidence is valid for, and whether private content was implicated.
+///
+/// # Privacy
+///
+/// Per spec §"Privacy and custody rules", a `DivergenceEvidence` MUST NOT
+/// embed private content bytes. For
+/// [`DivergenceClass::PrivateObjectReferenceMismatchWithoutContentDisclosure`],
+/// the `DigestMismatch` carries opaque references / hashes only; the
+/// `private_content_implication` flag records that the divergence touched
+/// private state so downstream renderers can apply the
+/// "review required / existence + scope only" rule.
+///
+/// # Self-authentication
+///
+/// `evidence_hash` is a blake3 binding over a domain-separated
+/// (`DOMAIN_TAG = b"icn:divergence-evidence:v1"`), length-prefixed canonical
+/// bincode encoding of all bound fields (excluding `evidence_hash` and
+/// `signature`). [`Self::verify_binding`] re-checks both the hash and the
+/// schema version; either alone is insufficient.
+///
+/// # Wire-version policing (fail-closed)
+///
+/// Deserialization uses `#[serde(try_from = "RawDivergenceEvidence")]` so
+/// wire data with `schema_version != DIVERGENCE_EVIDENCE_SCHEMA_VERSION`
+/// is rejected before any `DivergenceEvidence` value is constructed.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "RawDivergenceEvidence")]
+pub struct DivergenceEvidence {
+    /// Wire schema version. See [`DIVERGENCE_EVIDENCE_SCHEMA_VERSION`].
+    pub schema_version: u32,
+    /// Closed divergence class.
+    pub divergence_class: DivergenceClass,
+    /// The state class against which the divergence was observed.
+    pub affected_state_class: StateClass,
+    /// Target scope at which the divergence was observed.
+    pub scope: ProbeScope,
+    /// Canonical sorted, deduplicated set of peers involved.
+    pub peers: PeerSet,
+    /// Digest-form mismatch (or [`DigestMismatch::NotApplicable`] for
+    /// non-digest divergence classes).
+    pub digest_mismatch: DigestMismatch,
+    /// Reference to the policy clause under which classification was made.
+    pub policy_clause: PolicyClauseRef,
+    /// Classifier's clock at construction (Unix seconds).
+    pub freshness_emitted_at: u64,
+    /// Timestamp beyond which the evidence is stale (Unix seconds).
+    pub freshness_valid_until: u64,
+    /// `true` if the divergence touched private state (e.g., a
+    /// scoped-vault reference). Renderers MUST gate technical detail
+    /// behind the disclosure scope of the affected state.
+    pub private_content_implication: bool,
+    /// 32-byte random nonce. Two evidence records with otherwise-identical
+    /// fields produce distinct `evidence_hash`es.
+    pub evidence_nonce: [u8; 32],
+    /// blake3 binding hash over all bound fields, computed at construction.
+    pub evidence_hash: Hash,
+    /// Classifier signature (empty until signed by a higher layer).
+    pub signature: Signature,
+}
+
+/// Raw wire form for [`DivergenceEvidence`]. Validated into the public
+/// type via [`TryFrom`] (fails closed on unsupported `schema_version`).
+#[derive(Deserialize)]
+struct RawDivergenceEvidence {
+    schema_version: u32,
+    divergence_class: DivergenceClass,
+    affected_state_class: StateClass,
+    scope: ProbeScope,
+    peers: PeerSet,
+    digest_mismatch: DigestMismatch,
+    policy_clause: PolicyClauseRef,
+    freshness_emitted_at: u64,
+    freshness_valid_until: u64,
+    private_content_implication: bool,
+    evidence_nonce: [u8; 32],
+    evidence_hash: Hash,
+    signature: Signature,
+}
+
+impl TryFrom<RawDivergenceEvidence> for DivergenceEvidence {
+    type Error = String;
+
+    fn try_from(raw: RawDivergenceEvidence) -> Result<Self, Self::Error> {
+        if raw.schema_version != DIVERGENCE_EVIDENCE_SCHEMA_VERSION {
+            return Err(format!(
+                "unsupported DivergenceEvidence schema_version: got {}, supported {}",
+                raw.schema_version, DIVERGENCE_EVIDENCE_SCHEMA_VERSION,
+            ));
+        }
+        Ok(Self {
+            schema_version: raw.schema_version,
+            divergence_class: raw.divergence_class,
+            affected_state_class: raw.affected_state_class,
+            scope: raw.scope,
+            peers: raw.peers,
+            digest_mismatch: raw.digest_mismatch,
+            policy_clause: raw.policy_clause,
+            freshness_emitted_at: raw.freshness_emitted_at,
+            freshness_valid_until: raw.freshness_valid_until,
+            private_content_implication: raw.private_content_implication,
+            evidence_nonce: raw.evidence_nonce,
+            evidence_hash: raw.evidence_hash,
+            signature: raw.signature,
+        })
+    }
+}
+
+/// Canonical binding fields for `DivergenceEvidence::evidence_hash`.
+///
+/// Excludes `evidence_hash` (the output) and `signature` (filled after
+/// binding). Bincode-serialized in a stable order.
+#[derive(Serialize)]
+struct DivergenceEvidenceBinding<'a> {
+    schema_version: u32,
+    divergence_class: DivergenceClass,
+    affected_state_class: StateClass,
+    scope: &'a ProbeScope,
+    peers: &'a PeerSet,
+    digest_mismatch: &'a DigestMismatch,
+    policy_clause: &'a PolicyClauseRef,
+    freshness_emitted_at: u64,
+    freshness_valid_until: u64,
+    private_content_implication: bool,
+    evidence_nonce: [u8; 32],
+}
+
+impl DivergenceEvidence {
+    /// Domain-separation tag. Distinct from
+    /// [`AntiEntropyProbe::DOMAIN_TAG`] and [`ArtifactReceipt::DOMAIN_TAG`].
+    pub const DOMAIN_TAG: &'static [u8] = b"icn:divergence-evidence:v1";
+
+    /// Construct a new evidence record with computed `evidence_hash` and
+    /// empty signature. `schema_version` is set to
+    /// [`DIVERGENCE_EVIDENCE_SCHEMA_VERSION`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        divergence_class: DivergenceClass,
+        affected_state_class: StateClass,
+        scope: ProbeScope,
+        peers: PeerSet,
+        digest_mismatch: DigestMismatch,
+        policy_clause: PolicyClauseRef,
+        freshness_emitted_at: u64,
+        freshness_valid_until: u64,
+        private_content_implication: bool,
+        evidence_nonce: [u8; 32],
+    ) -> Self {
+        let evidence_hash = Self::compute_evidence_hash(
+            DIVERGENCE_EVIDENCE_SCHEMA_VERSION,
+            divergence_class,
+            affected_state_class,
+            &scope,
+            &peers,
+            &digest_mismatch,
+            &policy_clause,
+            freshness_emitted_at,
+            freshness_valid_until,
+            private_content_implication,
+            &evidence_nonce,
+        );
+        Self {
+            schema_version: DIVERGENCE_EVIDENCE_SCHEMA_VERSION,
+            divergence_class,
+            affected_state_class,
+            scope,
+            peers,
+            digest_mismatch,
+            policy_clause,
+            freshness_emitted_at,
+            freshness_valid_until,
+            private_content_implication,
+            evidence_nonce,
+            evidence_hash,
+            signature: Signature::new(Vec::new()),
+        }
+    }
+
+    /// Compute the binding hash from the significant fields.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_evidence_hash(
+        schema_version: u32,
+        divergence_class: DivergenceClass,
+        affected_state_class: StateClass,
+        scope: &ProbeScope,
+        peers: &PeerSet,
+        digest_mismatch: &DigestMismatch,
+        policy_clause: &PolicyClauseRef,
+        freshness_emitted_at: u64,
+        freshness_valid_until: u64,
+        private_content_implication: bool,
+        evidence_nonce: &[u8; 32],
+    ) -> Hash {
+        let binding = DivergenceEvidenceBinding {
+            schema_version,
+            divergence_class,
+            affected_state_class,
+            scope,
+            peers,
+            digest_mismatch,
+            policy_clause,
+            freshness_emitted_at,
+            freshness_valid_until,
+            private_content_implication,
+            evidence_nonce: *evidence_nonce,
+        };
+        let payload = bincode::serialize(&binding)
+            .expect("DivergenceEvidenceBinding serialization is infallible");
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        *hasher.finalize().as_bytes()
+    }
+
+    /// `true` iff `schema_version == DIVERGENCE_EVIDENCE_SCHEMA_VERSION`.
+    pub fn is_supported_schema_version(&self) -> bool {
+        self.schema_version == DIVERGENCE_EVIDENCE_SCHEMA_VERSION
+    }
+
+    /// Verify the stored `evidence_hash` and `schema_version`.
+    ///
+    /// Returns `true` only if both hold. Fails closed on unsupported
+    /// versions even when the stored hash matches a recomputation under
+    /// that version. Does NOT verify the signature.
+    pub fn verify_binding(&self) -> bool {
+        if !self.is_supported_schema_version() {
+            return false;
+        }
+        let recomputed = Self::compute_evidence_hash(
+            self.schema_version,
+            self.divergence_class,
+            self.affected_state_class,
+            &self.scope,
+            &self.peers,
+            &self.digest_mismatch,
+            &self.policy_clause,
+            self.freshness_emitted_at,
+            self.freshness_valid_until,
+            self.private_content_implication,
+            &self.evidence_nonce,
+        );
+        self.evidence_hash == recomputed
+    }
+
+    /// `true` if `now_unix_seconds <= freshness_valid_until`.
+    pub fn is_fresh(&self, now_unix_seconds: u64) -> bool {
+        now_unix_seconds <= self.freshness_valid_until
+    }
+}
+
+// ----------------------------------------------------------------------------
+// RepairPlan
+// ----------------------------------------------------------------------------
+
+/// Closed set of repair actions a `RepairPlan` may propose.
+///
+/// Derived from `docs/spec/network-anti-entropy-proof-loops.md` §"Plan"
+/// and §"Failure and safety table". The kernel does NOT execute these
+/// actions — `RepairPlan` records what a policy oracle decided, not what
+/// the runtime did. Execution receipts are tracked separately (forward
+/// work: `RepairReceipt`, currently named only via
+/// [`ExpectedRepairReceiptClass`]).
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum RepairAction {
+    /// Fetch the receipt(s) / artifact metadata the local peer is missing.
+    FetchMissing,
+    /// Re-replicate to restore the target replica count.
+    ReReplicate,
+    /// Retry the most recent failed backup verification per
+    /// `BackupPolicy`.
+    RetryBackup,
+    /// Run the overdue restore drill per `RecoveryPolicy`.
+    RunRestoreDrill,
+    /// Retry the most recent failed integrity verification per
+    /// `IntegrityPolicy`.
+    RetryIntegrityVerification,
+    /// Quarantine the offending peer's contributions pending governance
+    /// review (e.g., for `PeerEquivocation`).
+    QuarantinePeerPendingReview,
+    /// Escalate the divergence to federation clearing (e.g., for
+    /// settlement-record mismatch within an adopted federation
+    /// agreement).
+    EscalateToFederationClearing,
+    /// Hold for explicit governance review — no automatic repair
+    /// authorized. Used for governance-authoritative state, equivocation,
+    /// and unclassifiable divergences.
+    RequestGovernanceReview,
+    /// Restart the dispute window per
+    /// `docs/spec/federation-settlement-finality.md` finality rule.
+    RestartDisputeWindow,
+    /// No automatic repair authorized; record `DivergenceEvidence` only.
+    /// Distinct from `RequestGovernanceReview` in that no review is
+    /// pending — the divergence is recorded for audit but not actioned.
+    NoAutomaticRepair,
+}
+
+/// Closed set of authority bases a `RepairPlan` may name.
+///
+/// A `RepairPlan` SHOULD NOT propose automatic repair without naming the
+/// authority basis. The kernel does not verify the named authority's
+/// validity — that is a policy-oracle concern — but it records the basis
+/// so the boundary rule "No repair beyond authority"
+/// (`docs/spec/network-anti-entropy-proof-loops.md` §"Boundary rules"
+/// rule 2) is auditable.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthorityBasis {
+    /// The repair is authorized by a named clause of an adopted
+    /// `DomainPolicy`.
+    DomainPolicyClause(PolicyClauseRef),
+    /// The repair is authorized by a covering governance mandate
+    /// (per ADR-0014 / ADR-0019). The mandate is referenced by its
+    /// binding hash; the kernel does not verify the mandate body.
+    GovernanceMandate { mandate_hash: Hash },
+    /// The repair is authorized by an adopted federation agreement.
+    /// Referenced by the agreement's `agreement_id` binding hash.
+    FederationAgreement { agreement_hash: Hash },
+    /// No automatic authority; explicit governance review is required.
+    GovernanceReviewRequired,
+    /// No automatic authority and no review pending. The plan records the
+    /// divergence for audit without taking action.
+    NoAutomaticAuthority,
+}
+
+/// Closed set of references to the spec's ten boundary rules.
+///
+/// A `RepairPlan` lists which boundary rules its scope and action have
+/// been checked against. Inclusion is informational; the kernel does not
+/// re-verify the named rule.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum BoundaryRuleRef {
+    /// Boundary rule 1.
+    NoSilentGovernanceAuthoritativeRepair,
+    /// Boundary rule 2.
+    NoRepairBeyondAuthority,
+    /// Boundary rule 3.
+    NoRawPrivateContentInGossipOrProbes,
+    /// Boundary rule 4.
+    NoLocalityOrDisclosureWidening,
+    /// Boundary rule 5.
+    NoTreatingDegradedSyncAsHealthy,
+    /// Boundary rule 6.
+    NoFederationOrCommonsPlacementWithStaleProof,
+    /// Boundary rule 7.
+    NoSettlementFinalityWithoutAntiEntropyProof,
+    /// Boundary rule 8.
+    NoMemberFacingLie,
+    /// Boundary rule 9.
+    NoProductionOrLiveFederationClaim,
+    /// Boundary rule 10.
+    NoGenericCoopPrefixedPrimitives,
+}
+
+/// Canonical sorted, deduplicated set of [`BoundaryRuleRef`]s.
+///
+/// Invariant enforced at construction (via [`Self::from_rules`]) AND on
+/// the deserialize path (via `#[serde(from = "RawBoundaryRuleSet")]`).
+/// Field private; use [`Self::rules`] for read access.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(from = "RawBoundaryRuleSet")]
+pub struct BoundaryRuleSet {
+    rules: Vec<BoundaryRuleRef>,
+}
+
+#[derive(Deserialize)]
+struct RawBoundaryRuleSet {
+    rules: Vec<BoundaryRuleRef>,
+}
+
+impl From<RawBoundaryRuleSet> for BoundaryRuleSet {
+    fn from(raw: RawBoundaryRuleSet) -> Self {
+        Self::from_rules(raw.rules)
+    }
+}
+
+impl BoundaryRuleSet {
+    /// Construct from an unsorted iterator. Entries are sorted and
+    /// deduplicated.
+    pub fn from_rules<I>(rules: I) -> Self
+    where
+        I: IntoIterator<Item = BoundaryRuleRef>,
+    {
+        let mut v: Vec<BoundaryRuleRef> = rules.into_iter().collect();
+        v.sort();
+        v.dedup();
+        Self { rules: v }
+    }
+
+    /// The canonical sorted, deduplicated boundary rule references.
+    pub fn rules(&self) -> &[BoundaryRuleRef] {
+        &self.rules
+    }
+}
+
+/// Closed set of expected `RepairReceipt` classes a `RepairPlan` may name.
+///
+/// `RepairReceipt` itself is forward work — not implemented in this PR
+/// and not in scope for #1835. This enum exists so a `RepairPlan` can
+/// name the receipt class it expects on completion without depending on
+/// the receipt's wire shape. Maps 1:1 to [`RepairAction`].
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ExpectedRepairReceiptClass {
+    /// Receipt for a `FetchMissing` action.
+    FetchMissingReceipt,
+    /// Receipt for a `ReReplicate` action.
+    ReReplicationReceipt,
+    /// Receipt for a `RetryBackup` action.
+    BackupRetryReceipt,
+    /// Receipt for a `RunRestoreDrill` action.
+    RestoreDrillReceipt,
+    /// Receipt for a `RetryIntegrityVerification` action.
+    IntegrityVerificationReceipt,
+    /// Receipt for a `QuarantinePeerPendingReview` action.
+    QuarantineReceipt,
+    /// Receipt for an `EscalateToFederationClearing` action.
+    FederationClearingEscalationReceipt,
+    /// Receipt for a `RequestGovernanceReview` action.
+    GovernanceReviewReceipt,
+    /// Receipt for a `RestartDisputeWindow` action.
+    DisputeWindowRestartReceipt,
+    /// Sentinel for `NoAutomaticRepair` — no receipt is expected; the
+    /// divergence evidence is the only artifact produced.
+    NoAutomaticRepairReceipt,
+}
+
+/// Repair plan produced by the policy oracle in phase 5 ("Plan") of
+/// `docs/spec/network-anti-entropy-proof-loops.md`.
+///
+/// Names the [`RepairAction`], the [`AuthorityBasis`], the scope, the
+/// boundary rules the plan has been checked against, and the expected
+/// [`ExpectedRepairReceiptClass`] on completion. Cross-links to the
+/// [`DivergenceEvidence`] it acts on via that evidence's binding hash.
+///
+/// # The plan is not the execution
+///
+/// A `RepairPlan` records a decision, not an outcome. The kernel does
+/// not execute repairs (that is a runtime / app-side concern), does not
+/// verify the named authority (that is a policy-oracle concern), and
+/// does not produce `RepairReceipt`s (forward work). The plan exists so
+/// the boundary rule "No repair beyond authority" is auditable.
+///
+/// # Self-authentication
+///
+/// `plan_hash` is a blake3 binding under
+/// `DOMAIN_TAG = b"icn:repair-plan:v1"`, length-prefixed, over a canonical
+/// bincode encoding of the bound fields. [`Self::verify_binding`] re-checks
+/// both the hash and the schema version. Deserialization rejects
+/// unsupported schema versions via `#[serde(try_from = ...)]`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "RawRepairPlan")]
+pub struct RepairPlan {
+    /// Wire schema version. See [`REPAIR_PLAN_SCHEMA_VERSION`].
+    pub schema_version: u32,
+    /// The repair action the policy oracle proposed.
+    pub action: RepairAction,
+    /// Why the policy oracle says this action is allowed.
+    pub authority_basis: AuthorityBasis,
+    /// Scope of the repair (which records / which peers).
+    pub scope: ProbeScope,
+    /// Boundary rules the plan has been checked against.
+    pub boundary_rules: BoundaryRuleSet,
+    /// Receipt class expected on completion (forward work).
+    pub expected_repair_receipt_class: ExpectedRepairReceiptClass,
+    /// `evidence_hash` of the [`DivergenceEvidence`] this plan acts on.
+    /// Used to cross-link plan and evidence in an audit trail.
+    pub divergence_evidence_hash: Hash,
+    /// Planner's clock at construction (Unix seconds).
+    pub freshness_emitted_at: u64,
+    /// Timestamp beyond which the plan is stale (Unix seconds).
+    pub freshness_valid_until: u64,
+    /// 32-byte random nonce.
+    pub plan_nonce: [u8; 32],
+    /// blake3 binding hash over all bound fields, computed at construction.
+    pub plan_hash: Hash,
+    /// Planner signature (empty until signed by a higher layer).
+    pub signature: Signature,
+}
+
+/// Raw wire form for [`RepairPlan`]. Validated via [`TryFrom`].
+#[derive(Deserialize)]
+struct RawRepairPlan {
+    schema_version: u32,
+    action: RepairAction,
+    authority_basis: AuthorityBasis,
+    scope: ProbeScope,
+    boundary_rules: BoundaryRuleSet,
+    expected_repair_receipt_class: ExpectedRepairReceiptClass,
+    divergence_evidence_hash: Hash,
+    freshness_emitted_at: u64,
+    freshness_valid_until: u64,
+    plan_nonce: [u8; 32],
+    plan_hash: Hash,
+    signature: Signature,
+}
+
+impl TryFrom<RawRepairPlan> for RepairPlan {
+    type Error = String;
+
+    fn try_from(raw: RawRepairPlan) -> Result<Self, Self::Error> {
+        if raw.schema_version != REPAIR_PLAN_SCHEMA_VERSION {
+            return Err(format!(
+                "unsupported RepairPlan schema_version: got {}, supported {}",
+                raw.schema_version, REPAIR_PLAN_SCHEMA_VERSION,
+            ));
+        }
+        Ok(Self {
+            schema_version: raw.schema_version,
+            action: raw.action,
+            authority_basis: raw.authority_basis,
+            scope: raw.scope,
+            boundary_rules: raw.boundary_rules,
+            expected_repair_receipt_class: raw.expected_repair_receipt_class,
+            divergence_evidence_hash: raw.divergence_evidence_hash,
+            freshness_emitted_at: raw.freshness_emitted_at,
+            freshness_valid_until: raw.freshness_valid_until,
+            plan_nonce: raw.plan_nonce,
+            plan_hash: raw.plan_hash,
+            signature: raw.signature,
+        })
+    }
+}
+
+/// Canonical binding fields for `RepairPlan::plan_hash`.
+#[derive(Serialize)]
+struct RepairPlanBinding<'a> {
+    schema_version: u32,
+    action: RepairAction,
+    authority_basis: &'a AuthorityBasis,
+    scope: &'a ProbeScope,
+    boundary_rules: &'a BoundaryRuleSet,
+    expected_repair_receipt_class: ExpectedRepairReceiptClass,
+    divergence_evidence_hash: Hash,
+    freshness_emitted_at: u64,
+    freshness_valid_until: u64,
+    plan_nonce: [u8; 32],
+}
+
+impl RepairPlan {
+    /// Domain-separation tag. Distinct from
+    /// [`DivergenceEvidence::DOMAIN_TAG`], [`AntiEntropyProbe::DOMAIN_TAG`],
+    /// and [`ArtifactReceipt::DOMAIN_TAG`].
+    pub const DOMAIN_TAG: &'static [u8] = b"icn:repair-plan:v1";
+
+    /// Construct a new plan with computed `plan_hash` and empty signature.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        action: RepairAction,
+        authority_basis: AuthorityBasis,
+        scope: ProbeScope,
+        boundary_rules: BoundaryRuleSet,
+        expected_repair_receipt_class: ExpectedRepairReceiptClass,
+        divergence_evidence_hash: Hash,
+        freshness_emitted_at: u64,
+        freshness_valid_until: u64,
+        plan_nonce: [u8; 32],
+    ) -> Self {
+        let plan_hash = Self::compute_plan_hash(
+            REPAIR_PLAN_SCHEMA_VERSION,
+            action,
+            &authority_basis,
+            &scope,
+            &boundary_rules,
+            expected_repair_receipt_class,
+            divergence_evidence_hash,
+            freshness_emitted_at,
+            freshness_valid_until,
+            &plan_nonce,
+        );
+        Self {
+            schema_version: REPAIR_PLAN_SCHEMA_VERSION,
+            action,
+            authority_basis,
+            scope,
+            boundary_rules,
+            expected_repair_receipt_class,
+            divergence_evidence_hash,
+            freshness_emitted_at,
+            freshness_valid_until,
+            plan_nonce,
+            plan_hash,
+            signature: Signature::new(Vec::new()),
+        }
+    }
+
+    /// Compute the binding hash from the significant fields.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_plan_hash(
+        schema_version: u32,
+        action: RepairAction,
+        authority_basis: &AuthorityBasis,
+        scope: &ProbeScope,
+        boundary_rules: &BoundaryRuleSet,
+        expected_repair_receipt_class: ExpectedRepairReceiptClass,
+        divergence_evidence_hash: Hash,
+        freshness_emitted_at: u64,
+        freshness_valid_until: u64,
+        plan_nonce: &[u8; 32],
+    ) -> Hash {
+        let binding = RepairPlanBinding {
+            schema_version,
+            action,
+            authority_basis,
+            scope,
+            boundary_rules,
+            expected_repair_receipt_class,
+            divergence_evidence_hash,
+            freshness_emitted_at,
+            freshness_valid_until,
+            plan_nonce: *plan_nonce,
+        };
+        let payload =
+            bincode::serialize(&binding).expect("RepairPlanBinding serialization is infallible");
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        *hasher.finalize().as_bytes()
+    }
+
+    /// `true` iff `schema_version == REPAIR_PLAN_SCHEMA_VERSION`.
+    pub fn is_supported_schema_version(&self) -> bool {
+        self.schema_version == REPAIR_PLAN_SCHEMA_VERSION
+    }
+
+    /// Verify the stored `plan_hash` and `schema_version`. Fails closed
+    /// on unsupported versions.
+    pub fn verify_binding(&self) -> bool {
+        if !self.is_supported_schema_version() {
+            return false;
+        }
+        let recomputed = Self::compute_plan_hash(
+            self.schema_version,
+            self.action,
+            &self.authority_basis,
+            &self.scope,
+            &self.boundary_rules,
+            self.expected_repair_receipt_class,
+            self.divergence_evidence_hash,
+            self.freshness_emitted_at,
+            self.freshness_valid_until,
+            &self.plan_nonce,
+        );
+        self.plan_hash == recomputed
+    }
+
+    /// `true` if `now_unix_seconds <= freshness_valid_until`.
+    pub fn is_fresh(&self, now_unix_seconds: u64) -> bool {
+        now_unix_seconds <= self.freshness_valid_until
+    }
+}
+
 #[cfg(test)]
 mod anti_entropy_tests {
     use super::*;
@@ -1636,5 +2516,804 @@ mod anti_entropy_tests {
         let restored_bin: AntiEntropyProbe = bincode::deserialize(&bytes).unwrap();
         assert_eq!(probe, restored_bin);
         assert!(restored_bin.verify_binding());
+    }
+}
+
+#[cfg(test)]
+mod divergence_and_repair_tests {
+    use super::*;
+
+    // ---- Helpers ----
+
+    fn sample_policy_clause() -> PolicyClauseRef {
+        PolicyClauseRef {
+            policy_id: "compute-placement".to_string(),
+            policy_version_id: "v1-fixture".to_string(),
+            clause_id: "boundary-rules.4".to_string(),
+        }
+    }
+
+    fn sample_peers() -> PeerSet {
+        PeerSet::from_dids(vec![
+            "did:icn:peer-b".to_string(),
+            "did:icn:peer-a".to_string(),
+        ])
+    }
+
+    fn sample_digest_mismatch_missing_on_remote() -> DigestMismatch {
+        DigestMismatch::MissingOnRemote {
+            local: StateDigest::ShortList(ShortDigestList::from_hashes(vec![[0x01; 32]])),
+        }
+    }
+
+    fn sample_evidence() -> DivergenceEvidence {
+        DivergenceEvidence::new(
+            DivergenceClass::MissingReceipt,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            sample_peers(),
+            sample_digest_mismatch_missing_on_remote(),
+            sample_policy_clause(),
+            1_715_000_000,
+            1_715_000_030,
+            false,
+            [0xAB; 32],
+        )
+    }
+
+    fn sample_plan(evidence_hash: Hash) -> RepairPlan {
+        RepairPlan::new(
+            RepairAction::FetchMissing,
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            BoundaryRuleSet::from_rules(vec![
+                BoundaryRuleRef::NoRepairBeyondAuthority,
+                BoundaryRuleRef::NoLocalityOrDisclosureWidening,
+            ]),
+            ExpectedRepairReceiptClass::FetchMissingReceipt,
+            evidence_hash,
+            1_715_000_001,
+            1_715_000_031,
+            [0xCD; 32],
+        )
+    }
+
+    // ---- DivergenceClass — all 18 classes representable + snake_case names ----
+
+    #[test]
+    fn divergence_class_all_eighteen_round_trip() {
+        let all = [
+            DivergenceClass::MissingReceipt,
+            DivergenceClass::ConflictingReceipt,
+            DivergenceClass::MissingArtifactMetadata,
+            DivergenceClass::ContentHashMismatch,
+            DivergenceClass::ReplicaLag,
+            DivergenceClass::ReplicaMissing,
+            DivergenceClass::BackupVerificationFailure,
+            DivergenceClass::RestoreDrillMissing,
+            DivergenceClass::PeerBehindSyncWindow,
+            DivergenceClass::PeerEquivocation,
+            DivergenceClass::FederationAgreementMismatch,
+            DivergenceClass::CclPolicyVersionMismatch,
+            DivergenceClass::EvaluatorBindingMismatch,
+            DivergenceClass::PlacementEvidenceMissing,
+            DivergenceClass::SettlementRecordMismatch,
+            DivergenceClass::PrivateObjectReferenceMismatchWithoutContentDisclosure,
+            DivergenceClass::IntegrityPolicyViolation,
+            DivergenceClass::Unclassifiable,
+        ];
+        assert_eq!(all.len(), 18);
+        for c in &all {
+            let json = serde_json::to_string(c).unwrap();
+            let parsed: DivergenceClass = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, *c);
+        }
+    }
+
+    #[test]
+    fn divergence_class_serde_names_are_snake_case_and_stable() {
+        // Lock the wire names so future renaming forces a deliberate
+        // schema bump rather than silent breakage.
+        let cases: &[(DivergenceClass, &str)] = &[
+            (DivergenceClass::MissingReceipt, "\"missing_receipt\""),
+            (
+                DivergenceClass::ConflictingReceipt,
+                "\"conflicting_receipt\"",
+            ),
+            (DivergenceClass::PeerEquivocation, "\"peer_equivocation\""),
+            (
+                DivergenceClass::PrivateObjectReferenceMismatchWithoutContentDisclosure,
+                "\"private_object_reference_mismatch_without_content_disclosure\"",
+            ),
+            (DivergenceClass::Unclassifiable, "\"unclassifiable\""),
+        ];
+        for (c, expected) in cases {
+            assert_eq!(
+                serde_json::to_string(c).unwrap(),
+                *expected,
+                "stable wire name for {c:?}"
+            );
+        }
+    }
+
+    // ---- PeerSet canonicalization ----
+
+    #[test]
+    fn peer_set_sorts_and_dedupes_on_construction() {
+        let p = PeerSet::from_dids(vec![
+            "did:icn:c".to_string(),
+            "did:icn:a".to_string(),
+            "did:icn:b".to_string(),
+            "did:icn:a".to_string(), // dup
+        ]);
+        let dids: Vec<&str> = p.dids().iter().map(String::as_str).collect();
+        assert_eq!(dids, vec!["did:icn:a", "did:icn:b", "did:icn:c"]);
+    }
+
+    #[test]
+    fn peer_set_normalizes_unsorted_wire_input() {
+        let json = r#"{"dids":["did:icn:c","did:icn:a","did:icn:b","did:icn:a"]}"#;
+        let p: PeerSet = serde_json::from_str(json).unwrap();
+        let dids: Vec<&str> = p.dids().iter().map(String::as_str).collect();
+        assert_eq!(dids, vec!["did:icn:a", "did:icn:b", "did:icn:c"]);
+    }
+
+    #[test]
+    fn peer_set_normalizes_bincode_wire_input() {
+        #[derive(Serialize)]
+        struct LocalBadWire {
+            dids: Vec<Did>,
+        }
+        let bad = LocalBadWire {
+            dids: vec![
+                "did:icn:c".to_string(),
+                "did:icn:a".to_string(),
+                "did:icn:b".to_string(),
+                "did:icn:a".to_string(),
+            ],
+        };
+        let bytes = bincode::serialize(&bad).unwrap();
+        let p: PeerSet = bincode::deserialize(&bytes).unwrap();
+        let dids: Vec<&str> = p.dids().iter().map(String::as_str).collect();
+        assert_eq!(dids, vec!["did:icn:a", "did:icn:b", "did:icn:c"]);
+    }
+
+    // ---- BoundaryRuleSet canonicalization ----
+
+    #[test]
+    fn boundary_rule_set_sorts_and_dedupes_on_construction() {
+        let s = BoundaryRuleSet::from_rules(vec![
+            BoundaryRuleRef::NoLocalityOrDisclosureWidening,
+            BoundaryRuleRef::NoRepairBeyondAuthority,
+            BoundaryRuleRef::NoLocalityOrDisclosureWidening, // dup
+        ]);
+        // The PartialOrd derives use declaration order, so
+        // NoRepairBeyondAuthority comes before NoLocalityOrDisclosureWidening.
+        assert_eq!(s.rules().len(), 2);
+        assert!(s.rules().windows(2).all(|w| w[0] < w[1]));
+    }
+
+    #[test]
+    fn boundary_rule_set_normalizes_unsorted_wire_input() {
+        let json = r#"{"rules":["no_locality_or_disclosure_widening","no_repair_beyond_authority","no_locality_or_disclosure_widening"]}"#;
+        let s: BoundaryRuleSet = serde_json::from_str(json).unwrap();
+        assert_eq!(s.rules().len(), 2);
+        assert!(s.rules().windows(2).all(|w| w[0] < w[1]));
+    }
+
+    // ---- DigestMismatch round-trip ----
+
+    #[test]
+    fn digest_mismatch_all_variants_round_trip() {
+        let cases = [
+            DigestMismatch::MissingOnRemote {
+                local: StateDigest::ShortList(ShortDigestList::from_hashes(vec![[0x01; 32]])),
+            },
+            DigestMismatch::MissingOnLocal {
+                remote: StateDigest::MerkleRoot(MerkleRootProjection {
+                    root: [0x02; 32],
+                    leaf_count: 1,
+                }),
+            },
+            DigestMismatch::Differs {
+                local: StateDigest::ShortList(ShortDigestList::from_hashes(vec![[0x03; 32]])),
+                remote: StateDigest::ShortList(ShortDigestList::from_hashes(vec![[0x04; 32]])),
+            },
+            DigestMismatch::NotApplicable,
+        ];
+        for m in &cases {
+            let json = serde_json::to_string(m).unwrap();
+            let restored: DigestMismatch = serde_json::from_str(&json).unwrap();
+            assert_eq!(*m, restored);
+
+            let bytes = bincode::serialize(m).unwrap();
+            let restored_bin: DigestMismatch = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(*m, restored_bin);
+        }
+    }
+
+    // ---- DivergenceEvidence: binding, round-trip, tamper detection ----
+
+    #[test]
+    fn evidence_binding_is_deterministic() {
+        let e1 = sample_evidence();
+        let e2 = sample_evidence();
+        assert_eq!(e1.evidence_hash, e2.evidence_hash);
+        assert_ne!(e1.evidence_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn evidence_verify_binding_succeeds_for_fresh_record() {
+        let e = sample_evidence();
+        assert!(e.verify_binding());
+    }
+
+    #[test]
+    fn evidence_json_round_trip_preserves_hash() {
+        let original = sample_evidence();
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: DivergenceEvidence = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn evidence_bincode_round_trip_preserves_hash() {
+        let original = sample_evidence();
+        let bytes = bincode::serialize(&original).unwrap();
+        let restored: DivergenceEvidence = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(original, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn evidence_class_tamper_detected() {
+        let mut e = sample_evidence();
+        e.divergence_class = DivergenceClass::Unclassifiable;
+        assert!(!e.verify_binding());
+    }
+
+    #[test]
+    fn evidence_state_class_tamper_detected() {
+        let mut e = sample_evidence();
+        e.affected_state_class = StateClass::SettlementRecordIndex;
+        assert!(!e.verify_binding());
+    }
+
+    #[test]
+    fn evidence_scope_tamper_detected() {
+        let mut e = sample_evidence();
+        e.scope = ProbeScope::Commons;
+        assert!(!e.verify_binding());
+    }
+
+    #[test]
+    fn evidence_peers_tamper_detected() {
+        let mut e = sample_evidence();
+        e.peers = PeerSet::from_dids(vec!["did:icn:attacker".to_string()]);
+        assert!(!e.verify_binding());
+    }
+
+    #[test]
+    fn evidence_digest_mismatch_tamper_detected() {
+        let mut e = sample_evidence();
+        e.digest_mismatch = DigestMismatch::NotApplicable;
+        assert!(!e.verify_binding());
+    }
+
+    #[test]
+    fn evidence_policy_clause_tamper_detected() {
+        let mut e = sample_evidence();
+        e.policy_clause = PolicyClauseRef {
+            policy_id: "other".to_string(),
+            policy_version_id: "vX".to_string(),
+            clause_id: "evil".to_string(),
+        };
+        assert!(!e.verify_binding());
+    }
+
+    #[test]
+    fn evidence_freshness_tamper_detected() {
+        let mut e = sample_evidence();
+        e.freshness_emitted_at += 1;
+        assert!(!e.verify_binding());
+
+        let mut e = sample_evidence();
+        e.freshness_valid_until += 1;
+        assert!(!e.verify_binding());
+    }
+
+    #[test]
+    fn evidence_private_implication_tamper_detected() {
+        let mut e = sample_evidence();
+        e.private_content_implication = !e.private_content_implication;
+        assert!(!e.verify_binding());
+    }
+
+    #[test]
+    fn evidence_nonce_tamper_detected() {
+        let mut e = sample_evidence();
+        e.evidence_nonce = [0xFF; 32];
+        assert!(!e.verify_binding());
+    }
+
+    // ---- DivergenceEvidence: schema-version policing ----
+
+    #[test]
+    fn evidence_rejects_future_schema_version_on_json_decode() {
+        // Build a wire payload with an unsupported schema_version and a
+        // hash recomputed under that bogus version. The deserializer must
+        // refuse to construct a DivergenceEvidence at all.
+        #[derive(Serialize)]
+        struct WireShape<'a> {
+            schema_version: u32,
+            divergence_class: DivergenceClass,
+            affected_state_class: StateClass,
+            scope: &'a ProbeScope,
+            peers: &'a PeerSet,
+            digest_mismatch: &'a DigestMismatch,
+            policy_clause: &'a PolicyClauseRef,
+            freshness_emitted_at: u64,
+            freshness_valid_until: u64,
+            private_content_implication: bool,
+            evidence_nonce: [u8; 32],
+            evidence_hash: Hash,
+            signature: Signature,
+        }
+        let e = sample_evidence();
+        let bogus = DIVERGENCE_EVIDENCE_SCHEMA_VERSION + 1;
+        let recomputed = DivergenceEvidence::compute_evidence_hash(
+            bogus,
+            e.divergence_class,
+            e.affected_state_class,
+            &e.scope,
+            &e.peers,
+            &e.digest_mismatch,
+            &e.policy_clause,
+            e.freshness_emitted_at,
+            e.freshness_valid_until,
+            e.private_content_implication,
+            &e.evidence_nonce,
+        );
+        let wire = WireShape {
+            schema_version: bogus,
+            divergence_class: e.divergence_class,
+            affected_state_class: e.affected_state_class,
+            scope: &e.scope,
+            peers: &e.peers,
+            digest_mismatch: &e.digest_mismatch,
+            policy_clause: &e.policy_clause,
+            freshness_emitted_at: e.freshness_emitted_at,
+            freshness_valid_until: e.freshness_valid_until,
+            private_content_implication: e.private_content_implication,
+            evidence_nonce: e.evidence_nonce,
+            evidence_hash: recomputed,
+            signature: e.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<DivergenceEvidence, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed_bin: Result<DivergenceEvidence, _> = bincode::deserialize(&bytes);
+        assert!(parsed_bin.is_err());
+    }
+
+    #[test]
+    fn evidence_verify_binding_fails_closed_on_manual_bogus_version() {
+        let mut e = sample_evidence();
+        let bogus = DIVERGENCE_EVIDENCE_SCHEMA_VERSION + 5;
+        e.schema_version = bogus;
+        e.evidence_hash = DivergenceEvidence::compute_evidence_hash(
+            bogus,
+            e.divergence_class,
+            e.affected_state_class,
+            &e.scope,
+            &e.peers,
+            &e.digest_mismatch,
+            &e.policy_clause,
+            e.freshness_emitted_at,
+            e.freshness_valid_until,
+            e.private_content_implication,
+            &e.evidence_nonce,
+        );
+        assert!(
+            !e.verify_binding(),
+            "verify_binding() must fail closed even when the hash matches"
+        );
+    }
+
+    #[test]
+    fn evidence_domain_tag_affects_hash_and_differs_from_other_records() {
+        let e = sample_evidence();
+        let binding = DivergenceEvidenceBinding {
+            schema_version: e.schema_version,
+            divergence_class: e.divergence_class,
+            affected_state_class: e.affected_state_class,
+            scope: &e.scope,
+            peers: &e.peers,
+            digest_mismatch: &e.digest_mismatch,
+            policy_clause: &e.policy_clause,
+            freshness_emitted_at: e.freshness_emitted_at,
+            freshness_valid_until: e.freshness_valid_until,
+            private_content_implication: e.private_content_implication,
+            evidence_nonce: e.evidence_nonce,
+        };
+        let payload = bincode::serialize(&binding).unwrap();
+        let mut hasher = blake3::Hasher::new();
+        // Deliberately omit DOMAIN_TAG.
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        let without_tag: Hash = *hasher.finalize().as_bytes();
+        assert_ne!(e.evidence_hash, without_tag);
+        // Distinct from the other proof-class domain tags.
+        assert_ne!(DivergenceEvidence::DOMAIN_TAG, AntiEntropyProbe::DOMAIN_TAG);
+        assert_ne!(DivergenceEvidence::DOMAIN_TAG, ArtifactReceipt::DOMAIN_TAG);
+        assert_ne!(DivergenceEvidence::DOMAIN_TAG, RepairPlan::DOMAIN_TAG);
+    }
+
+    #[test]
+    fn evidence_two_records_with_distinct_nonces_distinct_hashes() {
+        let e1 = sample_evidence();
+        let e2 = DivergenceEvidence::new(
+            e1.divergence_class,
+            e1.affected_state_class,
+            e1.scope.clone(),
+            e1.peers.clone(),
+            e1.digest_mismatch.clone(),
+            e1.policy_clause.clone(),
+            e1.freshness_emitted_at,
+            e1.freshness_valid_until,
+            e1.private_content_implication,
+            [0xEE; 32],
+        );
+        assert_ne!(e1.evidence_hash, e2.evidence_hash);
+        assert!(e2.verify_binding());
+    }
+
+    // ---- DivergenceEvidence: privacy semantics ----
+
+    #[test]
+    fn private_divergence_carries_refs_not_bodies() {
+        // The PrivateObjectReferenceMismatchWithoutContentDisclosure class
+        // is represented as bounded ArtifactDigest/StateDigest forms — the
+        // type system does not let bodies enter (every StateDigest projection
+        // is a hash, count, or short list of hashes). This test is a smoke
+        // test of the privacy contract: the divergence carries refs, and the
+        // private_content_implication flag is true.
+        let private_refs = StateDigest::ShortList(ShortDigestList::from_hashes(vec![
+            [0xAA; 32], [0xBB; 32], [0xCC; 32],
+        ]));
+        let e = DivergenceEvidence::new(
+            DivergenceClass::PrivateObjectReferenceMismatchWithoutContentDisclosure,
+            StateClass::ScopedVaultReference,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-care-plan-vault".to_string(),
+            },
+            sample_peers(),
+            DigestMismatch::Differs {
+                local: private_refs.clone(),
+                remote: StateDigest::ShortList(ShortDigestList::from_hashes(vec![
+                    [0xAA; 32], [0xDD; 32],
+                ])),
+            },
+            sample_policy_clause(),
+            1_715_000_000,
+            1_715_000_030,
+            true, // private content implicated
+            [0x55; 32],
+        );
+        assert!(e.private_content_implication);
+        assert!(e.verify_binding());
+        // The digest is opaque hashes only — no human-readable "body" field
+        // exists anywhere on the record. This is structural: a future change
+        // that adds a body field would fail compilation here.
+        match e.digest_mismatch {
+            DigestMismatch::Differs { ref local, .. } => match local {
+                StateDigest::ShortList(list) => {
+                    assert_eq!(list.hashes().len(), 3);
+                }
+                _ => panic!("expected ShortList for the fixture"),
+            },
+            _ => panic!("expected Differs"),
+        }
+    }
+
+    // ---- RepairPlan: binding, round-trip, tamper detection ----
+
+    #[test]
+    fn plan_binding_is_deterministic() {
+        let ev = sample_evidence();
+        let p1 = sample_plan(ev.evidence_hash);
+        let p2 = sample_plan(ev.evidence_hash);
+        assert_eq!(p1.plan_hash, p2.plan_hash);
+        assert_ne!(p1.plan_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn plan_verify_binding_succeeds_for_fresh_record() {
+        let ev = sample_evidence();
+        let p = sample_plan(ev.evidence_hash);
+        assert!(p.verify_binding());
+    }
+
+    #[test]
+    fn plan_json_round_trip_preserves_hash() {
+        let ev = sample_evidence();
+        let original = sample_plan(ev.evidence_hash);
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: RepairPlan = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn plan_bincode_round_trip_preserves_hash() {
+        let ev = sample_evidence();
+        let original = sample_plan(ev.evidence_hash);
+        let bytes = bincode::serialize(&original).unwrap();
+        let restored: RepairPlan = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(original, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn plan_action_tamper_detected() {
+        let ev = sample_evidence();
+        let mut p = sample_plan(ev.evidence_hash);
+        p.action = RepairAction::RequestGovernanceReview;
+        assert!(!p.verify_binding());
+    }
+
+    #[test]
+    fn plan_authority_tamper_detected() {
+        let ev = sample_evidence();
+        let mut p = sample_plan(ev.evidence_hash);
+        p.authority_basis = AuthorityBasis::NoAutomaticAuthority;
+        assert!(!p.verify_binding());
+    }
+
+    #[test]
+    fn plan_scope_tamper_detected() {
+        let ev = sample_evidence();
+        let mut p = sample_plan(ev.evidence_hash);
+        p.scope = ProbeScope::Commons;
+        assert!(!p.verify_binding());
+    }
+
+    #[test]
+    fn plan_boundary_rules_tamper_detected() {
+        let ev = sample_evidence();
+        let mut p = sample_plan(ev.evidence_hash);
+        p.boundary_rules = BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoMemberFacingLie]);
+        assert!(!p.verify_binding());
+    }
+
+    #[test]
+    fn plan_expected_receipt_class_tamper_detected() {
+        let ev = sample_evidence();
+        let mut p = sample_plan(ev.evidence_hash);
+        p.expected_repair_receipt_class = ExpectedRepairReceiptClass::GovernanceReviewReceipt;
+        assert!(!p.verify_binding());
+    }
+
+    #[test]
+    fn plan_evidence_link_tamper_detected() {
+        let ev = sample_evidence();
+        let mut p = sample_plan(ev.evidence_hash);
+        p.divergence_evidence_hash = [0xFF; 32];
+        assert!(!p.verify_binding());
+    }
+
+    #[test]
+    fn plan_freshness_tamper_detected() {
+        let ev = sample_evidence();
+        let mut p = sample_plan(ev.evidence_hash);
+        p.freshness_emitted_at += 1;
+        assert!(!p.verify_binding());
+
+        let ev = sample_evidence();
+        let mut p = sample_plan(ev.evidence_hash);
+        p.freshness_valid_until += 1;
+        assert!(!p.verify_binding());
+    }
+
+    #[test]
+    fn plan_nonce_tamper_detected() {
+        let ev = sample_evidence();
+        let mut p = sample_plan(ev.evidence_hash);
+        p.plan_nonce = [0xFF; 32];
+        assert!(!p.verify_binding());
+    }
+
+    // ---- RepairPlan: schema-version policing ----
+
+    #[test]
+    fn plan_rejects_future_schema_version_on_decode() {
+        #[derive(Serialize)]
+        struct WireShape<'a> {
+            schema_version: u32,
+            action: RepairAction,
+            authority_basis: &'a AuthorityBasis,
+            scope: &'a ProbeScope,
+            boundary_rules: &'a BoundaryRuleSet,
+            expected_repair_receipt_class: ExpectedRepairReceiptClass,
+            divergence_evidence_hash: Hash,
+            freshness_emitted_at: u64,
+            freshness_valid_until: u64,
+            plan_nonce: [u8; 32],
+            plan_hash: Hash,
+            signature: Signature,
+        }
+        let ev = sample_evidence();
+        let p = sample_plan(ev.evidence_hash);
+        let bogus = REPAIR_PLAN_SCHEMA_VERSION + 1;
+        let recomputed = RepairPlan::compute_plan_hash(
+            bogus,
+            p.action,
+            &p.authority_basis,
+            &p.scope,
+            &p.boundary_rules,
+            p.expected_repair_receipt_class,
+            p.divergence_evidence_hash,
+            p.freshness_emitted_at,
+            p.freshness_valid_until,
+            &p.plan_nonce,
+        );
+        let wire = WireShape {
+            schema_version: bogus,
+            action: p.action,
+            authority_basis: &p.authority_basis,
+            scope: &p.scope,
+            boundary_rules: &p.boundary_rules,
+            expected_repair_receipt_class: p.expected_repair_receipt_class,
+            divergence_evidence_hash: p.divergence_evidence_hash,
+            freshness_emitted_at: p.freshness_emitted_at,
+            freshness_valid_until: p.freshness_valid_until,
+            plan_nonce: p.plan_nonce,
+            plan_hash: recomputed,
+            signature: p.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<RepairPlan, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed_bin: Result<RepairPlan, _> = bincode::deserialize(&bytes);
+        assert!(parsed_bin.is_err());
+    }
+
+    #[test]
+    fn plan_verify_binding_fails_closed_on_manual_bogus_version() {
+        let ev = sample_evidence();
+        let mut p = sample_plan(ev.evidence_hash);
+        let bogus = REPAIR_PLAN_SCHEMA_VERSION + 11;
+        p.schema_version = bogus;
+        p.plan_hash = RepairPlan::compute_plan_hash(
+            bogus,
+            p.action,
+            &p.authority_basis,
+            &p.scope,
+            &p.boundary_rules,
+            p.expected_repair_receipt_class,
+            p.divergence_evidence_hash,
+            p.freshness_emitted_at,
+            p.freshness_valid_until,
+            &p.plan_nonce,
+        );
+        assert!(!p.verify_binding());
+    }
+
+    // ---- Evidence ↔ Plan link ----
+
+    #[test]
+    fn plan_references_evidence_by_hash() {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        assert_eq!(plan.divergence_evidence_hash, ev.evidence_hash);
+
+        // Changing the evidence (different nonce) yields a different hash;
+        // a plan built from the old hash no longer matches the new evidence.
+        let ev2 = DivergenceEvidence::new(
+            ev.divergence_class,
+            ev.affected_state_class,
+            ev.scope.clone(),
+            ev.peers.clone(),
+            ev.digest_mismatch.clone(),
+            ev.policy_clause.clone(),
+            ev.freshness_emitted_at,
+            ev.freshness_valid_until,
+            ev.private_content_implication,
+            [0x77; 32], // distinct nonce
+        );
+        assert_ne!(ev.evidence_hash, ev2.evidence_hash);
+        assert_ne!(plan.divergence_evidence_hash, ev2.evidence_hash);
+    }
+
+    // ---- AuthorityBasis round-trip on all variants ----
+
+    #[test]
+    fn authority_basis_all_variants_round_trip() {
+        let cases = [
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            AuthorityBasis::GovernanceMandate {
+                mandate_hash: [0x11; 32],
+            },
+            AuthorityBasis::FederationAgreement {
+                agreement_hash: [0x22; 32],
+            },
+            AuthorityBasis::GovernanceReviewRequired,
+            AuthorityBasis::NoAutomaticAuthority,
+        ];
+        for a in &cases {
+            let json = serde_json::to_string(a).unwrap();
+            let restored: AuthorityBasis = serde_json::from_str(&json).unwrap();
+            assert_eq!(*a, restored);
+
+            let bytes = bincode::serialize(a).unwrap();
+            let restored_bin: AuthorityBasis = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(*a, restored_bin);
+        }
+    }
+
+    // ---- RepairAction + ExpectedRepairReceiptClass all variants ----
+
+    #[test]
+    fn repair_action_all_variants_round_trip() {
+        let cases = [
+            RepairAction::FetchMissing,
+            RepairAction::ReReplicate,
+            RepairAction::RetryBackup,
+            RepairAction::RunRestoreDrill,
+            RepairAction::RetryIntegrityVerification,
+            RepairAction::QuarantinePeerPendingReview,
+            RepairAction::EscalateToFederationClearing,
+            RepairAction::RequestGovernanceReview,
+            RepairAction::RestartDisputeWindow,
+            RepairAction::NoAutomaticRepair,
+        ];
+        for a in &cases {
+            let json = serde_json::to_string(a).unwrap();
+            let restored: RepairAction = serde_json::from_str(&json).unwrap();
+            assert_eq!(*a, restored);
+        }
+    }
+
+    #[test]
+    fn expected_repair_receipt_class_all_variants_round_trip() {
+        let cases = [
+            ExpectedRepairReceiptClass::FetchMissingReceipt,
+            ExpectedRepairReceiptClass::ReReplicationReceipt,
+            ExpectedRepairReceiptClass::BackupRetryReceipt,
+            ExpectedRepairReceiptClass::RestoreDrillReceipt,
+            ExpectedRepairReceiptClass::IntegrityVerificationReceipt,
+            ExpectedRepairReceiptClass::QuarantineReceipt,
+            ExpectedRepairReceiptClass::FederationClearingEscalationReceipt,
+            ExpectedRepairReceiptClass::GovernanceReviewReceipt,
+            ExpectedRepairReceiptClass::DisputeWindowRestartReceipt,
+            ExpectedRepairReceiptClass::NoAutomaticRepairReceipt,
+        ];
+        for c in &cases {
+            let json = serde_json::to_string(c).unwrap();
+            let restored: ExpectedRepairReceiptClass = serde_json::from_str(&json).unwrap();
+            assert_eq!(*c, restored);
+        }
+    }
+
+    // ---- Freshness helpers ----
+
+    #[test]
+    fn evidence_and_plan_freshness_helpers() {
+        let ev = sample_evidence();
+        assert!(ev.is_fresh(ev.freshness_emitted_at));
+        assert!(ev.is_fresh(ev.freshness_valid_until));
+        assert!(!ev.is_fresh(ev.freshness_valid_until + 1));
+
+        let p = sample_plan(ev.evidence_hash);
+        assert!(p.is_fresh(p.freshness_emitted_at));
+        assert!(p.is_fresh(p.freshness_valid_until));
+        assert!(!p.is_fresh(p.freshness_valid_until + 1));
     }
 }
