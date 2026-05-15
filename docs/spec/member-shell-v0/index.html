@@ -1,0 +1,729 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Member Shell v0 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>member shell v0</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/member-shell-v0.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Member Shell v0</h1>
+<blockquote>
+<p><strong>Status: spec, work-in-progress.</strong> Defines the ICN member shell as the primary participation surface at v0: mobile-first, offline-tolerant, accessibility-first, plain-language-first. The shell is the <strong>app-side rendering surface</strong> that turns ADR-0020 standing, ADR-0027 ActionCards, ADR-0026 receipts, and the merged sibling specs&#39; status vocabularies into participation. It does <strong>not</strong> redefine any of those contracts. It does <strong>not</strong> specify a native app, a PWA, an iOS/Android decision, a new backend endpoint, or any partner-specific skin. The PR introducing this doc advances <code>#1818</code> without closing it.</p>
+</blockquote>
+<!-- truth-class: normative -->
+
+<h2>Purpose</h2>
+<p>A member shows up to participate in their cooperative, community, or federation. The member shell is what they see. It answers, in plain language:</p>
+<ol>
+<li><strong>Who am I in this institution?</strong></li>
+<li><strong>What is my standing?</strong> What am I currently authorized to do?</li>
+<li><strong>What scope am I acting in?</strong></li>
+<li><strong>What actions are open to me?</strong> And what is closed to me, and why?</li>
+<li><strong>What authority allows this action?</strong></li>
+<li><strong>What will happen if I sign / confirm?</strong> What is the consequence, what is reversible, what is not?</li>
+<li><strong>What receipt proves what happened?</strong></li>
+<li><strong>What is still syncing, delayed, challenged, private, or under review?</strong></li>
+<li><strong>How do I ask for help, challenge, review, revoke, or exit where allowed?</strong></li>
+</ol>
+<p>This spec defines the v0 contract for that surface as a design-level rendering specification. It is not an implementation; no code lands here. It is the contract a future native app, PWA, web shell, or institution-package skin must satisfy to be called &quot;the ICN member shell.&quot;</p>
+<h2>Scope and non-goals</h2>
+<p><strong>In scope:</strong></p>
+<ul>
+<li>The boundary between the member shell, the steward cockpit, the node operator civic-role surface, the public website, the institution-package skin layer, and the runtime / gateway.</li>
+<li>Mobile-first, offline-tolerant, accessibility-first, plain-language-first design principles.</li>
+<li>The member-shell information architecture at v0 (the surfaces the shell must offer; not the visual design).</li>
+<li>The rendering contract for ADR-0027 ActionCards.</li>
+<li>The rendering contract for ADR-0020 standing.</li>
+<li>The signing / confirmation flow contract.</li>
+<li>The receipt / provenance rendering contract.</li>
+<li>Offline / low-bandwidth behavior, including the sync-degradation language from merged <code>docs/spec/network-anti-entropy-proof-loops.md</code>.</li>
+<li>Privacy and ScopedVault member affordances (per merged <code>docs/spec/artifact-registry-and-scoped-vault.md</code>).</li>
+<li>The closed accessibility baseline (per ADR-0028 and <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code>).</li>
+<li>A closed v0 member-facing status vocabulary.</li>
+<li>A failure / safety table.</li>
+<li>A fixture-first, design-review-first dogfood slice.</li>
+</ul>
+<p><strong>Not in scope (preserved out of this PR):</strong></p>
+<ul>
+<li>Not a native iOS / Android / PWA implementation. No platform decision.</li>
+<li>Not a runtime, gateway, or scheduler change. The shell consumes existing surfaces; it does not define new ones.</li>
+<li>Not a redefinition of ADR-0020 <code>/me/standing</code>, ADR-0027 ActionCard, ADR-0025 EffectRecord, ADR-0026 receipt envelope, ADR-0028 accessibility baseline, or any merged spec (#1819, #1820, #1821, #1822, #1823, #1824, #1826, #1829).</li>
+<li>Not a new endpoint specification beyond cross-referencing existing <code>/me/standing</code> and <code>/me/action-cards</code> surfaces.</li>
+<li>Not a steward cockpit specification (<code>#1795</code>) or a node operator civic-role surface (<code>#1613</code>). Those are separate surfaces with their own contracts.</li>
+<li>Not the institution-package skin / theme layer. Packages localize; the generic shell does not pre-decide.</li>
+<li>Not a wallet, account-management dashboard, fintech product, balance/trading interface, or generic admin panel.</li>
+<li>Not the public website (<code>web/</code> non-<code>pilot-ui</code> surfaces).</li>
+<li>Not NYCN-specific or named-partner-specific framing. Institution packages bring their own labels; the generic shell stays generic.</li>
+<li>Not a production-readiness or live-federation claim.</li>
+<li>Not closure of <code>#1818</code>. The PR introducing this doc uses <code>Refs:</code>; closure is left for separate review against the issue&#39;s acceptance criteria.</li>
+<li>Not the <code>signal_rule</code> (#1631) or <code>obligation_lifecycle</code> (#1634) ActionCard source paths. Those remain RFC-gated; this spec lists them only as reserved enum values per ADR-0027.</li>
+</ul>
+<h2>Boundary lines</h2>
+<p>The member shell lives in a clearly-bounded surface space. Each boundary below is load-bearing for keeping the shell honest at v0.</p>
+<h3>Member shell vs. steward cockpit (<code>#1795</code>)</h3>
+<p>The member shell is <strong>the member&#39;s view of their own participation</strong>. The steward cockpit is <strong>the operator&#39;s view of the institution&#39;s operability</strong>. They render different things from the same underlying receipts and evidence.</p>
+<ul>
+<li>The member shell renders <strong>plain participation status</strong> (Synced, Action paused until records sync, Receipt available, Review required, etc.). It does not render <code>DivergenceEvidence</code> class names, peer DIDs, digest forms, or <code>policy_version_id</code> hashes.</li>
+<li>The cockpit renders <strong>technical detail</strong> (the eight cockpit fields from <code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Steward cockpit surface&quot;). The shell does not.</li>
+</ul>
+<p>The same divergence event surfaces in both, with different vocabularies. The shell never shows the cockpit&#39;s technical detail; the cockpit never collapses to the shell&#39;s plain-language summary alone.</p>
+<h3>Member shell vs. node operator civic-role surface (<code>#1613</code>)</h3>
+<p>The node operator civic-role surface is a separate operator-facing affordance for cooperative-operators who also run infrastructure. It is <strong>not</strong> the member shell. A member who happens to also operate a node sees the operator surface in addition to, not instead of, the member shell.</p>
+<h3>Member shell vs. public website</h3>
+<p>The public website is the institution&#39;s outward face. The member shell is the institution&#39;s inward face. The website does not need a sign-in or a standing claim. The shell requires both.</p>
+<h3>Member shell vs. institution-package skin / theme</h3>
+<p>Institution packages (cooperative-specific, federation-specific, partner-specific) localize the member shell with their own role nouns (&quot;steward,&quot; &quot;delegate,&quot; &quot;co-chair,&quot; etc.), ceremony markers, and visual identity. The <strong>generic</strong> member-shell spec stays generic: it names the structural concepts (<code>LocalDomain</code>, <code>InstitutionalDomain</code>, <code>Domain</code>, <code>DomainPolicy</code>, <code>Mandate</code>, <code>AuthorityClass</code>, <code>ActionCard</code>, <code>Standing</code>), per <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3, and lets packages bring local nouns.</p>
+<h3>Member shell vs. backend / runtime</h3>
+<p>The member shell is <strong>app-side rendering</strong> per <code>docs/architecture/KERNEL_APP_SEPARATION.md</code>. The kernel never imports member-shell strings, layouts, or status enums. The shell consumes existing app-side surfaces (<code>/me/standing</code>, <code>/me/action-cards</code>, ADR-0026 receipts, the merged sibling specs&#39; status vocabularies) and renders them. It does not define new wire formats, new schemas, new endpoints, or new receipt classes.</p>
+<h2>Design principles</h2>
+<p>Ten v0 principles, each load-bearing for what the shell is allowed to be:</p>
+<ol>
+<li><strong>Mobile-first.</strong> The shell is designed for a small touch screen on an older device on a slow network. Desktop layouts are the <strong>secondary</strong> target, not the primary. Large tap targets (≥ 44 × 44 px per ADR-0028), single-column-first information density.</li>
+<li><strong>Accessibility-first.</strong> Every surface must pass the twelve-category gate in <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> before it can be called member-facing. Failing any category gates the surface from the &quot;member-facing / pilot-ready&quot; track.</li>
+<li><strong>Offline-tolerant.</strong> Read paths cache locally; write paths queue with explicit &quot;draft intent&quot; framing until signed and acknowledged. Local cache is <strong>derived state</strong>, never source of truth.</li>
+<li><strong>Plain language before formal records.</strong> Every receipt, ActionCard, and standing entry shows a one-sentence plain-language summary first. The formal record (hash, version id, signature, proof envelope) is available second, under a clearly-labeled &quot;details&quot; affordance.</li>
+<li><strong>Receipt / provenance visible for every state change.</strong> Every action the member takes that mutates institutional state produces a receipt the shell can render and link to. Every visible state change has an explanation that points back to a receipt or an open evidence trail. No silent state changes.</li>
+<li><strong>Scope-aware action.</strong> The shell always shows the member which <code>LocalDomain</code> (or wider scope) they are acting in. An ActionCard whose required authority scope does not match the member&#39;s current standing is rendered as visibly closed, with an explanation.</li>
+<li><strong>Safe signing confirmations.</strong> No signing happens without a pre-confirm summary that names the authority basis, the scope, the consequence, the reversibility window (or its absence), the expected receipt class, the privacy / disclosure warning (when relevant), and the offline / sync warning (when relevant).</li>
+<li><strong>Local cache is derived state, never source of truth.</strong> The member sees &quot;last refreshed at <time>&quot; on every read view that may be cached. If the cache is stale beyond a policy window, the shell marks it stale; if a pending action depends on stale state, the shell renders &quot;Action paused until records sync&quot; rather than letting the member act on stale data.</li>
+<li><strong>Multilingual / inclusive-access path.</strong> The shell must integrate with the language / glossary model in <code>#1610</code> and the multilingual access plan in <code>#1740</code>. ActionCard <code>title</code> and <code>summary</code>, standing entries, and the closed status-string set are all translation-tagged at the rendering layer; translation fallbacks are explicit, not silent.</li>
+<li><strong>No financial-product framing.</strong> The shell never uses payment, currency, balance, wallet, token, crypto, or blockchain framing for ICN-native participation. The vocabulary discipline in <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> §&quot;Vocabulary discipline&quot; applies in full. Settlement, position, obligation, allocation, receipt, and provenance are the spec-facing terms.</li>
+</ol>
+<h2>Member shell information architecture</h2>
+<p>The v0 shell offers the following surfaces. The list is the <strong>minimum</strong>; institution-package skins may add, but a shell missing any of these is not v0.</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Purpose</th>
+<th>Sources consumed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Home / Today</strong></td>
+<td>One-screen-at-a-glance: who am I, what&#39;s open to me today, what&#39;s pending, what&#39;s syncing.</td>
+<td><code>/me/standing</code> + <code>/me/action-cards</code> + sync-status vocabulary.</td>
+</tr>
+<tr>
+<td><strong>My Standing</strong></td>
+<td>The member&#39;s identity, devices, memberships, roles, mandates, authority class set, current scope. The &quot;who am I in this institution?&quot; surface.</td>
+<td><code>/me/standing</code> (ADR-0020).</td>
+</tr>
+<tr>
+<td><strong>Current Scope</strong></td>
+<td>Which <code>LocalDomain</code> / <code>InstitutionalDomain</code> / wider scope the member is acting in. Switcher if the member has standing in multiple domains.</td>
+<td><code>/me/standing</code> (domains list).</td>
+</tr>
+<tr>
+<td><strong>Action Cards</strong></td>
+<td>The list of open ActionCards, with status, deadline, authority basis, expected receipt.</td>
+<td><code>/me/action-cards</code> (ADR-0027).</td>
+</tr>
+<tr>
+<td><strong>Decisions / Governance</strong></td>
+<td>Open proposals the member can vote on, recent decisions in scope, the proposal-to-decision-to-effect chain.</td>
+<td><code>/me/action-cards</code> proposal source paths + governance read surface (forward-direction).</td>
+</tr>
+<tr>
+<td><strong>Receipts</strong></td>
+<td>The member&#39;s own receipts — every state change they participated in, with plain-language summaries, the formal record under &quot;details,&quot; and the challenge / review path.</td>
+<td>ADR-0026 receipt envelope (Layer 1–3); future ProvenanceQuery Layer 4 (<code>#1438</code>).</td>
+</tr>
+<tr>
+<td><strong>Records / Artifacts</strong></td>
+<td>The member-visible artifact list scoped to what their standing exposes. Private artifacts surface as opaque references (existence + scope + access path only).</td>
+<td>ArtifactRegistry (<code>docs/spec/artifact-registry-and-scoped-vault.md</code>).</td>
+</tr>
+<tr>
+<td><strong>Privacy / Access</strong></td>
+<td>What private data exists about the member, who can access it, why, and the access / export receipts trail.</td>
+<td>ScopedVault + access receipts (per <code>docs/spec/artifact-registry-and-scoped-vault.md</code>).</td>
+</tr>
+<tr>
+<td><strong>Sync / Offline status</strong></td>
+<td>The current sync state surface (the seven anti-entropy strings), the queue of draft intents, the queue of awaiting-acknowledgement signed actions.</td>
+<td><code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Member shell surface.&quot;</td>
+</tr>
+<tr>
+<td><strong>Help / Challenge / Review / Exit</strong></td>
+<td>The member&#39;s path to ask for help, challenge a record, request review, revoke a delegation, or exit a relationship where the domain&#39;s policy permits it.</td>
+<td>Domain policy (per <code>docs/spec/institutional-domain.md</code>).</td>
+</tr>
+</tbody></table>
+<p>The shell may offer more surfaces; a v0-conformant shell offers at least these.</p>
+<h2>ActionCard rendering contract</h2>
+<p>ADR-0027 defines the canonical ActionCard schema with fourteen fields. The spec <strong>does not redefine those fields</strong>. It defines the <strong>rendering contract</strong> — how the shell must surface each field to the member.</p>
+<h3>Mandatory rendering for every ActionCard</h3>
+<table>
+<thead>
+<tr>
+<th>ADR-0027 field</th>
+<th>Rendering requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>title</code></td>
+<td>First line, plain language, visible in the list row.</td>
+</tr>
+<tr>
+<td><code>summary</code></td>
+<td>One-line plain-language summary; visible in the list row.</td>
+</tr>
+<tr>
+<td><code>action_kind</code></td>
+<td>Mapped to a closed v0 plain-language verb set (see §&quot;Member-facing status vocabulary&quot; below). Not the raw enum value.</td>
+</tr>
+<tr>
+<td><code>source_kind</code></td>
+<td>Mapped to a closed v0 plain-language source label (e.g., <code>proposal</code> → &quot;Proposal in your domain&quot;). Not the raw enum value.</td>
+</tr>
+<tr>
+<td><code>scope</code></td>
+<td>Rendered as the human-readable domain name (per institution-package localization) plus the current-scope context. The member always sees which scope this card belongs to before they confirm.</td>
+</tr>
+<tr>
+<td><code>authority_basis</code></td>
+<td>Rendered verbatim in plain language (ADR-0027 already requires the field to be plain-language). Visible in the pre-confirm summary.</td>
+</tr>
+<tr>
+<td><code>required_authority_scope</code></td>
+<td>Rendered as either &quot;you are authorized for this&quot; (matches member&#39;s current standing) or &quot;this requires authority you do not currently hold&quot; with the specific missing authority class named.</td>
+</tr>
+<tr>
+<td><code>deadline</code></td>
+<td>If present, rendered as a relative-time clock (&quot;closes in 2 days&quot;) with the absolute timestamp under &quot;details.&quot; If absent, rendered as &quot;no time pressure&quot; rather than &quot;no deadline&quot; (more honest framing).</td>
+</tr>
+<tr>
+<td><code>risk_level</code></td>
+<td>Rendered as a coarse visual indicator (low / medium / high), color <strong>and</strong> glyph <strong>and</strong> label (per ADR-0028 color-independence rule). Not numeric; not technical.</td>
+</tr>
+<tr>
+<td><code>accessibility_hint</code></td>
+<td>Rendered as plain-language preamble on the card, before any decision controls. Required by ADR-0028.</td>
+</tr>
+<tr>
+<td><code>receipt_expected</code></td>
+<td>Rendered as the expected outcome line: &quot;If you confirm, this will produce a <receipt class summary>.&quot; Plain-language receipt-class name from the closed shell vocabulary.</td>
+</tr>
+<tr>
+<td><code>source_id</code></td>
+<td>Not rendered to the member by default. Available under &quot;details&quot; for the technically-inclined.</td>
+</tr>
+<tr>
+<td><code>domain_id</code></td>
+<td>Not rendered as an id. Translated to the institution-package domain name.</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td>Not rendered to the member by default. Available under &quot;details&quot; for support / challenge contexts.</td>
+</tr>
+</tbody></table>
+<h3>Card states the shell must distinguish</h3>
+<ul>
+<li><strong>Open</strong> — the member can act now; all conditions are met.</li>
+<li><strong>Open but paused</strong> — the card is open in principle but <code>Action paused until records sync</code> (per <code>docs/spec/network-anti-entropy-proof-loops.md</code>). The confirm control is disabled; the explanation is plain.</li>
+<li><strong>Closed: insufficient authority</strong> — <code>required_authority_scope</code> does not match the member&#39;s standing. The shell renders the missing authority class plainly and offers a &quot;request authority&quot; path if the domain&#39;s policy permits one.</li>
+<li><strong>Closed: deadline passed</strong> — the deadline elapsed before the member acted.</li>
+<li><strong>Closed: superseded</strong> — a later governance action made this card obsolete.</li>
+<li><strong>Closed: confirmed</strong> — the member confirmed; the receipt is available or pending.</li>
+<li><strong>Closed: declined</strong> — the member explicitly declined; the receipt is available if the action kind produces one.</li>
+<li><strong>Forward-direction</strong> — <code>signal_rule</code> / <code>obligation_lifecycle</code> source-path cards are listed under <code>#1631</code> / <code>#1634</code> and rendered as &quot;available soon&quot; placeholders only when the domain&#39;s policy adopts them; they are not enabled by the generic v0 shell.</li>
+</ul>
+<h3>Reserved source paths</h3>
+<p>Per ADR-0027 the closed <code>source_kind</code> taxonomy reserves <code>signal_rule</code> and <code>obligation_lifecycle</code> against <code>#1631</code> and <code>#1634</code>. The shell <strong>must not</strong> render either source path as live until the corresponding implementation lands. Until then, those values are inert at the rendering layer.</p>
+<h2>Standing surface</h2>
+<p>The Standing surface renders <code>/me/standing</code> (per ADR-0020) at v0. The shell must surface:</p>
+<ul>
+<li><strong>Identity</strong> — the member&#39;s DID, device name, last-active timestamp. The DID itself is shown under &quot;details&quot;; the surface uses a plain display name when one is configured.</li>
+<li><strong>Memberships</strong> — the list of <code>LocalDomain</code> / <code>InstitutionalDomain</code> entries the member belongs to, each with its owning entity class (Cooperative / Community / Federation / Individual / other governed class).</li>
+<li><strong>Roles</strong> — the member&#39;s roles per domain. Generic structural names by default; the institution package may localize.</li>
+<li><strong>Mandates and authority</strong> — the active mandates covering the member, with plain-language <code>AuthorityClass</code> labels (Representation / Execution / Attestation per ADR-0014). Each mandate names its scope, its grant origin, and its expiry / revocation conditions.</li>
+<li><strong>Current scope</strong> — the domain the member is currently acting in, with a switcher when the member has standing in multiple.</li>
+<li><strong>What is open to me now</strong> — a count and link to the current ActionCard list.</li>
+<li><strong>What is unavailable and why</strong> — a count of cards closed for &quot;insufficient authority&quot; with a one-line explanation of each blocker. This is the member&#39;s first signal that something is gated.</li>
+</ul>
+<p>The shell does <strong>not</strong> show raw <code>AuthorityGrant</code> content hashes, raw <code>policy_version_id</code> strings, or other technical identifiers as default surface. Those live under &quot;details&quot; for support and challenge contexts.</p>
+<h2>Signing / confirmation flow</h2>
+<p>No member action that mutates institutional state happens without passing through a pre-confirm summary. The flow is:</p>
+<ol>
+<li><strong>Review summary.</strong> Title + summary + plain-language description of what will change.</li>
+<li><strong>Authority basis.</strong> The mandate / policy clause that authorizes the action. Rendered from ADR-0027 <code>authority_basis</code> field.</li>
+<li><strong>Scope.</strong> The <code>LocalDomain</code> (or wider) the action affects. Rendered from ADR-0027 <code>scope</code> field, translated to the institution package&#39;s domain name.</li>
+<li><strong>Consequence.</strong> What will be true after the action that was not true before. Rendered in plain language; institution-specific consequences localized.</li>
+<li><strong>Reversibility / challenge window.</strong> Plain-language statement of whether the action is reversible and within what window. If irreversible, the shell renders an explicit &quot;<strong>this cannot be undone</strong>&quot; line and requires a distinct confirmation step (not a single tap).</li>
+<li><strong>Receipt expected.</strong> Plain-language name of the receipt class the action will produce (per ADR-0026 / ADR-0025), with a note that the receipt will appear in the member&#39;s Receipts surface.</li>
+<li><strong>Privacy / disclosure warning.</strong> If the action involves private data — exposing, sharing, requesting access — a plain-language disclosure warning before confirm.</li>
+<li><strong>Offline / sync warning.</strong> If the shell is currently in <code>Sync delayed</code>, <code>Some records are being verified</code>, <code>Action paused until records sync</code>, or <code>Sync delayed / degraded</code> state, the confirm control is <strong>either</strong> disabled (when the action&#39;s authority depends on the affected state class) <strong>or</strong> the warning is shown and the action is queued as draft intent (when the authority is independent of the degraded class).</li>
+<li><strong>Confirm / cancel.</strong> Two clearly-distinct affordances. Confirm requires a deliberate gesture (per ADR-0028 cognitive-load principle). Cancel always available, returns the member to the card list.</li>
+<li><strong>Post-action receipt status.</strong> Immediately after confirm, the shell renders one of: <code>Receipt available</code> (the receipt landed before the shell returned), <code>Some records are being verified</code> (the receipt is pending and the loop is in progress), or <code>Review required</code> (the action requires further governance ratification, e.g., advisory output per ADR-0030).</li>
+</ol>
+<p>Draft intent vs. signed-and-committed is always legible. A queued draft is plainly labeled &quot;Draft — will be sent when records sync.&quot; A signed-but-not-acknowledged action is plainly labeled &quot;Sent — waiting for receipt.&quot; A fully-acknowledged action shows the receipt summary.</p>
+<h2>Receipt and provenance rendering</h2>
+<p>Receipts are the spine of the shell. Every visible state change connects to a receipt. The rendering contract:</p>
+<ol>
+<li><strong>Plain summary first.</strong> One line: what happened, when, in what scope, with what consequence. No technical identifiers.</li>
+<li><strong>Explanation second.</strong> Two-to-three sentences: what authority allowed it, what came before (linked), what comes next (if applicable).</li>
+<li><strong>Formal record third.</strong> Under a clearly-labeled &quot;details&quot; affordance: receipt class name (<code>GovernanceDecisionReceipt</code>, <code>ActionItemCompletionReceipt</code>, <code>MeetingAttendanceReceipt</code>, <code>EffectDispatchEvidence</code>, future <code>RatificationReceipt</code>, etc.), receipt id, signature, mandate reference, policy_version_id, Stage 5 evidence link per <code>docs/spec/effect-dispatch-contract.md</code>.</li>
+<li><strong>Challenge / review path always visible where applicable.</strong> If the domain&#39;s policy provides a challenge window or a review surface for this receipt class, the shell renders the &quot;challenge / request review&quot; affordance with the deadline.</li>
+</ol>
+<p>The shell renders the <strong>plain summary</strong> even when the formal record is incomplete (e.g., during the Stage 5 evidence-still-arriving window). It marks the formal record as pending in that case.</p>
+<p>The shell renders the <strong>artifact-class</strong> label from <code>docs/spec/artifact-registry-and-scoped-vault.md</code> (Document, ComputeOutput, EvidencePacket, PrivateEvidence, Backup, SettlementRecord, Other) when a receipt references an artifact. <code>PrivateEvidence</code> artifacts are rendered as opaque references — existence and scope and access-path only, never body content.</p>
+<h2>Offline / low-bandwidth behavior</h2>
+<p>The shell must function on a slow or intermittent network on an older device. The contract:</p>
+<ul>
+<li><strong>Cache as derived.</strong> All read views may be cached locally. The cache shows &quot;last refreshed at <time>.&quot; Stale-beyond-policy-window cache is visibly stale.</li>
+<li><strong>Stale markers.</strong> A stale list row, card, or receipt summary shows a &quot;this is the last copy we have; refresh when online&quot; affordance.</li>
+<li><strong>Blocked actions where sync evidence is required.</strong> Per <code>docs/spec/network-anti-entropy-proof-loops.md</code> Boundary rule 6, federation- or commons-scope actions require fresh sync proof; the shell renders these as <code>Action paused until records sync</code> with a plain-language explanation rather than letting the member act on stale evidence.</li>
+<li><strong>Draft intent vs. signed / committed action.</strong> A draft intent is queued locally with no signature. A signed action is committed (signature is final) but its receipt may be in transit. The shell distinguishes the two visibly.</li>
+<li><strong>Queued-but-not-accepted distinction.</strong> A signed action that has not yet been acknowledged by the institution is &quot;Sent — waiting for receipt,&quot; not &quot;Confirmed.&quot; Confirmation requires the receipt.</li>
+<li><strong>Sync degradation language.</strong> The shell uses the closed seven-string set from <code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Member shell surface&quot; and the closed seven-string set from <code>docs/spec/compute-placement-policy.md</code> §&quot;Member shell&quot; verbatim. No invention.</li>
+</ul>
+<h2>Privacy and ScopedVault member affordances</h2>
+<p>Per merged <code>docs/spec/artifact-registry-and-scoped-vault.md</code> and forward-tracked <code>#1792</code> / <code>#1767</code>, private data lives in scoped vaults and never travels raw through gossip or shell-level caches. The shell&#39;s contract:</p>
+<ul>
+<li><strong>Existence metadata, never restricted contents.</strong> A <code>PrivateEvidence</code> artifact (per the artifact-class taxonomy) surfaces as &quot;a private record exists in this scope&quot; — never a preview of the body.</li>
+<li><strong>Who can access.</strong> The shell renders the list of access-holders in plain language (e.g., &quot;your steward of record,&quot; &quot;the privacy reviewer for this scope&quot;) when the policy permits the member to see that list.</li>
+<li><strong>Why they can access.</strong> The mandate or policy clause that authorizes the access, rendered plainly.</li>
+<li><strong>Access / export receipts.</strong> Every access to a member&#39;s private record produces a receipt. The shell renders these in the member&#39;s Receipts surface, plainly summarized.</li>
+<li><strong>Request / review / challenge path.</strong> The shell offers the member a path to request additional access, request review of who has access, or challenge an access that they believe was inappropriate.</li>
+<li><strong>No dashboard preview of private vault content.</strong> The shell does not paginate, preview, or surface body bytes of private vault objects. The opaque reference + existence + scope is the surface, full stop.</li>
+</ul>
+<h2>Accessibility baseline</h2>
+<p>The shell inherits the twelve-category gate from <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> and ADR-0028. <strong>Every</strong> member-facing surface must pass all twelve, or it is gated from the member-facing track:</p>
+<ol>
+<li><strong>Language access</strong> — plain language, glossary hooks (per <code>#1610</code>), translation readiness (per <code>#1740</code>).</li>
+<li><strong>Screen-reader and non-visual access</strong> — semantic HTML or platform-native equivalents, meaningful headings, ARIA labels, structured summaries.</li>
+<li><strong>Low-vision access</strong> — 200% zoom support, WCAG AA contrast (4.5:1 body, 3:1 large), no sub-14px critical labels.</li>
+<li><strong>Color-independent meaning</strong> — grayscale-safe status; color reinforces, never the only carrier. Glyphs and labels in addition to color for risk level, sync status, and receipt state.</li>
+<li><strong>Keyboard, switch, non-pointer access</strong> — fully reachable via keyboard / switch, visible focus state, no traps, ≥ 44 × 44 px hit targets.</li>
+<li><strong>Captions, transcripts, non-audio access</strong> — paired captions / transcripts; audio never sole signal.</li>
+<li><strong>Cognitive load and step complexity</strong> — progressive disclosure, consequences explained pre-action, reversibility legible.</li>
+<li><strong>Low-bandwidth and low-device access</strong> — mobile-first, older devices, minimal animations, exportable for offline reading.</li>
+<li><strong>Assistive-technology compatibility</strong> — real semantic structure, standard inputs, switch-control and screen-reader tested.</li>
+<li><strong>Privacy-preserving accommodation path</strong> — accommodation data lives in private overlays per <code>#1767</code>, never in public git or in plain-text cache. The shell never persists accommodation profile locally without encryption.</li>
+<li><strong>Receipts, provenance, evidence access</strong> — plain-language summaries before raw data, clear fixture-vs-live boundaries.</li>
+<li><strong>Governance and action access</strong> — ActionCards expose authority basis, status, reversibility, decision, and consequence in plain language <strong>before</strong> any confirm control.</li>
+</ol>
+<p>Failing any category gates the surface from the &quot;member-facing / pilot-ready&quot; track. No exceptions. The shell is not &quot;for some members&quot;; it is for all members, including older members, members on older devices, members with disabilities, members on slow networks, and members in non-English-default settings.</p>
+<h2>Member-facing status vocabulary</h2>
+<p>The v0 shell uses a <strong>closed</strong> plain-language vocabulary. The closed set is the union of the merged sibling specs&#39; member-shell strings plus a small set of action-status strings the shell needs for its own life-cycle. Inventing new strings outside this set is a v0 violation; the v0.x or v1 conversation can extend the set.</p>
+<h3>Sync state (from <code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Member shell surface&quot;)</h3>
+<ul>
+<li><strong>Synced</strong></li>
+<li><strong>Sync delayed</strong></li>
+<li><strong>Some records are being verified</strong></li>
+<li><strong>Action paused until records sync</strong></li>
+<li><strong>Receipt available</strong></li>
+<li><strong>Review required</strong></li>
+<li><strong>Sync delayed / degraded</strong></li>
+</ul>
+<h3>Execution scope (from <code>docs/spec/compute-placement-policy.md</code> §&quot;Member shell&quot;)</h3>
+<ul>
+<li><strong>local execution</strong></li>
+<li><strong>processed inside your institution</strong></li>
+<li><strong>sent to a federation executor under agreement</strong></li>
+<li><strong>commons compute pending</strong></li>
+<li><strong>review required</strong> (overlaps with sync state; same string)</li>
+<li><strong>receipt available</strong> (overlaps with sync state; same string)</li>
+<li><strong>sync delayed / degraded</strong> (overlaps with sync state; same string)</li>
+</ul>
+<h3>Action lifecycle (defined here as v0)</h3>
+<ul>
+<li><strong>Open</strong> — the action is available to confirm.</li>
+<li><strong>Open but paused</strong> — the action is open but blocked pending sync or related state.</li>
+<li><strong>Draft — will be sent when records sync</strong> — the member started but the shell is offline / degraded.</li>
+<li><strong>Sent — waiting for receipt</strong> — the member signed; the receipt has not arrived.</li>
+<li><strong>Confirmed</strong> — the receipt is available; the action is complete.</li>
+<li><strong>Declined</strong> — the member declined; the action is closed.</li>
+<li><strong>Closed — deadline passed</strong>.</li>
+<li><strong>Closed — superseded</strong>.</li>
+<li><strong>Closed — insufficient authority</strong>.</li>
+</ul>
+<h3>Privacy / disclosure (defined here as v0)</h3>
+<ul>
+<li><strong>Private record exists</strong></li>
+<li><strong>Access pending review</strong></li>
+<li><strong>Access granted</strong></li>
+<li><strong>Access denied</strong></li>
+<li><strong>Access export receipt available</strong></li>
+</ul>
+<h3>Receipt-class plain-language labels (mapping to ADR-0026 / ADR-0025)</h3>
+<p>The shell maps technical receipt class names to a small set of plain-language labels:</p>
+<ul>
+<li>&quot;Governance decision recorded&quot; → <code>GovernanceDecisionReceipt</code></li>
+<li>&quot;Action completed&quot; → <code>ActionItemCompletionReceipt</code></li>
+<li>&quot;Attendance recorded&quot; → <code>MeetingAttendanceReceipt</code></li>
+<li>&quot;Effect applied&quot; → <code>InstitutionalEffectRecord</code> + <code>EffectDispatchEvidence</code></li>
+<li>&quot;Output produced&quot; → <code>ArtifactReceipt</code> (Layer 2)</li>
+<li>&quot;Advisory output awaiting ratification&quot; → forward <code>RatificationReceipt</code> (when implemented)</li>
+<li>&quot;Repair recorded&quot; → <code>RepairReceipt</code> (forward-direction, per <code>docs/spec/network-anti-entropy-proof-loops.md</code>)</li>
+<li>&quot;Settlement recorded&quot; → settlement receipt class (per <code>docs/spec/federation-settlement-finality.md</code>)</li>
+</ul>
+<p>The full receipt class name is available under &quot;details,&quot; never as the primary surface.</p>
+<h2>Failure and safety table</h2>
+<p>The following failures are member-facing concerns. Each row names the failure, where it surfaces, and the shell&#39;s required disposition.</p>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Where it surfaces</th>
+<th>Disposition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/me/standing</code> returns empty or fails</td>
+<td>Standing surface</td>
+<td>Render &quot;Your standing is currently unavailable. We&#39;ll keep trying. If this persists, please contact your steward.&quot; Plain language; no error code as primary surface. Help path always visible.</td>
+</tr>
+<tr>
+<td>ActionCard generated without an <code>authority_basis</code> field</td>
+<td>ActionCard rendering</td>
+<td>Card rendered as &quot;Closed: missing authority basis. This card is misconfigured; please contact your steward.&quot; Never silently shown as actionable.</td>
+</tr>
+<tr>
+<td>Member signs while sync is degraded</td>
+<td>Signing flow</td>
+<td>If the action depends on the degraded state class: confirm control disabled with &quot;Action paused until records sync.&quot; If the action is authority-independent of the degraded class: confirm allowed with explicit &quot;Sync delayed — your action will be queued&quot; warning.</td>
+</tr>
+<tr>
+<td>Receipt missing after confirmed action</td>
+<td>Receipts surface</td>
+<td>&quot;Sent — waiting for receipt&quot; status persists; shell offers &quot;this is taking longer than expected — request review&quot; affordance after the policy&#39;s grace window expires.</td>
+</tr>
+<tr>
+<td>Local cache is stale beyond policy window</td>
+<td>All cached surfaces</td>
+<td>Stale marker visible on every affected list row; pending actions that depend on the stale class render <code>Action paused until records sync</code>.</td>
+</tr>
+<tr>
+<td>Private record existence hidden when policy says it should be visible</td>
+<td>Privacy / Access surface</td>
+<td>Disposition is a policy-side decision, not a shell-side default. The shell surfaces what the policy authorizes; if the policy is silent, the shell defaults to <strong>showing existence</strong> so the member is not blind to records about them.</td>
+</tr>
+<tr>
+<td>Restricted content exposed in shell</td>
+<td>Any surface</td>
+<td>Shell-side hard rule: never. Bodies of private artifacts never reach the rendering layer. If the rendering layer receives body bytes for a <code>PrivateEvidence</code> artifact, the surface drops them and logs a safety failure.</td>
+</tr>
+<tr>
+<td>Challenge window missing on receipt class that should have one</td>
+<td>Receipts surface</td>
+<td>Plain-language note: &quot;The challenge path for this kind of record is being defined. Please contact your steward if you wish to dispute.&quot; Receipt remains visible.</td>
+</tr>
+<tr>
+<td>Translation missing for current language</td>
+<td>Any surface</td>
+<td>Fallback to the institution&#39;s default language with a visible &quot;translation pending&quot; tag. Never silent fallback; the member always knows the surface is showing a non-native string.</td>
+</tr>
+<tr>
+<td>Accessibility gate failed for a surface</td>
+<td>Any surface</td>
+<td>The surface is <strong>not allowed</strong> in member-facing v0. Gate failure is a v0 violation; the surface is removed from the build until it passes.</td>
+</tr>
+<tr>
+<td>Scope ambiguous (member has standing in multiple domains and the shell does not know which one to render)</td>
+<td>All surfaces</td>
+<td>Scope switcher rendered prominently with &quot;Acting in <domain>&quot; label. Member must explicitly select before confirm controls become active for cross-domain actions.</td>
+</tr>
+<tr>
+<td>Offline draft intent mistaken for committed action</td>
+<td>Action lifecycle rendering</td>
+<td>Draft intent always labeled &quot;Draft — will be sent when records sync.&quot; Confirmed action labeled &quot;Confirmed.&quot; Two visibly distinct labels and affordances.</td>
+</tr>
+<tr>
+<td>Member presented with raw scheduler, runtime, or cockpit jargon</td>
+<td>Any surface</td>
+<td>v0 violation. The shell uses the closed plain-language vocabulary above. Raw jargon (DivergenceEvidence class names, policy_version_id strings, peer DIDs, BloomFilter, etc.) belongs to the cockpit, not the shell.</td>
+</tr>
+<tr>
+<td>Financial vocabulary (payment, wallet, balance, currency, token, crypto, blockchain) appears in member shell</td>
+<td>Any surface</td>
+<td>v0 violation. Replace with settlement / position / obligation / allocation / receipt / provenance. Forbidden as positive ICN-native framing.</td>
+</tr>
+<tr>
+<td>Action labeled reversible when it is not (or vice versa)</td>
+<td>ActionCard rendering</td>
+<td>The reversibility window comes from the underlying source. The shell must surface what the source declares. A reversible action lacking a challenge window prompts the safety table row above (&quot;challenge window missing&quot;).</td>
+</tr>
+<tr>
+<td>Action irreversible but not labeled as such</td>
+<td>Signing flow</td>
+<td>Confirm gated by an explicit &quot;this cannot be undone&quot; line and a distinct second confirmation step. Single-tap confirm is never allowed for irreversible actions.</td>
+</tr>
+<tr>
+<td>Member uses help / challenge / review / exit path and receives no response</td>
+<td>Help surface</td>
+<td>The institution&#39;s policy defines response cadence. The shell surfaces &quot;Your request was received at <time>. Expected response window: <policy-defined>.&quot; If the window elapses with no response, the shell surfaces escalation per policy.</td>
+</tr>
+<tr>
+<td>Institution-package skin overrides a generic structural label (e.g., renames &quot;Mandate&quot; to a partner-specific noun)</td>
+<td>Any surface</td>
+<td>Allowed by policy as long as the generic structural concept stays available under &quot;details.&quot; The shell never <strong>loses</strong> the structural concept; the package only <strong>adds</strong> the local noun.</td>
+</tr>
+</tbody></table>
+<h2>First safe proof-loop / dogfood slice</h2>
+<p>Per <code>#1818</code>&#39;s acceptance criterion and the established session pattern, the spec names a docs- and fixture-first slice that exercises the contract without touching real members, real partner institutions, or a real backend.</p>
+<h3>Slice A (preferred): Read-only standing + ActionCard + receipt + sync-delayed fixture</h3>
+<ul>
+<li><strong>Fictional member.</strong> A fixture DID (e.g., <code>did:icn:demo:member-1</code>) with a local signing key, a fixture display name, and a fixture device.</li>
+<li><strong>Fictional institution / domain.</strong> A fixture <code>LocalDomain</code> (e.g., <code>did:icn:demo:exampledomain</code>) with the four merged-spec scope vocabularies available.</li>
+<li><strong>One vote / review ActionCard.</strong> A fixture ActionCard of <code>source_kind = proposal</code>, <code>action_kind = vote</code>, with a fixture <code>authority_basis</code> (&quot;you are a voting member of this domain&quot;) and a fixture deadline.</li>
+<li><strong>One completed action with receipt available.</strong> A fixture <code>MeetingAttendanceReceipt</code> rendered as &quot;Attendance recorded&quot; with the plain summary, the two-sentence explanation, the formal record under details, and no challenge window (since attendance is not disputable here).</li>
+<li><strong>One action paused due to <code>Sync delayed / degraded</code>.</strong> A fixture ActionCard rendered as &quot;Open but paused — Action paused until records sync,&quot; with the confirm control disabled and the plain explanation visible.</li>
+<li><strong>One restricted / private record shown as existence metadata only.</strong> A fixture <code>PrivateEvidence</code> artifact rendered as &quot;Private record exists — access pending review,&quot; with the access path affordance present and no body content surfaced.</li>
+<li><strong>Accessibility checklist applied.</strong> All twelve categories pass on the fixture rendering. Keyboard reachable, screen-reader navigable, color-independent, 200% zoom, plain language, captions where media is present, etc.</li>
+<li><strong>No real partner data.</strong> No NYCN-specific labels, no named partner cooperatives, no real members.</li>
+<li><strong>No live network.</strong> All data is fixture; no <code>/me/standing</code> call against a real gateway; no real receipts retrieved.</li>
+<li><strong>No runtime mutation.</strong> The fixture is a rendering rehearsal. No state changes; no signed actions sent anywhere.</li>
+</ul>
+<p>The slice produces evidence that the rendering contract is implementable, that the accessibility gate is passable at v0, and that the closed status-string vocabularies render in plain language. It does not implement the shell.</p>
+<h3>Slice B (after design review): Signing flow rehearsal</h3>
+<p>Same fixture stack. A fixture member walks the signing / confirmation flow for a fixture ActionCard. The shell renders the ten-step pre-confirm summary; the member confirms; a fixture receipt arrives. Asserts the flow&#39;s accessibility, plain-language consistency, and reversibility / privacy / sync warning surfaces.</p>
+<h3>Slice C (after design review): Offline / degraded sync rehearsal</h3>
+<p>Same fixture stack. A fixture member starts an action while the shell is in <code>Sync delayed</code>. The action is queued as draft intent. The shell transitions through <code>Some records are being verified</code> and finally <code>Sync delayed / degraded</code>. The member sees plain-language warnings at each transition and is offered the help / review path.</p>
+<p>All three slices are fixture-only. None implements the shell. None claims production readiness, partner-pilot operation, or live federation.</p>
+<h2>Relationship to sibling work</h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Where it lives</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Member shell (this spec)</td>
+<td><code>#1818</code></td>
+</tr>
+<tr>
+<td>Steward cockpit operability surface</td>
+<td><code>#1795</code></td>
+</tr>
+<tr>
+<td>Node operator civic-role surface in Commons Shell</td>
+<td><code>#1613</code></td>
+</tr>
+<tr>
+<td><code>/me/action-cards</code> endpoint</td>
+<td><code>#1608</code> (current vertical slice) + <code>#1646</code> (action-cards on top of <code>/me/standing</code>)</td>
+</tr>
+<tr>
+<td>ActionCard <code>$id</code> compatibility review</td>
+<td><code>#1742</code></td>
+</tr>
+<tr>
+<td><code>signal_rule</code> ActionCard source path</td>
+<td><code>#1631</code> (forward-direction, reserved enum)</td>
+</tr>
+<tr>
+<td><code>obligation_lifecycle</code> ActionCard source path</td>
+<td><code>#1634</code> (forward-direction, reserved enum)</td>
+</tr>
+<tr>
+<td>Multilingual / inclusive-access path</td>
+<td><code>#1740</code></td>
+</tr>
+<tr>
+<td>Language / glossary endpoint</td>
+<td><code>#1610</code></td>
+</tr>
+<tr>
+<td>Network anti-entropy proof loops</td>
+<td><code>#1799</code> (merged #1829)</td>
+</tr>
+<tr>
+<td>Compute placement policy</td>
+<td><code>#1801</code> (merged #1826)</td>
+</tr>
+<tr>
+<td>ArtifactRegistry / ScopedVault</td>
+<td><code>#1798</code> (merged #1824)</td>
+</tr>
+<tr>
+<td>Storage durability policies</td>
+<td><code>#1816</code> (merged #1823)</td>
+</tr>
+<tr>
+<td>Governed service binding</td>
+<td><code>#1815</code> (merged #1822)</td>
+</tr>
+<tr>
+<td>CCL policy registry</td>
+<td><code>#1817</code> (merged #1821)</td>
+</tr>
+<tr>
+<td>Institutional domain and policy primitive</td>
+<td><code>#1794</code> (merged #1820)</td>
+</tr>
+<tr>
+<td>Effect dispatch contract</td>
+<td><code>#1797</code> (merged #1819)</td>
+</tr>
+<tr>
+<td>Integrated cooperative operating model</td>
+<td><code>#1793</code> (merged #1814)</td>
+</tr>
+<tr>
+<td>Encrypted distributed private-overlay storage</td>
+<td><code>#1767</code> (forward-direction)</td>
+</tr>
+<tr>
+<td>Private data disclosure boundary</td>
+<td><code>#1792</code> (forward-direction)</td>
+</tr>
+<tr>
+<td>Bootstrap activation + standing read model</td>
+<td>ADR-0020</td>
+</tr>
+<tr>
+<td>ActionCard schema</td>
+<td>ADR-0027 + <code>docs/contracts/institution-package/action-card.schema.json</code></td>
+</tr>
+<tr>
+<td>Accessibility baseline</td>
+<td>ADR-0028 + <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code></td>
+</tr>
+<tr>
+<td>AuthorityClass / TypedScope / Mandate</td>
+<td>ADR-0014</td>
+</tr>
+<tr>
+<td>Authority grant minting seam</td>
+<td>ADR-0019</td>
+</tr>
+<tr>
+<td>Institutional Effect Record canonical schema</td>
+<td>ADR-0025</td>
+</tr>
+<tr>
+<td>Receipt and provenance proof envelope</td>
+<td>ADR-0026</td>
+</tr>
+<tr>
+<td>Compute workload manifest and authority boundary</td>
+<td>ADR-0030</td>
+</tr>
+<tr>
+<td>Commons compute admission and settlement</td>
+<td>ADR-0031</td>
+</tr>
+<tr>
+<td>Entity-scope vocabulary boundary</td>
+<td><code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3</td>
+</tr>
+<tr>
+<td>Kernel / app separation</td>
+<td><code>docs/architecture/KERNEL_APP_SEPARATION.md</code></td>
+</tr>
+<tr>
+<td>Integrated spine</td>
+<td><code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code></td>
+</tr>
+</tbody></table>
+<h2>Non-claims (repeat block for grep clarity)</h2>
+<ul>
+<li>This spec does not implement a member shell. No code lands here.</li>
+<li>This spec does not specify a native app, an iOS / Android / PWA decision, or any platform choice.</li>
+<li>This spec does not define a new endpoint. It consumes existing <code>/me/standing</code> (per ADR-0020) and <code>/me/action-cards</code> (per <code>#1608</code> / <code>#1646</code>) surfaces; it does not extend, version, or otherwise mutate them.</li>
+<li>This spec does not redefine ADR-0020 standing, ADR-0027 ActionCard, ADR-0025 EffectRecord, ADR-0026 receipt envelope, ADR-0028 accessibility baseline, or any merged sibling spec.</li>
+<li>This spec does not introduce a new receipt class. It maps existing classes (per ADR-0026 / ADR-0025 / merged sibling specs) to plain-language labels at the rendering layer only.</li>
+<li>This spec does not implement the signal_rule or obligation_lifecycle ActionCard source paths. Those remain RFC-gated in <code>#1631</code> and <code>#1634</code>.</li>
+<li>This spec does not implement the steward cockpit, the node operator civic-role surface, or any operator-side surface.</li>
+<li>This spec does not specify partner-institution skinning. Generic shell stays generic; packages localize.</li>
+<li>This spec does not claim production readiness, a live partner federation, a formal NYCN pilot, or operation under this contract by any real institution today.</li>
+<li>This spec does not move, expose, preview, or cache private vault contents. Body bytes never reach the rendering layer.</li>
+<li>This spec does not use wallet, payment, balance, currency, token, crypto, or blockchain framing for ICN-native participation. All such terms in this doc appear in explicit negation context (design principle 10, failure-safety row, this non-claims block) or as references to existing legacy code identifiers preserved without endorsement (per the cross-sprint reconciliation plan).</li>
+<li>This spec does not authorize any change to the runtime, gateway, SDK, website, deploy scripts, K3s, DNS, Forgejo, or any deployed infrastructure.</li>
+<li>This spec does not close <code>#1818</code>. The PR uses <code>Refs: #1818</code>; closure is a user-driven decision against the issue&#39;s acceptance criteria.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

@@ -1,0 +1,531 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-05-15 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>handoff 2026 05 15 member shell v0</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/handoff-2026-05-15-member-shell-v0.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-05-15</h1>
+<p><strong>Topic:</strong> Member Shell v0 (#1818)
+<strong>Branch:</strong> <code>spec/member-shell-v0</code>
+<strong>Primary issue advanced:</strong> <a href="https://github.com/InterCooperative-Network/icn/issues/1818" target="_blank" rel="noopener">#1818</a> (member shell v0 as primary participation surface)
+<strong>Refs (not closed):</strong> <code>#1818</code>, <code>#1795</code>, <code>#1613</code>, <code>#1608</code>, <code>#1646</code>, <code>#1740</code>, <code>#1610</code>, <code>#1742</code>, <code>#1631</code>, <code>#1634</code>, <code>#1767</code>, <code>#1792</code>, <code>#1799</code>, <code>#1801</code>, <code>#1798</code>, <code>#1816</code>, <code>#1815</code>, <code>#1817</code>, <code>#1794</code>, <code>#1797</code>, <code>#1793</code>
+<strong>Closes:</strong> none</p>
+<hr>
+<h2>Session Goal</h2>
+<p>Define <code>docs/spec/member-shell-v0.md</code> as the design-level rendering contract for the ICN member shell at v0: mobile-first, offline-tolerant, accessibility-first, plain-language-first. The spec consumes ADR-0020 <code>/me/standing</code>, ADR-0027 ActionCard schema, ADR-0026 receipt envelope, ADR-0028 accessibility baseline, the closed seven-string sync vocabulary from merged <code>#1829</code> (network-anti-entropy-proof-loops.md), and the closed seven-string placement vocabulary from merged <code>#1826</code> (compute-placement-policy.md). It does not redefine any of those contracts. It does not specify a native app, a PWA, an iOS/Android decision, a new endpoint, a partner skin, or any runtime change.</p>
+<p>The spec advances <code>#1818</code>&#39;s purpose and scope; closure is left for human review against the issue&#39;s acceptance criteria.</p>
+<hr>
+<h2>Decisive Test</h2>
+<p>The PR fails if any of these holds:</p>
+<ol>
+<li>The spec invents new ActionCard schema fields, new receipt classes, or new endpoint surfaces.</li>
+<li>The spec uses positive ICN-native payment / wallet / balance / currency / token / crypto / blockchain framing outside explicit negation context.</li>
+<li>The spec picks a native-app / iOS / Android / PWA / web technology, or otherwise locks the implementation surface to a platform choice.</li>
+<li>The spec invents member-facing status strings outside the closed sets already merged in <code>#1826</code> and <code>#1829</code> plus the small action-lifecycle and privacy / disclosure additions named in §&quot;Member-facing status vocabulary.&quot;</li>
+<li>The spec describes the member shell as account management, a wallet, a fintech product, a trading interface, an admin panel, or the steward cockpit.</li>
+<li>The spec treats the local cache as the source of truth for any read or signed write path.</li>
+<li>The spec lets degraded sync render as healthy on any member-facing surface.</li>
+<li>The spec enables the <code>signal_rule</code> or <code>obligation_lifecycle</code> ActionCard source paths in the generic v0 shell (those are RFC-gated against <code>#1631</code> and <code>#1634</code> and must remain inert at the rendering layer until those land).</li>
+<li>The spec edits the <code>#1818</code> GitHub issue body.</li>
+<li>The spec touches Rust code, the SDK, the website, deploy scripts, K3s manifests, DNS, Forgejo, or the gateway.</li>
+<li>The PR commit closes <code>#1818</code> instead of using <code>Refs:</code>.</li>
+<li>The spec claims production readiness, live federation, NYCN as a formal pilot, or any partner operating under this contract today.</li>
+<li><code>python3 docs/scripts/doc_control_check.py --strict</code> introduces a new warning rooted in this PR.</li>
+<li><code>python3 docs/scripts/lint-arch.py docs/spec/member-shell-v0.md --cargo icn/Cargo.toml</code> returns errors (warnings in explicit negation context are acceptable).</li>
+</ol>
+<p>See §&quot;Verification Commands&quot; below for the exact commands.</p>
+<hr>
+<h2>Final State (Verified)</h2>
+<!-- TRUTH TYPE: Implementation truth — only facts confirmed by commands or code inspection -->
+
+<h3><code>main</code> HEAD before branching</h3>
+<p><code>0b3009478</code> — <code>docs(spec): define network anti-entropy proof loops (#1829)</code></p>
+<h3>Branches</h3>
+<ul>
+<li><code>spec/member-shell-v0</code> — head SHA at first commit recorded after <code>git commit</code>. Branch head moves with each push to address review feedback.</li>
+</ul>
+<h3>Open PRs</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Branch</th>
+<th>State</th>
+<th>CI Status</th>
+<th>Blocker</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>(to be opened)</td>
+<td><code>spec/member-shell-v0</code></td>
+<td>pending PR</td>
+<td>pending initial CI</td>
+<td>None</td>
+</tr>
+</tbody></table>
+<h3>Recent merged PRs</h3>
+<p><code>#1814</code>, <code>#1819</code>, <code>#1820</code>, <code>#1821</code>, <code>#1822</code>, <code>#1823</code>, <code>#1824</code>, <code>#1825</code>, <code>#1826</code>, <code>#1827</code>, <code>#1829</code>.</p>
+<h3>Sibling issues verified OPEN at session start</h3>
+<p><code>#1818</code> (primary; this PR advances), <code>#1795</code>, <code>#1613</code>, <code>#1608</code>, <code>#1646</code>, <code>#1740</code>, <code>#1610</code>, <code>#1742</code>, <code>#1711</code>, <code>#1712</code>. The <code>signal_rule</code> (<code>#1631</code>) and <code>obligation_lifecycle</code> (<code>#1634</code>) source-path issues are referenced but the issue numbers are forward-direction per ADR-0027&#39;s <code>x-icn-emitted-source-kinds</code> reserved-set; their state was not queried this session.</p>
+<h3>Existing surfaces inspected</h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Where</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/me/standing</code> runtime contract</td>
+<td>ADR-0020 (<code>docs/adr/ADR-0020-institutional-bootstrap-activation-and-standing-read-model.md</code>); <code>icn/apps/governance/src/http/handlers.rs</code></td>
+<td>Implemented (per ADR-0020 implementation_status).</td>
+</tr>
+<tr>
+<td><code>/me/action-cards</code> endpoint</td>
+<td>ADR-0027 + <code>#1608</code> + <code>#1646</code>; <code>icn/apps/governance/src/http/handlers.rs::get_my_action_cards</code></td>
+<td>Implemented as a vertical slice.</td>
+</tr>
+<tr>
+<td>ActionCard schema (14 fields)</td>
+<td><code>docs/contracts/institution-package/action-card.schema.json</code> (x-icn-status: rfc); ADR-0027</td>
+<td>Implemented at the schema level; rendering rules are this spec&#39;s job.</td>
+</tr>
+<tr>
+<td>ActionCard source paths</td>
+<td>ADR-0027 closed taxonomy</td>
+<td><code>proposal/vote</code>, <code>action_item/complete</code>, <code>meeting/attend</code> implemented end-to-end with receipts. <code>signal_rule</code> reserved against <code>#1631</code>; <code>obligation_lifecycle</code> reserved against <code>#1634</code>.</td>
+</tr>
+<tr>
+<td>Receipt classes</td>
+<td>ADR-0026 (envelope), ADR-0025 (EffectRecord), <code>icn/crates/icn-governance/src/proof.rs</code></td>
+<td><code>GovernanceDecisionReceipt</code>, <code>ActionItemCompletionReceipt</code>, <code>MeetingAttendanceReceipt</code> implemented; forward classes (<code>RatificationReceipt</code>, <code>RepairReceipt</code>) named in merged specs.</td>
+</tr>
+<tr>
+<td>Accessibility gate</td>
+<td><code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code>; ADR-0028</td>
+<td>Live PR-time checklist with twelve categories.</td>
+</tr>
+<tr>
+<td>Anti-entropy member-shell status strings</td>
+<td>merged <code>#1829</code>, §&quot;Member shell surface&quot;</td>
+<td>Closed set of seven strings.</td>
+</tr>
+<tr>
+<td>Placement member-shell strings</td>
+<td>merged <code>#1826</code>, §&quot;Member shell&quot;</td>
+<td>Closed set of seven strings.</td>
+</tr>
+<tr>
+<td>ScopedVault opaque-reference framing</td>
+<td>merged <code>#1824</code>, §&quot;ScopedVault&quot;</td>
+<td>Existence + scope + access path only; no body.</td>
+</tr>
+<tr>
+<td>Scope vocabulary</td>
+<td>merged <code>#1825</code> (<code>INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3)</td>
+<td><code>LocalDomain</code> / <code>InstitutionalDomain</code> / <code>DomainPolicy</code>; not <code>Coop</code>.</td>
+</tr>
+<tr>
+<td>Vocabulary discipline</td>
+<td>merged <code>#1814</code> (<code>ICN_INTEGRATED_SYSTEM_MODEL.md</code>)</td>
+<td>Settlement / position / obligation / allocation / receipt / provenance — not payment / wallet / currency.</td>
+</tr>
+</tbody></table>
+<h3>Files Changed</h3>
+<ol>
+<li><code>docs/spec/member-shell-v0.md</code> — new file (~500 lines).</li>
+<li><code>docs/registry.toml</code> — new entry inserted before <code>[docs.&quot;docs/spec/network-anti-entropy-proof-loops.md&quot;]</code>.</li>
+<li><code>docs/INDEX.md</code> — Specifications section: one new line after the <code>network-anti-entropy-proof-loops.md</code> entry.</li>
+<li><code>docs/DOCUMENT_REGISTRY.md</code> — regenerated via <code>--write-document-registry</code>. Corpus moves from 813 to 814 markdown files under <code>docs/</code> (the new spec; this handoff brings it to 815 once committed).</li>
+<li><code>docs/dev/handoff-2026-05-15-member-shell-v0.md</code> — this file.</li>
+</ol>
+<p>No Rust code touched. SDK untouched. Website untouched. Deploy scripts untouched. Existing specs not modified.</p>
+<hr>
+<h2>What Changed</h2>
+<!-- TRUTH TYPE: Execution truth — actions taken this session -->
+
+<h3>1. <code>docs/spec/member-shell-v0.md</code> (new doc)</h3>
+<p>Authority class: <code>normative</code>. Length: roughly 500 lines. Sections:</p>
+<ul>
+<li><strong>Purpose</strong> — names the nine questions the shell must answer in plain language (&quot;Who am I in this institution?&quot; through &quot;How do I ask for help, challenge, review, revoke, or exit?&quot;).</li>
+<li><strong>Scope and non-goals</strong> — twelve non-claim bullets covering platform choice, runtime change, schema redefinition, partner skinning, account-management framing, NYCN-specific labels, production claims, closure of <code>#1818</code>, the <code>#1631</code> / <code>#1634</code> ActionCard source paths.</li>
+<li><strong>Boundary lines</strong> — five hard boundaries: vs steward cockpit (<code>#1795</code>), vs node operator civic-role surface (<code>#1613</code>), vs public website, vs institution-package skin, vs backend / runtime.</li>
+<li><strong>Design principles</strong> — ten v0 principles: mobile-first, accessibility-first, offline-tolerant, plain language before formal records, receipt visible for every state change, scope-aware action, safe signing confirmations, local cache as derived state never source of truth, multilingual / inclusive-access path, no financial-product framing.</li>
+<li><strong>Member shell information architecture</strong> — ten surfaces: Home/Today, My Standing, Current Scope, Action Cards, Decisions/Governance, Receipts, Records/Artifacts, Privacy/Access, Sync/Offline status, Help/Challenge/Review/Exit.</li>
+<li><strong>ActionCard rendering contract</strong> — fourteen-field rendering table (one row per ADR-0027 schema field) plus eight card states the shell must distinguish (Open, Open but paused, Closed: insufficient authority, Closed: deadline passed, Closed: superseded, Closed: confirmed, Closed: declined, Forward-direction). Explicit &quot;reserved source paths&quot; subsection naming <code>signal_rule</code> / <code>obligation_lifecycle</code> as inert in v0.</li>
+<li><strong>Standing surface</strong> — six rendering elements (identity, memberships, roles, mandates and authority, current scope, what is open / unavailable and why).</li>
+<li><strong>Signing / confirmation flow</strong> — ten-step pre-confirm flow ending in post-action receipt status. Draft intent vs signed-but-pending vs confirmed distinguished visibly.</li>
+<li><strong>Receipt and provenance rendering</strong> — three-tier rendering (plain summary → explanation → formal record under details) plus the always-visible challenge / review path where the receipt class supports one.</li>
+<li><strong>Offline / low-bandwidth behavior</strong> — six rules including cache-as-derived, stale markers, blocked-actions-when-sync-required (per <code>#1829</code> Boundary rule 6), draft intent vs signed action distinction, queued-but-not-accepted vs confirmed distinction, sync degradation strings used verbatim.</li>
+<li><strong>Privacy and ScopedVault member affordances</strong> — six rules including existence-only surfacing, who can access, why, access/export receipts, request/review/challenge path, and the hard rule &quot;no dashboard preview of private vault content.&quot;</li>
+<li><strong>Accessibility baseline</strong> — twelve-category gate inherited from <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> and ADR-0028.</li>
+<li><strong>Member-facing status vocabulary</strong> — closed v0 set: seven sync-state strings (from <code>#1829</code>), seven execution-scope strings (from <code>#1826</code>), nine action-lifecycle strings (defined here), five privacy / disclosure strings (defined here), eight receipt-class plain-language labels (mapping to existing receipt classes per ADR-0026 / ADR-0025 / merged sibling specs).</li>
+<li><strong>Failure and safety table</strong> — eighteen rows.</li>
+<li><strong>First safe proof-loop / dogfood slice</strong> — three fixture-first slices: Slice A (read-only standing + ActionCard + receipt + sync-delayed rehearsal, preferred), Slice B (signing flow rehearsal), Slice C (offline / degraded sync rehearsal). All fixture-only; no real members; no live network; no runtime mutation; no partner data; no production claim.</li>
+<li><strong>Relationship to sibling work</strong> — comprehensive cross-link table including every merged spec, every relevant open issue, and every relevant ADR.</li>
+<li><strong>Non-claims (repeat block for grep clarity)</strong> — thirteen grep-friendly negation lines.</li>
+</ul>
+<h3>2. <code>docs/registry.toml</code> (one new entry)</h3>
+<p><code>[docs.&quot;docs/spec/member-shell-v0.md&quot;]</code>:</p>
+<ul>
+<li><code>category = &quot;architecture&quot;</code></li>
+<li><code>status = &quot;draft&quot;</code></li>
+<li><code>domain_tags = [&quot;member-shell&quot;, &quot;mobile&quot;, &quot;accessibility&quot;, &quot;ux&quot;, &quot;action-cards&quot;, &quot;standing&quot;, &quot;receipts&quot;, &quot;offline&quot;, &quot;privacy&quot;, &quot;kernel-app-boundary&quot;, &quot;spec&quot;]</code></li>
+<li><code>depends_on</code> enumerates the integrating spine doc, meaning-firewall doc, boundary doc, seven merged sibling specs, the accessibility gate, nine ADRs, and the ActionCard schema file.</li>
+</ul>
+<h3>3. <code>docs/INDEX.md</code> (Specifications section)</h3>
+<p>One new line after the <code>network-anti-entropy-proof-loops.md</code> entry, mirroring the section pattern of recent specs.</p>
+<h3>4. <code>docs/DOCUMENT_REGISTRY.md</code> (regenerated)</h3>
+<p>Via <code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict --write-document-registry docs/DOCUMENT_REGISTRY.md</code>. Corpus moves from 813 to 814 markdown files under <code>docs/</code> after spec lands; will move to 815 after this handoff lands.</p>
+<h3>5. <code>docs/dev/handoff-2026-05-15-member-shell-v0.md</code> (this file)</h3>
+<p>Filename uses the descriptive topic suffix convention canonicalized by PR #1827. Structure aligns with <code>docs/dev/HANDOFF_TEMPLATE.md</code>.</p>
+<hr>
+<h2>What&#39;s Open</h2>
+<!-- TRUTH TYPE: Execution truth — known incomplete work + preserved boundaries -->
+
+<h3>Incomplete work this session deliberately did not start</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Live UI implementation of the v0 shell (native app, PWA, web, or otherwise). The platform decision is itself a separate concern.</li>
+<li><input disabled="" type="checkbox"> The fixture-first dogfood slices named in §&quot;First safe proof-loop / dogfood slice&quot; (Slice A read-only rehearsal, Slice B signing-flow rehearsal, Slice C offline / degraded rehearsal). Tracked as follow-ups below.</li>
+<li><input disabled="" type="checkbox"> Integration with <code>#1610</code> glossary endpoint and <code>#1740</code> multilingual access for translation tagging of the closed status-string set.</li>
+<li><input disabled="" type="checkbox"> Layer 4 ProvenanceQuery (<code>#1438</code>) consumption when that surface lands; the shell currently consumes Layers 1–3 only.</li>
+<li><input disabled="" type="checkbox"> Steward cockpit spec (<code>#1795</code>) — the operator-side complement of this PR.</li>
+<li><input disabled="" type="checkbox"> Node operator civic-role surface spec (<code>#1613</code>).</li>
+<li><input disabled="" type="checkbox"> Per the established session pattern: <strong>&quot;Apply valid feedback only. Stop and summarize unless explicitly told to merge.&quot;</strong> Wait for explicit merge instruction.</li>
+<li><input disabled="" type="checkbox"> Decision on whether to file the follow-up issue drafts listed in §&quot;Follow-up Issue Drafts&quot; (deferred to user).</li>
+<li><input disabled="" type="checkbox"> Closure of <code>#1818</code>. The PR uses <code>Refs: #1818</code>; closure is left to the user against the issue&#39;s acceptance criteria.</li>
+</ul>
+<h3>Preserved scope boundaries (explicitly NOT changed)</h3>
+<ul>
+<li>No Rust code in <code>icn/crates/</code> or <code>icn/apps/</code>.</li>
+<li>No SDK changes (<code>sdk/typescript/</code>, <code>sdk/react-native/</code>).</li>
+<li>No website changes (<code>web/</code>).</li>
+<li>No new endpoints. <code>/me/standing</code> (per ADR-0020) and <code>/me/action-cards</code> (per <code>#1608</code> / <code>#1646</code>) are consumed verbatim.</li>
+<li>No new receipt classes. The shell maps existing classes to plain-language labels at the rendering layer only.</li>
+<li>No new ActionCard schema fields. The fourteen fields in <code>docs/contracts/institution-package/action-card.schema.json</code> are consumed verbatim.</li>
+<li>No new ADRs. The spec cross-links ADR-0014, -0019, -0020, -0025, -0026, -0027, -0028, -0030, -0031 without amending them.</li>
+<li>No edits to merged sibling specs.</li>
+<li>No edits to <code>#1818</code>&#39;s GitHub issue body.</li>
+<li>No platform decision (iOS, Android, PWA, web). Forward-direction.</li>
+<li>No <code>signal_rule</code> / <code>obligation_lifecycle</code> enablement; both remain RFC-gated and inert in v0.</li>
+<li>No K3s, DNS, Forgejo, gateway, storage-backend, or deploy-script changes.</li>
+<li>No <code>DataLocality::CoopReplicated</code> migration. No <code>FuelLimit</code> / <code>fuel_limit</code> rename. No <code>payment_rate</code> / <code>payment_currency</code> reconciliation. No <code>PrivacyClass</code> taxonomy migration. All carried forward as separate follow-ups in prior handoffs.</li>
+</ul>
+<hr>
+<h2>Unsafe Assumptions</h2>
+<!-- Explicitly name anything this session relied on that was not verified -->
+
+<ul>
+<li><strong>ADR-0020 <code>/me/standing</code> is the canonical standing read model.</strong> Verified by reading the ADR header and the implementation_status line. If a parallel in-flight PR amends the ADR, the spec&#39;s standing surface mapping needs a re-read.</li>
+<li><strong>ADR-0027&#39;s 14 ActionCard schema fields are the canonical set.</strong> Verified by reading the schema JSON properties directly (<code>id</code>, <code>source_kind</code>, <code>action_kind</code>, <code>scope</code>, <code>title</code>, <code>summary</code>, <code>authority_basis</code>, <code>required_authority_scope</code>, <code>deadline</code>, <code>risk_level</code>, <code>accessibility_hint</code>, <code>receipt_expected</code>, <code>source_id</code>, <code>domain_id</code>). If a parallel in-flight PR adds a field, the rendering table needs an addendum.</li>
+<li><strong>ADR-0028&#39;s twelve accessibility categories are the canonical gate.</strong> Verified by reading the ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md file structure. The category set may be reordered or renamed in future ADR work; this spec inherits the structure as it stands today.</li>
+<li><strong>The closed seven-string sync vocabulary from merged <code>#1829</code> is canonical and complete.</strong> Verified by reading <code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Member shell surface&quot; on the merged copy in <code>main</code>.</li>
+<li><strong>The closed seven-string execution-scope vocabulary from merged <code>#1826</code> is canonical and complete.</strong> Verified by reading <code>docs/spec/compute-placement-policy.md</code> §&quot;Member shell&quot; on the merged copy in <code>main</code>.</li>
+<li><strong><code>signal_rule</code> and <code>obligation_lifecycle</code> source paths remain RFC-gated.</strong> Verified per ADR-0027 implementation_status. If <code>#1631</code> or <code>#1634</code> lands implementation while this spec is in review, the &quot;reserved source paths&quot; subsection needs an update.</li>
+<li><strong><code>#1818</code> acceptance criteria.</strong> The issue body lists scope rules (mobile-first, accessibility-first, etc.) rather than enumerated acceptance criteria. The spec advances every named scope rule. Closure is a user-driven decision; the PR uses <code>Refs:</code>.</li>
+<li><strong><code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> exists in main.</strong> Verified by <code>ls</code>. If the doc is renamed or restructured before merge, the cross-link needs an update.</li>
+<li><strong>ADR-0028 exists and references <code>#1610</code> glossary endpoint.</strong> Verified by reading the ADR header. If <code>#1610</code> is restructured, the translation-readiness mapping in the accessibility section may need an update.</li>
+</ul>
+<hr>
+<h2>Next Move</h2>
+<!-- TRUTH TYPE: Execution truth — the exact sequence for the next session -->
+
+<ol>
+<li>Run validation suite (commands below).</li>
+<li>Commit (single commit; <code>docs(spec): define member shell v0</code>).</li>
+<li>Push branch.</li>
+<li>Open PR with <code>Refs: #1818</code> and the cross-refs in §&quot;Refs.&quot;</li>
+<li>Watch initial CI; address any failure rooted in this PR&#39;s added doc.</li>
+<li>Watch the AI reviewer outputs (Copilot, Codex). Apply only valid feedback (verify each claim against the live repo with grep before acting). Reply to review threads with commit SHA and exact fix.</li>
+<li><strong>Stop and summarize after applying valid feedback.</strong> Do not merge unless explicitly told to merge.</li>
+<li>The natural next architecture-spec PR after <code>#1828</code>-or-equivalent lands is <code>#1795</code> (steward cockpit) — the operator-side complement of this PR. Alternative: <code>#1767</code> (encrypted distributed private-overlay storage) if the user prefers private-storage work; the member-shell spec&#39;s privacy / ScopedVault affordances forward-reference it.</li>
+</ol>
+<hr>
+<h2>Architectural Decisions</h2>
+<!-- TRUTH TYPE: Decision truth — choices made and why -->
+
+<h3>1. The member shell is app-side rendering only.</h3>
+<p>Per <code>docs/architecture/KERNEL_APP_SEPARATION.md</code>. The kernel never imports member-shell strings, layouts, status enums, or rendering rules. This keeps the meaning firewall intact: the kernel enforces constraints; the policy oracle decides constraint values; the shell renders the result. Matches the pattern from #1826 (placement classes are app-side) and #1829 (proof-loop artifacts are app-side).</p>
+<h3>2. Closed status-string vocabulary, inherited not invented.</h3>
+<p>The spec uses the merged seven-string sync set from <code>#1829</code> and the merged seven-string placement set from <code>#1826</code> <strong>verbatim</strong>. It adds a small action-lifecycle set (nine strings), a privacy / disclosure set (five strings), and the receipt-class plain-language label set (eight strings). All sets are closed; v0 violations include inventing new strings outside these sets. This prevents string drift between member-facing surfaces in different parts of the institution.</p>
+<h3>3. ActionCard rendering contract, not ActionCard schema redefinition.</h3>
+<p>ADR-0027 defines the schema (14 fields). This spec defines the <strong>rendering rules</strong> for each field at the member-shell layer — which fields are mandatory in the list-row vs the pre-confirm summary vs the details affordance, how raw enum values translate to plain-language labels, and how reserved source paths (<code>signal_rule</code>, <code>obligation_lifecycle</code>) are kept inert at v0. The schema is unchanged.</p>
+<h3>4. Local cache is derived state, not source of truth.</h3>
+<p>A v0 hard rule. The shell may cache freely for offline performance, but it never treats the cache as authoritative. Every cached surface shows &quot;last refreshed at <time>&quot;; stale cache renders stale; pending actions that depend on stale state render <code>Action paused until records sync</code> rather than letting the member act on stale evidence. This matches the storage-durability-policies.md rule that backups are not source of truth, and the anti-entropy spec&#39;s Boundary rule 8 (no member-facing lie).</p>
+<h3>5. Reversibility and challenge windows are surfaced before confirm.</h3>
+<p>The ten-step signing flow makes reversibility legible <strong>before</strong> any confirm gesture. Irreversible actions require a distinct second confirmation; single-tap confirm is never allowed for irreversible actions. This matches ADR-0028 category 7 (&quot;Cognitive load and step complexity — consequences explained pre-action, reversibility legible&quot;) and category 12 (&quot;Governance and action access — ActionCards expose authority basis, status, reversibility, decision, and consequence in plain language before confirm&quot;).</p>
+<h3>6. Private vault contents never reach the rendering layer.</h3>
+<p>A v0 hard rule. The shell receives ScopedVault references as opaque digests; the body bytes never reach the rendering surface. If the rendering layer receives body bytes for a <code>PrivateEvidence</code> artifact, the surface drops them and logs a safety failure. This matches <code>docs/spec/artifact-registry-and-scoped-vault.md</code> §&quot;ScopedVault&quot; and the privacy / custody rules in <code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Privacy and custody rules.&quot;</p>
+<h3>7. The PR uses <code>Refs:</code>, not <code>Closes:</code>.</h3>
+<p>Per the standing session pattern and the <code>feedback_pr_refs_not_closes_unless_fully_satisfied</code> memory: closure of <code>#1818</code> requires verification that all named scope rules and the implied &quot;v0 design specification merged&quot; criterion are fully satisfied. The spec advances every scope rule named in <code>#1818</code>&#39;s body (mobile-first, offline-tolerant, accessibility-first, ActionCard rendering, standing surface, receipt rendering, safe signing, multilingual integration, anti-financial-product framing). <strong>Closure is a user-driven decision.</strong></p>
+<hr>
+<h2>Verification Commands</h2>
+<!-- Commands the next session should run to confirm starting state -->
+
+<pre><code class="language-bash">cd /home/matt/projects/icn
+
+# Confirm branch state
+git checkout spec/member-shell-v0
+git status --short
+gh pr view &lt;PR-number&gt; --json mergeStateStatus,state,headRefOid,statusCheckRollup
+
+# Re-run the validation suite
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict --write-document-registry docs/DOCUMENT_REGISTRY.md
+python3 docs/scripts/lint-arch.py docs/spec/member-shell-v0.md --cargo icn/Cargo.toml
+python3 .github/scripts/compliance_linter.py
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+
+# Targeted vocabulary check
+rg -n &quot;payment|currency|balance|wallet|token|blockchain|crypto|NYCN|Summit|live federation|production-ready|production readiness&quot; \
+   docs/spec/member-shell-v0.md docs/dev/handoff-2026-05-15-member-shell-v0.md docs/INDEX.md docs/registry.toml
+
+# Cross-link smoke check
+rg -o &quot;docs/[a-zA-Z0-9_/\-]+\.md&quot; docs/spec/member-shell-v0.md | sort -u | while read p; do test -f &quot;$p&quot; &amp;&amp; echo &quot;OK $p&quot; || echo &quot;MISSING $p&quot;; done
+
+# To see the spec contents
+sed -n &#39;1,80p&#39; docs/spec/member-shell-v0.md
+</code></pre>
+<hr>
+<h2>Truth-Plane Notes</h2>
+<!-- Which truth types were relied on? Any known conflicts between layers? -->
+
+<ul>
+<li><strong>Declared project truth:</strong> loaded from <code>docs/PHASE_HISTORY.md</code> (last completed phase per main) and <code>docs/STATE.md</code>. No conflict with this PR; the spec is doc-only design work.</li>
+<li><strong>Implementation truth:</strong> verified against ADR-0020, ADR-0027, ADR-0028, the action-card schema JSON, and the merged sibling spec member-shell sections. The implementation status of <code>/me/standing</code> and <code>/me/action-cards</code> was read from the ADR-0020 header, not from running the gateway against a live system.</li>
+<li><strong>Execution truth:</strong> verified branch + PR state via <code>gh</code> commands. Initial commit SHA, PR number, head SHA recorded after commit / push.</li>
+<li><strong>Narrative truth:</strong> loaded from prior session handoffs and the eleven merged architecture-spec PRs.</li>
+<li><strong>Known conflicts between layers:</strong> the eight-string action-lifecycle set added by this spec is <strong>new</strong> to the spec corpus; it does not exist in any prior merged sibling spec. It coexists with the seven-string sync set (<code>#1829</code>) and seven-string placement set (<code>#1826</code>) without overlap.</li>
+</ul>
+<hr>
+<h2>Follow-up Issue Drafts (Not Filed)</h2>
+<p>Six follow-ups drafted per the user&#39;s instruction. Paste-ready for separate review.</p>
+<h3>1. <code>test(devnet): fixture rendering rehearsal for member shell v0 (Slice A)</code></h3>
+<pre><code>## Purpose
+
+Implement Slice A from `docs/spec/member-shell-v0.md` §&quot;First safe proof-loop / dogfood slice&quot;: a fixture-only read-only rendering rehearsal that produces a standing surface, an ActionCard list, a receipt summary, a sync-delayed action, and an opaque private-record reference. Accessibility checklist applied to fixture rendering. No real members, no live network, no runtime mutation.
+
+## Scope
+
+- Fixture member DID, signing key, display name, device.
+- Fixture LocalDomain with the four owning-entity classes.
+- Fixture ActionCards: one `proposal/vote`, one `meeting/attend` (completed with receipt), one paused due to sync delay, one closed for insufficient authority.
+- Fixture `PrivateEvidence` artifact rendered as existence + scope + access path only.
+- Twelve-category accessibility checklist passed on the fixture rendering.
+
+## Non-goals
+
+- No live shell implementation.
+- No platform choice (iOS, Android, PWA, web).
+- No partner skin.
+
+## Related
+
+- `docs/spec/member-shell-v0.md` §&quot;First safe proof-loop / dogfood slice&quot; Slice A.
+</code></pre>
+<h3>2. <code>test(devnet): signing flow rehearsal for member shell v0 (Slice B)</code></h3>
+<pre><code>## Purpose
+
+Implement Slice B: the ten-step pre-confirm flow walked by a fixture member through a fixture ActionCard. Verifies the flow&#39;s accessibility, plain-language consistency, reversibility / privacy / sync warning surfaces.
+
+## Scope
+
+- Same fixture stack as Slice A.
+- Fixture member walks the ten-step pre-confirm summary.
+- Confirm gesture is exercised; fixture receipt arrives.
+- Failure surfaces from the eighteen-row failure / safety table exercised in negative-path fixtures.
+
+## Non-goals
+
+- No live signing key handling.
+- No real authority validation.
+- No platform decision.
+
+## Related
+
+- `docs/spec/member-shell-v0.md` §&quot;Signing / confirmation flow&quot; and §&quot;First safe proof-loop / dogfood slice&quot; Slice B.
+</code></pre>
+<h3>3. <code>test(devnet): offline / degraded sync rehearsal for member shell v0 (Slice C)</code></h3>
+<pre><code>## Purpose
+
+Implement Slice C: a fixture-first rehearsal of the offline / degraded path, transitioning through the seven anti-entropy sync states with plain-language warnings, queued draft intent, signed-but-pending state, and final receipt arrival.
+
+## Scope
+
+- Same fixture stack as Slices A and B.
+- Fixture member starts an action while shell is in `Sync delayed`.
+- Action queued as draft intent.
+- Shell transitions through `Some records are being verified` and `Sync delayed / degraded`.
+- Member sees plain-language warnings at each transition and is offered the help / review path.
+
+## Non-goals
+
+- No real anti-entropy probe traffic.
+- No live federation peer.
+
+## Related
+
+- `docs/spec/member-shell-v0.md` §&quot;Offline / low-bandwidth behavior&quot; and §&quot;First safe proof-loop / dogfood slice&quot; Slice C.
+- `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Member shell surface.&quot;
+</code></pre>
+<h3>4. <code>spec(web): pick the v0 platform target (PWA vs native vs hybrid)</code></h3>
+<pre><code>## Purpose
+
+The member-shell v0 spec is deliberately platform-agnostic. This issue is the separate decision-making PR that picks the platform target — likely PWA-first given the mobile-first / accessibility-first / offline-tolerant constraints. Tracks the trade-off analysis and the implementation roadmap.
+
+## Scope
+
+- Trade-off analysis: PWA vs native iOS/Android vs hybrid.
+- Constraints: mobile-first, offline-tolerant, accessibility-first, plain-language-first, must satisfy the twelve-category gate.
+- Implementation roadmap (which surfaces land first).
+
+## Non-goals
+
+- Not the v0 rendering contract (that&#39;s `docs/spec/member-shell-v0.md`).
+- Not a partner-pilot decision.
+- Not a native-app commitment in this issue.
+
+## Related
+
+- `docs/spec/member-shell-v0.md` §&quot;Boundary lines&quot; and §&quot;Design principles.&quot;
+- `#1818` parent issue.
+</code></pre>
+<h3>5. <code>spec(member-shell): integrate with #1610 glossary + #1740 multilingual access</code></h3>
+<pre><code>## Purpose
+
+Define the integration contract between the member shell&#39;s closed status-string vocabulary and the glossary endpoint (`#1610`) plus the multilingual access plan (`#1740`). Names which strings are translation-tagged, how fallbacks render, and how the institution-package skin layer overlays local terms.
+
+## Scope
+
+- Translation tagging for the closed status-string set (sync + execution-scope + action-lifecycle + privacy / disclosure + receipt-class labels).
+- Fallback strategy when current-language translation is missing.
+- Institution-package localization seam.
+
+## Non-goals
+
+- No new glossary endpoint behavior.
+- No new web-i18n framework choice.
+
+## Related
+
+- `docs/spec/member-shell-v0.md` §&quot;Design principles&quot; (multilingual / inclusive-access path) and §&quot;Member-facing status vocabulary.&quot;
+- `#1610`, `#1740`.
+</code></pre>
+<h3>6. <code>spec(member-shell): consume Layer 4 ProvenanceQuery when it lands (#1438)</code></h3>
+<pre><code>## Purpose
+
+When the generic Layer 4 `ProvenanceQuery` receipt-index surface lands (`#1438`), update the member-shell receipt rendering contract to consume it for the Receipts surface. Until then, the shell consumes Layers 1–3 (per ADR-0026) via the existing receipt-class endpoints.
+
+## Scope
+
+- Mapping from `ProvenanceQuery` results to the member-shell plain-language receipt summaries.
+- Pagination, freshness, and stale-marker handling for the Receipts surface.
+- Cross-link to `RoutingProof` / `RedundancyProof` / `RepairReceipt` (per merged `#1829`) when those land in the receipt index.
+
+## Non-goals
+
+- No `ProvenanceQuery` implementation (that&#39;s `#1438`).
+
+## Related
+
+- `docs/spec/member-shell-v0.md` §&quot;Receipt and provenance rendering.&quot;
+- ADR-0026 §4.
+- `#1438`.
+</code></pre>
+<hr>
+<h2>Process Note</h2>
+<p>The AGENTS.md handoff-path drift was resolved by <strong>PR #1827</strong> (merged 2026-05-15). The active convention is <code>docs/dev/handoff-YYYY-MM-DD-&lt;topic&gt;.md</code>, which is what this handoff uses. <strong>Do not carry the old AGENTS.md drift forward</strong> in future handoffs unless an AI reviewer surfaces it again, in which case respond with a verified rebuttal that points at #1827.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
