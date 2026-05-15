@@ -717,9 +717,24 @@ impl ArtifactDigest {
 /// `signature` is left empty by [`AntiEntropyProbe::new`]; a higher-layer
 /// signing step fills it. The verifier MUST verify both the signature and
 /// `verify_binding()`; either alone is insufficient.
+///
+/// # Wire-version policing (fail-closed)
+///
+/// Deserialization uses `#[serde(try_from = "RawAntiEntropyProbe")]` so
+/// wire data with `schema_version != ANTI_ENTROPY_PROBE_SCHEMA_VERSION`
+/// is rejected before any `AntiEntropyProbe` value is constructed. This
+/// closes the bypass where a peer could send a probe tagged with a future
+/// or bogus version, recompute the binding hash over that version, and
+/// have a current node accept it. The version field is also re-checked by
+/// [`AntiEntropyProbe::verify_binding`] so a manually-mutated probe with
+/// a recomputed hash still fails closed.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "RawAntiEntropyProbe")]
 pub struct AntiEntropyProbe {
     /// Wire schema version. See [`ANTI_ENTROPY_PROBE_SCHEMA_VERSION`].
+    /// Probes whose `schema_version` does not match are rejected at the
+    /// deserialization boundary (via `#[serde(try_from = ...)]`) and by
+    /// [`Self::verify_binding`] on already-constructed values.
     pub schema_version: u32,
     /// State class being probed.
     pub state_class: StateClass,
@@ -744,6 +759,55 @@ pub struct AntiEntropyProbe {
     pub probe_hash: Hash,
     /// Prober signature (empty until signed by a higher layer).
     pub signature: Signature,
+}
+
+/// Raw wire form for [`AntiEntropyProbe`]. Accepts any `schema_version`
+/// during deserialization and is validated into the public type via
+/// [`TryFrom<RawAntiEntropyProbe> for AntiEntropyProbe`].
+///
+/// The raw form exists exclusively so the conversion path can fail closed
+/// on unsupported versions before any consumer ever observes the value.
+#[derive(Deserialize)]
+struct RawAntiEntropyProbe {
+    schema_version: u32,
+    state_class: StateClass,
+    target_scope: ProbeScope,
+    digest: StateDigest,
+    prober_did: Did,
+    trigger_source: TriggerSource,
+    freshness_emitted_at: u64,
+    freshness_valid_until: u64,
+    requested_response: RequestedResponseClass,
+    probe_nonce: [u8; 32],
+    probe_hash: Hash,
+    signature: Signature,
+}
+
+impl TryFrom<RawAntiEntropyProbe> for AntiEntropyProbe {
+    type Error = String;
+
+    fn try_from(raw: RawAntiEntropyProbe) -> Result<Self, Self::Error> {
+        if raw.schema_version != ANTI_ENTROPY_PROBE_SCHEMA_VERSION {
+            return Err(format!(
+                "unsupported AntiEntropyProbe schema_version: got {}, supported {}",
+                raw.schema_version, ANTI_ENTROPY_PROBE_SCHEMA_VERSION,
+            ));
+        }
+        Ok(Self {
+            schema_version: raw.schema_version,
+            state_class: raw.state_class,
+            target_scope: raw.target_scope,
+            digest: raw.digest,
+            prober_did: raw.prober_did,
+            trigger_source: raw.trigger_source,
+            freshness_emitted_at: raw.freshness_emitted_at,
+            freshness_valid_until: raw.freshness_valid_until,
+            requested_response: raw.requested_response,
+            probe_nonce: raw.probe_nonce,
+            probe_hash: raw.probe_hash,
+            signature: raw.signature,
+        })
+    }
 }
 
 /// Canonical binding fields for `AntiEntropyProbe::probe_hash`.
@@ -861,11 +925,31 @@ impl AntiEntropyProbe {
         *hasher.finalize().as_bytes()
     }
 
-    /// Verify that the stored `probe_hash` matches a fresh computation.
+    /// `true` iff `schema_version == ANTI_ENTROPY_PROBE_SCHEMA_VERSION`.
     ///
-    /// Returns `true` if the probe has not been tampered with. Does NOT
-    /// verify the signature — that is a higher-layer concern.
+    /// Convenience for callers that want to assert wire-version
+    /// compatibility explicitly. Deserialization already rejects
+    /// unsupported versions via `try_from`; this method is the in-Rust
+    /// guard for values that were constructed directly (e.g., via
+    /// [`Self::new`], or manually mutated).
+    pub fn is_supported_schema_version(&self) -> bool {
+        self.schema_version == ANTI_ENTROPY_PROBE_SCHEMA_VERSION
+    }
+
+    /// Verify that the stored `probe_hash` matches a fresh computation
+    /// AND that `schema_version == ANTI_ENTROPY_PROBE_SCHEMA_VERSION`.
+    ///
+    /// Returns `true` only if both hold. Returning `false` on an
+    /// unsupported `schema_version` is a fail-closed property: an attacker
+    /// cannot evade version policing by recomputing the binding hash over
+    /// a bogus version (because that path would have to go through this
+    /// method's version check) and cannot evade it by deserializing such
+    /// a probe (because `try_from` rejects it). Does NOT verify the
+    /// signature — that is a higher-layer concern.
     pub fn verify_binding(&self) -> bool {
+        if !self.is_supported_schema_version() {
+            return false;
+        }
         let recomputed = Self::compute_probe_hash(
             self.schema_version,
             self.state_class,
@@ -1402,5 +1486,155 @@ mod anti_entropy_tests {
             ArtifactReceipt::DOMAIN_TAG,
             "anti-entropy probe and artifact receipt must use distinct domain tags"
         );
+    }
+
+    // ---- Schema-version rejection (review feedback) ----
+
+    #[test]
+    fn probe_is_supported_schema_version_helper() {
+        let probe = sample_probe();
+        assert!(probe.is_supported_schema_version());
+        assert_eq!(probe.schema_version, ANTI_ENTROPY_PROBE_SCHEMA_VERSION);
+    }
+
+    /// Helper: serialize a probe through a Raw-shaped wire form so the
+    /// `schema_version` can be set to a value that the public type would
+    /// otherwise reject at deserialization. Used to construct hostile wire
+    /// payloads in the tests below.
+    #[derive(Serialize)]
+    struct WireProbeShape<'a> {
+        schema_version: u32,
+        state_class: StateClass,
+        target_scope: &'a ProbeScope,
+        digest: &'a StateDigest,
+        prober_did: &'a Did,
+        trigger_source: TriggerSource,
+        freshness_emitted_at: u64,
+        freshness_valid_until: u64,
+        requested_response: RequestedResponseClass,
+        probe_nonce: [u8; 32],
+        probe_hash: Hash,
+        signature: Signature,
+    }
+
+    fn wire_with_version(version: u32) -> WireProbeShape<'static> {
+        // We can't borrow from a function-local because we need 'static. Use
+        // leak: the test process exits shortly anyway. (This is test-only.)
+        let probe = sample_probe();
+        let scope: &'static ProbeScope = Box::leak(Box::new(probe.target_scope.clone()));
+        let digest: &'static StateDigest = Box::leak(Box::new(probe.digest.clone()));
+        let did: &'static Did = Box::leak(Box::new(probe.prober_did.clone()));
+        // The hash is rebuilt under the requested (possibly hostile) version so
+        // that the test exercises the version-check path specifically — not the
+        // generic "tampered hash" path.
+        let recomputed_hash = AntiEntropyProbe::compute_probe_hash(
+            version,
+            probe.state_class,
+            scope,
+            digest,
+            did,
+            probe.trigger_source,
+            probe.freshness_emitted_at,
+            probe.freshness_valid_until,
+            probe.requested_response,
+            &probe.probe_nonce,
+        );
+        WireProbeShape {
+            schema_version: version,
+            state_class: probe.state_class,
+            target_scope: scope,
+            digest,
+            prober_did: did,
+            trigger_source: probe.trigger_source,
+            freshness_emitted_at: probe.freshness_emitted_at,
+            freshness_valid_until: probe.freshness_valid_until,
+            requested_response: probe.requested_response,
+            probe_nonce: probe.probe_nonce,
+            probe_hash: recomputed_hash,
+            signature: probe.signature.clone(),
+        }
+    }
+
+    #[test]
+    fn probe_rejects_future_schema_version_on_json_decode() {
+        // A peer sends a probe tagged with a future schema version, with a
+        // hash recomputed under that version. The current node must refuse
+        // to deserialize it — fail-closed wire-stability.
+        let wire = wire_with_version(ANTI_ENTROPY_PROBE_SCHEMA_VERSION + 1);
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<AntiEntropyProbe, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err(), "future schema_version must be rejected");
+    }
+
+    #[test]
+    fn probe_rejects_zero_schema_version_on_json_decode() {
+        let wire = wire_with_version(0);
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<AntiEntropyProbe, _> = serde_json::from_str(&json);
+        assert!(
+            parsed.is_err(),
+            "schema_version 0 must be rejected (1 is the lowest supported value)"
+        );
+    }
+
+    #[test]
+    fn probe_rejects_future_schema_version_on_bincode_decode() {
+        // Same property must hold for bincode wire data — the kernel's
+        // canonical encoding path.
+        let wire = wire_with_version(ANTI_ENTROPY_PROBE_SCHEMA_VERSION + 1);
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed: Result<AntiEntropyProbe, _> = bincode::deserialize(&bytes);
+        assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn probe_rejects_zero_schema_version_on_bincode_decode() {
+        let wire = wire_with_version(0);
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed: Result<AntiEntropyProbe, _> = bincode::deserialize(&bytes);
+        assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn probe_verify_binding_fails_closed_on_manual_bogus_version() {
+        // Even if a probe is constructed in-process with an unsupported
+        // schema_version AND a hash recomputed under that bogus version,
+        // verify_binding() must still return false. Closes the "manual
+        // mutation in Rust" path the deserialization guard cannot cover.
+        let mut probe = sample_probe();
+        let bogus_version = ANTI_ENTROPY_PROBE_SCHEMA_VERSION + 7;
+        probe.schema_version = bogus_version;
+        probe.probe_hash = AntiEntropyProbe::compute_probe_hash(
+            bogus_version,
+            probe.state_class,
+            &probe.target_scope,
+            &probe.digest,
+            &probe.prober_did,
+            probe.trigger_source,
+            probe.freshness_emitted_at,
+            probe.freshness_valid_until,
+            probe.requested_response,
+            &probe.probe_nonce,
+        );
+        assert!(
+            !probe.verify_binding(),
+            "verify_binding() must reject unsupported schema_version even when the hash matches"
+        );
+    }
+
+    #[test]
+    fn probe_supported_version_still_round_trips_after_validation_added() {
+        // Regression guard: the legitimate happy path still works.
+        let probe = sample_probe();
+        let json = serde_json::to_string(&probe).unwrap();
+        let restored: AntiEntropyProbe = serde_json::from_str(&json).unwrap();
+        assert_eq!(probe, restored);
+        assert!(restored.verify_binding());
+        assert!(restored.is_supported_schema_version());
+
+        let bytes = bincode::serialize(&probe).unwrap();
+        let restored_bin: AntiEntropyProbe = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(probe, restored_bin);
+        assert!(restored_bin.verify_binding());
     }
 }
