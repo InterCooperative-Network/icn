@@ -54,11 +54,17 @@ View source on GitHub →
 <h2>Decision</h2>
 <h3>Admission policy</h3>
 <ol>
-<li><strong>Affiliated vs unaffiliated.</strong> Participants are bucketed by trust class. Affiliated participants (trust class above a configured threshold) draw from the affiliated pool; unaffiliated draw from a separate unaffiliated pool that protects newcomers from being squeezed out by deep-trust participants.</li>
-<li><strong>Sybil rejection.</strong> Multiple low-trust DIDs originating from the same network identity, signing graph cluster, or temporal admission burst are rejected by configurable heuristics. The heuristics live in PolicyOracle; the pool consumes their decision.</li>
-<li><strong>Capacity is honest.</strong> Pool capacity is the sum of declared executor capacities, not aggregate optimism. Rejection at the pool boundary happens before workload start.</li>
-<li><strong>Scope-aware admission.</strong> A Coop-scoped task admits only executors that the coop has bound to its mandate; a Federation-scoped task admits federated executors only.</li>
-<li><strong>No governance gate today.</strong> Pool-level admission is policy-decided (the PolicyOracle), but pool <strong>policy itself</strong> (thresholds, ratios, sybil heuristics) is not yet governed by a charter rule. This is a known gap (registry candidate ADR-0081 picks up the WASM-side governance; commons-pool governance is future work).</li>
+<li><p><strong>Affiliated vs unaffiliated.</strong> Participants are bucketed by trust class. Affiliated participants (trust class above a configured threshold) draw from the affiliated pool; unaffiliated draw from a separate unaffiliated pool that protects newcomers from being squeezed out by deep-trust participants.</p>
+</li>
+<li><p><strong>Sybil rejection.</strong> Multiple low-trust DIDs originating from the same network identity, signing graph cluster, or temporal admission burst are rejected by configurable heuristics. The heuristics live in PolicyOracle; the pool consumes their decision.</p>
+</li>
+<li><p><strong>Capacity is honest.</strong> Pool capacity is the sum of declared executor capacities, not aggregate optimism. Rejection at the pool boundary happens before workload start.</p>
+</li>
+<li><p><strong>Scope-aware admission.</strong> A Coop-scoped task admits only executors that the coop has bound to its mandate; a Federation-scoped task admits federated executors only.</p>
+<p><em>Entity-scope naming note (added 2026-05-14):</em> This ADR uses <code>Coop-scoped</code> (and &quot;the coop&quot;) as the local-domain admission term because that was the vocabulary at the time of adoption. Current architecture (per <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3 &quot;Entity-scope vocabulary&quot; and <code>docs/spec/institutional-domain.md</code>) reads this slot as <code>LocalDomain-scoped</code>: a scope owned by an <code>InstitutionalDomain</code> whose owning entity class may be <code>Cooperative</code>, <code>Community</code>, <code>Federation</code>, <code>Individual</code>, or another governed class permitted by policy. The settlement-side wording at step 4 of §&quot;Settlement policy&quot; below has the same disposition: read <code>Coop-scoped</code> as <code>LocalDomain-scoped</code>. Future schema and runtime work should prefer <code>LocalDomain</code> names; existing serialized <code>Coop</code>-prefixed strings remain valid for backward compatibility. The ADR&#39;s decision is preserved as-is.</p>
+</li>
+<li><p><strong>No governance gate today.</strong> Pool-level admission is policy-decided (the PolicyOracle), but pool <strong>policy itself</strong> (thresholds, ratios, sybil heuristics) is not yet governed by a charter rule. This is a known gap (registry candidate ADR-0081 picks up the WASM-side governance; commons-pool governance is future work).</p>
+</li>
 </ol>
 <h3>Settlement policy</h3>
 <ol>

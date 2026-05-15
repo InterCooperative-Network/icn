@@ -273,6 +273,87 @@ structures:
 <h3>Known gap (tracked, not blocking model adoption)</h3>
 <p>The current <code>BootstrapOperation::CreateEntity</code> payload sent to the gateway&#39;s <code>/v1/entities</code> API does <strong>not</strong> forward <code>operating_purpose</code> at apply time. The seed schema accepts it, the validator/planner sees it, but the apply step drops it. Institution packages can author the corrected model today; the metadata round-trips through <code>validate</code> and <code>plan</code> outputs, but does not yet land on the live entity record. Plumbing this through is a small follow-up.</p>
 <hr>
+<h2>C3. Entity-scope vocabulary (scope vs organism)</h2>
+<blockquote>
+<p><strong>Core vocabulary names the scope. Institution packages name the organism.</strong></p>
+</blockquote>
+<p>ICN core names <strong>structural scopes</strong>, not one possible inhabitant of a scope. The local institutional layer between member/cell scope and federation/commons scope is a <strong>domain</strong> — an <code>InstitutionalDomain</code> per <code>docs/spec/institutional-domain.md</code>. The owning entity class of that domain may be a <code>Cooperative</code>, a <code>Community</code>, a <code>Federation</code>, an <code>Individual</code>, or another governed entity class permitted by policy. Naming a generic scope after one of its possible inhabitants privileges that inhabitant and forces every other entity class to be a second-class citizen of vocabulary the runtime itself defined.</p>
+<h3>The rule</h3>
+<ul>
+<li><strong>Generic scope language uses:</strong> <code>InstitutionalDomain</code>, <code>Domain</code>, <code>LocalDomain</code>, <code>DomainPolicy</code>, and &quot;owning entity class.&quot;</li>
+<li><strong>Generic scope language does NOT use:</strong> <code>Coop</code> or <code>Cooperative</code> as a stand-in for &quot;the local institutional layer.&quot; A local domain may be owned by a cooperative, but it may also be owned by a community, a federation, or another governed class. The scope name must not pre-decide that.</li>
+<li><strong><code>Cooperative</code> is reserved</strong> for the cases that are actually about cooperatives: the cooperative entity class itself, cooperative-specific setup paths, cooperative-economy framing, the cooperative-movement context, and institution packages serving cooperative federations.</li>
+<li><strong>Institution packages may use local nouns</strong> freely. NYCN may speak of &quot;the cooperative.&quot; Another package may speak of &quot;the assembly,&quot; &quot;the council,&quot; &quot;the care body.&quot; That is what packages are for.</li>
+</ul>
+<h3>What this means in practice</h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Generic ICN vocabulary</th>
+<th>Institution-package vocabulary</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Architecture spec sections about scope hierarchy</td>
+<td><code>LocalDomain</code> / <code>InstitutionalDomain</code> / &quot;local-domain-scoped&quot;</td>
+<td>&quot;cooperative&quot; / &quot;community&quot; / package-specific role names</td>
+</tr>
+<tr>
+<td>Compute placement classes</td>
+<td><code>LocalDomainBound</code> (preferred); <code>Coop</code>-prefixed forms in legacy ADRs are read as <code>LocalDomain</code></td>
+<td>Per-package role names</td>
+</tr>
+<tr>
+<td>Storage locality</td>
+<td>Generic spec describes the scope level; existing <code>DataLocality::CoopReplicated</code> is a Rust identifier preserved for compatibility (see &quot;Known drift&quot; below)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Member-shell language</td>
+<td>&quot;processed inside your institution&quot; or &quot;handled inside your organization&quot;</td>
+<td>Per-package phrasing</td>
+</tr>
+<tr>
+<td>Owning entity classes</td>
+<td><code>Individual</code> / <code>Cooperative</code> / <code>Community</code> / <code>Federation</code> (per <code>docs/spec/institutional-domain.md</code> §&quot;InstitutionalDomain (object outline)&quot;)</td>
+<td>Local synonyms for each class</td>
+</tr>
+</tbody></table>
+<h3>Why this matters</h3>
+<p>The primitive layer is the machine. If ICN core ships a generic primitive called <code>CoopBound</code> or a scope tag <code>Coop(coop_id)</code>, every consumer of that vocabulary either (a) treats community-owned and federation-owned domains as &quot;kind of like a coop&quot; and conflates them, or (b) special-cases them with branches the runtime should not need to know about. Either way the kernel/app separation softens: institution-specific framing leaks into generic primitive names. The fix is the same as for §C2 — name the structural concept (domain, scope, policy reference, owning entity class) and let packages carry the local noun.</p>
+<h3>Correct vs incorrect naming</h3>
+<pre><code class="language-text"># ❌ WRONG — generic scope named after one inhabitant
+CoopBound
+coop-scoped execution policy
+Coop(coop_id)
+&quot;sent for cooperative processing&quot;  (member shell)
+&quot;cooperative-bound executor&quot;        (operator dashboard)
+
+# ✅ RIGHT — generic scope named for what it actually is
+LocalDomainBound
+local-domain-scoped execution policy
+LocalDomain(domain_id)
+&quot;processed inside your institution&quot;  (member shell)
+&quot;local-domain-bound executor&quot;        (operator dashboard)
+</code></pre>
+<h3>Known drift (tracked, not blocking this section)</h3>
+<p>Existing canon already carries the older <code>Coop</code>-flavored naming in several load-bearing places:</p>
+<ul>
+<li><code>icn/crates/icn-kernel-api/src/storage.rs</code> — <code>DataLocality::CoopReplicated</code> is a Rust enum variant, the variant is serialized as <code>coop_replicated</code>, and ordering / numeric assignments (<code>= 1</code>) are stable. Renaming is forward work; it requires a compatibility-aware migration with serde aliases and call-site updates. Tracked as a separate refactor follow-up; not done in this doc-only PR.</li>
+<li><code>docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md</code> — uses <code>Scope: Commons | Coop(coop_id) | Federation(fed_id)</code> as the scope tag. The ADR is accepted; its decision is preserved as-is. A short naming note appended to the ADR reads the <code>Coop(...)</code> slot as <code>LocalDomain(...)</code> for current architecture.</li>
+<li><code>docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md</code> — uses <code>Coop-scoped</code> prose for the local-domain admission/settlement case. Same disposition: preserved with a short naming note.</li>
+<li>Issue <code>#1801</code> (compute placement) — uses <code>CoopBound</code>, <code>coop-scoped execution policy</code>, &quot;cooperative-bound executor,&quot; and member-shell language &quot;sent for cooperative processing.&quot; The forthcoming <code>#1801</code> spec PR is the right place to land the corrected vocabulary; the corrected names (<code>LocalDomainBound</code>, &quot;local-domain-scoped,&quot; &quot;processed inside your institution&quot;) are recorded in the boundary handoff for that PR to consume.</li>
+</ul>
+<h3>The test</h3>
+<p>When you propose a generic primitive or scope name, ask:</p>
+<ol>
+<li>Does this name describe a <strong>scope, jurisdiction, policy layer, or boundary</strong> — or does it describe a <strong>specific kind of institution</strong> that lives inside that scope?</li>
+<li>If a community-owned or federation-owned domain shipped tomorrow under this primitive, would the name still read accurately, or would it imply that domains are &quot;really&quot; cooperatives?</li>
+<li>Could an institution package add a local noun that maps cleanly onto this scope without overlapping the generic name?</li>
+</ol>
+<p>If you cannot answer &quot;scope,&quot; &quot;yes,&quot; and &quot;yes&quot; — the name needs revision.</p>
+<hr>
 <h2>D. Reusable Primitive Set</h2>
 <p>These belong in ICN because every cooperative institution needs them — verified against both what NYCN requires and what a second unrelated institution (housing federation, mutual aid collective) would also need unchanged.</p>
 <table>

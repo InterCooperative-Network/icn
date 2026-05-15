@@ -402,6 +402,9 @@ View source on GitHub →
 <p>For storage classes whose loss would affect members directly (canonical state, scoped vaults), the restore-test result is summarized for affected members at a member-shell-appropriate cadence (per <code>#1818</code>). The summary does not expose the underlying data; it asserts the institution&#39;s recovery posture.</p>
 <h2>Locality and privacy inheritance</h2>
 <p>The single most load-bearing rule in this spec. Stated three ways for emphasis.</p>
+<blockquote>
+<p><strong>Note on scope vocabulary.</strong> Generic scope language in this spec uses <code>LocalDomain</code> / <code>InstitutionalDomain</code> / <code>Domain</code> (per <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`../architecture/INSTITUTION_PACKAGE_BOUNDARY.md`</a> §C3 &quot;Entity-scope vocabulary&quot;). The kernel-level <code>DataLocality::CoopReplicated</code> enum variant is preserved as the existing serialized Rust identifier; new generic scope concepts that this spec introduces use the local-domain vocabulary rather than coining new <code>Coop-</code>-prefixed names. Rename of the kernel-level variant is forward work (compatibility-aware migration; not in this spec&#39;s scope).</p>
+</blockquote>
 <p><strong>Inheritance rule:</strong></p>
 <blockquote>
 <p>Backups, replicas, archives, exports, and restore targets inherit the source&#39;s <code>DataLocality</code> and privacy / disclosure constraints.</p>

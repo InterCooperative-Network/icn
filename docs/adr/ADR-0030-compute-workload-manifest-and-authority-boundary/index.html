@@ -54,13 +54,21 @@ View source on GitHub →
 <p>A compute workload is described by a <code>ComputeTask</code> manifest with the following properties, and operates under the following authority boundary.</p>
 <h3>Workload manifest</h3>
 <ol>
-<li><strong>Code reference.</strong> One of: a CCL contract, a WASM module hash, a SQL-reference query.</li>
-<li><strong>Fuel limit.</strong> A finite numeric ceiling.</li>
-<li><strong>Privacy class.</strong> Public, Encrypted, or Sealed (the privacy ADR-0082 will refine; for now: ICN supports each as a class).</li>
-<li><strong>Determinism class.</strong> Required for governance-grade output; advisory for assistive output.</li>
-<li><strong>Scope.</strong> <code>Commons | Coop(coop_id) | Federation(fed_id)</code>. Determines admission and settlement policy.</li>
-<li><strong>Resource profile.</strong> CPU, memory, storage envelope. Used by the commons pool and by federated placement.</li>
-<li><strong>Mandate reference (optional).</strong> If the workload&#39;s output will produce institutional effects, a reference to the covering mandate (ADR-0014, ADR-0019).</li>
+<li><p><strong>Code reference.</strong> One of: a CCL contract, a WASM module hash, a SQL-reference query.</p>
+</li>
+<li><p><strong>Fuel limit.</strong> A finite numeric ceiling.</p>
+</li>
+<li><p><strong>Privacy class.</strong> Public, Encrypted, or Sealed (the privacy ADR-0082 will refine; for now: ICN supports each as a class).</p>
+</li>
+<li><p><strong>Determinism class.</strong> Required for governance-grade output; advisory for assistive output.</p>
+</li>
+<li><p><strong>Scope.</strong> <code>Commons | Coop(coop_id) | Federation(fed_id)</code>. Determines admission and settlement policy.</p>
+<p><em>Entity-scope naming note (added 2026-05-14):</em> This ADR uses <code>Coop(coop_id)</code> as the local-domain scope tag because that was the vocabulary at the time of adoption. Current architecture (per <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3 &quot;Entity-scope vocabulary&quot; and <code>docs/spec/institutional-domain.md</code>) reads this slot as <code>LocalDomain(domain_id)</code>: a scope owned by an <code>InstitutionalDomain</code> whose owning entity class may be <code>Cooperative</code>, <code>Community</code>, <code>Federation</code>, <code>Individual</code>, or another governed class permitted by policy. Future schema and runtime work should prefer <code>LocalDomain</code> names; existing serialized <code>Coop</code>-prefixed strings remain valid for backward compatibility. The ADR&#39;s decision is preserved as-is; the slot&#39;s reading is updated.</p>
+</li>
+<li><p><strong>Resource profile.</strong> CPU, memory, storage envelope. Used by the commons pool and by federated placement.</p>
+</li>
+<li><p><strong>Mandate reference (optional).</strong> If the workload&#39;s output will produce institutional effects, a reference to the covering mandate (ADR-0014, ADR-0019).</p>
+</li>
 </ol>
 <h3>Authority boundary</h3>
 <ol>

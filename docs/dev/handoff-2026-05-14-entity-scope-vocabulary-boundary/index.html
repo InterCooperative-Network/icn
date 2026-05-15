@@ -1,0 +1,495 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-05-14 (entity-scope vocabulary boundary) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>handoff 2026 05 14 entity scope vocabulary boundary</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/handoff-2026-05-14-entity-scope-vocabulary-boundary.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-05-14 (entity-scope vocabulary boundary)</h1>
+<h2>Session Goal</h2>
+<p>Begin fixing the &quot;community / coop&quot; vocabulary problem in ICN core by writing the canon-boundary doctrine that prevents future specs from hardening the wrong model — without renaming Rust code, editing GitHub issue bodies, or rewriting historical ADRs.</p>
+<h2>Decisive Test</h2>
+<p>Can a future spec author — looking only at <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3 &quot;Entity-scope vocabulary,&quot; the new glossary entries, and the short cross-link notes in the merged specs — choose the right scope-level vocabulary (<code>InstitutionalDomain</code> / <code>LocalDomain</code> / <code>DomainPolicy</code> / &quot;owning entity class&quot;) instead of copying <code>Coop</code>-flavored names from the existing canon? If yes, the boundary doctrine has done its job.</p>
+<hr>
+<h2>Final State (Verified)</h2>
+<!-- TRUTH TYPE: Implementation truth — only facts confirmed by commands or code inspection -->
+
+<h3><code>main</code> HEAD</h3>
+<p><code>5461fd91d</code> — <code>docs(spec): define storage durability policy objects (#1823)</code> (merged earlier today).</p>
+<h3>Open PRs at session start</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Branch</th>
+<th>State</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1824</td>
+<td><code>spec/artifact-registry-and-scoped-vault</code></td>
+<td>OPEN</td>
+<td>Prior session&#39;s PR (clean, awaiting user&#39;s merge decision). Out of scope for this session.</td>
+</tr>
+<tr>
+<td>#1790</td>
+<td>dependabot (pilot-ui dev deps)</td>
+<td>OPEN</td>
+<td>Out of session scope.</td>
+</tr>
+<tr>
+<td>#1791</td>
+<td>dependabot (ts-sdk dev deps)</td>
+<td>OPEN</td>
+<td>Out of session scope.</td>
+</tr>
+</tbody></table>
+<h3>Branches</h3>
+<ul>
+<li><code>docs/entity-scope-vocabulary-boundary</code> — local; about to be pushed. Initial commit forthcoming after this handoff is committed.</li>
+<li>Local <code>main</code> synced to <code>5461fd91d</code>.</li>
+</ul>
+<h3>Issues</h3>
+<ul>
+<li><code>#1801</code> (compute placement) — OPEN. <strong>Not edited in this PR.</strong> The corrected vocabulary is recorded as a paste-ready body patch in §&quot;Proposed #1801 patch&quot; below for the forthcoming <code>#1801</code> spec PR to consume.</li>
+<li><code>#1798</code>, <code>#1816</code>, <code>#1817</code>, <code>#1815</code>, <code>#1820</code>, <code>#1819</code>, <code>#1814</code>, <code>#1767</code>, <code>#1792</code>, <code>#1799</code>, <code>#1818</code>, <code>#1795</code> — all OPEN per the user&#39;s deferred-closure pattern.</li>
+</ul>
+<hr>
+<h2>What Changed</h2>
+<!-- TRUTH TYPE: Execution truth — actions taken this session -->
+
+<h3>1. <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> (+93 lines)</h3>
+<p>Added a new section <strong>§C3 &quot;Entity-scope vocabulary (scope vs organism)&quot;</strong> inserted between §C2 (Entity Primitives vs Local Purpose Metadata) and §D (Reusable Primitive Set). The section:</p>
+<ul>
+<li>Names the rule sharply: <strong>&quot;Core vocabulary names the scope. Institution packages name the organism.&quot;</strong></li>
+<li>Defines what generic scope language uses (<code>InstitutionalDomain</code> / <code>Domain</code> / <code>LocalDomain</code> / <code>DomainPolicy</code> / &quot;owning entity class&quot;) and what it does NOT use (<code>Coop</code> / <code>Cooperative</code> as a generic stand-in for the local institutional scope).</li>
+<li>Reserves <code>Cooperative</code> for cases that are actually about cooperatives (the entity class, cooperative-specific setup paths, cooperative-economy framing, cooperative-movement context, institution packages serving cooperative federations).</li>
+<li>Notes that institution packages may use local nouns freely.</li>
+<li>Provides a &quot;What this means in practice&quot; table mapping surface → generic vocabulary → institution-package vocabulary.</li>
+<li>Provides &quot;Correct vs incorrect naming&quot; code-fence examples (<code>CoopBound</code> → <code>LocalDomainBound</code>, etc.).</li>
+<li>Names the <strong>Known drift</strong> that the doctrine does not yet fix in code: <code>DataLocality::CoopReplicated</code> in <code>icn-kernel-api</code>, ADR-0030&#39;s <code>Coop(coop_id)</code> scope tag, ADR-0031&#39;s <code>Coop-scoped</code> admission/settlement prose, issue <code>#1801</code>&#39;s placement-class taxonomy and member-shell language. Each drift item names where it will be addressed.</li>
+<li>Provides a &quot;test&quot; with three questions to ask when proposing a generic primitive or scope name.</li>
+</ul>
+<h3>2. <code>docs/glossary.md</code> (+25 lines)</h3>
+<p>Added five entries under §&quot;Organizations,&quot; placed before the existing <code>Cooperative (Coop)</code> entry so the abstractions precede the inhabitant classes:</p>
+<ul>
+<li><strong>InstitutionalDomain</strong> — the structural scope.</li>
+<li><strong>LocalDomain</strong> — shorthand for an <code>InstitutionalDomain</code> at the local institutional layer; prefer over <code>Coop</code>.</li>
+<li><strong>Owning entity class</strong> — <code>Individual</code> / <code>Cooperative</code> / <code>Community</code> / <code>Federation</code>, or another governed class.</li>
+</ul>
+<p>Updated the existing <strong>Cooperative</strong> and <strong>Community</strong> entries to add one sentence each that:</p>
+<ul>
+<li>Names them as <strong>one possible owning entity class</strong> for an <code>InstitutionalDomain</code>.</li>
+<li>Directs readers to <code>LocalDomain</code> / <code>InstitutionalDomain</code> for generic scope language.</li>
+<li>Preserves the existing description of each entity class verbatim otherwise — these entries describe what a Cooperative / Community IS; the disambiguation is about scope language, not entity definitions.</li>
+</ul>
+<h3>3. <code>docs/spec/governed-service-binding.md</code> (+1 boundary-rule cell)</h3>
+<p>Added a short note to the existing §&quot;Boundary rules&quot; → &quot;Package vocabulary stays in packages&quot; row pointing at the new §C3. Tells future readers: generic scope language uses <code>Domain</code> / <code>InstitutionalDomain</code> / <code>LocalDomain</code>, not <code>Coop</code>. One sentence. No restructure.</p>
+<h3>4. <code>docs/spec/storage-durability-policies.md</code> (+1 quote block)</h3>
+<p>Added a short note before the load-bearing inheritance rule in §&quot;Locality and privacy inheritance&quot; pointing at the new §C3. Acknowledges that the kernel-level <code>DataLocality::CoopReplicated</code> enum variant is preserved as-is (existing serialized Rust identifier) while new generic scope concepts in the spec use the local-domain vocabulary. One paragraph. No restructure.</p>
+<h3>5. <code>docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md</code> (+1 naming note)</h3>
+<p>Added a single &quot;Entity-scope naming note&quot; inline at the §&quot;Decision&quot; → &quot;Scope&quot; line (after <code>Commons | Coop(coop_id) | Federation(fed_id)</code>). The note reads: <strong>the slot should be read as <code>LocalDomain(domain_id)</code> for current architecture</strong>; the ADR&#39;s decision is preserved as-is; existing serialized <code>Coop</code>-prefixed strings remain valid for backward compatibility. No rewrite of the ADR body.</p>
+<h3>6. <code>docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md</code> (+1 naming note)</h3>
+<p>Added a single &quot;Entity-scope naming note&quot; inline at the §&quot;Admission policy&quot; → step 4 (<code>Coop-scoped task admits only executors...</code>). The note also applies the same rule to step 4 of §&quot;Settlement policy&quot; (the <code>Coop-scoped tasks settle within the coop&#39;s internal ledger</code> line). The ADR&#39;s decision is preserved as-is.</p>
+<h3>7. Doc-registry / DOCUMENT_REGISTRY.md</h3>
+<p>This PR only edits <strong>existing</strong> documents; no new docs land. The <code>docs/registry.toml</code> does not require a new entry. <code>docs/DOCUMENT_REGISTRY.md</code> was NOT regenerated because no new docs are introduced. Validation (<code>doc_control_check.py --strict</code>) does not require regen for in-place edits.</p>
+<hr>
+<h2>What&#39;s Open</h2>
+<!-- TRUTH TYPE: Execution truth — known incomplete work -->
+
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Branch created (<code>docs/entity-scope-vocabulary-boundary</code>).</li>
+<li><input checked="" disabled="" type="checkbox"> All six edits applied (boundary doc §C3, glossary entries, governed-service-binding cross-link, storage-durability-policies cross-link, ADR-0030 naming note, ADR-0031 naming note).</li>
+<li><input checked="" disabled="" type="checkbox"> Validation suite — to run before commit.</li>
+<li><input disabled="" type="checkbox"> Commit + push.</li>
+<li><input disabled="" type="checkbox"> Open PR.</li>
+<li><input disabled="" type="checkbox"> Watch CI on the initial head.</li>
+<li><input disabled="" type="checkbox"> Address any valid AI-reviewer feedback (Copilot/Codex) using the verified-rebuttal pattern from prior PRs.</li>
+<li><input disabled="" type="checkbox"> Per the established session pattern: <strong>&quot;Apply valid feedback only. Stop and summarize unless explicitly told to merge.&quot;</strong> Wait for explicit merge instruction.</li>
+<li><input disabled="" type="checkbox"> Decide whether to file the follow-up issue drafts listed in §&quot;Follow-up issue drafts&quot; (deferred to user).</li>
+<li><input disabled="" type="checkbox"> The <code>#1801</code> spec PR is the right place to land the corrected placement-class names; the patch is in §&quot;Proposed #1801 patch&quot; below for that PR to consume.</li>
+</ul>
+<h3>Carried forward (not addressed in this PR)</h3>
+<p><strong><code>docs(agents): reconcile handoff path with HANDOFF_TEMPLATE.md</code></strong> — <code>AGENTS.md</code> lines 281–313 still say <code>docs/dev-journal/</code>; <code>docs/dev/HANDOFF_TEMPLATE.md</code> and 18+ merged PRs use <code>docs/dev/</code>. Surfaced in #1820 review; carried through #1821, #1822, #1823, #1824, and this PR. <strong>Not addressed in this PR</strong> to keep scope tight.</p>
+<hr>
+<h2>Unsafe Assumptions</h2>
+<!-- Explicitly name anything this session relied on that was not verified -->
+
+<ul>
+<li><strong><code>docs/spec/institutional-domain.md</code> is the canonical source for the four owning-entity classes</strong> (<code>Individual</code> / <code>Cooperative</code> / <code>Community</code> / <code>Federation</code>). Verified by <code>grep</code> against the merged doc on <code>main</code>. If a follow-up amends the set, the glossary entries need a re-read.</li>
+<li><strong><code>DataLocality::CoopReplicated</code> is the only kernel-level enum variant carrying <code>Coop</code> framing.</strong> Verified by grep against <code>icn-kernel-api</code>. If a parallel in-flight PR adds another <code>Coop</code>-prefixed type, the rename-followup issue draft (Follow-up #1) needs to expand its scope.</li>
+<li><strong>No code path uses <code>coop_replicated</code> from outside the kernel-api crate by a different serialization name.</strong> Verified by grep on <code>icn/</code> — only <code>icn-kernel-api/src/storage.rs:259</code> writes <code>&quot;coop_replicated&quot;</code>. If serde-deserializers elsewhere parse the string with a different alias, the migration in Follow-up #1 needs to verify those round-trip too.</li>
+<li><strong>The two recent merged specs (<code>governed-service-binding.md</code>, <code>storage-durability-policies.md</code>) are the highest-leverage targets for cross-link notes.</strong> Other merged specs (<code>effect-dispatch-contract.md</code>, <code>institutional-domain.md</code>, <code>ccl-policy-registry.md</code>, <code>artifact-registry-and-scoped-vault.md</code> in the still-open #1824) don&#39;t directly name scope hierarchy; cross-links there would be noise. If a reviewer asks for broader cross-links, adding them is cheap.</li>
+<li><strong>ADR-0030 and ADR-0031 are the only two ADRs that ship <code>Coop</code>-flavored generic scope language.</strong> Verified by <code>grep -n &quot;Coop\|coop-scoped&quot; docs/adr/*.md</code>. Other ADRs (0014, 0019, 0025, 0026, 0027) use scope language correctly. If a reviewer surfaces a third ADR with the same drift, adding a third naming note is trivial.</li>
+<li><strong><code>docs/INDEX.md</code> does not need updating.</strong> No new docs are being introduced; the boundary doc is already in the architecture cluster.</li>
+</ul>
+<hr>
+<h2>Known remaining drift (not in this PR&#39;s scope)</h2>
+<p>These items are explicitly NOT touched in this PR. Each is named so future work can address them with proper migration discipline.</p>
+<ol>
+<li><p><strong><code>DataLocality::CoopReplicated</code> Rust enum variant</strong> (<code>icn/crates/icn-kernel-api/src/storage.rs:166</code>). Serialized as <code>coop_replicated</code>; numeric value <code>1</code>; used across <code>icn-compute</code>, <code>icn-core</code>, tests. Rename requires a compatibility-aware migration. See Follow-up #1.</p>
+</li>
+<li><p><strong><code>docs/state/storage-governance-spec.md</code></strong> — uses &quot;coop-scoped&quot; prose and <code>CoopReplicated</code> to accurately describe the existing implementation. Not changed in this PR because the implementation it describes still uses those names. Will update after the Rust rename lands (Follow-up #1).</p>
+</li>
+<li><p><strong><code>docs/design/COMPUTE_SUBSTRATE_STATUS.md</code></strong> and <strong><code>docs/state/ICN-Platform-Baseline-2026-03.md</code></strong> — reference <code>CoopReplicated</code> as canon. Same disposition as #2.</p>
+</li>
+<li><p><strong><code>docs/architecture/CELLS_AND_SCOPES.md</code></strong> and <strong><code>docs/spec/KERNEL_CONTRACTS.md</code></strong> — both reference <code>CoopReplicated</code> and a related federation policy enum. Same disposition.</p>
+</li>
+<li><p><strong>Issue <code>#1801</code> body</strong> — uses <code>CoopBound</code>, <code>coop-scoped</code>, &quot;cooperative-bound executor,&quot; and member-shell language &quot;sent for cooperative processing.&quot; <strong>Not edited by this PR</strong> per the user&#39;s explicit instruction. The forthcoming <code>#1801</code> spec PR is the right place to land the corrected vocabulary; the exact patch is in §&quot;Proposed #1801 patch&quot; below.</p>
+</li>
+<li><p><strong><code>icn-coop</code> crate naming</strong> and <strong><code>apps/membership/coop_core/*</code> paths</strong> — these are crate / module identifiers used across the workspace and SDK. Out of scope for this doc-only PR. Renaming would be a multi-crate refactor with downstream consumer impact.</p>
+</li>
+<li><p><strong>The handoff-path drift</strong> between <code>AGENTS.md</code> and <code>docs/dev/HANDOFF_TEMPLATE.md</code> (carried from #1820 review).</p>
+</li>
+</ol>
+<hr>
+<h2>Proposed #1801 patch (paste-ready)</h2>
+<p><strong>Do not apply this patch in the current PR.</strong> The <code>#1801</code> spec PR is the right place to land it. The patch reflects §C3&#39;s vocabulary rule.</p>
+<h3>Patch 1 — Purpose paragraph (top of #1801 body)</h3>
+<p>Current:</p>
+<pre><code>Define ICN compute placement policy: how a workload decides whether it should run locally, on a cooperative-bound executor, through a federation agreement, or in a commons compute pool.
+</code></pre>
+<p>Proposed:</p>
+<pre><code>Define ICN compute placement policy: how a workload decides whether it should run locally, on a local-domain-bound executor, through a federation agreement, or in a commons compute pool.
+</code></pre>
+<h3>Patch 2 — Placement hierarchy</h3>
+<p>Current:</p>
+<pre><code>1. Member device / local client cache when appropriate
+2. Local domain node
+3. Cooperative-bound executor
+4. Federation-bound executor under explicit agreement
+5. Commons compute pool under admission/settlement policy
+6. External bridge/custodian only by explicit agreement and policy
+</code></pre>
+<p>Proposed:</p>
+<pre><code>1. Member device / local client cache when appropriate
+2. Local domain node
+3. Local-domain-bound executor
+4. Federation-bound executor under explicit agreement
+5. Commons compute pool under admission/settlement policy
+6. External bridge/custodian only by explicit agreement and policy
+</code></pre>
+<h3>Patch 3 — Scope bullet under &quot;Scope&quot;</h3>
+<p>Current:</p>
+<pre><code>- coop-scoped execution policy;
+</code></pre>
+<p>Proposed:</p>
+<pre><code>- local-domain-scoped execution policy;
+</code></pre>
+<h3>Patch 4 — Candidate placement classes</h3>
+<p>Current:</p>
+<pre><code>- LocalOnly
+- DomainLocalPreferred
+- CoopBound
+- FederationBound
+- CommonsEligible
+- ExternalCustodianRequired
+- RejectedByPolicy
+</code></pre>
+<p>Proposed:</p>
+<pre><code>- LocalOnly
+- DomainLocalPreferred
+- LocalDomainBound
+- FederationBound
+- CommonsEligible
+- ExternalCustodianRequired
+- RejectedByPolicy
+</code></pre>
+<h3>Patch 5 — Candidate inputs</h3>
+<p>Current:</p>
+<pre><code>- domain id / scope;
+</code></pre>
+<p>(Already correct — leave as-is.)</p>
+<h3>Patch 6 — Future-spec scope tag (where ADR-0030&#39;s <code>Coop(coop_id)</code> would surface in #1801)</h3>
+<p>When the <code>#1801</code> spec PR adopts the ADR-0030 scope tag, prefer:</p>
+<pre><code>LocalDomain(domain_id)
+</code></pre>
+<p>over the historical <code>Coop(coop_id)</code> form. ADR-0030&#39;s existing form is preserved with a naming note (this PR landed that note); new spec text should use <code>LocalDomain(domain_id)</code>.</p>
+<h3>Patch 7 — Member-shell language</h3>
+<p>Current bullets under &quot;Member shell should show only plain participation status&quot;:</p>
+<pre><code>- local execution;
+- sent for cooperative processing;
+- sent to federation executor under agreement;
+- commons compute pending;
+- review required;
+- receipt available;
+- sync delayed / degraded.
+</code></pre>
+<p>Proposed:</p>
+<pre><code>- local execution;
+- processed inside your institution;
+- sent to a federation executor under agreement;
+- commons compute pending;
+- review required;
+- receipt available;
+- sync delayed / degraded.
+</code></pre>
+<p>The phrasing &quot;processed inside your institution&quot; handles cooperative-, community-, and federation-owned domains identically. An institution package may localize further (NYCN may say &quot;processed inside your cooperative&quot;; a care-network package may say &quot;processed inside your collective&quot;) — but the generic core string should not pre-decide.</p>
+<h3>Patch 8 — Boundary rules (no change required)</h3>
+<p>The existing §&quot;Boundary rules&quot; section in #1801&#39;s body is correct on the scope-vocabulary axis. The proposed <code>#1801</code> spec PR should add a cross-link to <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3 for the doctrine that prevents the corrected vocabulary from drifting back.</p>
+<hr>
+<h2>Follow-up issue drafts (not filed)</h2>
+<p>Six titles drafted per user instruction. Paste-ready for separate review.</p>
+<h3>1. <code>refactor(storage): rename CoopReplicated locality to LocalDomainReplicated</code></h3>
+<p><strong>Body draft:</strong></p>
+<pre><code>## Purpose
+
+Bring the `DataLocality` enum into alignment with the entity-scope vocabulary doctrine landed in `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md` §C3. The current `CoopReplicated` variant privileges one possible owning entity class at the scope level where multiple classes (Cooperative, Community, Federation, Individual) are equally valid.
+
+## Scope
+
+- Target enum: `icn/crates/icn-kernel-api/src/storage.rs:155-178` (`DataLocality`).
+- Current variants: `CellLocal = 0`, `CoopReplicated = 1`, `FederationMirrored = 2`, `CommonsPublic = 3`.
+- Target variants: `CellLocal = 0`, `LocalDomainReplicated = 1`, `FederationMirrored = 2`, `CommonsPublic = 3`.
+
+## Migration constraints
+
+- **Preserve numeric values.** `LocalDomainReplicated = 1` MUST keep the same ordering and on-wire integer.
+- **Serde alias for backward compatibility.** Add `#[serde(alias = &quot;coop_replicated&quot;)]` so existing serialized data still decodes.
+- **Decide encoding direction.** Two valid options:
+  - Option A (clean break): new encoder emits `&quot;local_domain_replicated&quot;`; deserializer accepts both `&quot;local_domain_replicated&quot;` and `&quot;coop_replicated&quot;`.
+  - Option B (compatibility-first): new encoder still emits `&quot;coop_replicated&quot;` so wire format is unchanged; only the Rust identifier renames. Decision belongs to a separate ADR-or-policy call.
+- **Update all call sites.** `icn-compute`, `icn-core`, `icn-kernel-api` itself, and tests. Approximately 30+ call sites per grep.
+- **Round-trip tests.** Add tests proving (a) old serialized `&quot;coop_replicated&quot;` still decodes to the renamed variant, and (b) re-encoding produces whichever encoding direction was chosen in the previous step.
+- **Update consumer docs.** After rename lands, update `docs/state/storage-governance-spec.md`, `docs/design/COMPUTE_SUBSTRATE_STATUS.md`, `docs/state/ICN-Platform-Baseline-2026-03.md`, `docs/architecture/CELLS_AND_SCOPES.md`, `docs/spec/KERNEL_CONTRACTS.md` to use the new variant name where they currently say `CoopReplicated`.
+
+## Non-goals
+
+- Not a wire-format change (the integer value stays).
+- Not a rename of `icn-coop` crate or `apps/membership/coop_core/*` paths.
+- Not a rename of other `Coop`-prefixed identifiers outside `DataLocality`.
+
+## Related
+
+- Doctrine: `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md` §C3 &quot;Entity-scope vocabulary.&quot;
+- Owning entity class taxonomy: `docs/spec/institutional-domain.md`.
+- Storage durability spec: `docs/spec/storage-durability-policies.md`.
+</code></pre>
+<h3>2. <code>docs(compute): align #1801 placement policy vocabulary with LocalDomain</code></h3>
+<p><strong>Body draft:</strong></p>
+<pre><code>## Purpose
+
+The forthcoming `#1801` spec PR (compute placement policy) should adopt the corrected scope vocabulary per `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md` §C3.
+
+## Scope
+
+Apply the patch recorded in `docs/dev/handoff-2026-05-14-entity-scope-vocabulary-boundary.md` §&quot;Proposed #1801 patch&quot;:
+
+1. Purpose paragraph: &quot;cooperative-bound&quot; → &quot;local-domain-bound.&quot;
+2. Placement hierarchy step 3: &quot;Cooperative-bound executor&quot; → &quot;Local-domain-bound executor.&quot;
+3. Scope bullet: &quot;coop-scoped execution policy&quot; → &quot;local-domain-scoped execution policy.&quot;
+4. Candidate placement classes: `CoopBound` → `LocalDomainBound`.
+5. Future scope tag: prefer `LocalDomain(domain_id)` over `Coop(coop_id)`.
+6. Member-shell language: &quot;sent for cooperative processing&quot; → &quot;processed inside your institution.&quot;
+7. Add cross-link to `INSTITUTION_PACKAGE_BOUNDARY.md` §C3 in the new spec.
+
+## Non-goals
+
+- Not editing the GitHub issue body before the spec PR opens.
+- Not changing the existing scope tags in ADR-0030 / ADR-0031 (those carry naming notes; new spec text uses the corrected form).
+</code></pre>
+<h3>3. <code>docs(adr): annotate Coop-scoped legacy wording in compute ADRs</code></h3>
+<p><strong>Status: DONE in the current PR for ADR-0030 and ADR-0031.</strong> Filed here only if a reviewer surfaces a third ADR with the same drift.</p>
+<h3>4. <code>docs(guides): audit cooperative-specific examples vs generic domain examples</code></h3>
+<p><strong>Body draft:</strong></p>
+<pre><code>## Purpose
+
+After the entity-scope vocabulary boundary landed (`docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md` §C3), audit the guides / tutorials / examples corpus for places where `cooperative` is used as a generic example when the example would be clearer with a `Domain` or `LocalDomain` framing (or where the example should explicitly note that it could equally apply to a community or federation-owned domain).
+
+## Scope
+
+- `docs/guides/**`
+- `docs/onboarding/**`
+- `docs/tutorials/**` (if exists)
+- `sdk/typescript/examples/**` (likely contains coop-specific code samples; out of doc-only scope but worth flagging)
+- `web/**` and `website/**` (for institutional-partner / cooperative-evaluator framing)
+
+## Non-goals
+
+- Not rewriting all cooperative-specific examples. Cooperative-specific examples are appropriate where the example is genuinely about cooperatives.
+- Not editing code examples that intentionally demonstrate cooperative-economy workflows.
+- The boundary is: &quot;is this example specific to cooperatives, or is it a generic scope-level example that happened to use the word `cooperative`?&quot;
+</code></pre>
+<h3>5. <code>spec(entity): define entity-class vocabulary and package-local nouns</code></h3>
+<p><strong>Body draft:</strong></p>
+<pre><code>## Purpose
+
+If the boundary doctrine in `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md` §C3 (&quot;Entity-scope vocabulary&quot;) is insufficient over time, write a dedicated spec under `docs/spec/` defining: the closed (but policy-extensible) entity-class set, how packages add local nouns without colliding with core, and how the runtime treats entity-class as data (not as branching logic).
+
+## Scope (provisional)
+
+- Closed entity-class set: `Individual` / `Cooperative` / `Community` / `Federation`.
+- Policy-extension protocol: how a domain&#39;s policy admits a new entity class.
+- Package-local noun mapping: where institution packages declare local synonyms.
+- Vocabulary boundary tests: lint rules or doc-check assertions that flag generic primitives named after one inhabitant.
+
+## Non-goals
+
+- Not redefining the institutional-domain spec (which already names owning-entity-class).
+- Not editing the four merged sibling specs unless the new spec&#39;s adoption requires it.
+- Filing this issue is forward work; the current §C3 doctrine may be enough.
+</code></pre>
+<h3>6. <code>docs(architecture): consider entity-scope-vocabulary checklist for future specs</code></h3>
+<p><strong>Body draft:</strong></p>
+<pre><code>## Purpose
+
+Add an explicit checklist item to the architecture-due-diligence pattern (per `docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md`) requiring spec authors to confirm that generic primitive names follow §C3 of `INSTITUTION_PACKAGE_BOUNDARY.md`.
+
+## Scope
+
+- One bullet added to the architecture-due-diligence checklist.
+- Optional: a similar bullet in the spec-PR template.
+
+## Non-goals
+
+- Not a doc-control-system enforcement (lint rule). That belongs to the Follow-up #5 spec if it lands.
+</code></pre>
+<hr>
+<h2>Validation Commands</h2>
+<pre><code class="language-bash">cd /home/matt/projects/icn
+
+# Doc control plane
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict
+
+# Architecture lint on every touched file
+python3 docs/scripts/lint-arch.py docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md --cargo icn/Cargo.toml
+python3 docs/scripts/lint-arch.py docs/spec/governed-service-binding.md --cargo icn/Cargo.toml
+python3 docs/scripts/lint-arch.py docs/spec/storage-durability-policies.md --cargo icn/Cargo.toml
+python3 docs/scripts/lint-arch.py docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md --cargo icn/Cargo.toml
+python3 docs/scripts/lint-arch.py docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md --cargo icn/Cargo.toml
+
+# Compliance + freshness
+python3 .github/scripts/compliance_linter.py
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+</code></pre>
+<p>Expected: all pass; freshness-check exit 1 from pre-existing <code>docs/ARCHITECTURE.md</code> staleness (informational; CI workflow treats as SUCCESS).</p>
+<hr>
+<h2>Architectural Decisions</h2>
+<!-- TRUTH TYPE: Declared project truth changes (if any were made or ratified) -->
+
+<ol>
+<li><strong>ICN core names scopes, not inhabitants.</strong> The doctrine is now load-bearing in <code>INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3. Future specs that violate it are reviewable on that basis.</li>
+<li><strong><code>Cooperative</code> is reserved</strong> for the actual cooperative entity class, cooperative-economy framing, and cooperative-specific institution packages. The generic local-institutional scope is <code>LocalDomain</code> / <code>InstitutionalDomain</code>.</li>
+<li><strong>Existing serialized <code>Coop</code>-prefixed identifiers</strong> (<code>DataLocality::CoopReplicated</code>, ADR-0030&#39;s <code>Coop(coop_id)</code> scope tag, ADR-0031&#39;s <code>Coop-scoped</code> admission/settlement prose) are preserved as-is. Rename is forward work with proper compatibility migration.</li>
+<li><strong>Issue <code>#1801</code>&#39;s body is NOT edited by this PR.</strong> The corrected vocabulary lands when the <code>#1801</code> spec PR opens, consuming the patch in §&quot;Proposed #1801 patch.&quot;</li>
+<li><strong>No Rust enum rename, no schema migration, no wire-format change</strong> in this PR. Doc-only.</li>
+</ol>
+<hr>
+<h2>Verification Commands (for the next session)</h2>
+<pre><code class="language-bash">cd /home/matt/projects/icn
+
+git branch --show-current
+gh pr view &lt;pr-number&gt; --json state,mergeable,mergeStateStatus
+
+# Re-run validation if anything is in question:
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict
+python3 docs/scripts/lint-arch.py docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md --cargo icn/Cargo.toml
+
+# Find any remaining drift not in the &quot;Known drift&quot; list:
+rg -nE &quot;CoopBound|cooperative-bound|coop-scoped|sent for cooperative processing&quot; docs icn/crates/icn-kernel-api icn/crates/icn-compute
+</code></pre>
+<hr>
+<h2>Truth-Plane Notes</h2>
+<!-- Which truth types were relied on? Any known conflicts between layers? -->
+
+<ul>
+<li><strong>Declared project truth:</strong> loaded from <code>docs/spec/institutional-domain.md</code> (merged via PR #1820) for the canonical owning-entity-class set.</li>
+<li><strong>Implementation truth:</strong> verified by grep against <code>icn/crates/icn-kernel-api/src/storage.rs</code> (<code>DataLocality::CoopReplicated</code> exists at line 166); <code>icn/crates/icn-compute/src/types.rs</code> (uses <code>CoopReplicated</code> at line 1188). No new Rust types invented; no existing types touched.</li>
+<li><strong>Execution truth:</strong> confirmed <code>main</code> HEAD <code>5461fd91d</code>; PR #1824 is still open (separate session&#39;s work); no other open PRs.</li>
+<li><strong>Known truth-plane conflict:</strong> AGENTS.md vs <code>docs/dev/HANDOFF_TEMPLATE.md</code> disagree on handoff path. Carried.</li>
+<li><strong>No partner-package vocabulary</strong> introduced. NYCN is mentioned in §C3&#39;s &quot;What this means in practice&quot; table as an example of an institution package, consistent with the existing §C2 worked example of NYCN. No NYCN-specific institutional nouns are imported into core text.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

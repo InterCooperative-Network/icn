@@ -97,6 +97,15 @@ View source on GitHub →
 <p>Attestation weight based on path length from organizational anchors. Members with no path to an org have zero attestation weight.</p>
 <hr>
 <h2>Organizations</h2>
+<h3>InstitutionalDomain</h3>
+<p>The <strong>structural scope</strong> of a governed entity in ICN — an <code>Individual</code>, <code>Cooperative</code>, <code>Community</code>, <code>Federation</code>, or another governed class permitted by domain policy. The addressable, self-governing jurisdiction inside which authority decisions are legitimate. Specified in <a href="/docs/spec/institutional-domain">`docs/spec/institutional-domain.md`</a>.</p>
+<p>An <code>InstitutionalDomain</code> is <strong>not</strong> an entity class. It is the scope the entity owns. Several entity classes can own a domain — see <code>owning entity class</code> below.</p>
+<h3>LocalDomain</h3>
+<p>Shorthand for an <code>InstitutionalDomain</code> at the <strong>local institutional layer</strong> (between member/cell-local scope and federation/commons scope). Prefer <code>LocalDomain</code> over <code>Coop</code> when naming a generic scope-level concept: a local domain may be owned by a <code>Cooperative</code>, a <code>Community</code>, a <code>Federation</code> acting as its own entity, or another governed class permitted by policy.</p>
+<p>See <a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md`</a> §C3 &quot;Entity-scope vocabulary&quot; for the boundary rule.</p>
+<h3>Owning entity class</h3>
+<p>The class of governed entity that owns an <code>InstitutionalDomain</code>. Per <a href="/docs/spec/institutional-domain">`docs/spec/institutional-domain.md`</a>, the closed (but extensible by policy) set is <code>Individual</code> / <code>Cooperative</code> / <code>Community</code> / <code>Federation</code>, or another governed entity class permitted by domain policy. The class shapes which adopted-charter forms are permitted and which authority classes the entity may grant.</p>
+<p>The owning entity class is <strong>a property of a domain</strong>, not a substitute for the domain&#39;s name. A domain owned by a cooperative is &quot;a domain whose owning entity class is <code>Cooperative</code>,&quot; not &quot;a Coop.&quot;</p>
 <h3>Cooperative (Coop)</h3>
 <p>A formal economic organization with:</p>
 <ul>
@@ -105,7 +114,7 @@ View source on GitHub →
 <li>Treasury and ledger</li>
 <li>Economic activity (trade, production)</li>
 </ul>
-<p>Cooperatives are the <strong>economic engine</strong> of ICN.</p>
+<p>Cooperatives are the <strong>economic engine</strong> of ICN and one possible owning entity class for an <code>InstitutionalDomain</code>. In generic ICN-core architecture text, <strong>prefer <code>LocalDomain</code> or <code>InstitutionalDomain</code> when naming a scope</strong>; use <code>Cooperative</code> only when the subject is specifically the cooperative entity class (per <code>docs/spec/institutional-domain.md</code>), the cooperative-movement context, or a cooperative-specific setup path / institution package.</p>
 <h3>Community</h3>
 <p>A civic organization for:</p>
 <ul>
@@ -114,7 +123,7 @@ View source on GitHub →
 <li>Advocacy</li>
 <li>Public service</li>
 </ul>
-<p>Communities are <strong>first-class entities</strong> in ICN, not just informal groups. They have DIDs, fuel pools, and governance.</p>
+<p>Communities are <strong>first-class entities</strong> in ICN, not just informal groups. They have DIDs, fuel pools, and governance. A community is one possible owning entity class for an <code>InstitutionalDomain</code>; community-owned domains are parallel to cooperative-owned domains at the local-institutional scope level (per <code>docs/spec/institutional-domain.md</code>).</p>
 <h3>Federation</h3>
 <p>A group of cooperatives and/or communities that:</p>
 <ul>
