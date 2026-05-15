@@ -353,6 +353,8 @@ For storage classes whose loss would affect members directly (canonical state, s
 
 The single most load-bearing rule in this spec. Stated three ways for emphasis.
 
+> **Note on scope vocabulary.** Generic scope language in this spec uses `LocalDomain` / `InstitutionalDomain` / `Domain` (per [`../architecture/INSTITUTION_PACKAGE_BOUNDARY.md`](../architecture/INSTITUTION_PACKAGE_BOUNDARY.md) §C3 "Entity-scope vocabulary"). The kernel-level `DataLocality::CoopReplicated` enum variant is preserved as the existing serialized Rust identifier; new generic scope concepts that this spec introduces use the local-domain vocabulary rather than coining new `Coop-`-prefixed names. Rename of the kernel-level variant is forward work (compatibility-aware migration; not in this spec's scope).
+
 **Inheritance rule:**
 
 > Backups, replicas, archives, exports, and restore targets inherit the source's `DataLocality` and privacy / disclosure constraints.

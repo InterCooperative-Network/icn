@@ -70,6 +70,21 @@ Attestation weight based on path length from organizational anchors. Members wit
 
 ## Organizations
 
+### InstitutionalDomain
+The **structural scope** of a federation, cooperative, community, or other governed entity in ICN. The addressable, self-governing jurisdiction inside which authority decisions are legitimate. Specified in [`docs/spec/institutional-domain.md`](spec/institutional-domain.md).
+
+An `InstitutionalDomain` is **not** an entity class. It is the scope the entity owns. Several entity classes can own a domain — see `owning entity class` below.
+
+### LocalDomain
+Shorthand for an `InstitutionalDomain` at the **local institutional layer** (between member/cell-local scope and federation/commons scope). Prefer `LocalDomain` over `Coop` when naming a generic scope-level concept: a local domain may be owned by a `Cooperative`, a `Community`, a `Federation` acting as its own entity, or another governed class permitted by policy.
+
+See [`docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md`](architecture/INSTITUTION_PACKAGE_BOUNDARY.md) §C3 "Entity-scope vocabulary" for the boundary rule.
+
+### Owning entity class
+The class of governed entity that owns an `InstitutionalDomain`. Per [`docs/spec/institutional-domain.md`](spec/institutional-domain.md), the closed (but extensible by policy) set is `Individual` / `Cooperative` / `Community` / `Federation`, or another governed entity class permitted by domain policy. The class shapes which adopted-charter forms are permitted and which authority classes the entity may grant.
+
+The owning entity class is **a property of a domain**, not a substitute for the domain's name. A domain owned by a cooperative is "a domain whose owning entity class is `Cooperative`," not "a Coop."
+
 ### Cooperative (Coop)
 A formal economic organization with:
 - Registered membership
@@ -77,7 +92,7 @@ A formal economic organization with:
 - Treasury and ledger
 - Economic activity (trade, production)
 
-Cooperatives are the **economic engine** of ICN.
+Cooperatives are the **economic engine** of ICN and one possible owning entity class for an `InstitutionalDomain`. In generic ICN-core architecture text, **prefer `LocalDomain` or `InstitutionalDomain` when naming a scope**; use `Cooperative` only when the subject is specifically the cooperative entity class (per `docs/spec/institutional-domain.md`), the cooperative-movement context, or a cooperative-specific setup path / institution package.
 
 ### Community
 A civic organization for:
@@ -86,7 +101,7 @@ A civic organization for:
 - Advocacy
 - Public service
 
-Communities are **first-class entities** in ICN, not just informal groups. They have DIDs, fuel pools, and governance.
+Communities are **first-class entities** in ICN, not just informal groups. They have DIDs, fuel pools, and governance. A community is one possible owning entity class for an `InstitutionalDomain`; community-owned domains are parallel to cooperative-owned domains at the local-institutional scope level (per `docs/spec/institutional-domain.md`).
 
 ### Federation
 A group of cooperatives and/or communities that:

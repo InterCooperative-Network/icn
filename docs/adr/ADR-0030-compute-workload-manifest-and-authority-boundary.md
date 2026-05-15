@@ -49,6 +49,8 @@ A compute workload is described by a `ComputeTask` manifest with the following p
 3. **Privacy class.** Public, Encrypted, or Sealed (the privacy ADR-0082 will refine; for now: ICN supports each as a class).
 4. **Determinism class.** Required for governance-grade output; advisory for assistive output.
 5. **Scope.** `Commons | Coop(coop_id) | Federation(fed_id)`. Determines admission and settlement policy.
+
+   *Entity-scope naming note (added 2026-05-14):* This ADR uses `Coop(coop_id)` as the local-domain scope tag because that was the vocabulary at the time of adoption. Current architecture (per `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md` §C3 "Entity-scope vocabulary" and `docs/spec/institutional-domain.md`) reads this slot as `LocalDomain(domain_id)`: a scope owned by an `InstitutionalDomain` whose owning entity class may be `Cooperative`, `Community`, `Federation`, `Individual`, or another governed class permitted by policy. Future schema and runtime work should prefer `LocalDomain` names; existing serialized `Coop`-prefixed strings remain valid for backward compatibility. The ADR's decision is preserved as-is; the slot's reading is updated.
 6. **Resource profile.** CPU, memory, storage envelope. Used by the commons pool and by federated placement.
 7. **Mandate reference (optional).** If the workload's output will produce institutional effects, a reference to the covering mandate (ADR-0014, ADR-0019).
 
