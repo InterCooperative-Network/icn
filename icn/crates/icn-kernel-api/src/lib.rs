@@ -102,7 +102,11 @@ pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{
     Discovery, EndpointType, NamingService, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId,
 };
-pub use proofs::ArtifactReceipt;
+pub use proofs::{
+    AntiEntropyProbe, ArtifactDigest, ArtifactReceipt, BloomProjection, MerkleRootProjection,
+    ProbeScope, ReceiptDigest, RequestedResponseClass, ShortDigestList, StateClass, StateDigest,
+    TriggerSource, VectorClockProjection, ANTI_ENTROPY_PROBE_SCHEMA_VERSION,
+};
 pub use receipts::{
     compute_canonical_hash, AllocationReceipt, CanonicalReceipt, Hash, ProvenanceAnchors, ReceiptId,
 };

@@ -35,6 +35,8 @@ This spec defines that loop as the proof-layer beneath:
 
 ## Scope and non-goals
 
+This spec was originally introduced (PR #1829) as a design-level document that named the proof-loop phases, artifact identifiers, divergence classes, and boundary rules without landing implementation. As of issue `#1834` / PR `#1843`, the first two proof-artifact families — `AntiEntropyProbe` and the `StateDigest` family (with `ReceiptDigest` and `ArtifactDigest` specializations and the `StateClass` / `ProbeScope` / `TriggerSource` / `RequestedResponseClass` enums) — are wire-stable Rust shapes in `icn-kernel-api`. The remaining identifiers stay design-level / forward-direction.
+
 **In scope:**
 
 - Naming the proof-loop phases, artifact identifiers, divergence classes, and boundary rules.
@@ -42,21 +44,23 @@ This spec defines that loop as the proof-layer beneath:
 - Defining steward and member surface vocabulary.
 - Naming the first safe proof-loop / dogfood slice.
 - Naming the privacy / custody rules that keep proof loops from leaking private data.
+- As of `#1834` / PR `#1843`: wire-stable record shapes for `AntiEntropyProbe` and the `StateDigest` family (see §"Proof artifacts (forward-direction names)" below for which identifiers are now wire-stable and which remain design-level).
 
-**Not in scope (preserved out of this PR):**
+**Not in scope (preserved out of this spec and out of `#1834`):**
 
-- Implementation of any of the new artifact names. None of them lands as Rust code in this PR.
+- Implementation of the remaining design-level artifact names. `PeerSyncReport`, `DivergenceEvidence`, `RepairPlan`, `RepairReceipt`, `SyncDegradedStatus`, `QuorumSyncCheck`, `FederationSyncWindow`, `RoutingProof`, and `RedundancyProof` remain forward-direction names; `DivergenceEvidence` and `RepairPlan` are tracked under `#1835` and the receipt-index anti-entropy fixture loop (Slice A) is tracked under `#1838`.
+- Live emission, classification, or repair. Even with the `AntiEntropyProbe` / `StateDigest` wire shapes now defined, no code path constructs, signs, gossips, classifies, or repairs them. The records are constructible and testable in isolation.
 - Schema migration for existing types in `icn-gossip` / `icn-net` / `icn-federation`.
 - Network protocol mutation. No changes to gossip topic strings, message envelopes, or peer discovery.
 - Live federation rollout, devnet provisioning, K3s manifest changes, DNS changes, Forgejo or identity-bridge changes.
 - Production-readiness claim. No clause of this spec is a claim that ICN-native anti-entropy is production-ready, that any partner federation is operating proof loops today, or that NYCN is a formal pilot.
 - Scheduler, gateway, runtime, admission engine, or settlement engine implementation.
-- Re-definition of `ArtifactReceipt`, `GovernanceProof`, `MerkleProof`, `ClearingReceipt`, or any other receipt class already named in ADR-0026 / ADR-0031 / `docs/spec/federation-settlement-finality.md`.
+- Re-definition of `ArtifactReceipt`, `GovernanceProof`, `MerkleProof`, `ClearingReceipt`, or any other receipt class already named in ADR-0026 / ADR-0031 / `docs/spec/federation-settlement-finality.md`. No new top-level ADR-0026 receipt class is introduced; the `AntiEntropyProbe` is an evidence envelope, not a receipt.
 - Re-definition of the `BackupPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy` shapes (per `docs/spec/storage-durability-policies.md`).
 - Encrypted private-overlay implementation (tracked in `#1767`).
 - PrivacyClass taxonomy reconciliation (tracked in `#1792`).
 - Adversarial / chaos harness (tracked in `#1010`).
-- Closure of `#1799`. The PR introducing this doc uses `Refs:`; closure is left for separate review against the acceptance criteria.
+- Closure of `#1799`. The PR introducing this doc used `Refs:`; closure remains forward work against `#1799`'s acceptance criteria as additional proof-rail slices land.
 
 ## Relationship to current canon
 
@@ -198,12 +202,14 @@ Anti-entropy proof loops apply to the following state classes. Each class names 
 
 ## Proof artifacts (forward-direction names)
 
-The following identifiers are **design-level names** introduced by this spec. None lands as a Rust type in this PR. Each travels inside an existing receipt envelope (Stage 5 `EffectDispatchEvidence` per `docs/spec/effect-dispatch-contract.md`, or Layer 2 `ArtifactReceipt` per ADR-0026 for blob-transfer repair).
+The following identifiers are **design-level names** introduced by this spec. Each travels inside an existing receipt envelope (Stage 5 `EffectDispatchEvidence` per `docs/spec/effect-dispatch-contract.md`, or Layer 2 `ArtifactReceipt` per ADR-0026 for blob-transfer repair).
 
-- **`AntiEntropyProbe`** — the probing message: state class, target scope, bounded digest, trigger source, freshness, signature.
-- **`StateDigest`** — a bounded representation of a state class at a freshness instant; concrete forms include Bloom filter (existing `BloomFilter`), Merkle root, vector clock, or short digest list.
-- **`ReceiptDigest`** — a `StateDigest` specialized to a receipt index.
-- **`ArtifactDigest`** — a `StateDigest` specialized to an artifact-registry entry or scoped-vault reference; never the artifact body.
+Two of these now have wire-stable Rust shapes in `icn/crates/icn-kernel-api/src/proofs.rs` (per `#1834`): `AntiEntropyProbe` and the `StateDigest` family (`BloomProjection`, `MerkleRootProjection`, `VectorClockProjection`, `ShortDigestList`), together with the `ReceiptDigest` and `ArtifactDigest` newtype specializations and the `StateClass` / `ProbeScope` / `TriggerSource` / `RequestedResponseClass` enums. The Bloom projection is wire-equivalent to `icn_gossip::types::BloomFilterData` plus an explicit cardinality hint; cross-link helpers (`icn_gossip::to_bloom_projection` / `icn_gossip::to_bloom_filter_data`, re-exported from the crate root) preserve byte-level membership across the boundary. None of these wire shapes mutates protocol topics, emits probes, or adds a new ADR-0026 receipt class — the kernel record is an evidence envelope, not a top-level receipt. The remaining identifiers below remain design-level names; `DivergenceEvidence` / `RepairPlan` / `RepairReceipt` are tracked under `#1835`, the fixture loop under `#1838`.
+
+- **`AntiEntropyProbe`** — the probing message: state class, target scope, bounded digest, trigger source, freshness, signature. **Wire-stable** (`#1834`).
+- **`StateDigest`** — a bounded representation of a state class at a freshness instant; concrete forms include Bloom filter (existing `BloomFilter`), Merkle root, vector clock, or short digest list. **Wire-stable** (`#1834`).
+- **`ReceiptDigest`** — a `StateDigest` specialized to a receipt index. **Wire-stable** (`#1834`).
+- **`ArtifactDigest`** — a `StateDigest` specialized to an artifact-registry entry or scoped-vault reference; never the artifact body. **Wire-stable** (`#1834`).
 - **`PeerSyncReport`** — the comparison result: matching / missing on local / missing on remote / divergent / unknown.
 - **`DivergenceEvidence`** — classified non-matching outcome; records class, scope, peers, digest forms, policy clause, freshness, private-content implication flag.
 - **`RepairPlan`** — repair action, authority basis, scope, boundary rules, expected `RepairReceipt` class.

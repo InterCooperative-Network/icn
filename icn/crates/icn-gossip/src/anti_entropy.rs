@@ -18,9 +18,52 @@
 
 use crate::bloom::BloomFilter;
 use crate::gossip::GossipActor;
-use crate::types::{ContentHash, GossipMessage};
+use crate::types::{BloomFilterData, ContentHash, GossipMessage};
 use anyhow::{Context as _, Result};
+use icn_kernel_api::proofs::BloomProjection;
 use tracing::debug;
+
+// ============================================================================
+// Cross-link to icn-kernel-api anti-entropy probe (issue #1834)
+//
+// `AntiEntropyProbe` / `StateDigest` live in `icn-kernel-api` so they remain
+// usable by code that does not depend on the gossip layer. The Bloom-filter
+// projection in kernel-api is wire-equivalent to this crate's existing
+// `BloomFilterData` on the `{bits, num_hashes, size}` shape, plus a
+// `hint_count` field that `BloomFilterData` does not carry. These helpers
+// make the round-trip explicit so the wire shapes cannot silently drift
+// apart.
+//
+// Note: Rust's orphan rule prevents an `impl From<&BloomFilterData> for
+// BloomProjection` here (foreign trait, foreign type), so the kernel→gossip
+// conversion is also exposed as a free function for symmetry.
+// ============================================================================
+
+/// Convert an existing gossip `BloomFilterData` into a kernel-api
+/// `BloomProjection` for inclusion in a `StateDigest::Bloom`.
+///
+/// `BloomFilterData` does not carry a cardinality estimate; the caller
+/// supplies `hint_count`. Typical callers use the same value they already
+/// pass into `GossipMessage::Digest { hint_count, .. }`.
+pub fn to_bloom_projection(data: &BloomFilterData, hint_count: u32) -> BloomProjection {
+    BloomProjection {
+        bits: data.bits.clone(),
+        num_hashes: data.num_hashes,
+        size: data.size,
+        hint_count,
+    }
+}
+
+/// Convert a kernel-api `BloomProjection` back to the gossip layer's
+/// `BloomFilterData`. The `hint_count` is intentionally dropped because
+/// `BloomFilterData` is a primitive that does not carry it.
+pub fn to_bloom_filter_data(proj: &BloomProjection) -> BloomFilterData {
+    BloomFilterData {
+        bits: proj.bits.clone(),
+        num_hashes: proj.num_hashes,
+        size: proj.size,
+    }
+}
 
 impl GossipActor {
     /// Get bloom filter for a topic
@@ -153,5 +196,73 @@ impl GossipActor {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod kernel_api_cross_link_tests {
+    use super::*;
+    use crate::bloom::BloomFilter;
+
+    fn populated_bloom_data() -> BloomFilterData {
+        let mut filter = BloomFilter::new_adaptive(4);
+        for byte in 1..=4u8 {
+            let mut h = [0u8; 32];
+            h[0] = byte;
+            filter.insert(&h);
+        }
+        filter.to_data()
+    }
+
+    #[test]
+    fn bloom_projection_roundtrip_preserves_bits() {
+        let original = populated_bloom_data();
+        let projection = to_bloom_projection(&original, 4);
+        assert_eq!(projection.bits, original.bits);
+        assert_eq!(projection.num_hashes, original.num_hashes);
+        assert_eq!(projection.size, original.size);
+        assert_eq!(projection.hint_count, 4);
+
+        let restored = to_bloom_filter_data(&projection);
+        assert_eq!(restored.bits, original.bits);
+        assert_eq!(restored.num_hashes, original.num_hashes);
+        assert_eq!(restored.size, original.size);
+    }
+
+    #[test]
+    fn bloom_projection_roundtrip_preserves_membership() {
+        // Round-tripping through the kernel-api projection must not change
+        // which content hashes the filter recognizes — this is the
+        // load-bearing property of the cross-link.
+        let original = populated_bloom_data();
+        let projection = to_bloom_projection(&original, 4);
+        let restored = to_bloom_filter_data(&projection);
+
+        let original_filter = BloomFilter::from_data(&original);
+        let restored_filter = BloomFilter::from_data(&restored);
+
+        for byte in 1..=4u8 {
+            let mut h = [0u8; 32];
+            h[0] = byte;
+            assert!(original_filter.contains(&h));
+            assert!(restored_filter.contains(&h));
+        }
+    }
+
+    #[test]
+    fn bloom_projection_hint_count_is_caller_supplied() {
+        // BloomFilterData does not carry hint_count, so the conversion is
+        // not bidirectional on that field — the gossip→kernel-api direction
+        // accepts an explicit hint from the caller and the reverse direction
+        // drops it.
+        let data = populated_bloom_data();
+        let p_zero = to_bloom_projection(&data, 0);
+        let p_ten = to_bloom_projection(&data, 10);
+        assert_eq!(p_zero.bits, p_ten.bits);
+        assert_ne!(p_zero.hint_count, p_ten.hint_count);
+        // Reverse drops the hint.
+        let d_zero = to_bloom_filter_data(&p_zero);
+        let d_ten = to_bloom_filter_data(&p_ten);
+        assert_eq!(d_zero.bits, d_ten.bits);
     }
 }

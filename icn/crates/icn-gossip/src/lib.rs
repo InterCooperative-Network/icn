@@ -56,6 +56,11 @@ mod anti_entropy;
 mod protocol;
 mod subscriptions;
 
+// Cross-link helpers between this crate's `BloomFilterData` and the
+// `icn-kernel-api` `BloomProjection` used inside `AntiEntropyProbe` /
+// `StateDigest` (issue #1834).
+pub use anti_entropy::{to_bloom_filter_data, to_bloom_projection};
+
 pub use bloom::{BloomFilter, BloomResizeConfig};
 pub use error::{GossipError, Result};
 pub use gossip::{
