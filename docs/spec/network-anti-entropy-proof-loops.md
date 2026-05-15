@@ -198,12 +198,14 @@ Anti-entropy proof loops apply to the following state classes. Each class names 
 
 ## Proof artifacts (forward-direction names)
 
-The following identifiers are **design-level names** introduced by this spec. None lands as a Rust type in this PR. Each travels inside an existing receipt envelope (Stage 5 `EffectDispatchEvidence` per `docs/spec/effect-dispatch-contract.md`, or Layer 2 `ArtifactReceipt` per ADR-0026 for blob-transfer repair).
+The following identifiers are **design-level names** introduced by this spec. Each travels inside an existing receipt envelope (Stage 5 `EffectDispatchEvidence` per `docs/spec/effect-dispatch-contract.md`, or Layer 2 `ArtifactReceipt` per ADR-0026 for blob-transfer repair).
 
-- **`AntiEntropyProbe`** — the probing message: state class, target scope, bounded digest, trigger source, freshness, signature.
-- **`StateDigest`** — a bounded representation of a state class at a freshness instant; concrete forms include Bloom filter (existing `BloomFilter`), Merkle root, vector clock, or short digest list.
-- **`ReceiptDigest`** — a `StateDigest` specialized to a receipt index.
-- **`ArtifactDigest`** — a `StateDigest` specialized to an artifact-registry entry or scoped-vault reference; never the artifact body.
+Two of these now have wire-stable Rust shapes in `icn/crates/icn-kernel-api/src/proofs.rs` (per `#1834`): `AntiEntropyProbe` and the `StateDigest` family (`BloomProjection`, `MerkleRootProjection`, `VectorClockProjection`, `ShortDigestList`), together with the `ReceiptDigest` and `ArtifactDigest` newtype specializations and the `StateClass` / `ProbeScope` / `TriggerSource` / `RequestedResponseClass` enums. The Bloom projection is wire-equivalent to `icn_gossip::types::BloomFilterData` plus an explicit cardinality hint; cross-link helpers (`icn_gossip::anti_entropy::to_bloom_projection` / `to_bloom_filter_data`) preserve byte-level membership across the boundary. None of these wire shapes mutates protocol topics, emits probes, or adds a new ADR-0026 receipt class — the kernel record is an evidence envelope, not a top-level receipt. The remaining identifiers below remain design-level names; `DivergenceEvidence` / `RepairPlan` / `RepairReceipt` are tracked under `#1835`, the fixture loop under `#1838`.
+
+- **`AntiEntropyProbe`** — the probing message: state class, target scope, bounded digest, trigger source, freshness, signature. **Wire-stable** (`#1834`).
+- **`StateDigest`** — a bounded representation of a state class at a freshness instant; concrete forms include Bloom filter (existing `BloomFilter`), Merkle root, vector clock, or short digest list. **Wire-stable** (`#1834`).
+- **`ReceiptDigest`** — a `StateDigest` specialized to a receipt index. **Wire-stable** (`#1834`).
+- **`ArtifactDigest`** — a `StateDigest` specialized to an artifact-registry entry or scoped-vault reference; never the artifact body. **Wire-stable** (`#1834`).
 - **`PeerSyncReport`** — the comparison result: matching / missing on local / missing on remote / divergent / unknown.
 - **`DivergenceEvidence`** — classified non-matching outcome; records class, scope, peers, digest forms, policy clause, freshness, private-content implication flag.
 - **`RepairPlan`** — repair action, authority basis, scope, boundary rules, expected `RepairReceipt` class.
