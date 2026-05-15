@@ -7,7 +7,7 @@ Last Reviewed: 2026-05-14
 
 # Artifact Registry and Scoped Vault — boundary, v0 design
 
-> **Status: spec, work-in-progress.** Defines the design-level shape of `ArtifactRegistry` v0 (the institutional record of content-addressed artifacts and their metadata) and `ScopedVault` (the privacy-enforced container for restricted objects). Names how documents, compute outputs, evidence packets, private evidence, and mobile cache fit. Reuses existing canonical types (`Hash`, `Did`, `Signature`, `StorageClass`, `DataLocality`, `ArtifactReceipt` from `icn-kernel-api`; `PrivacyClass` / `DisclosurePolicy` / `AccessReceipt` from `#1792`; `StorageSpec` / `BackupPolicy` / `RetentionPolicy` from `#1816`) and explicitly defers wire-stable schema, encryption / key model, and storage-backend implementation. The PR introducing this doc advances `#1798` without closing it.
+> **Status: spec, work-in-progress.** Defines the design-level shape of `ArtifactRegistry` v0 (the institutional record of content-addressed artifacts and their metadata) and `ScopedVault` (the privacy-enforced container for restricted objects). Names how documents, compute outputs, evidence packets, private evidence, and mobile cache fit. Reuses existing canonical types verbatim (`Hash`, `Did`, `Signature`, `StorageClass`, `DataLocality`, `ArtifactReceipt` from `icn-kernel-api`; `StorageSpec` / `BackupPolicy` / `ReplicationPolicy` / `RecoveryPolicy` / `ArchivePolicy` / `IntegrityPolicy` from `#1816`). Cross-links the **forward-direction** `PrivacyClass` / `DisclosurePolicy` / `PrivateObjectRef` / `AccessReceipt` / `ExportReceipt` / `RedactionMap` vocabulary proposed under `#1792` (still forward-direction at the time of writing — and distinct from existing `PrivacyClass` enums in code; see §"`ScopedVault` (object outline)" for the naming-collision surface this spec keeps explicit). Explicitly defers wire-stable schema, encryption / key model, and storage-backend implementation. The PR introducing this doc advances `#1798` without closing it.
 
 ## Purpose
 
@@ -16,7 +16,7 @@ Storage in ICN should mean **sovereign institutional memory**, not files in an a
 - **Artifact / blob store** — the content-addressed memory of artifacts the institution produces and reads. Tracked under #1798.
 - **Scoped vault / private storage** — the privacy-enforced container for restricted objects. Tracked under #1798 (and #1767 for encryption, #1792 for disclosure).
 
-This spec defines the design-level shape of both, and the boundary between them. It does not define schema, wire format, encryption, or storage-backend implementation. It does name how the existing receipt envelope (ADR-0026 Layer 2 `ArtifactReceipt`), the existing privacy taxonomy (`#1792`'s `PrivacyClass` / `DisclosurePolicy` / `PrivateObjectRef` / `AccessReceipt`), and the existing durability policy objects (`#1816`'s `StorageSpec` / `BackupPolicy` / `RetentionPolicy` / etc.) compose with the new `ArtifactRegistry` and `ScopedVault` records.
+This spec defines the design-level shape of both, and the boundary between them. It does not define schema, wire format, encryption, or storage-backend implementation. It does name how the existing receipt envelope (ADR-0026 Layer 2 `ArtifactReceipt`), the forward-direction privacy / disclosure vocabulary proposed under `#1792` (`PrivacyClass` / `DisclosurePolicy` / `PrivateObjectRef` / `AccessReceipt`), and the merged durability policy objects (`#1816`'s `StorageSpec` / `BackupPolicy` / `ReplicationPolicy` / `RecoveryPolicy` / `ArchivePolicy` / `IntegrityPolicy`) compose with the new `ArtifactRegistry` and `ScopedVault` records. Note: `#1816` does **not** define a separate `RetentionPolicy` object — retention is a field inside `BackupPolicy` (retention window) and `ArchivePolicy` (retention horizon). And `#1792`'s seven-variant `PrivacyClass` taxonomy is forward-direction; the codebase already exports a different `PrivacyClass` enum (`icn-kernel-api/src/compute.rs:217` with three variants — `Public` / `Member` / `NeedToKnow` — and a separate two-variant enum in `icn-boundary/src/types.rs:30`), which this spec keeps separate from `#1792`'s proposed taxonomy.
 
 The four merged sibling architecture specs each reference #1798 as the home for this boundary:
 
@@ -34,8 +34,8 @@ This spec gives those names design-level shape.
 - Not an encryption implementation. The vault's "encryption / key model" field is a **placeholder**; specifics are deferred to `#1767`.
 - Not a blob migration. Existing `blob_store` (in `icn/crates/icn-store/src/blob_store.rs`) continues to operate; the spec names what an artifact record points to, not how the bytes move.
 - Not a redefinition of `ArtifactReceipt` (the existing Layer 2 receipt type in `icn-kernel-api/src/proofs.rs:30`). The receipt proves a blob transfer; the registry records that an artifact exists and what governs it. These are distinct concepts (see §"`ArtifactReceipt` vs `ArtifactRegistry`" below).
-- Not a redefinition of `PrivacyClass`, `DisclosurePolicy`, `PrivateObjectRef`, `AccessReceipt`, `ExportReceipt`, or `RedactionMap`. Those are defined under `#1792`; this spec uses them verbatim.
-- Not a redefinition of `StorageClass`, `DataLocality`, `StorageSpec`, `BackupPolicy`, `RetentionPolicy`, or the other durability policy objects. Those are defined under `#1816`; this spec references them.
+- Not a redefinition of `PrivacyClass`, `DisclosurePolicy`, `PrivateObjectRef`, `AccessReceipt`, `ExportReceipt`, or `RedactionMap`. Those are proposed (forward-direction) under `#1792`; this spec references the proposed names without redefining them. The existing `PrivacyClass` enums in code (`icn-kernel-api/src/compute.rs:217`, `icn-boundary/src/types.rs:30`) are distinct from `#1792`'s proposed seven-variant taxonomy; reconciliation is forward work and out of scope here.
+- Not a redefinition of `StorageClass`, `DataLocality`, `StorageSpec`, `BackupPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, or `IntegrityPolicy`. Those are defined under `#1816` (`docs/spec/storage-durability-policies.md`, merged via PR #1823); this spec references them. `#1816` does **not** define a separate `RetentionPolicy` object — retention is a field inside `BackupPolicy` and `ArchivePolicy`.
 - Not authority to mutate DNS, K3s, Forgejo, identity-bridge, gateway, blob storage backends, or any deployed infrastructure.
 - Not a production-readiness or live-federation claim.
 - Not closure of `#1798`. The PR introducing this doc uses `Refs:`; closure is left for separate review against the issue's six acceptance criteria.
@@ -89,7 +89,7 @@ Fields at design granularity (no Rust type, no JSON schema, no field order fixed
 **Policy references**
 
 - **`access_policy_ref`** — Pointer to the `DisclosurePolicy` (per `#1792`) that governs who may read this artifact under what authority.
-- **`retention_policy_ref`** — Pointer to the `RetentionPolicy` / `BackupPolicy` / `ArchivePolicy` set (per `#1816`) that governs this artifact's durability and retention horizon.
+- **`retention_policy_ref`** — Pointer to the durability policy set that governs this artifact's retention. `#1816` carries retention as fields inside `BackupPolicy` (retention window) and `ArchivePolicy` (retention horizon); the artifact's `retention_policy_ref` resolves to one or both of those policies adopted by the owning domain, not to a separate `RetentionPolicy` object.
 
 **Receipts**
 
@@ -102,13 +102,13 @@ Fields at design granularity (no Rust type, no JSON schema, no field order fixed
 
 **Exportability**
 
-- **`exportability`** — Class indicating whether and how this artifact may be exported: `Public-portable`, `Member-portable-with-receipt`, `Scope-restricted`, `Vault-only-with-redaction`, `Not-exportable`. Exportability inherits from the `DisclosurePolicy` and the `RetentionPolicy`; the registry record names the resulting class for quick reference.
+- **`exportability`** — Class indicating whether and how this artifact may be exported: `Public-portable`, `Member-portable-with-receipt`, `Scope-restricted`, `Vault-only-with-redaction`, `Not-exportable`. Exportability inherits from the `DisclosurePolicy` and from `BackupPolicy` / `ArchivePolicy` retention horizons; the registry record names the resulting class for quick reference.
 
 **Invariants:**
 
 - An artifact MUST NOT be registered without a `content_hash` and `blob_location`. A record with neither is not an artifact; it is a placeholder, and the chain MUST refuse it.
 - An artifact MUST carry an `access_policy_ref` and a `retention_policy_ref` (or an explicit acknowledgement of `none` where the policy intentionally allows it, e.g., for purely public artifacts whose retention is "indefinite, public-by-policy").
-- An artifact's `scope` MUST match (or be wider than) the authority basis named in `provenance_refs`. A workload cannot register an artifact into a scope it does not have authority over.
+- An artifact's `scope` MUST match (or be **narrower** than) the authority basis named in `provenance_refs`. A workload cannot register an artifact into a scope wider than the authority it acts under. (Earlier draft said "wider than"; that was inverted — authority is the upper bound, scope is what the actor is permitted to write into.)
 - Reversal / supersession is a new version, not a mutation. The registry is append-only.
 
 ## `ScopedVault` (object outline)
@@ -124,13 +124,15 @@ Fields at design granularity:
 
 **Privacy and disclosure**
 
-- **`privacy_class`** — One of `Public` / `MembersOnly` / `ScopeRestricted` / `PrivateOverlay` / `SecretCredential` / `ExternalCustodian` / `SealedUntil` (per `#1792`). The vault's privacy class is the upper bound for everything it holds; an artifact entering the vault inherits at least the vault's privacy class.
+- **`privacy_class`** — A class from the **forward-direction** seven-variant taxonomy proposed under `#1792`: `Public` / `MembersOnly` / `ScopeRestricted` / `PrivateOverlay` / `SecretCredential` / `ExternalCustodian` / `SealedUntil`. The vault's privacy class is the upper bound for everything it holds; an artifact entering the vault inherits at least the vault's privacy class.
+
+  **Naming collision note.** Two unrelated `PrivacyClass` enums already exist in code: `icn/crates/icn-kernel-api/src/compute.rs:217` (`Public` / `Member` / `NeedToKnow`, used by compute workload manifests) and `icn/crates/icn-boundary/src/types.rs:30` (`Public` / `EncryptedOverlay`, used at the boundary layer). The `#1792` taxonomy this `ScopedVault` field uses is a **third, broader naming** intended for the disclosure / vault domain — it is **not** the same enum as either of the in-code types, and `#1792` itself is still forward-direction (the seven variants are proposed, not implemented). The eventual implementation tranche for `ScopedVault` will need to decide whether (a) `#1792` ships a separate `DisclosureClass` enum, (b) the existing `kernel-api::PrivacyClass` is widened to seven variants, or (c) both coexist with a typed conversion. That decision belongs to the implementation tranche, not to this design spec. This field reads against the `#1792` proposal until then.
 - **`encryption_key_model_placeholder`** — Where the vault's encryption model would be named. **Specifics are deferred to `#1767`** (encrypted distributed private-overlay storage). This spec names the placeholder slot; it does not specify the cipher, key custody, rotation, or recovery protocol.
 
 **Access and retention**
 
 - **`access_policy`** — Pointer to or inline `DisclosurePolicy` (per `#1792`) carrying `visibility`, `allowed_scopes`, `redaction_rules`, `access_request_path`.
-- **`retention_policy`** — Pointer to the `RetentionPolicy` / `BackupPolicy` / `ArchivePolicy` set (per `#1816`) that governs vault retention. Note: a vault entry's `BackupPolicy` inherits the vault's `privacy_class` and MUST NOT broaden disclosure (per `#1816` §"Locality and privacy inheritance").
+- **`retention_policy`** — Pointer to the durability policy set that governs vault retention. `#1816` defines retention as fields inside `BackupPolicy` (retention window) and `ArchivePolicy` (retention horizon); the vault's `retention_policy` resolves to one or both of those policies adopted by the owning domain, not to a separate `RetentionPolicy` object. A vault entry's `BackupPolicy` inherits the vault's `privacy_class` and MUST NOT broaden disclosure (per `#1816` §"Locality and privacy inheritance").
 - **`backup_export_policy`** — Specific subset of the retention policy that names when and how vault material may be backed up or exported, and what authority is required.
 
 **Receipts**
@@ -270,7 +272,7 @@ Per #1798's fifth acceptance criterion ("Spec identifies first safe implementati
 Why this slice first:
 
 - The `Document` class has the most active need (per `#1536`'s typed institutional memory).
-- A read-only registry surface exercises the metadata model without committing to write paths (which need the `RetentionPolicy` and `BackupPolicy` from `#1816` to be implemented first).
+- A read-only registry surface exercises the metadata model without committing to write paths (which need `BackupPolicy` and `ArchivePolicy` from `#1816` to be implemented first; those policies carry the retention fields that the artifact's `retention_policy_ref` resolves to).
 - It does not require `ScopedVault` implementation: documents in this slice are public-by-policy or members-only (not vault-backed). Vault-backed artifact classes (`PrivateEvidence`) are deferred to the slice after `#1767` lands.
 - It does not require encryption (`#1767` not yet implemented).
 - Steward cockpit (`#1795`) is the natural first reader; member shell (`#1818`) is the second reader.
@@ -283,7 +285,7 @@ Cross-link, do not duplicate.
 
 | Concern | Where it lives |
 |---|---|
-| Storage durability policies (`StorageSpec`, `BackupPolicy`, `RetentionPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy`) | `docs/spec/storage-durability-policies.md` (`#1816`, merged via PR #1823). |
+| Storage durability policies (`StorageSpec`, `BackupPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy` — retention is a field inside `BackupPolicy` / `ArchivePolicy`, not a separate `RetentionPolicy` object) | `docs/spec/storage-durability-policies.md` (`#1816`, merged via PR #1823). |
 | Governed service binding (`StorageSpec` lives in the binding) | `docs/spec/governed-service-binding.md` (`#1815`, merged via PR #1822). |
 | `InstitutionalDomain` + `DomainPolicy` (the domain adopts vault + artifact policies) | `docs/spec/institutional-domain.md` (`#1820`, merged via PR #1820). |
 | Effect dispatch contract (Stage 5 evidence; receipt classes) | `docs/spec/effect-dispatch-contract.md` (`#1819`, merged via PR #1819). |
@@ -323,7 +325,7 @@ Cross-link, do not duplicate.
 
 - This document does not introduce `ArtifactRegistry` or `ScopedVault` as Rust types. They remain forward-direction.
 - It does not introduce schema, wire format, or contract changes.
-- It does not redefine `ArtifactReceipt` (the existing Layer 2 receipt) or any of the other types it references (`PrivacyClass`, `DisclosurePolicy`, `PrivateObjectRef`, `AccessReceipt`, `ExportReceipt`, `RedactionMap`, `StorageClass`, `DataLocality`, `StorageSpec`, `BackupPolicy`, `RetentionPolicy`).
+- It does not redefine `ArtifactReceipt` (the existing Layer 2 receipt) or any of the other types it references — kernel-api types (`Hash`, `Did`, `Signature`, `StorageClass`, `DataLocality`); forward-direction `#1792` proposals (`PrivacyClass`, `DisclosurePolicy`, `PrivateObjectRef`, `AccessReceipt`, `ExportReceipt`, `RedactionMap`); merged `#1816` policy objects (`StorageSpec`, `BackupPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy`). The spec also does not invent a `RetentionPolicy` object; `#1816` does not define one (retention lives inside `BackupPolicy` and `ArchivePolicy`).
 - It does not specify encryption, key custody, or the distributed private-overlay protocol. Those are tracked under `#1767`.
 - It does not authorize mutation of any deployed infrastructure (DNS, K3s, Forgejo, identity-bridge, gateway, blob storage backends).
 - It does not claim production readiness.

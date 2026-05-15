@@ -6,7 +6,7 @@ Define `ArtifactRegistry` v0 (the institutional record of content-addressed arti
 
 ## Decisive Test
 
-Can a downstream implementer — looking only at this spec plus the canon it harmonizes with — name (1) what the registry holds at design granularity (16 fields), (2) what the vault holds (10 fields), (3) how `ArtifactReceipt` (existing Layer 2 receipt) is distinct from the new `ArtifactRegistry` (the metadata record), (4) which canonical types are reused verbatim (`PrivacyClass` from #1792, `StorageSpec` / `BackupPolicy` / `RetentionPolicy` from #1816, `ArtifactReceipt` from ADR-0026, etc.), (5) the closed `artifact_class` taxonomy and how each class connects to its source spec, (6) the six integration points (documents, compute outputs, evidence packets, private evidence, cache, replication), (7) the first safe implementation slice? If yes, the spec has done its job.
+Can a downstream implementer — looking only at this spec plus the canon it harmonizes with — name (1) what the registry holds at design granularity (16 fields), (2) what the vault holds (10 fields), (3) how `ArtifactReceipt` (existing Layer 2 receipt) is distinct from the new `ArtifactRegistry` (the metadata record), (4) which canonical types are reused verbatim — kernel-api types (`Hash`, `Did`, `Signature`, `StorageClass`, `DataLocality`, `ArtifactReceipt`), merged `#1816` policy objects (`StorageSpec`, `BackupPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy`), forward-direction `#1792` proposals (`PrivacyClass`, `DisclosurePolicy`, `PrivateObjectRef`, `AccessReceipt`, `ExportReceipt`, `RedactionMap`) — and which are explicitly not invented here (no `RetentionPolicy` object in `#1816`; `#1792`'s seven-variant `PrivacyClass` is forward-direction, separate from existing `PrivacyClass` enums in `icn-kernel-api/src/compute.rs` and `icn-boundary/src/types.rs`), (5) the closed `artifact_class` taxonomy and how each class connects to its source spec, (6) the six integration points (documents, compute outputs, evidence packets, private evidence, cache, replication), (7) the first safe implementation slice? If yes, the spec has done its job.
 
 ---
 
@@ -19,16 +19,16 @@ Can a downstream implementer — looking only at this spec plus the canon it har
 ### Open PRs
 | PR | Branch | State | CI Status | Blocker |
 |----|--------|-------|-----------|---------|
-| (this session's) | `spec/artifact-registry-and-scoped-vault` | local at head pending push | Initial CI runs on PR creation | Awaiting initial CI |
+| #1824 | `spec/artifact-registry-and-scoped-vault` | OPEN | All required checks passed on commit `91670761a` (the initial spec push). A review-feedback fix commit follows this handoff edit and must re-run CI before merge. | Awaiting CI re-run on the fix commit, then mergeability re-check. |
 | #1790 | dependabot (pilot-ui dev deps) | OPEN | n/a | Out of session scope |
 | #1791 | dependabot (ts-sdk dev deps) | OPEN | n/a | Out of session scope |
 
 ### Branches
-- `spec/artifact-registry-and-scoped-vault` — local; about to be pushed. Initial spec commit forthcoming after this handoff is committed.
-- Local `main` synced to `5461fd91d` (unchanged this session beyond branching).
+- `spec/artifact-registry-and-scoped-vault` — pushed to origin. Last verified head before this fix: `91670761a`. The head moves with each push; check `git rev-parse HEAD` after the next push for the current SHA.
+- Local `main` advanced to `1842e9839` after PR #1825 (entity-scope vocabulary boundary) merged.
 
 ### Issues
-- `#1798` — OPEN. This session writes the candidate spec doc. PR will use `Refs:`, not `Closes:`.
+- `#1798` — OPEN. PR #1824 uses `Refs:`, not `Closes:`.
 - `#1816` — OPEN (deferred closure decision; merged via PR #1823).
 - `#1815`, `#1817`, `#1820`, `#1819`, `#1814` — sibling spec parent issues, all OPEN per the user's deferred-closure pattern.
 - `#1767`, `#1792`, `#1799`, `#1801`, `#1818`, `#1748`, `#1634`, `#1536`, `#1795`, `#1438` — sibling and forward-direction issues, all OPEN.
@@ -64,7 +64,7 @@ Proactively. INDEX.md's Specifications section now lists all seven recent specs 
 
 ### 4. Regenerated `docs/DOCUMENT_REGISTRY.md`
 
-Via `python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict --write-document-registry docs/DOCUMENT_REGISTRY.md`. Diff is small (corpus 806 → 807 markdown files; explicit rows updated; `Last Reviewed` 2026-05-14).
+Via `python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict --write-document-registry docs/DOCUMENT_REGISTRY.md`. Diff is small (corpus 805 → 807 markdown files — two new files added by this PR: the spec doc and the handoff; explicit rows updated; `Last Reviewed` 2026-05-14).
 
 ### 5. Followed all prior review-cycle lessons proactively
 
@@ -74,7 +74,7 @@ Via `python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry
 - Foundational canon (`storage-governance-spec.md`) named SEPARATELY from merged sibling specs (lesson from #1823 Copilot review).
 - The `ArtifactReceipt` vs `ArtifactRegistry` name-collision distinction surfaced front-and-center (lesson from the Codex P2 catch on #1822 PrivacyClass naming).
 - Verified all 26 cross-link targets exist before commit.
-- Used canonical vocabulary verbatim: `Hash`, `Did`, `Signature`, `StorageClass`, `DataLocality`, `StorageValidationError`, `PrivacyClass`, `DisclosurePolicy`, `PrivateObjectRef`, `AccessReceipt`, `ExportReceipt`, `RedactionMap`, `StorageSpec`, `BackupPolicy`, `RetentionPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy`, `ArtifactReceipt`, `GovernanceProof`, `GovernanceDecisionReceipt`, `Mandate`, `AuthorityClass`, `EffectManifest`, `ComputeReceipt`, `DomainPolicy`, `GovernedServiceBinding`, `WorkloadManifest`.
+- Used canonical vocabulary verbatim: from kernel-api — `Hash`, `Did`, `Signature`, `StorageClass`, `DataLocality`, `StorageValidationError`, `ArtifactReceipt`; from merged `#1816` — `StorageSpec`, `BackupPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy` (`#1816` does **not** define `RetentionPolicy`); from forward-direction `#1792` — `PrivacyClass`, `DisclosurePolicy`, `PrivateObjectRef`, `AccessReceipt`, `ExportReceipt`, `RedactionMap` (treated as proposed names, not existing types); plus `GovernanceProof`, `GovernanceDecisionReceipt`, `Mandate`, `AuthorityClass`, `EffectManifest`, `ComputeReceipt`, `DomainPolicy`, `GovernedServiceBinding`, `WorkloadManifest` from the rest of the canon.
 - Forbidden vocabulary appears only in the explicit anti-claim sentence in §"Non-claims."
 - Handoff in HANDOFF_TEMPLATE.md format with truthful Final State (the lesson from #1820/#1822/#1823 reviews — no "PR not yet open" / "expected number" / "OPEN after push" / "local at head pending push" provisional language). Note: this section is labeled "Final State (Verified)" before the PR exists; the next session edits this section to record the verified PR number, head SHA, and CI history after the PR is opened (the pattern repeated across the prior six PRs' first commit-then-fix cycle).
 - Acknowledged the AGENTS.md vs HANDOFF_TEMPLATE.md handoff-path drift (carried from #1820 review). Not in this PR's scope.
@@ -112,7 +112,8 @@ Per the established pattern. Seven titles in §"Next Move" below.
 - **`PrivacyClass` taxonomy from #1792 is still 7 variants (`Public` / `MembersOnly` / `ScopeRestricted` / `PrivateOverlay` / `SecretCredential` / `ExternalCustodian` / `SealedUntil`).** Verified via the Explore agent's read of the issue body. If a follow-up draft has amended that enum, my privacy-class references need a re-read.
 - **`#1536` proposes `InstitutionalDocument` with `doc_type` field.** Verified via the Explore agent's read of the issue body. If `#1536` has been amended to use a different shape, my `Document` artifact-class description needs adjustment.
 - **`#1767` is forward work; no encryption / key-model code exists.** Verified by the Explore agent's grep. If a parallel PR is adding `#1767`-related code, my "encryption_key_model_placeholder" framing may need to become more concrete.
-- **No `ArtifactRegistry` / `ScopedVault` / `PrivateObjectRef` / `PrivacyClass` enum / `DisclosurePolicy` / `AccessReceipt` (generic) / `ExportReceipt` / `RedactionMap` / `RetentionPolicy` types exist in code today.** Verified by grep. If a parallel in-flight PR is adding any of these, my "forward-direction" framing for those names is wrong.
+- **`ArtifactRegistry`, `ScopedVault`, `PrivateObjectRef`, `DisclosurePolicy`, generic `AccessReceipt`, `ExportReceipt`, `RedactionMap` do not exist in code today.** Verified by grep. — **Correction (added 2026-05-14, in response to Copilot review):** the original Unsafe Assumption claimed "no `PrivacyClass` enum exists in code." That was wrong. Two `PrivacyClass` enums already exist: `icn/crates/icn-kernel-api/src/compute.rs:217` (variants `Public` / `Member` / `NeedToKnow`, used by compute workload manifests; this is the same enum the Codex P2 catch surfaced on PR #1822) and `icn/crates/icn-boundary/src/types.rs:30` (variants `Public` / `EncryptedOverlay`). The seven-variant taxonomy proposed under `#1792` is a third interpretation; reconciliation is forward work. The spec body now surfaces the naming collision explicitly in §"`ScopedVault` (object outline)" → `privacy_class`, and the registry description reflects the same correction.
+- **`RetentionPolicy` is NOT a distinct policy object in `#1816`.** Originally I framed `RetentionPolicy` as one of the merged storage-durability policy objects. That was wrong: `#1816` defines `StorageSpec` / `BackupPolicy` / `ReplicationPolicy` / `RecoveryPolicy` / `ArchivePolicy` / `IntegrityPolicy`. Retention is a **field** inside `BackupPolicy` (retention window) and `ArchivePolicy` (retention horizon), not its own object. The spec, registry description, and §"Relationship to sibling work" table have been corrected; the field name `retention_policy_ref` is retained as a descriptive identifier (a reference to whatever set of policies governs retention for the artifact / vault), but the surrounding text now correctly names which policy objects it resolves to.
 - **`storage-durability-policies.md` (merged via #1823) is unchanged on `main` since its merge.** Read post-merge but did not diff against the most recent main HEAD. If an in-flight follow-up amends its §"Storage class model" rows, my cross-references may shift.
 - **The 26 cross-link targets exist at session start.** Verified by file-existence sweep before committing. If a downstream PR renames or removes one before `#1798` lands, the spec's link will rot.
 
