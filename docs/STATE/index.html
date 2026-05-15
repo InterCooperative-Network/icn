@@ -38,6 +38,54 @@
 </script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>STATE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/STATE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN State (living doc)</h1>
+<!-- [sync edit] 2026-05-15 (post architecture-spec sprint, PRs #1814 / #1819 / #1820 / #1821 / #1822 / #1823 / #1824 / #1825 / #1826 / #1827 / #1829 / #1830 / #1831 / #1832 / #1833):
+     Truth-sync for the architecture-spec sprint completion. **Doc/control-plane only**: no Rust code, no schema fields changed, no new contract URN, no new ADR, no new RFC, no new ADR-0026 receipt class, no kernel/gateway/runtime mutation, no K3s/DNS/Forgejo mutation, no NYCN partner data, no production-readiness claim, no live-federation claim, no formal NYCN pilot claim, no Phase 2 completion claim.
+
+     The sprint landed thirteen design-level architecture-spec PRs over 2026-05-14 → 2026-05-15:
+       - #1814 docs(architecture): integrated cooperative operating model spine (the ladder root).
+       - #1819 docs(spec): accepted-proposal effect dispatch contract (closed #1797 on merge).
+       - #1820 docs(spec): institutional domain and policy primitive.
+       - #1821 docs(spec): CCL policy registry and hook contract.
+       - #1822 docs(spec): governed service binding, workload manifest, and runtime provider.
+       - #1823 docs(spec): storage durability policy objects.
+       - #1824 docs(spec): ArtifactRegistry v0 and ScopedVault boundary.
+       - #1825 docs(architecture): entity-scope vocabulary boundary (LocalDomain not Coop).
+       - #1826 docs(spec): compute placement policy.
+       - #1827 docs(agents): reconcile handoff path with template (process-doc).
+       - #1829 docs(spec): network anti-entropy proof loops.
+       - #1830 docs(spec): member shell v0.
+       - #1831 docs(spec): steward cockpit v0 (drift-fix follow-up landed as #1832 after late post-merge reviewer feedback).
+       - #1832 fix(spec): correct steward cockpit review drift (four rounds of fixes: 8→9 field count, ADR-0027 14-field requirement, PlacementFallbackReceipt attribution + handoff timing, IA-row no longer routes through ADR-0027).
+       - #1833 docs(dev): wrap architecture spec sprint closure review (the sprint closure handoff with paste-ready closure-comment drafts, deduplicated follow-up roster, and recommended next-decision sequence).
+
+     Following #1833 the closure batch landed: nine sprint sibling issues closed with the paste-ready closure comments — #1794 (institutional domain), #1795 (steward cockpit), #1798 (ArtifactRegistry/ScopedVault), #1799 (network anti-entropy), #1801 (compute placement), #1815 (governed service binding), #1816 (storage durability), #1817 (CCL policy registry), #1818 (member shell v0). #1797 (effect dispatch) was already closed by #1819. All ten sprint sibling issues are now CLOSED at docs/spec level; none of the closures implies runtime-implementation completion.
+
+     First-batch follow-up issues filed from the deduplicated wrap-up roster (seven of the wrap-up's thirty-four drafts):
+       - #1834 schema(network): define AntiEntropyProbe and StateDigest records.
+       - #1835 schema(network): define DivergenceEvidence and RepairPlan records.
+       - #1836 schema(compute): wire-stable PlacementDecision and ExecutorAdmissionDecision schemas.
+       - #1837 spec(contracts): define steward required-action card contract (the #1831/#1832 gap — ADR-0027 is member-only; steward cards need a separate or amended contract).
+       - #1838 test(devnet): receipt-index anti-entropy fixture (Slice A).
+       - #1839 test(devnet): member shell read-only rendering rehearsal (Slice A).
+       - #1840 test(devnet): steward cockpit divergence-render fixture (Slice A).
+     Twenty-seven additional follow-up drafts remain in the wrap-up doc's deduplicated roster for separate batch decisions.
+
+     Cross-sprint disciplines preserved verbatim:
+       - No new ADR-0026 receipt classes. The sprint introduced design-level proof-artifact identifiers (PlacementDecision, RepairReceipt, DivergenceEvidence, PlacementFallbackReceipt, etc.) that ride inside existing Stage 5 EffectDispatchEvidence or Layer 2 ArtifactReceipt envelopes.
+       - No ADR-0027 support for steward required-action cards. ADR-0027 covers member ActionCards; the steward cockpit's fourteen operator scenarios cannot be represented by its closed enums. #1837 carries the gap.
+       - LocalDomain vocabulary (not Coop) per #1825 §C3. Existing serialized Coop-prefixed identifiers (DataLocality::CoopReplicated, ADR-0030 Coop(coop_id), bonds:payments gossip topic) are preserved with naming notes pending the rename follow-up.
+       - Execution budget is policy-facing; fuel_limit is the runtime field; capacity is reserved for executor/node resource availability.
+       - Settlement / position / obligation / allocation / receipt / provenance — never payment / wallet / currency / balance / token / crypto / blockchain / timebank — for ICN-native compute / settlement / federation surfaces.
+       - Member shell shows plain participation status; steward cockpit shows technical detail. When cockpit shows degraded, member shell must show degraded too — v0 violation otherwise (#1831 Design principle 9 + failure-table row).
+       - Privacy is posture, not content. Body bytes of PrivateEvidence artifacts never reach any rendering layer.
+       - The kernel never imports app-side rendering. Member shell, steward cockpit, and policy oracle outputs are all app-side per docs/architecture/KERNEL_APP_SEPARATION.md.
+
+     Phase 2 status remains ⏳ (still partner-bound). The Phase 2 *machinery* is now substantially richer at the design-level layer (twelve merged specs covering institutional domain, effect dispatch, CCL registry, governed service binding, storage durability, ArtifactRegistry/ScopedVault, scope vocabulary, compute placement, anti-entropy proof loops, member shell, steward cockpit); what remains for Phase 2 is the human procedure — present, formalize, rehearse against organizer material — plus the implementation work the follow-up roster names. The next concrete human gate is unchanged from the prior sync: organizer presentation → pilot formalization → first operator rehearsal per the NYCN rehearsal gate (in the partner repo).
+
+     Next pre-RFC architecture move is **not yet selected**; this sync preserves optionality. Candidate next moves enumerated descriptively only (not selected here): (a) batch-file the remaining twenty-seven follow-up drafts from the wrap-up roster; (b) implementation slice — `feat(compute): policy oracle for placement decisions (read-only proof-loop)` per #1826's named first implementation slice; (c) first fixture rehearsal — pick one of the three already-filed Slice A fixtures (#1838 / #1839 / #1840); (d) next spec-ladder doc — #1837 steward required-action card contract; (e) DAP runtime dogfood emitting at least one receipt under ADR-0026 for one DAP primitive (carried from previous sync); (f) idea-0019 runtime dogfood emitting additional ProcessTransitionReceipt classes (carried from previous sync); (g) idea-0019 visibility/privacy-boundary run with redaction in evidence export (carried); (h) idea-0019 accessibility-gate ProcessGateResult on a real surface (carried); (i) idea-0019 open-question triage (carried). Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
+
+     Hard rule preserved: this sync does NOT change any contract field, does NOT mint a new contract URN, does NOT add an ADR, does NOT add an RFC, does NOT widen gateway typed governance imports, does NOT increase the meaning-firewall ratchet, does NOT touch K3s / DNS / GitHub / Forgejo state, does NOT handle private partner / member / organizer data, does NOT claim Phase 2 completion, does NOT claim formal NYCN pilot, does NOT claim production readiness, does NOT claim live federation, does NOT start runtime work, and does NOT start any Stage 1.5 / Stage 2 / Stage 3 / Stage 4 / Stage 5 work. Phase model unchanged. -->
+
 <!-- [sync edit] 2026-05-07 (post-#1761 / #1762 / #1763 / #1764):
      Truth-sync for the May-7 close-out cycle plus the ActionCard
      contract publication landing. This is **doc/control-plane only**:
@@ -681,8 +729,11 @@ View source on GitHub →
      Aligned crate list, merged PRs, and metrics to verified repo state.
      Phase model unchanged — phase classification is governance territory (PR C). -->
 
-<h2>Current status (2026-05-07 snapshot)</h2>
-<p><strong>Current phase:</strong> Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate definition lives in the partner NYCN repo. The Phase 2 <em>machinery</em> is in place end-to-end; what remains is the human procedure — present, formalize, rehearse — and recording each step.</p>
+<h2>Current status (2026-05-15 snapshot)</h2>
+<p><strong>Current phase:</strong> Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery + the now-complete architecture-spec ladder to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate definition lives in the partner NYCN repo. The Phase 2 <em>machinery</em> is in place end-to-end at the runtime layer; the <em>contract</em> layer is now substantially richer at the design-level after the May-14/May-15 architecture-spec sprint. What remains is the human procedure — present, formalize, rehearse — and recording each step, plus the implementation work the closure batch&#39;s follow-up roster names.</p>
+<p>The 2026-05-14 → 2026-05-15 architecture-spec sprint landed thirteen design-level spec PRs plus one process-doc PR plus one wrap-up PR (fifteen PRs total): #1814 integrated cooperative operating model spine, #1819 accepted-proposal effect dispatch contract (closed #1797 on merge), #1820 institutional domain and policy primitive, #1821 CCL policy registry and hook contract, #1822 governed service binding / workload manifest / runtime provider, #1823 storage durability policy objects, #1824 ArtifactRegistry v0 and ScopedVault boundary, #1825 entity-scope vocabulary boundary (LocalDomain not Coop), #1826 compute placement policy, #1827 reconciled the AGENTS.md handoff path with the actual template convention, #1829 network anti-entropy proof loops, #1830 member shell v0, #1831 steward cockpit v0, #1832 steward cockpit drift fix (four rounds of post-merge fixes addressing late reviewer feedback that landed after #1831 merged), and #1833 architecture-spec sprint closure-review wrap-up. After #1833 merged, the nine remaining sprint-related sibling issues were closed at the docs/spec level: #1794, #1795, #1798, #1799, #1801, #1815, #1816, #1817, #1818. The first batch of follow-up issues from the wrap-up&#39;s deduplicated roster was filed (#1834–#1840): three schema follow-ups (AntiEntropyProbe/StateDigest, DivergenceEvidence/RepairPlan, PlacementDecision/ExecutorAdmissionDecision), the steward required-action card contract (#1837 — the ADR-0027-doesn&#39;t-cover-operator-scenarios gap surfaced by #1831 / #1832), and three first-slice fixture follow-ups (anti-entropy Slice A, member shell Slice A, cockpit Slice A). Twenty-seven additional follow-up drafts remain in the wrap-up doc&#39;s deduplicated roster for separate batch decisions.</p>
+<p>No closure of any sprint sibling issue implies runtime-implementation completion: every closure comment names the docs/spec-level scope explicitly. The deferred items (DataLocality::CoopReplicated rename, FuelLimit/fuel_limit code-level alignment with the <code>execution budget</code> policy-facing term, payment_rate/payment_currency legacy reconciliation on ComputeTask, PrivacyClass taxonomy reconciliation between ADR-0030 and the in-code variants, bonds:payments gossip-topic legacy preservation, AGENTS.md auto-commit-handoff behavioral rule reconciliation) are all carried in the wrap-up roster and remain explicit out-of-scope for the sprint closure. Phase 2 status is unchanged; the sprint did not implement, deploy, or claim partner pilot.</p>
+<p>The prior May-7 close-out cycle context is preserved below.</p>
 <p>The May-7 close-out cycle landed: #1761 closed the surfaced sled-flusher race (#1760), #1762 truth-synced STATE.md and PHASE_PROGRESS.md for the opaque receipt storage stack, #1763 / #1735 bumped Dependabot dev dependencies, and #1764 published the generic ActionCard contract surface for institution packages (bundled fictional example + draft-2020-12 validator script + expanded README mirroring the convention used by <code>validate-preview-review.py</code> and <code>validate-rehearsal-evidence.py</code>). #1764 closed #1713 with all six acceptance criteria met. No schema fields changed; the schema&#39;s <code>$id</code> remains DNS-backed under the schema-id audit&#39;s retain-temporarily decision (#1742 tracks the 2026-06-30 review). Phase 2 status is unchanged.</p>
 <p>Active execution since the previous sync is mixed: the May-5 sequence was entirely doc/control-plane (#1734 rehearsal evidence export schema; #1739 architecture due-diligence checklist; #1741 contract schema-identifier audit; #1743 organizer/member accessibility gate definition; #1745 preview/review read-model contract <code>urn:icn:contract:preview-review:v1</code>; #1747 <code>idea-0019</code> Institutional Process Substrate framing brief; #1748 coordination/control milestone for spine composition; #1749 read-model fixture-walk dogfood slice for <code>idea-0019</code> plus the new <code>ops/ideas/README.md</code> &quot;Dogfood slice variants&quot; section; #1751 <code>idea-0020</code> Democratic Authority Primitives framing brief; #1753 read-model fixture-walk dogfood slice for <code>idea-0020</code>); the May-6/May-7 sequence is <strong>runtime/implementation truth</strong>, not doc/refinery — real Rust changes landed in <code>icn-gateway</code> and <code>apps/governance</code>. The first runtime dogfood emitting one of the eight named <code>ProcessTransitionReceipt</code> classes from the <code>idea-0019</code> framing brief landed as #1755 (<code>ProcessGateResultReceipt</code>), surfacing a production durability gap on the sled-backed <code>ReceiptStore</code> because no opaque storage path existed without expanding gateway typed governance imports. The opaque receipt storage stack (#1757 → #1758 → #1759) closed that gap: the gateway gained a meaning-blind <code>put_opaque</code> / <code>get_latest_opaque</code> / <code>list_opaque_for</code> primitive keyed on <code>(class, key1, key2_opt, recorded_at, record_hash)</code> (#1757); the <code>GovernanceReceiptBackend</code> trait gained a fail-closed opaque method surface and the sled-backed <code>ReceiptStore</code> overrode it via thin delegates to its inherent opaque methods (#1758); and <code>put_process_gate_result</code>&#39;s trait default was rewritten to attempt the opaque cascade first and fall back to the explicit <code>process_gate_result_backend_not_implemented</code> sentinel only when the underlying <code>put_opaque</code> itself returns the opaque-not-implemented sentinel (#1759). Production gateway-backed <code>ReceiptStore</code> therefore now durably persists <code>ProcessGateResultReceipt</code> through the opaque cascade without any new typed governance import on <code>icn-gateway</code>. A new invariant landed inside the merge cycle: the <code>OPAQUE_HASH_BIND_PREFIX</code> keyspace binds each <code>(class, record_hash)</code> to exactly one canonical <code>(key1, key2_opt, recorded_at)</code> tuple at first write; divergent re-binds abort with stable sentinel <code>opaque_record_hash_index_collision</code> to prevent one canonical receipt from fanning out across multiple audit chains. Bind, primary-record, and secondary-index writes are enforced atomically inside a single sled transaction. CI on #1759 surfaced a pre-existing sled-flusher race on the unrelated <code>test_commons_charter_survives_sled_drop_and_reopen</code> integration test (sled 0.34&#39;s flusher thread holds the OS <code>flock(LOCK_EX)</code> past <code>Db::drop</code>); filed as issue #1760 with corrected diagnosis and a follow-up bounded-retry fix opened on <code>fix/commons-sled-open-retry-on-wouldblock</code> as PR #1761 (merged 2026-05-07; closed #1760). Carrying forward: rehearsal evidence export schema (#1734); architecture due-diligence checklist (#1739); contract schema-identifier audit (#1741); organizer/member accessibility gate definition (#1743); preview/review read-model contract <code>urn:icn:contract:preview-review:v1</code> (#1745); <code>idea-0019</code> framing brief (#1747) + read-model fixture-walk dogfood (#1749); <code>idea-0020</code> framing brief (#1751) + read-model fixture-walk dogfood (#1753). Carrying forward: institutional-operability runtime (live charter activation, person-directory overlay, <code>/me/standing</code>, <code>authority_scope</code> plumbing) plus the action-card runtime (<code>/me/action-cards</code> endpoint with proof-loop linkage to <code>GovernanceDecisionReceipt</code> for proposal/vote, <code>ActionItemCompletionReceipt</code> for action_item/complete, and <code>MeetingAttendanceReceipt</code> for meeting/attend). The action-item completion-receipt retrieval endpoint shipped as #1675; the local HTTP proof loop closure is documented in #1676 and the K3s smoke proof closure is recorded in #1677. NYCN&#39;s drive-ingest operator ladder (NYCN #21–#28 in <code>fahertym/nycn</code>) is merged end-to-end, with subsequent NYCN #29–#32 also merged. The May-5 process-substrate and authority-primitive sequence is documentation/refinery only: no runtime executes; no kernel, gateway, ledger, governance, or SDK code changed; no new contract URN beyond <code>urn:icn:contract:preview-review:v1</code> (#1745) was minted; no implementation issue was opened from #1748; and a read-model fixture walk does not satisfy receipt-backed promotion thresholds per <code>ops/ideas/README.md</code> § &quot;Dogfood slice variants&quot;. Democratic Authority Primitives now has both pieces of its idea-refinery surface: framing brief landed in #1751 as <code>idea-0020</code> with brief at <code>ops/ideas/framing/democratic-authority-primitives.md</code>, and the read-model fixture-walk dogfood slice landed in #1753 at <code>ops/ideas/dogfood/democratic-authority-primitives-mvp.md</code>. The dogfood slice composes the six DAP primitive families named in the framing brief&#39;s §17 follow-up (<code>AuthorityBasis</code>, <code>ParticipationRole</code>, <code>FacilitatorSummary</code>, <code>ConflictDisclosure</code>, <code>MinorityReport</code>, <code>DeliberationContext</code> exercising three of its twelve reference families: <code>CharterRuleReference</code>, <code>PriorDecisionReference</code>, <code>AccessibilityNote</code>) plus references <code>OperatorExecutionAuthority</code> as the strictly-downstream-of-decision operator handle at the activation gate, all attached end-to-end to the merged <code>idea-0019</code> read-model fixture walk without modifying any kernel, runtime, gateway, ledger, governance, SDK, or contract file. Both DAP framing (#1751) and DAP read-model dogfood (#1753) are pre-RFC framing/refinery only; together they do not claim runtime validity, do not emit receipts, do not contact gateway, do not create schema, do not create a contract URN, do not promote to RFC, do not open implementation issues, do not start runtime dogfood, and do not claim Phase 2 completion, formal NYCN pilot, production readiness, or live federation. Per <code>ops/ideas/README.md</code> § &quot;Dogfood slice variants&quot; and per the DAP framing brief&#39;s §16.1, <strong>the read-model fixture walk does NOT satisfy receipt-backed promotion thresholds</strong>; promotion of <code>idea-0020</code> to RFC still requires (1) a separate runtime dogfood that emits at least one receipt under <code>ADR-0026</code> for one of the named primitives — the framing brief&#39;s §16.1 names a <code>ConflictDisclosure</code> accept receipt and a <code>MinorityReport</code> recorded receipt generically; the dogfood artifact references slice-local class candidates <code>ConflictDisclosureAcceptedReceipt</code> and <code>MinorityReportRecordedReceipt</code> at the right transition points but does not commit them as canonical, (2) a real visibility/privacy-boundary run with redaction in evidence export, (3) an accessibility-gate <code>ProcessGateResult</code> produced through <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> on a real surface, and (4) Q1 (<code>AuthorityBasis</code> polymorphism vs typed family) or Q5 (<code>ConflictDisclosure</code> and <code>MinorityReport</code> placement) <strong>resolved</strong> in writing (deferral is not sufficient for the RFC gate per §16.1; the resolved-or-deferred standard at §16.3 applies only to the broader runtime-justification threshold). Next pre-RFC architecture move is <strong>not yet selected</strong>; this sync deliberately preserves optionality for the next session rather than smuggling in a new commitment. The prior sync (post-#1751) named the DAP read-model composition slice as the most directly named candidate; #1753 has now landed it, so the candidate enumeration is reduced. The candidate next moves the next session may pick from, listed descriptively only: (a) DAP <strong>runtime</strong> dogfood emitting at least one receipt under <code>ADR-0026</code> for one DAP primitive — the next artifact called for by the slice&#39;s promotion gate; (b) <code>idea-0019</code> runtime dogfood emitting <strong>additional</strong> <code>ProcessTransitionReceipt</code> classes (the first — <code>ProcessGateResultReceipt</code> — landed in #1755 and is durably persisted via the opaque cascade since #1759; remaining candidates are <code>ProcessSessionOpenedReceipt</code>, <code>DeliberationEntryRecordedReceipt</code>, <code>DecisionRecordedReceipt</code>, <code>ActivationCrossedReceipt</code>, <code>MutationPlanRecordedReceipt</code>, <code>MutationAppliedReceipt</code>, <code>EvidencePacketProducedReceipt</code> — all eligible through the same opaque storage cascade); (c) <code>idea-0019</code> visibility/privacy-boundary run with redaction in evidence export (one of four #1748 acceptance gates); (d) <code>idea-0019</code> accessibility-gate <code>ProcessGateResult</code> produced through <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> on a real surface (one of four #1748 acceptance gates); (e) <code>idea-0019</code> open-question triage: at least one of Q1 (<code>ProcessTargetRef</code> polymorphism), Q3 (<code>DeliberationEntry</code> kind taxonomy), or Q4 (<code>HumanDecisionSet</code> vs proposal/vote) resolved or explicitly deferred in writing (one of four #1748 acceptance gates); (f) one of the DAP §17 follow-up framing briefs — pre-RFC, decompose-only (CCL hook-point catalog; expert/advisory across institution types; conflict object model connecting <code>ConflictDisclosure</code> to <code>idea-0016</code>/ADR-0029; federation tally semantics composing <code>RepresentationMandate</code> with #1609; delegation runtime gated on #1632); (g) control-plane cleanup, including unresolved/stale review-thread hygiene if inspection confirms it. None is selected here. Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.</p>
 <h3>Recently merged (since 2026-04-15)</h3>
@@ -695,6 +746,81 @@ View source on GitHub →
 </tr>
 </thead>
 <tbody><tr>
+<td>#1833</td>
+<td>docs(dev): wrap architecture spec sprint closure review</td>
+<td>2026-05-15</td>
+</tr>
+<tr>
+<td>#1832</td>
+<td>fix(spec): correct steward cockpit review drift</td>
+<td>2026-05-15</td>
+</tr>
+<tr>
+<td>#1831</td>
+<td>docs(spec): define steward cockpit v0</td>
+<td>2026-05-15</td>
+</tr>
+<tr>
+<td>#1830</td>
+<td>docs(spec): define member shell v0</td>
+<td>2026-05-15</td>
+</tr>
+<tr>
+<td>#1829</td>
+<td>docs(spec): define network anti-entropy proof loops</td>
+<td>2026-05-15</td>
+</tr>
+<tr>
+<td>#1827</td>
+<td>docs(agents): reconcile handoff path with template</td>
+<td>2026-05-15</td>
+</tr>
+<tr>
+<td>#1826</td>
+<td>docs(spec): define compute placement policy</td>
+<td>2026-05-15</td>
+</tr>
+<tr>
+<td>#1825</td>
+<td>docs(architecture): define entity-scope vocabulary boundary</td>
+<td>2026-05-15</td>
+</tr>
+<tr>
+<td>#1824</td>
+<td>docs(spec): define ArtifactRegistry v0 and ScopedVault boundary</td>
+<td>2026-05-15</td>
+</tr>
+<tr>
+<td>#1823</td>
+<td>docs(spec): define storage durability policy objects</td>
+<td>2026-05-14</td>
+</tr>
+<tr>
+<td>#1822</td>
+<td>docs(spec): define governed service binding, workload manifest, and runtime provider</td>
+<td>2026-05-14</td>
+</tr>
+<tr>
+<td>#1821</td>
+<td>docs(spec): define CCL policy registry and hook contract</td>
+<td>2026-05-14</td>
+</tr>
+<tr>
+<td>#1820</td>
+<td>docs(spec): define institutional domain and policy primitive</td>
+<td>2026-05-14</td>
+</tr>
+<tr>
+<td>#1819</td>
+<td>docs(spec): add accepted-proposal effect dispatch contract</td>
+<td>2026-05-14</td>
+</tr>
+<tr>
+<td>#1814</td>
+<td>docs(architecture): add integrated cooperative operating model spine</td>
+<td>2026-05-14</td>
+</tr>
+<tr>
 <td>#1764</td>
 <td>docs(contracts): publish ActionCard contract for institution packages</td>
 <td>2026-05-07</td>
