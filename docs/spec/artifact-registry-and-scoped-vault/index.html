@@ -1,0 +1,737 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Artifact Registry and Scoped Vault — boundary, v0 design | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>artifact registry and scoped vault</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/artifact-registry-and-scoped-vault.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Artifact Registry and Scoped Vault — boundary, v0 design</h1>
+<blockquote>
+<p><strong>Status: spec, work-in-progress.</strong> Defines the design-level shape of <code>ArtifactRegistry</code> v0 (the institutional record of content-addressed artifacts and their metadata) and <code>ScopedVault</code> (the privacy-enforced container for restricted objects). Names how documents, compute outputs, evidence packets, private evidence, and mobile cache fit. Reuses existing canonical types verbatim (<code>Hash</code>, <code>Did</code>, <code>Signature</code>, <code>StorageClass</code>, <code>DataLocality</code>, <code>ArtifactReceipt</code> from <code>icn-kernel-api</code>; <code>StorageSpec</code> / <code>BackupPolicy</code> / <code>ReplicationPolicy</code> / <code>RecoveryPolicy</code> / <code>ArchivePolicy</code> / <code>IntegrityPolicy</code> from <code>#1816</code>). Cross-links the <strong>forward-direction</strong> <code>PrivacyClass</code> / <code>DisclosurePolicy</code> / <code>PrivateObjectRef</code> / <code>AccessReceipt</code> / <code>ExportReceipt</code> / <code>RedactionMap</code> vocabulary proposed under <code>#1792</code> (still forward-direction at the time of writing — and distinct from existing <code>PrivacyClass</code> enums in code; see §&quot;<code>ScopedVault</code> (object outline)&quot; for the naming-collision surface this spec keeps explicit). Explicitly defers wire-stable schema, encryption / key model, and storage-backend implementation. The PR introducing this doc advances <code>#1798</code> without closing it.</p>
+</blockquote>
+<h2>Purpose</h2>
+<p>Storage in ICN should mean <strong>sovereign institutional memory</strong>, not files in an app. The merged spine doc names a seven-class custody taxonomy; <code>docs/spec/storage-durability-policies.md</code> (<code>#1816</code>, merged via PR #1823) names the durability policies that govern each class. Two custody classes remain forward-direction in those merged specs:</p>
+<ul>
+<li><strong>Artifact / blob store</strong> — the content-addressed memory of artifacts the institution produces and reads. Tracked under #1798.</li>
+<li><strong>Scoped vault / private storage</strong> — the privacy-enforced container for restricted objects. Tracked under #1798 (and #1767 for encryption, #1792 for disclosure).</li>
+</ul>
+<p>This spec defines the design-level shape of both, and the boundary between them. It does not define schema, wire format, encryption, or storage-backend implementation. It does name how the existing receipt envelope (ADR-0026 Layer 2 <code>ArtifactReceipt</code>), the forward-direction privacy / disclosure vocabulary proposed under <code>#1792</code> (<code>PrivacyClass</code> / <code>DisclosurePolicy</code> / <code>PrivateObjectRef</code> / <code>AccessReceipt</code>), and the merged durability policy objects (<code>#1816</code>&#39;s <code>StorageSpec</code> / <code>BackupPolicy</code> / <code>ReplicationPolicy</code> / <code>RecoveryPolicy</code> / <code>ArchivePolicy</code> / <code>IntegrityPolicy</code>) compose with the new <code>ArtifactRegistry</code> and <code>ScopedVault</code> records. Note: <code>#1816</code> does <strong>not</strong> define a separate <code>RetentionPolicy</code> object — retention is a field inside <code>BackupPolicy</code> (retention window) and <code>ArchivePolicy</code> (retention horizon). And <code>#1792</code>&#39;s seven-variant <code>PrivacyClass</code> taxonomy is forward-direction; the codebase already exports a different <code>PrivacyClass</code> enum (<code>icn-kernel-api/src/compute.rs:217</code> with three variants — <code>Public</code> / <code>Member</code> / <code>NeedToKnow</code> — and a separate two-variant enum in <code>icn-boundary/src/types.rs:30</code>), which this spec keeps separate from <code>#1792</code>&#39;s proposed taxonomy.</p>
+<p>The four merged sibling architecture specs each reference #1798 as the home for this boundary:</p>
+<ul>
+<li><code>docs/spec/storage-durability-policies.md</code> (#1823, merged): names &quot;Artifact / blob store&quot; and &quot;Scoped vault / private storage&quot; as custody classes whose registry / vault details live under <code>#1798</code>.</li>
+<li><code>docs/spec/institutional-domain.md</code> (#1820, merged): names &quot;scoped vault&quot; in the storage taxonomy reference.</li>
+<li><code>docs/spec/governed-service-binding.md</code> (#1822, merged): names the binding&#39;s storage object reference may point at &quot;an artifact in the registry, a volume, a vault entry, a service state store. References to objects in <code>#1798</code> (<code>ArtifactRegistry</code>) and <code>#1767</code> (encrypted private-overlay store) when those land.&quot;</li>
+<li><code>docs/spec/effect-dispatch-contract.md</code> (#1819, merged): names <code>ArtifactReceipt</code> (Layer 2) as one of the receipt classes emitted at Stage 5.</li>
+</ul>
+<p>This spec gives those names design-level shape.</p>
+<h2>What this spec is not</h2>
+<ul>
+<li>Not runtime implementation. No code lands here.</li>
+<li>Not a schema migration. No Rust types, JSON schemas, or wire formats are introduced.</li>
+<li>Not an encryption implementation. The vault&#39;s &quot;encryption / key model&quot; field is a <strong>placeholder</strong>; specifics are deferred to <code>#1767</code>.</li>
+<li>Not a blob migration. Existing <code>blob_store</code> (in <code>icn/crates/icn-store/src/blob_store.rs</code>) continues to operate; the spec names what an artifact record points to, not how the bytes move.</li>
+<li>Not a redefinition of <code>ArtifactReceipt</code> (the existing Layer 2 receipt type in <code>icn-kernel-api/src/proofs.rs:30</code>). The receipt proves a blob transfer; the registry records that an artifact exists and what governs it. These are distinct concepts (see §&quot;<code>ArtifactReceipt</code> vs <code>ArtifactRegistry</code>&quot; below).</li>
+<li>Not a redefinition of <code>PrivacyClass</code>, <code>DisclosurePolicy</code>, <code>PrivateObjectRef</code>, <code>AccessReceipt</code>, <code>ExportReceipt</code>, or <code>RedactionMap</code>. Those are proposed (forward-direction) under <code>#1792</code>; this spec references the proposed names without redefining them. The existing <code>PrivacyClass</code> enums in code (<code>icn-kernel-api/src/compute.rs:217</code>, <code>icn-boundary/src/types.rs:30</code>) are distinct from <code>#1792</code>&#39;s proposed seven-variant taxonomy; reconciliation is forward work and out of scope here.</li>
+<li>Not a redefinition of <code>StorageClass</code>, <code>DataLocality</code>, <code>StorageSpec</code>, <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, or <code>IntegrityPolicy</code>. Those are defined under <code>#1816</code> (<code>docs/spec/storage-durability-policies.md</code>, merged via PR #1823); this spec references them. <code>#1816</code> does <strong>not</strong> define a separate <code>RetentionPolicy</code> object — retention is a field inside <code>BackupPolicy</code> and <code>ArchivePolicy</code>.</li>
+<li>Not authority to mutate DNS, K3s, Forgejo, identity-bridge, gateway, blob storage backends, or any deployed infrastructure.</li>
+<li>Not a production-readiness or live-federation claim.</li>
+<li>Not closure of <code>#1798</code>. The PR introducing this doc uses <code>Refs:</code>; closure is left for separate review against the issue&#39;s six acceptance criteria.</li>
+</ul>
+<h2>Boundary lines</h2>
+<p>Storage objects nearby in the architecture overlap with <code>ArtifactRegistry</code> and <code>ScopedVault</code> but are distinct. The boundary is load-bearing.</p>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>Distinct from <code>ArtifactRegistry</code> / <code>ScopedVault</code> in this way</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><code>ArtifactReceipt</code></strong> (existing Layer 2 receipt in <code>icn-kernel-api/src/proofs.rs:30</code>)</td>
+<td>A receipt that proves a blob transfer happened, with fields <code>blob_hash</code>, <code>provider_did</code>, <code>requester_did</code>, <code>request_id</code>, <code>scope_id</code>, <code>verified_at</code>, <code>receipt_hash</code>, <code>signature</code>. The new <code>ArtifactRegistry</code> is the institutional record that an artifact <strong>exists</strong> and what governs it; the receipt proves an <strong>action on</strong> the artifact. The registry holds <code>receipt_refs</code>; some of those refs point at <code>ArtifactReceipt</code> instances. They share a name root and are intentionally separable.</td>
+</tr>
+<tr>
+<td><strong><code>ReceiptStore</code></strong> (existing <code>icn-gateway/src/receipt_store.rs</code>)</td>
+<td>Persistent receipt backend keyed by <code>record_hash</code>. Stores governance receipts, allocation receipts, attendance receipts. The <code>ArtifactRegistry</code> is a sibling store for artifact metadata, not a replacement. The two stores collaborate: receipts produced about artifacts land in <code>ReceiptStore</code>; the artifact metadata that describes the underlying object lands in <code>ArtifactRegistry</code>.</td>
+</tr>
+<tr>
+<td><strong>Generic key-value records</strong> (existing <code>icn-store</code> abstractions for service state)</td>
+<td>Large blobs SHOULD NOT be stored directly in generic key-value records. Artifacts go through the registry; the registry points at a content-addressed blob location (filesystem, object store, or distributed overlay). The KV store remains for small mutable records.</td>
+</tr>
+<tr>
+<td><strong><code>ScopedVault</code></strong> (this spec)</td>
+<td>The vault is the privacy-enforced container for restricted objects. Vault-backed objects appear in the artifact registry as <code>PrivateObjectRef</code>s (per <code>#1792</code>); the vault enforces access policy and emits <code>AccessReceipt</code>s. A vault entry is itself an artifact in the registry sense; the vault adds the privacy enforcement layer.</td>
+</tr>
+<tr>
+<td><strong><code>PrivateObjectRef</code></strong> (per <code>#1792</code>)</td>
+<td>The reference shape used by the registry when an artifact&#39;s content lives in a vault. Carries <code>object_id</code>, <code>content_hash</code>, <code>vault_id</code>, <code>privacy_class</code>, <code>policy_hash</code>, <code>receipt_ref</code>. The registry record&#39;s <code>blob_location</code> for a vault-backed artifact is a <code>PrivateObjectRef</code>, not a plaintext path.</td>
+</tr>
+<tr>
+<td><strong><code>InstitutionalDocument</code></strong> (proposed by <code>#1536</code>)</td>
+<td>A typed artifact metadata kind, not a separate storage universe. Documents become artifacts in the registry with <code>artifact_class = Document</code> and document-specific typed fields layered on top. See §&quot;Integration points&quot; below.</td>
+</tr>
+<tr>
+<td><strong>Mobile / member-shell cache</strong></td>
+<td>Disposable derived state. Reconstructible from the source artifact. <strong>MUST NOT</strong> be treated as canonical (matches <code>#1816</code> §&quot;Failure and safety rules&quot;). Cache entries are not registered as artifacts.</td>
+</tr>
+</tbody></table>
+<p>The shorthand:</p>
+<blockquote>
+<p>The registry records what artifacts exist and what governs them. The vault enforces privacy on restricted artifacts. The receipt store proves actions on both.</p>
+</blockquote>
+<h2><code>ArtifactRegistry</code> v0 (object outline)</h2>
+<p>The artifact registry is the institutional memory of the cooperative&#39;s content-addressed artifacts. Each entry is a metadata record describing one logical artifact, pointing at the blob&#39;s location, naming what governs it, and recording what receipts have been emitted about it.</p>
+<p>Fields at design granularity (no Rust type, no JSON schema, no field order fixed):</p>
+<p><strong>Identity</strong></p>
+<ul>
+<li><strong><code>artifact_id</code></strong> — Stable identifier for this artifact as a logical object. Survives version churn.</li>
+<li><strong><code>content_hash</code></strong> — <code>Hash</code> (from <code>icn-kernel-api</code>); content-addressed reference to the bytes. The hash is the integrity surface (also referenced by <code>#1816</code>&#39;s <code>IntegrityPolicy</code>).</li>
+</ul>
+<p><strong>Storage backend reference</strong></p>
+<ul>
+<li><strong><code>blob_location</code></strong> — Where the bytes live. For public-by-policy artifacts: a content-addressed path in the cooperative&#39;s blob store. For vault-backed artifacts: a <code>PrivateObjectRef</code> (per <code>#1792</code>) pointing into a <code>ScopedVault</code>. The registry never holds plaintext for restricted material; it holds the reference and lets the vault enforce access.</li>
+<li><strong><code>mime_type</code></strong> — Media type / format identifier.</li>
+<li><strong><code>size</code></strong> — Byte size (informational; not the authoritative integrity surface).</li>
+</ul>
+<p><strong>Classification</strong></p>
+<ul>
+<li><strong><code>artifact_class</code></strong> — One of the closed taxonomy named in §&quot;Artifact class taxonomy&quot; below.</li>
+<li><strong><code>scope</code></strong> — Owning scope (domain, structure, activity). The scope is the authority root for this artifact&#39;s lifecycle.</li>
+</ul>
+<p><strong>Provenance</strong></p>
+<ul>
+<li><strong><code>created_by</code></strong> — <code>Did</code> of the actor that introduced this artifact into the registry.</li>
+<li><strong><code>created_at</code></strong> — Timestamp of registration.</li>
+<li><strong><code>provenance_refs</code></strong> — Pointers back to the governance act (or other authority basis) that produced this artifact: <code>decision_hash</code>, <code>proposal_id</code>, <code>mandate_id</code>, <code>effect_record_id</code>, or an explicit <code>none</code> where the artifact predates a covering governance act and is grandfathered.</li>
+</ul>
+<p><strong>Policy references</strong></p>
+<ul>
+<li><strong><code>access_policy_ref</code></strong> — Pointer to the <code>DisclosurePolicy</code> (per <code>#1792</code>) that governs who may read this artifact under what authority.</li>
+<li><strong><code>retention_policy_ref</code></strong> — Pointer to the durability policy set that governs this artifact&#39;s retention. <code>#1816</code> carries retention as fields inside <code>BackupPolicy</code> (retention window) and <code>ArchivePolicy</code> (retention horizon); the artifact&#39;s <code>retention_policy_ref</code> resolves to one or both of those policies adopted by the owning domain, not to a separate <code>RetentionPolicy</code> object.</li>
+</ul>
+<p><strong>Receipts</strong></p>
+<ul>
+<li><strong><code>receipt_refs</code></strong> — Pointers to receipts emitted about this artifact: creation receipt, access receipts (per <code>AccessReceipt</code>), export receipts, modification receipts (where applicable), expiration receipts. The list is append-only; each receipt is itself in <code>ReceiptStore</code> per <code>effect-dispatch-contract.md</code> §&quot;Stage 5&quot;. For blob-transfer events specifically, the receipt is the existing <code>ArtifactReceipt</code> (Layer 2).</li>
+</ul>
+<p><strong>Versioning</strong></p>
+<ul>
+<li><strong><code>version_ref</code></strong> — Stable version identifier within this artifact&#39;s lineage. Reuses <code>SemanticVersion</code> shape from <code>icn/crates/icn-ccl/src/registry.rs</code> where applicable; otherwise a content-hash-derived version.</li>
+<li><strong><code>parent_refs</code></strong> — Pointers to predecessor versions, supersession records, or composing artifacts. Reversal of a version is a fresh registration with a parent pointer, never an edit.</li>
+</ul>
+<p><strong>Exportability</strong></p>
+<ul>
+<li><strong><code>exportability</code></strong> — Class indicating whether and how this artifact may be exported: <code>Public-portable</code>, <code>Member-portable-with-receipt</code>, <code>Scope-restricted</code>, <code>Vault-only-with-redaction</code>, <code>Not-exportable</code>. Exportability inherits from the <code>DisclosurePolicy</code> and from <code>BackupPolicy</code> / <code>ArchivePolicy</code> retention horizons; the registry record names the resulting class for quick reference.</li>
+</ul>
+<p><strong>Invariants:</strong></p>
+<ul>
+<li>An artifact MUST NOT be registered without a <code>content_hash</code> and <code>blob_location</code>. A record with neither is not an artifact; it is a placeholder, and the chain MUST refuse it.</li>
+<li>An artifact MUST carry an <code>access_policy_ref</code> and a <code>retention_policy_ref</code> (or an explicit acknowledgement of <code>none</code> where the policy intentionally allows it, e.g., for purely public artifacts whose retention is &quot;indefinite, public-by-policy&quot;).</li>
+<li>An artifact&#39;s <code>scope</code> MUST match (or be <strong>narrower</strong> than) the authority basis named in <code>provenance_refs</code>. A workload cannot register an artifact into a scope wider than the authority it acts under. (Earlier draft said &quot;wider than&quot;; that was inverted — authority is the upper bound, scope is what the actor is permitted to write into.)</li>
+<li>Reversal / supersession is a new version, not a mutation. The registry is append-only.</li>
+</ul>
+<h2><code>ScopedVault</code> (object outline)</h2>
+<p>The scoped vault is the privacy-enforced container for restricted objects. A vault is the authority-bound space that holds <code>PrivateObjectRef</code>s (per <code>#1792</code>) and emits <code>AccessReceipt</code>s on every read.</p>
+<p>Fields at design granularity:</p>
+<p><strong>Identity and ownership</strong></p>
+<ul>
+<li><strong><code>vault_id</code></strong> — Stable identifier for this vault as a logical container.</li>
+<li><strong><code>owning_scope</code></strong> — Scope that owns this vault: domain, structure, activity, or holder DID. The owning scope is the authority root for vault policy decisions.</li>
+</ul>
+<p><strong>Privacy and disclosure</strong></p>
+<ul>
+<li><p><strong><code>privacy_class</code></strong> — A class from the <strong>forward-direction</strong> seven-variant taxonomy proposed under <code>#1792</code>: <code>Public</code> / <code>MembersOnly</code> / <code>ScopeRestricted</code> / <code>PrivateOverlay</code> / <code>SecretCredential</code> / <code>ExternalCustodian</code> / <code>SealedUntil</code>. The vault&#39;s privacy class is the upper bound for everything it holds; an artifact entering the vault inherits at least the vault&#39;s privacy class.</p>
+<p><strong>Naming collision note.</strong> Two unrelated <code>PrivacyClass</code> enums already exist in code: <code>icn/crates/icn-kernel-api/src/compute.rs:217</code> (<code>Public</code> / <code>Member</code> / <code>NeedToKnow</code>, used by compute workload manifests) and <code>icn/crates/icn-boundary/src/types.rs:30</code> (<code>Public</code> / <code>EncryptedOverlay</code>, used at the boundary layer). The <code>#1792</code> taxonomy this <code>ScopedVault</code> field uses is a <strong>third, broader naming</strong> intended for the disclosure / vault domain — it is <strong>not</strong> the same enum as either of the in-code types, and <code>#1792</code> itself is still forward-direction (the seven variants are proposed, not implemented). The eventual implementation tranche for <code>ScopedVault</code> will need to decide whether (a) <code>#1792</code> ships a separate <code>DisclosureClass</code> enum, (b) the existing <code>kernel-api::PrivacyClass</code> is widened to seven variants, or (c) both coexist with a typed conversion. That decision belongs to the implementation tranche, not to this design spec. This field reads against the <code>#1792</code> proposal until then.</p>
+</li>
+<li><p><strong><code>encryption_key_model_placeholder</code></strong> — Where the vault&#39;s encryption model would be named. <strong>Specifics are deferred to <code>#1767</code></strong> (encrypted distributed private-overlay storage). This spec names the placeholder slot; it does not specify the cipher, key custody, rotation, or recovery protocol.</p>
+</li>
+</ul>
+<p><strong>Access and retention</strong></p>
+<ul>
+<li><strong><code>access_policy</code></strong> — Pointer to or inline <code>DisclosurePolicy</code> (per <code>#1792</code>) carrying <code>visibility</code>, <code>allowed_scopes</code>, <code>redaction_rules</code>, <code>access_request_path</code>.</li>
+<li><strong><code>retention_policy</code></strong> — Pointer to the durability policy set that governs vault retention. <code>#1816</code> defines retention as fields inside <code>BackupPolicy</code> (retention window) and <code>ArchivePolicy</code> (retention horizon); the vault&#39;s <code>retention_policy</code> resolves to one or both of those policies adopted by the owning domain, not to a separate <code>RetentionPolicy</code> object. A vault entry&#39;s <code>BackupPolicy</code> inherits the vault&#39;s <code>privacy_class</code> and MUST NOT broaden disclosure (per <code>#1816</code> §&quot;Locality and privacy inheritance&quot;).</li>
+<li><strong><code>backup_export_policy</code></strong> — Specific subset of the retention policy that names when and how vault material may be backed up or exported, and what authority is required.</li>
+</ul>
+<p><strong>Receipts</strong></p>
+<ul>
+<li><strong><code>access_receipt_requirement</code></strong> — Declarative rule for what an access produces. Every read MUST emit an <code>AccessReceipt</code> (per <code>#1792</code>) naming <code>object_ref</code>, <code>actor</code>, <code>authority_basis</code>, <code>purpose</code>, <code>timestamp</code>. No silent reads.</li>
+<li><strong><code>export_receipt_requirement</code></strong> — Every export of vault material MUST emit an <code>ExportReceipt</code> (per <code>#1792</code>) naming the redaction applied, the recipient, and the governance authority that authorized the export.</li>
+</ul>
+<p><strong>Relationship to private overlays</strong></p>
+<ul>
+<li><strong><code>private_overlay_binding</code></strong> — Where the vault delegates to a distributed private overlay (per <code>#1767</code>), this field names the binding. For local-only vaults, this is <code>none</code>. The binding is itself a forward-direction concept; <code>#1767</code> will specify its shape.</li>
+</ul>
+<p><strong>Invariants:</strong></p>
+<ul>
+<li>A vault MUST carry an <code>access_policy</code> and a <code>retention_policy</code>. A vault without those is not safely adoptable.</li>
+<li>A vault MUST emit an <code>AccessReceipt</code> on every successful read and an <code>ExportReceipt</code> on every successful export. No silent vault access.</li>
+<li>A vault&#39;s <code>privacy_class</code> is the upper bound for entries it holds; entries cannot have a wider privacy class than the vault.</li>
+<li>Backup of vault material MUST inherit the vault&#39;s <code>privacy_class</code> and <code>DataLocality</code> (per <code>#1816</code> §&quot;Locality and privacy inheritance&quot;). Backup that broadens either is refused at the policy layer.</li>
+<li>Vault contents MUST NOT be exposed in member-shell or steward-cockpit dashboards. Surfaces show the existence of vault entries (the <strong>fact</strong> that they exist) and their access provenance, never the contents.</li>
+</ul>
+<h2><code>ArtifactReceipt</code> vs <code>ArtifactRegistry</code></h2>
+<p>The two share a name root and are intentionally separable.</p>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Lives in</th>
+<th>Purpose</th>
+<th>Key fields</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><code>ArtifactReceipt</code></strong> (existing, implemented)</td>
+<td><code>icn-kernel-api/src/proofs.rs:30</code></td>
+<td>Proves a blob transfer occurred under specific authority. Layer 2 of ADR-0026.</td>
+<td><code>blob_hash</code>, <code>provider_did</code>, <code>requester_did</code>, <code>request_id</code>, <code>scope_id</code>, <code>verified_at</code>, <code>receipt_hash</code>, <code>signature</code>.</td>
+</tr>
+<tr>
+<td><strong><code>ArtifactRegistry</code></strong> (this spec, forward-direction)</td>
+<td>TBD (forthcoming follow-up: <code>schema(storage): define ArtifactRegistry persisted records</code>)</td>
+<td>Records the existence of an artifact and what governs it (policy, provenance, receipts). The institutional memory of artifacts.</td>
+<td><code>artifact_id</code>, <code>content_hash</code>, <code>blob_location</code>, <code>mime_type</code>, <code>size</code>, <code>artifact_class</code>, <code>scope</code>, <code>created_by</code>, <code>created_at</code>, <code>access_policy_ref</code>, <code>retention_policy_ref</code>, <code>provenance_refs</code>, <code>receipt_refs</code>, <code>version_ref</code>, <code>parent_refs</code>, <code>exportability</code>.</td>
+</tr>
+</tbody></table>
+<p>The registry&#39;s <code>receipt_refs</code> field may point at <code>ArtifactReceipt</code> instances (when blob transfer events are recorded) alongside other receipt classes (creation receipt, <code>AccessReceipt</code>, <code>ExportReceipt</code>, expiration receipt). The names are deliberately similar because both concern artifacts; the responsibilities are distinct.</p>
+<h2>Artifact class taxonomy</h2>
+<p>The <code>artifact_class</code> field carries a closed taxonomy at the design level. New classes require an ADR amendment (matching the pattern from <code>#1815</code> runtime classes and <code>effect-dispatch-contract.md</code> receipt classes).</p>
+<p>Initial closed set (each may carry typed metadata beyond the registry&#39;s generic fields):</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Typical content</th>
+<th>Typed metadata source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Document</code></td>
+<td>Typed institutional document (meeting minutes, charter, policy text, committee report, etc.)</td>
+<td><code>#1536</code> — typed institutional memory / documents. The registry record carries <code>doc_type</code> and document-specific fields.</td>
+</tr>
+<tr>
+<td><code>ComputeOutput</code></td>
+<td>Output of a workload execution (per <code>docs/spec/governed-service-binding.md</code>&#39;s <code>WorkloadManifest.outputs</code>)</td>
+<td><code>#1815</code> — governed service binding. The registry record carries <code>manifest_ref</code>, <code>binding_id</code>, <code>compute_receipt_ref</code> (per ADR-0031).</td>
+</tr>
+<tr>
+<td><code>EvidencePacket</code></td>
+<td>Redacted / exportable bundle assembled from underlying artifacts and receipts</td>
+<td><code>#1748</code> — institutional process substrate. The packet&#39;s contents are themselves artifacts; the packet is an artifact whose <code>blob_location</code> is the assembled bundle.</td>
+</tr>
+<tr>
+<td><code>PrivateEvidence</code></td>
+<td>Vault-backed evidence (a <code>PrivateObjectRef</code> per <code>#1792</code>)</td>
+<td><code>#1792</code> — private data disclosure boundary. The registry record&#39;s <code>blob_location</code> is a <code>PrivateObjectRef</code>; reading requires going through the vault.</td>
+</tr>
+<tr>
+<td><code>Backup</code></td>
+<td>A backup of canonical or service state (per <code>#1816</code>&#39;s <code>BackupPolicy</code>)</td>
+<td><code>#1816</code> — storage durability policies. The registry record carries <code>source_artifact_ref</code> or <code>source_storage_spec</code>, <code>backup_policy_ref</code>, integrity verification result.</td>
+</tr>
+<tr>
+<td><code>SettlementRecord</code></td>
+<td>Economic settlement artifact (per <code>#1634</code>)</td>
+<td><code>#1634</code> — obligation / allocation / settlement primitives. The registry record carries <code>settlement_target</code>, <code>obligation_ref</code>, <code>allocation_ref</code>.</td>
+</tr>
+<tr>
+<td><code>Other</code></td>
+<td>Forward-direction placeholder. New classes start here and migrate to a named class via ADR amendment when the pattern matures.</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<p>The list is <strong>closed at the kind level</strong> (no silent expansion of <code>artifact_class</code> values) and <strong>open at the typed-metadata level</strong> (each class may layer additional fields from its source spec). The boundary holds the kernel/app meaning-firewall principle: the registry does not interpret institution-specific meaning of an artifact; it carries the class label and points at the source spec for typed semantics.</p>
+<h2>Integration points</h2>
+<p>The six integration points named in <code>#1798</code>:</p>
+<h3>1. <code>InstitutionalDocument</code> as typed artifact metadata</h3>
+<p>Per <code>#1536</code>. Documents are not a separate storage universe; they are an <code>artifact_class</code> (<code>Document</code>) with typed metadata layered on top of the generic registry fields. <code>doc_type</code> (e.g., <code>MeetingAgenda</code>, <code>MeetingMinutes</code>, <code>CommitteeReport</code>, <code>Policy</code>, <code>Charter</code>) and document-specific parent / version pointers live in the document&#39;s typed metadata; the registry&#39;s generic fields carry identity, content hash, scope, policy refs, provenance, receipts.</p>
+<h3>2. Compute outputs as artifacts</h3>
+<p>Per <code>#1815</code> / <code>docs/spec/governed-service-binding.md</code>. A <code>WorkloadManifest</code> declares <code>outputs</code>; each completed workload execution registers its outputs as artifacts of class <code>ComputeOutput</code>, with <code>provenance_refs</code> pointing at the binding&#39;s <code>mandate_ref</code> and the dispatch chain&#39;s <code>decision_hash</code>. The <code>ComputeReceipt</code> (per ADR-0031) is one of the <code>receipt_refs</code>.</p>
+<p>Review state for advisory outputs (per ADR-0030, utility computation outputs are advisory until governance ratifies them) lives in the artifact&#39;s typed metadata: a review status field, the ratifying governance act if any, the receipt of the ratification.</p>
+<h3>3. Evidence packets as redacted / exportable bundles</h3>
+<p>Per <code>#1748</code>. An evidence packet is itself an artifact (class <code>EvidencePacket</code>) whose <code>blob_location</code> is the assembled bundle. The packet&#39;s contents are individually artifacts (typically <code>Document</code>, <code>ComputeOutput</code>, <code>Backup</code> instances); the packet record carries pointers to its constituent artifact records. Export of an evidence packet emits a packet-level <code>ExportReceipt</code> plus access receipts for any vault-backed contents touched during assembly.</p>
+<h3>4. Private evidence as vault-backed <code>PrivateObjectRef</code>s</h3>
+<p>Per <code>#1792</code>. An artifact of class <code>PrivateEvidence</code> has <code>blob_location</code> set to a <code>PrivateObjectRef</code> pointing into a <code>ScopedVault</code>. The registry records that the artifact exists, who is authorized to access, and what receipts have been emitted; the vault holds the bytes (encrypted per <code>#1767</code>&#39;s eventual key model) and enforces the access policy on every read.</p>
+<h3>5. Mobile / member-shell cache as disposable derived</h3>
+<p>Per the spine doc&#39;s seven-class custody taxonomy and <code>#1816</code>&#39;s &quot;cache treated as canonical is a bug&quot; rule. Mobile cache is reconstructible from the source artifact; it is <strong>not registered</strong> in <code>ArtifactRegistry</code>. The mobile cache holds local copies for offline operation; canonical truth lives in the registry. When the mobile cache and the registry diverge, the registry wins.</p>
+<h3>6. Replication policy tied to privacy / disclosure class</h3>
+<p>Per <code>#1816</code>&#39;s <code>ReplicationPolicy</code>. An artifact&#39;s replication policy MUST be bounded by its <code>privacy_class</code>: a <code>PrivateOverlay</code> artifact cannot replicate into <code>FederationMirrored</code> or <code>CommonsPublic</code>; a <code>Public</code> artifact may replicate freely under its <code>BackupPolicy</code>. The binding from <code>ReplicationPolicy</code> to <code>privacy_class</code> is the load-bearing rule (and matches <code>#1816</code>&#39;s &quot;Replica violates locality / privacy policy&quot; failure mode).</p>
+<h2>Receipt expectations</h2>
+<p>The registry and vault emit receipts at significant lifecycle transitions. No new receipt class is introduced by this spec; existing classes from <code>docs/spec/effect-dispatch-contract.md</code> §&quot;Receipt class summary&quot; and <code>#1792</code>&#39;s taxonomy are reused.</p>
+<table>
+<thead>
+<tr>
+<th>Transition</th>
+<th>Receipt class</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Artifact created / registered</td>
+<td>Creation effect record (per ADR-0025 forward direction); referenced by the registry&#39;s <code>receipt_refs</code></td>
+<td><code>docs/spec/effect-dispatch-contract.md</code> §&quot;Stage 5&quot;</td>
+</tr>
+<tr>
+<td>Artifact read (public-by-policy)</td>
+<td>None required at the artifact level; the dispatching workload&#39;s evidence is enough</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Vault entry accessed</td>
+<td><code>AccessReceipt</code> (per <code>#1792</code>)</td>
+<td><code>#1792</code></td>
+</tr>
+<tr>
+<td>Artifact exported</td>
+<td><code>ExportReceipt</code> (per <code>#1792</code>); for blob-transfer-specifically: <code>ArtifactReceipt</code> (Layer 2, ADR-0026, existing)</td>
+<td><code>#1792</code>, ADR-0026</td>
+</tr>
+<tr>
+<td>Vault entry exported</td>
+<td><code>ExportReceipt</code> with redaction reference (per <code>#1792</code>)</td>
+<td><code>#1792</code></td>
+</tr>
+<tr>
+<td>Artifact new version registered</td>
+<td>Creation effect record + version-link receipt</td>
+<td><code>docs/spec/effect-dispatch-contract.md</code></td>
+</tr>
+<tr>
+<td>Artifact expired / retired</td>
+<td>Expiration receipt (per <code>#1816</code> <code>ArchivePolicy.Expiration authority</code>)</td>
+<td><code>#1816</code></td>
+</tr>
+<tr>
+<td>Artifact backup created</td>
+<td>Backup-creation receipt (per <code>#1816</code> <code>BackupPolicy.Receipt classes</code>)</td>
+<td><code>#1816</code></td>
+</tr>
+<tr>
+<td>Artifact restored</td>
+<td>Restore-execution receipt (per <code>#1816</code> <code>RecoveryPolicy.Receipt classes</code>)</td>
+<td><code>#1816</code></td>
+</tr>
+<tr>
+<td>Vault entry deletion (governed)</td>
+<td>Deletion receipt with explicit authority basis</td>
+<td><code>#1816</code>, <code>#1792</code></td>
+</tr>
+</tbody></table>
+<p>The registry never invents a new receipt class. It carries <code>receipt_refs</code> to existing classes.</p>
+<h2>Boundary rules</h2>
+<p>Six load-bearing rules, drawn directly from <code>#1798</code>&#39;s scope.</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>No large blobs in generic key-value records.</strong></td>
+<td>The KV store is for small mutable service state. Large blobs go through <code>blob_store</code> and are pointed at by the registry&#39;s <code>blob_location</code>. The registry doesn&#39;t store bytes; it stores references.</td>
+</tr>
+<tr>
+<td><strong>No private vault contents in dashboards.</strong></td>
+<td>Dashboards (member shell <code>#1818</code>, steward cockpit <code>#1795</code>) MUST NOT render vault contents. They MAY show that a vault entry exists, its <code>privacy_class</code>, its access provenance, and access-receipt counts — never the bytes.</td>
+</tr>
+<tr>
+<td><strong>No bypass of receipt / provenance for artifact lifecycle.</strong></td>
+<td>Every artifact registration, every version, every vault read, every export emits a receipt. No silent operations on registered artifacts.</td>
+</tr>
+<tr>
+<td><strong>The registry does not interpret institution-specific meaning.</strong></td>
+<td>The registry carries <code>artifact_class</code> labels and generic fields. Institution-specific semantics (a federation&#39;s role names, a cooperative&#39;s intake form schema) live in the typed metadata attached per class. The boundary is the meaning firewall (per <code>docs/architecture/KERNEL_APP_SEPARATION.md</code>).</td>
+</tr>
+<tr>
+<td><strong>The vault is not a generic private-state dumping ground.</strong></td>
+<td>Every vault carries an <code>access_policy</code> and a <code>retention_policy</code>. An untyped private blob with no policy MUST NOT enter a vault. The vault is a governed surface, not a pile.</td>
+</tr>
+<tr>
+<td><strong>No encryption / key / runtime implementation in this spec.</strong></td>
+<td>The vault&#39;s <code>encryption_key_model_placeholder</code> is a slot. Specifics live in <code>#1767</code>. This spec names the slot&#39;s existence; it does not specify the cipher or key custody.</td>
+</tr>
+</tbody></table>
+<h2>Failure and safety rules</h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Response</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Artifact registration without <code>content_hash</code> or <code>blob_location</code></td>
+<td>Adoption MUST fail. Not an artifact.</td>
+</tr>
+<tr>
+<td>Artifact registration without <code>access_policy_ref</code> or <code>retention_policy_ref</code></td>
+<td>Adoption MUST fail (unless an explicit &quot;policy intentionally <code>none</code>&quot; record names why; this is a governance act in itself).</td>
+</tr>
+<tr>
+<td>Artifact <code>scope</code> wider than the authority basis in <code>provenance_refs</code></td>
+<td>Refused. Cannot register into a scope you don&#39;t have authority over.</td>
+</tr>
+<tr>
+<td>Vault read without an <code>AccessReceipt</code></td>
+<td>Bug. The read MUST be refused at the vault layer and recorded as evidence.</td>
+</tr>
+<tr>
+<td>Vault export without <code>ExportReceipt</code> with redaction reference</td>
+<td>Bug. Export MUST be refused.</td>
+</tr>
+<tr>
+<td>Vault entry with <code>privacy_class</code> wider than the vault</td>
+<td>Adoption MUST fail. An entry cannot widen the vault&#39;s privacy upper bound.</td>
+</tr>
+<tr>
+<td>Backup of vault material that broadens locality or disclosure</td>
+<td>Refused at the policy layer (per <code>#1816</code> §&quot;Locality and privacy inheritance&quot;).</td>
+</tr>
+<tr>
+<td>Private overlay binding referenced but <code>#1767</code> types not yet implemented</td>
+<td>Vault MAY enter a <code>pending-overlay</code> state where local-only operation is allowed; the binding is recorded but inert until <code>#1767</code>&#39;s implementation lands. Surface the gap in the steward cockpit.</td>
+</tr>
+<tr>
+<td>Mobile cache treated as canonical</td>
+<td>Bug per <code>#1816</code>. Cache MUST NOT be registered as an artifact.</td>
+</tr>
+<tr>
+<td>Registry surfaces vault contents in a dashboard</td>
+<td>Bug. Refuse at the dashboard layer; record the attempt.</td>
+</tr>
+<tr>
+<td>Artifact class outside the closed taxonomy</td>
+<td>Refused. New classes require ADR amendment.</td>
+</tr>
+<tr>
+<td>Replication of a <code>PrivateOverlay</code> artifact into <code>FederationMirrored</code> or <code>CommonsPublic</code></td>
+<td>Refused per <code>#1816</code> <code>ReplicationPolicy</code> constraint.</td>
+</tr>
+<tr>
+<td>Stale policy reference (artifact points at deprecated <code>BackupPolicy</code> version)</td>
+<td>Domain MUST amend its <code>DomainPolicy</code> via governance before continuing; same fail-closed pattern as <code>ccl-policy-registry.md</code> and <code>storage-durability-policies.md</code>.</td>
+</tr>
+</tbody></table>
+<p>Cross-cutting rule (matches the prior six architecture specs): <strong>fail closed, surface honestly, never silently fall back.</strong></p>
+<h2>First safe implementation slice</h2>
+<p>Per #1798&#39;s fifth acceptance criterion (&quot;Spec identifies first safe implementation slice without starting it&quot;). The candidate is:</p>
+<blockquote>
+<p><strong><code>ArtifactRegistry</code> v0 schema and <code>Document</code> artifact-class wire-stable record, with read-only registry surface for the steward cockpit.</strong></p>
+</blockquote>
+<p>Why this slice first:</p>
+<ul>
+<li>The <code>Document</code> class has the most active need (per <code>#1536</code>&#39;s typed institutional memory).</li>
+<li>A read-only registry surface exercises the metadata model without committing to write paths (which need <code>BackupPolicy</code> and <code>ArchivePolicy</code> from <code>#1816</code> to be implemented first; those policies carry the retention fields that the artifact&#39;s <code>retention_policy_ref</code> resolves to).</li>
+<li>It does not require <code>ScopedVault</code> implementation: documents in this slice are public-by-policy or members-only (not vault-backed). Vault-backed artifact classes (<code>PrivateEvidence</code>) are deferred to the slice after <code>#1767</code> lands.</li>
+<li>It does not require encryption (<code>#1767</code> not yet implemented).</li>
+<li>Steward cockpit (<code>#1795</code>) is the natural first reader; member shell (<code>#1818</code>) is the second reader.</li>
+</ul>
+<p>This is a recommendation, not a commitment. The actual implementation tranche order is for the user.</p>
+<h2>Relationship to sibling work</h2>
+<p>Cross-link, do not duplicate.</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Where it lives</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Storage durability policies (<code>StorageSpec</code>, <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, <code>IntegrityPolicy</code> — retention is a field inside <code>BackupPolicy</code> / <code>ArchivePolicy</code>, not a separate <code>RetentionPolicy</code> object)</td>
+<td><code>docs/spec/storage-durability-policies.md</code> (<code>#1816</code>, merged via PR #1823).</td>
+</tr>
+<tr>
+<td>Governed service binding (<code>StorageSpec</code> lives in the binding)</td>
+<td><code>docs/spec/governed-service-binding.md</code> (<code>#1815</code>, merged via PR #1822).</td>
+</tr>
+<tr>
+<td><code>InstitutionalDomain</code> + <code>DomainPolicy</code> (the domain adopts vault + artifact policies)</td>
+<td><code>docs/spec/institutional-domain.md</code> (<code>#1820</code>, merged via PR #1820).</td>
+</tr>
+<tr>
+<td>Effect dispatch contract (Stage 5 evidence; receipt classes)</td>
+<td><code>docs/spec/effect-dispatch-contract.md</code> (<code>#1819</code>, merged via PR #1819).</td>
+</tr>
+<tr>
+<td>CCL policy registry (artifact-related policy adoption)</td>
+<td><code>docs/spec/ccl-policy-registry.md</code> (<code>#1821</code>, merged via PR #1821).</td>
+</tr>
+<tr>
+<td>Integrated cooperative operating model (storage as custody)</td>
+<td><code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> (<code>#1793</code>, merged via PR #1814).</td>
+</tr>
+<tr>
+<td>Foundational storage canon (<code>StorageClass</code>, <code>DataLocality</code>, <code>StorageValidationError</code>)</td>
+<td><code>docs/state/storage-governance-spec.md</code> + <code>icn/crates/icn-kernel-api/src/storage.rs</code>.</td>
+</tr>
+<tr>
+<td>Private data disclosure boundary (<code>PrivacyClass</code>, <code>DisclosurePolicy</code>, <code>PrivateObjectRef</code>, <code>AccessReceipt</code>, <code>ExportReceipt</code>, <code>RedactionMap</code>)</td>
+<td><code>#1792</code>.</td>
+</tr>
+<tr>
+<td>Encrypted distributed private-overlay storage (key custody for vault)</td>
+<td><code>#1767</code>.</td>
+</tr>
+<tr>
+<td>Typed institutional memory / documents (<code>InstitutionalDocument</code> doc_type)</td>
+<td><code>#1536</code>.</td>
+</tr>
+<tr>
+<td>Institutional process substrate (evidence packets)</td>
+<td><code>#1748</code>.</td>
+</tr>
+<tr>
+<td>Obligation / allocation / settlement primitives (<code>SettlementRecord</code> class)</td>
+<td><code>#1634</code>.</td>
+</tr>
+<tr>
+<td>Network anti-entropy proof loops (replication convergence surface)</td>
+<td><code>#1799</code>.</td>
+</tr>
+<tr>
+<td>Compute placement (resource allocation for storage-providing workloads)</td>
+<td><code>#1801</code>.</td>
+</tr>
+<tr>
+<td>Member shell v0 (member-facing artifact rendering)</td>
+<td><code>#1818</code>.</td>
+</tr>
+<tr>
+<td>Steward cockpit v0 (operator-facing registry surface)</td>
+<td><code>#1795</code>.</td>
+</tr>
+<tr>
+<td>Receipt and provenance proof envelope (<code>ArtifactReceipt</code> Layer 2)</td>
+<td>ADR-0026.</td>
+</tr>
+<tr>
+<td>Constitutional object model (<code>AuthorityClass</code>, <code>Mandate</code>)</td>
+<td>ADR-0014.</td>
+</tr>
+<tr>
+<td>Commons compute admission and settlement (<code>ComputeReceipt</code>)</td>
+<td>ADR-0031.</td>
+</tr>
+</tbody></table>
+<h2>Open questions and deferred decisions</h2>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Deferred to</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Wire-stable schema for <code>ArtifactRegistry</code> and <code>ScopedVault</code> records</td>
+<td>Follow-up <code>schema(storage): define ArtifactRegistry and ScopedVault persisted records</code>.</td>
+</tr>
+<tr>
+<td>Closed taxonomy of <code>artifact_class</code> values past v0</td>
+<td>ADR amendment per new class.</td>
+</tr>
+<tr>
+<td>Typed-metadata schemas for each artifact class (<code>Document</code>, <code>ComputeOutput</code>, <code>EvidencePacket</code>, <code>PrivateEvidence</code>, <code>Backup</code>, <code>SettlementRecord</code>)</td>
+<td>Each class&#39;s source spec: <code>#1536</code>, <code>#1815</code> / <code>#1822</code>, <code>#1748</code>, <code>#1792</code>, <code>#1816</code>, <code>#1634</code>.</td>
+</tr>
+<tr>
+<td>Encryption / key model for <code>ScopedVault</code> (the <code>encryption_key_model_placeholder</code> slot)</td>
+<td><code>#1767</code>.</td>
+</tr>
+<tr>
+<td>Distributed private-overlay binding shape</td>
+<td><code>#1767</code>.</td>
+</tr>
+<tr>
+<td><code>AccessReceipt</code> / <code>ExportReceipt</code> envelope (Rust type, persistence, audit-query surface)</td>
+<td><code>#1792</code> and the receipt-envelope follow-ups for <code>#1816</code>.</td>
+</tr>
+<tr>
+<td>Registry read-only surface for the steward cockpit (the first safe implementation slice)</td>
+<td><code>#1795</code>.</td>
+</tr>
+<tr>
+<td>Member-shell rendering of artifacts</td>
+<td><code>#1818</code>.</td>
+</tr>
+<tr>
+<td>Replication convergence verification for artifact metadata</td>
+<td><code>#1799</code>.</td>
+</tr>
+<tr>
+<td><code>ProvenanceQuery</code> (Layer 4 surface for cross-coop artifact discovery)</td>
+<td>ADR-0026 §4; tracked under <code>#1438</code>.</td>
+</tr>
+<tr>
+<td>Reconciliation of the 7-class custody taxonomy with the 3-variant kernel <code>StorageClass</code> enum</td>
+<td>Carried from <code>#1816</code>; not in scope here.</td>
+</tr>
+</tbody></table>
+<h2>Non-claims (repeated for clarity)</h2>
+<ul>
+<li>This document does not introduce <code>ArtifactRegistry</code> or <code>ScopedVault</code> as Rust types. They remain forward-direction.</li>
+<li>It does not introduce schema, wire format, or contract changes.</li>
+<li>It does not redefine <code>ArtifactReceipt</code> (the existing Layer 2 receipt) or any of the other types it references — kernel-api types (<code>Hash</code>, <code>Did</code>, <code>Signature</code>, <code>StorageClass</code>, <code>DataLocality</code>); forward-direction <code>#1792</code> proposals (<code>PrivacyClass</code>, <code>DisclosurePolicy</code>, <code>PrivateObjectRef</code>, <code>AccessReceipt</code>, <code>ExportReceipt</code>, <code>RedactionMap</code>); merged <code>#1816</code> policy objects (<code>StorageSpec</code>, <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, <code>IntegrityPolicy</code>). The spec also does not invent a <code>RetentionPolicy</code> object; <code>#1816</code> does not define one (retention lives inside <code>BackupPolicy</code> and <code>ArchivePolicy</code>).</li>
+<li>It does not specify encryption, key custody, or the distributed private-overlay protocol. Those are tracked under <code>#1767</code>.</li>
+<li>It does not authorize mutation of any deployed infrastructure (DNS, K3s, Forgejo, identity-bridge, gateway, blob storage backends).</li>
+<li>It does not claim production readiness.</li>
+<li>It does not claim live inter-cooperative federation.</li>
+<li>It does not claim any partner federation is operating under these primitives today. NYCN appears nowhere in the spec; institution-package vocabulary stays in institution packages.</li>
+<li>It does not use payment, wallet, balance, currency, or blockchain as ICN-native framing. The discipline list in <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> §&quot;Vocabulary discipline&quot; applies in full.</li>
+<li>It does not by itself close <code>#1798</code>. The PR uses <code>Refs:</code>.</li>
+</ul>
+<h2>Related documents and issues</h2>
+<p>Architecture and spine:</p>
+<ul>
+<li><code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> — §&quot;Storage as custody&quot; (the seven-class custody taxonomy this spec extends).</li>
+<li><code>docs/architecture/KERNEL_APP_SEPARATION.md</code> — meaning firewall; the kernel never imports artifact / vault types.</li>
+<li><code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> — generic shapes vs. package vocabulary; the registry holds generic <code>artifact_class</code>, packages carry typed metadata.</li>
+<li><code>docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md</code> — design-direction overview.</li>
+</ul>
+<p>Specs (siblings and parent):</p>
+<ul>
+<li><code>docs/spec/storage-durability-policies.md</code> — durability policies the registry references.</li>
+<li><code>docs/spec/governed-service-binding.md</code> — <code>StorageSpec</code> references the registry.</li>
+<li><code>docs/spec/institutional-domain.md</code> — <code>DomainPolicy</code> adopts vault and artifact policies.</li>
+<li><code>docs/spec/effect-dispatch-contract.md</code> — Stage 5 receipts the registry&#39;s <code>receipt_refs</code> carry.</li>
+<li><code>docs/spec/ccl-policy-registry.md</code> — policy adoption is a CCL-evaluated governance act.</li>
+<li><code>docs/spec/KERNEL_CONTRACTS.md</code> — kernel primitive contracts.</li>
+</ul>
+<p>State and design:</p>
+<ul>
+<li><code>docs/state/storage-governance-spec.md</code> — foundational <code>StorageClass</code> / <code>DataLocality</code> canon.</li>
+<li><code>docs/design/compute-classes.md</code> — runtime classes that produce <code>ComputeOutput</code> artifacts.</li>
+</ul>
+<p>ADRs:</p>
+<ul>
+<li>ADR-0014 — Constitutional Object Model.</li>
+<li>ADR-0019 — Authority Grant Minting and Mandate Persistence Seam.</li>
+<li>ADR-0025 — Institutional Effect Record Canonical Schema (proposed).</li>
+<li>ADR-0026 — Receipt and Provenance Proof Envelope (<code>ArtifactReceipt</code> Layer 2).</li>
+<li>ADR-0027 — Action Card Contract.</li>
+<li>ADR-0030 — Compute Workload Manifest and Authority Boundary.</li>
+<li>ADR-0031 — Commons Compute Admission and Settlement Policy (<code>ComputeReceipt</code>).</li>
+</ul>
+<p>Code surface (existing types this spec references):</p>
+<ul>
+<li><code>icn/crates/icn-kernel-api/src/proofs.rs</code> — <code>ArtifactReceipt</code> (line 30; Layer 2 of ADR-0026 for blob transfers).</li>
+<li><code>icn/crates/icn-kernel-api/src/storage.rs</code> — <code>StorageClass</code> (line 53), <code>DataLocality</code> (line 155), <code>StorageValidationError</code> (line 272).</li>
+<li><code>icn/crates/icn-store/src/blob_store.rs</code> — hybrid blob store (sled metadata + filesystem blobs).</li>
+<li><code>icn/crates/icn-store/src/lib.rs</code> — persistent KV abstraction; <code>StorageChallenge</code>, <code>MerkleProof</code>, <code>PeerCache</code>, <code>MaintenanceManager</code>.</li>
+<li><code>icn/crates/icn-store/src/pos.rs</code> — proof-of-storage challenge system.</li>
+<li><code>icn/crates/icn-gateway/src/receipt_store.rs</code> — receipt persistence backend (sibling store to the future <code>ArtifactRegistry</code>).</li>
+<li><code>icn/crates/icn-governance/src/proof.rs</code> — <code>GovernanceProof</code>, <code>GovernanceDecisionReceipt</code>, <code>GovernanceDecisionAttestation</code>.</li>
+</ul>
+<p>Issues:</p>
+<ul>
+<li><code>#1798</code> — this spec.</li>
+<li><code>#1793</code> — integrated operating model (merged via PR #1814).</li>
+<li><code>#1794</code> — institutional domain (merged via PR #1820).</li>
+<li><code>#1797</code> — effect dispatch contract (merged via PR #1819).</li>
+<li><code>#1815</code> — governed service binding (merged via PR #1822).</li>
+<li><code>#1816</code> — storage durability policies (merged via PR #1823).</li>
+<li><code>#1817</code> — CCL policy registry (merged via PR #1821).</li>
+<li><code>#1767</code> — encrypted distributed private-overlay storage.</li>
+<li><code>#1792</code> — private data disclosure boundary.</li>
+<li><code>#1536</code> — typed institutional memory / documents.</li>
+<li><code>#1748</code> — institutional process substrate.</li>
+<li><code>#1634</code> — obligation / allocation / settlement primitives.</li>
+<li><code>#1799</code> — network anti-entropy proof loops.</li>
+<li><code>#1801</code> — compute placement.</li>
+<li><code>#1818</code> — member shell v0.</li>
+<li><code>#1795</code> — steward cockpit v0.</li>
+<li><code>#1438</code> — <code>ProvenanceQuery</code> Layer 4 surface (forward).</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

@@ -1,0 +1,297 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-05-14 (artifact registry and scoped vault spec) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>handoff 2026 05 14 artifact registry and scoped vault</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/handoff-2026-05-14-artifact-registry-and-scoped-vault.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-05-14 (artifact registry and scoped vault spec)</h1>
+<h2>Session Goal</h2>
+<p>Define <code>ArtifactRegistry</code> v0 (the institutional record of content-addressed artifacts and their metadata) and <code>ScopedVault</code> (the privacy-enforced container for restricted objects) as design-level forward-direction primitives, and the boundary between them. Make the artifact / vault custody classes named in <code>#1816</code>&#39;s merged storage-durability spec precise enough that implementation work can be safely filed.</p>
+<h2>Decisive Test</h2>
+<p>Can a downstream implementer — looking only at this spec plus the canon it harmonizes with — name (1) what the registry holds at design granularity (16 fields), (2) what the vault holds (10 fields), (3) how <code>ArtifactReceipt</code> (existing Layer 2 receipt) is distinct from the new <code>ArtifactRegistry</code> (the metadata record), (4) which canonical types are reused verbatim — kernel-api types (<code>Hash</code>, <code>Did</code>, <code>Signature</code>, <code>StorageClass</code>, <code>DataLocality</code>, <code>ArtifactReceipt</code>), merged <code>#1816</code> policy objects (<code>StorageSpec</code>, <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, <code>IntegrityPolicy</code>), forward-direction <code>#1792</code> proposals (<code>PrivacyClass</code>, <code>DisclosurePolicy</code>, <code>PrivateObjectRef</code>, <code>AccessReceipt</code>, <code>ExportReceipt</code>, <code>RedactionMap</code>) — and which are explicitly not invented here (no <code>RetentionPolicy</code> object in <code>#1816</code>; <code>#1792</code>&#39;s seven-variant <code>PrivacyClass</code> is forward-direction, separate from existing <code>PrivacyClass</code> enums in <code>icn-kernel-api/src/compute.rs</code> and <code>icn-boundary/src/types.rs</code>), (5) the closed <code>artifact_class</code> taxonomy and how each class connects to its source spec, (6) the six integration points (documents, compute outputs, evidence packets, private evidence, cache, replication), (7) the first safe implementation slice? If yes, the spec has done its job.</p>
+<hr>
+<h2>Final State (Verified)</h2>
+<!-- TRUTH TYPE: Implementation truth — only facts confirmed by commands or code inspection -->
+
+<h3><code>main</code> HEAD</h3>
+<p><code>5461fd91d</code> — <code>docs(spec): define storage durability policy objects (#1823)</code> (merged earlier today).</p>
+<h3>Open PRs</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Branch</th>
+<th>State</th>
+<th>CI Status</th>
+<th>Blocker</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1824</td>
+<td><code>spec/artifact-registry-and-scoped-vault</code></td>
+<td>OPEN</td>
+<td>All required checks passed on commit <code>91670761a</code> (the initial spec push). A review-feedback fix commit follows this handoff edit and must re-run CI before merge.</td>
+<td>Awaiting CI re-run on the fix commit, then mergeability re-check.</td>
+</tr>
+<tr>
+<td>#1790</td>
+<td>dependabot (pilot-ui dev deps)</td>
+<td>OPEN</td>
+<td>n/a</td>
+<td>Out of session scope</td>
+</tr>
+<tr>
+<td>#1791</td>
+<td>dependabot (ts-sdk dev deps)</td>
+<td>OPEN</td>
+<td>n/a</td>
+<td>Out of session scope</td>
+</tr>
+</tbody></table>
+<h3>Branches</h3>
+<ul>
+<li><code>spec/artifact-registry-and-scoped-vault</code> — pushed to origin. Last verified head before this fix: <code>91670761a</code>. The head moves with each push; check <code>git rev-parse HEAD</code> after the next push for the current SHA.</li>
+<li>Local <code>main</code> advanced to <code>1842e9839</code> after PR #1825 (entity-scope vocabulary boundary) merged.</li>
+</ul>
+<h3>Issues</h3>
+<ul>
+<li><code>#1798</code> — OPEN. PR #1824 uses <code>Refs:</code>, not <code>Closes:</code>.</li>
+<li><code>#1816</code> — OPEN (deferred closure decision; merged via PR #1823).</li>
+<li><code>#1815</code>, <code>#1817</code>, <code>#1820</code>, <code>#1819</code>, <code>#1814</code> — sibling spec parent issues, all OPEN per the user&#39;s deferred-closure pattern.</li>
+<li><code>#1767</code>, <code>#1792</code>, <code>#1799</code>, <code>#1801</code>, <code>#1818</code>, <code>#1748</code>, <code>#1634</code>, <code>#1536</code>, <code>#1795</code>, <code>#1438</code> — sibling and forward-direction issues, all OPEN.</li>
+</ul>
+<hr>
+<h2>What Changed</h2>
+<!-- TRUTH TYPE: Execution truth — actions taken this session -->
+
+<h3>1. Spec doc drafted (<code>docs/spec/artifact-registry-and-scoped-vault.md</code>, ~420 lines)</h3>
+<p>The doc:</p>
+<ul>
+<li><strong>Defines <code>ArtifactRegistry</code> v0 at object granularity</strong> with the 16 fields named in #1798&#39;s scope: identity (<code>artifact_id</code>, <code>content_hash</code>), storage backend reference (<code>blob_location</code> — either a content-addressed path or a <code>PrivateObjectRef</code> per #1792, <code>mime_type</code>, <code>size</code>), classification (<code>artifact_class</code>, <code>scope</code>), provenance (<code>created_by</code>, <code>created_at</code>, <code>provenance_refs</code>), policy references (<code>access_policy_ref</code>, <code>retention_policy_ref</code>), receipts (<code>receipt_refs</code>), versioning (<code>version_ref</code>, <code>parent_refs</code>), and exportability (closed class set).</li>
+<li><strong>Defines <code>ScopedVault</code> at object granularity</strong> with the 10 fields named in #1798: identity and ownership (<code>vault_id</code>, <code>owning_scope</code>), privacy (<code>privacy_class</code> per #1792, <code>encryption_key_model_placeholder</code> deferred to #1767), access and retention (<code>access_policy</code> per #1792&#39;s <code>DisclosurePolicy</code>, <code>retention_policy</code> per #1816, <code>backup_export_policy</code>), receipts (<code>access_receipt_requirement</code>, <code>export_receipt_requirement</code> both per #1792), and private-overlay binding (deferred to #1767).</li>
+<li><strong>Surfaces the <code>ArtifactReceipt</code> vs <code>ArtifactRegistry</code> distinction</strong> in its own section. <code>ArtifactReceipt</code> (existing Layer 2 receipt at <code>icn-kernel-api/src/proofs.rs:30</code>) proves a blob transfer; <code>ArtifactRegistry</code> (this spec&#39;s new record) describes that an artifact exists and what governs it. They share a name root and are intentionally separable; the registry&#39;s <code>receipt_refs</code> field may point at <code>ArtifactReceipt</code> instances among other receipt classes.</li>
+<li><strong>Specifies a closed <code>artifact_class</code> taxonomy at v0:</strong> <code>Document</code> (per #1536), <code>ComputeOutput</code> (per #1815), <code>EvidencePacket</code> (per #1748), <code>PrivateEvidence</code> (per #1792), <code>Backup</code> (per #1816), <code>SettlementRecord</code> (per #1634), <code>Other</code> (forward-direction placeholder). Closed at the kind level (no silent expansion); open at the typed-metadata level (each class layers fields from its source spec).</li>
+<li><strong>Maps the six integration points</strong> named in #1798: documents as typed artifact metadata; compute outputs as artifacts with review state; evidence packets as redacted/exportable bundles; private evidence as vault-backed <code>PrivateObjectRef</code>s; mobile cache as disposable derived (NOT canonical — matches #1816&#39;s &quot;cache treated as canonical is a bug&quot; rule); replication policy tied to privacy class (per #1816).</li>
+<li><strong>Specifies receipt expectations</strong> for ten lifecycle transitions. No new receipt class introduced; existing classes from <code>effect-dispatch-contract.md</code> §&quot;Receipt class summary&quot; and #1792&#39;s taxonomy are reused verbatim.</li>
+<li><strong>Six boundary rules</strong> drawn directly from #1798: no large blobs in generic KV; no private vault contents in dashboards; no bypass of receipt/provenance; registry does not interpret institution-specific meaning; vault is not a generic dumping ground; no encryption/runtime in this spec.</li>
+<li><strong>Thirteen-row failure / safety table</strong> with deterministic responses for missing fields, scope authority overreach, missing AccessReceipt, vault privacy upper-bound violation, locality/disclosure broadening, replication crossing privacy class, mobile cache treated as canonical, dashboard exposure of vault contents, unknown artifact_class, stale policy reference, etc. Cross-cutting rule: <strong>fail closed, surface honestly, never silently fall back.</strong></li>
+<li><strong>Identifies the first safe implementation slice:</strong> <code>ArtifactRegistry</code> v0 schema + <code>Document</code> artifact-class + read-only steward-cockpit registry surface. Recommended because it has the most active need (per #1536), exercises metadata model without committing to write paths, doesn&#39;t require ScopedVault or encryption.</li>
+<li><strong>Eleven open questions</strong> with named forward homes.</li>
+<li><strong>Acknowledges the lesson from #1823 review:</strong> the spec uses &quot;design-level&quot; / &quot;object granularity&quot; framing, NOT &quot;wire-stable form.&quot; Foundational canon (<code>storage-governance-spec.md</code>) is named separately from the merged sibling specs.</li>
+</ul>
+<h3>2. Registered the doc (<code>docs/registry.toml</code>, +13 lines before the <code>storage-durability-policies.md</code> entry)</h3>
+<p>Same registry pattern as #1819 / #1820 / #1821 / #1822 / #1823: <code>category = &quot;architecture&quot;</code>, <code>status = &quot;draft&quot;</code>, no <code>truth_class</code> / <code>role</code> overrides (lets the <code>docs/spec/</code> prefix default supply <code>truth_class = &quot;normative&quot;</code>, <code>role = &quot;spec&quot;</code>). Carries description, last_updated / last_reviewed, owner, audiences, domain_tags, depends_on, recommended_action.</p>
+<h3>3. Added the spec to <code>docs/INDEX.md</code> Specifications section</h3>
+<p>Proactively. INDEX.md&#39;s Specifications section now lists all seven recent specs (KERNEL_CONTRACTS, effect-dispatch, institutional-domain, ccl-policy-registry, governed-service-binding, storage-durability-policies, artifact-registry-and-scoped-vault).</p>
+<h3>4. Regenerated <code>docs/DOCUMENT_REGISTRY.md</code></h3>
+<p>Via <code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict --write-document-registry docs/DOCUMENT_REGISTRY.md</code>. Diff is small (corpus 805 → 807 markdown files — two new files added by this PR: the spec doc and the handoff; explicit rows updated; <code>Last Reviewed</code> 2026-05-14).</p>
+<h3>5. Followed all prior review-cycle lessons proactively</h3>
+<ul>
+<li>YAML frontmatter <code>Status: normative</code>; matches <code>docs/spec/</code> prefix default.</li>
+<li>Doc opening labeled &quot;spec, work-in-progress.&quot;</li>
+<li>&quot;Design-level policy contract&quot; / &quot;object granularity&quot; framing (NOT &quot;wire-stable form&quot; — lesson from #1823 Copilot review).</li>
+<li>Foundational canon (<code>storage-governance-spec.md</code>) named SEPARATELY from merged sibling specs (lesson from #1823 Copilot review).</li>
+<li>The <code>ArtifactReceipt</code> vs <code>ArtifactRegistry</code> name-collision distinction surfaced front-and-center (lesson from the Codex P2 catch on #1822 PrivacyClass naming).</li>
+<li>Verified all 26 cross-link targets exist before commit.</li>
+<li>Used canonical vocabulary verbatim: from kernel-api — <code>Hash</code>, <code>Did</code>, <code>Signature</code>, <code>StorageClass</code>, <code>DataLocality</code>, <code>StorageValidationError</code>, <code>ArtifactReceipt</code>; from merged <code>#1816</code> — <code>StorageSpec</code>, <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, <code>IntegrityPolicy</code> (<code>#1816</code> does <strong>not</strong> define <code>RetentionPolicy</code>); from forward-direction <code>#1792</code> — <code>PrivacyClass</code>, <code>DisclosurePolicy</code>, <code>PrivateObjectRef</code>, <code>AccessReceipt</code>, <code>ExportReceipt</code>, <code>RedactionMap</code> (treated as proposed names, not existing types); plus <code>GovernanceProof</code>, <code>GovernanceDecisionReceipt</code>, <code>Mandate</code>, <code>AuthorityClass</code>, <code>EffectManifest</code>, <code>ComputeReceipt</code>, <code>DomainPolicy</code>, <code>GovernedServiceBinding</code>, <code>WorkloadManifest</code> from the rest of the canon.</li>
+<li>Forbidden vocabulary appears only in the explicit anti-claim sentence in §&quot;Non-claims.&quot;</li>
+<li>Handoff in HANDOFF_TEMPLATE.md format with truthful Final State (the lesson from #1820/#1822/#1823 reviews — no &quot;PR not yet open&quot; / &quot;expected number&quot; / &quot;OPEN after push&quot; / &quot;local at head pending push&quot; provisional language). Note: this section is labeled &quot;Final State (Verified)&quot; before the PR exists; the next session edits this section to record the verified PR number, head SHA, and CI history after the PR is opened (the pattern repeated across the prior six PRs&#39; first commit-then-fix cycle).</li>
+<li>Acknowledged the AGENTS.md vs HANDOFF_TEMPLATE.md handoff-path drift (carried from #1820 review). Not in this PR&#39;s scope.</li>
+</ul>
+<h3>6. Drafted follow-up issues (not filed)</h3>
+<p>Per the established pattern. Seven titles in §&quot;Next Move&quot; below.</p>
+<hr>
+<h2>What&#39;s Open</h2>
+<!-- TRUTH TYPE: Execution truth — known incomplete work -->
+
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Branch created (<code>spec/artifact-registry-and-scoped-vault</code>).</li>
+<li><input checked="" disabled="" type="checkbox"> Spec doc drafted; registry updated; INDEX.md updated; DOCUMENT_REGISTRY.md regenerated.</li>
+<li><input checked="" disabled="" type="checkbox"> Validation suite passed locally. <em>(doc_control_check pass with 54 pre-existing/generated-doc warnings; lint-arch CLEAN; compliance_linter clean; freshness exit 1 from pre-existing <code>docs/ARCHITECTURE.md</code> staleness — same pattern as #1814 / #1819 / #1820 / #1821 / #1822 / #1823.)</em></li>
+<li><input disabled="" type="checkbox"> Commit + push.</li>
+<li><input disabled="" type="checkbox"> Open PR.</li>
+<li><input disabled="" type="checkbox"> Watch CI on the initial head.</li>
+<li><input disabled="" type="checkbox"> Address any valid AI-reviewer feedback (Copilot/Codex) using the verified-rebuttal pattern from the prior six PRs.</li>
+<li><input disabled="" type="checkbox"> Per the established session pattern: <strong>&quot;Apply valid feedback only. Stop and summarize unless the user explicitly tells you to merge after clean review.&quot;</strong> Wait for explicit merge instruction.</li>
+<li><input disabled="" type="checkbox"> Decide whether to file the follow-up issue drafts listed in §&quot;Next Move §5&quot; (deferred to user).</li>
+<li><input disabled="" type="checkbox"> After <code>#1798</code> lands, the next safe architecture spec is <code>#1799</code> (network anti-entropy proof loops) or <code>#1801</code> (compute placement) or <code>#1818</code> (member shell v0) — user&#39;s choice. The user explicitly asked not to start the next PR until the current is fully resolved.</li>
+</ul>
+<h3>Carried forward (not addressed in this PR)</h3>
+<p><strong><code>docs(agents): reconcile handoff path with HANDOFF_TEMPLATE.md</code></strong> — <code>AGENTS.md</code> lines 281–313 still say <code>docs/dev-journal/</code>; <code>docs/dev/HANDOFF_TEMPLATE.md</code> (lines 10, 109–111) and 17+ merged PRs use <code>docs/dev/</code>. The <code>docs/dev-journal/</code> directory does not exist. Surfaced in #1820 review; carried through #1821, #1822, #1823, and now this PR. Recommended one-line edit to AGENTS.md. <strong>Not addressed in this PR</strong> to keep scope tight.</p>
+<hr>
+<h2>Unsafe Assumptions</h2>
+<!-- Explicitly name anything this session relied on that was not verified -->
+
+<ul>
+<li><strong><code>ArtifactReceipt</code> shape in <code>icn-kernel-api/src/proofs.rs:30</code> is stable.</strong> Verified by reading the file. If a follow-up PR has amended the field set since this read, my &quot;registry&#39;s <code>receipt_refs</code> may point at <code>ArtifactReceipt</code>&quot; framing remains correct but the field-list summary in §&quot;<code>ArtifactReceipt</code> vs <code>ArtifactRegistry</code>&quot; may be incomplete.</li>
+<li><strong><code>PrivacyClass</code> taxonomy from #1792 is still 7 variants (<code>Public</code> / <code>MembersOnly</code> / <code>ScopeRestricted</code> / <code>PrivateOverlay</code> / <code>SecretCredential</code> / <code>ExternalCustodian</code> / <code>SealedUntil</code>).</strong> Verified via the Explore agent&#39;s read of the issue body. If a follow-up draft has amended that enum, my privacy-class references need a re-read.</li>
+<li><strong><code>#1536</code> proposes <code>InstitutionalDocument</code> with <code>doc_type</code> field.</strong> Verified via the Explore agent&#39;s read of the issue body. If <code>#1536</code> has been amended to use a different shape, my <code>Document</code> artifact-class description needs adjustment.</li>
+<li><strong><code>#1767</code> is forward work; no encryption / key-model code exists.</strong> Verified by the Explore agent&#39;s grep. If a parallel PR is adding <code>#1767</code>-related code, my &quot;encryption_key_model_placeholder&quot; framing may need to become more concrete.</li>
+<li><strong><code>ArtifactRegistry</code>, <code>ScopedVault</code>, <code>PrivateObjectRef</code>, <code>DisclosurePolicy</code>, generic <code>AccessReceipt</code>, <code>ExportReceipt</code>, <code>RedactionMap</code> do not exist in code today.</strong> Verified by grep. — <strong>Correction (added 2026-05-14, in response to Copilot review):</strong> the original Unsafe Assumption claimed &quot;no <code>PrivacyClass</code> enum exists in code.&quot; That was wrong. Two <code>PrivacyClass</code> enums already exist: <code>icn/crates/icn-kernel-api/src/compute.rs:217</code> (variants <code>Public</code> / <code>Member</code> / <code>NeedToKnow</code>, used by compute workload manifests; this is the same enum the Codex P2 catch surfaced on PR #1822) and <code>icn/crates/icn-boundary/src/types.rs:30</code> (variants <code>Public</code> / <code>EncryptedOverlay</code>). The seven-variant taxonomy proposed under <code>#1792</code> is a third interpretation; reconciliation is forward work. The spec body now surfaces the naming collision explicitly in §&quot;<code>ScopedVault</code> (object outline)&quot; → <code>privacy_class</code>, and the registry description reflects the same correction.</li>
+<li><strong><code>RetentionPolicy</code> is NOT a distinct policy object in <code>#1816</code>.</strong> Originally I framed <code>RetentionPolicy</code> as one of the merged storage-durability policy objects. That was wrong: <code>#1816</code> defines <code>StorageSpec</code> / <code>BackupPolicy</code> / <code>ReplicationPolicy</code> / <code>RecoveryPolicy</code> / <code>ArchivePolicy</code> / <code>IntegrityPolicy</code>. Retention is a <strong>field</strong> inside <code>BackupPolicy</code> (retention window) and <code>ArchivePolicy</code> (retention horizon), not its own object. The spec, registry description, and §&quot;Relationship to sibling work&quot; table have been corrected; the field name <code>retention_policy_ref</code> is retained as a descriptive identifier (a reference to whatever set of policies governs retention for the artifact / vault), but the surrounding text now correctly names which policy objects it resolves to.</li>
+<li><strong><code>storage-durability-policies.md</code> (merged via #1823) is unchanged on <code>main</code> since its merge.</strong> Read post-merge but did not diff against the most recent main HEAD. If an in-flight follow-up amends its §&quot;Storage class model&quot; rows, my cross-references may shift.</li>
+<li><strong>The 26 cross-link targets exist at session start.</strong> Verified by file-existence sweep before committing. If a downstream PR renames or removes one before <code>#1798</code> lands, the spec&#39;s link will rot.</li>
+</ul>
+<hr>
+<h2>Next Move</h2>
+<!-- TRUTH TYPE: Execution truth — the exact sequence for the next session -->
+
+<ol>
+<li>Commit and push.</li>
+<li>Open PR with <code>Refs: #1798</code> (not <code>Closes:</code>).</li>
+<li>Watch CI on the initial head. Expected: all required checks pass; non-required jobs skip (docs-only).</li>
+<li>Reply to any AI-reviewer threads using the verified-rebuttal pattern. For each comment: confirm or disconfirm against the live repo before applying.</li>
+<li>Per the established session pattern: <strong>&quot;Apply valid feedback only. Stop and summarize unless the user explicitly tells you to merge after clean review.&quot;</strong> Wait for explicit merge instruction.</li>
+<li><strong>Follow-up issue drafts (deferred; not filed in this PR):</strong><ul>
+<li><code>schema(storage): define ArtifactRegistry and ScopedVault persisted records</code> — wire-stable schema deliberately omitted.</li>
+<li><code>spec(storage): define artifact_class typed metadata schemas</code> — per-class metadata for <code>Document</code> (#1536), <code>ComputeOutput</code> (#1815), <code>EvidencePacket</code> (#1748), <code>PrivateEvidence</code> (#1792), <code>Backup</code> (#1816), <code>SettlementRecord</code> (#1634).</li>
+<li><code>spec(storage): define ScopedVault read enforcement contract</code> — how the vault enforces <code>access_policy</code> and emits <code>AccessReceipt</code> on every read.</li>
+<li><code>spec(storage): define ArtifactRegistry first-implementation-slice</code> — the Document-only read-only steward-cockpit slice (recommended in §&quot;First safe implementation slice&quot;).</li>
+<li><code>spec(member-shell): define member-facing artifact rendering</code> — likely overlaps <code>#1818</code>; flagged for triage.</li>
+<li><code>spec(steward-cockpit): define registry read-only surface</code> — likely overlaps <code>#1795</code>; flagged for triage.</li>
+<li><code>spec(provenance): connect ArtifactRegistry receipt_refs to ProvenanceQuery (Layer 4)</code> — integration with the forward-direction <code>ProvenanceQuery</code> surface (ADR-0026 §4, tracked under <code>#1438</code>).</li>
+</ul>
+</li>
+<li><strong>Separate process cleanup recommendation (carried from #1820 review):</strong> <code>docs(agents): reconcile handoff path with HANDOFF_TEMPLATE.md</code>. Not in this PR&#39;s scope.</li>
+</ol>
+<hr>
+<h2>Architectural Decisions</h2>
+<!-- TRUTH TYPE: Declared project truth changes (if any were made or ratified) -->
+
+<ol>
+<li><strong><code>ArtifactRegistry</code> and <code>ScopedVault</code> are distinct objects with distinct responsibilities.</strong> Registry records that an artifact exists and what governs it; vault enforces privacy on restricted artifacts. Both reference the same underlying <code>blob_location</code> mechanism but layer different policy enforcement on top.</li>
+<li><strong><code>ArtifactReceipt</code> (existing Layer 2 receipt) and <code>ArtifactRegistry</code> (new metadata record) are deliberately separable.</strong> They share a name root and have distinct purposes. The registry&#39;s <code>receipt_refs</code> field may point at <code>ArtifactReceipt</code> instances alongside other receipt classes.</li>
+<li><strong><code>artifact_class</code> is closed at the kind level, open at the typed-metadata level.</strong> New classes require ADR amendment. Each class&#39;s typed metadata layers on top of the registry&#39;s generic fields; the source spec for each class governs its typed shape.</li>
+<li><strong>Vault privacy class is the upper bound for entries.</strong> An entry cannot widen the vault&#39;s privacy class. This matches <code>#1816</code>&#39;s &quot;Locality and privacy inheritance&quot; rule and <code>#1792</code>&#39;s disclosure boundary.</li>
+<li><strong>No silent vault access; no silent export.</strong> Every successful read emits an <code>AccessReceipt</code>; every successful export emits an <code>ExportReceipt</code>. Failed access attempts are recorded as evidence (not buried in operational logs).</li>
+<li><strong>Mobile cache is disposable derived, not registered.</strong> Cache is reconstructible from the source artifact; treating it as canonical is a bug per <code>#1816</code>. Cache entries do not enter the registry.</li>
+<li><strong>The registry doesn&#39;t interpret institution-specific meaning.</strong> It carries <code>artifact_class</code> labels and points at the source spec for typed semantics. The boundary is the meaning firewall.</li>
+<li><strong>First safe implementation slice = <code>ArtifactRegistry</code> v0 + <code>Document</code> class + read-only steward-cockpit surface.</strong> Recommendation, not commitment.</li>
+</ol>
+<hr>
+<h2>Verification Commands</h2>
+<!-- Commands the next session should run to confirm starting state -->
+
+<pre><code class="language-bash">cd /home/matt/projects/icn
+
+# Branch + PR state
+git branch --show-current
+gh pr view &lt;pr-number&gt; --json state,mergeable,mergeStateStatus
+
+# Validation suite
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict
+python3 docs/scripts/lint-arch.py docs/spec/artifact-registry-and-scoped-vault.md --cargo icn/Cargo.toml
+python3 .github/scripts/compliance_linter.py
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+
+# Review thread state
+gh api repos/InterCooperative-Network/icn/pulls/&lt;pr-number&gt;/comments \
+  --jq &#39;.[] | {id, user: .user.login, line, in_reply_to_id, created_at}&#39;
+</code></pre>
+<p>Expected at session start before push: doc_control_check pass with 54 enforcement warnings (none on the new doc); lint-arch CLEAN (already verified); compliance_linter no violations; freshness-check exit 1 from pre-existing <code>docs/ARCHITECTURE.md</code> staleness.</p>
+<hr>
+<h2>Truth-Plane Notes</h2>
+<!-- Which truth types were relied on? Any known conflicts between layers? -->
+
+<ul>
+<li><strong>Declared project truth:</strong> loaded from <code>docs/STATE.md</code> and <code>docs/PHASE_PROGRESS.md</code>. No conflict surfaced.</li>
+<li><strong>Implementation truth:</strong> verified by Explore-agent reading of <code>icn-kernel-api/src/proofs.rs</code> (line 30: <code>ArtifactReceipt</code>), <code>icn-kernel-api/src/storage.rs</code> (lines 53, 155, 272: <code>StorageClass</code>, <code>DataLocality</code>, <code>StorageValidationError</code>), <code>icn-store/src/{blob_store, lib, pos}.rs</code>, <code>icn-gateway/src/receipt_store.rs</code>, <code>icn-governance/src/proof.rs</code>. No <code>ArtifactRegistry</code>, <code>ScopedVault</code>, <code>PrivateObjectRef</code>, <code>PrivacyClass</code> enum, <code>DisclosurePolicy</code>, <code>AccessReceipt</code> (generic), <code>ExportReceipt</code>, <code>RedactionMap</code>, or <code>RetentionPolicy</code> types exist today.</li>
+<li><strong>Execution truth:</strong> confirmed <code>main</code> HEAD <code>5461fd91d</code>, two dependabot PRs open, no other open PRs. <code>#1798</code> confirmed OPEN.</li>
+<li><strong>Known truth-plane conflict #1:</strong> <code>freshness-check.py</code> reports <code>docs/ARCHITECTURE.md</code> as carrying stale sections. CI workflow treats this as informational and reports SUCCESS; the script itself exits 1. Same pattern as the prior six architecture PRs.</li>
+<li><strong>Known truth-plane conflict #2 (carried, not in this PR):</strong> AGENTS.md vs <code>docs/dev/HANDOFF_TEMPLATE.md</code> disagree on handoff path. De-facto canon is <code>docs/dev/handoff-*.md</code> (used by 17+ merged PRs). Recommend separate scoped fix.</li>
+<li><strong>Forward dependency:</strong> This spec references <code>#1792</code> (<code>PrivacyClass</code>, <code>DisclosurePolicy</code>, <code>PrivateObjectRef</code>, <code>AccessReceipt</code>, <code>ExportReceipt</code>, <code>RedactionMap</code>) and <code>#1767</code> (encryption / key model) as forward direction. Implementation of those types is the prerequisite for the full <code>ScopedVault</code> semantics; this spec names the slot without specifying their internals.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
