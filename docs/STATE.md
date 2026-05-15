@@ -1,10 +1,58 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-05-07
+Last Reviewed: 2026-05-15
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-05-15 (post architecture-spec sprint, PRs #1814 / #1819 / #1820 / #1821 / #1822 / #1823 / #1824 / #1825 / #1826 / #1827 / #1829 / #1830 / #1831 / #1832 / #1833):
+     Truth-sync for the architecture-spec sprint completion. **Doc/control-plane only**: no Rust code, no schema fields changed, no new contract URN, no new ADR, no new RFC, no new ADR-0026 receipt class, no kernel/gateway/runtime mutation, no K3s/DNS/Forgejo mutation, no NYCN partner data, no production-readiness claim, no live-federation claim, no formal NYCN pilot claim, no Phase 2 completion claim.
+
+     The sprint landed thirteen design-level architecture-spec PRs over 2026-05-14 → 2026-05-15:
+       - #1814 docs(architecture): integrated cooperative operating model spine (the ladder root).
+       - #1819 docs(spec): accepted-proposal effect dispatch contract (closed #1797 on merge).
+       - #1820 docs(spec): institutional domain and policy primitive.
+       - #1821 docs(spec): CCL policy registry and hook contract.
+       - #1822 docs(spec): governed service binding, workload manifest, and runtime provider.
+       - #1823 docs(spec): storage durability policy objects.
+       - #1824 docs(spec): ArtifactRegistry v0 and ScopedVault boundary.
+       - #1825 docs(architecture): entity-scope vocabulary boundary (LocalDomain not Coop).
+       - #1826 docs(spec): compute placement policy.
+       - #1827 docs(agents): reconcile handoff path with template (process-doc).
+       - #1829 docs(spec): network anti-entropy proof loops.
+       - #1830 docs(spec): member shell v0.
+       - #1831 docs(spec): steward cockpit v0 (drift-fix follow-up landed as #1832 after late post-merge reviewer feedback).
+       - #1832 fix(spec): correct steward cockpit review drift (four rounds of fixes: 8→9 field count, ADR-0027 14-field requirement, PlacementFallbackReceipt attribution + handoff timing, IA-row no longer routes through ADR-0027).
+       - #1833 docs(dev): wrap architecture spec sprint closure review (the sprint closure handoff with paste-ready closure-comment drafts, deduplicated follow-up roster, and recommended next-decision sequence).
+
+     Following #1833 the closure batch landed: nine sprint sibling issues closed with the paste-ready closure comments — #1794 (institutional domain), #1795 (steward cockpit), #1798 (ArtifactRegistry/ScopedVault), #1799 (network anti-entropy), #1801 (compute placement), #1815 (governed service binding), #1816 (storage durability), #1817 (CCL policy registry), #1818 (member shell v0). #1797 (effect dispatch) was already closed by #1819. All ten sprint sibling issues are now CLOSED at docs/spec level; none of the closures implies runtime-implementation completion.
+
+     First-batch follow-up issues filed from the deduplicated wrap-up roster (seven of the wrap-up's thirty-four drafts):
+       - #1834 schema(network): define AntiEntropyProbe and StateDigest records.
+       - #1835 schema(network): define DivergenceEvidence and RepairPlan records.
+       - #1836 schema(compute): wire-stable PlacementDecision and ExecutorAdmissionDecision schemas.
+       - #1837 spec(contracts): define steward required-action card contract (the #1831/#1832 gap — ADR-0027 is member-only; steward cards need a separate or amended contract).
+       - #1838 test(devnet): receipt-index anti-entropy fixture (Slice A).
+       - #1839 test(devnet): member shell read-only rendering rehearsal (Slice A).
+       - #1840 test(devnet): steward cockpit divergence-render fixture (Slice A).
+     Twenty-seven additional follow-up drafts remain in the wrap-up doc's deduplicated roster for separate batch decisions.
+
+     Cross-sprint disciplines preserved verbatim:
+       - No new ADR-0026 receipt classes. The sprint introduced design-level proof-artifact identifiers (PlacementDecision, RepairReceipt, DivergenceEvidence, PlacementFallbackReceipt, etc.) that ride inside existing Stage 5 EffectDispatchEvidence or Layer 2 ArtifactReceipt envelopes.
+       - No ADR-0027 support for steward required-action cards. ADR-0027 covers member ActionCards; the steward cockpit's fourteen operator scenarios cannot be represented by its closed enums. #1837 carries the gap.
+       - LocalDomain vocabulary (not Coop) per #1825 §C3. Existing serialized Coop-prefixed identifiers (DataLocality::CoopReplicated, ADR-0030 Coop(coop_id), bonds:payments gossip topic) are preserved with naming notes pending the rename follow-up.
+       - Execution budget is policy-facing; fuel_limit is the runtime field; capacity is reserved for executor/node resource availability.
+       - Settlement / position / obligation / allocation / receipt / provenance — never payment / wallet / currency / balance / token / crypto / blockchain / timebank — for ICN-native compute / settlement / federation surfaces.
+       - Member shell shows plain participation status; steward cockpit shows technical detail. When cockpit shows degraded, member shell must show degraded too — v0 violation otherwise (#1831 Design principle 9 + failure-table row).
+       - Privacy is posture, not content. Body bytes of PrivateEvidence artifacts never reach any rendering layer.
+       - The kernel never imports app-side rendering. Member shell, steward cockpit, and policy oracle outputs are all app-side per docs/architecture/KERNEL_APP_SEPARATION.md.
+
+     Phase 2 status remains ⏳ (still partner-bound). The Phase 2 *machinery* is now substantially richer at the design-level layer (twelve merged specs covering institutional domain, effect dispatch, CCL registry, governed service binding, storage durability, ArtifactRegistry/ScopedVault, scope vocabulary, compute placement, anti-entropy proof loops, member shell, steward cockpit); what remains for Phase 2 is the human procedure — present, formalize, rehearse against organizer material — plus the implementation work the follow-up roster names. The next concrete human gate is unchanged from the prior sync: organizer presentation → pilot formalization → first operator rehearsal per the NYCN rehearsal gate (in the partner repo).
+
+     Next pre-RFC architecture move is **not yet selected**; this sync preserves optionality. Candidate next moves enumerated descriptively only (not selected here): (a) batch-file the remaining twenty-seven follow-up drafts from the wrap-up roster; (b) implementation slice — `feat(compute): policy oracle for placement decisions (read-only proof-loop)` per #1826's named first implementation slice; (c) first fixture rehearsal — pick one of the three already-filed Slice A fixtures (#1838 / #1839 / #1840); (d) next spec-ladder doc — #1837 steward required-action card contract; (e) DAP runtime dogfood emitting at least one receipt under ADR-0026 for one DAP primitive (carried from previous sync); (f) idea-0019 runtime dogfood emitting additional ProcessTransitionReceipt classes (carried from previous sync); (g) idea-0019 visibility/privacy-boundary run with redaction in evidence export (carried); (h) idea-0019 accessibility-gate ProcessGateResult on a real surface (carried); (i) idea-0019 open-question triage (carried). Phase model classification is unchanged; see PHASE_PROGRESS.md for phase definitions.
+
+     Hard rule preserved: this sync does NOT change any contract field, does NOT mint a new contract URN, does NOT add an ADR, does NOT add an RFC, does NOT widen gateway typed governance imports, does NOT increase the meaning-firewall ratchet, does NOT touch K3s / DNS / GitHub / Forgejo state, does NOT handle private partner / member / organizer data, does NOT claim Phase 2 completion, does NOT claim formal NYCN pilot, does NOT claim production readiness, does NOT claim live federation, does NOT start runtime work, and does NOT start any Stage 1.5 / Stage 2 / Stage 3 / Stage 4 / Stage 5 work. Phase model unchanged. -->
 
 <!-- [sync edit] 2026-05-07 (post-#1761 / #1762 / #1763 / #1764):
      Truth-sync for the May-7 close-out cycle plus the ActionCard
@@ -649,9 +697,15 @@ Last Reviewed: 2026-05-07
      Aligned crate list, merged PRs, and metrics to verified repo state.
      Phase model unchanged — phase classification is governance territory (PR C). -->
 
-## Current status (2026-05-07 snapshot)
+## Current status (2026-05-15 snapshot)
 
-**Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate definition lives in the partner NYCN repo. The Phase 2 *machinery* is in place end-to-end; what remains is the human procedure — present, formalize, rehearse — and recording each step.
+**Current phase:** Phase 2 — Pilot Launch. NYCN is the intended first cooperative partner (active partnership track, not yet a formally committed pilot). The next concrete step is presenting the merged drive-ingest ladder + ICN proof-loop machinery + the now-complete architecture-spec ladder to NYCN organizers. Subsequent gates are pilot formalization, then first operator rehearsal against real (or fixture-equivalent) organizer material. The exact gate definition lives in the partner NYCN repo. The Phase 2 *machinery* is in place end-to-end at the runtime layer; the *contract* layer is now substantially richer at the design-level after the May-14/May-15 architecture-spec sprint. What remains is the human procedure — present, formalize, rehearse — and recording each step, plus the implementation work the closure batch's follow-up roster names.
+
+The 2026-05-14 → 2026-05-15 architecture-spec sprint landed thirteen design-level spec PRs plus one process-doc PR plus one wrap-up PR (fifteen PRs total): #1814 integrated cooperative operating model spine, #1819 accepted-proposal effect dispatch contract (closed #1797 on merge), #1820 institutional domain and policy primitive, #1821 CCL policy registry and hook contract, #1822 governed service binding / workload manifest / runtime provider, #1823 storage durability policy objects, #1824 ArtifactRegistry v0 and ScopedVault boundary, #1825 entity-scope vocabulary boundary (LocalDomain not Coop), #1826 compute placement policy, #1827 reconciled the AGENTS.md handoff path with the actual template convention, #1829 network anti-entropy proof loops, #1830 member shell v0, #1831 steward cockpit v0, #1832 steward cockpit drift fix (four rounds of post-merge fixes addressing late reviewer feedback that landed after #1831 merged), and #1833 architecture-spec sprint closure-review wrap-up. After #1833 merged, the nine remaining sprint-related sibling issues were closed at the docs/spec level: #1794, #1795, #1798, #1799, #1801, #1815, #1816, #1817, #1818. The first batch of follow-up issues from the wrap-up's deduplicated roster was filed (#1834–#1840): three schema follow-ups (AntiEntropyProbe/StateDigest, DivergenceEvidence/RepairPlan, PlacementDecision/ExecutorAdmissionDecision), the steward required-action card contract (#1837 — the ADR-0027-doesn't-cover-operator-scenarios gap surfaced by #1831 / #1832), and three first-slice fixture follow-ups (anti-entropy Slice A, member shell Slice A, cockpit Slice A). Twenty-seven additional follow-up drafts remain in the wrap-up doc's deduplicated roster for separate batch decisions.
+
+No closure of any sprint sibling issue implies runtime-implementation completion: every closure comment names the docs/spec-level scope explicitly. The deferred items (DataLocality::CoopReplicated rename, FuelLimit/fuel_limit code-level alignment with the `execution budget` policy-facing term, payment_rate/payment_currency legacy reconciliation on ComputeTask, PrivacyClass taxonomy reconciliation between ADR-0030 and the in-code variants, bonds:payments gossip-topic legacy preservation, AGENTS.md auto-commit-handoff behavioral rule reconciliation) are all carried in the wrap-up roster and remain explicit out-of-scope for the sprint closure. Phase 2 status is unchanged; the sprint did not implement, deploy, or claim partner pilot.
+
+The prior May-7 close-out cycle context is preserved below.
 
 The May-7 close-out cycle landed: #1761 closed the surfaced sled-flusher race (#1760), #1762 truth-synced STATE.md and PHASE_PROGRESS.md for the opaque receipt storage stack, #1763 / #1735 bumped Dependabot dev dependencies, and #1764 published the generic ActionCard contract surface for institution packages (bundled fictional example + draft-2020-12 validator script + expanded README mirroring the convention used by `validate-preview-review.py` and `validate-rehearsal-evidence.py`). #1764 closed #1713 with all six acceptance criteria met. No schema fields changed; the schema's `$id` remains DNS-backed under the schema-id audit's retain-temporarily decision (#1742 tracks the 2026-06-30 review). Phase 2 status is unchanged.
 
@@ -661,6 +715,21 @@ Active execution since the previous sync is mixed: the May-5 sequence was entire
 
 | PR | Title | Merged |
 |----|-------|--------|
+| #1833 | docs(dev): wrap architecture spec sprint closure review | 2026-05-15 |
+| #1832 | fix(spec): correct steward cockpit review drift | 2026-05-15 |
+| #1831 | docs(spec): define steward cockpit v0 | 2026-05-15 |
+| #1830 | docs(spec): define member shell v0 | 2026-05-15 |
+| #1829 | docs(spec): define network anti-entropy proof loops | 2026-05-15 |
+| #1827 | docs(agents): reconcile handoff path with template | 2026-05-15 |
+| #1826 | docs(spec): define compute placement policy | 2026-05-15 |
+| #1825 | docs(architecture): define entity-scope vocabulary boundary | 2026-05-15 |
+| #1824 | docs(spec): define ArtifactRegistry v0 and ScopedVault boundary | 2026-05-15 |
+| #1823 | docs(spec): define storage durability policy objects | 2026-05-14 |
+| #1822 | docs(spec): define governed service binding, workload manifest, and runtime provider | 2026-05-14 |
+| #1821 | docs(spec): define CCL policy registry and hook contract | 2026-05-14 |
+| #1820 | docs(spec): define institutional domain and policy primitive | 2026-05-14 |
+| #1819 | docs(spec): add accepted-proposal effect dispatch contract | 2026-05-14 |
+| #1814 | docs(architecture): add integrated cooperative operating model spine | 2026-05-14 |
 | #1764 | docs(contracts): publish ActionCard contract for institution packages | 2026-05-07 |
 | #1763 | deps(ts-sdk): bump the dev-dependencies group across 1 directory with 4 updates | 2026-05-07 |
 | #1735 | deps(pilot-ui): bump @axe-core/playwright in /web/pilot-ui | 2026-05-07 |
