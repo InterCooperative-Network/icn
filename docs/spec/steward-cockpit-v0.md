@@ -109,7 +109,7 @@ The v0 cockpit offers twelve surfaces. The list is the **minimum**; institution-
 
 | Surface | Purpose | Primary sources consumed |
 |---|---|---|
-| **Overview / Required Actions** | One-screen-at-a-glance: which conditions require steward action now, with priority. | All sub-surfaces feed this; ActionCards (per ADR-0027) drive the required-action queue. |
+| **Overview / Required Actions** | One-screen-at-a-glance: which conditions require steward action now, with priority. | All sub-surfaces feed this; steward required-action rendering analogs (per §"Required Actions / Steward Action Cards" below) drive the queue, pending a future steward required-action card contract. ADR-0027 member `ActionCard`s are not reused for operator-required-action scenarios. |
 | **Node Status** | Daemon health for the local node. | `icn-obs` metrics; `icn-core` supervisor surfaces. |
 | **Domain Status** | The `InstitutionalDomain` the steward is operating; policy version; standing read-model health. | `docs/spec/institutional-domain.md`; `/me/standing`; CCL policy registry. |
 | **Network / Federation** | Peer reachability, sync state, divergence, repair. | `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" (the nine fields verbatim, including Escalation status). |
