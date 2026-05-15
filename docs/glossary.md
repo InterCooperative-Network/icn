@@ -71,7 +71,7 @@ Attestation weight based on path length from organizational anchors. Members wit
 ## Organizations
 
 ### InstitutionalDomain
-The **structural scope** of a federation, cooperative, community, or other governed entity in ICN. The addressable, self-governing jurisdiction inside which authority decisions are legitimate. Specified in [`docs/spec/institutional-domain.md`](spec/institutional-domain.md).
+The **structural scope** of a governed entity in ICN — an `Individual`, `Cooperative`, `Community`, `Federation`, or another governed class permitted by domain policy. The addressable, self-governing jurisdiction inside which authority decisions are legitimate. Specified in [`docs/spec/institutional-domain.md`](spec/institutional-domain.md).
 
 An `InstitutionalDomain` is **not** an entity class. It is the scope the entity owns. Several entity classes can own a domain — see `owning entity class` below.
 
