@@ -1,0 +1,820 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Steward Cockpit v0 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>steward cockpit v0</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/steward-cockpit-v0.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Steward Cockpit v0</h1>
+<blockquote>
+<p><strong>Status: spec, work-in-progress.</strong> Defines the ICN steward cockpit as the operator-facing civic-infrastructure surface for node and domain stewards at v0. It is the operator/steward complement of <code>docs/spec/member-shell-v0.md</code> (merged #1830). It does <strong>not</strong> redefine any merged sibling spec, does <strong>not</strong> implement a dashboard, does <strong>not</strong> define new endpoints, and does <strong>not</strong> specify a frontend technology choice. The shell renders plain participation status; the cockpit renders technical detail. The PR introducing this doc advances <code>#1795</code> without closing it.</p>
+</blockquote>
+<!-- truth-class: normative -->
+
+<h2>Purpose</h2>
+<p>A node steward, a domain steward, and a federation steward show up to keep institutional infrastructure honest. The cockpit is what they see. It answers, in technical detail:</p>
+<ol>
+<li><strong>Is this node / domain healthy?</strong></li>
+<li><strong>Are peers reachable?</strong></li>
+<li><strong>Is gossip / federation syncing?</strong></li>
+<li><strong>Are receipts persisting?</strong></li>
+<li><strong>Are artifacts, replicas, backups, and scoped-vault references healthy?</strong></li>
+<li><strong>Are compute jobs authorized, bounded, and reviewable?</strong></li>
+<li><strong>Are accessibility and translation gates passing for member-facing surfaces?</strong></li>
+<li><strong>Are privacy boundaries intact?</strong></li>
+<li><strong>What requires steward action right now?</strong></li>
+<li><strong>What evidence proves each claim?</strong></li>
+</ol>
+<p>The cockpit makes stewardship legible <strong>without turning stewards into rulers</strong>. It surfaces obligations, warnings, receipts, authority basis, and repair paths. Every steward action runs through the same mandate / authority / receipt envelope as every other institutional action.</p>
+<p>The cockpit is the consumer side of: the 8-field steward-cockpit surface in <code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Steward cockpit surface&quot; (merged #1829), the 14-field operator/steward dashboard in <code>docs/spec/compute-placement-policy.md</code> §&quot;Operator / steward dashboard&quot; (merged #1826), the storage durability policy objects in <code>docs/spec/storage-durability-policies.md</code> (merged #1823), the artifact registry / scoped-vault posture in <code>docs/spec/artifact-registry-and-scoped-vault.md</code> (merged #1824), the governed-service-binding lifecycle &quot;Observe&quot; state (merged #1822), the CCL policy registry adoption surface (merged #1821), the institutional-domain policy hooks (merged #1820), and the Stage 5 effect-dispatch evidence (merged #1819).</p>
+<h2>Scope and non-goals</h2>
+<p><strong>In scope:</strong></p>
+<ul>
+<li>Six hard boundary lines distinguishing the cockpit from neighboring surfaces.</li>
+<li>Ten v0 design principles (stewardship-not-domination at the top).</li>
+<li>Twelve cockpit information-architecture surfaces.</li>
+<li>The Required Actions / Steward Action Card rendering contract for fourteen named operator scenarios.</li>
+<li>Per-surface rendering contracts that consume the merged sibling specs&#39; cockpit / dashboard surfaces verbatim.</li>
+<li>A closed v0 operator-facing status vocabulary plus the member-impact summary surface.</li>
+<li>A failure / safety table covering twenty operator-side concerns.</li>
+<li>Three fixture-first dogfood slices.</li>
+</ul>
+<p><strong>Not in scope (preserved out of this PR):</strong></p>
+<ul>
+<li>Not a dashboard frontend implementation. No HTML, CSS, JS, React component, Tauri / Electron / native shell, or any other UI technology decision.</li>
+<li>Not a backend endpoint specification. The cockpit consumes existing telemetry, governance, gateway, and proof surfaces; it does not extend them.</li>
+<li>Not a runtime, scheduler, gateway, or storage-backend change.</li>
+<li>Not a redefinition of any merged sibling spec, ADR, or <code>icn-obs</code> metric module.</li>
+<li>Not a redefinition of the steward / operator role. Role definitions belong to <code>DomainPolicy</code> (per <code>docs/spec/institutional-domain.md</code>) and to institution-package skins; the cockpit renders against whatever role the policy adopts.</li>
+<li>Not the node operator civic-role surface in Commons Shell (<code>#1613</code>). That is a separate operator-facing surface with its own contract; the boundary is documented below.</li>
+<li>Not a generic admin panel, fintech dashboard, balance / credit / token interface, payment surface, trading interface, surveillance console, or private-data viewer.</li>
+<li>Not a wallet, account-management dashboard, or any account-as-product framing.</li>
+<li>Not a production-dashboard claim. No clause of this spec is a claim that any operator is running an ICN-native cockpit against a real federation today.</li>
+<li>Not a K3s, DNS, Forgejo, deploy-script, or identity-bridge mutation.</li>
+<li>Not a NYCN-specific or named-partner-specific framing. Institution packages localize labels; the generic cockpit stays generic.</li>
+<li>Not closure of <code>#1795</code>. The PR introducing this doc uses <code>Refs:</code>; closure is left for separate review against the issue&#39;s acceptance criteria.</li>
+</ul>
+<h2>Boundary lines</h2>
+<h3>Steward cockpit vs. member shell (<code>#1830</code>)</h3>
+<p>The member shell renders <strong>plain participation status</strong> using the closed seven-string sync vocabulary from <code>#1829</code> and the closed seven-string execution-scope vocabulary from <code>#1826</code>. The cockpit renders <strong>technical detail</strong> using the operator-facing names: <code>DivergenceEvidence</code> class names, peer DIDs, digest forms, <code>policy_version_id</code> content hashes, mandate references, replica counts, backup timestamps.</p>
+<p>The same divergence event surfaces in both, in different vocabularies. The shell <strong>must not</strong> show cockpit technical detail (per <code>docs/spec/member-shell-v0.md</code> Boundary lines). The cockpit <strong>must not</strong> collapse to the shell&#39;s plain-language summary alone — every cockpit row shows technical detail under &quot;details&quot; even when the row&#39;s headline is plain-language for quick scanning.</p>
+<p>A steward who is also a member sees both surfaces in their respective contexts. The cockpit is the steward-context view; the shell is the member-context view of the same institution.</p>
+<h3>Steward cockpit vs. node operator civic-role surface (<code>#1613</code>)</h3>
+<p><code>#1613</code>&#39;s node operator civic-role surface in Commons Shell is a <strong>separate</strong> operator surface aimed at infrastructure operators of cooperative-operated nodes who are also performing civic roles inside the cooperative. The cockpit is the <strong>institutional</strong> stewardship surface: domain stewards, federation stewards, and any steward role a <code>DomainPolicy</code> adopts. The two surfaces may share underlying telemetry but their audience and authority context are distinct. This spec does not preempt <code>#1613</code>.</p>
+<h3>Steward cockpit vs. public website</h3>
+<p>The website is the institution&#39;s outward-facing surface. The cockpit is the institution&#39;s inward-facing operator surface. The website has no operator authority; the cockpit consumes the steward&#39;s standing and mandates to render scoped actions.</p>
+<h3>Steward cockpit vs. institution-package skin</h3>
+<p>Institution packages localize the cockpit with their own role labels (&quot;steward,&quot; &quot;treasurer-of-record,&quot; &quot;node-keeper,&quot; etc.), ceremony markers, and visual identity. The generic v0 spec stays generic: it names the structural concepts (<code>LocalDomain</code>, <code>DomainPolicy</code>, <code>Mandate</code>, <code>AuthorityClass</code>, <code>Standing</code>, <code>DivergenceEvidence</code>, <code>RepairPlan</code>, <code>RepairReceipt</code>, <code>PlacementDecision</code>, <code>BackupPolicy</code>, etc.), and lets packages add local nouns under &quot;details&quot; without losing the structural concept.</p>
+<h3>Steward cockpit vs. backend / runtime</h3>
+<p>Per <code>docs/architecture/KERNEL_APP_SEPARATION.md</code>, the kernel never imports cockpit strings, layouts, or rendering rules. The cockpit is app-side rendering. It consumes existing surfaces (the <code>icn-obs</code> metrics modules; the governance proof / receipt surfaces; the gateway endpoints; the merged spec status vocabularies) and renders them. It does not define new wire formats, new endpoints, or new receipt classes.</p>
+<h3>Steward cockpit vs. surveillance / admin-control panel</h3>
+<p>The cockpit is <strong>not</strong> a surveillance console. Operator actions are bounded by authority: every steward action that mutates institutional state requires a covering mandate, produces a receipt, and is challengeable per <code>DomainPolicy</code>. The cockpit does <strong>not</strong> surface private vault content. It does <strong>not</strong> offer &quot;see all member activity&quot; views. Member-impact summaries surface affected scope and counts, never identities or message bodies, unless the steward holds an explicit, receipted authority basis to see them.</p>
+<h2>Design principles</h2>
+<p>Ten v0 principles, each load-bearing for what the cockpit is allowed to be:</p>
+<ol>
+<li><strong>Stewardship, not domination.</strong> Every cockpit action that mutates institutional state runs through the same mandate / authority / receipt envelope as every member action. The cockpit makes stewardship legible; it does not grant rulers.</li>
+<li><strong>Proof before confidence.</strong> The cockpit does not show &quot;everything is fine&quot; without evidence. A surface that lacks a recent matching <code>PeerSyncReport</code>, a recent matching <code>RoutingProof</code>, a fresh integrity-check receipt, or another freshness witness is rendered as <strong>stale</strong>, not as healthy.</li>
+<li><strong>Degraded is visible.</strong> <code>SyncDegradedStatus</code>, replica-below-policy, backup-overdue, restore-drill-missing, integrity-violation, and federation-sync-window-stale all render as visibly degraded. No surface renders &quot;healthy&quot; while a Boundary rule in a merged sibling spec is failing.</li>
+<li><strong>Privacy posture, not private content.</strong> The cockpit surfaces <strong>posture</strong> — that private overlays exist, that access grants are within policy, that export receipts are landing — without surfacing the <strong>content</strong> of private artifacts. Body bytes of <code>PrivateEvidence</code> artifacts (per <code>docs/spec/artifact-registry-and-scoped-vault.md</code>) never reach the cockpit rendering layer.</li>
+<li><strong>Receipts explain operational state.</strong> Every surface row that asserts a state of the world points to a receipt or an open evidence trail that justifies it. <code>Receipt</code> columns are first-class; &quot;no receipt available yet&quot; is itself a renderable state, never silently filled in.</li>
+<li><strong>Required actions are explicit.</strong> The Required Actions surface (the cockpit&#39;s &quot;Today&quot; view) names exactly which open conditions require steward attention. Authority basis, expected receipt, deadline, and reversibility window are surfaced before the steward acts.</li>
+<li><strong>Authority basis is visible.</strong> Every steward action that the cockpit offers names the mandate (per ADR-0014 / ADR-0019), the <code>DomainPolicy</code> clause, or the federation agreement that authorizes it. Actions without authority basis are rendered as visibly blocked.</li>
+<li><strong>Local / domain / federation / commons scope is visible.</strong> Every surface row carries an explicit scope tag. Cross-scope actions (e.g., a repair plan that involves federation peers) render the scope chain plainly.</li>
+<li><strong>Member-impact summary is always present.</strong> Every cockpit row that affects member-facing surfaces carries a one-line member-impact summary using the merged member-shell vocabulary from <code>docs/spec/member-shell-v0.md</code>. A steward looking at degraded sync sees both the technical detail and the seven-string member-facing status that members are seeing in their shell. This keeps the operator honest: when the cockpit shows degraded, the shell must already be showing degraded.</li>
+<li><strong>No financial-product framing.</strong> The cockpit never uses payment, currency, balance, wallet, token, crypto, blockchain, or timebank framing for ICN-native participation. The vocabulary discipline in <code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code> §&quot;Vocabulary discipline&quot; applies in full. Settlement, position, obligation, allocation, receipt, and provenance are the operator-facing terms.</li>
+</ol>
+<h2>Cockpit information architecture</h2>
+<p>The v0 cockpit offers twelve surfaces. The list is the <strong>minimum</strong>; institution-package skins may add, but a cockpit missing any of these is not v0.</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Purpose</th>
+<th>Primary sources consumed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Overview / Required Actions</strong></td>
+<td>One-screen-at-a-glance: which conditions require steward action now, with priority.</td>
+<td>All sub-surfaces feed this; ActionCards (per ADR-0027) drive the required-action queue.</td>
+</tr>
+<tr>
+<td><strong>Node Status</strong></td>
+<td>Daemon health for the local node.</td>
+<td><code>icn-obs</code> metrics; <code>icn-core</code> supervisor surfaces.</td>
+</tr>
+<tr>
+<td><strong>Domain Status</strong></td>
+<td>The <code>InstitutionalDomain</code> the steward is operating; policy version; standing read-model health.</td>
+<td><code>docs/spec/institutional-domain.md</code>; <code>/me/standing</code>; CCL policy registry.</td>
+</tr>
+<tr>
+<td><strong>Network / Federation</strong></td>
+<td>Peer reachability, sync state, divergence, repair.</td>
+<td><code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Steward cockpit surface&quot; (the 8 fields verbatim).</td>
+</tr>
+<tr>
+<td><strong>Receipt Store</strong></td>
+<td>Receipt persistence and read/write health.</td>
+<td>Governance proof module; receipt-store backend (sibling of future ArtifactRegistry); ADR-0026 envelope.</td>
+</tr>
+<tr>
+<td><strong>Storage / Artifacts / ScopedVault</strong></td>
+<td>Storage class / custody class posture; artifact and replica health; vault posture without content.</td>
+<td><code>docs/spec/storage-durability-policies.md</code>; <code>docs/spec/artifact-registry-and-scoped-vault.md</code>.</td>
+</tr>
+<tr>
+<td><strong>Governance / Process</strong></td>
+<td>Proposals, decisions, mandates, effect dispatch evidence, policy adoption.</td>
+<td><code>docs/spec/effect-dispatch-contract.md</code>; <code>docs/spec/ccl-policy-registry.md</code>; <code>docs/spec/institutional-domain.md</code>.</td>
+</tr>
+<tr>
+<td><strong>Compute / Commons</strong></td>
+<td>Queued / running / completed jobs; placement decisions; admission decisions; settlement receipts.</td>
+<td><code>docs/spec/compute-placement-policy.md</code> §&quot;Operator / steward dashboard&quot; (the 14 fields verbatim); ADR-0030; ADR-0031; <code>docs/spec/federation-settlement-finality.md</code>.</td>
+</tr>
+<tr>
+<td><strong>Participation Access</strong></td>
+<td>Accessibility-gate status and translation / glossary posture for member-facing surfaces in this domain.</td>
+<td><code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code>; ADR-0028; <code>#1610</code>; <code>#1740</code>.</td>
+</tr>
+<tr>
+<td><strong>Privacy Posture</strong></td>
+<td>Private-overlay loaded / missing, vault posture, access-grant posture, export-receipt queue.</td>
+<td><code>docs/spec/artifact-registry-and-scoped-vault.md</code>; <code>#1792</code>; <code>#1767</code>.</td>
+</tr>
+<tr>
+<td><strong>Backup / Export / Recovery</strong></td>
+<td><code>BackupPolicy</code> / <code>RecoveryPolicy</code> / <code>ArchivePolicy</code> / <code>IntegrityPolicy</code> posture; restore-test receipts.</td>
+<td><code>docs/spec/storage-durability-policies.md</code>.</td>
+</tr>
+<tr>
+<td><strong>Warnings / Incidents / Repair</strong></td>
+<td>Open <code>DivergenceEvidence</code>, open <code>RepairPlan</code>s, escalations to governance review, key-rotation prompts.</td>
+<td><code>docs/spec/network-anti-entropy-proof-loops.md</code>; ADR-0014; ADR-0019; key-rotation surfaces in <code>icn-gossip</code>.</td>
+</tr>
+</tbody></table>
+<p>The cockpit may offer more surfaces; a v0-conformant cockpit offers at least these twelve.</p>
+<h2>Required Actions / Steward Action Cards</h2>
+<p>Steward action cards consume the same ADR-0027 ActionCard schema as the member shell. The cockpit renders them with operator-facing technical detail rather than member-facing plain language. Per <code>#1795</code> acceptance criteria, the cockpit defines steward-side action cards for at least the following operator scenarios. Each scenario is named, with its source class, its authority basis pattern, and its expected <code>RepairReceipt</code> or evidence outcome.</p>
+<table>
+<thead>
+<tr>
+<th>Operator scenario</th>
+<th>Source class</th>
+<th>Authority pattern</th>
+<th>Expected outcome</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Failed receipt write</td>
+<td>Receipt-store telemetry</td>
+<td>Steward of receipt-store custody</td>
+<td><code>RepairReceipt</code> of class &quot;receipt-store recovery&quot;; retry log + read-back verification.</td>
+</tr>
+<tr>
+<td>Stale peer</td>
+<td><code>DivergenceEvidence</code> class &quot;peer behind sync window&quot;</td>
+<td><code>DomainPolicy</code> peer-management clause</td>
+<td><code>RepairReceipt</code> of class &quot;anti-entropy fetch&quot; once peer catches up; quarantine receipt if peer is dropped.</td>
+</tr>
+<tr>
+<td>Degraded sync</td>
+<td><code>SyncDegradedStatus</code> aggregated</td>
+<td>Sync-degradation governance clause</td>
+<td><code>RepairReceipt</code> once <code>QuorumSyncCheck</code> returns fresh.</td>
+</tr>
+<tr>
+<td>Missing replica</td>
+<td><code>DivergenceEvidence</code> class &quot;replica missing&quot;</td>
+<td><code>ReplicationPolicy</code> re-replication authority</td>
+<td><code>RepairReceipt</code> recording re-replication outcome.</td>
+</tr>
+<tr>
+<td>Backup overdue</td>
+<td><code>IntegrityPolicy</code> / <code>BackupPolicy</code> telemetry</td>
+<td>Backup-policy authority clause</td>
+<td>Successful <code>BackupPolicy</code> cycle receipt.</td>
+</tr>
+<tr>
+<td>Restore drill due</td>
+<td><code>RecoveryPolicy</code> cadence</td>
+<td>Recovery-drill authority clause</td>
+<td>Restore-test receipt (per <code>docs/spec/storage-durability-policies.md</code>).</td>
+</tr>
+<tr>
+<td>Compute output awaiting review</td>
+<td><code>PlacementDecision</code> with <code>ReviewRequiredActionCard</code></td>
+<td>Domain ratification clause</td>
+<td>Forward <code>RatificationReceipt</code>.</td>
+</tr>
+<tr>
+<td>Accessibility gate failed</td>
+<td>Member-facing surface telemetry</td>
+<td>Accessibility-gate authority</td>
+<td>Failure removed from track; surface re-evaluated against the 12-category gate.</td>
+</tr>
+<tr>
+<td>Missing translation / glossary review</td>
+<td><code>#1610</code> / <code>#1740</code> surfaces</td>
+<td>Translation-review authority</td>
+<td>Translation review receipt; fallback path documented.</td>
+</tr>
+<tr>
+<td>Private overlay missing</td>
+<td><code>#1767</code> posture telemetry</td>
+<td>Custody authority</td>
+<td>Overlay restored or quarantine receipt.</td>
+</tr>
+<tr>
+<td>Overbroad access grant</td>
+<td>Access-receipt review</td>
+<td>Privacy-policy review authority</td>
+<td>Grant narrowed; revocation receipt produced.</td>
+</tr>
+<tr>
+<td>Export receipt awaiting review</td>
+<td>Export-receipt queue</td>
+<td>Export-review authority</td>
+<td>Reviewed export receipt or revocation.</td>
+</tr>
+<tr>
+<td>Key rotation needed</td>
+<td>Key-status telemetry (per <code>icn-gossip</code> key rotation module)</td>
+<td><code>DomainPolicy</code> key-rotation cadence</td>
+<td>Key-rotation evidence + new key adoption receipt.</td>
+</tr>
+<tr>
+<td>Policy conflict / challenge window open</td>
+<td>Open challenge window on a <code>GovernanceDecisionReceipt</code> or <code>EffectDispatchEvidence</code></td>
+<td>Governance review authority</td>
+<td>Decision affirmed, reversed, or amended per policy; corresponding receipt class.</td>
+</tr>
+</tbody></table>
+<p>Each action card includes the fourteen ADR-0027 schema fields (<code>id</code>, <code>source_kind</code>, <code>action_kind</code>, <code>scope</code>, <code>title</code>, <code>summary</code>, <code>authority_basis</code>, <code>required_authority_scope</code>, <code>deadline</code>, <code>risk_level</code>, <code>accessibility_hint</code>, <code>receipt_expected</code>, <code>source_id</code>, <code>domain_id</code>). The cockpit rendering augments them with the technical fields the member shell explicitly does not show.</p>
+<h2>Node Status surface</h2>
+<p>Renders the local node&#39;s operational posture as observed via existing <code>icn-obs</code> metrics and <code>icn-core</code> supervisor state. Every field has a freshness timestamp; stale beyond a policy window renders as <code>stale</code>.</p>
+<ul>
+<li><strong>Daemon health</strong> — running / stopped / restarting / crashed; uptime; last-restart cause if not graceful.</li>
+<li><strong>Version</strong> — daemon version, git SHA if available, build profile.</li>
+<li><strong>Uptime</strong> — wall-clock since last start.</li>
+<li><strong>Config status</strong> — config file path; last-load timestamp; validation result (valid / warning / invalid).</li>
+<li><strong>Key status</strong> — local DID; key state; last rotation timestamp; next rotation window per <code>DomainPolicy</code>.</li>
+<li><strong>Local storage health</strong> — storage class breakdown (canonical, service state, blobs per <code>icn-kernel-api/src/storage.rs</code>); disk usage; integrity-policy verification posture.</li>
+<li><strong>Current mode</strong> — fixture / devnet / K3s / live, labeled honestly. Fixtures and devnet runs are never rendered as live.</li>
+<li><strong>Evidence timestamp</strong> — when the cockpit last refreshed this surface.</li>
+</ul>
+<h2>Domain Status surface</h2>
+<p>Renders the <code>InstitutionalDomain</code> the steward is operating against.</p>
+<ul>
+<li><strong>InstitutionalDomain id</strong> — the domain DID; the owning entity class (Cooperative / Community / Federation / Individual / other governed class, per <code>docs/spec/institutional-domain.md</code>).</li>
+<li><strong>Domain policy version</strong> — the <code>policy_version_id</code> of the adopted <code>DomainPolicy</code> per <code>docs/spec/ccl-policy-registry.md</code>.</li>
+<li><strong>Standing read-model health</strong> — last successful <code>/me/standing</code> regeneration; any divergence between regenerated standing and stored standing.</li>
+<li><strong>Active proposals / decisions</strong> — count and link to the Governance / Process surface.</li>
+<li><strong>Adopted CCL policy versions</strong> — by policy domain, with <code>policy_version_id</code> and adoption receipt link.</li>
+<li><strong>Service bindings</strong> — list of active <code>GovernedServiceBinding</code>s (per merged #1822) with their lifecycle state, especially flagging any in &quot;observe&quot; with degradation.</li>
+<li><strong>Action-card generation posture</strong> — <code>/me/action-cards</code> generation health; last generation timestamp; missing-source warnings (e.g., <code>signal_rule</code> / <code>obligation_lifecycle</code> source paths are inert pending <code>#1631</code> / <code>#1634</code>).</li>
+<li><strong>Member-facing readiness summary</strong> — a one-line summary of whether the domain&#39;s member-facing surfaces (per <code>docs/spec/member-shell-v0.md</code>) currently render <code>Synced</code>, <code>Sync delayed</code>, <code>Review required</code>, or <code>Sync delayed / degraded</code> to members in this domain.</li>
+</ul>
+<h2>Network / Federation surface</h2>
+<p>This surface <strong>consumes</strong> the 8-field cockpit surface from <code>docs/spec/network-anti-entropy-proof-loops.md</code> §&quot;Steward cockpit surface&quot; verbatim. Each open <code>DivergenceEvidence</code> (per the 18-class taxonomy) renders with:</p>
+<ol>
+<li><strong>Affected scope</strong> — <code>LocalDomain</code>, <code>Federation</code>, <code>Commons</code>, or peer-pair.</li>
+<li><strong>State class</strong> — one of the nine state classes (governance state, receipts, artifact metadata, scoped vault refs, storage replicas, compute receipts, settlement records, federation membership, CCL policy versions).</li>
+<li><strong>Peers</strong> — peer DIDs involved.</li>
+<li><strong>Digest mismatch</strong> — Bloom-filter set-difference, Merkle root inequality, vector-clock divergence, etc.</li>
+<li><strong>Last successful proof</strong> — when the last matching <code>PeerSyncReport</code> for this scope was recorded.</li>
+<li><strong>Repair plan</strong> — <code>RepairPlan</code> action, authority required, expected <code>RepairReceipt</code> class.</li>
+<li><strong>Authority required</strong> — the mandate or <code>DomainPolicy</code> clause the repair needs.</li>
+<li><strong>Receipts / evidence</strong> — links to <code>DivergenceEvidence</code>, <code>RepairPlan</code>, and any <code>RepairReceipt</code> already produced.</li>
+<li><strong>Escalation status</strong> — whether the divergence has escalated to governance review (unclassifiable, equivocation, or boundary-rule violations).</li>
+</ol>
+<p>Each row carries the closed status terminology from <code>#1799</code> / <code>#1829</code> (direct / relayed / degraded / partitioned / stale / syncing / verified / unverified) and a member-impact summary using the merged member-shell sync vocabulary.</p>
+<p><code>QuorumSyncCheck</code> and <code>FederationSyncWindow</code> posture appear here when the domain participates in a federation: which checks are fresh, which are stale beyond the window, and which placement / settlement decisions are currently <code>RejectedByPolicy</code> for lack of fresh proof (per <code>docs/spec/compute-placement-policy.md</code> Boundary rule 6 and <code>docs/spec/network-anti-entropy-proof-loops.md</code> Boundary rule 6).</p>
+<h2>Receipt Store surface</h2>
+<p>Renders persistent receipt posture.</p>
+<ul>
+<li><strong>Latest receipts</strong> — by class (per ADR-0026 / ADR-0025 / merged sibling specs): <code>GovernanceDecisionReceipt</code>, <code>ActionItemCompletionReceipt</code>, <code>MeetingAttendanceReceipt</code>, <code>ArtifactReceipt</code>, <code>InstitutionalEffectRecord</code> + <code>EffectDispatchEvidence</code>, future <code>RatificationReceipt</code>, future <code>RepairReceipt</code>, etc.</li>
+<li><strong>Failed writes</strong> — receipt writes that did not persist; retry log; cause if known.</li>
+<li><strong>Read / write health</strong> — read latency, write latency, error rate per <code>icn-obs</code> metrics.</li>
+<li><strong>Verification status</strong> — most recent integrity verification per <code>IntegrityPolicy</code>.</li>
+<li><strong>Opaque receipt store posture</strong> — for receipt stores backed by encrypted storage (<code>#1767</code>), posture indicators that do not reveal content.</li>
+<li><strong>Receipt class summary</strong> — counts per class, retention horizon per <code>DomainPolicy</code> §&quot;Receipt retention defaults.&quot;</li>
+<li><strong>Missing receipt warnings</strong> — <code>DivergenceEvidence</code> class &quot;missing receipt&quot; rows raised against peers.</li>
+<li><strong>Evidence envelope references</strong> — links to the Stage 5 <code>EffectDispatchEvidence</code> artifacts (per <code>docs/spec/effect-dispatch-contract.md</code>) the receipts belong to.</li>
+</ul>
+<h2>Storage / Artifacts / ScopedVault surface</h2>
+<p>Consumes <code>docs/spec/storage-durability-policies.md</code> and <code>docs/spec/artifact-registry-and-scoped-vault.md</code>.</p>
+<ul>
+<li><strong>Storage class / custody class</strong> — <code>Canonical</code>, <code>ServiceState</code>, <code>Blobs</code> (per <code>icn-kernel-api/src/storage.rs</code>); custody class breakdown.</li>
+<li><strong>Artifact registry health</strong> — registry index health, <code>content_hash</code> verification posture, integration-point coverage.</li>
+<li><strong>Replica health</strong> — replica count per <code>ReplicationPolicy.target_replicas</code>; flag any below target.</li>
+<li><strong>Backup / export / recovery status</strong> — <code>BackupPolicy</code> cadence freshness; export-receipt queue; recovery-drill cadence.</li>
+<li><strong>Scoped vault health without content preview</strong> — vault loaded / missing; <code>ScopedVault</code> reference count by privacy class; access-receipt queue. Body bytes never surface here.</li>
+<li><strong>Access / export receipt warnings</strong> — access grants exceeding policy scope; export receipts awaiting review.</li>
+<li><strong>Private object reference health</strong> — divergence class 16 (&quot;private object reference mismatch without content disclosure&quot;) rows.</li>
+<li><strong>Redaction / evidence packet status</strong> — <code>EvidencePacket</code> and <code>PrivateEvidence</code> artifact-class counts (per <code>docs/spec/artifact-registry-and-scoped-vault.md</code> artifact-class taxonomy); redaction posture without revealing content.</li>
+</ul>
+<h2>Governance / Process surface</h2>
+<p>Consumes <code>docs/spec/effect-dispatch-contract.md</code>, <code>docs/spec/institutional-domain.md</code>, <code>docs/spec/ccl-policy-registry.md</code>.</p>
+<ul>
+<li><strong>Proposals</strong> — open proposals scoped to the domain; deadline; current standing; vote tally if applicable.</li>
+<li><strong>Decisions</strong> — recent <code>GovernanceDecisionReceipt</code>s; dispute-window status for each per <code>docs/spec/federation-settlement-finality.md</code> analogue.</li>
+<li><strong>Mandate / effect status</strong> — open mandates per ADR-0014 / ADR-0019; <code>EffectManifest</code> and Stage 5 <code>EffectDispatchEvidence</code> per <code>docs/spec/effect-dispatch-contract.md</code>.</li>
+<li><strong>Effect dispatch evidence</strong> — links to the Stage 5 evidence artifacts.</li>
+<li><strong>CCL policy registry versions</strong> — adopted, draft, superseded versions per <code>docs/spec/ccl-policy-registry.md</code>.</li>
+<li><strong>Process-transition receipt classes where present</strong> — coverage check against <code>docs/spec/effect-dispatch-contract.md</code> receipt-class summary.</li>
+<li><strong>Challenge / reversal windows</strong> — open challenge windows on receipts that support disputes; deadlines; required authority class to act.</li>
+</ul>
+<h2>Compute / Commons surface</h2>
+<p>This surface <strong>consumes</strong> the 14-field operator/steward dashboard from <code>docs/spec/compute-placement-policy.md</code> §&quot;Operator / steward dashboard&quot; verbatim:</p>
+<ol>
+<li><strong>Placement decision</strong> — one of the seven placement classes (<code>LocalOnly</code>, <code>DomainLocalPreferred</code>, <code>LocalDomainBound</code>, <code>FederationBound</code>, <code>CommonsEligible</code>, <code>ExternalCustodianRequired</code>, <code>RejectedByPolicy</code>).</li>
+<li><strong>Runner / executor class</strong> — one of the seven runtime classes from <code>docs/spec/governed-service-binding.md</code>.</li>
+<li><strong>Scope</strong> — <code>LocalDomain</code> and any wider scope the placement authorizes.</li>
+<li><strong>Privacy class</strong> — per the workload manifest (current code variants <code>Public</code> / <code>Member</code> / <code>NeedToKnow</code>; ADR-0030 names <code>Public</code> / <code>Encrypted</code> / <code>Sealed</code> — reconciliation tracked in <code>#1792</code>).</li>
+<li><strong>Determinism class</strong> — governance-grade or advisory.</li>
+<li><strong>Resource envelope</strong> — declared CPU / memory / storage / network shape.</li>
+<li><strong>Execution budget</strong> — the policy-facing name for <code>fuel_limit</code>. Compatibility note per <code>docs/spec/compute-placement-policy.md</code> §&quot;Vocabulary boundaries&quot;: <code>FuelLimit</code> is the runtime field; <code>execution budget</code> is the cockpit-facing term; <code>capacity</code> is reserved for executor / node resource availability.</li>
+<li><strong>Capacity fit</strong> — whether the selected executor has capacity for the workload&#39;s resource envelope at the moment of placement.</li>
+<li><strong>Allocation decision</strong> — the governed permission to consume capacity, with the mandate ref.</li>
+<li><strong>Federation / commons agreement ref</strong> — when applicable.</li>
+<li><strong>Output artifact ref</strong> — when the workload has produced an output artifact (per <code>docs/spec/artifact-registry-and-scoped-vault.md</code>).</li>
+<li><strong>Settlement receipt</strong> — settlement receipt ref per ADR-0031 (not &quot;payment receipt&quot;).</li>
+<li><strong>Review requirement</strong> — whether the output is awaiting human ratification.</li>
+<li><strong>Failure / fallback reason</strong> — when the placement fell back or was <code>RejectedByPolicy</code>, the reason and authority basis.</li>
+</ol>
+<p>Rejected and fallback rows show the original preferred class, the chosen class (or rejection), and the policy clause invoked. <code>PlacementFallbackReceipt</code>s (per <code>docs/spec/network-anti-entropy-proof-loops.md</code> Stage 5 evidence) render as evidence attachments on their parent <code>PlacementDecision</code>.</p>
+<h2>Participation Access surface</h2>
+<p>Consumes <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> and ADR-0028.</p>
+<ul>
+<li><strong>Accessibility gate results</strong> — pass / fail per the twelve categories, per member-facing surface in this domain.</li>
+<li><strong>Missing translations</strong> — surfaces or strings missing translation per the institution&#39;s adopted languages.</li>
+<li><strong>Glossary gaps</strong> — terms with no glossary entry, per <code>#1610</code>.</li>
+<li><strong>Member-shell readiness</strong> — overall readiness summary for <code>docs/spec/member-shell-v0.md</code> v0 conformance.</li>
+<li><strong>Low-bandwidth / offline readiness</strong> — last successful low-bandwidth audit; cache freshness; offline-mode behavior verification posture.</li>
+<li><strong>Screen-reader / keyboard / color-independent readiness</strong> — per the relevant categories from ADR-0028.</li>
+</ul>
+<p>A failing accessibility gate row produces a Required Action card per the table above.</p>
+<h2>Privacy Posture surface</h2>
+<p>Consumes merged <code>docs/spec/artifact-registry-and-scoped-vault.md</code> and forward-direction <code>#1792</code> / <code>#1767</code>.</p>
+<ul>
+<li><strong>Private overlay loaded / missing</strong> — per <code>#1767</code> (encrypted distributed private-overlay storage).</li>
+<li><strong>Public package clean</strong> — no private artifacts have leaked into the public artifact-registry index.</li>
+<li><strong>Vault health</strong> — <code>ScopedVault</code> loaded; access-key custody healthy; integrity checks fresh.</li>
+<li><strong>Overbroad grants</strong> — access grants that exceed <code>DomainPolicy</code> scope; flagged for review.</li>
+<li><strong>Export receipts awaiting review</strong> — export receipts that produced data movement outside the domain; review-window deadlines.</li>
+<li><strong>Redaction / evidence status</strong> — <code>EvidencePacket</code> and <code>PrivateEvidence</code> posture without surfacing content.</li>
+<li><strong>Hard rule:</strong> no raw private content in cockpit. Body bytes of private artifacts never reach the rendering layer.</li>
+</ul>
+<h2>Backup / Export / Recovery surface</h2>
+<p>Consumes <code>docs/spec/storage-durability-policies.md</code>.</p>
+<ul>
+<li><strong>Backup policy status</strong> — <code>BackupPolicy</code> cadence freshness per spec; missed backups flagged.</li>
+<li><strong>Restore-test receipt status</strong> — last successful restore-test receipt; cadence freshness per <code>RecoveryPolicy</code>.</li>
+<li><strong>Archive verification</strong> — <code>ArchivePolicy</code> verification cadence; integrity-check posture.</li>
+<li><strong>Export authority</strong> — open export-receipt queue; authority basis per export.</li>
+<li><strong>Recovery drill cadence</strong> — when the next drill is due per <code>DomainPolicy</code>.</li>
+<li><strong>Locality / disclosure inheritance warnings</strong> — any backup, replica, archive, or export that would broaden <code>DataLocality</code> or <code>privacy_class</code> is flagged before it can run (per <code>docs/spec/storage-durability-policies.md</code> §&quot;Locality and privacy inheritance&quot; and <code>docs/spec/network-anti-entropy-proof-loops.md</code> Boundary rule 4).</li>
+</ul>
+<h2>Status vocabulary</h2>
+<p>The cockpit uses operator-facing technical terms. Each operator term carries a member-impact summary that maps to the closed seven-string member-shell sync vocabulary from <code>docs/spec/network-anti-entropy-proof-loops.md</code> and the closed seven-string member-shell execution-scope vocabulary from <code>docs/spec/compute-placement-policy.md</code>.</p>
+<h3>Operator states (closed v0 set)</h3>
+<ul>
+<li><strong>healthy</strong> — fresh evidence; all relevant freshness windows satisfied.</li>
+<li><strong>degraded</strong> — partial evidence; some freshness windows stale or some metrics outside policy bounds.</li>
+<li><strong>syncing</strong> — anti-entropy probe in flight; pending convergence.</li>
+<li><strong>stale</strong> — last successful evidence is beyond freshness window.</li>
+<li><strong>partitioned</strong> — peer unreachable; no fresh <code>PeerSyncReport</code>.</li>
+<li><strong>relayed</strong> — direct connection unavailable; relayed path in use; relay is not authority.</li>
+<li><strong>verification pending</strong> — <code>DivergenceEvidence</code> open; classification result pending.</li>
+<li><strong>repair planned</strong> — <code>RepairPlan</code> produced; awaiting authorization or execution.</li>
+<li><strong>repair applied</strong> — <code>RepairReceipt</code> recorded with <code>EffectOutcome::Applied</code>.</li>
+<li><strong>review required</strong> — escalation to governance review (unclassifiable, equivocation, boundary-rule violation, or advisory output awaiting ratification).</li>
+<li><strong>blocked by policy</strong> — action available in principle but blocked by current <code>DomainPolicy</code> (e.g., placement <code>RejectedByPolicy</code>, federation agreement absent).</li>
+<li><strong>private content restricted</strong> — surface intentionally opaque due to privacy / custody rule; existence + scope + access path are shown, body is not.</li>
+</ul>
+<h3>Member-impact summary mapping</h3>
+<p>Every operator-state surface row that has member impact carries a one-line member-impact line using the merged member-shell sync vocabulary:</p>
+<table>
+<thead>
+<tr>
+<th>Operator state</th>
+<th>Member-impact summary (verbatim from <code>#1829</code> member shell)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>healthy</td>
+<td>&quot;Members see: Synced.&quot;</td>
+</tr>
+<tr>
+<td>degraded</td>
+<td>&quot;Members see: Sync delayed.&quot;</td>
+</tr>
+<tr>
+<td>syncing</td>
+<td>&quot;Members see: Some records are being verified.&quot;</td>
+</tr>
+<tr>
+<td>stale (within grace)</td>
+<td>&quot;Members see: Sync delayed.&quot;</td>
+</tr>
+<tr>
+<td>stale (beyond grace)</td>
+<td>&quot;Members see: Sync delayed / degraded.&quot;</td>
+</tr>
+<tr>
+<td>partitioned</td>
+<td>&quot;Members see: Some records are being verified.&quot;</td>
+</tr>
+<tr>
+<td>repair planned</td>
+<td>&quot;Members see: Action paused until records sync.&quot;</td>
+</tr>
+<tr>
+<td>repair applied</td>
+<td>&quot;Members see: Receipt available.&quot;</td>
+</tr>
+<tr>
+<td>review required</td>
+<td>&quot;Members see: Review required.&quot;</td>
+</tr>
+<tr>
+<td>blocked by policy</td>
+<td>&quot;Members see: Action paused until records sync.&quot;</td>
+</tr>
+</tbody></table>
+<p>This mapping is <strong>honest</strong>: when the cockpit shows <code>degraded</code>, the member shell must already be showing <code>Sync delayed</code>. The &quot;dashboard says healthy while member shell says degraded&quot; row in the failure / safety table below is a v0 violation.</p>
+<h2>Failure and safety table</h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Where it surfaces</th>
+<th>Disposition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Receipt store unavailable</td>
+<td>Receipt Store + Required Actions</td>
+<td>Required Action card &quot;failed receipt write.&quot; Member-impact: &quot;Members see: Sync delayed / degraded.&quot; Cockpit renders the underlying error class and the retry plan.</td>
+</tr>
+<tr>
+<td>Receipt write failed</td>
+<td>Receipt Store + Required Actions</td>
+<td>Required Action card per the table above; underlying class + retry log surfaced.</td>
+</tr>
+<tr>
+<td>Anti-entropy divergence</td>
+<td>Network / Federation</td>
+<td><code>DivergenceEvidence</code> row rendered with the 8 cockpit fields per <code>#1829</code>; member-impact summary attached.</td>
+</tr>
+<tr>
+<td>Stale peer</td>
+<td>Network / Federation + Required Actions</td>
+<td>Required Action card &quot;stale peer&quot;; <code>DivergenceEvidence</code> class &quot;peer behind sync window.&quot;</td>
+</tr>
+<tr>
+<td>Partition / rejoin incomplete</td>
+<td>Network / Federation</td>
+<td>Status: <code>partitioned</code> then <code>syncing</code>; rejoin progress visible; member-impact summary attached.</td>
+</tr>
+<tr>
+<td>Replica below policy</td>
+<td>Storage / Artifacts / ScopedVault + Required Actions</td>
+<td>Required Action card &quot;missing replica&quot;; <code>DivergenceEvidence</code> class &quot;replica missing&quot; or &quot;replica lag.&quot;</td>
+</tr>
+<tr>
+<td>Backup overdue</td>
+<td>Backup / Export / Recovery + Required Actions</td>
+<td>Required Action card &quot;backup overdue&quot;; <code>BackupPolicy</code> cadence telemetry surfaced.</td>
+</tr>
+<tr>
+<td>Restore drill failed</td>
+<td>Backup / Export / Recovery + Required Actions</td>
+<td>Required Action card &quot;restore drill due&quot;; failure detail; escalation per <code>RecoveryPolicy</code>.</td>
+</tr>
+<tr>
+<td>Private overlay missing</td>
+<td>Privacy Posture + Required Actions</td>
+<td>Required Action card &quot;private overlay missing&quot;; surfaces existence of the gap without exposing what is gated behind it.</td>
+</tr>
+<tr>
+<td>ScopedVault content exposed in cockpit</td>
+<td>Any surface</td>
+<td>v0 violation. Bodies of private artifacts never reach the rendering layer. If detected, drop and log a safety failure.</td>
+</tr>
+<tr>
+<td>Export without receipt</td>
+<td>Backup / Export / Recovery + Privacy Posture</td>
+<td>Hard rule: export requires a receipt. An export attempt without a receipt is rejected; cockpit logs the rejection and surfaces a Required Action.</td>
+</tr>
+<tr>
+<td>Compute job lacks authority basis</td>
+<td>Compute / Commons + Required Actions</td>
+<td>Per Boundary rule 3 in <code>docs/spec/compute-placement-policy.md</code>: <code>RejectedByPolicy</code>. Cockpit surfaces the missing mandate.</td>
+</tr>
+<tr>
+<td>Compute output not reviewed</td>
+<td>Compute / Commons + Required Actions</td>
+<td>Required Action card &quot;compute output awaiting review&quot;; advisory output renders <code>Review required</code> member-impact.</td>
+</tr>
+<tr>
+<td>Federation sync window expired</td>
+<td>Network / Federation + Compute / Commons</td>
+<td>Per <code>docs/spec/network-anti-entropy-proof-loops.md</code> Boundary rule 6 and <code>docs/spec/compute-placement-policy.md</code> Boundary rule 6: federation / commons placement renders <code>RejectedByPolicy</code> until <code>QuorumSyncCheck</code> refreshes.</td>
+</tr>
+<tr>
+<td>Settlement finality claimed without proof</td>
+<td>Compute / Commons</td>
+<td>Per <code>docs/spec/network-anti-entropy-proof-loops.md</code> Boundary rule 7: finality is not claimed; dispute window restarts; cockpit surfaces the missing proof.</td>
+</tr>
+<tr>
+<td>Accessibility gate failed</td>
+<td>Participation Access + Required Actions</td>
+<td>Required Action card &quot;accessibility gate failed&quot;; the failing category named; surface removed from member-facing track.</td>
+</tr>
+<tr>
+<td>Translation missing</td>
+<td>Participation Access + Required Actions</td>
+<td>Required Action card &quot;missing translation&quot;; fallback language surfaced; review path offered.</td>
+</tr>
+<tr>
+<td>Dashboard says healthy while member shell says degraded</td>
+<td>Any surface</td>
+<td>v0 violation per Design principle 9 (&quot;member-impact summary is always present&quot;) + the member-impact mapping above. If detected, the cockpit row is marked stale until the member-impact summary can be reconciled.</td>
+</tr>
+<tr>
+<td>Steward action lacks authority basis</td>
+<td>Required Actions</td>
+<td>Action rendered as visibly blocked; the missing mandate / clause / agreement is named; no confirm affordance until the basis is supplied.</td>
+</tr>
+<tr>
+<td>Fintech vocabulary appears (payment / wallet / balance / currency / token / crypto / blockchain / timebank)</td>
+<td>Any surface</td>
+<td>v0 violation. Replace with settlement / position / obligation / allocation / receipt / provenance. Forbidden as positive ICN-native framing in operator copy.</td>
+</tr>
+</tbody></table>
+<h2>First safe proof-loop / dogfood slice</h2>
+<p>Per <code>#1795</code> acceptance criteria and the session pattern from #1829 / #1830, the spec names docs- and fixture-first slices that exercise the cockpit contract without touching real operators, real partner federations, or a real backend.</p>
+<h3>Slice A (preferred): Read-only receipt-store + anti-entropy degraded / repair cockpit fixture</h3>
+<ul>
+<li><strong>Fixture peers.</strong> Three peer fixtures (DIDs assigned, signing keys local) per <code>docs/spec/network-anti-entropy-proof-loops.md</code> Slice A.</li>
+<li><strong>Fictional institution / domain.</strong> A fixture <code>LocalDomain</code> (e.g., <code>did:icn:demo:exampledomain</code>).</li>
+<li><strong>One open <code>DivergenceEvidence</code>.</strong> Class &quot;missing receipt&quot;; affected scope the fixture domain; peers named; digest mismatch surfaced as Bloom-filter set-difference.</li>
+<li><strong>One <code>RepairPlan</code>.</strong> Action &quot;fetch missing receipt&quot;; authority basis fixture clause; expected <code>RepairReceipt</code> class.</li>
+<li><strong>One <code>RepairReceipt</code>.</strong> <code>EffectOutcome::Applied</code>; before / after digests; signed by fixture steward.</li>
+<li><strong>Cockpit fields rendered.</strong> All eight from <code>#1829</code> plus escalation status. Member-impact summary attached: <code>Members see: Sync delayed → Receipt available</code>.</li>
+<li><strong>Accessibility checklist applied.</strong> The twelve-category gate from ADR-0028 / <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> evaluated on the fixture rendering. Operator surfaces are accessible: keyboard reachable, screen-reader navigable, color-independent status, plain technical detail without surveillance-style aggregation.</li>
+</ul>
+<h3>Slice B: Storage replica / backup overdue / restore-test receipt fixture</h3>
+<ul>
+<li>Same fixture stack.</li>
+<li>Fixture artifacts with <code>ReplicationPolicy.target_replicas = 3</code> held by only two of three fixture peers.</li>
+<li><code>DivergenceEvidence</code> class &quot;replica missing&quot;; <code>RepairPlan</code> of action &quot;re-replicate within scope&quot;; <code>RepairReceipt</code> with <code>EffectOutcome::Applied</code>.</li>
+<li>Backup cadence intentionally set such that the most recent backup is overdue; Required Action card &quot;backup overdue&quot; surfaces.</li>
+<li>Restore-test receipt fixture: one successful, one failed; cockpit surfaces both with member-impact summaries.</li>
+</ul>
+<h3>Slice C: Compute placement review-required fixture</h3>
+<ul>
+<li>Same fixture stack.</li>
+<li>Fixture <code>PlacementDecision</code> for an advisory workload that produces a <code>ReviewRequiredActionCard</code>.</li>
+<li>The fourteen <code>#1826</code> operator-dashboard fields rendered for the placement, including the fallback path if applicable.</li>
+<li>A fixture <code>ExecutorAdmissionDecision</code> and an optional <code>PlacementFallbackReceipt</code> exercise the post-placement artifact rendering.</li>
+<li>Member-impact summary: <code>Members see: Review required</code>.</li>
+</ul>
+<p>All three slices are fixture-only. None implements the cockpit. None touches a real network, a real federation, real artifacts, or real members.</p>
+<h2>Relationship to sibling work</h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Where it lives</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Steward cockpit (this spec)</td>
+<td><code>#1795</code></td>
+</tr>
+<tr>
+<td>Member shell v0</td>
+<td><code>#1818</code> (merged #1830)</td>
+</tr>
+<tr>
+<td>Network anti-entropy proof loops</td>
+<td><code>#1799</code> (merged #1829) — supplies the 8 cockpit fields</td>
+</tr>
+<tr>
+<td>Compute placement policy</td>
+<td><code>#1801</code> (merged #1826) — supplies the 14 operator/steward dashboard fields</td>
+</tr>
+<tr>
+<td>Storage durability policies</td>
+<td><code>#1816</code> (merged #1823) — supplies BackupPolicy / ReplicationPolicy / RecoveryPolicy / ArchivePolicy / IntegrityPolicy posture</td>
+</tr>
+<tr>
+<td>ArtifactRegistry / ScopedVault</td>
+<td><code>#1798</code> (merged #1824) — supplies artifact-class taxonomy and scoped-vault posture</td>
+</tr>
+<tr>
+<td>Governed service binding</td>
+<td><code>#1815</code> (merged #1822) — supplies the binding &quot;Observe&quot; lifecycle state</td>
+</tr>
+<tr>
+<td>CCL policy registry</td>
+<td><code>#1817</code> (merged #1821) — supplies policy_version_id and adoption posture</td>
+</tr>
+<tr>
+<td>Institutional domain</td>
+<td><code>#1794</code> (merged #1820) — supplies DomainPolicy hooks</td>
+</tr>
+<tr>
+<td>Effect dispatch</td>
+<td><code>#1797</code> (merged #1819) — supplies Stage 5 evidence envelope</td>
+</tr>
+<tr>
+<td>Entity-scope vocabulary boundary</td>
+<td><code>#1825</code> (merged) — supplies the corrected scope vocabulary</td>
+</tr>
+<tr>
+<td>Integrated cooperative operating model</td>
+<td><code>#1793</code> (merged #1814) — supplies the spine that names the cockpit and shell together</td>
+</tr>
+<tr>
+<td>Federation settlement finality</td>
+<td><code>docs/spec/federation-settlement-finality.md</code> — supplies dispute window / clearing receipt context</td>
+</tr>
+<tr>
+<td>Node operator civic-role surface</td>
+<td><code>#1613</code> — separate operator surface; boundary documented above</td>
+</tr>
+<tr>
+<td>Legibility dashboards</td>
+<td><code>#1012</code> — related concern; not in scope</td>
+</tr>
+<tr>
+<td>Private data disclosure boundary</td>
+<td><code>#1792</code> — forward-direction; cockpit observes posture, never content</td>
+</tr>
+<tr>
+<td>Encrypted distributed private-overlay storage</td>
+<td><code>#1767</code> — forward-direction; cockpit surfaces overlay loaded / missing</td>
+</tr>
+<tr>
+<td>Language / glossary model</td>
+<td><code>#1610</code> — forward-direction; cockpit consumes glossary status</td>
+</tr>
+<tr>
+<td>Multilingual / inclusive-access</td>
+<td><code>#1740</code> — forward-direction; cockpit surfaces translation posture</td>
+</tr>
+<tr>
+<td>AuthorityClass / TypedScope / Mandate</td>
+<td>ADR-0014</td>
+</tr>
+<tr>
+<td>Authority grant minting seam</td>
+<td>ADR-0019</td>
+</tr>
+<tr>
+<td>Bootstrap activation + standing read model</td>
+<td>ADR-0020</td>
+</tr>
+<tr>
+<td>Institutional Effect Record canonical schema</td>
+<td>ADR-0025</td>
+</tr>
+<tr>
+<td>Receipt and provenance proof envelope</td>
+<td>ADR-0026</td>
+</tr>
+<tr>
+<td>ActionCard contract</td>
+<td>ADR-0027 + <code>docs/contracts/institution-package/action-card.schema.json</code></td>
+</tr>
+<tr>
+<td>Accessibility baseline</td>
+<td>ADR-0028 + <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code></td>
+</tr>
+<tr>
+<td>Compute workload manifest</td>
+<td>ADR-0030</td>
+</tr>
+<tr>
+<td>Commons compute admission and settlement</td>
+<td>ADR-0031</td>
+</tr>
+<tr>
+<td>Kernel / app separation</td>
+<td><code>docs/architecture/KERNEL_APP_SEPARATION.md</code></td>
+</tr>
+</tbody></table>
+<h2>Non-claims (repeat block for grep clarity)</h2>
+<ul>
+<li>This spec does not implement a steward cockpit. No code lands here.</li>
+<li>This spec does not specify a frontend technology, a native shell, a web framework, or any platform choice.</li>
+<li>This spec does not define new endpoints. It consumes existing <code>icn-obs</code> metrics, governance proof / receipt surfaces, <code>/me/standing</code> (per ADR-0020), <code>/me/action-cards</code> (per <code>#1608</code> / <code>#1646</code>), and the merged sibling specs&#39; status surfaces.</li>
+<li>This spec does not redefine any merged sibling spec, ADR, or <code>icn-obs</code> metric module.</li>
+<li>This spec does not introduce new receipt classes. It surfaces existing classes (per ADR-0026 / ADR-0025 / merged sibling specs) in operator-facing detail.</li>
+<li>This spec does not preempt <code>#1613</code> (node operator civic-role surface in Commons Shell). That is a separate operator surface.</li>
+<li>This spec does not redefine the steward / operator role. Role definitions belong to <code>DomainPolicy</code> and to institution-package skins.</li>
+<li>This spec does not authorize a generic admin panel, a surveillance console, a private-data viewer, or any account-as-product framing.</li>
+<li>This spec does not claim production readiness, a live partner federation, a formal NYCN pilot, or operation under this contract by any real institution today.</li>
+<li>This spec does not move, expose, preview, or cache private vault contents. Body bytes of <code>PrivateEvidence</code> artifacts never reach the rendering layer.</li>
+<li>This spec does not use wallet, payment, balance, currency, token, crypto, blockchain, or timebank framing for ICN-native participation. All such terms appear in this doc only in explicit negation context (Design principles, Failure / safety table, Non-claims) or as references to existing legacy code identifiers preserved without endorsement.</li>
+<li>This spec does not authorize any change to the runtime, gateway, SDK, website, deploy scripts, K3s, DNS, Forgejo, or any deployed infrastructure.</li>
+<li>This spec does not close <code>#1795</code>. The PR uses <code>Refs: #1795</code>; closure is a user-driven decision against the issue&#39;s acceptance criteria.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
