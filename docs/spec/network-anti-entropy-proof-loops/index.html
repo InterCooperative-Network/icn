@@ -1,0 +1,697 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Network Anti-Entropy Proof Loops | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>network anti entropy proof loops</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/network-anti-entropy-proof-loops.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Network Anti-Entropy Proof Loops</h1>
+<blockquote>
+<p><strong>Status: spec, work-in-progress.</strong> Defines the design-level contract for how ICN nodes prove that routing, replication, receipt propagation, artifact references, and federation / settlement state have not silently diverged. Names the proof-loop phases, the artifact identifiers (<code>AntiEntropyProbe</code>, <code>StateDigest</code>, <code>ReceiptDigest</code>, <code>ArtifactDigest</code>, <code>PeerSyncReport</code>, <code>DivergenceEvidence</code>, <code>RepairPlan</code>, <code>RepairReceipt</code>, <code>SyncDegradedStatus</code>, <code>QuorumSyncCheck</code>, <code>FederationSyncWindow</code>, <code>RoutingProof</code>, <code>RedundancyProof</code>), the divergence classes, the boundary rules that keep repair from broadening locality or disclosure, the steward / member rendering surfaces, and the first safe proof-loop slice. Anchors against existing primitives in <code>icn-gossip</code> (Bloom filters, vector clocks, anti-entropy module) and <code>icn-core</code> (anti-entropy background task) without redefining them. The PR introducing this doc advances <code>#1799</code> without closing it.</p>
+</blockquote>
+<!-- truth-class: normative -->
+
+<h2>Purpose</h2>
+<p>ICN nodes already exchange state through gossip with Bloom filters, vector clocks, peer sync managers, and a background anti-entropy task. What is still missing — what <code>#1799</code> exists to define — is the <strong>institutional proof-loop layer</strong> above those mechanisms: when two peers disagree, what does the disagreement mean, who is allowed to repair it, what evidence is produced, and how is the resulting state surfaced to stewards and members?</p>
+<p>Anti-entropy is not &quot;eventual consistency vibes.&quot; It is a structured institutional evidence loop:</p>
+<ol>
+<li><strong>Detect</strong> divergence between peers.</li>
+<li><strong>Prove</strong> what diverged — which state class, which scope, which records.</li>
+<li><strong>Identify</strong> authority, custody, and scope affected.</li>
+<li><strong>Repair</strong> within authority, or escalate.</li>
+<li><strong>Emit</strong> receipts and evidence that the loop ran.</li>
+<li><strong>Surface</strong> state honestly to stewards (technical detail) and members (plain participation status).</li>
+</ol>
+<p>This spec defines that loop as the proof-layer beneath:</p>
+<ul>
+<li>federation-bound and commons compute placement (per <code>docs/spec/compute-placement-policy.md</code>);</li>
+<li>replicated storage and durability policies (per <code>docs/spec/storage-durability-policies.md</code>);</li>
+<li>artifact registry references (per <code>docs/spec/artifact-registry-and-scoped-vault.md</code>);</li>
+<li>receipt clearing and federation settlement (per <code>docs/spec/federation-settlement-finality.md</code>);</li>
+<li>the steward cockpit operability surface (per <code>#1795</code>);</li>
+<li>the member shell &quot;sync delayed / degraded&quot; surface (per <code>#1818</code>).</li>
+</ul>
+<h2>Scope and non-goals</h2>
+<p><strong>In scope:</strong></p>
+<ul>
+<li>Naming the proof-loop phases, artifact identifiers, divergence classes, and boundary rules.</li>
+<li>Cross-linking the existing code surface (<code>icn-gossip</code> anti-entropy module, Bloom filter primitives, peer sync manager, partition detector, vector clock merger, <code>icn-core</code> background anti-entropy task) so future implementation work has unambiguous anchors.</li>
+<li>Defining steward and member surface vocabulary.</li>
+<li>Naming the first safe proof-loop / dogfood slice.</li>
+<li>Naming the privacy / custody rules that keep proof loops from leaking private data.</li>
+</ul>
+<p><strong>Not in scope (preserved out of this PR):</strong></p>
+<ul>
+<li>Implementation of any of the new artifact names. None of them lands as Rust code in this PR.</li>
+<li>Schema migration for existing types in <code>icn-gossip</code> / <code>icn-net</code> / <code>icn-federation</code>.</li>
+<li>Network protocol mutation. No changes to gossip topic strings, message envelopes, or peer discovery.</li>
+<li>Live federation rollout, devnet provisioning, K3s manifest changes, DNS changes, Forgejo or identity-bridge changes.</li>
+<li>Production-readiness claim. No clause of this spec is a claim that ICN-native anti-entropy is production-ready, that any partner federation is operating proof loops today, or that NYCN is a formal pilot.</li>
+<li>Scheduler, gateway, runtime, admission engine, or settlement engine implementation.</li>
+<li>Re-definition of <code>ArtifactReceipt</code>, <code>GovernanceProof</code>, <code>MerkleProof</code>, <code>ClearingReceipt</code>, or any other receipt class already named in ADR-0026 / ADR-0031 / <code>docs/spec/federation-settlement-finality.md</code>.</li>
+<li>Re-definition of the <code>BackupPolicy</code>, <code>ReplicationPolicy</code>, <code>RecoveryPolicy</code>, <code>ArchivePolicy</code>, <code>IntegrityPolicy</code> shapes (per <code>docs/spec/storage-durability-policies.md</code>).</li>
+<li>Encrypted private-overlay implementation (tracked in <code>#1767</code>).</li>
+<li>PrivacyClass taxonomy reconciliation (tracked in <code>#1792</code>).</li>
+<li>Adversarial / chaos harness (tracked in <code>#1010</code>).</li>
+<li>Closure of <code>#1799</code>. The PR introducing this doc uses <code>Refs:</code>; closure is left for separate review against the acceptance criteria.</li>
+</ul>
+<h2>Relationship to current canon</h2>
+<p>This spec sits beneath all of the following and supplies the evidence loop they assume:</p>
+<ul>
+<li><code>docs/spec/compute-placement-policy.md</code> §&quot;Boundary rules&quot; 4 and 6 (federation / external-custodian fail-closed gates) and §&quot;Fallback behavior&quot; rule 5 (&quot;No silent fallback to commons&quot;) all assume that placement can require fresh anti-entropy evidence before authorizing federation- or commons-scope work.</li>
+<li><code>docs/spec/storage-durability-policies.md</code> §&quot;Anti-entropy expectation&quot; and §&quot;Locality and privacy inheritance&quot; name this spec as the verification surface for replica divergence detection, backup verification, restore-test evidence, and repair authority.</li>
+<li><code>docs/spec/artifact-registry-and-scoped-vault.md</code> integration point 6 (&quot;Replication policy tied to privacy / disclosure class&quot;) relies on anti-entropy proofs to detect content-hash mismatch and receipt-index divergence without leaking private artifact bodies.</li>
+<li><code>docs/spec/effect-dispatch-contract.md</code> §&quot;Stage 5 — Application and evidence&quot; is where this spec&#39;s evidence artifacts (<code>DivergenceEvidence</code>, <code>RepairPlan</code>, <code>RepairReceipt</code>, <code>PeerSyncReport</code>) travel inside <code>EffectDispatchEvidence</code> envelopes; no new ADR-0026 receipt class is introduced.</li>
+<li><code>docs/spec/federation-settlement-finality.md</code> settlement-finality conditions (1–5: receipt chain complete, signature valid, dispute window elapsed, not disputed, batch flushed) all assume that the federation participants can prove their state has not silently diverged across the dispute window. This spec names that proof.</li>
+<li><code>docs/spec/institutional-domain.md</code> §&quot;Compute placement and review&quot; and the broader <code>DomainPolicy</code> references this spec as the place where the domain&#39;s &quot;anti-entropy expectations&quot; are evaluated.</li>
+<li><code>docs/spec/governed-service-binding.md</code> §&quot;Lifecycle state&quot; → &quot;Observe&quot; is where binding-level divergence surfaces — the binding&#39;s runtime provider feeds this spec&#39;s proof loop.</li>
+<li><code>docs/spec/ccl-policy-registry.md</code> policy adoption is a peer-to-peer event; this spec names the divergence class for <code>policy_version_id</code> mismatch between peers.</li>
+<li><code>docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md</code> Layer 1 (<code>GovernanceProof</code>), Layer 2 (<code>ArtifactReceipt</code>), Layer 3 (<code>FederationProvenance</code>), Layer 4 (<code>ProvenanceQuery</code>) — this spec&#39;s evidence artifacts ride inside Layer 2 / Layer 3 envelopes; no new layer is added.</li>
+<li><code>docs/architecture/KERNEL_APP_SEPARATION.md</code> meaning firewall — the kernel may run <code>icn-gossip</code> and <code>icn-core</code> anti-entropy primitives blindly; the policy oracle decides whether a given divergence is harmless lag, a degraded sync, or a custody / authority violation.</li>
+<li><code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3 — generic scope vocabulary (<code>LocalDomain</code>, <code>InstitutionalDomain</code>, <code>DomainPolicy</code>); no <code>Coop</code>-prefixed framing in generic primitives.</li>
+</ul>
+<h2>Existing code surface (anchors only)</h2>
+<p>This spec <strong>does not redefine</strong> any of the following. They exist; the spec assumes their continued correctness and names the design-level artifact layer above them.</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Location</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>BloomFilter</code></td>
+<td><code>icn/crates/icn-gossip/src/bloom.rs</code></td>
+<td>Compact set-membership digest exchanged between peers.</td>
+</tr>
+<tr>
+<td><code>GossipActor::get_bloom_filter</code> / <code>find_missing</code> / <code>anti_entropy_check</code> / <code>emit_digest</code> / <code>emit_all_digests</code></td>
+<td><code>icn/crates/icn-gossip/src/anti_entropy.rs</code></td>
+<td>Existing per-topic Bloom-filter sync primitive.</td>
+</tr>
+<tr>
+<td><code>VectorClock</code> and <code>VectorClockMerger</code></td>
+<td><code>icn/crates/icn-gossip/src/vector_clock.rs</code>, <code>partition.rs</code></td>
+<td>Causal ordering and merge for partition / rejoin.</td>
+</tr>
+<tr>
+<td><code>PeerSyncState</code>, <code>PeerSyncManager</code>, <code>Backoff</code></td>
+<td><code>icn/crates/icn-gossip/src/sync.rs</code></td>
+<td>Per-peer sync tracking and back-off scheduling.</td>
+</tr>
+<tr>
+<td><code>PartitionDetector</code>, <code>Conflict</code>, <code>ConflictResolution</code>, <code>ResolutionOutcome</code>, <code>VersionGap</code>, <code>GapDirection</code>, <code>ConflictResolver</code></td>
+<td><code>icn/crates/icn-gossip/src/partition.rs</code></td>
+<td>Partition detection and per-data-type conflict resolution.</td>
+</tr>
+<tr>
+<td><code>AntiEntropyConfig</code>, <code>spawn_anti_entropy_task</code></td>
+<td><code>icn/crates/icn-core/src/anti_entropy.rs</code></td>
+<td>Background task that periodically exchanges Bloom filters with peers (default 30 s interval; max 100 missing per round).</td>
+</tr>
+<tr>
+<td><code>gossip.anti_entropy_interval</code> parameter</td>
+<td><code>icn/crates/icn-governance/src/protocol_defaults.rs</code></td>
+<td>Governance-tunable anti-entropy interval.</td>
+</tr>
+<tr>
+<td><code>ArtifactReceipt</code> (Layer 2 ADR-0026)</td>
+<td><code>icn/crates/icn-kernel-api/src/proofs.rs</code></td>
+<td>Existing blob-transfer / artifact receipt; the envelope this spec&#39;s repair evidence travels inside.</td>
+</tr>
+<tr>
+<td><code>MerkleProof</code> / proof-of-storage primitives</td>
+<td><code>icn/crates/icn-store/</code></td>
+<td>Existing primitives for content-addressed verification.</td>
+</tr>
+<tr>
+<td><code>ReceiptClearingManager</code>, <code>ClearingReceipt</code></td>
+<td>per <code>docs/spec/federation-settlement-finality.md</code></td>
+<td>Federation-side receipt batching; this spec names the proof requirement for the dispute window.</td>
+</tr>
+<tr>
+<td>Existing gossip topic strings</td>
+<td><code>services:announce</code>, <code>services:query</code>, <code>key:rotation</code>, <code>bonds:issuance</code>, <code>bonds:payments</code> (legacy topic identifier in <code>icn-gossip/src/labor_shares.rs</code>; not ICN-native vocabulary framing), <code>network:candidates</code>, governance / contract topics</td>
+<td>The closed set of topic strings. This spec does not propose new topics; future implementation work may. Verbatim quotation of existing topic identifiers — including the legacy <code>bonds:payments</code> name — does not imply endorsement of payment-vocabulary framing; the topic identifier predates the vocabulary boundary doctrine and is preserved without renaming.</td>
+</tr>
+</tbody></table>
+<h2>Anti-entropy loop model</h2>
+<p>The loop runs in eight ordered phases. A complete pass through the loop produces evidence; an aborted pass produces evidence of the abort. The kernel and the gossip layer execute phases 1–3 and 6 blindly; the policy oracle (per <code>docs/architecture/KERNEL_APP_SEPARATION.md</code>) executes phases 4, 5, and 7. Phase 8 is rendering.</p>
+<h3>1. Schedule / trigger</h3>
+<p>Loop entry conditions, in order of priority:</p>
+<ul>
+<li><strong>Periodic.</strong> Governance-tunable interval per <code>gossip.anti_entropy_interval</code> (default 30 s).</li>
+<li><strong>Threshold-triggered.</strong> Replica count below <code>ReplicationPolicy.target_replicas</code>; backup verification overdue; restore-test cadence missed; receipt-clearing batch nearing dispute-window expiry.</li>
+<li><strong>Governance-triggered.</strong> A <code>DomainPolicy</code> change adopting a stricter sync expectation or a new <code>FederationSyncWindow</code> cadence; explicit steward request via the cockpit.</li>
+<li><strong>Incident-triggered.</strong> Suspected equivocation, peer churn beyond a threshold, partition detected by <code>PartitionDetector</code>, network candidate cache anomaly.</li>
+<li><strong>Peer-requested.</strong> A remote peer&#39;s <code>AntiEntropyProbe</code> arrives and the local node responds in scope.</li>
+</ul>
+<p>The trigger source is recorded on every <code>AntiEntropyProbe</code>.</p>
+<h3>2. Probe</h3>
+<p>The probing peer assembles an <code>AntiEntropyProbe</code> for one state class (or a bundled set) and emits it. The probe carries:</p>
+<ul>
+<li>the state class identifier (see §&quot;State classes covered&quot; below);</li>
+<li>the target scope (<code>LocalDomain</code>, <code>Federation</code>, <code>Commons</code>, or peer-pair);</li>
+<li>a bounded <code>StateDigest</code> (Bloom filter, Merkle root, vector clock, or short digest list — not full state);</li>
+<li>the prober&#39;s identity (DID) and signature;</li>
+<li>a freshness timestamp and a freshness validity window;</li>
+<li>the requested response class (read-only digest exchange, fetch-missing, repair authorization).</li>
+</ul>
+<p>Probes are content-bounded. A probe MUST NOT carry raw private content. A probe MAY carry an opaque reference to a scoped-vault object plus its <code>ArtifactDigest</code>, but never the object body.</p>
+<h3>3. Compare</h3>
+<p>The responding peer compares the incoming digest against its own state and produces a <code>PeerSyncReport</code>:</p>
+<ul>
+<li><strong>matching</strong> — both peers&#39; digests for this state class agree at the boundary.</li>
+<li><strong>missing on local</strong> — peer has entries the responder does not.</li>
+<li><strong>missing on remote</strong> — responder has entries the peer does not (responder may volunteer them subject to scope and disclosure rules).</li>
+<li><strong>divergent</strong> — both peers claim entries at the same address (e.g., same Merkle root path) with different contents; this requires classification in phase 4.</li>
+<li><strong>unknown / out of scope</strong> — responder cannot evaluate (insufficient authority, scope mismatch, stale freshness, unknown state class).</li>
+</ul>
+<p>The <code>PeerSyncReport</code> records the comparison result, the digest forms used, the freshness, and the responder&#39;s signature. It does NOT carry raw state.</p>
+<h3>4. Classify</h3>
+<p>The policy oracle classifies the comparison result into a divergence class (see §&quot;Divergence classes&quot; below). Classification consumes the comparison, the workload&#39;s privacy / locality / authority context, the domain&#39;s policy, and the relevant federation agreement (if any). Classification produces a <code>DivergenceEvidence</code> artifact when the result is non-matching.</p>
+<p><code>DivergenceEvidence</code> records:</p>
+<ul>
+<li>the divergence class;</li>
+<li>the affected state class and scope;</li>
+<li>the peers involved (DIDs);</li>
+<li>the digest forms compared;</li>
+<li>the policy clause under which classification was made;</li>
+<li>the freshness window the evidence is valid for;</li>
+<li>whether private content was implicated (without disclosing it).</li>
+</ul>
+<h3>5. Plan</h3>
+<p>The policy oracle produces a <code>RepairPlan</code> (or a &quot;no repair authorized&quot; decision). The plan names:</p>
+<ul>
+<li>the repair action (fetch missing, re-replicate, quarantine, request governance review, escalate to federation clearing, no-op);</li>
+<li>the authority basis (which mandate or <code>DomainPolicy</code> clause authorizes the action);</li>
+<li>the scope of the repair (which records, which peers);</li>
+<li>the boundary rules the repair must respect (privacy class, locality, custody);</li>
+<li>the expected <code>RepairReceipt</code> class on completion.</li>
+</ul>
+<p>Repair of governance-authoritative state always requires a covering mandate per ADR-0014 / ADR-0019; this spec does not soften that rule.</p>
+<h3>6. Apply</h3>
+<p>The repair executor (which may be the gossip layer, the storage layer, or a federation peer) performs the repair within the plan&#39;s scope. Existing primitives (Bloom-filter fetch-missing, partition rejoin, replica top-up, blob transfer) carry the work. The repair does not import the placement class taxonomy or the privacy taxonomy; it executes the bounded action the plan specifies.</p>
+<h3>7. Evidence</h3>
+<p>A <code>RepairReceipt</code> is recorded. It carries:</p>
+<ul>
+<li>the original <code>DivergenceEvidence</code> reference;</li>
+<li>the <code>RepairPlan</code> reference;</li>
+<li>the action taken and its outcome (<code>Applied</code>, <code>Partial</code>, <code>NoOp</code>, <code>Failed</code> — same vocabulary as <code>EffectOutcome</code> per ADR-0030);</li>
+<li>the after-state digest (so a later probe can confirm convergence);</li>
+<li>the actor identity and signature;</li>
+<li>the receipt envelope (Stage 5 <code>EffectDispatchEvidence</code> per <code>docs/spec/effect-dispatch-contract.md</code>, or Layer 2 <code>ArtifactReceipt</code> per ADR-0026 where the repair was a blob transfer).</li>
+</ul>
+<p>No new top-level receipt class is added. <code>RepairReceipt</code> is an evidence-artifact identifier traveling inside an existing envelope.</p>
+<h3>8. Surface</h3>
+<p>Both the steward cockpit and the member shell update. The steward cockpit shows technical detail (<code>DivergenceEvidence</code>, <code>RepairPlan</code>, scope, peers, digest mismatch, last successful proof, authority required, escalation status). The member shell shows plain-language status (<code>Synced</code>, <code>Sync delayed</code>, <code>Some records are being verified</code>, <code>Action paused until records sync</code>, <code>Receipt available</code>, <code>Review required</code>). See §&quot;Steward cockpit surface&quot; and §&quot;Member shell surface&quot; below.</p>
+<h2>State classes covered</h2>
+<p>Anti-entropy proof loops apply to the following state classes. Each class names what is digested and what privacy / custody rules apply.</p>
+<table>
+<thead>
+<tr>
+<th>State class</th>
+<th>Digested as</th>
+<th>Privacy / custody rule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Governance state — accepted proposals, effect dispatch evidence (per <code>docs/spec/effect-dispatch-contract.md</code>)</td>
+<td>Merkle root over canonical decisions and Stage 5 evidence artifacts</td>
+<td>Public within the issuing domain; cross-domain probes require federation agreement.</td>
+</tr>
+<tr>
+<td>Receipts and receipt indexes (per ADR-0026)</td>
+<td>Bloom filter over receipt content-hashes, or Merkle root over receipt index</td>
+<td>Indexed receipts may be probed by scope; the receipt body&#39;s disclosure rules apply on fetch.</td>
+</tr>
+<tr>
+<td>Artifact registry metadata (per <code>docs/spec/artifact-registry-and-scoped-vault.md</code>)</td>
+<td>Bloom filter over <code>content_hash</code> + <code>receipt_refs</code> index</td>
+<td>Replication is bounded by <code>privacy_class</code>; <code>PrivateOverlay</code> artifacts never replicate to <code>FederationMirrored</code> or <code>CommonsPublic</code>.</td>
+</tr>
+<tr>
+<td>Scoped vault references (per <code>docs/spec/artifact-registry-and-scoped-vault.md</code>)</td>
+<td>Opaque <code>ArtifactDigest</code> only</td>
+<td>Reference is digestible; body is not. Probes prove existence and scope; they do not reveal content.</td>
+</tr>
+<tr>
+<td>Storage replicas and backup / restore verification metadata (per <code>docs/spec/storage-durability-policies.md</code>)</td>
+<td>Replica-count digest, backup-verification digest, restore-test receipt reference</td>
+<td>Locality inheritance is non-broadening. Repair MUST NOT widen <code>DataLocality</code> or privacy class.</td>
+</tr>
+<tr>
+<td>Compute receipts and placement / admission evidence (per <code>docs/spec/compute-placement-policy.md</code>)</td>
+<td>Stage 5 evidence-artifact digests + <code>policy_version_id</code></td>
+<td>Federation- and commons-scope probes require the corresponding agreement to be adopted by both ends.</td>
+</tr>
+<tr>
+<td>Settlement / obligation / allocation / position records (per <code>docs/spec/federation-settlement-finality.md</code> and <code>#1634</code>)</td>
+<td>Clearing-batch digest + dispute-window timestamp</td>
+<td>Federation participants must have adopted the settlement policy. No payment / wallet / currency framing in any probe field.</td>
+</tr>
+<tr>
+<td>Federation membership / peer identity / trust-and-admission metadata</td>
+<td>Membership digest + signed peer roster</td>
+<td>Peer identity changes require signed peer roster; equivocation produces <code>DivergenceEvidence</code> of suspected peer misbehavior.</td>
+</tr>
+<tr>
+<td>CCL policy registry versions and evaluator bindings (per <code>docs/spec/ccl-policy-registry.md</code>)</td>
+<td><code>policy_version_id</code> and <code>evaluator_binding_id</code> digests</td>
+<td>Adoption is a governance act; missing adoption is divergence, not silent upgrade.</td>
+</tr>
+</tbody></table>
+<h2>Proof artifacts (forward-direction names)</h2>
+<p>The following identifiers are <strong>design-level names</strong> introduced by this spec. None lands as a Rust type in this PR. Each travels inside an existing receipt envelope (Stage 5 <code>EffectDispatchEvidence</code> per <code>docs/spec/effect-dispatch-contract.md</code>, or Layer 2 <code>ArtifactReceipt</code> per ADR-0026 for blob-transfer repair).</p>
+<ul>
+<li><strong><code>AntiEntropyProbe</code></strong> — the probing message: state class, target scope, bounded digest, trigger source, freshness, signature.</li>
+<li><strong><code>StateDigest</code></strong> — a bounded representation of a state class at a freshness instant; concrete forms include Bloom filter (existing <code>BloomFilter</code>), Merkle root, vector clock, or short digest list.</li>
+<li><strong><code>ReceiptDigest</code></strong> — a <code>StateDigest</code> specialized to a receipt index.</li>
+<li><strong><code>ArtifactDigest</code></strong> — a <code>StateDigest</code> specialized to an artifact-registry entry or scoped-vault reference; never the artifact body.</li>
+<li><strong><code>PeerSyncReport</code></strong> — the comparison result: matching / missing on local / missing on remote / divergent / unknown.</li>
+<li><strong><code>DivergenceEvidence</code></strong> — classified non-matching outcome; records class, scope, peers, digest forms, policy clause, freshness, private-content implication flag.</li>
+<li><strong><code>RepairPlan</code></strong> — repair action, authority basis, scope, boundary rules, expected <code>RepairReceipt</code> class.</li>
+<li><strong><code>RepairReceipt</code></strong> — evidence-artifact identifier for the repair outcome; carries before / after digests and the <code>EffectOutcome</code> value.</li>
+<li><strong><code>SyncDegradedStatus</code></strong> — the steward / member-facing status when the loop has detected divergence that has not yet been repaired within policy.</li>
+<li><strong><code>QuorumSyncCheck</code></strong> — proof that a quorum of named federation peers exchanged matching <code>StateDigest</code>s within a stated freshness window for a stated state class; the gate for federation-bound placement and federation settlement.</li>
+<li><strong><code>FederationSyncWindow</code></strong> — the freshness window the domain&#39;s policy requires for <code>QuorumSyncCheck</code> to count as fresh; named per state class (e.g., settlement records may require a stricter window than artifact-registry metadata).</li>
+<li><strong><code>RoutingProof</code></strong> — evidence that a message or receipt reached its intended peer(s); produced by gossip-layer acknowledgement and signed receipt-of-receipt.</li>
+<li><strong><code>RedundancyProof</code></strong> — evidence that the live replica count for an artifact meets or exceeds <code>ReplicationPolicy.target_replicas</code>; produced by the replica-count probe.</li>
+</ul>
+<h2>Routing and redundancy checks</h2>
+<p><code>RoutingProof</code> and <code>RedundancyProof</code> are the proof complements of the placement and storage policies.</p>
+<ul>
+<li><strong><code>RoutingProof</code></strong> is the evidence side of #1799&#39;s proof scenario 1 (&quot;multi-node gossip&quot;). It records that a generic event / receipt was emitted by node A and acknowledged by intended-recipient peers B / C, with hashes and signatures preserved. The kernel records the proof; the policy oracle decides whether the proof is fresh enough for the placement / settlement decision that depends on it.</li>
+<li><strong><code>RedundancyProof</code></strong> is the evidence side of #1799&#39;s proof scenario 4 (&quot;replica failure / re-replication&quot;). It records that an artifact (per <code>docs/spec/artifact-registry-and-scoped-vault.md</code>) currently has at least <code>ReplicationPolicy.target_replicas</code> live replicas in scope. A failing <code>RedundancyProof</code> triggers a <code>DivergenceEvidence</code> of class &quot;replica lag&quot; or &quot;replica missing&quot; and a <code>RepairPlan</code> action of &quot;re-replicate.&quot;</li>
+</ul>
+<p>Both proofs are bounded:</p>
+<ul>
+<li>A <code>RoutingProof</code> ages out after the freshness window the domain&#39;s policy specifies.</li>
+<li>A <code>RedundancyProof</code> is per-artifact; the loop produces it only for artifacts whose <code>ReplicationPolicy</code> declares a <code>target_replicas &gt; 1</code>.</li>
+<li>Neither proof claims production reachability or live federation; both are honest about freshness and scope.</li>
+</ul>
+<h2>Divergence classes</h2>
+<p>A <code>DivergenceEvidence</code> artifact carries exactly one class. The closed set:</p>
+<ol>
+<li><strong>Missing receipt</strong> — peer A has a receipt for an effect at a known content hash; peer B does not.</li>
+<li><strong>Conflicting receipt</strong> — peer A and peer B both claim a receipt at the same logical identifier (same effect, same scope, same <code>policy_version_id</code>) but the receipts have different content hashes.</li>
+<li><strong>Missing artifact metadata</strong> — peer A has an <code>ArtifactRegistry</code> entry; peer B&#39;s index does not include it.</li>
+<li><strong>Content hash mismatch</strong> — both peers have the artifact under the same logical name; their content hashes differ.</li>
+<li><strong>Replica lag</strong> — current replica count is below <code>ReplicationPolicy.target_replicas</code> but the policy permits a grace window before escalation.</li>
+<li><strong>Replica missing</strong> — replica count has fallen outside the grace window; the policy authorizes re-replication.</li>
+<li><strong>Backup verification failure</strong> — the most recent <code>BackupPolicy</code>-prescribed backup did not verify (per <code>docs/spec/storage-durability-policies.md</code>).</li>
+<li><strong>Restore drill missing</strong> — the <code>RecoveryPolicy</code> cadence has elapsed without a successful restore-test receipt.</li>
+<li><strong>Peer behind sync window</strong> — peer&#39;s freshness timestamp falls outside the domain&#39;s <code>FederationSyncWindow</code> for the state class in question.</li>
+<li><strong>Peer equivocation</strong> — peer is observed making inconsistent claims to different peers about the same state at the same time. Treated as suspected misbehavior; classification is &quot;suspected equivocation&quot; pending governance review.</li>
+<li><strong>Federation agreement mismatch</strong> — both peers claim to be operating under the same federation agreement but reference different <code>agreement_id</code> content hashes or different adopted versions.</li>
+<li><strong>CCL policy version mismatch</strong> — peer&#39;s <code>policy_version_id</code> for a named policy disagrees with the local adopted version (per <code>docs/spec/ccl-policy-registry.md</code>).</li>
+<li><strong>Evaluator binding mismatch</strong> — peer&#39;s <code>evaluator_binding_id</code> for a named evaluator disagrees with the local binding (per <code>docs/spec/ccl-policy-registry.md</code>).</li>
+<li><strong>Placement evidence missing</strong> — peer cannot produce the <code>PlacementDecision</code> evidence (per <code>docs/spec/compute-placement-policy.md</code>) for a workload that was claimed to have completed in scope.</li>
+<li><strong>Settlement record mismatch</strong> — peer&#39;s clearing-batch digest disagrees with the local clearing manager&#39;s view (per <code>docs/spec/federation-settlement-finality.md</code>).</li>
+<li><strong>Private object reference mismatch without content disclosure</strong> — both peers have a scoped-vault reference at the same logical identifier; the <code>ArtifactDigest</code>s disagree; the divergence is recorded as existence-plus-scope-plus-affected-records, never as content.</li>
+<li><strong>Integrity policy violation</strong> — the most recent <code>IntegrityPolicy</code>-prescribed verification failed (per <code>docs/spec/storage-durability-policies.md</code>).</li>
+<li><strong>Unclassifiable</strong> — the comparison is non-matching but does not fit any of the above; produces <code>DivergenceEvidence</code> with class &quot;unclassifiable&quot; and triggers governance review rather than automatic repair.</li>
+</ol>
+<h2>Boundary rules</h2>
+<p>The following rules are load-bearing. A repair plan that violates any rule is invalid. A scheduler, gossip layer, or storage backend that admits a repair violating any rule is a meaning-firewall violation.</p>
+<ol>
+<li><strong>No silent repair of governance-authoritative state.</strong> Repair of a <code>GovernanceProof</code> (Layer 1, ADR-0026) or an <code>InstitutionalEffectRecord</code> (per ADR-0025) requires a covering mandate per ADR-0014 / ADR-0019. The anti-entropy loop produces <code>DivergenceEvidence</code>; it does not produce governance-authoritative output without a mandate.</li>
+<li><strong>No repair beyond authority.</strong> A <code>RepairPlan</code> may only act within the authority basis it names. The kernel enforces the bound; the policy oracle decided it.</li>
+<li><strong>No raw private content in gossip or probes.</strong> Probes carry digests, not bodies. <code>ArtifactDigest</code> for a scoped-vault object reveals nothing about the body.</li>
+<li><strong>No widening of locality or disclosure during repair.</strong> A repair that would move data to a wider <code>DataLocality</code> than the source allowed is rejected. A repair that would re-tag an artifact&#39;s <code>privacy_class</code> to a wider class is rejected. Per <code>docs/spec/storage-durability-policies.md</code> §&quot;Locality and privacy inheritance.&quot;</li>
+<li><strong>No treating degraded sync as healthy.</strong> If a <code>PeerSyncReport</code> is &quot;divergent&quot; or &quot;missing on local&quot; and the divergence is not yet repaired within the freshness window, the surface MUST render <code>SyncDegradedStatus</code>. The cockpit MUST NOT show healthy; the member shell MUST NOT show &quot;Synced.&quot;</li>
+<li><strong>No federation- or commons-scope placement if required sync proof is stale beyond policy window.</strong> Per <code>docs/spec/compute-placement-policy.md</code> §&quot;Boundary rules&quot; 4 and 5, federation execution requires an explicit agreement and commons execution goes through ADR-0031. This spec adds: both also require a fresh <code>QuorumSyncCheck</code> within the relevant <code>FederationSyncWindow</code> for the state classes the workload depends on. A stale or missing proof yields <code>RejectedByPolicy</code> on the placement side.</li>
+<li><strong>No settlement finality claim without anti-entropy proof where federation scope applies.</strong> Per <code>docs/spec/federation-settlement-finality.md</code> finality conditions (receipt chain complete, signature valid, dispute window elapsed, not disputed, batch flushed): the &quot;receipt chain complete&quot; condition is evaluated against a fresh <code>QuorumSyncCheck</code> over the relevant state classes; if the check is missing or stale, finality is not claimed and the dispute window is restarted.</li>
+<li><strong>No member-facing lie.</strong> If sync is degraded, the member shell says &quot;sync delayed&quot; or &quot;some records are being verified&quot; — never &quot;synced&quot; or &quot;confirmed.&quot;</li>
+<li><strong>No production / live-federation claim.</strong> No clause of this spec is a claim that ICN-native anti-entropy is production-ready; that any partner federation is operating proof loops today; or that NYCN is a formal pilot.</li>
+<li><strong>No <code>Coop</code>-prefixed generic primitives.</strong> Per <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3, generic scope vocabulary uses <code>LocalDomain</code>, <code>InstitutionalDomain</code>, <code>Domain</code>, <code>DomainPolicy</code>. The federation- and commons-class names that appear here (<code>Federation</code>, <code>Commons</code>) are structural, not institution-package nouns.</li>
+</ol>
+<h2>Privacy and custody rules</h2>
+<p>Anti-entropy must not leak private data. This is restated separately because it is the most easily misread constraint.</p>
+<ul>
+<li><strong><code>ScopedVault</code>-backed artifacts</strong> participate in proof loops as opaque <code>ArtifactDigest</code> only. The probe proves existence and scope; the body never moves through gossip.</li>
+<li><strong>Digest / proof surfaces must preserve the source&#39;s disclosure policy.</strong> A digest derived over a <code>Member</code>- or <code>NeedToKnow</code>-class object MUST NOT travel outside the disclosure scope of the source.</li>
+<li><strong>Private divergence may be surfaced as existence / affected scope / review path</strong> without exposing restricted content. Example: &quot;Three private artifacts in the care-plan vault have divergent digests with peer X. Review required.&quot; Not: the contents of the artifacts.</li>
+<li><strong>Export or repair across domains requires explicit authority.</strong> A repair that would copy a private artifact across a domain boundary requires a covering mandate that names the cross-domain authority.</li>
+<li><strong>No repair may broaden locality or disclosure.</strong> Boundary rule 4 is restated here because it is easy to violate by accident in well-meaning repair flows.</li>
+<li><strong>Anti-entropy can prove mismatch without revealing the object</strong> when policy requires. A <code>DivergenceEvidence</code> with class &quot;private object reference mismatch without content disclosure&quot; is the explicit surface for this case.</li>
+</ul>
+<h2>Steward cockpit surface</h2>
+<p>Per <code>#1795</code>, the steward cockpit shows operator detail. Each open <code>DivergenceEvidence</code> renders with:</p>
+<ul>
+<li><strong>Affected scope</strong> — <code>LocalDomain</code>, <code>Federation</code>, <code>Commons</code>, or peer-pair.</li>
+<li><strong>State class</strong> — which class from §&quot;State classes covered&quot; the divergence affects.</li>
+<li><strong>Peers</strong> — DIDs involved.</li>
+<li><strong>Digest mismatch</strong> — which digest form was used and what it showed (Bloom-filter set-difference, Merkle root inequality, vector-clock divergence, etc.).</li>
+<li><strong>Last successful proof</strong> — when the last matching <code>PeerSyncReport</code> for this scope was recorded.</li>
+<li><strong>Repair plan</strong> — the action, the authority required, the expected <code>RepairReceipt</code>.</li>
+<li><strong>Authority required</strong> — the mandate or <code>DomainPolicy</code> clause needed (if the plan requires explicit grant).</li>
+<li><strong>Receipts / evidence</strong> — links to <code>DivergenceEvidence</code>, <code>RepairPlan</code>, and any <code>RepairReceipt</code> already produced.</li>
+<li><strong>Escalation status</strong> — whether the divergence has escalated to governance review (e.g., for unclassifiable divergence, equivocation, or boundary-rule violations).</li>
+</ul>
+<p>Cockpit copy uses the technical vocabulary defined in this spec. No member-shell plain-language substitution.</p>
+<h2>Member shell surface</h2>
+<p>Per <code>#1818</code>, the member shell renders only plain participation status. The closed set of strings:</p>
+<ul>
+<li><strong>Synced</strong> — all relevant proof loops have a fresh matching <code>PeerSyncReport</code> for this member&#39;s affected scope.</li>
+<li><strong>Sync delayed</strong> — a recent <code>PeerSyncReport</code> is &quot;missing on remote&quot; or &quot;missing on local&quot; but the policy&#39;s grace window has not expired.</li>
+<li><strong>Some records are being verified</strong> — a <code>DivergenceEvidence</code> is open and a <code>RepairPlan</code> is in flight; outcome is not yet known.</li>
+<li><strong>Action paused until records sync</strong> — the member&#39;s pending action depends on a state class that is currently in <code>SyncDegradedStatus</code>; the action is held until the loop converges or is escalated.</li>
+<li><strong>Receipt available</strong> — the relevant <code>RepairReceipt</code> (or <code>RoutingProof</code>, or <code>RedundancyProof</code>) has landed; the surface can render confirmation.</li>
+<li><strong>Review required</strong> — divergence has been escalated to governance review; the member is informed without seeing technical detail.</li>
+<li><strong>Sync delayed / degraded</strong> — a <code>SyncDegradedStatus</code> that has persisted beyond the policy&#39;s grace window; honest signaling that the institution is not currently in a healthy sync state.</li>
+</ul>
+<p>No raw protocol jargon. No Bloom-filter, Merkle-root, vector-clock, or <code>policy_version_id</code> wording. The shell renders state, not mechanism.</p>
+<h2>Failure and safety table</h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Where it surfaces</th>
+<th>Disposition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Probe arrives without a valid signature</td>
+<td>Gossip layer</td>
+<td>Drop; emit metric; do not produce <code>PeerSyncReport</code>.</td>
+</tr>
+<tr>
+<td>Probe arrives with stale freshness</td>
+<td>Compare phase</td>
+<td><code>PeerSyncReport</code> records &quot;unknown / out of scope&quot;; no <code>DivergenceEvidence</code> produced.</td>
+</tr>
+<tr>
+<td>Probe targets a state class outside the domain&#39;s adopted scope</td>
+<td>Compare phase</td>
+<td><code>PeerSyncReport</code> records &quot;unknown / out of scope.&quot;</td>
+</tr>
+<tr>
+<td>Comparison shows &quot;missing on local&quot; within grace window</td>
+<td>Classify</td>
+<td><code>DivergenceEvidence</code> class &quot;replica lag&quot; or &quot;missing receipt&quot;; <code>RepairPlan</code> action &quot;fetch missing.&quot;</td>
+</tr>
+<tr>
+<td>Comparison shows &quot;missing on local&quot; past grace window</td>
+<td>Classify</td>
+<td><code>DivergenceEvidence</code> class promoted to &quot;replica missing&quot;; <code>SyncDegradedStatus</code> surfaced.</td>
+</tr>
+<tr>
+<td>Comparison shows &quot;divergent&quot; on a governance-authoritative artifact</td>
+<td>Classify</td>
+<td><code>DivergenceEvidence</code> class &quot;conflicting receipt&quot;; <code>RepairPlan</code> requires governance review per Boundary rule 1.</td>
+</tr>
+<tr>
+<td>Comparison shows &quot;divergent&quot; on a private scoped-vault reference</td>
+<td>Classify</td>
+<td><code>DivergenceEvidence</code> class &quot;private object reference mismatch without content disclosure&quot;; cockpit renders existence + scope, never content.</td>
+</tr>
+<tr>
+<td>Suspected peer equivocation detected via cross-peer comparison</td>
+<td>Classify</td>
+<td><code>DivergenceEvidence</code> class &quot;peer equivocation&quot;; mandatory escalation to governance review; affected peer&#39;s contributions quarantined pending resolution.</td>
+</tr>
+<tr>
+<td><code>QuorumSyncCheck</code> cannot reach quorum within <code>FederationSyncWindow</code></td>
+<td>Classify</td>
+<td><code>DivergenceEvidence</code> class &quot;peer behind sync window&quot;; placement decisions consuming this proof yield <code>RejectedByPolicy</code> for <code>FederationBound</code> and <code>CommonsEligible</code> per Boundary rule 6.</td>
+</tr>
+<tr>
+<td><code>RepairPlan</code> proposes widening locality or disclosure</td>
+<td>Plan</td>
+<td>Plan rejected; <code>DivergenceEvidence</code> updated with rejection reason; escalation per Boundary rule 4.</td>
+</tr>
+<tr>
+<td><code>RepairPlan</code> proposes acting without authority basis</td>
+<td>Plan</td>
+<td>Plan rejected per Boundary rule 2.</td>
+</tr>
+<tr>
+<td>Repair executes but the after-state digest still does not match the planned outcome</td>
+<td>Evidence</td>
+<td><code>RepairReceipt</code> records <code>EffectOutcome::Partial</code> or <code>EffectOutcome::Failed</code>; cockpit retains open <code>DivergenceEvidence</code>.</td>
+</tr>
+<tr>
+<td>Backup verification failure detected by <code>IntegrityPolicy</code>-driven probe</td>
+<td>Classify</td>
+<td><code>DivergenceEvidence</code> class &quot;backup verification failure&quot;; <code>RepairPlan</code> references the <code>BackupPolicy</code> retry path.</td>
+</tr>
+<tr>
+<td><code>RecoveryPolicy</code> cadence elapsed without a successful restore-test receipt</td>
+<td>Classify</td>
+<td><code>DivergenceEvidence</code> class &quot;restore drill missing&quot;; mandatory escalation per <code>docs/spec/storage-durability-policies.md</code>.</td>
+</tr>
+<tr>
+<td>Settlement-side <code>QuorumSyncCheck</code> stale at dispute-window expiry</td>
+<td>Classify</td>
+<td><code>DivergenceEvidence</code> class &quot;settlement record mismatch&quot;; finality not claimed; dispute window restarts per Boundary rule 7.</td>
+</tr>
+<tr>
+<td>Peer roster changes without signed roster</td>
+<td>Classify</td>
+<td><code>DivergenceEvidence</code> class &quot;federation agreement mismatch&quot;; affected peer&#39;s contributions held pending roster verification.</td>
+</tr>
+<tr>
+<td>Probe attempted on a state class with no canonical digest form</td>
+<td>Compare</td>
+<td><code>PeerSyncReport</code> &quot;unknown / out of scope&quot;; tracked as a follow-up to extend the closed state-class set.</td>
+</tr>
+</tbody></table>
+<h2>First safe proof-loop / dogfood slice</h2>
+<p>Per <code>#1799</code>&#39;s acceptance criterion 1 (&quot;Network proof-loop design doc or test plan merged&quot;), this spec names a docs-and-fixture-only first slice that exercises the contract without touching real network, real federation, or private data.</p>
+<h3>Slice A (preferred): Read-only receipt-index anti-entropy rehearsal</h3>
+<p>Fixture-based exercise of phases 1–8:</p>
+<ul>
+<li><strong>Fixtures.</strong> Two or three peer fixtures (DIDs assigned, signing keys local). Each peer holds a small receipt index over public, fixture-only receipts (no real artifacts; no private data).</li>
+<li><strong>Probe.</strong> Peer A constructs an <code>AntiEntropyProbe</code> for the receipt-index state class, scoped to a fixture <code>LocalDomain</code>, carrying a <code>ReceiptDigest</code> in <code>BloomFilter</code> form (existing <code>icn-gossip</code> primitive).</li>
+<li><strong>Compare.</strong> Peer B receives the probe and produces a <code>PeerSyncReport</code>. Peer B&#39;s index intentionally lacks one of peer A&#39;s receipts; the report records &quot;missing on remote.&quot;</li>
+<li><strong>Classify.</strong> A fixture policy oracle classifies the result as <code>DivergenceEvidence</code> of class &quot;missing receipt.&quot; Private-content implication flag: false.</li>
+<li><strong>Plan.</strong> The fixture policy oracle produces a <code>RepairPlan</code> of action &quot;fetch missing receipt from peer A, scope-bounded to the fixture domain, no widening.&quot;</li>
+<li><strong>Apply.</strong> Peer B fetches the missing receipt over the existing gossip primitive.</li>
+<li><strong>Evidence.</strong> A <code>RepairReceipt</code> is recorded with <code>EffectOutcome::Applied</code>, the before-/after-digests, and the actor identity.</li>
+<li><strong>Surface.</strong> A fixture steward-cockpit view renders the open-then-resolved <code>DivergenceEvidence</code>. A fixture member-shell view renders &quot;sync delayed&quot; → &quot;receipt available.&quot;</li>
+</ul>
+<p>The slice produces nothing that crosses a real network, exercises no private artifacts, mutates no real runtime state, and makes no live-federation claim.</p>
+<h3>Slice B (after Slice A): replica-count <code>RedundancyProof</code> simulation</h3>
+<p>Same fixture structure. A small set of fixture artifacts with <code>ReplicationPolicy.target_replicas = 3</code> is held by only two of the three fixture peers. A <code>RedundancyProof</code> probe surfaces the gap. <code>DivergenceEvidence</code> of class &quot;replica missing&quot; is recorded. A <code>RepairPlan</code> of action &quot;re-replicate within scope&quot; runs. A <code>RepairReceipt</code> records <code>EffectOutcome::Applied</code>. No real artifacts; no real replicas.</p>
+<h3>Slice C (after governance-review path is specified): <code>QuorumSyncCheck</code> for fixture federation placement</h3>
+<p>A fixture federation agreement is adopted by three fixture domain peers. A <code>QuorumSyncCheck</code> is requested for the receipt-index state class within a fixture <code>FederationSyncWindow</code>. The proof either succeeds (placement decision proceeds) or fails (placement returns <code>RejectedByPolicy</code> per <code>docs/spec/compute-placement-policy.md</code> §&quot;Boundary rules&quot; 6 + this spec&#39;s Boundary rule 6).</p>
+<p>All three slices are fixture-first. None is a live-network claim. None is an implementation milestone in this PR.</p>
+<h2>Relationship to sibling work</h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Where it lives</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Compute placement classes and the federation / commons fail-closed gates</td>
+<td><code>docs/spec/compute-placement-policy.md</code> (#1801, merged #1826)</td>
+</tr>
+<tr>
+<td>Storage durability policy objects and replica / backup / restore semantics</td>
+<td><code>docs/spec/storage-durability-policies.md</code> (#1816, merged #1823)</td>
+</tr>
+<tr>
+<td>ArtifactRegistry metadata and ScopedVault opaque references</td>
+<td><code>docs/spec/artifact-registry-and-scoped-vault.md</code> (#1798, merged #1824)</td>
+</tr>
+<tr>
+<td>Governance decision → mandate → effect dispatch chain</td>
+<td><code>docs/spec/effect-dispatch-contract.md</code> (#1797, merged #1819)</td>
+</tr>
+<tr>
+<td><code>InstitutionalDomain</code> and <code>DomainPolicy</code></td>
+<td><code>docs/spec/institutional-domain.md</code> (#1794, merged #1820)</td>
+</tr>
+<tr>
+<td>Governed service binding lifecycle</td>
+<td><code>docs/spec/governed-service-binding.md</code> (#1815, merged #1822)</td>
+</tr>
+<tr>
+<td>CCL policy registry, policy adoption, evaluator selection</td>
+<td><code>docs/spec/ccl-policy-registry.md</code> (#1817, merged #1821)</td>
+</tr>
+<tr>
+<td>Federation settlement finality and dispute window</td>
+<td><code>docs/spec/federation-settlement-finality.md</code> (#1365, Phase 1 spec)</td>
+</tr>
+<tr>
+<td>Steward cockpit operability surface</td>
+<td><code>#1795</code></td>
+</tr>
+<tr>
+<td>Member shell v0</td>
+<td><code>#1818</code></td>
+</tr>
+<tr>
+<td>Private data disclosure boundary</td>
+<td><code>#1792</code></td>
+</tr>
+<tr>
+<td>Encrypted distributed private-overlay storage</td>
+<td><code>#1767</code></td>
+</tr>
+<tr>
+<td>Adversarial / chaos harness</td>
+<td><code>#1010</code></td>
+</tr>
+<tr>
+<td>Proof-level taxonomy and capability matrix</td>
+<td><code>#1796</code></td>
+</tr>
+<tr>
+<td>Authority class / typed scope / mandate</td>
+<td>ADR-0014</td>
+</tr>
+<tr>
+<td>Grant minting seam</td>
+<td>ADR-0019</td>
+</tr>
+<tr>
+<td>Receipt and provenance proof envelope</td>
+<td>ADR-0026</td>
+</tr>
+<tr>
+<td>Compute workload manifest and authority boundary</td>
+<td>ADR-0030</td>
+</tr>
+<tr>
+<td>Commons compute admission and settlement</td>
+<td>ADR-0031</td>
+</tr>
+<tr>
+<td>Entity-scope vocabulary boundary</td>
+<td><code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3</td>
+</tr>
+<tr>
+<td>Kernel / app separation and meaning firewall</td>
+<td><code>docs/architecture/KERNEL_APP_SEPARATION.md</code></td>
+</tr>
+<tr>
+<td>Integrated cooperative operating model spine</td>
+<td><code>docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md</code></td>
+</tr>
+</tbody></table>
+<h2>Open questions and follow-up drafts (not filed)</h2>
+<p>Eight follow-ups drafted in the handoff for human review:</p>
+<ol>
+<li><code>schema(network): define AntiEntropyProbe and StateDigest records</code> — wire-stable record shapes for the probe and digest forms, with round-trip tests.</li>
+<li><code>schema(network): define DivergenceEvidence and RepairPlan records</code> — wire-stable record shapes for the classification and plan artifacts; ADR amendment to ADR-0026 if any new evidence layer is needed.</li>
+<li><code>test(devnet): add receipt-index anti-entropy fixture</code> — implement Slice A as a docs / fixture test that does not touch the real runtime.</li>
+<li><code>spec(steward-cockpit): define sync degradation and repair surface</code> — the cockpit-side rendering contract for <code>DivergenceEvidence</code> / <code>RepairPlan</code> / <code>RepairReceipt</code>.</li>
+<li><code>spec(member-shell): define sync status rendering</code> — the member-shell-side rendering contract for the seven status strings named here.</li>
+<li><code>spec(federation): define quorum sync window for federation-bound placement</code> — the cross-link binding between <code>QuorumSyncCheck</code> / <code>FederationSyncWindow</code> and <code>docs/spec/compute-placement-policy.md</code> §&quot;Boundary rules&quot; 4 + 6.</li>
+<li><code>spec(storage): connect replication repair receipts to StorageSpec / RecoveryPolicy</code> — close the cross-link between <code>docs/spec/storage-durability-policies.md</code> policy objects and this spec&#39;s <code>RepairReceipt</code> / <code>RedundancyProof</code>.</li>
+<li><code>spec(privacy): define private-object digest proof without content disclosure</code> — the formal contract for divergence class 16 (&quot;private object reference mismatch without content disclosure&quot;); cross-link <code>#1792</code> and <code>#1767</code>.</li>
+</ol>
+<h2>Non-claims (repeat block for grep clarity)</h2>
+<ul>
+<li>This spec does not implement an anti-entropy network protocol. No code lands here.</li>
+<li>This spec does not claim production readiness for ICN-native anti-entropy.</li>
+<li>This spec does not claim any partner federation is operating anti-entropy proof loops today.</li>
+<li>This spec does not claim NYCN is a formal pilot.</li>
+<li>This spec does not move private data through gossip.</li>
+<li>This spec does not implement encryption, key custody, or scoped-vault encryption schemes.</li>
+<li>This spec does not redefine <code>ArtifactReceipt</code>, <code>GovernanceProof</code>, <code>MerkleProof</code>, <code>ClearingReceipt</code>, the seven runtime classes, the seven placement classes, the storage-durability policy objects, or the CCL evaluator-selection contract.</li>
+<li>This spec does not rename <code>FuelLimit</code>, <code>fuel_limit</code>, <code>payment_rate</code>, <code>payment_currency</code>, <code>DataLocality::CoopReplicated</code>, the <code>icn-coop</code> crate, or <code>coop_core</code> module paths.</li>
+<li>This spec does not introduce new receipt classes; placement / divergence / repair artifacts travel inside existing receipt envelopes.</li>
+<li>This spec does not implement, mutate, or claim live state for K3s, DNS, Forgejo, the gateway, the SDK, the website, the scheduler, the storage backend, the federation peer registry, or any deployed infrastructure.</li>
+<li>This spec does not specify retry semantics for failed repairs beyond noting that an <code>EffectOutcome::Failed</code> re-enters the loop via a new probe if and when the trigger conditions are met.</li>
+<li>This spec does not use unsafe vocabulary (payment, wallet, balance, currency, token, timebank, crypto, blockchain) for ICN-native compute / settlement / federation surfaces. All such terms in this doc appear either in explicit negation context (Boundary rules, Privacy / custody rules, Non-claims) or as <strong>verbatim quotations of existing code identifiers</strong> that predate the vocabulary boundary doctrine (the legacy <code>bonds:payments</code> gossip topic identifier in <code>icn-gossip/src/labor_shares.rs</code>, and the legacy <code>payment_rate</code> / <code>payment_currency</code> fields on <code>ComputeTask</code> that this spec preserves without endorsement and that prior handoffs track as a separate reconciliation follow-up). Quoting an existing identifier verbatim is not the same as endorsing its framing.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

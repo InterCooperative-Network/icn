@@ -1,0 +1,532 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-05-15 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>handoff 2026 05 15 network anti entropy proof loops</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/handoff-2026-05-15-network-anti-entropy-proof-loops.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-05-15</h1>
+<p><strong>Topic:</strong> Network Anti-Entropy Proof Loops (#1799)
+<strong>Branch:</strong> <code>spec/network-anti-entropy-proof-loops</code>
+<strong>Primary issue advanced:</strong> <a href="https://github.com/InterCooperative-Network/icn/issues/1799" target="_blank" rel="noopener">#1799</a> (network routing, redundancy, and anti-entropy proof loops)
+<strong>Refs (not closed):</strong> <code>#1799</code>, <code>#1010</code>, <code>#1365</code>, <code>#1767</code>, <code>#1792</code>, <code>#1795</code>, <code>#1796</code>, <code>#1797</code>, <code>#1798</code>, <code>#1801</code>, <code>#1815</code>, <code>#1816</code>, <code>#1817</code>, <code>#1818</code>, <code>#1820</code>, <code>#1822</code>, <code>#1823</code>, <code>#1824</code>, <code>#1825</code>, <code>#1826</code>
+<strong>Closes:</strong> none</p>
+<hr>
+<h2>Session Goal</h2>
+<p>Define <code>docs/spec/network-anti-entropy-proof-loops.md</code> as the design-level contract for ICN&#39;s anti-entropy proof loops: the institutional evidence loop sitting beneath compute placement, storage durability, artifact registry, receipt clearing, and federation settlement finality. The spec consumes existing primitives in <code>icn-gossip</code> (BloomFilter, VectorClock, PeerSyncManager, PartitionDetector, anti-entropy module) and <code>icn-core</code> (background anti-entropy task) without redefining them; it introduces design-level proof-artifact names (<code>AntiEntropyProbe</code>, <code>StateDigest</code>, <code>DivergenceEvidence</code>, <code>RepairPlan</code>, <code>RepairReceipt</code>, <code>QuorumSyncCheck</code>, <code>FederationSyncWindow</code>, <code>RoutingProof</code>, <code>RedundancyProof</code>, etc.) and names the closed sets of state classes, divergence classes, and boundary rules.</p>
+<p>The spec advances #1799&#39;s acceptance criterion 1 (&quot;Network proof-loop design doc or test plan merged&quot;) and provides a credible interpretation of criterion 6 (&quot;Spec identifies first safe proof-loop or dogfood slice without starting implementation&quot;) via three fixture-first slices. Closure is left for human review.</p>
+<hr>
+<h2>Decisive Test</h2>
+<p>The PR fails if any of these holds:</p>
+<ol>
+<li>The spec uses positive ICN-native payment / currency / balance / wallet / token / crypto / blockchain framing outside explicit negation context or outside verbatim quotation of existing legacy code identifiers.</li>
+<li>The spec redefines <code>ArtifactReceipt</code>, <code>GovernanceProof</code>, <code>MerkleProof</code>, <code>ClearingReceipt</code>, or any other receipt class already named in ADR-0026 / ADR-0031 / <code>docs/spec/federation-settlement-finality.md</code>.</li>
+<li>The spec introduces a new ADR-0026 receipt class.</li>
+<li>The spec touches Rust code in <code>icn/crates/icn-gossip</code>, <code>icn-net</code>, <code>icn-core</code>, <code>icn-federation</code>, <code>icn-protocol</code>, <code>icn-store</code>, or <code>icn-kernel-api</code>.</li>
+<li>The spec edits the <code>#1799</code> GitHub issue body.</li>
+<li><code>python3 docs/scripts/doc_control_check.py --strict</code> introduces a new warning rooted in this PR.</li>
+<li><code>python3 docs/scripts/lint-arch.py docs/spec/network-anti-entropy-proof-loops.md --cargo icn/Cargo.toml</code> returns errors (warnings in explicit negation context are acceptable).</li>
+<li>The commit uses <code>Closes: #1799</code> instead of <code>Refs:</code>.</li>
+<li>The PR claims production readiness, live federation, or any partner-pilot operating under this spec today.</li>
+<li>Anti-entropy boundary rules contradict the federation / commons fail-closed gates in <code>docs/spec/compute-placement-policy.md</code> §&quot;Boundary rules&quot; 4 and 6, or the finality conditions in <code>docs/spec/federation-settlement-finality.md</code> §&quot;Finality.&quot;</li>
+</ol>
+<p>See §&quot;Verification Commands&quot; below for the exact commands used to check each item.</p>
+<hr>
+<h2>Final State (Verified)</h2>
+<!-- TRUTH TYPE: Implementation truth — only facts confirmed by commands or code inspection -->
+
+<h3><code>main</code> HEAD before branching</h3>
+<p><code>2a5b75c58</code> — <code>docs(agents): reconcile handoff path with template (#1827)</code></p>
+<h3>Branches</h3>
+<ul>
+<li><code>spec/network-anti-entropy-proof-loops</code> — head SHA at first commit was <code>6439afb4a</code>. Branch head moves with each push to address review feedback; the latest head SHA is reflected in <code>gh pr view 1829 --json headRefOid</code>.</li>
+</ul>
+<h3>Open PRs</h3>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Branch</th>
+<th>State</th>
+<th>CI Status</th>
+<th>Blocker</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1829" target="_blank" rel="noopener">#1829</a></td>
+<td><code>spec/network-anti-entropy-proof-loops</code></td>
+<td>OPEN</td>
+<td>23 pass / 6 skip / 0 fail at initial head</td>
+<td>None</td>
+</tr>
+</tbody></table>
+<h3>Recent merged PRs</h3>
+<p><code>#1814</code>, <code>#1819</code>, <code>#1820</code>, <code>#1821</code>, <code>#1822</code>, <code>#1823</code>, <code>#1824</code>, <code>#1825</code>, <code>#1826</code>, <code>#1827</code>.</p>
+<h3>Sibling issues verified OPEN at session start</h3>
+<p><code>#1799</code> (primary; this PR advances), <code>#1801</code>, <code>#1818</code>, <code>#1798</code>, <code>#1767</code>, <code>#1792</code>, <code>#1010</code>, <code>#1796</code>, <code>#1795</code>, <code>#1815</code>, <code>#1816</code>, <code>#1817</code>.</p>
+<h3>Existing code surface inspected</h3>
+<ul>
+<li><code>icn/crates/icn-gossip/src/anti_entropy.rs</code> — <code>GossipActor::get_bloom_filter</code>, <code>find_missing</code>, <code>anti_entropy_check</code>, <code>emit_digest</code>, <code>emit_all_digests</code>. The Bloom-filter-based sync primitive is already implemented.</li>
+<li><code>icn/crates/icn-gossip/src/bloom.rs</code> — <code>BloomFilter</code>.</li>
+<li><code>icn/crates/icn-gossip/src/vector_clock.rs</code>, <code>partition.rs</code> — <code>VectorClock</code>, <code>VectorClockMerger</code>, <code>PartitionDetector</code>, <code>Conflict</code>, <code>ConflictResolution</code>, <code>ResolutionOutcome</code>, <code>VersionGap</code>, <code>GapDirection</code>, <code>ConflictResolver</code>.</li>
+<li><code>icn/crates/icn-gossip/src/sync.rs</code> — <code>PeerSyncState</code>, <code>PeerSyncManager</code>, <code>Backoff</code>.</li>
+<li><code>icn/crates/icn-core/src/anti_entropy.rs</code> — <code>AntiEntropyConfig</code> (default 30 s interval; 100 max missing per round), <code>spawn_anti_entropy_task</code> (background gossip-anti-entropy task).</li>
+<li><code>icn/crates/icn-governance/src/protocol_defaults.rs</code> — <code>gossip.anti_entropy_interval</code> is a governance-tunable parameter.</li>
+<li><code>icn/crates/icn-federation/src/lib.rs</code> — federation crate exists; modules are <code>error</code>, <code>gossip</code>, <code>metrics</code>, <code>registry</code>, <code>types</code>; DID prefix-format routing.</li>
+<li><code>docs/spec/federation-settlement-finality.md</code> — Phase 1 spec defines <code>ClearingReceipt</code>, <code>ReceiptClearingManager</code>, 72-hour dispute window, bilateral / multilateral netting.</li>
+</ul>
+<h3>Forward-direction names introduced by this spec (all design-level only)</h3>
+<p><code>AntiEntropyProbe</code>, <code>StateDigest</code>, <code>ReceiptDigest</code>, <code>ArtifactDigest</code>, <code>PeerSyncReport</code>, <code>DivergenceEvidence</code>, <code>RepairPlan</code>, <code>RepairReceipt</code>, <code>SyncDegradedStatus</code>, <code>QuorumSyncCheck</code>, <code>FederationSyncWindow</code>, <code>RoutingProof</code>, <code>RedundancyProof</code>. None lands as a Rust type in this PR.</p>
+<h3>Files Changed</h3>
+<ol>
+<li><code>docs/spec/network-anti-entropy-proof-loops.md</code> — new file (~470 lines, later +2 lines after review-feedback fix on the bonds:payments legacy-identifier carve-out).</li>
+<li><code>docs/registry.toml</code> — new entry inserted before <code>[docs.&quot;docs/spec/compute-placement-policy.md&quot;]</code>.</li>
+<li><code>docs/INDEX.md</code> — Specifications section: one new line after the <code>compute-placement-policy.md</code> entry.</li>
+<li><code>docs/DOCUMENT_REGISTRY.md</code> — regenerated via <code>--write-document-registry</code>. Corpus moves from 811 to 813 markdown files under <code>docs/</code> (the new spec + this handoff).</li>
+<li><code>docs/dev/handoff-2026-05-15-network-anti-entropy-proof-loops.md</code> — this file.</li>
+</ol>
+<p>No Rust code touched. SDK untouched. Website untouched. Deploy scripts untouched. Existing specs not modified.</p>
+<hr>
+<h2>What Changed</h2>
+<!-- TRUTH TYPE: Execution truth — actions taken this session -->
+
+<h3>1. <code>docs/spec/network-anti-entropy-proof-loops.md</code> (new doc)</h3>
+<p>Authority class: <code>normative</code>. Length: roughly 470 lines. Sections:</p>
+<ul>
+<li><strong>Purpose</strong> — names the proof-loop institutional evidence layer above existing gossip / Bloom-filter primitives; lists the six loop steps (detect, prove, identify, repair, emit, surface).</li>
+<li><strong>Scope and non-goals</strong> — twelve non-claim bullets including: no implementation, no schema migration, no protocol mutation, no live federation, no production claim, no scheduler / gateway / runtime change, no receipt class redefinition, no <code>#1767</code> / <code>#1792</code> taxonomy migration, no <code>#1010</code> chaos work, no closure of <code>#1799</code>.</li>
+<li><strong>Relationship to current canon</strong> — explicit pointers to each merged spec / ADR / architecture doc this spec sits beneath.</li>
+<li><strong>Existing code surface (anchors only)</strong> — eleven-row table of existing types / files / parameters that this spec consumes without redefining.</li>
+<li><strong>Anti-entropy loop model</strong> — eight phases: schedule / trigger, probe, compare, classify, plan, apply, evidence, surface. Each phase names which artifact it produces and which boundary rules apply.</li>
+<li><strong>State classes covered</strong> — nine-row table covering governance state, receipts, artifact registry metadata, scoped vault references, storage replicas, compute receipts, settlement records, federation membership, CCL policy versions. Per-class privacy / custody rule recorded.</li>
+<li><strong>Proof artifacts (forward-direction names)</strong> — thirteen design-level identifiers, each with a one-line definition; explicit &quot;no new top-level receipt class introduced&quot; claim, with all artifacts traveling inside existing receipt envelopes.</li>
+<li><strong>Routing and redundancy checks</strong> — <code>RoutingProof</code> and <code>RedundancyProof</code> as the proof complements of placement and storage policies; explicit freshness bounds and absence of production-reachability claims.</li>
+<li><strong>Divergence classes</strong> — eighteen closed classes (missing receipt, conflicting receipt, missing artifact metadata, content hash mismatch, replica lag, replica missing, backup verification failure, restore drill missing, peer behind sync window, peer equivocation, federation agreement mismatch, CCL policy version mismatch, evaluator binding mismatch, placement evidence missing, settlement record mismatch, private object reference mismatch without content disclosure, integrity policy violation, unclassifiable).</li>
+<li><strong>Boundary rules</strong> — ten load-bearing rules. Rule 6 explicitly says federation- and commons-scope placement require a fresh <code>QuorumSyncCheck</code> within the relevant <code>FederationSyncWindow</code>. Rule 7 explicitly says settlement finality requires anti-entropy proof under federation scope.</li>
+<li><strong>Privacy and custody rules</strong> — restates the non-leakage rules separately because they are the most easily misread. Names the divergence-class-16 surface (&quot;private object reference mismatch without content disclosure&quot;) as the explicit pattern for proving mismatch without revealing the object.</li>
+<li><strong>Steward cockpit surface</strong> — eight rendering fields (affected scope, state class, peers, digest mismatch, last successful proof, repair plan, authority required, receipts / evidence, escalation status).</li>
+<li><strong>Member shell surface</strong> — closed set of seven plain-language status strings (<code>Synced</code>, <code>Sync delayed</code>, <code>Some records are being verified</code>, <code>Action paused until records sync</code>, <code>Receipt available</code>, <code>Review required</code>, <code>Sync delayed / degraded</code>).</li>
+<li><strong>Failure and safety table</strong> — eighteen rows.</li>
+<li><strong>First safe proof-loop / dogfood slice</strong> — three fixture-first slices: read-only receipt-index anti-entropy rehearsal (Slice A, preferred), <code>RedundancyProof</code> simulation (Slice B), <code>QuorumSyncCheck</code> fixture for federation placement (Slice C). All fixture-only; no live network; no real artifacts; no real replicas.</li>
+<li><strong>Relationship to sibling work</strong> — table of cross-links across every merged spec, the federation-settlement-finality spec, every relevant open issue, and the five relevant ADRs.</li>
+<li><strong>Open questions and follow-up drafts</strong> — eight follow-ups named (see below).</li>
+<li><strong>Non-claims (repeat block for grep clarity)</strong> — twelve grep-friendly negation lines.</li>
+</ul>
+<h3>2. <code>docs/registry.toml</code> (one new entry)</h3>
+<p><code>[docs.&quot;docs/spec/network-anti-entropy-proof-loops.md&quot;]</code>:</p>
+<ul>
+<li><code>category = &quot;architecture&quot;</code></li>
+<li><code>status = &quot;draft&quot;</code></li>
+<li><code>domain_tags = [&quot;network&quot;, &quot;anti-entropy&quot;, &quot;gossip&quot;, &quot;federation&quot;, &quot;settlement&quot;, &quot;storage&quot;, &quot;replication&quot;, &quot;divergence&quot;, &quot;repair&quot;, &quot;proof-loop&quot;, &quot;kernel-app-boundary&quot;, &quot;spec&quot;]</code></li>
+<li><code>depends_on</code> enumerates the integrating spine doc, meaning-firewall doc, boundary doc, six sibling specs, the federation-settlement-finality spec, and seven ADRs.</li>
+</ul>
+<h3>3. <code>docs/INDEX.md</code> (Specifications section)</h3>
+<p>One new line after the <code>compute-placement-policy.md</code> entry.</p>
+<h3>4. <code>docs/DOCUMENT_REGISTRY.md</code> (regenerated)</h3>
+<p><code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict --write-document-registry docs/DOCUMENT_REGISTRY.md</code>. 811 → 812 markdown files. 54 pre-existing yaml-mismatch warnings persist; none introduced by this PR.</p>
+<h3>5. <code>docs/dev/handoff-2026-05-15-network-anti-entropy-proof-loops.md</code> (this file)</h3>
+<p>Filename uses the descriptive topic suffix convention now canonicalized by PR #1827.</p>
+<hr>
+<h2>What&#39;s Open</h2>
+<!-- TRUTH TYPE: Execution truth — known incomplete work + preserved boundaries -->
+
+<h3>Incomplete work this session deliberately did not start</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Wire-stable schemas for any of the forward-direction proof-artifact names (<code>AntiEntropyProbe</code>, <code>StateDigest</code>, <code>DivergenceEvidence</code>, <code>RepairPlan</code>, etc.). Tracked as follow-ups #1 and #2 below.</li>
+<li><input disabled="" type="checkbox"> Devnet fixture for Slice A (read-only receipt-index anti-entropy rehearsal). Tracked as follow-up #3 below.</li>
+<li><input disabled="" type="checkbox"> Steward cockpit / member-shell rendering specs that consume this spec&#39;s surface vocabulary. Tracked as follow-ups #4 and #5 below.</li>
+<li><input disabled="" type="checkbox"> Federation-side quorum sync window protocol detail. Tracked as follow-up #6 below.</li>
+<li><input disabled="" type="checkbox"> Storage-side repair-receipt connector to <code>StorageSpec</code> / <code>RecoveryPolicy</code>. Tracked as follow-up #7 below.</li>
+<li><input disabled="" type="checkbox"> Private-object digest proof contract (divergence class 16). Tracked as follow-up #8 below.</li>
+<li><input disabled="" type="checkbox"> Per the established session pattern: <strong>&quot;Apply valid feedback only. Stop and summarize unless explicitly told to merge.&quot;</strong> Wait for explicit merge instruction.</li>
+<li><input disabled="" type="checkbox"> Decision on whether to file the eight follow-up issue drafts listed in §&quot;Follow-up Issue Drafts&quot; (deferred to user).</li>
+<li><input disabled="" type="checkbox"> Closure of <code>#1799</code>. The PR uses <code>Refs: #1799</code>; closure is left to the user against the seven acceptance criteria. See §&quot;Unsafe Assumptions&quot; for the per-criterion coverage breakdown.</li>
+</ul>
+<h3>Preserved scope boundaries (explicitly NOT changed)</h3>
+<ul>
+<li>No Rust code in <code>icn/crates/icn-gossip</code>, <code>icn-net</code>, <code>icn-core</code>, <code>icn-federation</code>, <code>icn-protocol</code>, <code>icn-store</code>, <code>icn-kernel-api</code>, or anywhere else.</li>
+<li>No new or modified gossip topic strings. The existing set (<code>services:announce</code>, <code>services:query</code>, <code>key:rotation</code>, <code>bonds:issuance</code>, <code>bonds:payments</code>, <code>network:candidates</code>, governance / contract topics) is preserved verbatim.</li>
+<li>No new receipt classes. <code>ArtifactReceipt</code> (Layer 2 ADR-0026), <code>GovernanceProof</code>, <code>MerkleProof</code>, <code>ClearingReceipt</code> are referenced, not redefined.</li>
+<li>No edits to <code>docs/spec/compute-placement-policy.md</code>, <code>docs/spec/storage-durability-policies.md</code>, <code>docs/spec/artifact-registry-and-scoped-vault.md</code>, <code>docs/spec/effect-dispatch-contract.md</code>, <code>docs/spec/institutional-domain.md</code>, <code>docs/spec/governed-service-binding.md</code>, <code>docs/spec/ccl-policy-registry.md</code>, or <code>docs/spec/federation-settlement-finality.md</code>. This spec sits beneath them as a separate document.</li>
+<li>No edits to ADRs.</li>
+<li>No edits to <code>#1799</code>&#39;s GitHub issue body.</li>
+<li>No <code>DataLocality::CoopReplicated</code> migration. No <code>FuelLimit</code> → <code>execution budget</code> code rename. No <code>payment_rate</code> / <code>payment_currency</code> reconciliation. No <code>PrivacyClass</code> taxonomy migration. All carried forward as separate follow-ups in prior handoffs.</li>
+<li>No K3s, DNS, Forgejo, gateway, storage-backend, identity-bridge, or deploy-script changes.</li>
+<li>No <code>#1010</code> / <code>#1818</code> / <code>#1767</code> / <code>#1792</code> work.</li>
+</ul>
+<hr>
+<h2>Unsafe Assumptions</h2>
+<!-- Explicitly name anything this session relied on that was not verified -->
+
+<ul>
+<li><strong><code>icn/crates/icn-federation</code> is a real crate at the path named.</strong> Verified by <code>wc -l icn/crates/icn-federation/src/lib.rs</code> returning 145 lines. The spec names <code>icn-federation</code> in the existing-code-surface table; if the crate is later restructured or renamed, the table needs a re-read.</li>
+<li><strong><code>docs/spec/federation-settlement-finality.md</code> exists in <code>main</code>.</strong> Verified by <code>head -25</code> against the file. The spec cross-links it for the dispute-window and clearing-receipt semantics; the cross-link assumes that doc&#39;s vocabulary (<code>ClearingReceipt</code>, <code>ReceiptClearingManager</code>, 72-hour dispute window) remains as it is in main.</li>
+<li><strong>The set of forward-direction proof-artifact names does not collide with existing identifiers.</strong> Verified by <code>rg &quot;AntiEntropyProbe|StateDigest|ReceiptDigest|ArtifactDigest|PeerSyncReport|DivergenceEvidence|RepairPlan|RepairReceipt|SyncDegradedStatus|QuorumSyncCheck|FederationSyncWindow|RoutingProof|RedundancyProof&quot;</code> returning no matches in the codebase outside this spec. If a parallel in-flight PR adds any of these names with a different shape, the spec&#39;s forward-direction claim needs reconciliation.</li>
+<li><strong><code>gossip.anti_entropy_interval</code> is a real governance parameter.</strong> Verified by <code>grep</code> against <code>icn-governance/src/protocol_defaults.rs</code>. The spec&#39;s §&quot;Schedule / trigger&quot; cites this name; if it&#39;s renamed in code before implementation work starts, the spec&#39;s anchor needs an update.</li>
+<li><strong>The eighteen-class divergence taxonomy is closed but extensible.</strong> The spec asserts &quot;closed set&quot; for clarity, but the failure-and-safety table also names a fallback (&quot;Probe attempted on a state class with no canonical digest form&quot;) whose disposition is to track extending the state-class set as a follow-up. If reviewers prefer &quot;open with rules for extension&quot; over &quot;closed with extension protocol,&quot; the wording can be adjusted in a follow-up commit.</li>
+<li><strong><code>#1799</code> acceptance criteria.</strong> The spec satisfies criterion 1 (&quot;Network proof-loop design doc or test plan merged&quot;) on merge, criterion 4 (&quot;Dashboard/member status mapping is defined&quot;) via §&quot;Steward cockpit surface&quot; + §&quot;Member shell surface&quot;, and offers a credible interpretation of criterion 6 (&quot;first safe proof-loop or dogfood slice&quot;) via the three fixture slices. Criteria 2 (&quot;proof scenarios classified by proof level using #1796 taxonomy&quot;) and 3 (&quot;each scenario identifies required source paths/endpoints/tests and current gaps&quot;) are partially addressed via the §&quot;Existing code surface&quot; table and the §&quot;First safe proof-loop / dogfood slice&quot; section, but <code>#1796</code>&#39;s taxonomy is itself forward work; full classification awaits #1796. Criterion 5 (&quot;Follow-up implementation/test issues are opened only after the proof plan is accepted&quot;) is honored — this PR drafts follow-ups in the handoff but does not file them. <strong>Closure of <code>#1799</code> is left to the user.</strong></li>
+</ul>
+<hr>
+<h2>Next Move</h2>
+<!-- TRUTH TYPE: Execution truth — the exact sequence for the next session -->
+
+<ol>
+<li>Wait for any further AI-reviewer feedback on PR #1829 beyond the initial three threads (Copilot bonds:payments + Copilot template alignment + Codex handoff-removal). Apply valid feedback in additional commits on the same branch.</li>
+<li>After all valid feedback is applied, <strong>stop and summarize</strong>. Do not merge until explicitly instructed.</li>
+<li>If the user instructs to merge: squash-merge with <code>--delete-branch</code>; sync local <code>main</code>; confirm working tree clean.</li>
+<li>Carry forward the eight follow-up issue drafts in §&quot;Follow-up Issue Drafts&quot; for separate user decision on filing.</li>
+<li>Do <strong>not</strong> carry forward the AGENTS.md handoff-path drift in future handoffs unless an AI reviewer surfaces it again; #1827 reconciled it.</li>
+<li>The natural next architecture-spec PR after <code>#1829</code> lands is <code>#1818</code> (member shell v0) or <code>#1795</code> (steward cockpit) — both are direct consumers of this spec&#39;s surface vocabulary. <code>#1767</code> (encrypted private overlay) is the alternative if the user prefers to push on the private-storage side instead of the operability side.</li>
+</ol>
+<hr>
+<h2>Validation Results</h2>
+<!-- TRUTH TYPE: Verification — exact commands run and outcomes -->
+
+<pre><code class="language-bash">cd /home/matt/projects/icn
+
+# Doc control plane (strict)
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict --write-document-registry docs/DOCUMENT_REGISTRY.md
+# OK: doc control check passed (812 docs markdown files under docs/); 54 enforcement warnings
+# 54 yaml-mismatch warnings are pre-existing; none introduced by this PR.
+
+# Architecture vocabulary lint
+python3 docs/scripts/lint-arch.py docs/spec/network-anti-entropy-proof-loops.md --cargo icn/Cargo.toml
+# Expected: 0 errors; some &quot;soft-forbidden&quot; warnings in negation context (vocabulary boundary, non-claims).
+
+# Regulatory compliance linter
+python3 .github/scripts/compliance_linter.py
+# Expected: ✅ No compliance violations detected!
+
+# Freshness check (pre-existing stale sections unrelated to this PR)
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+# Expected: pre-existing stale sections (06, 10, 11, 12, 14). None introduced by this PR.
+
+# Targeted vocabulary check
+rg -n &quot;payment|currency|balance|wallet|token|blockchain|crypto|NYCN|Summit|live federation|production-ready|production readiness&quot; \
+   docs/spec/network-anti-entropy-proof-loops.md docs/dev/handoff-2026-05-15-network-anti-entropy-proof-loops.md docs/INDEX.md docs/registry.toml
+# Expected: only matches in explicit negation context (Boundary rules, Privacy / custody rules, Non-claims).
+
+# Cross-link smoke check
+rg -o &quot;docs/[a-zA-Z0-9_/\-]+\.md&quot; docs/spec/network-anti-entropy-proof-loops.md | sort -u | while read p; do test -f &quot;$p&quot; &amp;&amp; echo OK $p || echo MISSING $p; done
+# Expected: every link resolves.
+</code></pre>
+<p>(Validation outputs are recorded against the initial commit SHA; the branch head moves with each push to address review feedback.)</p>
+<hr>
+<h2>Follow-up Issue Drafts (Not Filed)</h2>
+<p>Eight follow-ups drafted per the user&#39;s instruction. Paste-ready for separate review.</p>
+<h3>1. <code>schema(network): define AntiEntropyProbe and StateDigest records</code></h3>
+<pre><code>## Purpose
+
+Land wire-stable record shapes for `AntiEntropyProbe` and the family of `StateDigest` forms named in `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Proof artifacts (forward-direction names)&quot; — including `ReceiptDigest`, `ArtifactDigest`, and the Bloom-filter / Merkle-root / vector-clock projections.
+
+## Scope
+
+- Probe record shape (state class, target scope, bounded digest field, prober DID and signature, trigger source, freshness timestamp, freshness validity window, requested response class).
+- StateDigest projections (Bloom filter, Merkle root, vector clock, short digest list) with explicit serialization.
+- Round-trip tests.
+- Cross-link to existing `icn-gossip` BloomFilter and the per-topic Bloom-filter sync primitive in `anti_entropy.rs`.
+
+## Non-goals
+
+- No protocol mutation. Existing gossip topic strings remain.
+- No new receipt class. The probe is an envelope, not a receipt.
+- No live federation rollout.
+
+## Related
+
+- `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Probe&quot; and §&quot;Proof artifacts (forward-direction names).&quot;
+- `icn/crates/icn-gossip/src/anti_entropy.rs`, `bloom.rs`.
+</code></pre>
+<h3>2. <code>schema(network): define DivergenceEvidence and RepairPlan records</code></h3>
+<pre><code>## Purpose
+
+Wire-stable record shapes for `DivergenceEvidence` and `RepairPlan` per `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Proof artifacts.&quot; Includes the eighteen-class divergence taxonomy as a closed enum (with the &quot;unclassifiable&quot; fallback).
+
+## Scope
+
+- DivergenceEvidence shape (class, affected state class, scope, peers, digest forms, policy clause, freshness window, private-content implication flag).
+- RepairPlan shape (action, authority basis, scope, boundary rules, expected RepairReceipt class).
+- Round-trip tests; ADR-0026 amendment if needed for any new evidence layer.
+
+## Non-goals
+
+- No automatic-repair implementation.
+- No governance review surface (separate concern).
+
+## Related
+
+- `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Classify&quot; and §&quot;Plan.&quot;
+- ADR-0026 §&quot;Layer 2 / Stage 5 evidence.&quot;
+</code></pre>
+<h3>3. <code>test(devnet): add receipt-index anti-entropy fixture</code></h3>
+<pre><code>## Purpose
+
+Implement Slice A from `docs/spec/network-anti-entropy-proof-loops.md` §&quot;First safe proof-loop / dogfood slice&quot;: a fixture-only read-only receipt-index anti-entropy rehearsal across two or three peer fixtures with no live network and no real artifacts.
+
+## Scope
+
+- Fixture peers (DIDs assigned; signing keys local; receipt index over fixture-only public receipts).
+- Probe / compare / classify / plan / apply / evidence / surface pass.
+- DivergenceEvidence of class &quot;missing receipt&quot; produced and resolved.
+- Fixture cockpit and member-shell views render the open-then-resolved divergence.
+
+## Non-goals
+
+- No live network. No private artifacts. No runtime mutation.
+- Not a chaos test (that&#39;s `#1010`).
+
+## Related
+
+- `docs/spec/network-anti-entropy-proof-loops.md` §&quot;First safe proof-loop / dogfood slice&quot; → Slice A.
+</code></pre>
+<h3>4. <code>spec(steward-cockpit): define sync degradation and repair surface</code></h3>
+<pre><code>## Purpose
+
+Define the cockpit-side rendering contract for `DivergenceEvidence`, `RepairPlan`, `RepairReceipt`, and `SyncDegradedStatus` per `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Steward cockpit surface.&quot;
+
+## Scope
+
+- Cockpit field set (affected scope, state class, peers, digest mismatch, last successful proof, repair plan, authority required, receipts/evidence, escalation status).
+- Cockpit refresh cadence.
+- Cockpit access control (only stewards with the relevant authority class see private-implication evidence).
+
+## Non-goals
+
+- No member-shell content (separate spec).
+- No automatic repair (separate concern).
+
+## Related
+
+- `#1795` (steward cockpit dashboard).
+- `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Steward cockpit surface.&quot;
+</code></pre>
+<h3>5. <code>spec(member-shell): define sync status rendering</code></h3>
+<pre><code>## Purpose
+
+Define the member-shell-side rendering contract for the seven plain-language status strings named in `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Member shell surface.&quot;
+
+## Scope
+
+- The seven closed strings.
+- The transitions between them (Synced → Sync delayed → Some records are being verified → Action paused until records sync → Receipt available; or Review required as terminal).
+- Boundary rule 8 enforcement at the rendering layer (no member-facing lie).
+
+## Non-goals
+
+- No raw protocol surface in the shell.
+- No cockpit content.
+
+## Related
+
+- `#1818` (member shell v0).
+- `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Member shell surface&quot; and Boundary rule 8.
+</code></pre>
+<h3>6. <code>spec(federation): define quorum sync window for federation-bound placement</code></h3>
+<pre><code>## Purpose
+
+Define the cross-link between `QuorumSyncCheck` / `FederationSyncWindow` (per `docs/spec/network-anti-entropy-proof-loops.md`) and the federation-scope fail-closed gates in `docs/spec/compute-placement-policy.md` §&quot;Boundary rules&quot; 4 and 6.
+
+## Scope
+
+- The protocol for assembling a quorum of named federation peers for a state-class digest exchange.
+- Per-state-class freshness windows (settlement records may require a stricter window than artifact-registry metadata).
+- The interaction with the federation-settlement-finality dispute window (per `docs/spec/federation-settlement-finality.md`).
+
+## Non-goals
+
+- No new federation agreement schema.
+- No new ADR.
+
+## Related
+
+- `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Routing and redundancy checks,&quot; Boundary rules 6 + 7.
+- `docs/spec/compute-placement-policy.md` §&quot;Boundary rules&quot; 4 + 6.
+- `docs/spec/federation-settlement-finality.md`.
+</code></pre>
+<h3>7. <code>spec(storage): connect replication repair receipts to StorageSpec / RecoveryPolicy</code></h3>
+<pre><code>## Purpose
+
+Close the cross-link between `docs/spec/storage-durability-policies.md` policy objects (`StorageSpec`, `RecoveryPolicy`, `IntegrityPolicy`) and the `RepairReceipt` / `RedundancyProof` artifacts named in `docs/spec/network-anti-entropy-proof-loops.md`.
+
+## Scope
+
+- How a `BackupPolicy` retry path produces a `RepairReceipt` of which class.
+- How an `IntegrityPolicy` verification failure produces a `DivergenceEvidence` of class &quot;integrity policy violation.&quot;
+- How a missed `RecoveryPolicy` restore-test cadence escalates without auto-repair.
+
+## Non-goals
+
+- No backup-engine implementation.
+- No restore-engine implementation.
+
+## Related
+
+- `docs/spec/storage-durability-policies.md`.
+- `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Divergence classes&quot; 5–8 and 17.
+</code></pre>
+<h3>8. <code>spec(privacy): define private-object digest proof without content disclosure</code></h3>
+<pre><code>## Purpose
+
+Formal contract for divergence class 16 in `docs/spec/network-anti-entropy-proof-loops.md` (&quot;private object reference mismatch without content disclosure&quot;). Defines how a probe can prove that a scoped-vault reference&#39;s `ArtifactDigest` disagrees between peers without exposing the artifact body or its disclosure-sensitive metadata.
+
+## Scope
+
+- The shape of an `ArtifactDigest` over a scoped-vault object (e.g., HMAC over a content-hash plus a domain-scoped salt).
+- The cockpit / member-shell rendering rule (existence + scope + review path, never content).
+- The interaction with `#1767`&#39;s encrypted private overlay scheme.
+
+## Non-goals
+
+- No encryption-scheme implementation.
+- No `PrivacyClass` taxonomy migration (tracked in `#1792`).
+
+## Related
+
+- `#1792` (private data disclosure boundary).
+- `#1767` (encrypted distributed private-overlay storage).
+- `docs/spec/network-anti-entropy-proof-loops.md` §&quot;Privacy and custody rules&quot; and divergence class 16.
+</code></pre>
+<hr>
+<h2>Architectural Decisions</h2>
+<!-- TRUTH TYPE: Decision truth — choices made and why -->
+
+<h3>1. The proof-loop layer is an app-side concept, not a kernel-side one.</h3>
+<p><code>AntiEntropyProbe</code>, <code>DivergenceEvidence</code>, <code>RepairPlan</code>, <code>RepairReceipt</code> are policy-oracle outputs (per <code>docs/architecture/KERNEL_APP_SEPARATION.md</code>). The kernel runs the gossip / Bloom-filter / vector-clock primitives blindly; the policy oracle decides what classification the comparison gets, what plan is authorized, and what evidence is recorded. This preserves the meaning firewall.</p>
+<h3>2. No new receipt class.</h3>
+<p>All artifacts ride inside existing receipt envelopes: Stage 5 <code>EffectDispatchEvidence</code> (per <code>docs/spec/effect-dispatch-contract.md</code>) for divergence / plan / evidence artifacts, or Layer 2 <code>ArtifactReceipt</code> (per ADR-0026) for blob-transfer repair. This matches the pattern from #1826 (compute placement, also no new receipt class).</p>
+<h3>3. The divergence taxonomy is closed with an explicit fallback.</h3>
+<p>Eighteen classes including &quot;unclassifiable&quot; as the explicit escape valve. The failure-and-safety table names the disposition for a probe targeting a state class without a canonical digest form (track as a follow-up to extend the state-class set). This avoids both unbounded open enums and silent failure on novel divergence shapes.</p>
+<h3>4. The spec consumes existing primitives without redefining them.</h3>
+<p>The existing <code>icn-gossip</code> and <code>icn-core</code> anti-entropy code is real and load-bearing. The spec names it in an anchors-only table at the top of the doc, then builds the design-level artifact layer above it. This prevents the spec from being treated as a rewrite request for working code.</p>
+<h3>5. The settlement-finality cross-link is explicit.</h3>
+<p>Boundary rule 7 names that the receipt-chain-complete condition in <code>docs/spec/federation-settlement-finality.md</code> is evaluated against a fresh <code>QuorumSyncCheck</code>. This closes the load-bearing gap that compute placement&#39;s federation gate (Boundary rules 4 + 6 in <code>docs/spec/compute-placement-policy.md</code>) implicitly depended on.</p>
+<h3>6. Privacy / custody rules are restated separately.</h3>
+<p>They appear in §&quot;Privacy and custody rules&quot; (their own section) and again in Boundary rules 3 + 4 and in the failure-and-safety table. Restating is intentional: this is the most easily misread constraint, and reviewers can grep for &quot;private&quot; or &quot;disclosure&quot; and find the rule in three places.</p>
+<h3>7. The PR uses <code>Refs:</code>, not <code>Closes:</code>.</h3>
+<p>Per the standing session pattern and the <code>feedback_pr_refs_not_closes_unless_fully_satisfied</code> memory: closure of <code>#1799</code> requires verification that all seven acceptance criteria are fully satisfied. The spec advances criterion 1 (the spec is merged), criterion 4 (status mapping), and criterion 6 (first safe slice); it partially addresses criteria 2 and 3 (proof-level classification awaits <code>#1796</code>); criterion 5 (follow-ups only after acceptance) is honored by drafting in the handoff. <strong>Closure is a user-driven decision.</strong></p>
+<hr>
+<h2>Verification Commands</h2>
+<!-- Commands the next session should run to confirm starting state -->
+
+<pre><code class="language-bash">cd /home/matt/projects/icn
+
+git checkout spec/network-anti-entropy-proof-loops
+git status --short
+gh pr view &lt;PR-number&gt; --json mergeStateStatus,state,headRefOid,statusCheckRollup
+
+# To re-run the validation suite:
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict --write-document-registry docs/DOCUMENT_REGISTRY.md
+python3 docs/scripts/lint-arch.py docs/spec/network-anti-entropy-proof-loops.md --cargo icn/Cargo.toml
+python3 .github/scripts/compliance_linter.py
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+
+# To see the spec contents:
+sed -n &#39;1,80p&#39; docs/spec/network-anti-entropy-proof-loops.md
+</code></pre>
+<hr>
+<h2>Truth-Plane Notes</h2>
+<!-- Which truth types were relied on? Any known conflicts between layers? -->
+
+<ul>
+<li><strong>Declared project truth:</strong> loaded from <code>docs/PHASE_HISTORY.md</code> (Phase 18 last completed; ~75% implementation as of 2025-12-03 K3s deploy) and <code>docs/STATE.md</code> (current state). No conflict with this PR; the spec is doc-only design work.</li>
+<li><strong>Implementation truth:</strong> verified against <code>icn/crates/icn-gossip/src/anti_entropy.rs</code>, <code>bloom.rs</code>, <code>vector_clock.rs</code>, <code>partition.rs</code>, <code>sync.rs</code>; <code>icn/crates/icn-core/src/anti_entropy.rs</code>; <code>icn/crates/icn-governance/src/protocol_defaults.rs</code>. The existing-code-surface table reflects what is actually in <code>main</code> at session start.</li>
+<li><strong>Execution truth:</strong> verified branch + PR state via <code>gh</code> commands. Initial commit SHA, PR number, head SHA recorded after commit / push.</li>
+<li><strong>Narrative truth:</strong> loaded from prior session handoffs and the eight merged architecture-spec PRs. No conflict.</li>
+<li><strong>Known conflicts between layers:</strong> none introduced by this PR. The <code>DataLocality::CoopReplicated</code> Rust enum still uses <code>Coop</code> framing while the spec layer prefers <code>LocalDomain</code> framing — preserved per <code>docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</code> §C3 and tracked as a follow-up across the sprint.</li>
+</ul>
+<hr>
+<h2>Process Note</h2>
+<p>The AGENTS.md handoff-path drift was resolved by <strong>PR #1827</strong> (merged 2026-05-15). The active convention is <code>docs/dev/handoff-YYYY-MM-DD-&lt;topic&gt;.md</code>, which is what this handoff uses. <strong>Do not carry the old AGENTS.md drift forward</strong> in future handoffs unless an AI reviewer surfaces it again, in which case respond with a verified rebuttal that points at #1827.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
