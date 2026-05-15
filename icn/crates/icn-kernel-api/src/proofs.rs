@@ -407,8 +407,9 @@ pub enum RequestedResponseClass {
 /// Wire-equivalent to `icn_gossip::types::BloomFilterData` on the `{bits,
 /// num_hashes, size}` shape, plus an explicit `hint_count` for set
 /// cardinality. The gossip layer provides
-/// `icn_gossip::anti_entropy::to_bloom_projection` and
-/// `icn_gossip::anti_entropy::to_bloom_filter_data` for lossless conversion;
+/// `icn_gossip::to_bloom_projection` and
+/// `icn_gossip::to_bloom_filter_data` (re-exported from the crate root)
+/// for lossless conversion;
 /// `hint_count` is the only non-bloom field and must be supplied by the
 /// caller because `BloomFilterData` does not carry it.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -442,15 +443,37 @@ pub struct MerkleRootProjection {
 
 /// Vector-clock projection of a partitioned state class.
 ///
-/// Stores `(did, count)` entries **sorted by DID**. Sorting is enforced at
-/// construction so canonical encoding is deterministic and node-independent.
+/// Stores `(did, count)` entries **sorted by DID**, with duplicate DIDs
+/// collapsed by keeping the maximum count (vector-clock merge semantics).
+/// The invariant is enforced at construction (via [`Self::from_entries`])
+/// AND on deserialization (via `#[serde(from = ...)]`): the wire form is
+/// normalized before the value is constructed, so peer-supplied data that
+/// arrives unsorted or with duplicates is silently canonicalized rather
+/// than producing a non-canonical digest that would falsely diverge.
+///
 /// Wire-equivalent to the serialized form of
 /// `icn_gossip::vector_clock::VectorClock`, which serializes only counts
-/// (runtime `last_seen` instants are stripped).
+/// (runtime `last_seen` instants are stripped). The field is private; use
+/// [`Self::entries`] for read access.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(from = "RawVectorClockProjection")]
 pub struct VectorClockProjection {
     /// `(did, count)` pairs, sorted lexicographically by DID.
-    pub entries: Vec<(Did, u64)>,
+    entries: Vec<(Did, u64)>,
+}
+
+/// Raw wire form for [`VectorClockProjection`] — accepts arbitrary order /
+/// duplicates and is normalized into the canonical form via the
+/// `#[serde(from = ...)]` attribute on the public type.
+#[derive(Deserialize)]
+struct RawVectorClockProjection {
+    entries: Vec<(Did, u64)>,
+}
+
+impl From<RawVectorClockProjection> for VectorClockProjection {
+    fn from(raw: RawVectorClockProjection) -> Self {
+        Self::from_entries(raw.entries)
+    }
 }
 
 impl VectorClockProjection {
@@ -472,18 +495,40 @@ impl VectorClockProjection {
             entries: map.into_iter().collect(),
         }
     }
+
+    /// The canonical `(did, count)` pairs, sorted lexicographically by DID.
+    pub fn entries(&self) -> &[(Did, u64)] {
+        &self.entries
+    }
 }
 
 /// Short explicit list of content hashes.
 ///
 /// Used when the state class is small enough that the false-positive rate
-/// of a Bloom filter would dominate set-difference detection. Entries are
-/// sorted lexicographically at construction so canonical encoding is
-/// deterministic.
+/// of a Bloom filter would dominate set-difference detection. The invariant
+/// is enforced at construction (via [`Self::from_hashes`]) AND on
+/// deserialization (via `#[serde(from = ...)]`): hashes are sorted
+/// lexicographically and deduplicated before the value is constructed. The
+/// field is private; use [`Self::hashes`] for read access.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(from = "RawShortDigestList")]
 pub struct ShortDigestList {
     /// Content hashes, sorted lexicographically.
-    pub hashes: Vec<Hash>,
+    hashes: Vec<Hash>,
+}
+
+/// Raw wire form for [`ShortDigestList`] — accepts arbitrary order /
+/// duplicates and is normalized into the canonical form via the
+/// `#[serde(from = ...)]` attribute on the public type.
+#[derive(Deserialize)]
+struct RawShortDigestList {
+    hashes: Vec<Hash>,
+}
+
+impl From<RawShortDigestList> for ShortDigestList {
+    fn from(raw: RawShortDigestList) -> Self {
+        Self::from_hashes(raw.hashes)
+    }
 }
 
 impl ShortDigestList {
@@ -498,6 +543,11 @@ impl ShortDigestList {
         v.sort();
         v.dedup();
         Self { hashes: v }
+    }
+
+    /// The canonical, sorted, deduplicated content hashes.
+    pub fn hashes(&self) -> &[Hash] {
+        &self.hashes
     }
 }
 
@@ -560,30 +610,36 @@ impl ReceiptDigest {
 /// A [`StateDigest`] specialized to an artifact-registry entry or
 /// scoped-vault reference.
 ///
-/// Newtype wrapper. The owning [`StateClass`] is supplied at construction:
-/// either [`StateClass::ArtifactRegistryMetadata`] (for public artifact
-/// metadata) or [`StateClass::ScopedVaultReference`] (for opaque references
-/// to scoped-vault objects whose bodies never travel through gossip).
+/// Modeled as a closed enum so the state-class specialization is enforced
+/// by the type system: no constructor or deserialization path can produce
+/// an `ArtifactDigest` tagged with [`StateClass::ReceiptIndex`],
+/// [`StateClass::GovernanceState`], etc. — only the two artifact classes
+/// are representable. This is stricter than the original two-field-struct
+/// shape, which allowed any `StateClass` value to enter via derived
+/// `Deserialize`.
 ///
 /// Per spec §"Privacy and custody rules" and Boundary rule 3, an
-/// `ArtifactDigest` over a scoped-vault reference proves existence and
-/// scope. It never proves content.
+/// `ArtifactDigest::ScopedVaultReference` proves existence and scope. It
+/// never proves content. The kernel cannot enforce that property by type
+/// alone (a digest's *bytes* are opaque) but the privacy contract is
+/// documented, reviewable, and bound to the variant.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ArtifactDigest {
-    /// Either `ArtifactRegistryMetadata` or `ScopedVaultReference`.
-    pub state_class: StateClass,
-    /// The underlying digest (Bloom over content hashes, Merkle root over
-    /// the registry index, or a short list of references — never bodies).
-    pub digest: StateDigest,
+#[serde(rename_all = "snake_case")]
+pub enum ArtifactDigest {
+    /// Public artifact-registry metadata
+    /// (per `docs/spec/artifact-registry-and-scoped-vault.md`). The digest
+    /// covers public metadata; replication is governed by the artifact's
+    /// `privacy_class`.
+    Registry(StateDigest),
+    /// Opaque reference to a scoped-vault object. The digest is over the
+    /// reference index, never the object body.
+    ScopedVaultReference(StateDigest),
 }
 
 impl ArtifactDigest {
     /// Construct an `ArtifactRegistryMetadata` specialization.
     pub fn registry(digest: StateDigest) -> Self {
-        Self {
-            state_class: StateClass::ArtifactRegistryMetadata,
-            digest,
-        }
+        Self::Registry(digest)
     }
 
     /// Construct a `ScopedVaultReference` specialization.
@@ -592,9 +648,23 @@ impl ArtifactDigest {
     /// references, not bodies. The kernel cannot enforce this by type
     /// alone, but the privacy contract is documented and reviewable.
     pub fn scoped_vault_reference(digest: StateDigest) -> Self {
-        Self {
-            state_class: StateClass::ScopedVaultReference,
-            digest,
+        Self::ScopedVaultReference(digest)
+    }
+
+    /// The state class this digest is specialized to. Always either
+    /// [`StateClass::ArtifactRegistryMetadata`] or
+    /// [`StateClass::ScopedVaultReference`].
+    pub fn state_class(&self) -> StateClass {
+        match self {
+            Self::Registry(_) => StateClass::ArtifactRegistryMetadata,
+            Self::ScopedVaultReference(_) => StateClass::ScopedVaultReference,
+        }
+    }
+
+    /// The underlying [`StateDigest`] for either variant.
+    pub fn digest(&self) -> &StateDigest {
+        match self {
+            Self::Registry(d) | Self::ScopedVaultReference(d) => d,
         }
     }
 }
@@ -1064,7 +1134,7 @@ mod anti_entropy_tests {
         ]));
         // Entries must be sorted by DID after construction.
         if let StateDigest::VectorClock(ref proj) = digest {
-            let dids: Vec<&str> = proj.entries.iter().map(|(d, _)| d.as_str()).collect();
+            let dids: Vec<&str> = proj.entries().iter().map(|(d, _)| d.as_str()).collect();
             assert_eq!(dids, vec!["did:icn:a", "did:icn:b", "did:icn:c"]);
         } else {
             panic!("expected VectorClock variant");
@@ -1080,9 +1150,9 @@ mod anti_entropy_tests {
             [0x03; 32], [0x01; 32], [0x02; 32], [0x01; 32], // duplicate
         ]));
         if let StateDigest::ShortList(ref list) = digest {
-            assert_eq!(list.hashes.len(), 3, "duplicates must be deduplicated");
+            assert_eq!(list.hashes().len(), 3, "duplicates must be deduplicated");
             assert!(
-                list.hashes.windows(2).all(|w| w[0] < w[1]),
+                list.hashes().windows(2).all(|w| w[0] < w[1]),
                 "hashes must be sorted"
             );
         } else {
@@ -1124,8 +1194,106 @@ mod anti_entropy_tests {
             ("did:icn:a".to_string(), 7),
             ("did:icn:a".to_string(), 1),
         ]);
-        assert_eq!(proj.entries.len(), 1);
-        assert_eq!(proj.entries[0], ("did:icn:a".to_string(), 7));
+        assert_eq!(proj.entries().len(), 1);
+        assert_eq!(proj.entries()[0], ("did:icn:a".to_string(), 7));
+    }
+
+    // ---- Canonical-form enforcement on the wire (review feedback) ----
+
+    #[test]
+    fn vector_clock_projection_normalizes_unsorted_wire_input() {
+        // Wire data that arrives with unsorted DIDs must be normalized to
+        // canonical form on deserialization, not stored as-received. If this
+        // ever regresses, two peers that built logically-identical clocks
+        // would compute different digest hashes and falsely diverge.
+        let bad_json = r#"{"entries":[["did:icn:c",1],["did:icn:a",5],["did:icn:b",3]]}"#;
+        let proj: VectorClockProjection = serde_json::from_str(bad_json).unwrap();
+        let dids: Vec<&str> = proj.entries().iter().map(|(d, _)| d.as_str()).collect();
+        assert_eq!(dids, vec!["did:icn:a", "did:icn:b", "did:icn:c"]);
+    }
+
+    #[test]
+    fn vector_clock_projection_collapses_duplicate_did_on_wire() {
+        // Wire data with a duplicated DID must collapse to one entry holding
+        // the maximum count (vector-clock merge semantics).
+        let bad_json = r#"{"entries":[["did:icn:a",3],["did:icn:a",7],["did:icn:a",1]]}"#;
+        let proj: VectorClockProjection = serde_json::from_str(bad_json).unwrap();
+        assert_eq!(proj.entries().len(), 1);
+        assert_eq!(proj.entries()[0], ("did:icn:a".to_string(), 7));
+    }
+
+    #[test]
+    fn vector_clock_projection_normalization_is_bincode_path_too() {
+        // Same normalization must apply on bincode-deserialized wire data.
+        // Build a non-canonical payload via a local Serialize-only helper
+        // (the production `Raw…` types are deserialize-only by design).
+        #[derive(Serialize)]
+        struct LocalBadWire {
+            entries: Vec<(Did, u64)>,
+        }
+        let bad = LocalBadWire {
+            entries: vec![
+                ("did:icn:c".to_string(), 1),
+                ("did:icn:a".to_string(), 5),
+                ("did:icn:a".to_string(), 9),
+                ("did:icn:b".to_string(), 3),
+            ],
+        };
+        let bytes = bincode::serialize(&bad).unwrap();
+        let proj: VectorClockProjection = bincode::deserialize(&bytes).unwrap();
+        let dids: Vec<&str> = proj.entries().iter().map(|(d, _)| d.as_str()).collect();
+        assert_eq!(dids, vec!["did:icn:a", "did:icn:b", "did:icn:c"]);
+        // Duplicate DID must collapse to max count.
+        assert_eq!(proj.entries()[0].1, 9);
+    }
+
+    #[test]
+    fn short_digest_list_normalizes_unsorted_wire_input() {
+        let bad_json = r#"{"hashes":[[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]]}"#;
+        let list: ShortDigestList = serde_json::from_str(bad_json).unwrap();
+        assert_eq!(list.hashes().len(), 3);
+        assert!(list.hashes().windows(2).all(|w| w[0] < w[1]));
+        assert_eq!(list.hashes()[0], [0x01; 32]);
+        assert_eq!(list.hashes()[2], [0x03; 32]);
+    }
+
+    #[test]
+    fn short_digest_list_dedups_on_wire() {
+        #[derive(Serialize)]
+        struct LocalBadWire {
+            hashes: Vec<Hash>,
+        }
+        let bad = LocalBadWire {
+            hashes: vec![[0x01; 32], [0x01; 32], [0x02; 32], [0x01; 32]],
+        };
+        let list: ShortDigestList =
+            bincode::deserialize(&bincode::serialize(&bad).unwrap()).unwrap();
+        assert_eq!(list.hashes().len(), 2);
+        assert_eq!(list.hashes()[0], [0x01; 32]);
+        assert_eq!(list.hashes()[1], [0x02; 32]);
+    }
+
+    #[test]
+    fn artifact_digest_invalid_state_class_cannot_decode() {
+        // The original two-field-struct shape accepted any `StateClass` via
+        // derived `Deserialize`. After the enum refactor, the wire form is
+        // tagged by variant — there is no way to express
+        // `state_class=receipt_index` on the wire because that variant does
+        // not exist. The closest analog (a JSON payload tagged with a
+        // foreign top-level key) must be rejected.
+        let bogus_json = r#"{"receipt_index":{"merkle_root":{"root":[0;32],"leaf_count":0}}}"#;
+        let parsed: Result<ArtifactDigest, _> = serde_json::from_str(bogus_json);
+        assert!(
+            parsed.is_err(),
+            "ArtifactDigest must not deserialize from a non-artifact variant tag"
+        );
+    }
+
+    #[test]
+    fn artifact_digest_unknown_variant_rejected() {
+        let bogus_json = r#"{"governance_state":{"merkle_root":{"root":[0;32],"leaf_count":0}}}"#;
+        let parsed: Result<ArtifactDigest, _> = serde_json::from_str(bogus_json);
+        assert!(parsed.is_err());
     }
 
     // ---- StateClass / TriggerSource / RequestedResponseClass / ProbeScope ----
@@ -1201,18 +1369,24 @@ mod anti_entropy_tests {
             root: [0x22; 32],
             leaf_count: 3,
         }));
-        assert_eq!(registry.state_class, StateClass::ArtifactRegistryMetadata);
+        assert_eq!(registry.state_class(), StateClass::ArtifactRegistryMetadata);
+        assert!(matches!(registry, ArtifactDigest::Registry(_)));
 
         let vault = ArtifactDigest::scoped_vault_reference(StateDigest::ShortList(
             ShortDigestList::from_hashes(vec![[0x01; 32]]),
         ));
-        assert_eq!(vault.state_class, StateClass::ScopedVaultReference);
+        assert_eq!(vault.state_class(), StateClass::ScopedVaultReference);
+        assert!(matches!(vault, ArtifactDigest::ScopedVaultReference(_)));
 
-        // Round-trip both.
+        // Round-trip both via JSON and bincode.
         for ad in [&registry, &vault] {
             let json = serde_json::to_string(ad).unwrap();
             let restored: ArtifactDigest = serde_json::from_str(&json).unwrap();
             assert_eq!(ad, &restored);
+
+            let bytes = bincode::serialize(ad).unwrap();
+            let restored_bin: ArtifactDigest = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(ad, &restored_bin);
         }
     }
 
