@@ -157,6 +157,7 @@ Formal protocol and contract specifications:
 - [governed-service-binding.md](spec/governed-service-binding.md) - `GovernedServiceBinding`, `WorkloadManifest`, and `RuntimeProvider` (the integrating envelope for hosted services, tools, compute jobs, and CCL evaluators)
 - [storage-durability-policies.md](spec/storage-durability-policies.md) - `StorageSpec`, `BackupPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy`, restore-test receipts, locality + privacy inheritance, restore authority
 - [artifact-registry-and-scoped-vault.md](spec/artifact-registry-and-scoped-vault.md) - `ArtifactRegistry` v0 (content-addressed artifact metadata) and `ScopedVault` (privacy-enforced container), the boundary between them, the artifact-class taxonomy, and six integration points (documents, compute outputs, evidence packets, private evidence, mobile cache, replication)
+- [compute-placement-policy.md](spec/compute-placement-policy.md) - Compute placement policy contract (seven placement classes, decision inputs and outputs, fallback behavior, boundary rules, dashboard and member-shell rendering) sitting between ADR-0030 (workload manifest) and ADR-0031 (commons admission and settlement); fixes scope vocabulary (LocalDomain not Coop), execution vs capacity vocabulary (execution budget vs fuel vs capacity vs allocation), and settlement vs payment vocabulary
 
 ---
 
