@@ -156,6 +156,7 @@ Formal protocol and contract specifications:
 - [ccl-policy-registry.md](spec/ccl-policy-registry.md) - CCL policy registry, versioning, adoption contract, and governance-effect hook contract
 - [governed-service-binding.md](spec/governed-service-binding.md) - `GovernedServiceBinding`, `WorkloadManifest`, and `RuntimeProvider` (the integrating envelope for hosted services, tools, compute jobs, and CCL evaluators)
 - [storage-durability-policies.md](spec/storage-durability-policies.md) - `StorageSpec`, `BackupPolicy`, `ReplicationPolicy`, `RecoveryPolicy`, `ArchivePolicy`, `IntegrityPolicy`, restore-test receipts, locality + privacy inheritance, restore authority
+- [artifact-registry-and-scoped-vault.md](spec/artifact-registry-and-scoped-vault.md) - `ArtifactRegistry` v0 (content-addressed artifact metadata) and `ScopedVault` (privacy-enforced container), the boundary between them, the artifact-class taxonomy, and six integration points (documents, compute outputs, evidence packets, private evidence, mobile cache, replication)
 
 ---
 
