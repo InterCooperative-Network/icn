@@ -219,7 +219,7 @@ Renders persistent receipt posture.
 - **Receipt class summary** — counts per class, retention horizon per `DomainPolicy` §"Receipt retention defaults."
 - **Missing receipt warnings** — `DivergenceEvidence` class "missing receipt" rows raised against peers.
 - **Evidence envelope references** — links to the Stage 5 `EffectDispatchEvidence` artifacts (per `docs/spec/effect-dispatch-contract.md`) the receipts belong to.
-- **Anti-entropy proof artifacts (evidence, not receipt classes).** `RepairReceipt`, `RoutingProof`, `RedundancyProof`, `PlacementFallbackReceipt`, and the other forward-direction artifact identifiers from `docs/spec/network-anti-entropy-proof-loops.md` §"Proof artifacts (forward-direction names)" are **evidence-artifact identifiers that travel inside existing receipt envelopes** (Stage 5 `EffectDispatchEvidence` or Layer 2 `ArtifactReceipt` per ADR-0026), not new ADR-0026 receipt classes. The cockpit surfaces them as attachments on their parent evidence record; they do NOT appear in the "Latest receipts — by class" list above.
+- **Forward-direction proof / evidence artifacts (not receipt classes).** Several merged sibling specs name forward-direction artifact identifiers that travel **inside existing receipt envelopes** (Stage 5 `EffectDispatchEvidence` or Layer 2 `ArtifactReceipt` per ADR-0026), **not** as new ADR-0026 receipt classes. From `docs/spec/network-anti-entropy-proof-loops.md` §"Proof artifacts (forward-direction names)": `RepairReceipt`, `RoutingProof`, `RedundancyProof` (and the broader anti-entropy proof-artifact set). From `docs/spec/compute-placement-policy.md` §"Candidate outputs": `PlacementFallbackReceipt` (an attachment on its parent `PlacementDecision`, not a new top-level receipt class — see also the Compute / Commons surface below for the placement-side rendering). The cockpit surfaces these as attachments on their parent evidence record; they do **not** appear in the "Latest receipts — by class" list above.
 
 ## Storage / Artifacts / ScopedVault surface
 
@@ -265,7 +265,7 @@ This surface **consumes** the 14-field operator/steward dashboard from `docs/spe
 13. **Review requirement** — whether the output is awaiting human ratification.
 14. **Failure / fallback reason** — when the placement fell back or was `RejectedByPolicy`, the reason and authority basis.
 
-Rejected and fallback rows show the original preferred class, the chosen class (or rejection), and the policy clause invoked. `PlacementFallbackReceipt`s (per `docs/spec/network-anti-entropy-proof-loops.md` Stage 5 evidence) render as evidence attachments on their parent `PlacementDecision`.
+Rejected and fallback rows show the original preferred class, the chosen class (or rejection), and the policy clause invoked. `PlacementFallbackReceipt`s (per `docs/spec/compute-placement-policy.md` §"Candidate outputs") render as evidence attachments on their parent `PlacementDecision`. The Stage 5 envelope that carries the attachment is the `EffectDispatchEvidence` from `docs/spec/effect-dispatch-contract.md`.
 
 ## Participation Access surface
 

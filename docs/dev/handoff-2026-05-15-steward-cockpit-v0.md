@@ -55,9 +55,14 @@ See §"Verification Commands" below for the exact commands.
 |----|--------|-------|-----------|---------|
 | _none open from this session_ — see "Late reviewer feedback" below | — | — | — | — |
 
-### Late reviewer feedback (post-merge)
+### Reviewer feedback around the merge window
 
-Codex (12:47:26Z) and Copilot (12:49:41Z) reviews landed **after** PR #1831 was merged at 12:48:54Z. Nine review threads, all valid: (1) anti-entropy cockpit field count is 9, not 8, across spec / registry / INDEX / handoff; (2) ADR-0027 ActionCard schema can't represent operator scenarios — claim must be reframed as forward-direction; (3) `RepairReceipt` is an evidence-artifact identifier per #1829, not a top-level ADR-0026 receipt class; (4) the Warnings / Incidents / Repair surface is listed in the IA but has no per-surface rendering section; (5) this handoff's "Open PRs" table was stale (now corrected). A follow-up PR (`fix(spec): correct steward cockpit review drift`) addresses all five drifts. **The sections of this handoff that pre-date the merge remain historical; they are not updated except where the merge superseded them.**
+Reviewer threads landed on both sides of the merge at 12:48:54Z:
+
+- **Codex** submitted at **12:47:26Z** — **before** the merge (by 1m28s). Codex's threads were live on the PR at merge time but had not yet been responded to.
+- **Copilot** submitted at **12:49:41Z** — **after** the merge (by 47s).
+
+Net effect: nine review threads, all valid, none addressed in the merged commit. (1) Anti-entropy cockpit field count is 9, not 8, across spec / registry / INDEX / handoff; (2) ADR-0027 ActionCard schema can't represent operator scenarios — claim must be reframed as forward-direction; (3) `RepairReceipt` is an evidence-artifact identifier per #1829, not a top-level ADR-0026 receipt class; (4) the Warnings / Incidents / Repair surface is listed in the IA but has no per-surface rendering section; (5) this handoff's "Open PRs" table was stale (now corrected). A follow-up PR (`fix(spec): correct steward cockpit review drift`, PR #1832) addresses all five drifts plus the post-round-1 cleanup feedback (additional 8-field sites, stale ADR-0027 14-field requirement in §"Required Actions / Steward Action Cards," `PlacementFallbackReceipt` misattribution, and this very timing reconciliation). **The sections of this handoff that pre-date the merge remain historical; they are not updated except where the merge or the follow-up PR superseded them.**
 
 ### Recent merged PRs (including #1831)
 
