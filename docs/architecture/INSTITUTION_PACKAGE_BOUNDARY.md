@@ -212,6 +212,72 @@ The current `BootstrapOperation::CreateEntity` payload sent to the gateway's `/v
 
 ---
 
+## C3. Entity-scope vocabulary (scope vs organism)
+
+> **Core vocabulary names the scope. Institution packages name the organism.**
+
+ICN core names **structural scopes**, not one possible inhabitant of a scope. The local institutional layer between member/cell scope and federation/commons scope is a **domain** — an `InstitutionalDomain` per `docs/spec/institutional-domain.md`. The owning entity class of that domain may be a `Cooperative`, a `Community`, a `Federation`, an `Individual`, or another governed entity class permitted by policy. Naming a generic scope after one of its possible inhabitants privileges that inhabitant and forces every other entity class to be a second-class citizen of vocabulary the runtime itself defined.
+
+### The rule
+
+- **Generic scope language uses:** `InstitutionalDomain`, `Domain`, `LocalDomain`, `DomainPolicy`, and "owning entity class."
+- **Generic scope language does NOT use:** `Coop` or `Cooperative` as a stand-in for "the local institutional layer." A local domain may be owned by a cooperative, but it may also be owned by a community, a federation, or another governed class. The scope name must not pre-decide that.
+- **`Cooperative` is reserved** for the cases that are actually about cooperatives: the cooperative entity class itself, cooperative-specific setup paths, cooperative-economy framing, the cooperative-movement context, and institution packages serving cooperative federations.
+- **Institution packages may use local nouns** freely. NYCN may speak of "the cooperative." Another package may speak of "the assembly," "the council," "the care body." That is what packages are for.
+
+### What this means in practice
+
+| Surface | Generic ICN vocabulary | Institution-package vocabulary |
+|---|---|---|
+| Architecture spec sections about scope hierarchy | `LocalDomain` / `InstitutionalDomain` / "local-domain-scoped" | "cooperative" / "community" / package-specific role names |
+| Compute placement classes | `LocalDomainBound` (preferred); `Coop`-prefixed forms in legacy ADRs are read as `LocalDomain` | Per-package role names |
+| Storage locality | Generic spec describes the scope level; existing `DataLocality::CoopReplicated` is a Rust identifier preserved for compatibility (see "Known drift" below) | — |
+| Member-shell language | "processed inside your institution" or "handled inside your organization" | Per-package phrasing |
+| Owning entity classes | `Individual` / `Cooperative` / `Community` / `Federation` (per `docs/spec/institutional-domain.md` §"InstitutionalDomain (object outline)") | Local synonyms for each class |
+
+### Why this matters
+
+The primitive layer is the machine. If ICN core ships a generic primitive called `CoopBound` or a scope tag `Coop(coop_id)`, every consumer of that vocabulary either (a) treats community-owned and federation-owned domains as "kind of like a coop" and conflates them, or (b) special-cases them with branches the runtime should not need to know about. Either way the kernel/app separation softens: institution-specific framing leaks into generic primitive names. The fix is the same as for §C2 — name the structural concept (domain, scope, policy reference, owning entity class) and let packages carry the local noun.
+
+### Correct vs incorrect naming
+
+```text
+# ❌ WRONG — generic scope named after one inhabitant
+CoopBound
+coop-scoped execution policy
+Coop(coop_id)
+"sent for cooperative processing"  (member shell)
+"cooperative-bound executor"        (operator dashboard)
+
+# ✅ RIGHT — generic scope named for what it actually is
+LocalDomainBound
+local-domain-scoped execution policy
+LocalDomain(domain_id)
+"processed inside your institution"  (member shell)
+"local-domain-bound executor"        (operator dashboard)
+```
+
+### Known drift (tracked, not blocking this section)
+
+Existing canon already carries the older `Coop`-flavored naming in several load-bearing places:
+
+- `icn/crates/icn-kernel-api/src/storage.rs` — `DataLocality::CoopReplicated` is a Rust enum variant, the variant is serialized as `coop_replicated`, and ordering / numeric assignments (`= 1`) are stable. Renaming is forward work; it requires a compatibility-aware migration with serde aliases and call-site updates. Tracked as a separate refactor follow-up; not done in this doc-only PR.
+- `docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md` — uses `Scope: Commons | Coop(coop_id) | Federation(fed_id)` as the scope tag. The ADR is accepted; its decision is preserved as-is. A short naming note appended to the ADR reads the `Coop(...)` slot as `LocalDomain(...)` for current architecture.
+- `docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md` — uses `Coop-scoped` prose for the local-domain admission/settlement case. Same disposition: preserved with a short naming note.
+- Issue `#1801` (compute placement) — uses `CoopBound`, `coop-scoped execution policy`, "cooperative-bound executor," and member-shell language "sent for cooperative processing." The forthcoming `#1801` spec PR is the right place to land the corrected vocabulary; the corrected names (`LocalDomainBound`, "local-domain-scoped," "processed inside your institution") are recorded in the boundary handoff for that PR to consume.
+
+### The test
+
+When you propose a generic primitive or scope name, ask:
+
+1. Does this name describe a **scope, jurisdiction, policy layer, or boundary** — or does it describe a **specific kind of institution** that lives inside that scope?
+2. If a community-owned or federation-owned domain shipped tomorrow under this primitive, would the name still read accurately, or would it imply that domains are "really" cooperatives?
+3. Could an institution package add a local noun that maps cleanly onto this scope without overlapping the generic name?
+
+If you cannot answer "scope," "yes," and "yes" — the name needs revision.
+
+---
+
 ## D. Reusable Primitive Set
 
 These belong in ICN because every cooperative institution needs them — verified against both what NYCN requires and what a second unrelated institution (housing federation, mutual aid collective) would also need unchanged.
