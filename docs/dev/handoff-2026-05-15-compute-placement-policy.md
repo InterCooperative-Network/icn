@@ -38,22 +38,22 @@ This PR fails if any of the following holds:
 9. The PR's commit closes `#1801` instead of using `Refs:`.
 10. The PR touches Rust, SDK, deploy scripts, K3s manifests, the website, the gateway, the scheduler, or the runtime.
 
-All decisive-test items have been checked locally before push (see §"Verification Commands" below).
+The decisive-test items above define the failure mode. See §"Verification Commands" for the exact commands used to check them.
 
 ---
 
 ## Final State Verified
 <!-- TRUTH TYPE: Execution truth — actual state of the repo at handoff time -->
 
-**Branch head SHA at handoff:** _to record after commit_
-
 **Branch:** `spec/compute-placement-policy`.
 
-**PR:** _to record after `gh pr create`_.
+**Initial commit SHA:** `caa3258c7` (spec, registry, INDEX, regenerated DOCUMENT_REGISTRY, this handoff). The branch head moves with each push to address review feedback; the latest head SHA is reflected in `gh pr view 1826 --json headRefOid`.
 
-The PR is in **draft / open** state pending the user's "watch CI + apply valid review feedback" step. Per session pattern, the agent will not merge without explicit instruction.
+**PR:** [#1826](https://github.com/InterCooperative-Network/icn/pull/1826).
 
-Branch base: `main` at `3af0d7ffd` (post-#1824, post-#1825 merge).
+**Branch base:** `main` at `3af0d7ffd` (post-#1824, post-#1825 merge).
+
+The PR is in **open** state. Per session pattern, the agent does not merge without explicit instruction. As of the latest push, all required CI checks have passed and AI reviewer (Copilot + Codex) feedback has been received and addressed.
 
 Files modified or created:
 
@@ -79,7 +79,7 @@ Length: roughly 400 lines. Authority class: normative (defines forward-direction
 - **Vocabulary boundaries** — three boundaries (scope per `INSTITUTION_PACKAGE_BOUNDARY.md` §C3, execution vs capacity, settlement vs payment) with a six-row term table and the verbatim compatibility note the user specified.
 - **Placement classes** — seven closed classes: `LocalOnly`, `DomainLocalPreferred`, `LocalDomainBound`, `FederationBound`, `CommonsEligible`, `ExternalCustodianRequired`, `RejectedByPolicy`.
 - **Placement hierarchy** — local-first default with explicit override path.
-- **Decision contract** — sixteen candidate inputs (domain id, submitting actor, authority basis, workload kind, privacy class, determinism class, data locality, execution budget / `fuel_limit`, resource envelope, deadline, executor capabilities, executor capacity, trust / admission class, federation agreement refs, commons pool policy refs, allocation policy refs, settlement policy refs, required review state). Five candidate outputs (`PlacementDecision`, `PlacementRejected`, `ExecutorAdmissionDecision`, `PlacementFallbackReceipt`, `ReviewRequiredActionCard`). `ComputeReceipt`, `OutputArtifactReceipt`, and `SettlementReceipt` are referenced from the placement decision but emitted by post-execution chain.
+- **Decision contract** — eighteen candidate inputs (domain id, submitting actor, authority basis, workload kind, privacy class, determinism class, data locality, execution budget / `fuel_limit`, resource envelope, deadline / priority, executor capabilities, executor capacity, trust / admission class, federation agreement refs, commons pool policy refs, allocation policy refs, settlement policy refs, required review state). Two-layer outputs: Layer 1 policy-oracle return value is exactly one of `PlacementDecision` or `PlacementRejected`, with an optional attached `PlacementFallbackReceipt` and a surfaced `ReviewRequiredActionCard`. Layer 2 post-placement artifact is `ExecutorAdmissionDecision` emitted by the selected executor. `ComputeReceipt`, `OutputArtifactReceipt`, and `SettlementReceipt` are referenced from the placement decision but emitted by the post-execution chain.
 - **Boundary rules** — nine load-bearing rules.
 - **Fallback behavior** — five rules covering capacity-bound fallback, authority-bound fallback, receipt emission, fallback-is-not-retry, and no-silent-fallback-to-commons.
 - **Example policies to specify** — four illustrative examples: public advisory workload, private care / accessibility workload, federation report workload, deterministic governance-grade workload.
@@ -124,11 +124,11 @@ Records intent, decisive test, final state, what changed, what's open, unsafe as
 - [x] INDEX entry added.
 - [x] `DOCUMENT_REGISTRY.md` regenerated (810 markdown files).
 - [x] Handoff written (this file).
-- [ ] Validation suite — to run before commit.
-- [ ] Commit + push.
-- [ ] Open PR.
-- [ ] Watch CI on the initial head.
-- [ ] Address any valid AI-reviewer feedback (Copilot/Codex) using the verified-rebuttal pattern from prior PRs.
+- [x] Validation suite run before commit (doc_control_check `--strict` pass; lint-arch 0 errors / 9 warnings, all in explicit negation context; compliance_linter clean; cross-link smoke check OK; targeted vocabulary check OK).
+- [x] Commit + push (`caa3258c7`).
+- [x] PR opened ([#1826](https://github.com/InterCooperative-Network/icn/pull/1826)).
+- [x] Initial CI watched: 23 pass / 5 expected docs-only skips / 0 fail; `mergeStateStatus: CLEAN`.
+- [x] AI-reviewer feedback (Copilot 6 threads + 2 low-confidence comments; Codex 1 P2 thread) received and addressed in a follow-up commit on the same branch.
 - [ ] Per the established session pattern: **"Apply valid feedback only. Stop and summarize unless explicitly told to merge."** Wait for explicit merge instruction.
 - [ ] Decide whether to file the follow-up issue drafts listed in §"Follow-up issue drafts" (deferred to user).
 
