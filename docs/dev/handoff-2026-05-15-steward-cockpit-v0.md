@@ -10,7 +10,7 @@
 
 ## Session Goal
 
-Define `docs/spec/steward-cockpit-v0.md` as the design-level rendering contract for the ICN steward cockpit at v0: the operator/steward complement of `docs/spec/member-shell-v0.md` (merged #1830). The spec consumes the 8-field cockpit surface from merged #1829, the 14-field operator/steward dashboard from merged #1826, the storage durability policy objects from merged #1823, the artifact / vault posture from merged #1824, the governed-service-binding "Observe" lifecycle state from merged #1822, the CCL policy registry adoption surface from merged #1821, the institutional-domain policy hooks from merged #1820, and the Stage 5 effect-dispatch evidence from merged #1819 — all verbatim, without redefinition.
+Define `docs/spec/steward-cockpit-v0.md` as the design-level rendering contract for the ICN steward cockpit at v0: the operator/steward complement of `docs/spec/member-shell-v0.md` (merged #1830). The spec consumes the 9-field cockpit surface from merged #1829, the 14-field operator/steward dashboard from merged #1826, the storage durability policy objects from merged #1823, the artifact / vault posture from merged #1824, the governed-service-binding "Observe" lifecycle state from merged #1822, the CCL policy registry adoption surface from merged #1821, the institutional-domain policy hooks from merged #1820, and the Stage 5 effect-dispatch evidence from merged #1819 — all verbatim, without redefinition.
 
 The spec advances `#1795`'s named acceptance criteria. Closure is left for human review.
 
@@ -47,17 +47,21 @@ See §"Verification Commands" below for the exact commands.
 
 ### Branches
 
-- `spec/steward-cockpit-v0` — branch head SHA recorded after `git commit`. Moves with each push for review feedback.
+- `spec/steward-cockpit-v0` — historical; merged via PR #1831 at SHA `eab37348402bba16dfaa8651392c0eb33c7c4170`.
 
 ### Open PRs
 
 | PR | Branch | State | CI Status | Blocker |
 |----|--------|-------|-----------|---------|
-| (to be opened) | `spec/steward-cockpit-v0` | pending PR | pending initial CI | None |
+| _none open from this session_ — see "Late reviewer feedback" below | — | — | — | — |
 
-### Recent merged PRs
+### Late reviewer feedback (post-merge)
 
-`#1814`, `#1819`, `#1820`, `#1821`, `#1822`, `#1823`, `#1824`, `#1825`, `#1826`, `#1827`, `#1829`, `#1830`.
+Codex (12:47:26Z) and Copilot (12:49:41Z) reviews landed **after** PR #1831 was merged at 12:48:54Z. Nine review threads, all valid: (1) anti-entropy cockpit field count is 9, not 8, across spec / registry / INDEX / handoff; (2) ADR-0027 ActionCard schema can't represent operator scenarios — claim must be reframed as forward-direction; (3) `RepairReceipt` is an evidence-artifact identifier per #1829, not a top-level ADR-0026 receipt class; (4) the Warnings / Incidents / Repair surface is listed in the IA but has no per-surface rendering section; (5) this handoff's "Open PRs" table was stale (now corrected). A follow-up PR (`fix(spec): correct steward cockpit review drift`) addresses all five drifts. **The sections of this handoff that pre-date the merge remain historical; they are not updated except where the merge superseded them.**
+
+### Recent merged PRs (including #1831)
+
+`#1814`, `#1819`, `#1820`, `#1821`, `#1822`, `#1823`, `#1824`, `#1825`, `#1826`, `#1827`, `#1829`, `#1830`, `#1831` — `cee87b936515d80326286e9d62bedf3fdcbdb020` (`docs(spec): define steward cockpit v0`).
 
 ### Sibling issues verified OPEN at session start
 
@@ -67,7 +71,7 @@ See §"Verification Commands" below for the exact commands.
 
 | Surface | Where | Status |
 |---|---|---|
-| 8-field anti-entropy cockpit surface | `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" (merged #1829) | Authoritative; this spec consumes verbatim. |
+| 9-field anti-entropy cockpit surface | `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" (merged #1829) | Authoritative; this spec consumes verbatim. |
 | 14-field operator/steward placement dashboard | `docs/spec/compute-placement-policy.md` §"Operator / steward dashboard" (merged #1826) | Authoritative; this spec consumes verbatim. |
 | Storage durability policy objects | `docs/spec/storage-durability-policies.md` (merged #1823) | Authoritative; this spec surfaces posture. |
 | ArtifactRegistry / ScopedVault | `docs/spec/artifact-registry-and-scoped-vault.md` (merged #1824) | Authoritative; this spec surfaces posture, never content. |
@@ -109,7 +113,7 @@ Authority class: `normative`. Length: roughly 550 lines. Sections:
 - **Required Actions / Steward Action Cards** — fourteen-row table naming operator scenarios with source class, authority pattern, expected outcome. Covers failed receipt write, stale peer, degraded sync, missing replica, backup overdue, restore drill due, compute output awaiting review, accessibility gate failed, missing translation, private overlay missing, overbroad access grant, export receipt awaiting review, key rotation needed, policy conflict / challenge window open.
 - **Node Status surface** — eight rendered fields (daemon health, version, uptime, config status, key status, local storage health, current mode, evidence timestamp).
 - **Domain Status surface** — eight rendered fields (InstitutionalDomain id, domain policy version, standing read-model health, active proposals/decisions, adopted CCL policy versions, service bindings, action-card generation posture, member-facing readiness summary).
-- **Network / Federation surface** — consumes the 8-field cockpit surface from #1829 verbatim plus QuorumSyncCheck / FederationSyncWindow posture.
+- **Network / Federation surface** — consumes the 9-field cockpit surface from #1829 verbatim plus QuorumSyncCheck / FederationSyncWindow posture.
 - **Receipt Store surface** — eight rendered fields including failed-writes, evidence-envelope refs, opaque receipt-store posture.
 - **Storage / Artifacts / ScopedVault surface** — eight rendered fields consuming #1823 + #1824, including the hard "no content preview" rule.
 - **Governance / Process surface** — seven rendered fields consuming #1819 / #1820 / #1821.
@@ -182,7 +186,7 @@ Filename uses the descriptive topic suffix convention canonicalized by #1827. St
 ## Unsafe Assumptions
 <!-- Explicitly name anything this session relied on that was not verified -->
 
-- **The 8-field cockpit surface in merged #1829 is canonical and complete.** Verified by reading `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" on the merged copy in `main`.
+- **The 9-field cockpit surface in merged #1829 is canonical and complete.** Verified by reading `docs/spec/network-anti-entropy-proof-loops.md` §"Steward cockpit surface" on the merged copy in `main`.
 - **The 14-field operator/steward dashboard in merged #1826 is canonical and complete.** Verified by reading `docs/spec/compute-placement-policy.md` §"Operator / steward dashboard" on the merged copy.
 - **The 12-category accessibility gate applies to operators too.** ADR-0028 names the gate as foundational for member-facing surfaces; this spec extends the gate's applicability to operator-facing surfaces. If a future ADR creates an operator-specific accessibility baseline, this section needs a re-read.
 - **The legacy `web/dashboard/` directory is not the cockpit.** Verified by `ls web/dashboard/` — contents are `app.js`, `style.css`, `index.html`, `deploy.sh`, `package.json`, `README.md`. The spec treats this directory as legacy that the cockpit spec is not retrofitting; follow-up #5 names the explicit-boundary work.
@@ -218,7 +222,7 @@ Per `docs/spec/member-shell-v0.md` §"Boundary lines" → "Member shell vs stewa
 
 Design principle 9 ("Member-impact summary is always present") plus the failure-table row "Dashboard says healthy while member shell says degraded" make this concrete: if the cockpit shows healthy on a state class that's degraded in the member shell, that's a v0 violation. The cockpit cannot silently disagree with the member shell about what state the institution is in. This prevents a class of operator-side lying that would otherwise be tempting under load.
 
-### 3. The 8-field anti-entropy cockpit surface and the 14-field placement dashboard are consumed verbatim.
+### 3. The 9-field anti-entropy cockpit surface and the 14-field placement dashboard are consumed verbatim.
 
 This spec deliberately re-states the field sets from merged #1829 and #1826 rather than inventing new ones. The rendering contract is "render what the merged spec already names"; the cockpit's job is to surface those fields with appropriate technical detail plus member-impact summaries. Consuming verbatim prevents drift between the merged spec and the cockpit rendering.
 
@@ -283,7 +287,34 @@ sed -n '1,80p' docs/spec/steward-cockpit-v0.md
 
 ## Follow-up Issue Drafts (Not Filed)
 
-Five follow-ups drafted per the user's instruction. Paste-ready for separate review.
+Six follow-ups drafted (the original five plus one added after the post-merge review on PR #1831 surfaced the ADR-0027 schema gap). Paste-ready for separate review.
+
+### 0. `spec(contracts): define steward required-action card contract` (added post-merge)
+
+```
+## Purpose
+
+The steward cockpit v0 spec at `docs/spec/steward-cockpit-v0.md` names fourteen operator scenarios (failed receipt write, stale peer, degraded sync, missing replica, backup overdue, restore drill due, compute output awaiting review, accessibility gate failed, missing translation, private overlay missing, overbroad access grant, export receipt awaiting review, key rotation needed, policy conflict / challenge window open) that the cockpit's Required Actions surface must render. The existing ADR-0027 `ActionCard` schema cannot represent these scenarios: its closed enums for `source_kind` (`proposal` / `meeting` / `action_item` + two RFC-gated reserved) and `action_kind` (`vote` / `attend` / `complete`) were defined for member participation cards, not operator required actions.
+
+## Scope
+
+- Decide between (a) amending ADR-0027 with an operator-required-action superset, or (b) defining a separate `StewardRequiredActionCard` primitive alongside the member-facing `ActionCard`.
+- Specify the closed source-class / action-class enums for the fourteen named operator scenarios.
+- Specify the wire-stable record shape.
+- Cross-link the cockpit spec's §"Required Actions / Steward Action Cards" so the forward-direction status is reconciled.
+
+## Non-goals
+
+- No cockpit implementation in this issue.
+- No new ADR-0026 receipt classes.
+
+## Related
+
+- `docs/spec/steward-cockpit-v0.md` §"Required Actions / Steward Action Cards."
+- ADR-0027 (`docs/adr/ADR-0027-action-card-contract.md`).
+- `docs/contracts/institution-package/action-card.schema.json`.
+- `#1795` parent.
+```
 
 ### 1. `spec(web): pick the steward cockpit platform target`
 
