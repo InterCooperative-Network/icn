@@ -7,7 +7,7 @@ Last verified: 2026-04-15
 
 # ICN Handoff Template
 
-Use this template when writing session handoffs to `docs/dev/handoff-YYYY-MM-DD.md`.
+Use this template when writing session handoffs to `docs/dev/handoff-YYYY-MM-DD-<topic>.md`.
 
 Each section explicitly labels its truth type. Do not blend verified facts with assumptions.
 
@@ -106,8 +106,8 @@ Each section explicitly labels its truth type. Do not blend verified facts with 
 
 ## Usage Notes
 
-- Handoff files go in `docs/dev/handoff-YYYY-MM-DD.md`.
-- If multiple handoffs occur on the same day, append a suffix: `handoff-YYYY-MM-DD-b.md`.
+- Handoff files go in `docs/dev/handoff-YYYY-MM-DD-<topic>.md`. Use a descriptive topic suffix (e.g., `handoff-2026-05-15-compute-placement-policy.md`); this matches the convention used across the recent architecture-spec sprint (#1814, #1819 – #1826).
+- If multiple handoffs cover the same topic on the same day, append an alphabetical suffix to disambiguate: `handoff-YYYY-MM-DD-<topic>-b.md`.
 - Do NOT commit the handoff file automatically — the user decides.
 - Keep notes concise. This is for the next session, not a PR description.
 - The "Unsafe Assumptions" section is the most important section. If you skip one section, do not skip that one.
