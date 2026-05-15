@@ -39,7 +39,7 @@
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>HANDOFF TEMPLATE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/HANDOFF_TEMPLATE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Handoff Template</h1>
-<p>Use this template when writing session handoffs to <code>docs/dev/handoff-YYYY-MM-DD.md</code>.</p>
+<p>Use this template when writing session handoffs to <code>docs/dev/handoff-YYYY-MM-DD-&lt;topic&gt;.md</code>.</p>
 <p>Each section explicitly labels its truth type. Do not blend verified facts with assumptions.</p>
 <hr>
 <pre><code class="language-markdown"># Session Handoff — YYYY-MM-DD
@@ -132,8 +132,8 @@ View source on GitHub →
 <hr>
 <h2>Usage Notes</h2>
 <ul>
-<li>Handoff files go in <code>docs/dev/handoff-YYYY-MM-DD.md</code>.</li>
-<li>If multiple handoffs occur on the same day, append a suffix: <code>handoff-YYYY-MM-DD-b.md</code>.</li>
+<li>Handoff files go in <code>docs/dev/handoff-YYYY-MM-DD-&lt;topic&gt;.md</code>. Use a descriptive topic suffix (e.g., <code>handoff-2026-05-15-compute-placement-policy.md</code>); this matches the convention used across the recent architecture-spec sprint (#1814, #1819 – #1826).</li>
+<li>If multiple handoffs cover the same topic on the same day, append an alphabetical suffix to disambiguate: <code>handoff-YYYY-MM-DD-&lt;topic&gt;-b.md</code>.</li>
 <li>Do NOT commit the handoff file automatically — the user decides.</li>
 <li>Keep notes concise. This is for the next session, not a PR description.</li>
 <li>The &quot;Unsafe Assumptions&quot; section is the most important section. If you skip one section, do not skip that one.</li>
