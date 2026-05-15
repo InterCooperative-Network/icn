@@ -3403,6 +3403,7 @@ dependencies = [
  "bincode",
  "blake3",
  "hex",
+ "icn-gossip",
  "ordered-float 5.1.0",
  "parking_lot 0.12.5",
  "rand 0.8.5",
