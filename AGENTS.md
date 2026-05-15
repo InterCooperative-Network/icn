@@ -284,36 +284,24 @@ When ending a session or passing work to another agent, write a handoff note usi
 
 **What to capture:**
 
-```markdown
-# Session Handoff — YYYY-MM-DD
+Use `docs/dev/HANDOFF_TEMPLATE.md` as the canonical structure (it carries the truth-type labels and section ordering). At minimum each handoff records:
 
-## Branch
-`feat/<slug>` — base: main
-
-## Commits this session
-- <sha> <message>
-
-## Open PRs
-- #<N>: <title> (state)
-
-## Open threads
-- [ ] <unfinished work or decision needed>
-
-## TODOs added this session
-- `<file>:<line>` — <text>
-
-## Next steps
-1. <first action for next session>
-```
+- **Current state** — branch, head SHA, base SHA, working-tree status.
+- **Open PRs and issues** — which PRs are open, which issues are advanced, what's blocked.
+- **Validation results** — which checks ran (and which did not), with their outputs.
+- **Unresolved reviewer feedback** — open AI-reviewer threads or human comments, and their disposition (accepted, rejected with rebuttal, or deferred).
+- **Unsafe assumptions** — anything this session relied on but did not verify.
+- **Next recommended action** — the exact starting move for the next session.
 
 **Rules:**
-- Write to `docs/dev-journal/session-YYYY-MM-DD.md` (append if file exists today)
+- Write to `docs/dev/handoff-YYYY-MM-DD-<topic>.md`. Use a descriptive topic suffix (e.g., `handoff-2026-05-15-compute-placement-policy.md`); if multiple handoffs land the same day under the same topic, follow `docs/dev/HANDOFF_TEMPLATE.md` §"Usage Notes" for the suffix convention.
+- Do not invent `docs/dev-journal/` — that directory does not exist in this repository. The canonical location is `docs/dev/`.
 - Stash must be empty before ending — commit or drop stashes
 - If pushing, use `/push` (runs fmt + clippy gates first)
 - The handoff file is for context continuity — do not auto-commit it
 
 **Resuming from a handoff:**
-1. Read `docs/dev-journal/session-YYYY-MM-DD.md` (most recent date)
+1. Read the most recent `docs/dev/handoff-YYYY-MM-DD-<topic>.md`
 2. Run `/preflight` to verify environment
 3. Run `git fetch origin && git rebase origin/main` if branch is stale
 4. Check open threads from the handoff note before starting new work
