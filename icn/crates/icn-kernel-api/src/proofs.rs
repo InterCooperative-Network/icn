@@ -2621,6 +2621,805 @@ impl QuorumSyncCheck {
 }
 
 // ============================================================================
+// RoutingProof + RedundancyProof — routing and redundancy attestations
+// (issue #1862)
+//
+// Wire-stable records for the two remaining design-level identifiers
+// from spec §"Proof artifacts" lines 237–238. After this pair the
+// entire identifier set in spec line 10 is wire-stable.
+//
+// `RoutingProof` is the evidence side of #1799 scenario 1 ("multi-node
+// gossip"): a generic event or receipt was emitted by an originating
+// node and acknowledged by intended-recipient peers. The kernel
+// records the proof; the policy oracle decides whether it is fresh
+// enough for the placement / settlement decision that depends on it.
+//
+// `RedundancyProof` is the evidence side of #1799 scenario 4 ("replica
+// failure / re-replication"): per-artifact attestation that the live
+// replica count meets or falls short of `ReplicationPolicy.target_replicas`.
+// A failing proof triggers `DivergenceEvidence` of class "replica lag"
+// or "replica missing" and a `RepairPlan` of action "re-replicate" at
+// the policy-oracle layer. Per spec line 250: only produced for
+// artifacts whose `ReplicationPolicy` declares `target_replicas > 1`.
+//
+// Per spec line 220: both records ride inside an existing Stage 5
+// `EffectDispatchEvidence` envelope. No new top-level ADR-0026
+// receipt class is introduced.
+// ============================================================================
+
+/// Schema version for `RoutingProof`.
+pub const ROUTING_PROOF_SCHEMA_VERSION: u32 = 1;
+
+/// Schema version for `RedundancyProof`.
+pub const REDUNDANCY_PROOF_SCHEMA_VERSION: u32 = 1;
+
+// ----------------------------------------------------------------------------
+// RoutedMessageKind — closed two-variant taxonomy
+// ----------------------------------------------------------------------------
+
+/// Closed taxonomy of message kinds that may carry a `RoutingProof`.
+///
+/// Per spec §"Routing and redundancy checks" line 244: "a generic
+/// event / receipt was emitted by node A and acknowledged by
+/// intended-recipient peers B / C." The two-variant split mirrors that
+/// "/" — every routed payload is either a generic gossip event or a
+/// receipt of some kind. The kernel does not interpret WHICH receipt
+/// (`ArtifactReceipt`, `RepairReceipt`, etc.) — that is a policy /
+/// app concern. The kernel only ensures the recorded kind round-trips
+/// deterministically and that no kind outside this closed set can be
+/// expressed on the wire.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutedMessageKind {
+    /// A generic gossip event (e.g., a topic announcement, a
+    /// vector-clock probe, a `PeerSyncReport`).
+    GossipEvent,
+    /// A receipt of any kind (`ArtifactReceipt`, `RepairReceipt`,
+    /// app-layer receipt — the kernel does not discriminate).
+    Receipt,
+}
+
+// ----------------------------------------------------------------------------
+// RoutingProof — Error
+// ----------------------------------------------------------------------------
+
+/// Structural validation errors a `RoutingProof` can produce.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum RoutingProofError {
+    /// `schema_version` did not match [`ROUTING_PROOF_SCHEMA_VERSION`].
+    #[error("unsupported RoutingProof schema_version: got {got}, supported {supported}")]
+    UnsupportedSchemaVersion {
+        /// The version observed on the wire / at construction.
+        got: u32,
+        /// The version this build supports.
+        supported: u32,
+    },
+    /// `acknowledging_peers` is empty. A routing proof with zero
+    /// acknowledgements is not evidence of routing.
+    #[error("RoutingProof must have at least one acknowledging peer")]
+    EmptyAcknowledgingPeers,
+    /// `emitter_did` appears in `acknowledging_peers`. A self-ack is
+    /// trivially provable and not evidence of cross-peer routing.
+    #[error(
+        "RoutingProof emitter_did={emitter_did} is also in acknowledging_peers; \
+         self-acknowledgement is not evidence of routing"
+    )]
+    EmitterInAcknowledgingPeers {
+        /// The emitter DID that appeared in both fields.
+        emitter_did: Did,
+    },
+    /// `emitted_at > freshness_valid_until`.
+    #[error(
+        "RoutingProof emitted_at={emitted_at} is after \
+         freshness_valid_until={freshness_valid_until}"
+    )]
+    EmittedAfterFreshness {
+        /// The emission timestamp.
+        emitted_at: u64,
+        /// The freshness expiry.
+        freshness_valid_until: u64,
+    },
+}
+
+impl From<RoutingProofError> for String {
+    fn from(err: RoutingProofError) -> Self {
+        err.to_string()
+    }
+}
+
+// ----------------------------------------------------------------------------
+// RoutingProof
+// ----------------------------------------------------------------------------
+
+/// Evidence that a message or receipt reached its intended peer(s).
+///
+/// Per spec §"Routing and redundancy checks" line 244: "a generic
+/// event / receipt was emitted by node A and acknowledged by
+/// intended-recipient peers B / C, with hashes and signatures
+/// preserved." The kernel records the proof; the policy oracle
+/// decides freshness sufficiency for the downstream placement /
+/// settlement decision.
+///
+/// # Privacy
+///
+/// `RoutingProof` carries the `message_hash` (a content-addressed
+/// reference, never the body) plus peer DIDs and timestamps. There is
+/// no body / payload / raw_bytes field by construction. For routes
+/// over private artifacts, `private_content_implication` is set;
+/// renderers MUST gate technical detail behind the disclosure scope.
+///
+/// # Self-authentication
+///
+/// `routing_hash` is a blake3 binding under
+/// `DOMAIN_TAG = b"icn:routing-proof:v1"`, length-prefixed, over a
+/// canonical bincode encoding of all bound fields (excluding
+/// `routing_hash` and `signature`). Deserialization rejects
+/// unsupported schema versions AND structural rule violations.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "RawRoutingProof")]
+pub struct RoutingProof {
+    /// Wire schema version. See [`ROUTING_PROOF_SCHEMA_VERSION`].
+    pub schema_version: u32,
+    /// Content hash of the routed message or receipt.
+    pub message_hash: Hash,
+    /// Closed taxonomy of what was routed.
+    pub message_kind: RoutedMessageKind,
+    /// DID of the originating node that emitted the message.
+    pub emitter_did: Did,
+    /// Canonicalized set of peers that acknowledged receipt. MUST
+    /// be non-empty and MUST NOT contain `emitter_did`.
+    pub acknowledging_peers: PeerSet,
+    /// Scope at which the routing happened.
+    pub scope: ProbeScope,
+    /// Emitter's clock when the message was sent (Unix seconds).
+    pub emitted_at: u64,
+    /// Unix seconds beyond which the proof is stale.
+    pub freshness_valid_until: u64,
+    /// `true` if the routed payload touched private state.
+    pub private_content_implication: bool,
+    /// 32-byte random nonce.
+    pub routing_nonce: [u8; 32],
+    /// blake3 binding hash.
+    pub routing_hash: Hash,
+    /// Emitter signature (empty until signed by a higher layer).
+    pub signature: Signature,
+}
+
+#[derive(Deserialize)]
+struct RawRoutingProof {
+    schema_version: u32,
+    message_hash: Hash,
+    message_kind: RoutedMessageKind,
+    emitter_did: Did,
+    acknowledging_peers: PeerSet,
+    scope: ProbeScope,
+    emitted_at: u64,
+    freshness_valid_until: u64,
+    private_content_implication: bool,
+    routing_nonce: [u8; 32],
+    routing_hash: Hash,
+    signature: Signature,
+}
+
+impl TryFrom<RawRoutingProof> for RoutingProof {
+    type Error = String;
+
+    fn try_from(raw: RawRoutingProof) -> Result<Self, Self::Error> {
+        if raw.schema_version != ROUTING_PROOF_SCHEMA_VERSION {
+            return Err(RoutingProofError::UnsupportedSchemaVersion {
+                got: raw.schema_version,
+                supported: ROUTING_PROOF_SCHEMA_VERSION,
+            }
+            .to_string());
+        }
+        RoutingProof::validate_structural_invariants(
+            &raw.emitter_did,
+            &raw.acknowledging_peers,
+            raw.emitted_at,
+            raw.freshness_valid_until,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(Self {
+            schema_version: raw.schema_version,
+            message_hash: raw.message_hash,
+            message_kind: raw.message_kind,
+            emitter_did: raw.emitter_did,
+            acknowledging_peers: raw.acknowledging_peers,
+            scope: raw.scope,
+            emitted_at: raw.emitted_at,
+            freshness_valid_until: raw.freshness_valid_until,
+            private_content_implication: raw.private_content_implication,
+            routing_nonce: raw.routing_nonce,
+            routing_hash: raw.routing_hash,
+            signature: raw.signature,
+        })
+    }
+}
+
+/// Canonical binding fields for `RoutingProof::routing_hash`.
+#[derive(Serialize)]
+struct RoutingProofBinding<'a> {
+    schema_version: u32,
+    message_hash: Hash,
+    message_kind: RoutedMessageKind,
+    emitter_did: &'a Did,
+    acknowledging_peers: &'a PeerSet,
+    scope: &'a ProbeScope,
+    emitted_at: u64,
+    freshness_valid_until: u64,
+    private_content_implication: bool,
+    routing_nonce: [u8; 32],
+}
+
+impl RoutingProof {
+    /// Domain-separation tag. Distinct from all other proof records.
+    pub const DOMAIN_TAG: &'static [u8] = b"icn:routing-proof:v1";
+
+    /// Construct a new routing proof with computed `routing_hash` and
+    /// empty signature.
+    ///
+    /// Returns [`RoutingProofError`] if structural invariants are
+    /// violated.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        message_hash: Hash,
+        message_kind: RoutedMessageKind,
+        emitter_did: Did,
+        acknowledging_peers: PeerSet,
+        scope: ProbeScope,
+        emitted_at: u64,
+        freshness_valid_until: u64,
+        private_content_implication: bool,
+        routing_nonce: [u8; 32],
+    ) -> Result<Self, RoutingProofError> {
+        Self::validate_structural_invariants(
+            &emitter_did,
+            &acknowledging_peers,
+            emitted_at,
+            freshness_valid_until,
+        )?;
+        let routing_hash = Self::compute_routing_hash(
+            ROUTING_PROOF_SCHEMA_VERSION,
+            message_hash,
+            message_kind,
+            &emitter_did,
+            &acknowledging_peers,
+            &scope,
+            emitted_at,
+            freshness_valid_until,
+            private_content_implication,
+            &routing_nonce,
+        );
+        Ok(Self {
+            schema_version: ROUTING_PROOF_SCHEMA_VERSION,
+            message_hash,
+            message_kind,
+            emitter_did,
+            acknowledging_peers,
+            scope,
+            emitted_at,
+            freshness_valid_until,
+            private_content_implication,
+            routing_nonce,
+            routing_hash,
+            signature: Signature::new(Vec::new()),
+        })
+    }
+
+    /// Validate the structural invariants:
+    ///
+    /// - `acknowledging_peers` MUST be non-empty.
+    /// - `emitter_did` MUST NOT appear in `acknowledging_peers`.
+    /// - `emitted_at <= freshness_valid_until`.
+    pub fn validate_structural_invariants(
+        emitter_did: &Did,
+        acknowledging_peers: &PeerSet,
+        emitted_at: u64,
+        freshness_valid_until: u64,
+    ) -> Result<(), RoutingProofError> {
+        let peers = acknowledging_peers.dids();
+        if peers.is_empty() {
+            return Err(RoutingProofError::EmptyAcknowledgingPeers);
+        }
+        if peers.iter().any(|p| p == emitter_did) {
+            return Err(RoutingProofError::EmitterInAcknowledgingPeers {
+                emitter_did: emitter_did.clone(),
+            });
+        }
+        if emitted_at > freshness_valid_until {
+            return Err(RoutingProofError::EmittedAfterFreshness {
+                emitted_at,
+                freshness_valid_until,
+            });
+        }
+        Ok(())
+    }
+
+    /// Compute the binding hash from the significant fields.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_routing_hash(
+        schema_version: u32,
+        message_hash: Hash,
+        message_kind: RoutedMessageKind,
+        emitter_did: &Did,
+        acknowledging_peers: &PeerSet,
+        scope: &ProbeScope,
+        emitted_at: u64,
+        freshness_valid_until: u64,
+        private_content_implication: bool,
+        routing_nonce: &[u8; 32],
+    ) -> Hash {
+        let binding = RoutingProofBinding {
+            schema_version,
+            message_hash,
+            message_kind,
+            emitter_did,
+            acknowledging_peers,
+            scope,
+            emitted_at,
+            freshness_valid_until,
+            private_content_implication,
+            routing_nonce: *routing_nonce,
+        };
+        let payload =
+            bincode::serialize(&binding).expect("RoutingProofBinding serialization is infallible");
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        *hasher.finalize().as_bytes()
+    }
+
+    /// `true` iff `schema_version == ROUTING_PROOF_SCHEMA_VERSION`.
+    pub fn is_supported_schema_version(&self) -> bool {
+        self.schema_version == ROUTING_PROOF_SCHEMA_VERSION
+    }
+
+    /// Verify the stored `routing_hash` and `schema_version`. Fails
+    /// closed on unsupported versions.
+    pub fn verify_binding(&self) -> bool {
+        if !self.is_supported_schema_version() {
+            return false;
+        }
+        let recomputed = Self::compute_routing_hash(
+            self.schema_version,
+            self.message_hash,
+            self.message_kind,
+            &self.emitter_did,
+            &self.acknowledging_peers,
+            &self.scope,
+            self.emitted_at,
+            self.freshness_valid_until,
+            self.private_content_implication,
+            &self.routing_nonce,
+        );
+        self.routing_hash == recomputed
+    }
+
+    /// `true` if `now_unix_seconds <= freshness_valid_until`.
+    pub fn is_fresh(&self, now_unix_seconds: u64) -> bool {
+        now_unix_seconds <= self.freshness_valid_until
+    }
+}
+
+// ----------------------------------------------------------------------------
+// RedundancyOutcome — closed two-variant taxonomy
+// ----------------------------------------------------------------------------
+
+/// Closed taxonomy of redundancy proof outcomes.
+///
+/// Per spec §"Routing and redundancy checks" line 245: "A failing
+/// `RedundancyProof` triggers a `DivergenceEvidence` of class 'replica
+/// lag' or 'replica missing'." The two-variant split distinguishes a
+/// passing proof (observed replica count met target) from a failing
+/// proof (observed count fell short).
+///
+/// The kernel does not classify what each outcome *means* for repair
+/// authority — that is the policy oracle's job. The kernel ensures
+/// the recorded outcome round-trips deterministically and is
+/// structurally consistent with the recorded observed / target counts.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum RedundancyOutcome {
+    /// `observed_replicas >= target_replicas`. The artifact is
+    /// replicated at or above policy.
+    TargetMet,
+    /// `observed_replicas < target_replicas`. The artifact is
+    /// under-replicated and would trigger `DivergenceEvidence` at
+    /// the policy-oracle layer.
+    BelowTarget,
+}
+
+// ----------------------------------------------------------------------------
+// RedundancyProof — Error
+// ----------------------------------------------------------------------------
+
+/// Structural validation errors a `RedundancyProof` can produce.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum RedundancyProofError {
+    /// `schema_version` did not match [`REDUNDANCY_PROOF_SCHEMA_VERSION`].
+    #[error("unsupported RedundancyProof schema_version: got {got}, supported {supported}")]
+    UnsupportedSchemaVersion {
+        /// The version observed on the wire / at construction.
+        got: u32,
+        /// The version this build supports.
+        supported: u32,
+    },
+    /// `target_replicas <= 1`. Per spec line 250: the loop only
+    /// produces a `RedundancyProof` for artifacts whose
+    /// `ReplicationPolicy` declares `target_replicas > 1`.
+    #[error(
+        "RedundancyProof target_replicas={target_replicas} must be > 1 \
+         (spec: only produced for artifacts with target_replicas > 1)"
+    )]
+    InvalidTargetReplicas {
+        /// The disallowed target replica count.
+        target_replicas: u32,
+    },
+    /// `observed_replicas != replica_peers.dids().len()`. The
+    /// recorded count must equal the canonicalized peer-set length.
+    #[error(
+        "RedundancyProof observed_replicas={observed_replicas} does not equal \
+         replica_peers length {peers_len}"
+    )]
+    ObservedReplicasPeerCountMismatch {
+        /// Recorded count.
+        observed_replicas: u32,
+        /// Canonicalized peer-set length.
+        peers_len: u32,
+    },
+    /// `outcome` does not match the actual observed / target
+    /// relationship. `TargetMet` requires `observed >= target`;
+    /// `BelowTarget` requires `observed < target`.
+    #[error(
+        "RedundancyProof outcome={outcome:?} is inconsistent with \
+         observed_replicas={observed_replicas} vs target_replicas={target_replicas}"
+    )]
+    OutcomeInconsistent {
+        /// The recorded outcome.
+        outcome: RedundancyOutcome,
+        /// The recorded observed count.
+        observed_replicas: u32,
+        /// The recorded target count.
+        target_replicas: u32,
+    },
+    /// `observed_at > freshness_valid_until`.
+    #[error(
+        "RedundancyProof observed_at={observed_at} is after \
+         freshness_valid_until={freshness_valid_until}"
+    )]
+    ObservedAfterFreshness {
+        /// The observation timestamp.
+        observed_at: u64,
+        /// The freshness expiry.
+        freshness_valid_until: u64,
+    },
+}
+
+impl From<RedundancyProofError> for String {
+    fn from(err: RedundancyProofError) -> Self {
+        err.to_string()
+    }
+}
+
+// ----------------------------------------------------------------------------
+// RedundancyProof
+// ----------------------------------------------------------------------------
+
+/// Per-artifact attestation that the live replica count meets or falls
+/// short of `ReplicationPolicy.target_replicas`.
+///
+/// Per spec §"Routing and redundancy checks" line 245: "A failing
+/// `RedundancyProof` triggers a `DivergenceEvidence` of class 'replica
+/// lag' or 'replica missing' and a `RepairPlan` action of
+/// 're-replicate.'" The kernel records the observation; the policy
+/// oracle decides whether to escalate.
+///
+/// # Privacy
+///
+/// `RedundancyProof` carries the artifact's content hash (a
+/// content-addressed reference, never the body), peer DIDs, counts,
+/// and timestamps. There is no body / payload / raw_bytes field by
+/// construction. For replicas of private artifacts,
+/// `private_content_implication` is set.
+///
+/// # Self-authentication
+///
+/// `proof_hash` is a blake3 binding under
+/// `DOMAIN_TAG = b"icn:redundancy-proof:v1"`. Deserialization rejects
+/// unsupported schema versions AND structural rule violations.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "RawRedundancyProof")]
+pub struct RedundancyProof {
+    /// Wire schema version. See [`REDUNDANCY_PROOF_SCHEMA_VERSION`].
+    pub schema_version: u32,
+    /// Content hash of the artifact this proof covers.
+    pub artifact_hash: Hash,
+    /// Scope at which replica counts were observed.
+    pub scope: ProbeScope,
+    /// Categorical outcome consistent with the observed / target
+    /// counts.
+    pub outcome: RedundancyOutcome,
+    /// Live replica count observed. MUST equal
+    /// `replica_peers.dids().len()`.
+    pub observed_replicas: u32,
+    /// `ReplicationPolicy.target_replicas`. MUST be `> 1`.
+    pub target_replicas: u32,
+    /// Canonicalized set of peers observed to hold replicas.
+    pub replica_peers: PeerSet,
+    /// DID of the reporter that recorded the proof.
+    pub reporter_did: Did,
+    /// Unix seconds when the counts were observed.
+    pub observed_at: u64,
+    /// Unix seconds beyond which the proof is stale.
+    pub freshness_valid_until: u64,
+    /// `true` if the artifact is private. Renderers MUST gate
+    /// technical detail behind the disclosure scope.
+    pub private_content_implication: bool,
+    /// 32-byte random nonce.
+    pub proof_nonce: [u8; 32],
+    /// blake3 binding hash.
+    pub proof_hash: Hash,
+    /// Reporter signature (empty until signed by a higher layer).
+    pub signature: Signature,
+}
+
+#[derive(Deserialize)]
+struct RawRedundancyProof {
+    schema_version: u32,
+    artifact_hash: Hash,
+    scope: ProbeScope,
+    outcome: RedundancyOutcome,
+    observed_replicas: u32,
+    target_replicas: u32,
+    replica_peers: PeerSet,
+    reporter_did: Did,
+    observed_at: u64,
+    freshness_valid_until: u64,
+    private_content_implication: bool,
+    proof_nonce: [u8; 32],
+    proof_hash: Hash,
+    signature: Signature,
+}
+
+impl TryFrom<RawRedundancyProof> for RedundancyProof {
+    type Error = String;
+
+    fn try_from(raw: RawRedundancyProof) -> Result<Self, Self::Error> {
+        if raw.schema_version != REDUNDANCY_PROOF_SCHEMA_VERSION {
+            return Err(RedundancyProofError::UnsupportedSchemaVersion {
+                got: raw.schema_version,
+                supported: REDUNDANCY_PROOF_SCHEMA_VERSION,
+            }
+            .to_string());
+        }
+        RedundancyProof::validate_structural_invariants(
+            raw.outcome,
+            raw.observed_replicas,
+            raw.target_replicas,
+            &raw.replica_peers,
+            raw.observed_at,
+            raw.freshness_valid_until,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(Self {
+            schema_version: raw.schema_version,
+            artifact_hash: raw.artifact_hash,
+            scope: raw.scope,
+            outcome: raw.outcome,
+            observed_replicas: raw.observed_replicas,
+            target_replicas: raw.target_replicas,
+            replica_peers: raw.replica_peers,
+            reporter_did: raw.reporter_did,
+            observed_at: raw.observed_at,
+            freshness_valid_until: raw.freshness_valid_until,
+            private_content_implication: raw.private_content_implication,
+            proof_nonce: raw.proof_nonce,
+            proof_hash: raw.proof_hash,
+            signature: raw.signature,
+        })
+    }
+}
+
+/// Canonical binding fields for `RedundancyProof::proof_hash`.
+#[derive(Serialize)]
+struct RedundancyProofBinding<'a> {
+    schema_version: u32,
+    artifact_hash: Hash,
+    scope: &'a ProbeScope,
+    outcome: RedundancyOutcome,
+    observed_replicas: u32,
+    target_replicas: u32,
+    replica_peers: &'a PeerSet,
+    reporter_did: &'a Did,
+    observed_at: u64,
+    freshness_valid_until: u64,
+    private_content_implication: bool,
+    proof_nonce: [u8; 32],
+}
+
+impl RedundancyProof {
+    /// Domain-separation tag. Distinct from all other proof records.
+    pub const DOMAIN_TAG: &'static [u8] = b"icn:redundancy-proof:v1";
+
+    /// Construct a new redundancy proof with computed `proof_hash` and
+    /// empty signature.
+    ///
+    /// Returns [`RedundancyProofError`] if structural invariants are
+    /// violated.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        artifact_hash: Hash,
+        scope: ProbeScope,
+        outcome: RedundancyOutcome,
+        observed_replicas: u32,
+        target_replicas: u32,
+        replica_peers: PeerSet,
+        reporter_did: Did,
+        observed_at: u64,
+        freshness_valid_until: u64,
+        private_content_implication: bool,
+        proof_nonce: [u8; 32],
+    ) -> Result<Self, RedundancyProofError> {
+        Self::validate_structural_invariants(
+            outcome,
+            observed_replicas,
+            target_replicas,
+            &replica_peers,
+            observed_at,
+            freshness_valid_until,
+        )?;
+        let proof_hash = Self::compute_proof_hash(
+            REDUNDANCY_PROOF_SCHEMA_VERSION,
+            artifact_hash,
+            &scope,
+            outcome,
+            observed_replicas,
+            target_replicas,
+            &replica_peers,
+            &reporter_did,
+            observed_at,
+            freshness_valid_until,
+            private_content_implication,
+            &proof_nonce,
+        );
+        Ok(Self {
+            schema_version: REDUNDANCY_PROOF_SCHEMA_VERSION,
+            artifact_hash,
+            scope,
+            outcome,
+            observed_replicas,
+            target_replicas,
+            replica_peers,
+            reporter_did,
+            observed_at,
+            freshness_valid_until,
+            private_content_implication,
+            proof_nonce,
+            proof_hash,
+            signature: Signature::new(Vec::new()),
+        })
+    }
+
+    /// Validate structural invariants:
+    ///
+    /// - `target_replicas > 1`.
+    /// - `observed_replicas == replica_peers.dids().len()`.
+    /// - `outcome == TargetMet` iff `observed_replicas >= target_replicas`.
+    /// - `observed_at <= freshness_valid_until`.
+    pub fn validate_structural_invariants(
+        outcome: RedundancyOutcome,
+        observed_replicas: u32,
+        target_replicas: u32,
+        replica_peers: &PeerSet,
+        observed_at: u64,
+        freshness_valid_until: u64,
+    ) -> Result<(), RedundancyProofError> {
+        if target_replicas <= 1 {
+            return Err(RedundancyProofError::InvalidTargetReplicas { target_replicas });
+        }
+        let peers_len = replica_peers.dids().len() as u32;
+        if observed_replicas != peers_len {
+            return Err(RedundancyProofError::ObservedReplicasPeerCountMismatch {
+                observed_replicas,
+                peers_len,
+            });
+        }
+        let target_met = observed_replicas >= target_replicas;
+        let outcome_consistent = matches!(
+            (outcome, target_met),
+            (RedundancyOutcome::TargetMet, true) | (RedundancyOutcome::BelowTarget, false)
+        );
+        if !outcome_consistent {
+            return Err(RedundancyProofError::OutcomeInconsistent {
+                outcome,
+                observed_replicas,
+                target_replicas,
+            });
+        }
+        if observed_at > freshness_valid_until {
+            return Err(RedundancyProofError::ObservedAfterFreshness {
+                observed_at,
+                freshness_valid_until,
+            });
+        }
+        Ok(())
+    }
+
+    /// Compute the binding hash from the significant fields.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_proof_hash(
+        schema_version: u32,
+        artifact_hash: Hash,
+        scope: &ProbeScope,
+        outcome: RedundancyOutcome,
+        observed_replicas: u32,
+        target_replicas: u32,
+        replica_peers: &PeerSet,
+        reporter_did: &Did,
+        observed_at: u64,
+        freshness_valid_until: u64,
+        private_content_implication: bool,
+        proof_nonce: &[u8; 32],
+    ) -> Hash {
+        let binding = RedundancyProofBinding {
+            schema_version,
+            artifact_hash,
+            scope,
+            outcome,
+            observed_replicas,
+            target_replicas,
+            replica_peers,
+            reporter_did,
+            observed_at,
+            freshness_valid_until,
+            private_content_implication,
+            proof_nonce: *proof_nonce,
+        };
+        let payload = bincode::serialize(&binding)
+            .expect("RedundancyProofBinding serialization is infallible");
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        *hasher.finalize().as_bytes()
+    }
+
+    /// `true` iff `schema_version == REDUNDANCY_PROOF_SCHEMA_VERSION`.
+    pub fn is_supported_schema_version(&self) -> bool {
+        self.schema_version == REDUNDANCY_PROOF_SCHEMA_VERSION
+    }
+
+    /// Verify the stored `proof_hash` and `schema_version`. Fails
+    /// closed on unsupported versions.
+    pub fn verify_binding(&self) -> bool {
+        if !self.is_supported_schema_version() {
+            return false;
+        }
+        let recomputed = Self::compute_proof_hash(
+            self.schema_version,
+            self.artifact_hash,
+            &self.scope,
+            self.outcome,
+            self.observed_replicas,
+            self.target_replicas,
+            &self.replica_peers,
+            &self.reporter_did,
+            self.observed_at,
+            self.freshness_valid_until,
+            self.private_content_implication,
+            &self.proof_nonce,
+        );
+        self.proof_hash == recomputed
+    }
+
+    /// `true` if `now_unix_seconds <= freshness_valid_until`.
+    pub fn is_fresh(&self, now_unix_seconds: u64) -> bool {
+        now_unix_seconds <= self.freshness_valid_until
+    }
+}
+
+// ============================================================================
 // DivergenceEvidence and RepairPlan records (issue #1835)
 //
 // Wire-stable record shapes for the next two design-level identifiers from
@@ -6760,6 +7559,833 @@ mod anti_entropy_tests {
         let restored: QuorumSyncCheck = serde_json::from_str(&json).unwrap();
         assert!(restored.private_content_implication);
         assert!(restored.verify_binding());
+    }
+
+    // =========================================================================
+    // RoutingProof (issue #1862)
+    // =========================================================================
+
+    fn sample_routing_acks() -> PeerSet {
+        PeerSet::from_dids(vec![
+            "did:icn:peer-b".to_string(),
+            "did:icn:peer-c".to_string(),
+        ])
+    }
+
+    fn sample_routing_proof() -> RoutingProof {
+        RoutingProof::new(
+            [0x42; 32],
+            RoutedMessageKind::Receipt,
+            "did:icn:peer-a".to_string(),
+            sample_routing_acks(),
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            1_715_000_000,
+            1_715_000_030,
+            false,
+            [0xB1; 32],
+        )
+        .expect("sample routing proof is structurally consistent")
+    }
+
+    // ---- RoutedMessageKind round-trip ----
+
+    #[test]
+    fn routed_message_kind_all_variants_round_trip() {
+        let cases = [RoutedMessageKind::GossipEvent, RoutedMessageKind::Receipt];
+        assert_eq!(cases.len(), 2);
+        for k in &cases {
+            let json = serde_json::to_string(k).unwrap();
+            let restored: RoutedMessageKind = serde_json::from_str(&json).unwrap();
+            assert_eq!(*k, restored);
+            let bytes = bincode::serialize(k).unwrap();
+            let restored_bin: RoutedMessageKind = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(*k, restored_bin);
+        }
+    }
+
+    // ---- RoutingProof: binding + round-trip ----
+
+    #[test]
+    fn routing_proof_binding_is_deterministic() {
+        let r1 = sample_routing_proof();
+        let r2 = sample_routing_proof();
+        assert_eq!(r1.routing_hash, r2.routing_hash);
+        assert_ne!(r1.routing_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn routing_proof_verify_binding_succeeds_for_fresh() {
+        let r = sample_routing_proof();
+        assert!(r.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_json_round_trip_preserves_hash() {
+        let r = sample_routing_proof();
+        let json = serde_json::to_string(&r).unwrap();
+        let restored: RoutingProof = serde_json::from_str(&json).unwrap();
+        assert_eq!(r, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_bincode_round_trip_preserves_hash() {
+        let r = sample_routing_proof();
+        let bytes = bincode::serialize(&r).unwrap();
+        let restored: RoutingProof = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(r, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_signature_starts_empty() {
+        let r = sample_routing_proof();
+        assert!(r.signature.as_bytes().is_empty());
+    }
+
+    #[test]
+    fn routing_proof_freshness_helper() {
+        let r = sample_routing_proof();
+        assert!(r.is_fresh(r.emitted_at));
+        assert!(r.is_fresh(r.freshness_valid_until));
+        assert!(!r.is_fresh(r.freshness_valid_until + 1));
+    }
+
+    // ---- RoutingProof: tamper detection ----
+
+    #[test]
+    fn routing_proof_message_hash_tamper_detected() {
+        let mut r = sample_routing_proof();
+        r.message_hash = [0xFF; 32];
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_message_kind_tamper_detected() {
+        let mut r = sample_routing_proof();
+        r.message_kind = RoutedMessageKind::GossipEvent;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_emitter_did_tamper_detected() {
+        let mut r = sample_routing_proof();
+        r.emitter_did = "did:icn:attacker".to_string();
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_acknowledging_peers_tamper_detected() {
+        let mut r = sample_routing_proof();
+        r.acknowledging_peers = PeerSet::from_dids(vec!["did:icn:other".to_string()]);
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_scope_tamper_detected() {
+        let mut r = sample_routing_proof();
+        r.scope = ProbeScope::Commons;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_emitted_at_tamper_detected() {
+        let mut r = sample_routing_proof();
+        r.emitted_at += 1;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_freshness_tamper_detected() {
+        let mut r = sample_routing_proof();
+        r.freshness_valid_until += 1;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_private_implication_tamper_detected() {
+        let mut r = sample_routing_proof();
+        r.private_content_implication = !r.private_content_implication;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_nonce_tamper_detected() {
+        let mut r = sample_routing_proof();
+        r.routing_nonce = [0xFF; 32];
+        assert!(!r.verify_binding());
+    }
+
+    // ---- RoutingProof: structural rules ----
+
+    #[test]
+    fn routing_proof_rejects_empty_acknowledging_peers() {
+        let err = RoutingProof::new(
+            [0x42; 32],
+            RoutedMessageKind::Receipt,
+            "did:icn:peer-a".to_string(),
+            PeerSet::from_dids(Vec::<Did>::new()),
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            1_715_000_000,
+            1_715_000_030,
+            false,
+            [0xB1; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(err, RoutingProofError::EmptyAcknowledgingPeers));
+    }
+
+    #[test]
+    fn routing_proof_rejects_self_ack() {
+        let err = RoutingProof::new(
+            [0x42; 32],
+            RoutedMessageKind::Receipt,
+            "did:icn:peer-a".to_string(),
+            PeerSet::from_dids(vec![
+                "did:icn:peer-a".to_string(),
+                "did:icn:peer-b".to_string(),
+            ]),
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            1_715_000_000,
+            1_715_000_030,
+            false,
+            [0xB1; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RoutingProofError::EmitterInAcknowledgingPeers { .. }
+        ));
+    }
+
+    #[test]
+    fn routing_proof_rejects_emitted_after_freshness() {
+        let err = RoutingProof::new(
+            [0x42; 32],
+            RoutedMessageKind::Receipt,
+            "did:icn:peer-a".to_string(),
+            sample_routing_acks(),
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            1_715_000_200,
+            1_715_000_030,
+            false,
+            [0xB1; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RoutingProofError::EmittedAfterFreshness { .. }
+        ));
+    }
+
+    // ---- RoutingProof: schema-version policing ----
+
+    #[derive(Serialize)]
+    struct RoutingProofWireShape<'a> {
+        schema_version: u32,
+        message_hash: Hash,
+        message_kind: RoutedMessageKind,
+        emitter_did: &'a Did,
+        acknowledging_peers: &'a PeerSet,
+        scope: &'a ProbeScope,
+        emitted_at: u64,
+        freshness_valid_until: u64,
+        private_content_implication: bool,
+        routing_nonce: [u8; 32],
+        routing_hash: Hash,
+        signature: Signature,
+    }
+
+    #[test]
+    fn routing_proof_rejects_future_schema_version_on_decode() {
+        let r = sample_routing_proof();
+        let bogus = ROUTING_PROOF_SCHEMA_VERSION + 1;
+        let recomputed = RoutingProof::compute_routing_hash(
+            bogus,
+            r.message_hash,
+            r.message_kind,
+            &r.emitter_did,
+            &r.acknowledging_peers,
+            &r.scope,
+            r.emitted_at,
+            r.freshness_valid_until,
+            r.private_content_implication,
+            &r.routing_nonce,
+        );
+        let wire = RoutingProofWireShape {
+            schema_version: bogus,
+            message_hash: r.message_hash,
+            message_kind: r.message_kind,
+            emitter_did: &r.emitter_did,
+            acknowledging_peers: &r.acknowledging_peers,
+            scope: &r.scope,
+            emitted_at: r.emitted_at,
+            freshness_valid_until: r.freshness_valid_until,
+            private_content_implication: r.private_content_implication,
+            routing_nonce: r.routing_nonce,
+            routing_hash: recomputed,
+            signature: r.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        assert!(serde_json::from_str::<RoutingProof>(&json).is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        assert!(bincode::deserialize::<RoutingProof>(&bytes).is_err());
+    }
+
+    #[test]
+    fn routing_proof_verify_binding_fails_closed_on_manual_bogus_version() {
+        let mut r = sample_routing_proof();
+        let bogus = ROUTING_PROOF_SCHEMA_VERSION + 5;
+        r.schema_version = bogus;
+        r.routing_hash = RoutingProof::compute_routing_hash(
+            bogus,
+            r.message_hash,
+            r.message_kind,
+            &r.emitter_did,
+            &r.acknowledging_peers,
+            &r.scope,
+            r.emitted_at,
+            r.freshness_valid_until,
+            r.private_content_implication,
+            &r.routing_nonce,
+        );
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn routing_proof_wire_rejects_self_ack() {
+        // Hash-consistent wire payload with self-ack must be refused
+        // before any value is constructed.
+        let bad_peers = PeerSet::from_dids(vec![
+            "did:icn:peer-a".to_string(),
+            "did:icn:peer-b".to_string(),
+        ]);
+        let recomputed = RoutingProof::compute_routing_hash(
+            ROUTING_PROOF_SCHEMA_VERSION,
+            [0x42; 32],
+            RoutedMessageKind::Receipt,
+            &"did:icn:peer-a".to_string(),
+            &bad_peers,
+            &ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            1_715_000_000,
+            1_715_000_030,
+            false,
+            &[0xB1; 32],
+        );
+        let scope = ProbeScope::LocalDomain {
+            domain_id: "fixture-domain-a".to_string(),
+        };
+        let emitter = "did:icn:peer-a".to_string();
+        let wire = RoutingProofWireShape {
+            schema_version: ROUTING_PROOF_SCHEMA_VERSION,
+            message_hash: [0x42; 32],
+            message_kind: RoutedMessageKind::Receipt,
+            emitter_did: &emitter,
+            acknowledging_peers: &bad_peers,
+            scope: &scope,
+            emitted_at: 1_715_000_000,
+            freshness_valid_until: 1_715_000_030,
+            private_content_implication: false,
+            routing_nonce: [0xB1; 32],
+            routing_hash: recomputed,
+            signature: Signature::new(Vec::new()),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        assert!(serde_json::from_str::<RoutingProof>(&json).is_err());
+    }
+
+    // ---- RoutingProof: privacy ----
+
+    #[test]
+    fn routing_proof_private_content_implication_round_trips() {
+        let r = RoutingProof::new(
+            [0xCD; 32],
+            RoutedMessageKind::Receipt,
+            "did:icn:scoped-vault-steward".to_string(),
+            sample_routing_acks(),
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-care-plan-vault".to_string(),
+            },
+            1_715_000_000,
+            1_715_000_030,
+            true,
+            [0x55; 32],
+        )
+        .expect("private-content routing proof is structurally consistent");
+        assert!(r.private_content_implication);
+        assert!(r.verify_binding());
+        let json = serde_json::to_string(&r).unwrap();
+        let restored: RoutingProof = serde_json::from_str(&json).unwrap();
+        assert!(restored.private_content_implication);
+        assert!(restored.verify_binding());
+    }
+
+    // =========================================================================
+    // RedundancyProof (issue #1862)
+    // =========================================================================
+
+    fn sample_redundancy_peers() -> PeerSet {
+        PeerSet::from_dids(vec![
+            "did:icn:replica-a".to_string(),
+            "did:icn:replica-b".to_string(),
+            "did:icn:replica-c".to_string(),
+        ])
+    }
+
+    fn sample_redundancy_proof() -> RedundancyProof {
+        RedundancyProof::new(
+            [0x33; 32],
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            RedundancyOutcome::TargetMet,
+            3,
+            3,
+            sample_redundancy_peers(),
+            "did:icn:replica-reporter".to_string(),
+            1_715_000_000,
+            1_715_000_120,
+            false,
+            [0xC1; 32],
+        )
+        .expect("sample redundancy proof is structurally consistent")
+    }
+
+    // ---- RedundancyOutcome round-trip ----
+
+    #[test]
+    fn redundancy_outcome_all_variants_round_trip() {
+        let cases = [RedundancyOutcome::TargetMet, RedundancyOutcome::BelowTarget];
+        assert_eq!(cases.len(), 2);
+        for o in &cases {
+            let json = serde_json::to_string(o).unwrap();
+            let restored: RedundancyOutcome = serde_json::from_str(&json).unwrap();
+            assert_eq!(*o, restored);
+            let bytes = bincode::serialize(o).unwrap();
+            let restored_bin: RedundancyOutcome = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(*o, restored_bin);
+        }
+    }
+
+    // ---- RedundancyProof: binding + round-trip ----
+
+    #[test]
+    fn redundancy_proof_binding_is_deterministic() {
+        let r1 = sample_redundancy_proof();
+        let r2 = sample_redundancy_proof();
+        assert_eq!(r1.proof_hash, r2.proof_hash);
+        assert_ne!(r1.proof_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn redundancy_proof_verify_binding_succeeds_for_fresh() {
+        let r = sample_redundancy_proof();
+        assert!(r.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_json_round_trip_preserves_hash() {
+        let r = sample_redundancy_proof();
+        let json = serde_json::to_string(&r).unwrap();
+        let restored: RedundancyProof = serde_json::from_str(&json).unwrap();
+        assert_eq!(r, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_bincode_round_trip_preserves_hash() {
+        let r = sample_redundancy_proof();
+        let bytes = bincode::serialize(&r).unwrap();
+        let restored: RedundancyProof = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(r, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_freshness_helper() {
+        let r = sample_redundancy_proof();
+        assert!(r.is_fresh(r.observed_at));
+        assert!(r.is_fresh(r.freshness_valid_until));
+        assert!(!r.is_fresh(r.freshness_valid_until + 1));
+    }
+
+    #[test]
+    fn redundancy_proof_below_target_round_trips() {
+        // 2 replicas observed, target = 3 → BelowTarget. Spec says
+        // failing proofs trigger DivergenceEvidence at the policy
+        // layer; the kernel records the observation faithfully.
+        let r = RedundancyProof::new(
+            [0x33; 32],
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            RedundancyOutcome::BelowTarget,
+            2,
+            3,
+            PeerSet::from_dids(vec![
+                "did:icn:replica-a".to_string(),
+                "did:icn:replica-b".to_string(),
+            ]),
+            "did:icn:replica-reporter".to_string(),
+            1_715_000_000,
+            1_715_000_120,
+            false,
+            [0xC2; 32],
+        )
+        .expect("below-target proof is structurally consistent");
+        assert_eq!(r.outcome, RedundancyOutcome::BelowTarget);
+        assert!(r.verify_binding());
+        let json = serde_json::to_string(&r).unwrap();
+        let restored: RedundancyProof = serde_json::from_str(&json).unwrap();
+        assert_eq!(r, restored);
+    }
+
+    // ---- RedundancyProof: tamper detection ----
+
+    #[test]
+    fn redundancy_proof_artifact_hash_tamper_detected() {
+        let mut r = sample_redundancy_proof();
+        r.artifact_hash = [0xFF; 32];
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_scope_tamper_detected() {
+        let mut r = sample_redundancy_proof();
+        r.scope = ProbeScope::Commons;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_outcome_tamper_detected() {
+        let mut r = sample_redundancy_proof();
+        r.outcome = RedundancyOutcome::BelowTarget;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_observed_replicas_tamper_detected() {
+        let mut r = sample_redundancy_proof();
+        r.observed_replicas += 1;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_target_replicas_tamper_detected() {
+        let mut r = sample_redundancy_proof();
+        r.target_replicas += 1;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_replica_peers_tamper_detected() {
+        let mut r = sample_redundancy_proof();
+        r.replica_peers = PeerSet::from_dids(vec!["did:icn:attacker".to_string()]);
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_reporter_did_tamper_detected() {
+        let mut r = sample_redundancy_proof();
+        r.reporter_did = "did:icn:attacker".to_string();
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_observed_at_tamper_detected() {
+        let mut r = sample_redundancy_proof();
+        r.observed_at += 1;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_freshness_tamper_detected() {
+        let mut r = sample_redundancy_proof();
+        r.freshness_valid_until += 1;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_private_implication_tamper_detected() {
+        let mut r = sample_redundancy_proof();
+        r.private_content_implication = !r.private_content_implication;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn redundancy_proof_nonce_tamper_detected() {
+        let mut r = sample_redundancy_proof();
+        r.proof_nonce = [0xFF; 32];
+        assert!(!r.verify_binding());
+    }
+
+    // ---- RedundancyProof: structural rules ----
+
+    #[test]
+    fn redundancy_proof_rejects_target_replicas_one_or_less() {
+        for target in [0u32, 1u32] {
+            let err = RedundancyProof::new(
+                [0x33; 32],
+                ProbeScope::LocalDomain {
+                    domain_id: "fixture-domain-a".to_string(),
+                },
+                RedundancyOutcome::TargetMet,
+                target,
+                target,
+                PeerSet::from_dids(Vec::<Did>::new()),
+                "did:icn:replica-reporter".to_string(),
+                1_715_000_000,
+                1_715_000_120,
+                false,
+                [0xC1; 32],
+            )
+            .unwrap_err();
+            assert!(matches!(
+                err,
+                RedundancyProofError::InvalidTargetReplicas { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn redundancy_proof_rejects_observed_peer_count_mismatch() {
+        let err = RedundancyProof::new(
+            [0x33; 32],
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            RedundancyOutcome::TargetMet,
+            2,
+            2,
+            sample_redundancy_peers(), // 3 peers
+            "did:icn:replica-reporter".to_string(),
+            1_715_000_000,
+            1_715_000_120,
+            false,
+            [0xC1; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RedundancyProofError::ObservedReplicasPeerCountMismatch {
+                observed_replicas: 2,
+                peers_len: 3,
+            }
+        ));
+    }
+
+    #[test]
+    fn redundancy_proof_rejects_outcome_inconsistent_with_counts() {
+        // observed=2, target=3 → must be BelowTarget; record TargetMet.
+        let err = RedundancyProof::new(
+            [0x33; 32],
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            RedundancyOutcome::TargetMet,
+            2,
+            3,
+            PeerSet::from_dids(vec![
+                "did:icn:replica-a".to_string(),
+                "did:icn:replica-b".to_string(),
+            ]),
+            "did:icn:replica-reporter".to_string(),
+            1_715_000_000,
+            1_715_000_120,
+            false,
+            [0xC1; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RedundancyProofError::OutcomeInconsistent { .. }
+        ));
+        // And inverted: observed=3, target=2 → must be TargetMet; record BelowTarget.
+        let err2 = RedundancyProof::new(
+            [0x33; 32],
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            RedundancyOutcome::BelowTarget,
+            3,
+            2,
+            sample_redundancy_peers(),
+            "did:icn:replica-reporter".to_string(),
+            1_715_000_000,
+            1_715_000_120,
+            false,
+            [0xC1; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err2,
+            RedundancyProofError::OutcomeInconsistent { .. }
+        ));
+    }
+
+    #[test]
+    fn redundancy_proof_rejects_observed_after_freshness() {
+        let err = RedundancyProof::new(
+            [0x33; 32],
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            RedundancyOutcome::TargetMet,
+            3,
+            3,
+            sample_redundancy_peers(),
+            "did:icn:replica-reporter".to_string(),
+            1_715_000_200,
+            1_715_000_120,
+            false,
+            [0xC1; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RedundancyProofError::ObservedAfterFreshness { .. }
+        ));
+    }
+
+    // ---- RedundancyProof: schema-version policing ----
+
+    #[derive(Serialize)]
+    struct RedundancyProofWireShape<'a> {
+        schema_version: u32,
+        artifact_hash: Hash,
+        scope: &'a ProbeScope,
+        outcome: RedundancyOutcome,
+        observed_replicas: u32,
+        target_replicas: u32,
+        replica_peers: &'a PeerSet,
+        reporter_did: &'a Did,
+        observed_at: u64,
+        freshness_valid_until: u64,
+        private_content_implication: bool,
+        proof_nonce: [u8; 32],
+        proof_hash: Hash,
+        signature: Signature,
+    }
+
+    #[test]
+    fn redundancy_proof_rejects_future_schema_version_on_decode() {
+        let r = sample_redundancy_proof();
+        let bogus = REDUNDANCY_PROOF_SCHEMA_VERSION + 1;
+        let recomputed = RedundancyProof::compute_proof_hash(
+            bogus,
+            r.artifact_hash,
+            &r.scope,
+            r.outcome,
+            r.observed_replicas,
+            r.target_replicas,
+            &r.replica_peers,
+            &r.reporter_did,
+            r.observed_at,
+            r.freshness_valid_until,
+            r.private_content_implication,
+            &r.proof_nonce,
+        );
+        let wire = RedundancyProofWireShape {
+            schema_version: bogus,
+            artifact_hash: r.artifact_hash,
+            scope: &r.scope,
+            outcome: r.outcome,
+            observed_replicas: r.observed_replicas,
+            target_replicas: r.target_replicas,
+            replica_peers: &r.replica_peers,
+            reporter_did: &r.reporter_did,
+            observed_at: r.observed_at,
+            freshness_valid_until: r.freshness_valid_until,
+            private_content_implication: r.private_content_implication,
+            proof_nonce: r.proof_nonce,
+            proof_hash: recomputed,
+            signature: r.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        assert!(serde_json::from_str::<RedundancyProof>(&json).is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        assert!(bincode::deserialize::<RedundancyProof>(&bytes).is_err());
+    }
+
+    #[test]
+    fn redundancy_proof_verify_binding_fails_closed_on_manual_bogus_version() {
+        let mut r = sample_redundancy_proof();
+        let bogus = REDUNDANCY_PROOF_SCHEMA_VERSION + 9;
+        r.schema_version = bogus;
+        r.proof_hash = RedundancyProof::compute_proof_hash(
+            bogus,
+            r.artifact_hash,
+            &r.scope,
+            r.outcome,
+            r.observed_replicas,
+            r.target_replicas,
+            &r.replica_peers,
+            &r.reporter_did,
+            r.observed_at,
+            r.freshness_valid_until,
+            r.private_content_implication,
+            &r.proof_nonce,
+        );
+        assert!(!r.verify_binding());
+    }
+
+    // ---- RedundancyProof: privacy ----
+
+    #[test]
+    fn redundancy_proof_private_content_implication_round_trips() {
+        let r = RedundancyProof::new(
+            [0x33; 32],
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-care-plan-vault".to_string(),
+            },
+            RedundancyOutcome::TargetMet,
+            3,
+            3,
+            sample_redundancy_peers(),
+            "did:icn:scoped-vault-steward".to_string(),
+            1_715_000_000,
+            1_715_000_120,
+            true,
+            [0x55; 32],
+        )
+        .expect("private-content redundancy proof is structurally consistent");
+        assert!(r.private_content_implication);
+        assert!(r.verify_binding());
+        let json = serde_json::to_string(&r).unwrap();
+        let restored: RedundancyProof = serde_json::from_str(&json).unwrap();
+        assert!(restored.private_content_implication);
+        assert!(restored.verify_binding());
+    }
+
+    // ---- Domain-tag separation ----
+
+    #[test]
+    fn routing_redundancy_proofs_domain_tags_distinct() {
+        assert_ne!(RoutingProof::DOMAIN_TAG, RedundancyProof::DOMAIN_TAG);
+        for other in [
+            AntiEntropyProbe::DOMAIN_TAG,
+            PeerSyncReport::DOMAIN_TAG,
+            DivergenceEvidence::DOMAIN_TAG,
+            RepairPlan::DOMAIN_TAG,
+            RepairReceipt::DOMAIN_TAG,
+            SyncDegradedStatus::DOMAIN_TAG,
+            QuorumSyncCheck::DOMAIN_TAG,
+            FederationSyncWindow::DOMAIN_TAG,
+            ArtifactReceipt::DOMAIN_TAG,
+        ] {
+            assert_ne!(RoutingProof::DOMAIN_TAG, other);
+            assert_ne!(RedundancyProof::DOMAIN_TAG, other);
+        }
     }
 }
 
