@@ -44,9 +44,10 @@
 //! * Not a member shell implementation (`#1839`). The fixture attaches
 //!   the member-impact summary string verbatim from the spec's mapping
 //!   but does not render the member-shell surface itself.
-//! * Not a public `PeerSyncReport` schema. That identifier remains
-//!   design-level; the fixture compares peer indexes directly rather
-//!   than constructing a wire-stable `PeerSyncReport`.
+//! * Not a runtime emission of `PeerSyncReport` or
+//!   `SyncDegradedStatus`. Both records (#1853, #1856) are
+//!   constructed in-process from the same in-memory peer indexes the
+//!   fixture builds; no live network comparison happens.
 //! * Not a production-readiness claim, live-federation claim, or NYCN
 //!   pilot claim. The repair did not run against a live network; the
 //!   `RepairReceipt` records what a fixture peer would have produced
@@ -57,10 +58,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use icn_gossip::{to_bloom_projection, BloomFilter};
 use icn_kernel_api::{
-    AntiEntropyProbe, AuthorityBasis, BoundaryRuleRef, BoundaryRuleSet, Did, DigestMismatch,
-    DivergenceClass, DivergenceEvidence, EffectOutcome, ExpectedRepairReceiptClass, Hash, PeerSet,
-    PolicyClauseRef, ProbeScope, RepairAction, RepairPlan, RepairReceipt, RepairReceiptClass,
-    RequestedResponseClass, StateClass, StateDigest, TriggerSource,
+    AntiEntropyProbe, AuthorityBasis, BoundaryRuleRef, BoundaryRuleSet, DegradationLevel, Did,
+    DigestMismatch, DivergenceClass, DivergenceEvidence, EffectOutcome, ExpectedRepairReceiptClass,
+    Hash, PeerSet, PeerSyncOutcome, PeerSyncReport, PolicyClauseRef, ProbeScope, RepairAction,
+    RepairPlan, RepairReceipt, RepairReceiptClass, RequestedResponseClass, StateClass, StateDigest,
+    SyncDegradedStatus, TriggerSource,
 };
 
 // ===========================================================================
@@ -355,6 +357,15 @@ struct FixtureEvidenceLinks {
     evidence_hash: Hash,
     /// `RepairPlan::plan_hash`.
     plan_hash: Hash,
+    /// `PeerSyncReport::report_hash` (#1853). Present whenever the
+    /// cockpit row represents a compare-phase outcome — both the open
+    /// (degraded) view and the resolved view carry it so the audit
+    /// chain is complete.
+    peer_sync_report_hash: Hash,
+    /// `SyncDegradedStatus::status_hash` (#1856). Present on the open
+    /// (degraded) view per spec boundary rule 5; `None` on the
+    /// resolved view (degradation has cleared once repair lands).
+    sync_degraded_status_hash: Option<Hash>,
     /// Cross-link to the public `RepairReceipt` (#1849), present only
     /// on the resolved view. Records the receipt's binding hash and
     /// actor DID so the cockpit row can chase the chain back to the
@@ -710,9 +721,78 @@ fn build_repair_plan(evidence: &DivergenceEvidence) -> RepairPlan {
     )
 }
 
+/// Build a Slice A probe with deterministic fixture inputs. Helper
+/// for fixture tests that need a probe for compare-phase report
+/// construction.
+fn build_probe(peer_a: &FixturePeer) -> AntiEntropyProbe {
+    AntiEntropyProbe::new(
+        StateClass::ReceiptIndex,
+        fixture_scope(),
+        peer_a.state_digest(),
+        peer_a.did.clone(),
+        TriggerSource::Periodic,
+        1_715_000_000,
+        1_715_000_030,
+        RequestedResponseClass::DigestExchange,
+        [0xAA; 32],
+    )
+}
+
+/// Build the public `PeerSyncReport` (#1853) the cockpit row is
+/// derived from. The cockpit fixture treats peer_b as the responder
+/// (the peer answering peer_a's probe); peer_b's local index is
+/// missing r3 that peer_a has, so the public outcome is
+/// `MissingOnLocal` per spec §"Compare":
+///   "missing on local — peer has entries the responder does not."
+fn build_peer_sync_report(probe: &AntiEntropyProbe, peer_b: &FixturePeer) -> PeerSyncReport {
+    PeerSyncReport::new(
+        probe.probe_hash,
+        PeerSyncOutcome::MissingOnLocal,
+        probe.state_class,
+        probe.target_scope.clone(),
+        peer_b.did.clone(),
+        probe.prober_did.clone(),
+        peer_b.state_digest(),
+        1_715_000_001,
+        1_715_000_031,
+        None,
+        false,
+        [0xDE; 32],
+    )
+    .expect("Slice A cockpit PeerSyncReport is structurally consistent")
+}
+
+/// Build the public `SyncDegradedStatus` (#1856) the cockpit's open
+/// view renders against. Slice A is within the policy's grace window:
+/// the spec's member-impact mapping for `RepairPlanned` is
+/// "Action paused until records sync", which aligns to
+/// `DegradationLevel::WithinGraceWindow` per spec §"Member shell
+/// surface".
+fn build_sync_degraded_status(
+    report: &PeerSyncReport,
+    evidence: &DivergenceEvidence,
+) -> SyncDegradedStatus {
+    SyncDegradedStatus::new(
+        report.report_hash,
+        report.sync_outcome,
+        report.state_class,
+        report.scope.clone(),
+        "did:icn:policy-oracle".to_string(),
+        DegradationLevel::WithinGraceWindow,
+        report.observed_at,
+        report.freshness_valid_until,
+        Some(evidence.evidence_hash),
+        false,
+        [0xEF; 32],
+    )
+    .expect("Slice A cockpit SyncDegradedStatus is structurally consistent")
+}
+
 fn render_cockpit_open(
     evidence: &DivergenceEvidence,
     plan: &RepairPlan,
+    report: &PeerSyncReport,
+    degraded: &SyncDegradedStatus,
     affected_hashes: &[Hash],
     last_successful_proof_at: Option<u64>,
 ) -> FixtureStewardCockpitView {
@@ -738,6 +818,8 @@ fn render_cockpit_open(
         receipts_and_evidence: FixtureEvidenceLinks {
             evidence_hash: evidence.evidence_hash,
             plan_hash: plan.plan_hash,
+            peer_sync_report_hash: report.report_hash,
+            sync_degraded_status_hash: Some(degraded.status_hash),
             repair_receipt_hash: None,
             repair_outcome_actor: None,
         },
@@ -760,6 +842,11 @@ fn render_cockpit_resolved(
         receipts_and_evidence: FixtureEvidenceLinks {
             evidence_hash: open_view.receipts_and_evidence.evidence_hash,
             plan_hash: open_view.receipts_and_evidence.plan_hash,
+            peer_sync_report_hash: open_view.receipts_and_evidence.peer_sync_report_hash,
+            // Degradation has cleared once the repair lands — spec
+            // §"Operator states" RepairApplied is no longer a
+            // degraded state, so the link drops.
+            sync_degraded_status_hash: None,
             repair_receipt_hash: Some(receipt.receipt_hash),
             repair_outcome_actor: Some(receipt.actor_did.clone()),
         },
@@ -812,9 +899,59 @@ fn cockpit_slice_a_renders_all_nine_fields_and_passes_accessibility_gate() {
     assert!(plan.verify_binding());
     assert_eq!(plan.divergence_evidence_hash, evidence.evidence_hash);
 
+    // ---- PeerSyncReport + SyncDegradedStatus (public evidence) ----
+    //
+    // The cockpit row is derived from a compare-phase report. Boundary
+    // rule 5 says: "If a `PeerSyncReport` is 'divergent' or 'missing
+    // on local' and the divergence is not yet repaired within the
+    // freshness window, the surface MUST render `SyncDegradedStatus`."
+    // The open cockpit view renders `RepairPlanned` (member-impact:
+    // "Action paused until records sync"), so a degraded status MUST
+    // back it. The retrofit anchors both audit hashes on the view.
+    let peer_sync_report = build_peer_sync_report(&probe, &peer_b);
+    assert!(peer_sync_report.verify_binding());
+    assert_eq!(peer_sync_report.probe_hash, probe.probe_hash);
+    assert_eq!(
+        peer_sync_report.sync_outcome,
+        PeerSyncOutcome::MissingOnLocal
+    );
+    let sync_degraded = build_sync_degraded_status(&peer_sync_report, &evidence);
+    assert!(sync_degraded.verify_binding());
+    assert_eq!(
+        sync_degraded.peer_sync_report_hash,
+        peer_sync_report.report_hash
+    );
+    assert_eq!(
+        sync_degraded.triggered_by_outcome,
+        PeerSyncOutcome::MissingOnLocal
+    );
+    assert_eq!(
+        sync_degraded.degradation_level,
+        DegradationLevel::WithinGraceWindow
+    );
+    assert_eq!(
+        sync_degraded.divergence_evidence_hash,
+        Some(evidence.evidence_hash)
+    );
+
     // ---- Render open cockpit view ----
     let last_successful = Some(1_714_999_900u64);
-    let open_view = render_cockpit_open(&evidence, &plan, &missing, last_successful);
+    let open_view = render_cockpit_open(
+        &evidence,
+        &plan,
+        &peer_sync_report,
+        &sync_degraded,
+        &missing,
+        last_successful,
+    );
+    assert_eq!(
+        open_view.receipts_and_evidence.peer_sync_report_hash,
+        peer_sync_report.report_hash
+    );
+    assert_eq!(
+        open_view.receipts_and_evidence.sync_degraded_status_hash,
+        Some(sync_degraded.status_hash)
+    );
 
     // Spec §"Network / Federation surface" — every one of the nine
     // required fields is populated.
@@ -956,7 +1093,17 @@ fn cockpit_view_has_exactly_the_nine_required_fields() {
     let (peer_a, peer_b, peer_c) = build_three_peer_slice_a();
     let evidence = build_divergence_evidence(&peer_a, &peer_b, &peer_c);
     let plan = build_repair_plan(&evidence);
-    let view = render_cockpit_open(&evidence, &plan, &[[0x03; 32]], Some(1_714_999_900));
+    let probe = build_probe(&peer_a);
+    let report = build_peer_sync_report(&probe, &peer_b);
+    let degraded = build_sync_degraded_status(&report, &evidence);
+    let view = render_cockpit_open(
+        &evidence,
+        &plan,
+        &report,
+        &degraded,
+        &[[0x03; 32]],
+        Some(1_714_999_900),
+    );
 
     // Touch each of the nine required fields and the two derived ones.
     let _f1 = &view.affected_scope;
@@ -981,7 +1128,17 @@ fn accessibility_gate_marks_blocked_when_cockpit_view_omits_evidence_link() {
     let (peer_a, peer_b, peer_c) = build_three_peer_slice_a();
     let evidence = build_divergence_evidence(&peer_a, &peer_b, &peer_c);
     let plan = build_repair_plan(&evidence);
-    let mut bad_view = render_cockpit_open(&evidence, &plan, &[[0x03; 32]], Some(1_714_999_900));
+    let probe = build_probe(&peer_a);
+    let report = build_peer_sync_report(&probe, &peer_b);
+    let degraded = build_sync_degraded_status(&report, &evidence);
+    let mut bad_view = render_cockpit_open(
+        &evidence,
+        &plan,
+        &report,
+        &degraded,
+        &[[0x03; 32]],
+        Some(1_714_999_900),
+    );
     bad_view.receipts_and_evidence.evidence_hash = [0u8; 32]; // simulate a broken link
 
     let checklist = FixtureAccessibilityChecklist::evaluate(&bad_view);
@@ -1009,7 +1166,17 @@ fn accessibility_gate_marks_blocked_when_authority_label_is_missing() {
     let (peer_a, peer_b, peer_c) = build_three_peer_slice_a();
     let evidence = build_divergence_evidence(&peer_a, &peer_b, &peer_c);
     let plan = build_repair_plan(&evidence);
-    let mut bad_view = render_cockpit_open(&evidence, &plan, &[[0x03; 32]], Some(1_714_999_900));
+    let probe = build_probe(&peer_a);
+    let report = build_peer_sync_report(&probe, &peer_b);
+    let degraded = build_sync_degraded_status(&report, &evidence);
+    let mut bad_view = render_cockpit_open(
+        &evidence,
+        &plan,
+        &report,
+        &degraded,
+        &[[0x03; 32]],
+        Some(1_714_999_900),
+    );
     bad_view.authority_required.clause_id = String::new();
 
     let checklist = FixtureAccessibilityChecklist::evaluate(&bad_view);
@@ -1083,7 +1250,17 @@ fn missing_receipt_with_named_authority_does_not_escalate() {
     let (peer_a, peer_b, peer_c) = build_three_peer_slice_a();
     let evidence = build_divergence_evidence(&peer_a, &peer_b, &peer_c);
     let plan = build_repair_plan(&evidence);
-    let view = render_cockpit_open(&evidence, &plan, &[[0x03; 32]], Some(1_714_999_900));
+    let probe = build_probe(&peer_a);
+    let report = build_peer_sync_report(&probe, &peer_b);
+    let degraded = build_sync_degraded_status(&report, &evidence);
+    let view = render_cockpit_open(
+        &evidence,
+        &plan,
+        &report,
+        &degraded,
+        &[[0x03; 32]],
+        Some(1_714_999_900),
+    );
     assert_eq!(
         view.escalation_status,
         FixtureEscalationStatus::NotEscalated
@@ -1171,7 +1348,17 @@ fn accessibility_pass_and_not_applicable_counts_are_consistent() {
     let (peer_a, peer_b, peer_c) = build_three_peer_slice_a();
     let evidence = build_divergence_evidence(&peer_a, &peer_b, &peer_c);
     let plan = build_repair_plan(&evidence);
-    let view = render_cockpit_open(&evidence, &plan, &[[0x03; 32]], Some(1_714_999_900));
+    let probe = build_probe(&peer_a);
+    let report = build_peer_sync_report(&probe, &peer_b);
+    let degraded = build_sync_degraded_status(&report, &evidence);
+    let view = render_cockpit_open(
+        &evidence,
+        &plan,
+        &report,
+        &degraded,
+        &[[0x03; 32]],
+        Some(1_714_999_900),
+    );
     let checklist = FixtureAccessibilityChecklist::evaluate(&view);
     assert_eq!(
         checklist.pass_count() + checklist.not_applicable_count(),

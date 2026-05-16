@@ -57,7 +57,13 @@
 //!   to the resolved repair evidence. No member-facing string surfaces
 //!   the receipt's internal field set; the closed plain-language
 //!   vocabulary stays intact.
-//! * Not a public `PeerSyncReport` schema. Still design-level.
+//! * Not a runtime emission of `PeerSyncReport` (#1853) or
+//!   `SyncDegradedStatus` (#1856). Both records are constructed
+//!   in-process from the same in-memory peer indexes the fixture
+//!   builds; the resolved card's opaque cross-link hashes anchor on
+//!   them, but no member-facing string surfaces either record's
+//!   internal field set. The closed plain-language vocabulary stays
+//!   intact.
 //! * Not a steward cockpit surface. That fixture (#1840 / PR #1846)
 //!   renders the operator-facing technical detail; this fixture renders
 //!   the member-facing plain-language projection of the same proof rail.
@@ -68,10 +74,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use icn_gossip::{to_bloom_projection, BloomFilter};
 use icn_kernel_api::{
-    AuthorityBasis, BoundaryRuleRef, BoundaryRuleSet, Did, DigestMismatch, DivergenceClass,
-    DivergenceEvidence, EffectOutcome, ExpectedRepairReceiptClass, Hash, PeerSet, PolicyClauseRef,
-    ProbeScope, RepairAction, RepairPlan, RepairReceipt, RepairReceiptClass, StateClass,
-    StateDigest,
+    AntiEntropyProbe, AuthorityBasis, BoundaryRuleRef, BoundaryRuleSet, DegradationLevel, Did,
+    DigestMismatch, DivergenceClass, DivergenceEvidence, EffectOutcome, ExpectedRepairReceiptClass,
+    Hash, PeerSet, PeerSyncOutcome, PeerSyncReport, PolicyClauseRef, ProbeScope, RepairAction,
+    RepairPlan, RepairReceipt, RepairReceiptClass, RequestedResponseClass, StateClass, StateDigest,
+    SyncDegradedStatus, TriggerSource,
 };
 
 // ===========================================================================
@@ -206,6 +213,78 @@ fn build_slice_a_repair_receipt(evidence: &DivergenceEvidence, plan: &RepairPlan
         [0xDD; 32],
     )
     .expect("Slice A member-shell receipt is structurally consistent")
+}
+
+/// Build a Slice A `AntiEntropyProbe` over peer_a's three-receipt
+/// index. Helper for compare-phase report construction.
+fn build_slice_a_probe() -> AntiEntropyProbe {
+    let r1 = fixture_receipt_hash("r1", 0x01);
+    let r2 = fixture_receipt_hash("r2", 0x02);
+    let r3 = fixture_receipt_hash("r3", 0x03);
+    let digest = fixture_bloom_digest(&[r1.receipt_hash, r2.receipt_hash, r3.receipt_hash]);
+    AntiEntropyProbe::new(
+        StateClass::ReceiptIndex,
+        fixture_scope(),
+        digest,
+        "did:icn:fixture:a".to_string(),
+        TriggerSource::Periodic,
+        1_715_000_000,
+        1_715_000_030,
+        RequestedResponseClass::DigestExchange,
+        [0xAA; 32],
+    )
+}
+
+/// Build the public `PeerSyncReport` (#1853) the member-shell view's
+/// degraded state is derived from. peer_b (the responder) is missing
+/// r3 that peer_a (the prober) has, so the spec-aligned outcome is
+/// `PeerSyncOutcome::MissingOnLocal`.
+fn build_slice_a_peer_sync_report(probe: &AntiEntropyProbe) -> PeerSyncReport {
+    let r1 = fixture_receipt_hash("r1", 0x01);
+    let r2 = fixture_receipt_hash("r2", 0x02);
+    let local_digest = fixture_bloom_digest(&[r1.receipt_hash, r2.receipt_hash]);
+    PeerSyncReport::new(
+        probe.probe_hash,
+        PeerSyncOutcome::MissingOnLocal,
+        probe.state_class,
+        probe.target_scope.clone(),
+        "did:icn:fixture:b".to_string(),
+        probe.prober_did.clone(),
+        local_digest,
+        1_715_000_001,
+        1_715_000_031,
+        None,
+        false,
+        [0xCC; 32],
+    )
+    .expect("Slice A member-shell PeerSyncReport is structurally consistent")
+}
+
+/// Build the public `SyncDegradedStatus` (#1856) the member-shell
+/// view's open state renders against per spec boundary rule 5.
+/// Slice A is within the policy grace window — the member-shell
+/// labels are "Sync delayed" (surface) and "Action paused until
+/// records sync" (paused card), both mapped to
+/// `DegradationLevel::WithinGraceWindow` per spec §"Member shell
+/// surface".
+fn build_slice_a_sync_degraded_status(
+    report: &PeerSyncReport,
+    evidence: &DivergenceEvidence,
+) -> SyncDegradedStatus {
+    SyncDegradedStatus::new(
+        report.report_hash,
+        report.sync_outcome,
+        report.state_class,
+        report.scope.clone(),
+        "did:icn:fixture:policy-oracle".to_string(),
+        DegradationLevel::WithinGraceWindow,
+        report.observed_at,
+        report.freshness_valid_until,
+        Some(evidence.evidence_hash),
+        false,
+        [0xDD; 32],
+    )
+    .expect("Slice A member-shell SyncDegradedStatus is structurally consistent")
 }
 
 // ===========================================================================
@@ -1304,6 +1383,55 @@ fn member_shell_slice_a_renders_read_only_surface_and_action_cards() {
     // ---- Open state surface rollup ----
     assert_eq!(open_view.surface_sync_status.label(), "Sync delayed");
 
+    // ---- Public SyncDegradedStatus (#1856) backs the degraded surface ----
+    //
+    // Spec boundary rule 5: when a PeerSyncReport is "missing on local"
+    // and not yet repaired within the freshness window, the surface
+    // MUST render SyncDegradedStatus. The fixture constructs the
+    // wire-stable status that backs the "Sync delayed" surface label
+    // and the paused card's "Action paused until records sync" — both
+    // mapped to DegradationLevel::WithinGraceWindow per spec §"Member
+    // shell surface". The status's binding hash is the auditor-facing
+    // anchor; member-facing strings stay in the closed plain-language
+    // vocabulary.
+    let slice_a_evidence = build_slice_a_divergence();
+    let slice_a_probe = build_slice_a_probe();
+    let peer_sync_report = build_slice_a_peer_sync_report(&slice_a_probe);
+    assert!(peer_sync_report.verify_binding());
+    assert_eq!(peer_sync_report.probe_hash, slice_a_probe.probe_hash);
+    assert_eq!(peer_sync_report.state_class, slice_a_probe.state_class);
+    assert_eq!(peer_sync_report.scope, slice_a_probe.target_scope);
+    assert_eq!(
+        peer_sync_report.sync_outcome,
+        PeerSyncOutcome::MissingOnLocal
+    );
+    let sync_degraded = build_slice_a_sync_degraded_status(&peer_sync_report, &slice_a_evidence);
+    assert!(sync_degraded.verify_binding());
+    assert_eq!(
+        sync_degraded.peer_sync_report_hash,
+        peer_sync_report.report_hash
+    );
+    assert_eq!(
+        sync_degraded.triggered_by_outcome,
+        PeerSyncOutcome::MissingOnLocal
+    );
+    assert_eq!(
+        sync_degraded.degradation_level,
+        DegradationLevel::WithinGraceWindow
+    );
+    assert_eq!(
+        sync_degraded.divergence_evidence_hash,
+        Some(slice_a_evidence.evidence_hash)
+    );
+    // Structural mapping: WithinGraceWindow status backs the surface's
+    // "Sync delayed" label and the paused card's "Action paused until
+    // records sync" — both within-grace member-shell labels.
+    assert!(
+        open_view.surface_sync_status == FixtureSyncStatus::SyncDelayed
+            && sync_degraded.degradation_level == DegradationLevel::WithinGraceWindow,
+        "surface 'Sync delayed' must be backed by a WithinGraceWindow SyncDegradedStatus"
+    );
+
     // ---- Accessibility gate ----
     let checklist_open = FixtureAccessibilityChecklist::evaluate(&open_view);
     assert_eq!(checklist_open.items.len(), 12, "exactly 12 categories");
@@ -1858,9 +1986,15 @@ fn proof_rail_records_stay_off_member_facing_strings() {
     let divergence = build_slice_a_divergence();
     let plan = build_slice_a_repair_plan(&divergence);
     let receipt = build_slice_a_repair_receipt(&divergence, &plan);
+    let probe = build_slice_a_probe();
+    let peer_sync_report = build_slice_a_peer_sync_report(&probe);
+    let sync_degraded = build_slice_a_sync_degraded_status(&peer_sync_report, &divergence);
     let evidence_hex = hex::encode(divergence.evidence_hash);
     let plan_hex = hex::encode(plan.plan_hash);
     let receipt_hex = hex::encode(receipt.receipt_hash);
+    let probe_hex = hex::encode(probe.probe_hash);
+    let report_hex = hex::encode(peer_sync_report.report_hash);
+    let status_hex = hex::encode(sync_degraded.status_hash);
     let open_view = render_open_view();
     let resolved_view = render_resolved_view(&open_view, &receipt);
     for (label, view) in [("open", &open_view), ("resolved", &resolved_view)] {
@@ -1876,6 +2010,18 @@ fn proof_rail_records_stay_off_member_facing_strings() {
             assert!(
                 !s.contains(&receipt_hex),
                 "{label} member-facing string leaks receipt_hash: `{s}`"
+            );
+            assert!(
+                !s.contains(&probe_hex),
+                "{label} member-facing string leaks probe_hash: `{s}`"
+            );
+            assert!(
+                !s.contains(&report_hex),
+                "{label} member-facing string leaks report_hash: `{s}`"
+            );
+            assert!(
+                !s.contains(&status_hex),
+                "{label} member-facing string leaks status_hash: `{s}`"
             );
         }
     }
