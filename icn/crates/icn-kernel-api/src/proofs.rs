@@ -40,6 +40,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::effects::EffectOutcome;
 use crate::types::{Did, Hash, Signature};
 
 /// Proof that a blob transfer completed and the content was verified.
@@ -1855,6 +1856,683 @@ impl RepairPlan {
     }
 }
 
+// ============================================================================
+// RepairReceipt and supporting taxonomies (issue #1849)
+//
+// Wire-stable record shape for the resolved repair artifact named in
+// `docs/spec/network-anti-entropy-proof-loops.md` §"Evidence" (phase 7) and
+// §"Proof artifacts (forward-direction names)". Completes the
+// `AntiEntropyProbe` → `DivergenceEvidence` → `RepairPlan` → `RepairReceipt`
+// proof rail at schema level.
+//
+// Per spec line 186: "No new top-level receipt class is added. `RepairReceipt`
+// is an evidence-artifact identifier traveling inside an existing envelope"
+// (Stage 5 `EffectDispatchEvidence` per `docs/spec/effect-dispatch-contract.md`
+// or Layer 2 `ArtifactReceipt` per ADR-0026 where the repair was a blob
+// transfer). `EffectOutcome` is reused from `crate::effects` per spec line
+// 181 — the kernel does not redefine the outcome vocabulary.
+//
+// Like the prior records in this module, `RepairReceipt` is
+// self-authenticating: a domain-tagged blake3 binding hash is computed at
+// construction over a canonical bincode encoding of the bound fields, and
+// `verify_binding()` recomputes and fails closed on unsupported schema
+// versions even when the stored hash matches a recomputation under the bogus
+// version.
+// ============================================================================
+
+/// Schema version for `RepairReceipt`. Increment on any wire-affecting
+/// change to the binding (field set, order, encoding).
+pub const REPAIR_RECEIPT_SCHEMA_VERSION: u32 = 1;
+
+// ----------------------------------------------------------------------------
+// RepairReceiptClass — closed taxonomy mirroring ExpectedRepairReceiptClass
+// ----------------------------------------------------------------------------
+
+/// Closed taxonomy of repair-receipt classes.
+///
+/// Each variant maps 1:1 to a variant of [`ExpectedRepairReceiptClass`] — a
+/// `RepairPlan` declares the expected class via that enum, and the
+/// completed `RepairReceipt` records the same class via this one. Keeping
+/// the two enums distinct lets the receipt's wire shape evolve without
+/// dragging the plan's wire shape with it.
+///
+/// The kernel does not interpret what each class *means* — classification
+/// is the policy oracle's concern (see
+/// `docs/architecture/KERNEL_APP_SEPARATION.md`). The kernel only ensures
+/// the recorded class round-trips deterministically and that no class
+/// outside this closed set can be expressed on the wire.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum RepairReceiptClass {
+    /// Receipt for a `FetchMissing` action.
+    FetchMissingReceipt,
+    /// Receipt for a `ReReplicate` action.
+    ReReplicationReceipt,
+    /// Receipt for a `RetryBackup` action.
+    BackupRetryReceipt,
+    /// Receipt for a `RunRestoreDrill` action.
+    RestoreDrillReceipt,
+    /// Receipt for a `RetryIntegrityVerification` action.
+    IntegrityVerificationReceipt,
+    /// Receipt for a `QuarantinePeerPendingReview` action.
+    QuarantineReceipt,
+    /// Receipt for an `EscalateToFederationClearing` action.
+    FederationClearingEscalationReceipt,
+    /// Receipt for a `RequestGovernanceReview` action.
+    GovernanceReviewReceipt,
+    /// Receipt for a `RestartDisputeWindow` action.
+    DisputeWindowRestartReceipt,
+    /// Sentinel for `NoAutomaticRepair` — no repair was attempted; the
+    /// divergence evidence is the only artifact the loop produced. This
+    /// class is structurally required to carry [`EffectOutcome::NoOp`];
+    /// `Applied` / `Partial` / `Failed` are rejected at construction and
+    /// on deserialize. Downstream anti-entropy surfaces rely on the
+    /// sentinel to mean exactly "no repair happened."
+    NoAutomaticRepairReceipt,
+}
+
+impl From<ExpectedRepairReceiptClass> for RepairReceiptClass {
+    fn from(expected: ExpectedRepairReceiptClass) -> Self {
+        match expected {
+            ExpectedRepairReceiptClass::FetchMissingReceipt => Self::FetchMissingReceipt,
+            ExpectedRepairReceiptClass::ReReplicationReceipt => Self::ReReplicationReceipt,
+            ExpectedRepairReceiptClass::BackupRetryReceipt => Self::BackupRetryReceipt,
+            ExpectedRepairReceiptClass::RestoreDrillReceipt => Self::RestoreDrillReceipt,
+            ExpectedRepairReceiptClass::IntegrityVerificationReceipt => {
+                Self::IntegrityVerificationReceipt
+            }
+            ExpectedRepairReceiptClass::QuarantineReceipt => Self::QuarantineReceipt,
+            ExpectedRepairReceiptClass::FederationClearingEscalationReceipt => {
+                Self::FederationClearingEscalationReceipt
+            }
+            ExpectedRepairReceiptClass::GovernanceReviewReceipt => Self::GovernanceReviewReceipt,
+            ExpectedRepairReceiptClass::DisputeWindowRestartReceipt => {
+                Self::DisputeWindowRestartReceipt
+            }
+            ExpectedRepairReceiptClass::NoAutomaticRepairReceipt => Self::NoAutomaticRepairReceipt,
+        }
+    }
+}
+
+impl From<RepairReceiptClass> for ExpectedRepairReceiptClass {
+    fn from(class: RepairReceiptClass) -> Self {
+        match class {
+            RepairReceiptClass::FetchMissingReceipt => Self::FetchMissingReceipt,
+            RepairReceiptClass::ReReplicationReceipt => Self::ReReplicationReceipt,
+            RepairReceiptClass::BackupRetryReceipt => Self::BackupRetryReceipt,
+            RepairReceiptClass::RestoreDrillReceipt => Self::RestoreDrillReceipt,
+            RepairReceiptClass::IntegrityVerificationReceipt => Self::IntegrityVerificationReceipt,
+            RepairReceiptClass::QuarantineReceipt => Self::QuarantineReceipt,
+            RepairReceiptClass::FederationClearingEscalationReceipt => {
+                Self::FederationClearingEscalationReceipt
+            }
+            RepairReceiptClass::GovernanceReviewReceipt => Self::GovernanceReviewReceipt,
+            RepairReceiptClass::DisputeWindowRestartReceipt => Self::DisputeWindowRestartReceipt,
+            RepairReceiptClass::NoAutomaticRepairReceipt => Self::NoAutomaticRepairReceipt,
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// RepairFailureReason — bounded taxonomy for Failed / Partial outcomes
+// ----------------------------------------------------------------------------
+
+/// Closed, bounded taxonomy of failure reasons for `RepairReceipt` outcomes
+/// of [`EffectOutcome::Failed`] or [`EffectOutcome::Partial`].
+///
+/// Intentionally narrow. The kernel records *what kind* of failure was
+/// observed so a steward / auditor can route follow-up work; it does not
+/// model runtime error chains. Richer detail (stack traces, exception
+/// messages, sub-error codes) belongs at the executing service / app layer
+/// and travels in the receipt envelope's free-form metadata if needed, not
+/// in this taxonomy.
+///
+/// `Unclassifiable` is the fallback that lets a partial / failed repair be
+/// recorded without forcing a misclassification.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum RepairFailureReason {
+    /// The executor's authority basis was rejected at apply time (e.g., a
+    /// stale mandate, an expired policy clause, a federation agreement no
+    /// longer adopted).
+    AuthorityRejected,
+    /// The source peer / replica required for the repair was unreachable or
+    /// did not respond within the freshness window.
+    SourceUnavailable,
+    /// The repair completed its bounded action but the after-state digest
+    /// still disagrees with the planned outcome.
+    DigestMismatchPersisted,
+    /// The repair would have required disclosing private content the actor
+    /// does not have a disclosure scope for; the action was refused per
+    /// Boundary rule 3.
+    PrivateContentUnavailable,
+    /// The policy oracle denied the action at apply time (distinct from
+    /// `AuthorityRejected`: the authority was valid, the policy ruling was
+    /// "no").
+    PolicyDenied,
+    /// The repair exceeded the freshness window before completing.
+    Timeout,
+    /// The failure does not fit any of the above. Triggers steward review
+    /// rather than automatic retry.
+    Unclassifiable,
+}
+
+// ----------------------------------------------------------------------------
+// RepairReceipt
+// ----------------------------------------------------------------------------
+
+/// Structural validation errors a `RepairReceipt` can produce at
+/// construction or wire-deserialization time.
+///
+/// These are kernel-level structural rules only: they catch outcome /
+/// reason / digest combinations that are *internally inconsistent* per the
+/// spec, not runtime errors. App-level policy violations (e.g., "this
+/// authority basis cannot apply to this state class") are not enforced
+/// here.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum RepairReceiptError {
+    /// `schema_version` did not match [`REPAIR_RECEIPT_SCHEMA_VERSION`].
+    #[error("unsupported RepairReceipt schema_version: got {got}, supported {supported}")]
+    UnsupportedSchemaVersion {
+        /// The version observed on the wire / at construction.
+        got: u32,
+        /// The version this build supports.
+        supported: u32,
+    },
+    /// Outcome is [`EffectOutcome::Applied`] or [`EffectOutcome::NoOp`] but
+    /// a [`RepairFailureReason`] is set.
+    #[error(
+        "RepairReceipt with outcome={outcome} must not carry failure_reason \
+         (Applied / NoOp are not failure outcomes)"
+    )]
+    FailureReasonNotAllowed {
+        /// The non-failure outcome that incorrectly carried a reason.
+        outcome: &'static str,
+    },
+    /// Outcome is [`EffectOutcome::Partial`] or [`EffectOutcome::Failed`]
+    /// but no [`RepairFailureReason`] is set.
+    #[error(
+        "RepairReceipt with outcome={outcome} requires a bounded failure_reason \
+         (Partial / Failed outcomes must record why)"
+    )]
+    FailureReasonRequired {
+        /// The failure outcome that lacked a reason.
+        outcome: &'static str,
+    },
+    /// Outcome is [`EffectOutcome::Failed`] but `after_state_digest` is
+    /// `Some(_)`. A `Failed` outcome means no durable state mutation took
+    /// place; an after-state digest would contradict that.
+    #[error(
+        "RepairReceipt with outcome=failed must not carry after_state_digest \
+         (Failed means no durable mutation)"
+    )]
+    AfterStateDigestOnFailed,
+    /// Class is [`RepairReceiptClass::NoAutomaticRepairReceipt`] but the
+    /// outcome is not [`EffectOutcome::NoOp`]. The sentinel class means
+    /// "no repair attempted" — pairing it with `Applied` / `Partial` /
+    /// `Failed` would let evidence falsely claim a repair under the
+    /// no-action class. Downstream anti-entropy surfaces depend on this
+    /// invariant; the validator rejects the combination at construction
+    /// and on the wire.
+    #[error(
+        "RepairReceipt class=no_automatic_repair_receipt requires outcome=no_op \
+         (sentinel class must not claim a repair happened); got outcome={outcome}"
+    )]
+    NoAutomaticRepairReceiptRequiresNoOp {
+        /// The non-`NoOp` outcome that incorrectly paired with the
+        /// no-automatic-repair sentinel class.
+        outcome: &'static str,
+    },
+}
+
+impl From<RepairReceiptError> for String {
+    fn from(err: RepairReceiptError) -> Self {
+        err.to_string()
+    }
+}
+
+/// The resolved repair artifact for an anti-entropy proof loop.
+///
+/// Produced in phase 7 ("Evidence") of
+/// `docs/spec/network-anti-entropy-proof-loops.md`. Records:
+///
+/// - The [`RepairReceiptClass`] (1:1 from the planned
+///   [`ExpectedRepairReceiptClass`]).
+/// - The [`EffectOutcome`] of the repair attempt (`Applied`, `NoOp`,
+///   `Partial`, `Failed`) — reused from
+///   [`crate::effects::EffectOutcome`] per spec line 181.
+/// - Cross-links to the [`DivergenceEvidence`] and [`RepairPlan`] this
+///   receipt resolves, via their binding hashes.
+/// - The [`StateClass`] affected and the [`ProbeScope`] the repair ran in.
+/// - The actor [`Did`] that applied (or chose not to apply) the repair,
+///   the [`AuthorityBasis`] under which they acted, and the
+///   [`BoundaryRuleSet`] the receipt has been checked against.
+/// - Optional before / after [`StateDigest`]s so a later probe can confirm
+///   convergence. The kernel does not enforce digest presence — some state
+///   classes are not digest-shaped, and some outcomes (`NoOp`,
+///   `NoAutomaticRepairReceipt`) carry no digests by design.
+/// - The applied-at timestamp and freshness window.
+/// - A `private_content_implication` flag so renderers can gate technical
+///   detail behind disclosure scope per Boundary rule 3.
+/// - A bounded [`RepairFailureReason`] for `Partial` / `Failed` outcomes.
+/// - A 32-byte nonce so otherwise-identical receipts get distinct hashes.
+///
+/// # The receipt is not the envelope
+///
+/// Per spec line 186 ("No new top-level receipt class is added.
+/// `RepairReceipt` is an evidence-artifact identifier traveling inside an
+/// existing envelope"), this record rides inside a Stage 5
+/// `EffectDispatchEvidence` per
+/// `docs/spec/effect-dispatch-contract.md` or alongside a Layer 2
+/// `ArtifactReceipt` per ADR-0026 (for blob-transfer repairs). It does NOT
+/// introduce a new ADR-0026 layer.
+///
+/// # The receipt is not the execution
+///
+/// A `RepairReceipt` records what an executor attempted and what the
+/// resulting outcome was; the kernel does not execute repairs (that is a
+/// runtime / app concern), does not verify the named authority's validity
+/// (a policy-oracle concern), and does not autonomously emit receipts. The
+/// receipt exists so the boundary rule "No member-facing lie" is auditable
+/// — both stewards and members can see what was attempted and how it
+/// resolved.
+///
+/// # Privacy
+///
+/// `RepairReceipt` MUST NOT carry raw private content. For repairs that
+/// touch private state, `before_state_digest` / `after_state_digest`
+/// carry bounded `StateDigest` projections (Bloom over content hashes,
+/// Merkle root, vector clock, or short list of reference hashes) and
+/// `private_content_implication` is set. Object bodies, vault bytes, and
+/// raw private artifact contents never appear on this record.
+///
+/// # Self-authentication
+///
+/// `receipt_hash` is a blake3 binding under
+/// `DOMAIN_TAG = b"icn:repair-receipt:v1"`, length-prefixed, over a
+/// canonical bincode encoding of all bound fields (excluding `receipt_hash`
+/// and `signature`). [`Self::verify_binding`] re-checks both the hash and
+/// the schema version; either alone is insufficient. Deserialization
+/// rejects unsupported schema versions AND outcome / reason / digest
+/// combinations that are structurally inconsistent via
+/// `#[serde(try_from = ...)]`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "RawRepairReceipt")]
+pub struct RepairReceipt {
+    /// Wire schema version. See [`REPAIR_RECEIPT_SCHEMA_VERSION`].
+    pub schema_version: u32,
+    /// The repair-receipt class (1:1 from the planned
+    /// [`ExpectedRepairReceiptClass`]).
+    pub repair_receipt_class: RepairReceiptClass,
+    /// Structural outcome of the repair attempt (reused from
+    /// [`crate::effects::EffectOutcome`] per spec line 181).
+    pub effect_outcome: EffectOutcome,
+    /// `evidence_hash` of the [`DivergenceEvidence`] this receipt resolves.
+    pub divergence_evidence_hash: Hash,
+    /// `plan_hash` of the [`RepairPlan`] this receipt executes.
+    pub repair_plan_hash: Hash,
+    /// The state class affected by the repair.
+    pub affected_state_class: StateClass,
+    /// Scope of the repair (which records / which peers).
+    pub scope: ProbeScope,
+    /// DID of the actor that applied (or recorded the non-application of)
+    /// the repair.
+    pub actor_did: Did,
+    /// Why the actor was authorized to act (or the explicit no-authority
+    /// sentinel for non-action receipts).
+    pub authority_basis: AuthorityBasis,
+    /// Boundary rules the receipt has been checked against.
+    pub boundary_rules: BoundaryRuleSet,
+    /// Digest of the affected state before the repair, when available. May
+    /// be `None` for repairs that have no before-state digest (e.g.,
+    /// `NoAutomaticRepairReceipt`, or state classes that are not
+    /// digest-shaped).
+    pub before_state_digest: Option<StateDigest>,
+    /// Digest of the affected state after the repair, when available. By
+    /// structural rule MUST be `None` when `effect_outcome` is
+    /// [`EffectOutcome::Failed`] (no durable mutation occurred).
+    pub after_state_digest: Option<StateDigest>,
+    /// Actor's clock when the repair attempt resolved (Unix seconds).
+    /// Applies to Applied / Partial / Failed / NoOp uniformly.
+    pub applied_at: u64,
+    /// Timestamp beyond which the receipt is stale (Unix seconds).
+    pub freshness_valid_until: u64,
+    /// `true` if the repair touched private state. Renderers MUST gate
+    /// technical detail behind the disclosure scope of the affected state.
+    pub private_content_implication: bool,
+    /// Bounded reason for `Partial` / `Failed` outcomes. MUST be `Some(_)`
+    /// for `Partial` / `Failed`, MUST be `None` for `Applied` / `NoOp`.
+    pub failure_reason: Option<RepairFailureReason>,
+    /// 32-byte random nonce. Two receipts with otherwise-identical fields
+    /// produce distinct `receipt_hash`es.
+    pub receipt_nonce: [u8; 32],
+    /// blake3 binding hash over all bound fields, computed at construction.
+    pub receipt_hash: Hash,
+    /// Actor signature (empty until signed by a higher layer).
+    pub signature: Signature,
+}
+
+/// Raw wire form for [`RepairReceipt`]. Validated into the public type via
+/// [`TryFrom`] (fails closed on unsupported `schema_version` and on
+/// structurally inconsistent outcome / reason / after-state combinations).
+#[derive(Deserialize)]
+struct RawRepairReceipt {
+    schema_version: u32,
+    repair_receipt_class: RepairReceiptClass,
+    effect_outcome: EffectOutcome,
+    divergence_evidence_hash: Hash,
+    repair_plan_hash: Hash,
+    affected_state_class: StateClass,
+    scope: ProbeScope,
+    actor_did: Did,
+    authority_basis: AuthorityBasis,
+    boundary_rules: BoundaryRuleSet,
+    before_state_digest: Option<StateDigest>,
+    after_state_digest: Option<StateDigest>,
+    applied_at: u64,
+    freshness_valid_until: u64,
+    private_content_implication: bool,
+    failure_reason: Option<RepairFailureReason>,
+    receipt_nonce: [u8; 32],
+    receipt_hash: Hash,
+    signature: Signature,
+}
+
+impl TryFrom<RawRepairReceipt> for RepairReceipt {
+    type Error = String;
+
+    fn try_from(raw: RawRepairReceipt) -> Result<Self, Self::Error> {
+        if raw.schema_version != REPAIR_RECEIPT_SCHEMA_VERSION {
+            return Err(RepairReceiptError::UnsupportedSchemaVersion {
+                got: raw.schema_version,
+                supported: REPAIR_RECEIPT_SCHEMA_VERSION,
+            }
+            .to_string());
+        }
+        RepairReceipt::validate_outcome_consistency(
+            raw.repair_receipt_class,
+            raw.effect_outcome,
+            raw.failure_reason,
+            raw.after_state_digest.as_ref(),
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(Self {
+            schema_version: raw.schema_version,
+            repair_receipt_class: raw.repair_receipt_class,
+            effect_outcome: raw.effect_outcome,
+            divergence_evidence_hash: raw.divergence_evidence_hash,
+            repair_plan_hash: raw.repair_plan_hash,
+            affected_state_class: raw.affected_state_class,
+            scope: raw.scope,
+            actor_did: raw.actor_did,
+            authority_basis: raw.authority_basis,
+            boundary_rules: raw.boundary_rules,
+            before_state_digest: raw.before_state_digest,
+            after_state_digest: raw.after_state_digest,
+            applied_at: raw.applied_at,
+            freshness_valid_until: raw.freshness_valid_until,
+            private_content_implication: raw.private_content_implication,
+            failure_reason: raw.failure_reason,
+            receipt_nonce: raw.receipt_nonce,
+            receipt_hash: raw.receipt_hash,
+            signature: raw.signature,
+        })
+    }
+}
+
+/// Canonical binding fields for `RepairReceipt::receipt_hash`.
+///
+/// Excludes `receipt_hash` (the output) and `signature` (filled after
+/// binding). Bincode-serialized in a stable order. Any new bound field
+/// added here requires bumping [`REPAIR_RECEIPT_SCHEMA_VERSION`].
+#[derive(Serialize)]
+struct RepairReceiptBinding<'a> {
+    schema_version: u32,
+    repair_receipt_class: RepairReceiptClass,
+    effect_outcome: EffectOutcome,
+    divergence_evidence_hash: Hash,
+    repair_plan_hash: Hash,
+    affected_state_class: StateClass,
+    scope: &'a ProbeScope,
+    actor_did: &'a Did,
+    authority_basis: &'a AuthorityBasis,
+    boundary_rules: &'a BoundaryRuleSet,
+    before_state_digest: &'a Option<StateDigest>,
+    after_state_digest: &'a Option<StateDigest>,
+    applied_at: u64,
+    freshness_valid_until: u64,
+    private_content_implication: bool,
+    failure_reason: Option<RepairFailureReason>,
+    receipt_nonce: [u8; 32],
+}
+
+impl RepairReceipt {
+    /// Domain-separation tag for `receipt_hash`. Distinct from
+    /// [`RepairPlan::DOMAIN_TAG`], [`DivergenceEvidence::DOMAIN_TAG`],
+    /// [`AntiEntropyProbe::DOMAIN_TAG`], and [`ArtifactReceipt::DOMAIN_TAG`].
+    pub const DOMAIN_TAG: &'static [u8] = b"icn:repair-receipt:v1";
+
+    /// Construct a new receipt with computed `receipt_hash` and empty
+    /// signature.
+    ///
+    /// `schema_version` is set to [`REPAIR_RECEIPT_SCHEMA_VERSION`].
+    /// Returns [`RepairReceiptError`] if the outcome / reason / digest
+    /// combination is structurally inconsistent (see
+    /// [`Self::validate_outcome_consistency`]). The caller must sign the
+    /// receipt at a higher layer before emission.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        repair_receipt_class: RepairReceiptClass,
+        effect_outcome: EffectOutcome,
+        divergence_evidence_hash: Hash,
+        repair_plan_hash: Hash,
+        affected_state_class: StateClass,
+        scope: ProbeScope,
+        actor_did: Did,
+        authority_basis: AuthorityBasis,
+        boundary_rules: BoundaryRuleSet,
+        before_state_digest: Option<StateDigest>,
+        after_state_digest: Option<StateDigest>,
+        applied_at: u64,
+        freshness_valid_until: u64,
+        private_content_implication: bool,
+        failure_reason: Option<RepairFailureReason>,
+        receipt_nonce: [u8; 32],
+    ) -> Result<Self, RepairReceiptError> {
+        Self::validate_outcome_consistency(
+            repair_receipt_class,
+            effect_outcome,
+            failure_reason,
+            after_state_digest.as_ref(),
+        )?;
+        let receipt_hash = Self::compute_receipt_hash(
+            REPAIR_RECEIPT_SCHEMA_VERSION,
+            repair_receipt_class,
+            effect_outcome,
+            divergence_evidence_hash,
+            repair_plan_hash,
+            affected_state_class,
+            &scope,
+            &actor_did,
+            &authority_basis,
+            &boundary_rules,
+            &before_state_digest,
+            &after_state_digest,
+            applied_at,
+            freshness_valid_until,
+            private_content_implication,
+            failure_reason,
+            &receipt_nonce,
+        );
+        Ok(Self {
+            schema_version: REPAIR_RECEIPT_SCHEMA_VERSION,
+            repair_receipt_class,
+            effect_outcome,
+            divergence_evidence_hash,
+            repair_plan_hash,
+            affected_state_class,
+            scope,
+            actor_did,
+            authority_basis,
+            boundary_rules,
+            before_state_digest,
+            after_state_digest,
+            applied_at,
+            freshness_valid_until,
+            private_content_implication,
+            failure_reason,
+            receipt_nonce,
+            receipt_hash,
+            signature: Signature::new(Vec::new()),
+        })
+    }
+
+    /// Validate the structural outcome / reason / digest / sentinel-class
+    /// invariants.
+    ///
+    /// Returns `Ok(())` if the combination is consistent, else an error
+    /// describing the violation. Kernel-level structural rules only:
+    ///
+    /// - [`EffectOutcome::Applied`] and [`EffectOutcome::NoOp`] MUST NOT
+    ///   carry a `failure_reason`.
+    /// - [`EffectOutcome::Partial`] and [`EffectOutcome::Failed`] MUST
+    ///   carry a `failure_reason`.
+    /// - [`EffectOutcome::Failed`] MUST NOT carry an `after_state_digest`
+    ///   (no durable mutation occurred).
+    /// - [`RepairReceiptClass::NoAutomaticRepairReceipt`] MUST carry
+    ///   [`EffectOutcome::NoOp`] — the sentinel class means "no repair
+    ///   attempted." Pairing it with `Applied` / `Partial` / `Failed`
+    ///   would let evidence falsely claim a repair happened under the
+    ///   no-action class.
+    pub fn validate_outcome_consistency(
+        repair_receipt_class: RepairReceiptClass,
+        effect_outcome: EffectOutcome,
+        failure_reason: Option<RepairFailureReason>,
+        after_state_digest: Option<&StateDigest>,
+    ) -> Result<(), RepairReceiptError> {
+        match effect_outcome {
+            EffectOutcome::Applied | EffectOutcome::NoOp => {
+                if failure_reason.is_some() {
+                    return Err(RepairReceiptError::FailureReasonNotAllowed {
+                        outcome: effect_outcome.as_str(),
+                    });
+                }
+            }
+            EffectOutcome::Partial | EffectOutcome::Failed => {
+                if failure_reason.is_none() {
+                    return Err(RepairReceiptError::FailureReasonRequired {
+                        outcome: effect_outcome.as_str(),
+                    });
+                }
+            }
+        }
+        if matches!(effect_outcome, EffectOutcome::Failed) && after_state_digest.is_some() {
+            return Err(RepairReceiptError::AfterStateDigestOnFailed);
+        }
+        if matches!(
+            repair_receipt_class,
+            RepairReceiptClass::NoAutomaticRepairReceipt
+        ) && !matches!(effect_outcome, EffectOutcome::NoOp)
+        {
+            return Err(RepairReceiptError::NoAutomaticRepairReceiptRequiresNoOp {
+                outcome: effect_outcome.as_str(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Compute the binding hash from the significant fields.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_receipt_hash(
+        schema_version: u32,
+        repair_receipt_class: RepairReceiptClass,
+        effect_outcome: EffectOutcome,
+        divergence_evidence_hash: Hash,
+        repair_plan_hash: Hash,
+        affected_state_class: StateClass,
+        scope: &ProbeScope,
+        actor_did: &Did,
+        authority_basis: &AuthorityBasis,
+        boundary_rules: &BoundaryRuleSet,
+        before_state_digest: &Option<StateDigest>,
+        after_state_digest: &Option<StateDigest>,
+        applied_at: u64,
+        freshness_valid_until: u64,
+        private_content_implication: bool,
+        failure_reason: Option<RepairFailureReason>,
+        receipt_nonce: &[u8; 32],
+    ) -> Hash {
+        let binding = RepairReceiptBinding {
+            schema_version,
+            repair_receipt_class,
+            effect_outcome,
+            divergence_evidence_hash,
+            repair_plan_hash,
+            affected_state_class,
+            scope,
+            actor_did,
+            authority_basis,
+            boundary_rules,
+            before_state_digest,
+            after_state_digest,
+            applied_at,
+            freshness_valid_until,
+            private_content_implication,
+            failure_reason,
+            receipt_nonce: *receipt_nonce,
+        };
+        let payload =
+            bincode::serialize(&binding).expect("RepairReceiptBinding serialization is infallible");
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        *hasher.finalize().as_bytes()
+    }
+
+    /// `true` iff `schema_version == REPAIR_RECEIPT_SCHEMA_VERSION`.
+    pub fn is_supported_schema_version(&self) -> bool {
+        self.schema_version == REPAIR_RECEIPT_SCHEMA_VERSION
+    }
+
+    /// Verify the stored `receipt_hash` and `schema_version`.
+    ///
+    /// Returns `true` only if both hold. Fails closed on unsupported
+    /// versions even when the stored hash matches a recomputation under
+    /// that version. Does NOT verify the signature — that is a
+    /// higher-layer concern.
+    pub fn verify_binding(&self) -> bool {
+        if !self.is_supported_schema_version() {
+            return false;
+        }
+        let recomputed = Self::compute_receipt_hash(
+            self.schema_version,
+            self.repair_receipt_class,
+            self.effect_outcome,
+            self.divergence_evidence_hash,
+            self.repair_plan_hash,
+            self.affected_state_class,
+            &self.scope,
+            &self.actor_did,
+            &self.authority_basis,
+            &self.boundary_rules,
+            &self.before_state_digest,
+            &self.after_state_digest,
+            self.applied_at,
+            self.freshness_valid_until,
+            self.private_content_implication,
+            self.failure_reason,
+            &self.receipt_nonce,
+        );
+        self.receipt_hash == recomputed
+    }
+
+    /// `true` if `now_unix_seconds <= freshness_valid_until`.
+    pub fn is_fresh(&self, now_unix_seconds: u64) -> bool {
+        now_unix_seconds <= self.freshness_valid_until
+    }
+}
+
 #[cfg(test)]
 mod anti_entropy_tests {
     use super::*;
@@ -3315,5 +3993,1165 @@ mod divergence_and_repair_tests {
         assert!(p.is_fresh(p.freshness_emitted_at));
         assert!(p.is_fresh(p.freshness_valid_until));
         assert!(!p.is_fresh(p.freshness_valid_until + 1));
+    }
+
+    // =========================================================================
+    // RepairReceipt (issue #1849)
+    // =========================================================================
+
+    fn sample_before_digest() -> StateDigest {
+        StateDigest::ShortList(ShortDigestList::from_hashes(vec![
+            [0x10; 32], [0x11; 32], [0x12; 32],
+        ]))
+    }
+
+    fn sample_after_digest() -> StateDigest {
+        StateDigest::ShortList(ShortDigestList::from_hashes(vec![
+            [0x10; 32], [0x11; 32], [0x12; 32], [0x13; 32],
+        ]))
+    }
+
+    fn sample_receipt() -> RepairReceipt {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        RepairReceipt::new(
+            RepairReceiptClass::FetchMissingReceipt,
+            EffectOutcome::Applied,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            BoundaryRuleSet::from_rules(vec![
+                BoundaryRuleRef::NoRepairBeyondAuthority,
+                BoundaryRuleRef::NoLocalityOrDisclosureWidening,
+            ]),
+            Some(sample_before_digest()),
+            Some(sample_after_digest()),
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            None,
+            [0xEF; 32],
+        )
+        .expect("sample RepairReceipt is structurally consistent")
+    }
+
+    // ---- RepairReceiptClass: 1:1 mapping from ExpectedRepairReceiptClass ----
+
+    #[test]
+    fn repair_receipt_class_round_trips_through_expected_class() {
+        let cases = [
+            (
+                ExpectedRepairReceiptClass::FetchMissingReceipt,
+                RepairReceiptClass::FetchMissingReceipt,
+            ),
+            (
+                ExpectedRepairReceiptClass::ReReplicationReceipt,
+                RepairReceiptClass::ReReplicationReceipt,
+            ),
+            (
+                ExpectedRepairReceiptClass::BackupRetryReceipt,
+                RepairReceiptClass::BackupRetryReceipt,
+            ),
+            (
+                ExpectedRepairReceiptClass::RestoreDrillReceipt,
+                RepairReceiptClass::RestoreDrillReceipt,
+            ),
+            (
+                ExpectedRepairReceiptClass::IntegrityVerificationReceipt,
+                RepairReceiptClass::IntegrityVerificationReceipt,
+            ),
+            (
+                ExpectedRepairReceiptClass::QuarantineReceipt,
+                RepairReceiptClass::QuarantineReceipt,
+            ),
+            (
+                ExpectedRepairReceiptClass::FederationClearingEscalationReceipt,
+                RepairReceiptClass::FederationClearingEscalationReceipt,
+            ),
+            (
+                ExpectedRepairReceiptClass::GovernanceReviewReceipt,
+                RepairReceiptClass::GovernanceReviewReceipt,
+            ),
+            (
+                ExpectedRepairReceiptClass::DisputeWindowRestartReceipt,
+                RepairReceiptClass::DisputeWindowRestartReceipt,
+            ),
+            (
+                ExpectedRepairReceiptClass::NoAutomaticRepairReceipt,
+                RepairReceiptClass::NoAutomaticRepairReceipt,
+            ),
+        ];
+        // Decisive 1:1 evidence: count, forward map, and reverse map all agree.
+        assert_eq!(cases.len(), 10);
+        for (expected, class) in cases {
+            assert_eq!(RepairReceiptClass::from(expected), class);
+            assert_eq!(ExpectedRepairReceiptClass::from(class), expected);
+        }
+    }
+
+    #[test]
+    fn repair_receipt_class_all_variants_round_trip() {
+        let cases = [
+            RepairReceiptClass::FetchMissingReceipt,
+            RepairReceiptClass::ReReplicationReceipt,
+            RepairReceiptClass::BackupRetryReceipt,
+            RepairReceiptClass::RestoreDrillReceipt,
+            RepairReceiptClass::IntegrityVerificationReceipt,
+            RepairReceiptClass::QuarantineReceipt,
+            RepairReceiptClass::FederationClearingEscalationReceipt,
+            RepairReceiptClass::GovernanceReviewReceipt,
+            RepairReceiptClass::DisputeWindowRestartReceipt,
+            RepairReceiptClass::NoAutomaticRepairReceipt,
+        ];
+        for c in &cases {
+            let json = serde_json::to_string(c).unwrap();
+            let restored: RepairReceiptClass = serde_json::from_str(&json).unwrap();
+            assert_eq!(*c, restored);
+            let bytes = bincode::serialize(c).unwrap();
+            let restored_bin: RepairReceiptClass = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(*c, restored_bin);
+        }
+    }
+
+    #[test]
+    fn repair_failure_reason_all_variants_round_trip() {
+        let cases = [
+            RepairFailureReason::AuthorityRejected,
+            RepairFailureReason::SourceUnavailable,
+            RepairFailureReason::DigestMismatchPersisted,
+            RepairFailureReason::PrivateContentUnavailable,
+            RepairFailureReason::PolicyDenied,
+            RepairFailureReason::Timeout,
+            RepairFailureReason::Unclassifiable,
+        ];
+        for r in &cases {
+            let json = serde_json::to_string(r).unwrap();
+            let restored: RepairFailureReason = serde_json::from_str(&json).unwrap();
+            assert_eq!(*r, restored);
+            let bytes = bincode::serialize(r).unwrap();
+            let restored_bin: RepairFailureReason = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(*r, restored_bin);
+        }
+    }
+
+    // ---- RepairReceipt: binding, round-trip, freshness ----
+
+    #[test]
+    fn receipt_binding_is_deterministic() {
+        let r1 = sample_receipt();
+        let r2 = sample_receipt();
+        assert_eq!(r1.receipt_hash, r2.receipt_hash);
+        assert_ne!(r1.receipt_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn receipt_verify_binding_succeeds_for_fresh_record() {
+        let r = sample_receipt();
+        assert!(r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_json_round_trip_preserves_hash() {
+        let original = sample_receipt();
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: RepairReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn receipt_bincode_round_trip_preserves_hash() {
+        let original = sample_receipt();
+        let bytes = bincode::serialize(&original).unwrap();
+        let restored: RepairReceipt = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(original, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn receipt_freshness_helper() {
+        let r = sample_receipt();
+        assert!(r.is_fresh(r.applied_at));
+        assert!(r.is_fresh(r.freshness_valid_until));
+        assert!(!r.is_fresh(r.freshness_valid_until + 1));
+    }
+
+    #[test]
+    fn receipt_two_records_with_distinct_nonces_distinct_hashes() {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        let r1 = sample_receipt();
+        let r2 = RepairReceipt::new(
+            r1.repair_receipt_class,
+            r1.effect_outcome,
+            ev.evidence_hash,
+            plan.plan_hash,
+            r1.affected_state_class,
+            r1.scope.clone(),
+            r1.actor_did.clone(),
+            r1.authority_basis.clone(),
+            r1.boundary_rules.clone(),
+            r1.before_state_digest.clone(),
+            r1.after_state_digest.clone(),
+            r1.applied_at,
+            r1.freshness_valid_until,
+            r1.private_content_implication,
+            r1.failure_reason,
+            [0x77; 32], // distinct nonce
+        )
+        .unwrap();
+        assert_ne!(r1.receipt_hash, r2.receipt_hash);
+        assert!(r2.verify_binding());
+    }
+
+    #[test]
+    fn receipt_domain_tag_distinct_from_other_records() {
+        assert_ne!(RepairReceipt::DOMAIN_TAG, AntiEntropyProbe::DOMAIN_TAG);
+        assert_ne!(RepairReceipt::DOMAIN_TAG, DivergenceEvidence::DOMAIN_TAG);
+        assert_ne!(RepairReceipt::DOMAIN_TAG, RepairPlan::DOMAIN_TAG);
+        assert_ne!(RepairReceipt::DOMAIN_TAG, ArtifactReceipt::DOMAIN_TAG);
+    }
+
+    #[test]
+    fn receipt_domain_tag_affects_hash() {
+        let r = sample_receipt();
+        let binding = RepairReceiptBinding {
+            schema_version: r.schema_version,
+            repair_receipt_class: r.repair_receipt_class,
+            effect_outcome: r.effect_outcome,
+            divergence_evidence_hash: r.divergence_evidence_hash,
+            repair_plan_hash: r.repair_plan_hash,
+            affected_state_class: r.affected_state_class,
+            scope: &r.scope,
+            actor_did: &r.actor_did,
+            authority_basis: &r.authority_basis,
+            boundary_rules: &r.boundary_rules,
+            before_state_digest: &r.before_state_digest,
+            after_state_digest: &r.after_state_digest,
+            applied_at: r.applied_at,
+            freshness_valid_until: r.freshness_valid_until,
+            private_content_implication: r.private_content_implication,
+            failure_reason: r.failure_reason,
+            receipt_nonce: r.receipt_nonce,
+        };
+        let payload = bincode::serialize(&binding).unwrap();
+        let mut hasher = blake3::Hasher::new();
+        // Deliberately omit DOMAIN_TAG.
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        let without_tag: Hash = *hasher.finalize().as_bytes();
+        assert_ne!(r.receipt_hash, without_tag);
+    }
+
+    // ---- RepairReceipt: tamper detection for every bound field ----
+
+    #[test]
+    fn receipt_class_tamper_detected() {
+        let mut r = sample_receipt();
+        r.repair_receipt_class = RepairReceiptClass::GovernanceReviewReceipt;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_outcome_tamper_detected() {
+        let mut r = sample_receipt();
+        // Both Applied and NoOp are consistent with failure_reason=None,
+        // so the hash is the only mechanism that catches this mutation.
+        r.effect_outcome = EffectOutcome::NoOp;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_divergence_evidence_link_tamper_detected() {
+        let mut r = sample_receipt();
+        r.divergence_evidence_hash = [0xFF; 32];
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_plan_link_tamper_detected() {
+        let mut r = sample_receipt();
+        r.repair_plan_hash = [0xFF; 32];
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_state_class_tamper_detected() {
+        let mut r = sample_receipt();
+        r.affected_state_class = StateClass::SettlementRecordIndex;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_scope_tamper_detected() {
+        let mut r = sample_receipt();
+        r.scope = ProbeScope::Commons;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_actor_did_tamper_detected() {
+        let mut r = sample_receipt();
+        r.actor_did = "did:icn:attacker".to_string();
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_authority_tamper_detected() {
+        let mut r = sample_receipt();
+        r.authority_basis = AuthorityBasis::NoAutomaticAuthority;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_boundary_rules_tamper_detected() {
+        let mut r = sample_receipt();
+        r.boundary_rules = BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoMemberFacingLie]);
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_before_digest_tamper_detected() {
+        let mut r = sample_receipt();
+        r.before_state_digest = Some(StateDigest::ShortList(ShortDigestList::from_hashes(vec![
+            [0xAA; 32],
+        ])));
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_after_digest_tamper_detected() {
+        let mut r = sample_receipt();
+        r.after_state_digest = Some(StateDigest::ShortList(ShortDigestList::from_hashes(vec![
+            [0xBB; 32],
+        ])));
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_applied_at_tamper_detected() {
+        let mut r = sample_receipt();
+        r.applied_at += 1;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_freshness_tamper_detected() {
+        let mut r = sample_receipt();
+        r.freshness_valid_until += 1;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_private_implication_tamper_detected() {
+        let mut r = sample_receipt();
+        r.private_content_implication = !r.private_content_implication;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_failure_reason_tamper_detected() {
+        // Construct a Partial receipt with a specific reason, then mutate
+        // the reason. Both reasons are valid for Partial; the hash is the
+        // only catch.
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        let mut r = RepairReceipt::new(
+            RepairReceiptClass::FetchMissingReceipt,
+            EffectOutcome::Partial,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoRepairBeyondAuthority]),
+            Some(sample_before_digest()),
+            Some(sample_after_digest()),
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            Some(RepairFailureReason::SourceUnavailable),
+            [0xEF; 32],
+        )
+        .expect("partial receipt with reason is consistent");
+        assert!(r.verify_binding());
+        r.failure_reason = Some(RepairFailureReason::Timeout);
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_nonce_tamper_detected() {
+        let mut r = sample_receipt();
+        r.receipt_nonce = [0xFF; 32];
+        assert!(!r.verify_binding());
+    }
+
+    // ---- RepairReceipt: schema-version policing ----
+
+    #[derive(Serialize)]
+    struct ReceiptWireShape<'a> {
+        schema_version: u32,
+        repair_receipt_class: RepairReceiptClass,
+        effect_outcome: EffectOutcome,
+        divergence_evidence_hash: Hash,
+        repair_plan_hash: Hash,
+        affected_state_class: StateClass,
+        scope: &'a ProbeScope,
+        actor_did: &'a Did,
+        authority_basis: &'a AuthorityBasis,
+        boundary_rules: &'a BoundaryRuleSet,
+        before_state_digest: &'a Option<StateDigest>,
+        after_state_digest: &'a Option<StateDigest>,
+        applied_at: u64,
+        freshness_valid_until: u64,
+        private_content_implication: bool,
+        failure_reason: Option<RepairFailureReason>,
+        receipt_nonce: [u8; 32],
+        receipt_hash: Hash,
+        signature: Signature,
+    }
+
+    #[test]
+    fn receipt_rejects_future_schema_version_on_decode() {
+        let r = sample_receipt();
+        let bogus = REPAIR_RECEIPT_SCHEMA_VERSION + 1;
+        // Recompute the binding hash under the bogus version so we close
+        // the "manually crafted hash" bypass too.
+        let recomputed = RepairReceipt::compute_receipt_hash(
+            bogus,
+            r.repair_receipt_class,
+            r.effect_outcome,
+            r.divergence_evidence_hash,
+            r.repair_plan_hash,
+            r.affected_state_class,
+            &r.scope,
+            &r.actor_did,
+            &r.authority_basis,
+            &r.boundary_rules,
+            &r.before_state_digest,
+            &r.after_state_digest,
+            r.applied_at,
+            r.freshness_valid_until,
+            r.private_content_implication,
+            r.failure_reason,
+            &r.receipt_nonce,
+        );
+        let wire = ReceiptWireShape {
+            schema_version: bogus,
+            repair_receipt_class: r.repair_receipt_class,
+            effect_outcome: r.effect_outcome,
+            divergence_evidence_hash: r.divergence_evidence_hash,
+            repair_plan_hash: r.repair_plan_hash,
+            affected_state_class: r.affected_state_class,
+            scope: &r.scope,
+            actor_did: &r.actor_did,
+            authority_basis: &r.authority_basis,
+            boundary_rules: &r.boundary_rules,
+            before_state_digest: &r.before_state_digest,
+            after_state_digest: &r.after_state_digest,
+            applied_at: r.applied_at,
+            freshness_valid_until: r.freshness_valid_until,
+            private_content_implication: r.private_content_implication,
+            failure_reason: r.failure_reason,
+            receipt_nonce: r.receipt_nonce,
+            receipt_hash: recomputed,
+            signature: r.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<RepairReceipt, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed_bin: Result<RepairReceipt, _> = bincode::deserialize(&bytes);
+        assert!(parsed_bin.is_err());
+    }
+
+    #[test]
+    fn receipt_verify_binding_fails_closed_on_manual_bogus_version() {
+        let mut r = sample_receipt();
+        let bogus = REPAIR_RECEIPT_SCHEMA_VERSION + 7;
+        r.schema_version = bogus;
+        r.receipt_hash = RepairReceipt::compute_receipt_hash(
+            bogus,
+            r.repair_receipt_class,
+            r.effect_outcome,
+            r.divergence_evidence_hash,
+            r.repair_plan_hash,
+            r.affected_state_class,
+            &r.scope,
+            &r.actor_did,
+            &r.authority_basis,
+            &r.boundary_rules,
+            &r.before_state_digest,
+            &r.after_state_digest,
+            r.applied_at,
+            r.freshness_valid_until,
+            r.private_content_implication,
+            r.failure_reason,
+            &r.receipt_nonce,
+        );
+        assert!(
+            !r.verify_binding(),
+            "verify_binding() must reject unsupported schema_version even when the hash matches"
+        );
+    }
+
+    // ---- RepairReceipt: outcome / reason / digest structural rules ----
+
+    #[test]
+    fn receipt_applied_outcome_carries_before_after_digest() {
+        let r = sample_receipt();
+        assert_eq!(r.effect_outcome, EffectOutcome::Applied);
+        assert!(r.before_state_digest.is_some());
+        assert!(r.after_state_digest.is_some());
+        assert!(r.verify_binding());
+    }
+
+    #[test]
+    fn receipt_applied_rejects_failure_reason() {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        let err = RepairReceipt::new(
+            RepairReceiptClass::FetchMissingReceipt,
+            EffectOutcome::Applied,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoRepairBeyondAuthority]),
+            Some(sample_before_digest()),
+            Some(sample_after_digest()),
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            Some(RepairFailureReason::Timeout),
+            [0xEF; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RepairReceiptError::FailureReasonNotAllowed { .. }
+        ));
+    }
+
+    #[test]
+    fn receipt_noop_rejects_failure_reason() {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        let err = RepairReceipt::new(
+            RepairReceiptClass::NoAutomaticRepairReceipt,
+            EffectOutcome::NoOp,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::NoAutomaticAuthority,
+            BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoRepairBeyondAuthority]),
+            None,
+            None,
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            Some(RepairFailureReason::Timeout),
+            [0xEF; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RepairReceiptError::FailureReasonNotAllowed { .. }
+        ));
+    }
+
+    #[test]
+    fn receipt_partial_requires_failure_reason() {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        let err = RepairReceipt::new(
+            RepairReceiptClass::FetchMissingReceipt,
+            EffectOutcome::Partial,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoRepairBeyondAuthority]),
+            Some(sample_before_digest()),
+            Some(sample_after_digest()),
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            None, // missing
+            [0xEF; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RepairReceiptError::FailureReasonRequired { .. }
+        ));
+    }
+
+    #[test]
+    fn receipt_failed_requires_failure_reason() {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        let err = RepairReceipt::new(
+            RepairReceiptClass::FetchMissingReceipt,
+            EffectOutcome::Failed,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoRepairBeyondAuthority]),
+            Some(sample_before_digest()),
+            None,
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            None, // missing
+            [0xEF; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RepairReceiptError::FailureReasonRequired { .. }
+        ));
+    }
+
+    #[test]
+    fn receipt_failed_must_not_have_after_state_digest() {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        let err = RepairReceipt::new(
+            RepairReceiptClass::FetchMissingReceipt,
+            EffectOutcome::Failed,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoRepairBeyondAuthority]),
+            Some(sample_before_digest()),
+            Some(sample_after_digest()), // disallowed for Failed
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            Some(RepairFailureReason::DigestMismatchPersisted),
+            [0xEF; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(err, RepairReceiptError::AfterStateDigestOnFailed));
+    }
+
+    // ---- RepairReceipt: NoAutomaticRepairReceipt + NoOp sentinel rule ----
+
+    fn _no_auth_receipt_attempt(
+        outcome: EffectOutcome,
+        failure_reason: Option<RepairFailureReason>,
+        after_state_digest: Option<StateDigest>,
+    ) -> Result<RepairReceipt, RepairReceiptError> {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        RepairReceipt::new(
+            RepairReceiptClass::NoAutomaticRepairReceipt,
+            outcome,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::NoAutomaticAuthority,
+            BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoRepairBeyondAuthority]),
+            None,
+            after_state_digest,
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            failure_reason,
+            [0xEF; 32],
+        )
+    }
+
+    #[test]
+    fn receipt_no_automatic_repair_class_rejects_applied_outcome() {
+        let err = _no_auth_receipt_attempt(EffectOutcome::Applied, None, None).unwrap_err();
+        assert!(matches!(
+            err,
+            RepairReceiptError::NoAutomaticRepairReceiptRequiresNoOp { outcome } if outcome == "applied"
+        ));
+    }
+
+    #[test]
+    fn receipt_no_automatic_repair_class_rejects_partial_outcome() {
+        // Pair Partial with a reason so the earlier `FailureReasonRequired`
+        // rule doesn't pre-empt the sentinel rule.
+        let err = _no_auth_receipt_attempt(
+            EffectOutcome::Partial,
+            Some(RepairFailureReason::Unclassifiable),
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RepairReceiptError::NoAutomaticRepairReceiptRequiresNoOp { outcome } if outcome == "partial"
+        ));
+    }
+
+    #[test]
+    fn receipt_no_automatic_repair_class_rejects_failed_outcome() {
+        let err = _no_auth_receipt_attempt(
+            EffectOutcome::Failed,
+            Some(RepairFailureReason::AuthorityRejected),
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RepairReceiptError::NoAutomaticRepairReceiptRequiresNoOp { outcome } if outcome == "failed"
+        ));
+    }
+
+    #[test]
+    fn receipt_wire_rejects_no_automatic_repair_with_applied_outcome() {
+        // Build a hash-consistent wire shape that pairs the sentinel
+        // class with Applied. The deserializer must refuse it before
+        // any RepairReceipt is constructed.
+        let r = sample_receipt();
+        let scope = r.scope.clone();
+        let actor = r.actor_did.clone();
+        let authority = AuthorityBasis::NoAutomaticAuthority;
+        let rules = r.boundary_rules.clone();
+        let before: Option<StateDigest> = None;
+        let after: Option<StateDigest> = None;
+        let nonce = [0x66u8; 32];
+        let class = RepairReceiptClass::NoAutomaticRepairReceipt;
+        let outcome = EffectOutcome::Applied;
+        let failure: Option<RepairFailureReason> = None;
+        let applied_at = r.applied_at;
+        let valid_until = r.freshness_valid_until;
+        let private = false;
+        let hash = RepairReceipt::compute_receipt_hash(
+            REPAIR_RECEIPT_SCHEMA_VERSION,
+            class,
+            outcome,
+            r.divergence_evidence_hash,
+            r.repair_plan_hash,
+            r.affected_state_class,
+            &scope,
+            &actor,
+            &authority,
+            &rules,
+            &before,
+            &after,
+            applied_at,
+            valid_until,
+            private,
+            failure,
+            &nonce,
+        );
+        let wire = ReceiptWireShape {
+            schema_version: REPAIR_RECEIPT_SCHEMA_VERSION,
+            repair_receipt_class: class,
+            effect_outcome: outcome,
+            divergence_evidence_hash: r.divergence_evidence_hash,
+            repair_plan_hash: r.repair_plan_hash,
+            affected_state_class: r.affected_state_class,
+            scope: &scope,
+            actor_did: &actor,
+            authority_basis: &authority,
+            boundary_rules: &rules,
+            before_state_digest: &before,
+            after_state_digest: &after,
+            applied_at,
+            freshness_valid_until: valid_until,
+            private_content_implication: private,
+            failure_reason: failure,
+            receipt_nonce: nonce,
+            receipt_hash: hash,
+            signature: r.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<RepairReceipt, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed_bin: Result<RepairReceipt, _> = bincode::deserialize(&bytes);
+        assert!(parsed_bin.is_err());
+    }
+
+    #[test]
+    fn receipt_noop_no_automatic_repair_sentinel_round_trips() {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        let r = RepairReceipt::new(
+            RepairReceiptClass::NoAutomaticRepairReceipt,
+            EffectOutcome::NoOp,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::NoAutomaticAuthority,
+            BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoRepairBeyondAuthority]),
+            None,
+            None,
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            None,
+            [0x55; 32],
+        )
+        .expect("NoOp + NoAutomaticRepairReceipt is the canonical sentinel");
+        assert!(r.verify_binding());
+        let json = serde_json::to_string(&r).unwrap();
+        let restored: RepairReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(r, restored);
+        assert_eq!(restored.effect_outcome, EffectOutcome::NoOp);
+        assert_eq!(
+            restored.repair_receipt_class,
+            RepairReceiptClass::NoAutomaticRepairReceipt
+        );
+    }
+
+    #[test]
+    fn receipt_partial_round_trips_with_bounded_reason() {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        let r = RepairReceipt::new(
+            RepairReceiptClass::ReReplicationReceipt,
+            EffectOutcome::Partial,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::StorageReplicaVerification,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoRepairBeyondAuthority]),
+            Some(sample_before_digest()),
+            Some(sample_after_digest()),
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            Some(RepairFailureReason::SourceUnavailable),
+            [0xCC; 32],
+        )
+        .unwrap();
+        let json = serde_json::to_string(&r).unwrap();
+        let restored: RepairReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.effect_outcome, EffectOutcome::Partial);
+        assert_eq!(
+            restored.failure_reason,
+            Some(RepairFailureReason::SourceUnavailable)
+        );
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn receipt_failed_round_trips_with_bounded_reason() {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        let r = RepairReceipt::new(
+            RepairReceiptClass::FetchMissingReceipt,
+            EffectOutcome::Failed,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoRepairBeyondAuthority]),
+            Some(sample_before_digest()),
+            None,
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            Some(RepairFailureReason::AuthorityRejected),
+            [0xDD; 32],
+        )
+        .unwrap();
+        let json = serde_json::to_string(&r).unwrap();
+        let restored: RepairReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.effect_outcome, EffectOutcome::Failed);
+        assert!(restored.after_state_digest.is_none());
+        assert_eq!(
+            restored.failure_reason,
+            Some(RepairFailureReason::AuthorityRejected)
+        );
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn receipt_wire_rejects_inconsistent_outcome_reason() {
+        // Build a structurally inconsistent wire shape (Applied + reason)
+        // and assert the deserializer refuses it. Closes the bypass where
+        // a peer crafts a wire payload that new() would never produce.
+        let r = sample_receipt();
+        let wire = ReceiptWireShape {
+            schema_version: REPAIR_RECEIPT_SCHEMA_VERSION,
+            repair_receipt_class: r.repair_receipt_class,
+            effect_outcome: EffectOutcome::Applied,
+            divergence_evidence_hash: r.divergence_evidence_hash,
+            repair_plan_hash: r.repair_plan_hash,
+            affected_state_class: r.affected_state_class,
+            scope: &r.scope,
+            actor_did: &r.actor_did,
+            authority_basis: &r.authority_basis,
+            boundary_rules: &r.boundary_rules,
+            before_state_digest: &r.before_state_digest,
+            after_state_digest: &r.after_state_digest,
+            applied_at: r.applied_at,
+            freshness_valid_until: r.freshness_valid_until,
+            private_content_implication: r.private_content_implication,
+            failure_reason: Some(RepairFailureReason::Timeout), // inconsistent
+            receipt_nonce: r.receipt_nonce,
+            receipt_hash: r.receipt_hash,
+            signature: r.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<RepairReceipt, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed_bin: Result<RepairReceipt, _> = bincode::deserialize(&bytes);
+        assert!(parsed_bin.is_err());
+    }
+
+    #[test]
+    fn receipt_wire_rejects_failed_with_after_state_digest() {
+        let r = sample_receipt();
+        let wire = ReceiptWireShape {
+            schema_version: REPAIR_RECEIPT_SCHEMA_VERSION,
+            repair_receipt_class: r.repair_receipt_class,
+            effect_outcome: EffectOutcome::Failed,
+            divergence_evidence_hash: r.divergence_evidence_hash,
+            repair_plan_hash: r.repair_plan_hash,
+            affected_state_class: r.affected_state_class,
+            scope: &r.scope,
+            actor_did: &r.actor_did,
+            authority_basis: &r.authority_basis,
+            boundary_rules: &r.boundary_rules,
+            before_state_digest: &r.before_state_digest,
+            after_state_digest: &r.after_state_digest, // disallowed for Failed
+            applied_at: r.applied_at,
+            freshness_valid_until: r.freshness_valid_until,
+            private_content_implication: r.private_content_implication,
+            failure_reason: Some(RepairFailureReason::DigestMismatchPersisted),
+            receipt_nonce: r.receipt_nonce,
+            receipt_hash: r.receipt_hash,
+            signature: r.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<RepairReceipt, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+    }
+
+    // ---- RepairReceipt: collection canonicalization ----
+
+    #[test]
+    fn receipt_boundary_rules_normalize_unsorted_wire_input() {
+        // A peer sends boundary_rules in non-canonical order with a dup;
+        // BoundaryRuleSet's serde(from = ...) collapses it. The resulting
+        // RepairReceipt has the canonical set and verify_binding() agrees.
+        let r = sample_receipt();
+        let canonical_rules = r.boundary_rules.rules().to_vec();
+        assert!(canonical_rules.len() >= 2);
+        let mut shuffled: Vec<BoundaryRuleRef> = canonical_rules.iter().copied().rev().collect();
+        shuffled.push(shuffled[0]); // dup
+
+        #[derive(Serialize)]
+        struct LocalWire<'a> {
+            schema_version: u32,
+            repair_receipt_class: RepairReceiptClass,
+            effect_outcome: EffectOutcome,
+            divergence_evidence_hash: Hash,
+            repair_plan_hash: Hash,
+            affected_state_class: StateClass,
+            scope: &'a ProbeScope,
+            actor_did: &'a Did,
+            authority_basis: &'a AuthorityBasis,
+            boundary_rules: LocalBadRules,
+            before_state_digest: &'a Option<StateDigest>,
+            after_state_digest: &'a Option<StateDigest>,
+            applied_at: u64,
+            freshness_valid_until: u64,
+            private_content_implication: bool,
+            failure_reason: Option<RepairFailureReason>,
+            receipt_nonce: [u8; 32],
+            receipt_hash: Hash,
+            signature: Signature,
+        }
+        #[derive(Serialize)]
+        struct LocalBadRules {
+            rules: Vec<BoundaryRuleRef>,
+        }
+
+        let wire = LocalWire {
+            schema_version: r.schema_version,
+            repair_receipt_class: r.repair_receipt_class,
+            effect_outcome: r.effect_outcome,
+            divergence_evidence_hash: r.divergence_evidence_hash,
+            repair_plan_hash: r.repair_plan_hash,
+            affected_state_class: r.affected_state_class,
+            scope: &r.scope,
+            actor_did: &r.actor_did,
+            authority_basis: &r.authority_basis,
+            boundary_rules: LocalBadRules { rules: shuffled },
+            before_state_digest: &r.before_state_digest,
+            after_state_digest: &r.after_state_digest,
+            applied_at: r.applied_at,
+            freshness_valid_until: r.freshness_valid_until,
+            private_content_implication: r.private_content_implication,
+            failure_reason: r.failure_reason,
+            receipt_nonce: r.receipt_nonce,
+            receipt_hash: r.receipt_hash,
+            signature: r.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let restored: RepairReceipt = serde_json::from_str(&json).unwrap();
+        // Canonicalization restored the sorted/deduped set, so the
+        // recomputed binding hash matches the original.
+        assert_eq!(restored.boundary_rules.rules(), canonical_rules.as_slice());
+        assert!(restored.verify_binding());
+    }
+
+    // ---- RepairReceipt: privacy ----
+
+    #[test]
+    fn receipt_private_case_carries_refs_not_bodies() {
+        // For a repair touching scoped-vault references, the receipt's
+        // before/after digests are bounded StateDigest projections
+        // (hashes / counts / Merkle roots) — never object bodies. The
+        // type system enforces this structurally: there is no field on
+        // RepairReceipt that can carry a body.
+        let private_before =
+            StateDigest::ShortList(ShortDigestList::from_hashes(vec![[0xAA; 32], [0xBB; 32]]));
+        let private_after = StateDigest::ShortList(ShortDigestList::from_hashes(vec![
+            [0xAA; 32], [0xBB; 32], [0xCC; 32],
+        ]));
+        let ev = DivergenceEvidence::new(
+            DivergenceClass::PrivateObjectReferenceMismatchWithoutContentDisclosure,
+            StateClass::ScopedVaultReference,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-care-plan-vault".to_string(),
+            },
+            sample_peers(),
+            DigestMismatch::Differs {
+                local: private_before.clone(),
+                remote: private_after.clone(),
+            },
+            sample_policy_clause(),
+            1_715_000_000,
+            1_715_000_030,
+            true,
+            [0x55; 32],
+        );
+        let plan = RepairPlan::new(
+            RepairAction::FetchMissing,
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-care-plan-vault".to_string(),
+            },
+            BoundaryRuleSet::from_rules(vec![
+                BoundaryRuleRef::NoRawPrivateContentInGossipOrProbes,
+                BoundaryRuleRef::NoLocalityOrDisclosureWidening,
+            ]),
+            ExpectedRepairReceiptClass::FetchMissingReceipt,
+            ev.evidence_hash,
+            1_715_000_001,
+            1_715_000_031,
+            [0x66; 32],
+        );
+        let r = RepairReceipt::new(
+            RepairReceiptClass::FetchMissingReceipt,
+            EffectOutcome::Applied,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ScopedVaultReference,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-care-plan-vault".to_string(),
+            },
+            "did:icn:scoped-vault-steward".to_string(),
+            AuthorityBasis::DomainPolicyClause(sample_policy_clause()),
+            BoundaryRuleSet::from_rules(vec![
+                BoundaryRuleRef::NoRawPrivateContentInGossipOrProbes,
+                BoundaryRuleRef::NoLocalityOrDisclosureWidening,
+            ]),
+            Some(private_before),
+            Some(private_after),
+            1_715_000_002,
+            1_715_000_032,
+            true,
+            None,
+            [0x77; 32],
+        )
+        .expect("private repair receipt is structurally consistent");
+        assert!(r.private_content_implication);
+        assert!(r.verify_binding());
+        // Structurally: the only fields that could carry private data are
+        // before_state_digest / after_state_digest, and both are
+        // StateDigest enums whose every projection is hashes / counts.
+        match r.before_state_digest.as_ref().unwrap() {
+            StateDigest::ShortList(list) => assert_eq!(list.hashes().len(), 2),
+            _ => panic!("expected ShortList projection"),
+        }
+        match r.after_state_digest.as_ref().unwrap() {
+            StateDigest::ShortList(list) => assert_eq!(list.hashes().len(), 3),
+            _ => panic!("expected ShortList projection"),
+        }
+    }
+
+    // ---- RepairReceipt: cross-links back to plan and evidence ----
+
+    #[test]
+    fn receipt_references_plan_and_evidence_by_hash() {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        let r = sample_receipt();
+        assert_eq!(r.divergence_evidence_hash, ev.evidence_hash);
+        assert_eq!(r.repair_plan_hash, plan.plan_hash);
+        // A receipt built against a different evidence nonce no longer
+        // matches the live evidence — the cross-link is meaningful.
+        let ev2 = DivergenceEvidence::new(
+            ev.divergence_class,
+            ev.affected_state_class,
+            ev.scope.clone(),
+            ev.peers.clone(),
+            ev.digest_mismatch.clone(),
+            ev.policy_clause.clone(),
+            ev.freshness_emitted_at,
+            ev.freshness_valid_until,
+            ev.private_content_implication,
+            [0xEE; 32],
+        );
+        assert_ne!(r.divergence_evidence_hash, ev2.evidence_hash);
     }
 }
