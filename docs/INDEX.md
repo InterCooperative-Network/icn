@@ -105,6 +105,7 @@ Comprehensive architectural reviews and design decisions:
 - [CELLS_AND_SCOPES.md](architecture/CELLS_AND_SCOPES.md) - Cell-based federation model
 - [SCOPE_BOUNDED_TRUST.md](architecture/SCOPE_BOUNDED_TRUST.md) - Trust scope architecture
 - [KERNEL_APP_SEPARATION.md](architecture/KERNEL_APP_SEPARATION.md) - Kernel/app boundary design
+- [ABUSE_CASE_HARDENING_STRATEGY.md](architecture/ABUSE_CASE_HARDENING_STRATEGY.md) - Institutional-failure-mode hardening doctrine
 - [DEBIAN_APPLIANCE_MODEL.md](architecture/DEBIAN_APPLIANCE_MODEL.md) - Debian appliance / installable node image (scaffold-only; not production)
 - [FEDERATION_INTEROP_CONTRACT.md](architecture/FEDERATION_INTEROP_CONTRACT.md) - Federation protocols
 - [CLIENT_MODEL.md](architecture/CLIENT_MODEL.md) - Client architecture patterns

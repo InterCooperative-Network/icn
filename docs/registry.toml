@@ -666,7 +666,7 @@ category = "status"
 status = "living"
 title = "ICN State (living doc)"
 description = "Living snapshot of repo layout, decisions, constraints, and current engineering status"
-last_updated = "2026-05-15"
+last_updated = "2026-05-16"
 owner = "matt"
 audiences = ["developers", "agents"]
 truth_class = "descriptive"
@@ -675,7 +675,7 @@ canonical = "yes"
 freshness = "current"
 domain_tags = ["status", "project"]
 recommended_action = "keep"
-last_reviewed = "2026-05-15"
+last_reviewed = "2026-05-16"
 
 [docs."docs/DOCUMENTATION_CONTROL_SYSTEM.md"]
 category = "reference"
@@ -898,6 +898,22 @@ freshness = "current"
 domain_tags = ["architecture", "process", "contracts", "governance", "accessibility"]
 recommended_action = "keep"
 last_reviewed = "2026-05-04"
+
+[docs."docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md"]
+category = "architecture"
+status = "living"
+title = "Abuse-case hardening strategy"
+description = "Strategy / doctrine doc codifying ICN's institutional-failure-mode hardening layer: the substrate must not become an administrative panel with receipts. Ten one-line doctrine rules (receipts prove events not legitimacy; authority shortcuts must label themselves as shortcuts; unresolved standing is not standing in production; accepted is not applied; convenience paths must not become authority paths; bootstrap is not democracy; a capability token is not a mandate; a UI must not launder uncertainty into confidence; privacy posture is not private content; index absence is not record absence). Ten code-anchored abuse stories and matching hardening tracks: narrowing the broad governance:write scope, marking direct membership mutation and direct charter activation as bootstrap-only shortcuts with explicit administrative receipts, fail-closed resolver/checker policy in production, closed lifecycle vocabulary across API/shell/cockpit, per-effect idempotency, governance-parameter sanity bands, shell/cockpit fixture matrix, PrivateEvidence non-rendering regression, typed-receipt atomicity inventory. Strategy only — no runtime change, no new ADR, no new contract URN, no production-readiness claim. Companion to ARCHITECTURE_DUE_DILIGENCE.md and upstream of security/production-hardening.md."
+last_updated = "2026-05-16"
+owner = "matt"
+audiences = ["architects", "contributors"]
+truth_class = "descriptive"
+role = "architecture"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["architecture", "process", "governance", "security", "hardening"]
+recommended_action = "keep"
+last_reviewed = "2026-05-16"
 
 [docs."docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md"]
 category = "architecture"

@@ -1,10 +1,34 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-05-15
+Last Reviewed: 2026-05-16
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-05-16 (abuse-case hardening strategy doc):
+     Truth-sync recording the landing of `docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md`. **Doc/control-plane only**: no Rust code, no schema fields changed, no new contract URN, no new ADR, no new RFC, no new ADR-0026 receipt class, no kernel/gateway/runtime mutation, no K3s/DNS/Forgejo mutation, no NYCN partner data, no production-readiness claim, no live-federation claim, no formal NYCN pilot claim, no Phase 2 completion claim.
+
+     The session landed five files in one commit on branch `docs/abuse-case-hardening-strategy` (worktree-isolated):
+       - docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md (new, 608 lines): institutional-failure-mode hardening doctrine. Ten one-line doctrine rules (receipts prove events not legitimacy; authority shortcuts must label themselves as shortcuts; unresolved standing is not standing in production; accepted is not applied; convenience paths must not become authority paths; bootstrap is not democracy; a capability token is not a mandate; a UI must not launder uncertainty into confidence; privacy posture is not private content; index absence is not record absence). Ten code-anchored abuse stories and matching hardening tracks against current main (d57ff1d6e): broad `governance:write` scope at icn-rpc/src/auth.rs:947 covering ~12 mutation handlers; direct membership mutation at apps/governance/src/http/handlers.rs:548-635 with fail-open TrustThreshold at :572/:617; direct charter activation at handlers.rs:694-744 with synthetic `direct-activation:` provenance; optional checker wiring at apps/governance/src/http/configure.rs:197-264; reconciliation status enum at apps/governance/src/dispatch_evidence.rs:131-169 with EmittedOnly/ExecutionEvidenced/ExecutionFailed; receipt_backend.rs:178-190 documenting put_mandate_with_grants default as NOT atomic; kernel-api/src/proofs.rs:646-661 ScopedVault digest-only rendering boundary. Closed lifecycle vocabulary, production invariants, authority-shortcut policy, resolver fail-closed policy, fixture-matrix plan, and a P0–P3 candidate issue roster are all named without filing.
+       - docs/dev/handoff-2026-05-16-abuse-case-hardening.md (new): session handoff with verified anchor table, decisive-test fail criteria, deferred-items list, preserved-boundaries list, unsafe-assumptions list, next-move PR command, and checks-run / checks-not-run tables.
+       - docs/INDEX.md: one architecture-section line under KERNEL_APP_SEPARATION.md.
+       - docs/registry.toml: one [docs."docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md"] control-plane row, schema matching ARCHITECTURE_DUE_DILIGENCE.md.
+       - docs/STATE.md: this sync-edit block.
+
+     Cross-sprint disciplines preserved verbatim:
+       - No new ADR, no new RFC, no new contract URN. The strategy doc is process / principle, not an architectural decision; specific design picks (scope decomposition vs mandate gating, administrative receipt class, closed-vocabulary owner, degraded-state record class, direct-mutation lifetime) are explicitly listed as open questions deferred to follow-up PRs.
+       - No new ADR-0026 receipt class. The candidate `BootstrapCharterActivationReceipt` and `BootstrapMembershipMutationReceipt` artifacts are draft names; whether they are new receipt classes or discriminators on existing administrative receipt types is itself an open question (§15).
+       - The meaning firewall is not widened. §4.1 keeps mandate-bundle gating as the ICN-native authority path where it fits; kernel-side capability strings are kept for kernel enforcement only.
+       - Settlement / position / obligation / allocation / receipt / provenance — never payment / wallet / currency / balance / token / crypto / blockchain / timebank — for ICN-native compute / settlement / federation surfaces.
+       - Privacy is posture, not content. PrivateEvidence body bytes never reach any rendering layer; the §4.9 / §12 regression-test set asserts this against the existing digest-only boundary at icn-kernel-api/src/proofs.rs:646-661.
+       - When cockpit shows degraded, member shell must show degraded too — the §4.8 / §11 fixture-matrix plan formalizes this against the existing member-shell-v0 / steward-cockpit-v0 v0 violation rule.
+
+     Phase 2 status remains ⏳ (still partner-bound). Nothing in this session completes a phase, removes a partner-binding gate, or implements any of the named hardening tracks. The strategy doc is descriptive of what production must look like; the implementation that achieves it is sequenced in §16 (Stages A–E) and unfiled.
+
+     Next pre-RFC architecture move is **not yet selected**; this sync preserves optionality. The strategy doc's §14 P0 roster (scope split design, BootstrapMembershipMutationReceipt design, BootstrapCharterActivationReceipt design, production startup guard for optional checkers / resolvers) is the named first candidate set, but neither selection nor issue filing is part of this session.
+
+     Hard rule preserved: this sync does NOT change any contract field, does NOT mint a new contract URN, does NOT add an ADR, does NOT add an RFC, does NOT widen gateway typed governance imports, does NOT increase the meaning-firewall ratchet, does NOT touch K3s / DNS / GitHub / Forgejo state, does NOT handle private partner / member / organizer data, does NOT claim Phase 2 completion, does NOT claim formal NYCN pilot, does NOT claim production readiness, does NOT claim live federation, does NOT start runtime work. Phase model unchanged. -->
 
 <!-- [sync edit] 2026-05-15 (post architecture-spec sprint, PRs #1814 / #1819 / #1820 / #1821 / #1822 / #1823 / #1824 / #1825 / #1826 / #1827 / #1829 / #1830 / #1831 / #1832 / #1833):
      Truth-sync for the architecture-spec sprint completion. **Doc/control-plane only**: no Rust code, no schema fields changed, no new contract URN, no new ADR, no new RFC, no new ADR-0026 receipt class, no kernel/gateway/runtime mutation, no K3s/DNS/Forgejo mutation, no NYCN partner data, no production-readiness claim, no live-federation claim, no formal NYCN pilot claim, no Phase 2 completion claim.
