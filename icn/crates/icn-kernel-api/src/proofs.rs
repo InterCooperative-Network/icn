@@ -1511,6 +1511,479 @@ impl PeerSyncReport {
 }
 
 // ============================================================================
+// SyncDegradedStatus — policy-derived rendering directive (issue #1856)
+//
+// Wire-stable record for the spec's boundary rule 5 ("No treating
+// degraded sync as healthy") in
+// `docs/spec/network-anti-entropy-proof-loops.md`. When a
+// `PeerSyncReport` reports `Divergent` or `MissingOnLocal` and the
+// divergence is not repaired within the freshness window, the surface
+// MUST render a degraded status; the cockpit MUST NOT show healthy and
+// the member shell MUST NOT show "Synced." `SyncDegradedStatus` is the
+// kernel-side record of that policy decision.
+//
+// Unlike the other proof records in this module, `SyncDegradedStatus`
+// is not part of the probe → compare → classify → plan → apply chain.
+// It is a *parallel* policy-derived status that the steward and member
+// rendering surfaces consume to honor boundary rule 5. The kernel does
+// not classify when to emit one — that is the policy oracle's job —
+// but it records the categorical degradation level and the cross-link
+// to the originating `PeerSyncReport`.
+//
+// Per spec line 218: this record rides inside an existing Stage 5
+// `EffectDispatchEvidence` envelope. No new top-level ADR-0026
+// receipt class is introduced.
+// ============================================================================
+
+/// Schema version for `SyncDegradedStatus`. Increment on any
+/// wire-affecting change to the binding.
+pub const SYNC_DEGRADED_STATUS_SCHEMA_VERSION: u32 = 1;
+
+// ----------------------------------------------------------------------------
+// DegradationLevel — closed two-variant taxonomy
+// ----------------------------------------------------------------------------
+
+/// Closed degradation severity taxonomy aligned to the spec's
+/// member-shell vocabulary.
+///
+/// Per `docs/spec/network-anti-entropy-proof-loops.md` §"Member shell
+/// surface":
+///
+/// - `WithinGraceWindow` — the degradation is fresh within policy.
+///   The member shell renders one of: "Sync delayed", "Action paused
+///   until records sync".
+/// - `BeyondGraceWindow` — the degradation has persisted past the
+///   policy's grace window. The member shell renders "Sync delayed /
+///   degraded" — honest signaling that the institution is not
+///   currently in a healthy sync state.
+///
+/// The kernel does not interpret what each level *means* for action
+/// authority — that is the policy oracle's concern. The kernel only
+/// ensures the recorded level round-trips deterministically and that
+/// no level outside this closed set can be expressed on the wire.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum DegradationLevel {
+    /// Degradation is fresh; within the policy's grace window.
+    WithinGraceWindow,
+    /// Degradation has persisted past the policy's grace window.
+    BeyondGraceWindow,
+}
+
+impl DegradationLevel {
+    /// Stable lowercase string label for logs and audit rows. Not the
+    /// serialized wire encoding.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DegradationLevel::WithinGraceWindow => "within_grace_window",
+            DegradationLevel::BeyondGraceWindow => "beyond_grace_window",
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// SyncDegradedStatusError — structural validation
+// ----------------------------------------------------------------------------
+
+/// Structural validation errors a `SyncDegradedStatus` can produce at
+/// construction or wire-deserialization time.
+///
+/// Kernel-level structural rules only.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum SyncDegradedStatusError {
+    /// `schema_version` did not match
+    /// [`SYNC_DEGRADED_STATUS_SCHEMA_VERSION`].
+    #[error("unsupported SyncDegradedStatus schema_version: got {got}, supported {supported}")]
+    UnsupportedSchemaVersion {
+        /// The version observed on the wire / at construction.
+        got: u32,
+        /// The version this build supports.
+        supported: u32,
+    },
+    /// `triggered_by_outcome` is not one of the outcomes that the
+    /// spec's boundary rule 5 permits to trigger a degraded status.
+    /// Only `MissingOnLocal` and `Divergent` may trigger degradation;
+    /// `Matching`, `MissingOnRemote`, and `UnknownOutOfScope` cannot.
+    #[error(
+        "SyncDegradedStatus triggered_by_outcome={outcome} is not eligible to trigger \
+         degradation (spec boundary rule 5: only `divergent` and `missing on local` qualify)"
+    )]
+    OutcomeNotEligibleForDegradation {
+        /// The ineligible outcome.
+        outcome: &'static str,
+    },
+    /// `degraded_since` is later than `freshness_valid_until`. The
+    /// freshness window must end at or after the degradation began.
+    #[error(
+        "SyncDegradedStatus degraded_since={degraded_since} is after \
+         freshness_valid_until={freshness_valid_until}"
+    )]
+    DegradedSinceAfterFreshness {
+        /// The recorded degradation start.
+        degraded_since: u64,
+        /// The recorded freshness expiry.
+        freshness_valid_until: u64,
+    },
+}
+
+impl From<SyncDegradedStatusError> for String {
+    fn from(err: SyncDegradedStatusError) -> Self {
+        err.to_string()
+    }
+}
+
+// ----------------------------------------------------------------------------
+// SyncDegradedStatus
+// ----------------------------------------------------------------------------
+
+/// The policy-derived rendering directive for a `PeerSyncReport`
+/// outcome that is not repaired within policy.
+///
+/// Per `docs/spec/network-anti-entropy-proof-loops.md` §"Boundary
+/// rules" rule 5: when a `PeerSyncReport` is `Divergent` or
+/// `MissingOnLocal` and the divergence is not yet repaired within the
+/// freshness window, the steward / member-facing surface MUST render
+/// `SyncDegradedStatus`. The cockpit MUST NOT show healthy; the
+/// member shell MUST NOT show "Synced."
+///
+/// `SyncDegradedStatus` carries:
+///
+/// - A mandatory cross-link to the originating `PeerSyncReport` via
+///   `peer_sync_report_hash`.
+/// - A copy of the `triggered_by_outcome` (structurally restricted to
+///   `MissingOnLocal` | `Divergent` per boundary rule 5).
+/// - The affected state class and scope (which must mirror the
+///   originating report's; the kernel does not re-verify because it
+///   does not have the report in hand).
+/// - The reporter DID — the policy oracle / surface producer that
+///   recorded the status.
+/// - A `DegradationLevel` (within-grace vs beyond-grace per spec
+///   §"Member shell surface" vocabulary).
+/// - A `degraded_since` timestamp.
+/// - A `freshness_valid_until` timestamp (must be ≥ `degraded_since`).
+/// - An optional cross-link to a downstream `DivergenceEvidence` via
+///   `divergence_evidence_hash` (`None` when classification has not
+///   yet run; `Some(_)` when it has).
+/// - A `private_content_implication` flag.
+///
+/// # The status is not the comparison
+///
+/// `SyncDegradedStatus` records that a comparison outcome has
+/// persisted past policy grace into a degraded state. It does NOT
+/// re-run the comparison, classify divergence, or plan repair. It is
+/// purely a rendering directive carrying the policy decision "this
+/// surface MUST render degraded."
+///
+/// # Privacy
+///
+/// `SyncDegradedStatus` does not carry raw state — only opaque
+/// cross-link hashes and the categorical degradation level. For
+/// statuses derived from comparisons over private state,
+/// `private_content_implication` is set; renderers MUST gate
+/// technical detail behind the disclosure scope of the affected
+/// state.
+///
+/// # Self-authentication
+///
+/// `status_hash` is a blake3 binding under
+/// `DOMAIN_TAG = b"icn:sync-degraded-status:v1"`, length-prefixed,
+/// over a canonical bincode encoding of all bound fields (excluding
+/// `status_hash` and `signature`). [`Self::verify_binding`] re-checks
+/// both the hash and the schema version; either alone is insufficient.
+/// Deserialization rejects unsupported schema versions AND
+/// structurally invalid `triggered_by_outcome` values AND
+/// `degraded_since` > `freshness_valid_until` via
+/// `#[serde(try_from = ...)]`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "RawSyncDegradedStatus")]
+pub struct SyncDegradedStatus {
+    /// Wire schema version. See [`SYNC_DEGRADED_STATUS_SCHEMA_VERSION`].
+    pub schema_version: u32,
+    /// `report_hash` of the originating [`PeerSyncReport`] this status
+    /// derives from.
+    pub peer_sync_report_hash: Hash,
+    /// The compare-phase outcome that triggered this degraded status.
+    /// MUST be `MissingOnLocal` or `Divergent` per spec boundary rule 5.
+    pub triggered_by_outcome: PeerSyncOutcome,
+    /// State class affected by the degradation. MUST mirror the
+    /// originating report's `state_class`.
+    pub state_class: StateClass,
+    /// Scope of the degradation. MUST mirror the originating report's
+    /// `scope`.
+    pub scope: ProbeScope,
+    /// DID of the policy oracle / surface producer that recorded this
+    /// status.
+    pub reporter_did: Did,
+    /// Categorical degradation severity (within-grace vs beyond-grace).
+    pub degradation_level: DegradationLevel,
+    /// Unix seconds when the degradation began (typically the
+    /// originating report's `observed_at`).
+    pub degraded_since: u64,
+    /// Unix seconds beyond which this status is stale. MUST be
+    /// `>= degraded_since`.
+    pub freshness_valid_until: u64,
+    /// Optional cross-link to a downstream
+    /// [`DivergenceEvidence::evidence_hash`] when classification has
+    /// produced one. `None` before classification, `Some(_)` after.
+    pub divergence_evidence_hash: Option<Hash>,
+    /// `true` if the degraded comparison touched private state.
+    /// Renderers MUST gate technical detail behind the disclosure
+    /// scope of the affected state.
+    pub private_content_implication: bool,
+    /// 32-byte random nonce.
+    pub status_nonce: [u8; 32],
+    /// blake3 binding hash over all bound fields.
+    pub status_hash: Hash,
+    /// Reporter signature (empty until signed by a higher layer).
+    pub signature: Signature,
+}
+
+/// Raw wire form for [`SyncDegradedStatus`]. Validated into the
+/// public type via [`TryFrom`] (fails closed on unsupported
+/// `schema_version`, ineligible `triggered_by_outcome`, and
+/// `degraded_since` > `freshness_valid_until`).
+#[derive(Deserialize)]
+struct RawSyncDegradedStatus {
+    schema_version: u32,
+    peer_sync_report_hash: Hash,
+    triggered_by_outcome: PeerSyncOutcome,
+    state_class: StateClass,
+    scope: ProbeScope,
+    reporter_did: Did,
+    degradation_level: DegradationLevel,
+    degraded_since: u64,
+    freshness_valid_until: u64,
+    divergence_evidence_hash: Option<Hash>,
+    private_content_implication: bool,
+    status_nonce: [u8; 32],
+    status_hash: Hash,
+    signature: Signature,
+}
+
+impl TryFrom<RawSyncDegradedStatus> for SyncDegradedStatus {
+    type Error = String;
+
+    fn try_from(raw: RawSyncDegradedStatus) -> Result<Self, Self::Error> {
+        if raw.schema_version != SYNC_DEGRADED_STATUS_SCHEMA_VERSION {
+            return Err(SyncDegradedStatusError::UnsupportedSchemaVersion {
+                got: raw.schema_version,
+                supported: SYNC_DEGRADED_STATUS_SCHEMA_VERSION,
+            }
+            .to_string());
+        }
+        SyncDegradedStatus::validate_structural_invariants(
+            raw.triggered_by_outcome,
+            raw.degraded_since,
+            raw.freshness_valid_until,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(Self {
+            schema_version: raw.schema_version,
+            peer_sync_report_hash: raw.peer_sync_report_hash,
+            triggered_by_outcome: raw.triggered_by_outcome,
+            state_class: raw.state_class,
+            scope: raw.scope,
+            reporter_did: raw.reporter_did,
+            degradation_level: raw.degradation_level,
+            degraded_since: raw.degraded_since,
+            freshness_valid_until: raw.freshness_valid_until,
+            divergence_evidence_hash: raw.divergence_evidence_hash,
+            private_content_implication: raw.private_content_implication,
+            status_nonce: raw.status_nonce,
+            status_hash: raw.status_hash,
+            signature: raw.signature,
+        })
+    }
+}
+
+/// Canonical binding fields for `SyncDegradedStatus::status_hash`.
+///
+/// Excludes `status_hash` (the output) and `signature` (filled after
+/// binding). Any new bound field added here requires bumping
+/// [`SYNC_DEGRADED_STATUS_SCHEMA_VERSION`].
+#[derive(Serialize)]
+struct SyncDegradedStatusBinding<'a> {
+    schema_version: u32,
+    peer_sync_report_hash: Hash,
+    triggered_by_outcome: PeerSyncOutcome,
+    state_class: StateClass,
+    scope: &'a ProbeScope,
+    reporter_did: &'a Did,
+    degradation_level: DegradationLevel,
+    degraded_since: u64,
+    freshness_valid_until: u64,
+    divergence_evidence_hash: Option<Hash>,
+    private_content_implication: bool,
+    status_nonce: [u8; 32],
+}
+
+impl SyncDegradedStatus {
+    /// Domain-separation tag for `status_hash`. Distinct from
+    /// [`PeerSyncReport::DOMAIN_TAG`], [`AntiEntropyProbe::DOMAIN_TAG`],
+    /// [`DivergenceEvidence::DOMAIN_TAG`], [`RepairPlan::DOMAIN_TAG`],
+    /// [`RepairReceipt::DOMAIN_TAG`], and [`ArtifactReceipt::DOMAIN_TAG`].
+    pub const DOMAIN_TAG: &'static [u8] = b"icn:sync-degraded-status:v1";
+
+    /// Construct a new status with computed `status_hash` and empty
+    /// signature.
+    ///
+    /// Returns [`SyncDegradedStatusError`] if structural invariants
+    /// are violated (see [`Self::validate_structural_invariants`]).
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        peer_sync_report_hash: Hash,
+        triggered_by_outcome: PeerSyncOutcome,
+        state_class: StateClass,
+        scope: ProbeScope,
+        reporter_did: Did,
+        degradation_level: DegradationLevel,
+        degraded_since: u64,
+        freshness_valid_until: u64,
+        divergence_evidence_hash: Option<Hash>,
+        private_content_implication: bool,
+        status_nonce: [u8; 32],
+    ) -> Result<Self, SyncDegradedStatusError> {
+        Self::validate_structural_invariants(
+            triggered_by_outcome,
+            degraded_since,
+            freshness_valid_until,
+        )?;
+        let status_hash = Self::compute_status_hash(
+            SYNC_DEGRADED_STATUS_SCHEMA_VERSION,
+            peer_sync_report_hash,
+            triggered_by_outcome,
+            state_class,
+            &scope,
+            &reporter_did,
+            degradation_level,
+            degraded_since,
+            freshness_valid_until,
+            divergence_evidence_hash,
+            private_content_implication,
+            &status_nonce,
+        );
+        Ok(Self {
+            schema_version: SYNC_DEGRADED_STATUS_SCHEMA_VERSION,
+            peer_sync_report_hash,
+            triggered_by_outcome,
+            state_class,
+            scope,
+            reporter_did,
+            degradation_level,
+            degraded_since,
+            freshness_valid_until,
+            divergence_evidence_hash,
+            private_content_implication,
+            status_nonce,
+            status_hash,
+            signature: Signature::new(Vec::new()),
+        })
+    }
+
+    /// Validate the structural invariants:
+    ///
+    /// - `triggered_by_outcome` MUST be `MissingOnLocal` or
+    ///   `Divergent` per spec boundary rule 5.
+    /// - `degraded_since` MUST be `<= freshness_valid_until`.
+    pub fn validate_structural_invariants(
+        triggered_by_outcome: PeerSyncOutcome,
+        degraded_since: u64,
+        freshness_valid_until: u64,
+    ) -> Result<(), SyncDegradedStatusError> {
+        if !matches!(
+            triggered_by_outcome,
+            PeerSyncOutcome::MissingOnLocal | PeerSyncOutcome::Divergent
+        ) {
+            return Err(SyncDegradedStatusError::OutcomeNotEligibleForDegradation {
+                outcome: triggered_by_outcome.as_str(),
+            });
+        }
+        if degraded_since > freshness_valid_until {
+            return Err(SyncDegradedStatusError::DegradedSinceAfterFreshness {
+                degraded_since,
+                freshness_valid_until,
+            });
+        }
+        Ok(())
+    }
+
+    /// Compute the binding hash from the significant fields.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_status_hash(
+        schema_version: u32,
+        peer_sync_report_hash: Hash,
+        triggered_by_outcome: PeerSyncOutcome,
+        state_class: StateClass,
+        scope: &ProbeScope,
+        reporter_did: &Did,
+        degradation_level: DegradationLevel,
+        degraded_since: u64,
+        freshness_valid_until: u64,
+        divergence_evidence_hash: Option<Hash>,
+        private_content_implication: bool,
+        status_nonce: &[u8; 32],
+    ) -> Hash {
+        let binding = SyncDegradedStatusBinding {
+            schema_version,
+            peer_sync_report_hash,
+            triggered_by_outcome,
+            state_class,
+            scope,
+            reporter_did,
+            degradation_level,
+            degraded_since,
+            freshness_valid_until,
+            divergence_evidence_hash,
+            private_content_implication,
+            status_nonce: *status_nonce,
+        };
+        let payload = bincode::serialize(&binding)
+            .expect("SyncDegradedStatusBinding serialization is infallible");
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        *hasher.finalize().as_bytes()
+    }
+
+    /// `true` iff `schema_version == SYNC_DEGRADED_STATUS_SCHEMA_VERSION`.
+    pub fn is_supported_schema_version(&self) -> bool {
+        self.schema_version == SYNC_DEGRADED_STATUS_SCHEMA_VERSION
+    }
+
+    /// Verify the stored `status_hash` and `schema_version`.
+    ///
+    /// Returns `true` only if both hold. Fails closed on unsupported
+    /// versions even when the stored hash matches a recomputation
+    /// under that version.
+    pub fn verify_binding(&self) -> bool {
+        if !self.is_supported_schema_version() {
+            return false;
+        }
+        let recomputed = Self::compute_status_hash(
+            self.schema_version,
+            self.peer_sync_report_hash,
+            self.triggered_by_outcome,
+            self.state_class,
+            &self.scope,
+            &self.reporter_did,
+            self.degradation_level,
+            self.degraded_since,
+            self.freshness_valid_until,
+            self.divergence_evidence_hash,
+            self.private_content_implication,
+            &self.status_nonce,
+        );
+        self.status_hash == recomputed
+    }
+
+    /// `true` if `now_unix_seconds <= freshness_valid_until`.
+    pub fn is_fresh(&self, now_unix_seconds: u64) -> bool {
+        now_unix_seconds <= self.freshness_valid_until
+    }
+}
+
+// ============================================================================
 // DivergenceEvidence and RepairPlan records (issue #1835)
 //
 // Wire-stable record shapes for the next two design-level identifiers from
@@ -4348,6 +4821,603 @@ mod anti_entropy_tests {
         // record.
         let json = serde_json::to_string(&r).unwrap();
         let restored: PeerSyncReport = serde_json::from_str(&json).unwrap();
+        assert!(restored.private_content_implication);
+        assert!(restored.verify_binding());
+    }
+
+    // =========================================================================
+    // SyncDegradedStatus (issue #1856)
+    // =========================================================================
+
+    fn sample_sync_degraded_status() -> SyncDegradedStatus {
+        let report = sample_peer_sync_report();
+        // The sample report is `MissingOnRemote`, which boundary rule 5
+        // does NOT permit as a degradation trigger. The status sample
+        // therefore uses a `MissingOnLocal`-shaped scenario: build a
+        // dedicated report and derive the status from it.
+        let probe = sample_probe();
+        let local_report = PeerSyncReport::new(
+            probe.probe_hash,
+            PeerSyncOutcome::MissingOnLocal,
+            probe.state_class,
+            probe.target_scope.clone(),
+            "did:icn:responder789".to_string(),
+            probe.prober_did.clone(),
+            sample_responder_local_digest(),
+            1_715_000_005,
+            1_715_000_035,
+            None,
+            false,
+            [0xBA; 32],
+        )
+        .expect("MissingOnLocal report is structurally consistent");
+        // The status itself; note `peer_sync_report_hash` cross-links to
+        // `local_report`, not `report` (which uses MissingOnRemote).
+        let _ = report; // suppress unused warning while keeping the symbol
+        SyncDegradedStatus::new(
+            local_report.report_hash,
+            PeerSyncOutcome::MissingOnLocal,
+            local_report.state_class,
+            local_report.scope.clone(),
+            "did:icn:policy-oracle".to_string(),
+            DegradationLevel::WithinGraceWindow,
+            1_715_000_010,
+            1_715_000_070,
+            None,
+            false,
+            [0x77; 32],
+        )
+        .expect("sample SyncDegradedStatus is structurally consistent")
+    }
+
+    // ---- DegradationLevel + Outcome eligibility round-trips ----
+
+    #[test]
+    fn degradation_level_all_variants_round_trip() {
+        let cases = [
+            DegradationLevel::WithinGraceWindow,
+            DegradationLevel::BeyondGraceWindow,
+        ];
+        assert_eq!(cases.len(), 2);
+        for d in &cases {
+            let json = serde_json::to_string(d).unwrap();
+            let restored: DegradationLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(*d, restored);
+            let bytes = bincode::serialize(d).unwrap();
+            let restored_bin: DegradationLevel = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(*d, restored_bin);
+        }
+    }
+
+    #[test]
+    fn degradation_level_as_str_is_stable() {
+        assert_eq!(
+            DegradationLevel::WithinGraceWindow.as_str(),
+            "within_grace_window"
+        );
+        assert_eq!(
+            DegradationLevel::BeyondGraceWindow.as_str(),
+            "beyond_grace_window"
+        );
+    }
+
+    // ---- SyncDegradedStatus: binding determinism + round-trip ----
+
+    #[test]
+    fn sync_degraded_status_binding_is_deterministic() {
+        let s1 = sample_sync_degraded_status();
+        let s2 = sample_sync_degraded_status();
+        assert_eq!(s1.status_hash, s2.status_hash);
+        assert_ne!(s1.status_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn sync_degraded_status_verify_binding_succeeds_for_fresh_record() {
+        let s = sample_sync_degraded_status();
+        assert!(s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_json_round_trip_preserves_hash() {
+        let original = sample_sync_degraded_status();
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: SyncDegradedStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_bincode_round_trip_preserves_hash() {
+        let original = sample_sync_degraded_status();
+        let bytes = bincode::serialize(&original).unwrap();
+        let restored: SyncDegradedStatus = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(original, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_freshness_helper() {
+        let s = sample_sync_degraded_status();
+        assert!(s.is_fresh(s.degraded_since));
+        assert!(s.is_fresh(s.freshness_valid_until));
+        assert!(!s.is_fresh(s.freshness_valid_until + 1));
+    }
+
+    #[test]
+    fn sync_degraded_status_signature_starts_empty() {
+        let s = sample_sync_degraded_status();
+        assert!(s.signature.as_bytes().is_empty());
+    }
+
+    // ---- SyncDegradedStatus: tamper detection for every bound field ----
+
+    #[test]
+    fn sync_degraded_status_peer_sync_report_hash_tamper_detected() {
+        let mut s = sample_sync_degraded_status();
+        s.peer_sync_report_hash = [0xFF; 32];
+        assert!(!s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_triggered_by_outcome_tamper_detected() {
+        // Both MissingOnLocal and Divergent are structurally legal
+        // triggers; switching from one to the other keeps the receipt
+        // structurally consistent and isolates the hash check.
+        let mut s = sample_sync_degraded_status();
+        s.triggered_by_outcome = PeerSyncOutcome::Divergent;
+        assert!(!s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_state_class_tamper_detected() {
+        let mut s = sample_sync_degraded_status();
+        s.state_class = StateClass::ArtifactRegistryMetadata;
+        assert!(!s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_scope_tamper_detected() {
+        let mut s = sample_sync_degraded_status();
+        s.scope = ProbeScope::Commons;
+        assert!(!s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_reporter_did_tamper_detected() {
+        let mut s = sample_sync_degraded_status();
+        s.reporter_did = "did:icn:attacker".to_string();
+        assert!(!s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_degradation_level_tamper_detected() {
+        let mut s = sample_sync_degraded_status();
+        s.degradation_level = DegradationLevel::BeyondGraceWindow;
+        assert!(!s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_degraded_since_tamper_detected() {
+        let mut s = sample_sync_degraded_status();
+        // Keep the value inside the freshness window so we don't trip
+        // the structural rule before the hash check.
+        s.degraded_since += 1;
+        assert!(!s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_freshness_tamper_detected() {
+        let mut s = sample_sync_degraded_status();
+        s.freshness_valid_until += 1;
+        assert!(!s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_divergence_link_tamper_detected() {
+        // The sample uses divergence_evidence_hash=None. Manually
+        // attach a link without recomputing the hash — verify_binding
+        // must reject.
+        let mut s = sample_sync_degraded_status();
+        s.divergence_evidence_hash = Some([0x42; 32]);
+        assert!(!s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_private_implication_tamper_detected() {
+        let mut s = sample_sync_degraded_status();
+        s.private_content_implication = !s.private_content_implication;
+        assert!(!s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_nonce_tamper_detected() {
+        let mut s = sample_sync_degraded_status();
+        s.status_nonce = [0xFF; 32];
+        assert!(!s.verify_binding());
+    }
+
+    // ---- SyncDegradedStatus: schema-version policing ----
+
+    #[derive(Serialize)]
+    struct SyncDegradedStatusWireShape<'a> {
+        schema_version: u32,
+        peer_sync_report_hash: Hash,
+        triggered_by_outcome: PeerSyncOutcome,
+        state_class: StateClass,
+        scope: &'a ProbeScope,
+        reporter_did: &'a Did,
+        degradation_level: DegradationLevel,
+        degraded_since: u64,
+        freshness_valid_until: u64,
+        divergence_evidence_hash: Option<Hash>,
+        private_content_implication: bool,
+        status_nonce: [u8; 32],
+        status_hash: Hash,
+        signature: Signature,
+    }
+
+    #[test]
+    fn sync_degraded_status_rejects_future_schema_version_on_decode() {
+        let s = sample_sync_degraded_status();
+        let bogus = SYNC_DEGRADED_STATUS_SCHEMA_VERSION + 1;
+        let recomputed = SyncDegradedStatus::compute_status_hash(
+            bogus,
+            s.peer_sync_report_hash,
+            s.triggered_by_outcome,
+            s.state_class,
+            &s.scope,
+            &s.reporter_did,
+            s.degradation_level,
+            s.degraded_since,
+            s.freshness_valid_until,
+            s.divergence_evidence_hash,
+            s.private_content_implication,
+            &s.status_nonce,
+        );
+        let wire = SyncDegradedStatusWireShape {
+            schema_version: bogus,
+            peer_sync_report_hash: s.peer_sync_report_hash,
+            triggered_by_outcome: s.triggered_by_outcome,
+            state_class: s.state_class,
+            scope: &s.scope,
+            reporter_did: &s.reporter_did,
+            degradation_level: s.degradation_level,
+            degraded_since: s.degraded_since,
+            freshness_valid_until: s.freshness_valid_until,
+            divergence_evidence_hash: s.divergence_evidence_hash,
+            private_content_implication: s.private_content_implication,
+            status_nonce: s.status_nonce,
+            status_hash: recomputed,
+            signature: s.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<SyncDegradedStatus, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed_bin: Result<SyncDegradedStatus, _> = bincode::deserialize(&bytes);
+        assert!(parsed_bin.is_err());
+    }
+
+    #[test]
+    fn sync_degraded_status_verify_binding_fails_closed_on_manual_bogus_version() {
+        let mut s = sample_sync_degraded_status();
+        let bogus = SYNC_DEGRADED_STATUS_SCHEMA_VERSION + 13;
+        s.schema_version = bogus;
+        s.status_hash = SyncDegradedStatus::compute_status_hash(
+            bogus,
+            s.peer_sync_report_hash,
+            s.triggered_by_outcome,
+            s.state_class,
+            &s.scope,
+            &s.reporter_did,
+            s.degradation_level,
+            s.degraded_since,
+            s.freshness_valid_until,
+            s.divergence_evidence_hash,
+            s.private_content_implication,
+            &s.status_nonce,
+        );
+        assert!(
+            !s.verify_binding(),
+            "verify_binding() must reject unsupported schema_version even when the hash matches"
+        );
+    }
+
+    // ---- SyncDegradedStatus: structural rule (boundary rule 5) ----
+
+    fn _attempt_status_with_outcome(
+        outcome: PeerSyncOutcome,
+    ) -> Result<SyncDegradedStatus, SyncDegradedStatusError> {
+        let report = sample_peer_sync_report();
+        SyncDegradedStatus::new(
+            report.report_hash,
+            outcome,
+            report.state_class,
+            report.scope.clone(),
+            "did:icn:policy-oracle".to_string(),
+            DegradationLevel::WithinGraceWindow,
+            1_715_000_010,
+            1_715_000_070,
+            None,
+            false,
+            [0x77; 32],
+        )
+    }
+
+    #[test]
+    fn sync_degraded_status_rejects_matching_outcome() {
+        let err = _attempt_status_with_outcome(PeerSyncOutcome::Matching).unwrap_err();
+        assert!(matches!(
+            err,
+            SyncDegradedStatusError::OutcomeNotEligibleForDegradation { outcome } if outcome == "matching"
+        ));
+    }
+
+    #[test]
+    fn sync_degraded_status_rejects_missing_on_remote_outcome() {
+        let err = _attempt_status_with_outcome(PeerSyncOutcome::MissingOnRemote).unwrap_err();
+        assert!(matches!(
+            err,
+            SyncDegradedStatusError::OutcomeNotEligibleForDegradation { outcome } if outcome == "missing_on_remote"
+        ));
+    }
+
+    #[test]
+    fn sync_degraded_status_rejects_every_unknown_out_of_scope_reason() {
+        for reason in [
+            UnknownOutOfScopeReason::StaleProbe,
+            UnknownOutOfScopeReason::ScopeMismatch,
+            UnknownOutOfScopeReason::InsufficientAuthority,
+            UnknownOutOfScopeReason::UnknownStateClass,
+        ] {
+            let err = _attempt_status_with_outcome(PeerSyncOutcome::UnknownOutOfScope(reason))
+                .unwrap_err();
+            assert!(matches!(
+                err,
+                SyncDegradedStatusError::OutcomeNotEligibleForDegradation {
+                    outcome
+                } if outcome == "unknown_out_of_scope"
+            ));
+        }
+    }
+
+    #[test]
+    fn sync_degraded_status_accepts_missing_on_local() {
+        let s = _attempt_status_with_outcome(PeerSyncOutcome::MissingOnLocal)
+            .expect("MissingOnLocal is the canonical trigger");
+        assert!(s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_accepts_divergent() {
+        let s = _attempt_status_with_outcome(PeerSyncOutcome::Divergent)
+            .expect("Divergent is the other canonical trigger");
+        assert!(s.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_rejects_degraded_since_after_freshness() {
+        let report = sample_peer_sync_report();
+        let err = SyncDegradedStatus::new(
+            report.report_hash,
+            PeerSyncOutcome::MissingOnLocal,
+            report.state_class,
+            report.scope.clone(),
+            "did:icn:policy-oracle".to_string(),
+            DegradationLevel::WithinGraceWindow,
+            1_715_000_100, // degraded_since
+            1_715_000_070, // freshness_valid_until < degraded_since
+            None,
+            false,
+            [0x77; 32],
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            SyncDegradedStatusError::DegradedSinceAfterFreshness { .. }
+        ));
+    }
+
+    #[test]
+    fn sync_degraded_status_wire_rejects_matching_outcome() {
+        // Even a hash-consistent wire payload must be refused before
+        // any value is constructed.
+        let s = sample_sync_degraded_status();
+        let recomputed = SyncDegradedStatus::compute_status_hash(
+            SYNC_DEGRADED_STATUS_SCHEMA_VERSION,
+            s.peer_sync_report_hash,
+            PeerSyncOutcome::Matching,
+            s.state_class,
+            &s.scope,
+            &s.reporter_did,
+            s.degradation_level,
+            s.degraded_since,
+            s.freshness_valid_until,
+            s.divergence_evidence_hash,
+            s.private_content_implication,
+            &s.status_nonce,
+        );
+        let wire = SyncDegradedStatusWireShape {
+            schema_version: SYNC_DEGRADED_STATUS_SCHEMA_VERSION,
+            peer_sync_report_hash: s.peer_sync_report_hash,
+            triggered_by_outcome: PeerSyncOutcome::Matching,
+            state_class: s.state_class,
+            scope: &s.scope,
+            reporter_did: &s.reporter_did,
+            degradation_level: s.degradation_level,
+            degraded_since: s.degraded_since,
+            freshness_valid_until: s.freshness_valid_until,
+            divergence_evidence_hash: s.divergence_evidence_hash,
+            private_content_implication: s.private_content_implication,
+            status_nonce: s.status_nonce,
+            status_hash: recomputed,
+            signature: s.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<SyncDegradedStatus, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+    }
+
+    // ---- SyncDegradedStatus: cross-link to PeerSyncReport ----
+
+    #[test]
+    fn sync_degraded_status_links_to_peer_sync_report_hash() {
+        // The status's peer_sync_report_hash must match the originating
+        // report. If the report is rebuilt with a different nonce, the
+        // link breaks.
+        let probe = sample_probe();
+        let report = PeerSyncReport::new(
+            probe.probe_hash,
+            PeerSyncOutcome::MissingOnLocal,
+            probe.state_class,
+            probe.target_scope.clone(),
+            "did:icn:responder789".to_string(),
+            probe.prober_did.clone(),
+            sample_responder_local_digest(),
+            1_715_000_005,
+            1_715_000_035,
+            None,
+            false,
+            [0xBA; 32],
+        )
+        .unwrap();
+        let s = SyncDegradedStatus::new(
+            report.report_hash,
+            PeerSyncOutcome::MissingOnLocal,
+            report.state_class,
+            report.scope.clone(),
+            "did:icn:policy-oracle".to_string(),
+            DegradationLevel::WithinGraceWindow,
+            1_715_000_010,
+            1_715_000_070,
+            None,
+            false,
+            [0x77; 32],
+        )
+        .unwrap();
+        assert_eq!(s.peer_sync_report_hash, report.report_hash);
+        let report_v2 = PeerSyncReport::new(
+            probe.probe_hash,
+            PeerSyncOutcome::MissingOnLocal,
+            probe.state_class,
+            probe.target_scope.clone(),
+            "did:icn:responder789".to_string(),
+            probe.prober_did.clone(),
+            sample_responder_local_digest(),
+            1_715_000_005,
+            1_715_000_035,
+            None,
+            false,
+            [0xEE; 32], // distinct nonce
+        )
+        .unwrap();
+        assert_ne!(s.peer_sync_report_hash, report_v2.report_hash);
+    }
+
+    // ---- SyncDegradedStatus: domain-tag separation ----
+
+    #[test]
+    fn sync_degraded_status_domain_tag_distinct_from_other_records() {
+        assert_ne!(SyncDegradedStatus::DOMAIN_TAG, PeerSyncReport::DOMAIN_TAG);
+        assert_ne!(SyncDegradedStatus::DOMAIN_TAG, AntiEntropyProbe::DOMAIN_TAG);
+        assert_ne!(
+            SyncDegradedStatus::DOMAIN_TAG,
+            DivergenceEvidence::DOMAIN_TAG
+        );
+        assert_ne!(SyncDegradedStatus::DOMAIN_TAG, RepairPlan::DOMAIN_TAG);
+        assert_ne!(SyncDegradedStatus::DOMAIN_TAG, RepairReceipt::DOMAIN_TAG);
+        assert_ne!(SyncDegradedStatus::DOMAIN_TAG, ArtifactReceipt::DOMAIN_TAG);
+    }
+
+    #[test]
+    fn sync_degraded_status_domain_tag_affects_hash() {
+        let s = sample_sync_degraded_status();
+        let binding = SyncDegradedStatusBinding {
+            schema_version: s.schema_version,
+            peer_sync_report_hash: s.peer_sync_report_hash,
+            triggered_by_outcome: s.triggered_by_outcome,
+            state_class: s.state_class,
+            scope: &s.scope,
+            reporter_did: &s.reporter_did,
+            degradation_level: s.degradation_level,
+            degraded_since: s.degraded_since,
+            freshness_valid_until: s.freshness_valid_until,
+            divergence_evidence_hash: s.divergence_evidence_hash,
+            private_content_implication: s.private_content_implication,
+            status_nonce: s.status_nonce,
+        };
+        let payload = bincode::serialize(&binding).unwrap();
+        let mut hasher = blake3::Hasher::new();
+        // Deliberately omit DOMAIN_TAG.
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        let without_tag: Hash = *hasher.finalize().as_bytes();
+        assert_ne!(s.status_hash, without_tag);
+    }
+
+    // ---- SyncDegradedStatus: optional divergence_evidence_hash ----
+
+    #[test]
+    fn sync_degraded_status_round_trips_with_divergence_link() {
+        let report = sample_peer_sync_report();
+        let s = SyncDegradedStatus::new(
+            report.report_hash,
+            PeerSyncOutcome::MissingOnLocal,
+            report.state_class,
+            report.scope.clone(),
+            "did:icn:policy-oracle".to_string(),
+            DegradationLevel::BeyondGraceWindow,
+            1_715_000_010,
+            1_715_000_070,
+            Some([0x42; 32]),
+            false,
+            [0x88; 32],
+        )
+        .unwrap();
+        assert_eq!(s.divergence_evidence_hash, Some([0x42; 32]));
+        let json = serde_json::to_string(&s).unwrap();
+        let restored: SyncDegradedStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(s, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn sync_degraded_status_round_trips_without_divergence_link() {
+        let s = sample_sync_degraded_status();
+        assert!(s.divergence_evidence_hash.is_none());
+        let json = serde_json::to_string(&s).unwrap();
+        let restored: SyncDegradedStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(s, restored);
+    }
+
+    // ---- SyncDegradedStatus: privacy ----
+
+    #[test]
+    fn sync_degraded_status_private_content_implication_round_trips() {
+        let report = sample_peer_sync_report();
+        let s = SyncDegradedStatus::new(
+            report.report_hash,
+            PeerSyncOutcome::MissingOnLocal,
+            StateClass::ScopedVaultReference,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-care-plan-vault".to_string(),
+            },
+            "did:icn:scoped-vault-steward".to_string(),
+            DegradationLevel::WithinGraceWindow,
+            1_715_000_010,
+            1_715_000_070,
+            None,
+            true,
+            [0x55; 32],
+        )
+        .expect("private-content status is structurally consistent");
+        assert!(s.private_content_implication);
+        assert!(s.verify_binding());
+        // Structurally: the record carries only cross-link hashes,
+        // DIDs, timestamps, and categorical labels. There is no body
+        // / payload / raw_bytes / secret field by construction.
+        let json = serde_json::to_string(&s).unwrap();
+        let restored: SyncDegradedStatus = serde_json::from_str(&json).unwrap();
         assert!(restored.private_content_implication);
         assert!(restored.verify_binding());
     }
