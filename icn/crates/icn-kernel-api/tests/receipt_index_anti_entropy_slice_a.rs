@@ -361,8 +361,13 @@ fn slice_a_receipt_index_probe_classify_plan_apply_surface() {
     // The report carries the categorical outcome and the responder's
     // local digest (the bounded `StateDigest` projection peer_b
     // produced when answering the probe); it does NOT carry the
-    // explicit missing-hash list — that detail lives on the
-    // downstream `DivergenceEvidence` via `DigestMismatch`.
+    // explicit missing-hash list. That list stays on the compare-math
+    // helper (`FixtureSyncOutcome`) where the apply phase consumes it.
+    // The downstream `DivergenceEvidence` carries bounded
+    // `DigestMismatch` projections (Bloom / Merkle root / vector clock
+    // / short list of refs), not explicit hash lists either — the
+    // proof rail keeps the explicit lists out of the wire-stable
+    // records on purpose.
     //
     // `divergence_evidence_hash` is `None` here because classification
     // has not yet run (classification is phase 4, below). After
@@ -434,35 +439,18 @@ fn slice_a_receipt_index_probe_classify_plan_apply_surface() {
         "PeerSet must be sorted"
     );
 
-    // ---- 3b. Post-classification PeerSyncReport (link populated) ----
-    //
-    // Once classification has produced `evidence`, a follow-up
-    // PeerSyncReport may carry the divergence_evidence_hash. The spec
-    // permits but does not require this — the categorical outcome is
-    // the same; only the optional cross-link is added. Building a
-    // second report here demonstrates the structural rule that
-    // non-matching outcomes (`MissingOnLocal` in Slice A) may carry
-    // the link.
-    let peer_sync_report_with_link = PeerSyncReport::new(
-        probe.probe_hash,
-        PeerSyncOutcome::MissingOnLocal,
-        StateClass::ReceiptIndex,
-        scope.clone(),
-        peer_b.did.clone(),
-        peer_a.did.clone(),
-        peer_b.state_digest(),
-        1_715_000_001,
-        1_715_000_031,
-        Some(evidence.evidence_hash),
-        false,
-        [0xCD; 32],
-    )
-    .expect("post-classification PeerSyncReport with link is structurally consistent");
-    assert!(peer_sync_report_with_link.verify_binding());
-    assert_eq!(
-        peer_sync_report_with_link.divergence_evidence_hash,
-        Some(evidence.evidence_hash)
-    );
+    // NOTE: The fixture does not build a post-classification
+    // `PeerSyncReport` that carries `divergence_evidence_hash`. The
+    // pre-classification report above is built from peer_b's responder
+    // POV (`MissingOnLocal`), while the `evidence` constructed below
+    // uses the fixture's compare-helper orientation (peer_a as
+    // "local", `DigestMismatch::MissingOnRemote { local: peer_a... }`).
+    // Linking the two would conflate two different local/remote
+    // framings of the same divergence — the schema permits the cross-
+    // link structurally, but the fixture keeps the records honest by
+    // not asserting an orientation-mismatched link. The optional-link
+    // case is exercised in the PeerSyncReport schema's own tests
+    // (`peer_sync_report_missing_on_local_may_carry_divergence_link`).
 
     // ---- 4. Plan ----
     let plan = RepairPlan::new(
