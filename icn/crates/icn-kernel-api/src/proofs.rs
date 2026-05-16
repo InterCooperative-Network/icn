@@ -1923,8 +1923,11 @@ pub enum RepairReceiptClass {
     /// Receipt for a `RestartDisputeWindow` action.
     DisputeWindowRestartReceipt,
     /// Sentinel for `NoAutomaticRepair` — no repair was attempted; the
-    /// divergence evidence is the only artifact the loop produced. By
-    /// construction this class only carries [`EffectOutcome::NoOp`].
+    /// divergence evidence is the only artifact the loop produced. This
+    /// class is structurally required to carry [`EffectOutcome::NoOp`];
+    /// `Applied` / `Partial` / `Failed` are rejected at construction and
+    /// on deserialize. Downstream anti-entropy surfaces rely on the
+    /// sentinel to mean exactly "no repair happened."
     NoAutomaticRepairReceipt,
 }
 
@@ -2064,6 +2067,22 @@ pub enum RepairReceiptError {
          (Failed means no durable mutation)"
     )]
     AfterStateDigestOnFailed,
+    /// Class is [`RepairReceiptClass::NoAutomaticRepairReceipt`] but the
+    /// outcome is not [`EffectOutcome::NoOp`]. The sentinel class means
+    /// "no repair attempted" — pairing it with `Applied` / `Partial` /
+    /// `Failed` would let evidence falsely claim a repair under the
+    /// no-action class. Downstream anti-entropy surfaces depend on this
+    /// invariant; the validator rejects the combination at construction
+    /// and on the wire.
+    #[error(
+        "RepairReceipt class=no_automatic_repair_receipt requires outcome=no_op \
+         (sentinel class must not claim a repair happened); got outcome={outcome}"
+    )]
+    NoAutomaticRepairReceiptRequiresNoOp {
+        /// The non-`NoOp` outcome that incorrectly paired with the
+        /// no-automatic-repair sentinel class.
+        outcome: &'static str,
+    },
 }
 
 impl From<RepairReceiptError> for String {
@@ -2231,6 +2250,7 @@ impl TryFrom<RawRepairReceipt> for RepairReceipt {
             .to_string());
         }
         RepairReceipt::validate_outcome_consistency(
+            raw.repair_receipt_class,
             raw.effect_outcome,
             raw.failure_reason,
             raw.after_state_digest.as_ref(),
@@ -2320,6 +2340,7 @@ impl RepairReceipt {
         receipt_nonce: [u8; 32],
     ) -> Result<Self, RepairReceiptError> {
         Self::validate_outcome_consistency(
+            repair_receipt_class,
             effect_outcome,
             failure_reason,
             after_state_digest.as_ref(),
@@ -2366,7 +2387,8 @@ impl RepairReceipt {
         })
     }
 
-    /// Validate the structural outcome / reason / digest invariants.
+    /// Validate the structural outcome / reason / digest / sentinel-class
+    /// invariants.
     ///
     /// Returns `Ok(())` if the combination is consistent, else an error
     /// describing the violation. Kernel-level structural rules only:
@@ -2377,7 +2399,13 @@ impl RepairReceipt {
     ///   carry a `failure_reason`.
     /// - [`EffectOutcome::Failed`] MUST NOT carry an `after_state_digest`
     ///   (no durable mutation occurred).
+    /// - [`RepairReceiptClass::NoAutomaticRepairReceipt`] MUST carry
+    ///   [`EffectOutcome::NoOp`] — the sentinel class means "no repair
+    ///   attempted." Pairing it with `Applied` / `Partial` / `Failed`
+    ///   would let evidence falsely claim a repair happened under the
+    ///   no-action class.
     pub fn validate_outcome_consistency(
+        repair_receipt_class: RepairReceiptClass,
         effect_outcome: EffectOutcome,
         failure_reason: Option<RepairFailureReason>,
         after_state_digest: Option<&StateDigest>,
@@ -2400,6 +2428,15 @@ impl RepairReceipt {
         }
         if matches!(effect_outcome, EffectOutcome::Failed) && after_state_digest.is_some() {
             return Err(RepairReceiptError::AfterStateDigestOnFailed);
+        }
+        if matches!(
+            repair_receipt_class,
+            RepairReceiptClass::NoAutomaticRepairReceipt
+        ) && !matches!(effect_outcome, EffectOutcome::NoOp)
+        {
+            return Err(RepairReceiptError::NoAutomaticRepairReceiptRequiresNoOp {
+                outcome: effect_outcome.as_str(),
+            });
         }
         Ok(())
     }
@@ -4627,6 +4664,143 @@ mod divergence_and_repair_tests {
         )
         .unwrap_err();
         assert!(matches!(err, RepairReceiptError::AfterStateDigestOnFailed));
+    }
+
+    // ---- RepairReceipt: NoAutomaticRepairReceipt + NoOp sentinel rule ----
+
+    fn _no_auth_receipt_attempt(
+        outcome: EffectOutcome,
+        failure_reason: Option<RepairFailureReason>,
+        after_state_digest: Option<StateDigest>,
+    ) -> Result<RepairReceipt, RepairReceiptError> {
+        let ev = sample_evidence();
+        let plan = sample_plan(ev.evidence_hash);
+        RepairReceipt::new(
+            RepairReceiptClass::NoAutomaticRepairReceipt,
+            outcome,
+            ev.evidence_hash,
+            plan.plan_hash,
+            StateClass::ReceiptIndex,
+            ProbeScope::LocalDomain {
+                domain_id: "fixture-domain-a".to_string(),
+            },
+            "did:icn:repair-actor".to_string(),
+            AuthorityBasis::NoAutomaticAuthority,
+            BoundaryRuleSet::from_rules(vec![BoundaryRuleRef::NoRepairBeyondAuthority]),
+            None,
+            after_state_digest,
+            1_715_000_002,
+            1_715_000_032,
+            false,
+            failure_reason,
+            [0xEF; 32],
+        )
+    }
+
+    #[test]
+    fn receipt_no_automatic_repair_class_rejects_applied_outcome() {
+        let err = _no_auth_receipt_attempt(EffectOutcome::Applied, None, None).unwrap_err();
+        assert!(matches!(
+            err,
+            RepairReceiptError::NoAutomaticRepairReceiptRequiresNoOp { outcome } if outcome == "applied"
+        ));
+    }
+
+    #[test]
+    fn receipt_no_automatic_repair_class_rejects_partial_outcome() {
+        // Pair Partial with a reason so the earlier `FailureReasonRequired`
+        // rule doesn't pre-empt the sentinel rule.
+        let err = _no_auth_receipt_attempt(
+            EffectOutcome::Partial,
+            Some(RepairFailureReason::Unclassifiable),
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RepairReceiptError::NoAutomaticRepairReceiptRequiresNoOp { outcome } if outcome == "partial"
+        ));
+    }
+
+    #[test]
+    fn receipt_no_automatic_repair_class_rejects_failed_outcome() {
+        let err = _no_auth_receipt_attempt(
+            EffectOutcome::Failed,
+            Some(RepairFailureReason::AuthorityRejected),
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            RepairReceiptError::NoAutomaticRepairReceiptRequiresNoOp { outcome } if outcome == "failed"
+        ));
+    }
+
+    #[test]
+    fn receipt_wire_rejects_no_automatic_repair_with_applied_outcome() {
+        // Build a hash-consistent wire shape that pairs the sentinel
+        // class with Applied. The deserializer must refuse it before
+        // any RepairReceipt is constructed.
+        let r = sample_receipt();
+        let scope = r.scope.clone();
+        let actor = r.actor_did.clone();
+        let authority = AuthorityBasis::NoAutomaticAuthority;
+        let rules = r.boundary_rules.clone();
+        let before: Option<StateDigest> = None;
+        let after: Option<StateDigest> = None;
+        let nonce = [0x66u8; 32];
+        let class = RepairReceiptClass::NoAutomaticRepairReceipt;
+        let outcome = EffectOutcome::Applied;
+        let failure: Option<RepairFailureReason> = None;
+        let applied_at = r.applied_at;
+        let valid_until = r.freshness_valid_until;
+        let private = false;
+        let hash = RepairReceipt::compute_receipt_hash(
+            REPAIR_RECEIPT_SCHEMA_VERSION,
+            class,
+            outcome,
+            r.divergence_evidence_hash,
+            r.repair_plan_hash,
+            r.affected_state_class,
+            &scope,
+            &actor,
+            &authority,
+            &rules,
+            &before,
+            &after,
+            applied_at,
+            valid_until,
+            private,
+            failure,
+            &nonce,
+        );
+        let wire = ReceiptWireShape {
+            schema_version: REPAIR_RECEIPT_SCHEMA_VERSION,
+            repair_receipt_class: class,
+            effect_outcome: outcome,
+            divergence_evidence_hash: r.divergence_evidence_hash,
+            repair_plan_hash: r.repair_plan_hash,
+            affected_state_class: r.affected_state_class,
+            scope: &scope,
+            actor_did: &actor,
+            authority_basis: &authority,
+            boundary_rules: &rules,
+            before_state_digest: &before,
+            after_state_digest: &after,
+            applied_at,
+            freshness_valid_until: valid_until,
+            private_content_implication: private,
+            failure_reason: failure,
+            receipt_nonce: nonce,
+            receipt_hash: hash,
+            signature: r.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<RepairReceipt, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed_bin: Result<RepairReceipt, _> = bincode::deserialize(&bytes);
+        assert!(parsed_bin.is_err());
     }
 
     #[test]
