@@ -482,11 +482,36 @@ struct FixtureActionCard {
     risk_level: FixtureRiskLevel,
     accessibility_hint: &'static str,
     receipt_expected: bool,
+    /// Plain-language expected-receipt label per
+    /// `docs/spec/member-shell-v0.md` §"ActionCard rendering contract
+    /// / Mandatory rendering for every ActionCard / `receipt_expected`":
+    /// the shell renders an outcome line ("If you confirm, this will
+    /// produce a <receipt class summary>"). Required whenever
+    /// `receipt_expected` is true AND the card is in a pre-receipt
+    /// state (Open / OpenButPaused / DraftWillBeSentWhenRecordsSync /
+    /// SentWaitingForReceipt). `None` for closed cards or cards
+    /// already Confirmed with a `receipt_summary`.
+    expected_receipt_label: Option<FixtureReceiptClassLabel>,
     state: FixtureActionLifecycle,
     sync_status: FixtureSyncStatus,
     /// Plain receipt summary present only when the card has been
     /// confirmed and a receipt has landed.
     receipt_summary: Option<FixtureReceiptSummary>,
+}
+
+impl FixtureActionCard {
+    /// True if the card is in a state where it would still produce a
+    /// receipt on confirm. Used by the accessibility gate to require
+    /// the expected-receipt label only on pre-receipt cards.
+    fn is_pre_receipt_state(&self) -> bool {
+        matches!(
+            self.state,
+            FixtureActionLifecycle::Open
+                | FixtureActionLifecycle::OpenButPaused
+                | FixtureActionLifecycle::DraftWillBeSentWhenRecordsSync
+                | FixtureActionLifecycle::SentWaitingForReceipt
+        )
+    }
 }
 
 /// Composed member shell view rendered for a single member.
@@ -539,6 +564,9 @@ impl FixtureMemberShellView {
                 out.push(receipt.plain_summary);
                 out.push(receipt.receipt_class_label.label());
                 out.push(receipt.scope_label);
+            }
+            if let Some(expected) = card.expected_receipt_label {
+                out.push(expected.label());
             }
         }
 
@@ -648,6 +676,22 @@ impl FixtureAccessibilityChecklist {
             .action_cards
             .iter()
             .all(|c| !c.authority_basis.is_empty());
+        // Spec §"ActionCard rendering contract / `receipt_expected`":
+        // pre-receipt cards that expect a receipt must surface the
+        // plain expected-receipt label so the member sees the outcome
+        // line before confirm.
+        let pre_receipt_expecting_cards_carry_expected_label = view.action_cards.iter().all(|c| {
+            !c.receipt_expected || !c.is_pre_receipt_state() || c.expected_receipt_label.is_some()
+        });
+        // Spec §"Card states the shell must distinguish / Closed:
+        // insufficient authority": the shell must name the missing
+        // authority plainly. A closed-insufficient-authority card with
+        // no `required_authority_explanation` violates the contract
+        // even when `authority_basis` is non-empty.
+        let insufficient_authority_cards_have_explanation = view.action_cards.iter().all(|c| {
+            !matches!(c.state, FixtureActionLifecycle::ClosedInsufficientAuthority)
+                || c.required_authority_explanation.is_some()
+        });
         let every_card_has_textual_risk_glyph_pair = view
             .action_cards
             .iter()
@@ -775,30 +819,44 @@ impl FixtureAccessibilityChecklist {
             ),
             // 3.11 Receipts / provenance / evidence access — confirmed
             // cards carry a plain-language receipt summary with the
-            // closed receipt-class label. The opaque `receipt_ref_hash`
-            // is available for "details" but never shown as primary.
+            // closed receipt-class label. Pre-receipt cards that
+            // expect a receipt carry the plain expected-receipt label
+            // so the member sees the outcome line before confirm. The
+            // opaque `receipt_ref_hash` is available for "details" but
+            // never shown as primary.
             item(
                 Cat::ReceiptsProvenanceAndEvidenceAccess,
-                if receipt_summary_present_for_confirmed {
-                    Pass
-                } else {
+                if !receipt_summary_present_for_confirmed {
                     Blocked {
                         reason: "confirmed card missing receipt summary",
                     }
+                } else if !pre_receipt_expecting_cards_carry_expected_label {
+                    Blocked {
+                        reason: "pre-receipt card with receipt_expected=true is missing the \
+                                 plain expected-receipt label",
+                    }
+                } else {
+                    Pass
                 },
             ),
             // 3.12 Governance and action access — every card carries
             // its plain-language `authority_basis`; the
-            // insufficient-authority card carries a plain explanation
-            // of which authority is missing.
+            // insufficient-authority card carries a plain
+            // `required_authority_explanation` naming the missing
+            // authority class.
             item(
                 Cat::GovernanceAndActionAccess,
-                if every_card_has_authority {
-                    Pass
-                } else {
+                if !every_card_has_authority {
                     Blocked {
                         reason: "card missing plain-language authority basis",
                     }
+                } else if !insufficient_authority_cards_have_explanation {
+                    Blocked {
+                        reason: "ClosedInsufficientAuthority card missing required_authority_\
+                                 explanation",
+                    }
+                } else {
+                    Pass
                 },
             ),
         ];
@@ -868,6 +926,7 @@ fn proposal_vote_card() -> FixtureActionCard {
         risk_level: FixtureRiskLevel::Normal,
         accessibility_hint: "This card asks you to vote on a fixture proposal in your domain.",
         receipt_expected: true,
+        expected_receipt_label: Some(FixtureReceiptClassLabel::GovernanceDecisionRecorded),
         state: FixtureActionLifecycle::Open,
         sync_status: FixtureSyncStatus::Synced,
         receipt_summary: None,
@@ -888,6 +947,10 @@ fn meeting_attend_confirmed_card() -> FixtureActionCard {
         risk_level: FixtureRiskLevel::Low,
         accessibility_hint: "This card records that you attended a fixture meeting.",
         receipt_expected: true,
+        // The card has already produced a receipt — the `receipt_summary`
+        // below is the rendered post-confirm artifact, so the pre-receipt
+        // expected-receipt label is no longer applicable.
+        expected_receipt_label: None,
         state: FixtureActionLifecycle::Confirmed,
         sync_status: FixtureSyncStatus::ReceiptAvailable,
         receipt_summary: Some(FixtureReceiptSummary {
@@ -915,6 +978,7 @@ fn sync_delayed_paused_card() -> FixtureActionCard {
         accessibility_hint: "This card is currently paused. You will be able to act once your \
                              domain's records finish syncing.",
         receipt_expected: true,
+        expected_receipt_label: Some(FixtureReceiptClassLabel::ActionCompleted),
         state: FixtureActionLifecycle::OpenButPaused,
         sync_status: FixtureSyncStatus::ActionPausedUntilRecordsSync,
         receipt_summary: None,
@@ -940,6 +1004,7 @@ fn closed_insufficient_authority_card() -> FixtureActionCard {
         accessibility_hint: "This card is closed because you do not currently hold the required \
                              authority. A plain-language explanation is shown.",
         receipt_expected: false,
+        expected_receipt_label: None,
         state: FixtureActionLifecycle::ClosedInsufficientAuthority,
         sync_status: FixtureSyncStatus::Synced,
         receipt_summary: None,
@@ -998,6 +1063,10 @@ fn render_resolved_view(open_view: &FixtureMemberShellView) -> FixtureMemberShel
             card.summary = "Your action completed once your domain's records finished syncing.";
             card.accessibility_hint =
                 "This card has been recorded as completed. The plain receipt summary is shown.";
+            // Receipt has landed — the pre-receipt expected-receipt
+            // label is no longer applicable; the receipt_summary below
+            // is the rendered post-confirm artifact.
+            card.expected_receipt_label = None;
             card.receipt_summary = Some(FixtureReceiptSummary {
                 plain_summary:
                     "Your action item was completed for the example fixture action item.",
@@ -1461,6 +1530,132 @@ fn accessibility_gate_marks_blocked_when_card_misses_authority_basis() {
         cat_312.outcome,
         FixtureAccessibilityOutcome::Blocked { .. }
     ));
+}
+
+#[test]
+fn pre_receipt_cards_with_receipt_expected_carry_expected_label() {
+    // Spec §"ActionCard rendering contract / Mandatory rendering for
+    // every ActionCard / `receipt_expected`": the shell must render
+    // the outcome line ("If you confirm, this will produce a <receipt
+    // class summary>") whenever the card is pre-receipt and expects
+    // one. Slice A has two such cards (proposal/vote Open,
+    // action_item/complete OpenButPaused) — both must carry the label.
+    let view = render_open_view();
+    let mut pre_receipt_expecting = 0;
+    for card in &view.action_cards {
+        if card.receipt_expected && card.is_pre_receipt_state() {
+            pre_receipt_expecting += 1;
+            assert!(
+                card.expected_receipt_label.is_some(),
+                "card {} is pre-receipt with receipt_expected=true but is missing the \
+                 plain expected-receipt label",
+                card.card_id
+            );
+        }
+    }
+    assert!(
+        pre_receipt_expecting >= 2,
+        "Slice A is expected to render at least two pre-receipt cards \
+         that expect a receipt; found {pre_receipt_expecting}"
+    );
+    // And the labels we expect: vote → "Governance decision recorded";
+    // action_item/complete → "Action completed."
+    let labels: BTreeSet<&'static str> = view
+        .action_cards
+        .iter()
+        .filter_map(|c| c.expected_receipt_label.map(|l| l.label()))
+        .collect();
+    assert!(labels.contains("Governance decision recorded"));
+    assert!(labels.contains("Action completed"));
+}
+
+#[test]
+fn accessibility_gate_marks_blocked_when_pre_receipt_card_omits_expected_label() {
+    // Defense-in-depth for the 3.11 condition above. A pre-receipt
+    // card with `receipt_expected=true` but no `expected_receipt_label`
+    // must Block category 3.11.
+    let mut bad_view = render_open_view();
+    let pos = bad_view
+        .action_cards
+        .iter()
+        .position(|c| c.receipt_expected && c.is_pre_receipt_state())
+        .expect("Slice A renders at least one pre-receipt expecting card");
+    bad_view.action_cards[pos].expected_receipt_label = None;
+
+    let checklist = FixtureAccessibilityChecklist::evaluate(&bad_view);
+    assert!(!checklist.is_acceptable());
+    let cat = checklist
+        .items
+        .iter()
+        .find(|c| {
+            matches!(
+                c.category,
+                FixtureAccessibilityCategory::ReceiptsProvenanceAndEvidenceAccess
+            )
+        })
+        .expect("category 3.11 must be present");
+    let blocked_reason = match &cat.outcome {
+        FixtureAccessibilityOutcome::Blocked { reason } => *reason,
+        other => panic!("expected Blocked, got {other:?}"),
+    };
+    assert!(
+        blocked_reason.contains("expected-receipt label"),
+        "Blocked reason should name the expected-receipt label gap; got: `{blocked_reason}`"
+    );
+}
+
+#[test]
+fn accessibility_gate_marks_blocked_when_insufficient_authority_card_omits_explanation() {
+    // Spec §"Card states the shell must distinguish / Closed:
+    // insufficient authority" + ADR-0028 §3.12: a card closed for
+    // insufficient authority must carry a plain explanation naming the
+    // missing authority class. `authority_basis` alone is not enough.
+    let mut bad_view = render_open_view();
+    let pos = bad_view
+        .action_cards
+        .iter()
+        .position(|c| matches!(c.state, FixtureActionLifecycle::ClosedInsufficientAuthority))
+        .expect("Slice A renders an insufficient-authority card");
+    bad_view.action_cards[pos].required_authority_explanation = None;
+
+    let checklist = FixtureAccessibilityChecklist::evaluate(&bad_view);
+    assert!(!checklist.is_acceptable());
+    let cat = checklist
+        .items
+        .iter()
+        .find(|c| {
+            matches!(
+                c.category,
+                FixtureAccessibilityCategory::GovernanceAndActionAccess
+            )
+        })
+        .expect("category 3.12 must be present");
+    let blocked_reason = match &cat.outcome {
+        FixtureAccessibilityOutcome::Blocked { reason } => *reason,
+        other => panic!("expected Blocked, got {other:?}"),
+    };
+    assert!(
+        blocked_reason.contains("required_authority_explanation"),
+        "Blocked reason should name the missing required_authority_explanation; \
+         got: `{blocked_reason}`"
+    );
+}
+
+#[test]
+fn closed_insufficient_authority_card_carries_required_authority_explanation() {
+    // Positive complement to the negative test above: the Slice A
+    // insufficient-authority card always carries its plain
+    // explanation.
+    let view = render_open_view();
+    let card = view
+        .action_cards
+        .iter()
+        .find(|c| matches!(c.state, FixtureActionLifecycle::ClosedInsufficientAuthority))
+        .expect("Slice A renders an insufficient-authority card");
+    let explanation = card
+        .required_authority_explanation
+        .expect("insufficient-authority card carries a plain explanation");
+    assert!(!explanation.is_empty());
 }
 
 #[test]
