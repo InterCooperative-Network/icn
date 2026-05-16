@@ -1048,14 +1048,23 @@ pub enum UnknownOutOfScopeReason {
 ///
 /// Matches `docs/spec/network-anti-entropy-proof-loops.md` §"Compare"
 /// verbatim — the five outcomes the responder may record after
-/// comparing the incoming probe's digest against its own state:
+/// comparing the incoming probe's digest against its own state. The
+/// "local" / "remote" framing is the responder's: "local" is the
+/// responder's index; "remote" is the prober's (the peer whose probe
+/// is being answered).
 ///
 /// - `Matching` — both peers' digests for this state class agree at the
 ///   boundary.
-/// - `MissingOnLocal` — the responder has entries the prober does not
-///   (the prober is "missing on local" relative to the responder).
-/// - `MissingOnRemote` — the prober has entries the responder does not
-///   (the responder is "missing on remote" relative to the prober).
+/// - `MissingOnLocal` — the **responder's local index is missing**
+///   entries the prober has. Equivalent to the spec's `missing on
+///   local`: "peer has entries the responder does not." The responder
+///   may request those entries from the prober, subject to scope and
+///   disclosure rules.
+/// - `MissingOnRemote` — the **prober's remote index is missing**
+///   entries the responder has. Equivalent to the spec's `missing on
+///   remote`: "responder has entries the peer does not." The responder
+///   may volunteer those entries to the prober, subject to scope and
+///   disclosure rules.
 /// - `Divergent` — both peers claim entries at the same address (e.g.,
 ///   same Merkle root path) with different contents; requires
 ///   classification in phase 4 (`DivergenceEvidence`).
@@ -1072,9 +1081,11 @@ pub enum UnknownOutOfScopeReason {
 pub enum PeerSyncOutcome {
     /// Both peers' digests for this state class agree at the boundary.
     Matching,
-    /// The responder has entries the prober does not.
+    /// The responder's local index is missing entries the prober has
+    /// (spec: "peer has entries the responder does not").
     MissingOnLocal,
-    /// The prober has entries the responder does not.
+    /// The prober's remote index is missing entries the responder has
+    /// (spec: "responder has entries the peer does not").
     MissingOnRemote,
     /// Both peers claim entries at the same address with different
     /// contents. Requires classification in phase 4.
@@ -1099,7 +1110,14 @@ impl PeerSyncOutcome {
         )
     }
 
-    /// Short lowercase label for logs / audit rows. Stable wire shape.
+    /// Stable lowercase string label for logs and audit rows.
+    ///
+    /// This is **not** the serialized wire encoding — serde uses the
+    /// enum's externally-tagged representation, which renders unit
+    /// variants as quoted strings and the `UnknownOutOfScope` tuple
+    /// variant as a single-key object. `as_str()` instead returns a
+    /// flat label suitable for log lines and audit-row keys; it is
+    /// stable across releases but does not round-trip through serde.
     pub fn as_str(self) -> &'static str {
         match self {
             PeerSyncOutcome::Matching => "matching",
@@ -3717,13 +3735,16 @@ mod anti_entropy_tests {
     // =========================================================================
 
     fn sample_responder_local_digest() -> StateDigest {
-        // A different Bloom projection than the probe carries — the
-        // responder's local index does not match the prober's exactly.
+        // A different Bloom projection than the probe carries. The
+        // responder's local index has MORE entries than the prober's
+        // (5 vs the probe's 4), which is the digest-level shape
+        // matching the sample outcome `MissingOnRemote` — i.e., the
+        // prober's remote index is missing entries the responder has.
         StateDigest::Bloom(BloomProjection {
-            bits: vec![0b0000_0101, 0, 0, 0, 0, 0, 0, 0],
+            bits: vec![0b0011_0101, 0, 0, 0, 0, 0, 0, 0],
             num_hashes: 1,
             size: 64,
-            hint_count: 3,
+            hint_count: 5,
         })
     }
 
@@ -3771,7 +3792,9 @@ mod anti_entropy_tests {
 
     #[test]
     fn peer_sync_outcome_as_str_is_stable() {
-        // Lock the wire-stable lowercase labels.
+        // Lock the audit-row label set — these are NOT the serialized
+        // wire labels (serde uses the externally-tagged representation
+        // for the enum); these are stable strings for logs / audit rows.
         assert_eq!(PeerSyncOutcome::Matching.as_str(), "matching");
         assert_eq!(PeerSyncOutcome::MissingOnLocal.as_str(), "missing_on_local");
         assert_eq!(
