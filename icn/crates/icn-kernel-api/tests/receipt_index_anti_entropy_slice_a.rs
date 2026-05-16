@@ -21,6 +21,9 @@
 //! Fixture plan produces RepairPlan { action: FetchMissing }.
 //! Fixture apply copies only public fixture receipt r3 into B's index.
 //! After-state matches.
+//! Public RepairReceipt (#1849) with EffectOutcome::Applied is constructed
+//! over the after-state digest; verify_binding() passes; the cross-link
+//! hashes resolve back to the evidence and plan.
 //! Cockpit / member-shell surfaces move from open / "sync delayed" to
 //! resolved / "receipt available".
 //! ```
@@ -41,19 +44,20 @@
 //!   that ICN-native anti-entropy operates today against real peers.
 //! * Not a `PeerSyncReport` implementation. That identifier remains
 //!   design-level per spec §"Proof artifacts"; the fixture uses a
-//!   private `FixtureSyncOutcome` enum scoped to this file.
-//! * Not a `RepairReceipt` implementation. That identifier also remains
-//!   design-level. After-state is asserted directly against the fixture
-//!   peer indexes.
+//!   private `FixtureSyncOutcome` enum scoped to this file for the
+//!   compare-phase result, distinct from the resolved repair artifact.
+//! * Not a live repair. The `RepairReceipt` constructed at phase 7 is
+//!   evidence of what a fixture peer would have produced; no real
+//!   `FetchMissing` ran against a real peer.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use icn_gossip::{to_bloom_projection, BloomFilter};
 use icn_kernel_api::{
     AntiEntropyProbe, AuthorityBasis, BoundaryRuleRef, BoundaryRuleSet, Did, DigestMismatch,
-    DivergenceClass, DivergenceEvidence, ExpectedRepairReceiptClass, Hash, PeerSet,
-    PolicyClauseRef, ProbeScope, ReceiptDigest, RepairAction, RepairPlan, RequestedResponseClass,
-    StateClass, StateDigest, TriggerSource,
+    DivergenceClass, DivergenceEvidence, EffectOutcome, ExpectedRepairReceiptClass, Hash, PeerSet,
+    PolicyClauseRef, ProbeScope, ReceiptDigest, RepairAction, RepairPlan, RepairReceipt,
+    RepairReceiptClass, RequestedResponseClass, StateClass, StateDigest, TriggerSource,
 };
 
 // ---------------------------------------------------------------------------
@@ -211,6 +215,9 @@ struct FixtureCockpitView {
     repair_action: RepairAction,
     evidence_hash: Hash,
     plan_hash: Hash,
+    /// Present only on the resolved view. The public `RepairReceipt`
+    /// (#1849) binding hash that resolves the open divergence.
+    repair_receipt_hash: Option<Hash>,
 }
 
 /// Fixture renderer for the member shell. **Private to this test file.**
@@ -404,6 +411,7 @@ fn slice_a_receipt_index_probe_classify_plan_apply_surface() {
         repair_action: plan.action,
         evidence_hash: evidence.evidence_hash,
         plan_hash: plan.plan_hash,
+        repair_receipt_hash: None,
     };
     assert!(cockpit_open.open);
     assert_eq!(
@@ -411,6 +419,7 @@ fn slice_a_receipt_index_probe_classify_plan_apply_surface() {
         DivergenceClass::MissingReceipt
     );
     assert_eq!(cockpit_open.repair_action, RepairAction::FetchMissing);
+    assert!(cockpit_open.repair_receipt_hash.is_none());
 
     let member_shell_open = FixtureMemberShellState::SyncDelayed;
     assert_eq!(member_shell_open.as_str(), "sync delayed");
@@ -422,7 +431,7 @@ fn slice_a_receipt_index_probe_classify_plan_apply_surface() {
     // no network, no gossip, no runtime mutation.
     peer_b.fixture_apply_fetch_missing(&peer_a, &missing);
 
-    // ---- 7. Evidence (after-state) ----
+    // ---- 7. Evidence (after-state + RepairReceipt) ----
     assert_eq!(
         peer_b.receipt_index.len(),
         3,
@@ -450,16 +459,72 @@ fn slice_a_receipt_index_probe_classify_plan_apply_surface() {
     // hash-keyed BTreeMap iterates in sorted order.
     assert_eq!(peer_a.state_digest(), peer_b.state_digest());
 
+    // Public RepairReceipt (#1849) — the wire-stable evidence artifact
+    // for the resolved repair. The fixture builds the receipt over
+    // peer B's now-converged state digest, cross-linked back to the
+    // evidence and the plan; verify_binding() proves the receipt has
+    // not been tampered with. The receipt's `affected_state_class`,
+    // `scope`, `authority_basis`, and `boundary_rules` are sourced
+    // directly from `evidence` and `plan` so any drift in the plan→
+    // receipt chain would diverge the binding hash. No live network,
+    // no live repair: the receipt records what a fixture peer would
+    // have produced had the bounded FetchMissing action run against
+    // real peers.
+    let repair_receipt = RepairReceipt::new(
+        RepairReceiptClass::from(plan.expected_repair_receipt_class),
+        EffectOutcome::Applied,
+        evidence.evidence_hash,
+        plan.plan_hash,
+        evidence.affected_state_class,
+        plan.scope.clone(),
+        "did:icn:fixture:repair-actor".to_string(),
+        plan.authority_basis.clone(),
+        plan.boundary_rules.clone(),
+        None,
+        Some(peer_b.state_digest()),
+        1_715_000_003,
+        1_715_000_033,
+        evidence.private_content_implication,
+        None,
+        [0xEE; 32],
+    )
+    .expect("Slice A receipt is structurally consistent");
+    assert!(repair_receipt.verify_binding());
+    assert_eq!(repair_receipt.effect_outcome, EffectOutcome::Applied);
+    assert_eq!(
+        repair_receipt.repair_receipt_class,
+        RepairReceiptClass::FetchMissingReceipt
+    );
+    assert_eq!(
+        repair_receipt.divergence_evidence_hash,
+        evidence.evidence_hash
+    );
+    assert_eq!(repair_receipt.repair_plan_hash, plan.plan_hash);
+    assert!(repair_receipt.failure_reason.is_none());
+    assert!(repair_receipt.after_state_digest.is_some());
+    // The receipt's class matches the plan's expected receipt class
+    // (1:1 from ExpectedRepairReceiptClass per #1849).
+    assert_eq!(
+        ExpectedRepairReceiptClass::from(repair_receipt.repair_receipt_class),
+        plan.expected_repair_receipt_class
+    );
+
     // ---- 8. Surface (resolved) ----
     let cockpit_resolved = FixtureCockpitView {
         open: false,
+        repair_receipt_hash: Some(repair_receipt.receipt_hash),
         ..cockpit_open.clone()
     };
     assert!(!cockpit_resolved.open);
-    // The cross-link to evidence / plan persists in the resolved view;
-    // only the open flag flips.
+    // The cross-link to evidence / plan / receipt persists in the
+    // resolved view; only the open flag flips and the receipt link
+    // populates.
     assert_eq!(cockpit_resolved.evidence_hash, evidence.evidence_hash);
     assert_eq!(cockpit_resolved.plan_hash, plan.plan_hash);
+    assert_eq!(
+        cockpit_resolved.repair_receipt_hash,
+        Some(repair_receipt.receipt_hash)
+    );
 
     let member_shell_resolved = FixtureMemberShellState::ReceiptAvailable;
     assert_eq!(member_shell_resolved.as_str(), "receipt available");
