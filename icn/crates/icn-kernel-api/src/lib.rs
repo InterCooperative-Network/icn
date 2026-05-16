@@ -105,11 +105,13 @@ pub use naming::{
 pub use proofs::{
     AntiEntropyProbe, ArtifactDigest, ArtifactReceipt, AuthorityBasis, BloomProjection,
     BoundaryRuleRef, BoundaryRuleSet, DigestMismatch, DivergenceClass, DivergenceEvidence,
-    ExpectedRepairReceiptClass, MerkleRootProjection, PeerSet, PolicyClauseRef, ProbeScope,
-    ReceiptDigest, RepairAction, RepairFailureReason, RepairPlan, RepairReceipt,
-    RepairReceiptClass, RepairReceiptError, RequestedResponseClass, ShortDigestList, StateClass,
-    StateDigest, TriggerSource, VectorClockProjection, ANTI_ENTROPY_PROBE_SCHEMA_VERSION,
-    DIVERGENCE_EVIDENCE_SCHEMA_VERSION, REPAIR_PLAN_SCHEMA_VERSION, REPAIR_RECEIPT_SCHEMA_VERSION,
+    ExpectedRepairReceiptClass, MerkleRootProjection, PeerSet, PeerSyncOutcome, PeerSyncReport,
+    PeerSyncReportError, PolicyClauseRef, ProbeScope, ReceiptDigest, RepairAction,
+    RepairFailureReason, RepairPlan, RepairReceipt, RepairReceiptClass, RepairReceiptError,
+    RequestedResponseClass, ShortDigestList, StateClass, StateDigest, TriggerSource,
+    UnknownOutOfScopeReason, VectorClockProjection, ANTI_ENTROPY_PROBE_SCHEMA_VERSION,
+    DIVERGENCE_EVIDENCE_SCHEMA_VERSION, PEER_SYNC_REPORT_SCHEMA_VERSION,
+    REPAIR_PLAN_SCHEMA_VERSION, REPAIR_RECEIPT_SCHEMA_VERSION,
 };
 pub use receipts::{
     compute_canonical_hash, AllocationReceipt, CanonicalReceipt, Hash, ProvenanceAnchors, ReceiptId,

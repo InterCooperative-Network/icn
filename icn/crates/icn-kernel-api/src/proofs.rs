@@ -977,6 +977,522 @@ impl AntiEntropyProbe {
 }
 
 // ============================================================================
+// PeerSyncReport — compare-phase outcome (issue #1852)
+//
+// Wire-stable record for phase 3 ("Compare") of
+// `docs/spec/network-anti-entropy-proof-loops.md`. The responding peer
+// compares the incoming `AntiEntropyProbe`'s digest against its own
+// state and produces a `PeerSyncReport` whose outcome is one of five
+// spec-named categories. The report records the comparison result, the
+// digest forms used, the freshness, and the responder's signature. It
+// does NOT carry raw state.
+//
+// Per spec line 218: this record rides inside an existing Stage 5
+// `EffectDispatchEvidence` envelope (per
+// `docs/spec/effect-dispatch-contract.md`); no new top-level ADR-0026
+// receipt class is introduced.
+//
+// Like the prior records in this module, `PeerSyncReport` is
+// self-authenticating: a domain-tagged blake3 binding hash is computed
+// at construction over a canonical bincode encoding of the bound fields,
+// and `verify_binding()` recomputes and fails closed on unsupported
+// schema versions even when the stored hash matches a recomputation
+// under the bogus version.
+// ============================================================================
+
+/// Schema version for `PeerSyncReport`. Increment on any wire-affecting
+/// change to the binding (field set, order, encoding).
+pub const PEER_SYNC_REPORT_SCHEMA_VERSION: u32 = 1;
+
+// ----------------------------------------------------------------------------
+// UnknownOutOfScopeReason — closed taxonomy for the "unknown / out of scope"
+// outcome
+// ----------------------------------------------------------------------------
+
+/// Closed reason taxonomy for [`PeerSyncOutcome::UnknownOutOfScope`].
+///
+/// Matches `docs/spec/network-anti-entropy-proof-loops.md` §"Failure and
+/// safety table" rows where the responder cannot evaluate the probe
+/// (stale freshness, scope mismatch, insufficient authority, unknown
+/// state class). Each row produces a `PeerSyncReport` with the
+/// corresponding reason; no `DivergenceEvidence` is produced.
+///
+/// The kernel does not interpret what each reason *means* in policy
+/// terms — it only ensures the recorded reason round-trips deterministically
+/// and that no reason outside this closed set can be expressed on the wire.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum UnknownOutOfScopeReason {
+    /// The probe's `freshness_valid_until` has elapsed before the
+    /// responder evaluated it. The report records this outcome rather
+    /// than classifying divergence over stale state.
+    StaleProbe,
+    /// The probe's target scope does not overlap the responder's
+    /// adopted scope for this state class.
+    ScopeMismatch,
+    /// The responder cannot evaluate the probe within the policy /
+    /// disclosure scope the prober's authority permits.
+    InsufficientAuthority,
+    /// The probe names a state class the responder does not recognize
+    /// (e.g., a forward-direction extension not yet adopted). Tracked
+    /// as a follow-up to extend the closed `StateClass` set rather
+    /// than as a divergence.
+    UnknownStateClass,
+}
+
+// ----------------------------------------------------------------------------
+// PeerSyncOutcome — closed 5-variant taxonomy matching spec phase 3
+// ----------------------------------------------------------------------------
+
+/// Closed taxonomy of compare-phase outcomes.
+///
+/// Matches `docs/spec/network-anti-entropy-proof-loops.md` §"Compare"
+/// verbatim — the five outcomes the responder may record after
+/// comparing the incoming probe's digest against its own state:
+///
+/// - `Matching` — both peers' digests for this state class agree at the
+///   boundary.
+/// - `MissingOnLocal` — the responder has entries the prober does not
+///   (the prober is "missing on local" relative to the responder).
+/// - `MissingOnRemote` — the prober has entries the responder does not
+///   (the responder is "missing on remote" relative to the prober).
+/// - `Divergent` — both peers claim entries at the same address (e.g.,
+///   same Merkle root path) with different contents; requires
+///   classification in phase 4 (`DivergenceEvidence`).
+/// - `UnknownOutOfScope` — responder cannot evaluate (see
+///   [`UnknownOutOfScopeReason`] for the four spec-named cases).
+///
+/// The kernel does not classify what each non-matching outcome *means*
+/// for repair authority — that is the policy oracle's job in phase 4.
+/// The kernel only ensures the recorded outcome round-trips
+/// deterministically and that no outcome outside this closed set can
+/// be expressed on the wire.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum PeerSyncOutcome {
+    /// Both peers' digests for this state class agree at the boundary.
+    Matching,
+    /// The responder has entries the prober does not.
+    MissingOnLocal,
+    /// The prober has entries the responder does not.
+    MissingOnRemote,
+    /// Both peers claim entries at the same address with different
+    /// contents. Requires classification in phase 4.
+    Divergent,
+    /// Responder cannot evaluate the probe; see [`UnknownOutOfScopeReason`].
+    UnknownOutOfScope(UnknownOutOfScopeReason),
+}
+
+impl PeerSyncOutcome {
+    /// `true` iff this outcome may legally carry a
+    /// [`PeerSyncReport::divergence_evidence_hash`] cross-link.
+    ///
+    /// `Matching` and `UnknownOutOfScope` never produce
+    /// `DivergenceEvidence` (per spec §"Compare" and §"Failure and
+    /// safety table"); the three non-matching outcomes may.
+    pub fn may_carry_divergence_evidence(self) -> bool {
+        matches!(
+            self,
+            PeerSyncOutcome::MissingOnLocal
+                | PeerSyncOutcome::MissingOnRemote
+                | PeerSyncOutcome::Divergent,
+        )
+    }
+
+    /// Short lowercase label for logs / audit rows. Stable wire shape.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PeerSyncOutcome::Matching => "matching",
+            PeerSyncOutcome::MissingOnLocal => "missing_on_local",
+            PeerSyncOutcome::MissingOnRemote => "missing_on_remote",
+            PeerSyncOutcome::Divergent => "divergent",
+            PeerSyncOutcome::UnknownOutOfScope(_) => "unknown_out_of_scope",
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// PeerSyncReportError — structural validation
+// ----------------------------------------------------------------------------
+
+/// Structural validation errors a `PeerSyncReport` can produce at
+/// construction or wire-deserialization time.
+///
+/// Kernel-level structural rules only: they catch outcome / divergence-
+/// link combinations that are internally inconsistent per the spec, not
+/// runtime errors. App-level policy violations are not enforced here.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum PeerSyncReportError {
+    /// `schema_version` did not match [`PEER_SYNC_REPORT_SCHEMA_VERSION`].
+    #[error("unsupported PeerSyncReport schema_version: got {got}, supported {supported}")]
+    UnsupportedSchemaVersion {
+        /// The version observed on the wire / at construction.
+        got: u32,
+        /// The version this build supports.
+        supported: u32,
+    },
+    /// Outcome is `Matching` or `UnknownOutOfScope` but a
+    /// `divergence_evidence_hash` was set. These outcomes never produce
+    /// `DivergenceEvidence`; a cross-link to one would be a lie.
+    #[error(
+        "PeerSyncReport with outcome={outcome} must not carry divergence_evidence_hash \
+         (Matching / UnknownOutOfScope outcomes do not route to classification)"
+    )]
+    DivergenceEvidenceHashNotAllowed {
+        /// The outcome that incorrectly carried a divergence-evidence link.
+        outcome: &'static str,
+    },
+}
+
+impl From<PeerSyncReportError> for String {
+    fn from(err: PeerSyncReportError) -> Self {
+        err.to_string()
+    }
+}
+
+// ----------------------------------------------------------------------------
+// PeerSyncReport
+// ----------------------------------------------------------------------------
+
+/// The compare-phase outcome record produced in phase 3 of
+/// `docs/spec/network-anti-entropy-proof-loops.md`.
+///
+/// Cross-links to the originating [`AntiEntropyProbe`] by hash, records
+/// the responder's [`PeerSyncOutcome`], the state class probed, the
+/// scope, the prober and responder DIDs, the responder's local
+/// [`StateDigest`] (the digest form they compared against — never raw
+/// state), the observed / freshness timestamps, an optional cross-link
+/// to a downstream [`DivergenceEvidence`] when classification produced
+/// one, a private-content implication flag, a 32-byte nonce, and a
+/// blake3 binding hash.
+///
+/// # The report is not the sync
+///
+/// A `PeerSyncReport` records what a responder *observed* when
+/// comparing digests; the kernel does not execute peer sync (that is a
+/// runtime / gossip-layer concern), does not classify outcomes into
+/// divergence classes (that is the policy oracle's job in phase 4),
+/// and does not emit reports autonomously. The report exists so an
+/// auditor can chase the chain from probe → compare → classify →
+/// plan → apply → receipt without trusting any single peer.
+///
+/// # Privacy
+///
+/// `PeerSyncReport` MUST NOT carry raw state. The `local_digest` field
+/// carries one of four bounded [`StateDigest`] projections (Bloom over
+/// content hashes, Merkle root, vector clock, or short list of
+/// content-addressed hashes); none reveal the bodies they reference.
+/// For comparisons that touch private state, `private_content_implication`
+/// is set; renderers MUST gate technical detail behind the disclosure
+/// scope of the affected state.
+///
+/// # Self-authentication
+///
+/// `report_hash` is a blake3 binding under
+/// `DOMAIN_TAG = b"icn:peer-sync-report:v1"`, length-prefixed, over a
+/// canonical bincode encoding of all bound fields (excluding
+/// `report_hash` and `signature`). [`Self::verify_binding`] re-checks
+/// both the hash and the schema version; either alone is insufficient.
+/// Deserialization rejects unsupported schema versions AND structurally
+/// inconsistent outcome / divergence-link combinations via
+/// `#[serde(try_from = ...)]`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "RawPeerSyncReport")]
+pub struct PeerSyncReport {
+    /// Wire schema version. See [`PEER_SYNC_REPORT_SCHEMA_VERSION`].
+    pub schema_version: u32,
+    /// `probe_hash` of the originating [`AntiEntropyProbe`] this
+    /// report responds to.
+    pub probe_hash: Hash,
+    /// The compare-phase outcome. One of five spec-named categories.
+    pub sync_outcome: PeerSyncOutcome,
+    /// State class being compared. MUST match the probe's
+    /// `state_class`; the kernel does not re-verify because it does
+    /// not have the probe in hand, but the responder is responsible
+    /// for not mis-reporting the field.
+    pub state_class: StateClass,
+    /// Target scope. MUST match the probe's `target_scope`.
+    pub scope: ProbeScope,
+    /// DID of the responder — the peer that performed the comparison
+    /// and signed the report.
+    pub reporter_did: Did,
+    /// DID of the prober — the peer whose probe this report responds to.
+    pub counterparty_did: Did,
+    /// The responder's local digest at the comparison instant. Bounded
+    /// projection (never raw state).
+    pub local_digest: StateDigest,
+    /// Responder's clock at construction (Unix seconds).
+    pub observed_at: u64,
+    /// Timestamp beyond which the report is stale (Unix seconds).
+    pub freshness_valid_until: u64,
+    /// Cross-link to a downstream [`DivergenceEvidence::evidence_hash`]
+    /// when phase 4 classification produced one. MUST be `None` for
+    /// outcomes that cannot route to classification (`Matching`,
+    /// `UnknownOutOfScope`).
+    pub divergence_evidence_hash: Option<Hash>,
+    /// `true` if the comparison touched private state. Renderers MUST
+    /// gate technical detail behind the disclosure scope of the
+    /// affected state.
+    pub private_content_implication: bool,
+    /// 32-byte random nonce. Two reports with otherwise-identical
+    /// fields produce distinct `report_hash`es.
+    pub report_nonce: [u8; 32],
+    /// blake3 binding hash over all bound fields, computed at construction.
+    pub report_hash: Hash,
+    /// Responder signature (empty until signed by a higher layer).
+    pub signature: Signature,
+}
+
+/// Raw wire form for [`PeerSyncReport`]. Validated into the public
+/// type via [`TryFrom`] (fails closed on unsupported `schema_version`
+/// and on structurally inconsistent outcome / divergence-link
+/// combinations).
+#[derive(Deserialize)]
+struct RawPeerSyncReport {
+    schema_version: u32,
+    probe_hash: Hash,
+    sync_outcome: PeerSyncOutcome,
+    state_class: StateClass,
+    scope: ProbeScope,
+    reporter_did: Did,
+    counterparty_did: Did,
+    local_digest: StateDigest,
+    observed_at: u64,
+    freshness_valid_until: u64,
+    divergence_evidence_hash: Option<Hash>,
+    private_content_implication: bool,
+    report_nonce: [u8; 32],
+    report_hash: Hash,
+    signature: Signature,
+}
+
+impl TryFrom<RawPeerSyncReport> for PeerSyncReport {
+    type Error = String;
+
+    fn try_from(raw: RawPeerSyncReport) -> Result<Self, Self::Error> {
+        if raw.schema_version != PEER_SYNC_REPORT_SCHEMA_VERSION {
+            return Err(PeerSyncReportError::UnsupportedSchemaVersion {
+                got: raw.schema_version,
+                supported: PEER_SYNC_REPORT_SCHEMA_VERSION,
+            }
+            .to_string());
+        }
+        PeerSyncReport::validate_outcome_link_consistency(
+            raw.sync_outcome,
+            raw.divergence_evidence_hash.as_ref(),
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(Self {
+            schema_version: raw.schema_version,
+            probe_hash: raw.probe_hash,
+            sync_outcome: raw.sync_outcome,
+            state_class: raw.state_class,
+            scope: raw.scope,
+            reporter_did: raw.reporter_did,
+            counterparty_did: raw.counterparty_did,
+            local_digest: raw.local_digest,
+            observed_at: raw.observed_at,
+            freshness_valid_until: raw.freshness_valid_until,
+            divergence_evidence_hash: raw.divergence_evidence_hash,
+            private_content_implication: raw.private_content_implication,
+            report_nonce: raw.report_nonce,
+            report_hash: raw.report_hash,
+            signature: raw.signature,
+        })
+    }
+}
+
+/// Canonical binding fields for `PeerSyncReport::report_hash`.
+///
+/// Excludes `report_hash` (the output) and `signature` (filled after
+/// binding). Bincode-serialized in a stable order. Any new bound field
+/// added here requires bumping [`PEER_SYNC_REPORT_SCHEMA_VERSION`].
+#[derive(Serialize)]
+struct PeerSyncReportBinding<'a> {
+    schema_version: u32,
+    probe_hash: Hash,
+    sync_outcome: PeerSyncOutcome,
+    state_class: StateClass,
+    scope: &'a ProbeScope,
+    reporter_did: &'a Did,
+    counterparty_did: &'a Did,
+    local_digest: &'a StateDigest,
+    observed_at: u64,
+    freshness_valid_until: u64,
+    divergence_evidence_hash: Option<Hash>,
+    private_content_implication: bool,
+    report_nonce: [u8; 32],
+}
+
+impl PeerSyncReport {
+    /// Domain-separation tag for `report_hash`. Distinct from
+    /// [`AntiEntropyProbe::DOMAIN_TAG`], [`DivergenceEvidence::DOMAIN_TAG`],
+    /// [`RepairPlan::DOMAIN_TAG`], [`RepairReceipt::DOMAIN_TAG`], and
+    /// [`ArtifactReceipt::DOMAIN_TAG`].
+    pub const DOMAIN_TAG: &'static [u8] = b"icn:peer-sync-report:v1";
+
+    /// Construct a new report with computed `report_hash` and empty
+    /// signature.
+    ///
+    /// `schema_version` is set to [`PEER_SYNC_REPORT_SCHEMA_VERSION`].
+    /// Returns [`PeerSyncReportError`] if the outcome / divergence-link
+    /// combination is structurally inconsistent (see
+    /// [`Self::validate_outcome_link_consistency`]). The caller must
+    /// sign the report at a higher layer before emission.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        probe_hash: Hash,
+        sync_outcome: PeerSyncOutcome,
+        state_class: StateClass,
+        scope: ProbeScope,
+        reporter_did: Did,
+        counterparty_did: Did,
+        local_digest: StateDigest,
+        observed_at: u64,
+        freshness_valid_until: u64,
+        divergence_evidence_hash: Option<Hash>,
+        private_content_implication: bool,
+        report_nonce: [u8; 32],
+    ) -> Result<Self, PeerSyncReportError> {
+        Self::validate_outcome_link_consistency(sync_outcome, divergence_evidence_hash.as_ref())?;
+        let report_hash = Self::compute_report_hash(
+            PEER_SYNC_REPORT_SCHEMA_VERSION,
+            probe_hash,
+            sync_outcome,
+            state_class,
+            &scope,
+            &reporter_did,
+            &counterparty_did,
+            &local_digest,
+            observed_at,
+            freshness_valid_until,
+            divergence_evidence_hash,
+            private_content_implication,
+            &report_nonce,
+        );
+        Ok(Self {
+            schema_version: PEER_SYNC_REPORT_SCHEMA_VERSION,
+            probe_hash,
+            sync_outcome,
+            state_class,
+            scope,
+            reporter_did,
+            counterparty_did,
+            local_digest,
+            observed_at,
+            freshness_valid_until,
+            divergence_evidence_hash,
+            private_content_implication,
+            report_nonce,
+            report_hash,
+            signature: Signature::new(Vec::new()),
+        })
+    }
+
+    /// Validate the structural outcome / divergence-link invariant.
+    ///
+    /// Returns `Ok(())` if the combination is consistent, else an
+    /// error. Kernel-level structural rule only:
+    ///
+    /// - `Matching` and `UnknownOutOfScope` MUST NOT carry a
+    ///   `divergence_evidence_hash` (these outcomes never route to
+    ///   classification).
+    /// - `MissingOnLocal`, `MissingOnRemote`, `Divergent` MAY carry a
+    ///   `divergence_evidence_hash` (classification happened) or `None`
+    ///   (report alone, classification pending).
+    pub fn validate_outcome_link_consistency(
+        sync_outcome: PeerSyncOutcome,
+        divergence_evidence_hash: Option<&Hash>,
+    ) -> Result<(), PeerSyncReportError> {
+        if !sync_outcome.may_carry_divergence_evidence() && divergence_evidence_hash.is_some() {
+            return Err(PeerSyncReportError::DivergenceEvidenceHashNotAllowed {
+                outcome: sync_outcome.as_str(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Compute the binding hash from the significant fields.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_report_hash(
+        schema_version: u32,
+        probe_hash: Hash,
+        sync_outcome: PeerSyncOutcome,
+        state_class: StateClass,
+        scope: &ProbeScope,
+        reporter_did: &Did,
+        counterparty_did: &Did,
+        local_digest: &StateDigest,
+        observed_at: u64,
+        freshness_valid_until: u64,
+        divergence_evidence_hash: Option<Hash>,
+        private_content_implication: bool,
+        report_nonce: &[u8; 32],
+    ) -> Hash {
+        let binding = PeerSyncReportBinding {
+            schema_version,
+            probe_hash,
+            sync_outcome,
+            state_class,
+            scope,
+            reporter_did,
+            counterparty_did,
+            local_digest,
+            observed_at,
+            freshness_valid_until,
+            divergence_evidence_hash,
+            private_content_implication,
+            report_nonce: *report_nonce,
+        };
+        let payload = bincode::serialize(&binding)
+            .expect("PeerSyncReportBinding serialization is infallible");
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        *hasher.finalize().as_bytes()
+    }
+
+    /// `true` iff `schema_version == PEER_SYNC_REPORT_SCHEMA_VERSION`.
+    pub fn is_supported_schema_version(&self) -> bool {
+        self.schema_version == PEER_SYNC_REPORT_SCHEMA_VERSION
+    }
+
+    /// Verify the stored `report_hash` and `schema_version`.
+    ///
+    /// Returns `true` only if both hold. Fails closed on unsupported
+    /// versions even when the stored hash matches a recomputation under
+    /// that version. Does NOT verify the signature — that is a
+    /// higher-layer concern.
+    pub fn verify_binding(&self) -> bool {
+        if !self.is_supported_schema_version() {
+            return false;
+        }
+        let recomputed = Self::compute_report_hash(
+            self.schema_version,
+            self.probe_hash,
+            self.sync_outcome,
+            self.state_class,
+            &self.scope,
+            &self.reporter_did,
+            &self.counterparty_did,
+            &self.local_digest,
+            self.observed_at,
+            self.freshness_valid_until,
+            self.divergence_evidence_hash,
+            self.private_content_implication,
+            &self.report_nonce,
+        );
+        self.report_hash == recomputed
+    }
+
+    /// `true` if `now_unix_seconds <= freshness_valid_until`.
+    pub fn is_fresh(&self, now_unix_seconds: u64) -> bool {
+        now_unix_seconds <= self.freshness_valid_until
+    }
+}
+
+// ============================================================================
 // DivergenceEvidence and RepairPlan records (issue #1835)
 //
 // Wire-stable record shapes for the next two design-level identifiers from
@@ -3194,6 +3710,623 @@ mod anti_entropy_tests {
         let restored_bin: AntiEntropyProbe = bincode::deserialize(&bytes).unwrap();
         assert_eq!(probe, restored_bin);
         assert!(restored_bin.verify_binding());
+    }
+
+    // =========================================================================
+    // PeerSyncReport (issue #1852)
+    // =========================================================================
+
+    fn sample_responder_local_digest() -> StateDigest {
+        // A different Bloom projection than the probe carries — the
+        // responder's local index does not match the prober's exactly.
+        StateDigest::Bloom(BloomProjection {
+            bits: vec![0b0000_0101, 0, 0, 0, 0, 0, 0, 0],
+            num_hashes: 1,
+            size: 64,
+            hint_count: 3,
+        })
+    }
+
+    fn sample_peer_sync_report() -> PeerSyncReport {
+        let probe = sample_probe();
+        PeerSyncReport::new(
+            probe.probe_hash,
+            PeerSyncOutcome::MissingOnRemote,
+            probe.state_class,
+            probe.target_scope.clone(),
+            "did:icn:responder456".to_string(),
+            probe.prober_did.clone(),
+            sample_responder_local_digest(),
+            1_715_000_005,
+            1_715_000_035,
+            None,
+            false,
+            [0xAB; 32],
+        )
+        .expect("sample PeerSyncReport is structurally consistent")
+    }
+
+    // ---- Outcome + reason taxonomies: round-trip ----
+
+    #[test]
+    fn peer_sync_outcome_all_five_variants_round_trip() {
+        let cases = [
+            PeerSyncOutcome::Matching,
+            PeerSyncOutcome::MissingOnLocal,
+            PeerSyncOutcome::MissingOnRemote,
+            PeerSyncOutcome::Divergent,
+            PeerSyncOutcome::UnknownOutOfScope(UnknownOutOfScopeReason::StaleProbe),
+        ];
+        // Decisive evidence the spec's five outcomes are representable.
+        assert_eq!(cases.len(), 5);
+        for c in &cases {
+            let json = serde_json::to_string(c).unwrap();
+            let restored: PeerSyncOutcome = serde_json::from_str(&json).unwrap();
+            assert_eq!(*c, restored);
+            let bytes = bincode::serialize(c).unwrap();
+            let restored_bin: PeerSyncOutcome = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(*c, restored_bin);
+        }
+    }
+
+    #[test]
+    fn peer_sync_outcome_as_str_is_stable() {
+        // Lock the wire-stable lowercase labels.
+        assert_eq!(PeerSyncOutcome::Matching.as_str(), "matching");
+        assert_eq!(PeerSyncOutcome::MissingOnLocal.as_str(), "missing_on_local");
+        assert_eq!(
+            PeerSyncOutcome::MissingOnRemote.as_str(),
+            "missing_on_remote"
+        );
+        assert_eq!(PeerSyncOutcome::Divergent.as_str(), "divergent");
+        assert_eq!(
+            PeerSyncOutcome::UnknownOutOfScope(UnknownOutOfScopeReason::StaleProbe).as_str(),
+            "unknown_out_of_scope"
+        );
+    }
+
+    #[test]
+    fn unknown_out_of_scope_reason_all_four_variants_round_trip() {
+        let cases = [
+            UnknownOutOfScopeReason::StaleProbe,
+            UnknownOutOfScopeReason::ScopeMismatch,
+            UnknownOutOfScopeReason::InsufficientAuthority,
+            UnknownOutOfScopeReason::UnknownStateClass,
+        ];
+        // Decisive evidence the spec's four skip cases are representable.
+        assert_eq!(cases.len(), 4);
+        for r in &cases {
+            let json = serde_json::to_string(r).unwrap();
+            let restored: UnknownOutOfScopeReason = serde_json::from_str(&json).unwrap();
+            assert_eq!(*r, restored);
+            let bytes = bincode::serialize(r).unwrap();
+            let restored_bin: UnknownOutOfScopeReason = bincode::deserialize(&bytes).unwrap();
+            assert_eq!(*r, restored_bin);
+        }
+    }
+
+    #[test]
+    fn peer_sync_outcome_may_carry_divergence_evidence_classification() {
+        assert!(!PeerSyncOutcome::Matching.may_carry_divergence_evidence());
+        assert!(PeerSyncOutcome::MissingOnLocal.may_carry_divergence_evidence());
+        assert!(PeerSyncOutcome::MissingOnRemote.may_carry_divergence_evidence());
+        assert!(PeerSyncOutcome::Divergent.may_carry_divergence_evidence());
+        assert!(
+            !PeerSyncOutcome::UnknownOutOfScope(UnknownOutOfScopeReason::ScopeMismatch)
+                .may_carry_divergence_evidence()
+        );
+    }
+
+    // ---- PeerSyncReport: binding determinism + round-trip ----
+
+    #[test]
+    fn peer_sync_report_binding_is_deterministic() {
+        let r1 = sample_peer_sync_report();
+        let r2 = sample_peer_sync_report();
+        assert_eq!(r1.report_hash, r2.report_hash);
+        assert_ne!(r1.report_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn peer_sync_report_verify_binding_succeeds_for_fresh_record() {
+        let r = sample_peer_sync_report();
+        assert!(r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_json_round_trip_preserves_hash() {
+        let original = sample_peer_sync_report();
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: PeerSyncReport = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_bincode_round_trip_preserves_hash() {
+        let original = sample_peer_sync_report();
+        let bytes = bincode::serialize(&original).unwrap();
+        let restored: PeerSyncReport = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(original, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_signature_starts_empty() {
+        let r = sample_peer_sync_report();
+        assert!(r.signature.as_bytes().is_empty());
+    }
+
+    #[test]
+    fn peer_sync_report_two_records_with_distinct_nonces_distinct_hashes() {
+        let r1 = sample_peer_sync_report();
+        let probe = sample_probe();
+        let r2 = PeerSyncReport::new(
+            probe.probe_hash,
+            r1.sync_outcome,
+            r1.state_class,
+            r1.scope.clone(),
+            r1.reporter_did.clone(),
+            r1.counterparty_did.clone(),
+            r1.local_digest.clone(),
+            r1.observed_at,
+            r1.freshness_valid_until,
+            r1.divergence_evidence_hash,
+            r1.private_content_implication,
+            [0x99; 32], // distinct nonce
+        )
+        .unwrap();
+        assert_ne!(r1.report_hash, r2.report_hash);
+        assert!(r2.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_freshness_helper() {
+        let r = sample_peer_sync_report();
+        assert!(r.is_fresh(r.observed_at));
+        assert!(r.is_fresh(r.freshness_valid_until));
+        assert!(!r.is_fresh(r.freshness_valid_until + 1));
+    }
+
+    // ---- PeerSyncReport: tamper detection for every bound field ----
+
+    #[test]
+    fn peer_sync_report_probe_hash_tamper_detected() {
+        let mut r = sample_peer_sync_report();
+        r.probe_hash = [0xFF; 32];
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_outcome_tamper_detected() {
+        // Mutate from MissingOnRemote → MissingOnLocal; both pair
+        // legally with divergence_evidence_hash=None, so the hash is
+        // the only catch.
+        let mut r = sample_peer_sync_report();
+        r.sync_outcome = PeerSyncOutcome::MissingOnLocal;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_state_class_tamper_detected() {
+        let mut r = sample_peer_sync_report();
+        r.state_class = StateClass::ArtifactRegistryMetadata;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_scope_tamper_detected() {
+        let mut r = sample_peer_sync_report();
+        r.scope = ProbeScope::Commons;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_reporter_did_tamper_detected() {
+        let mut r = sample_peer_sync_report();
+        r.reporter_did = "did:icn:attacker".to_string();
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_counterparty_did_tamper_detected() {
+        let mut r = sample_peer_sync_report();
+        r.counterparty_did = "did:icn:attacker".to_string();
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_local_digest_tamper_detected() {
+        let mut r = sample_peer_sync_report();
+        r.local_digest = StateDigest::Bloom(sample_bloom());
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_observed_at_tamper_detected() {
+        let mut r = sample_peer_sync_report();
+        r.observed_at += 1;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_freshness_tamper_detected() {
+        let mut r = sample_peer_sync_report();
+        r.freshness_valid_until += 1;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_divergence_link_tamper_detected() {
+        // Build a Divergent-outcome report with no link, then manually
+        // attach one. Both states are structurally legal for Divergent;
+        // only the hash catches the change.
+        let probe = sample_probe();
+        let mut r = PeerSyncReport::new(
+            probe.probe_hash,
+            PeerSyncOutcome::Divergent,
+            probe.state_class,
+            probe.target_scope.clone(),
+            "did:icn:responder456".to_string(),
+            probe.prober_did.clone(),
+            sample_responder_local_digest(),
+            1_715_000_005,
+            1_715_000_035,
+            None,
+            false,
+            [0xAB; 32],
+        )
+        .unwrap();
+        assert!(r.verify_binding());
+        r.divergence_evidence_hash = Some([0x42; 32]);
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_private_implication_tamper_detected() {
+        let mut r = sample_peer_sync_report();
+        r.private_content_implication = !r.private_content_implication;
+        assert!(!r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_nonce_tamper_detected() {
+        let mut r = sample_peer_sync_report();
+        r.report_nonce = [0xFF; 32];
+        assert!(!r.verify_binding());
+    }
+
+    // ---- PeerSyncReport: schema-version policing ----
+
+    #[derive(Serialize)]
+    struct PeerSyncReportWireShape<'a> {
+        schema_version: u32,
+        probe_hash: Hash,
+        sync_outcome: PeerSyncOutcome,
+        state_class: StateClass,
+        scope: &'a ProbeScope,
+        reporter_did: &'a Did,
+        counterparty_did: &'a Did,
+        local_digest: &'a StateDigest,
+        observed_at: u64,
+        freshness_valid_until: u64,
+        divergence_evidence_hash: Option<Hash>,
+        private_content_implication: bool,
+        report_nonce: [u8; 32],
+        report_hash: Hash,
+        signature: Signature,
+    }
+
+    #[test]
+    fn peer_sync_report_rejects_future_schema_version_on_decode() {
+        let r = sample_peer_sync_report();
+        let bogus = PEER_SYNC_REPORT_SCHEMA_VERSION + 1;
+        let recomputed = PeerSyncReport::compute_report_hash(
+            bogus,
+            r.probe_hash,
+            r.sync_outcome,
+            r.state_class,
+            &r.scope,
+            &r.reporter_did,
+            &r.counterparty_did,
+            &r.local_digest,
+            r.observed_at,
+            r.freshness_valid_until,
+            r.divergence_evidence_hash,
+            r.private_content_implication,
+            &r.report_nonce,
+        );
+        let wire = PeerSyncReportWireShape {
+            schema_version: bogus,
+            probe_hash: r.probe_hash,
+            sync_outcome: r.sync_outcome,
+            state_class: r.state_class,
+            scope: &r.scope,
+            reporter_did: &r.reporter_did,
+            counterparty_did: &r.counterparty_did,
+            local_digest: &r.local_digest,
+            observed_at: r.observed_at,
+            freshness_valid_until: r.freshness_valid_until,
+            divergence_evidence_hash: r.divergence_evidence_hash,
+            private_content_implication: r.private_content_implication,
+            report_nonce: r.report_nonce,
+            report_hash: recomputed,
+            signature: r.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<PeerSyncReport, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed_bin: Result<PeerSyncReport, _> = bincode::deserialize(&bytes);
+        assert!(parsed_bin.is_err());
+    }
+
+    #[test]
+    fn peer_sync_report_verify_binding_fails_closed_on_manual_bogus_version() {
+        let mut r = sample_peer_sync_report();
+        let bogus = PEER_SYNC_REPORT_SCHEMA_VERSION + 9;
+        r.schema_version = bogus;
+        r.report_hash = PeerSyncReport::compute_report_hash(
+            bogus,
+            r.probe_hash,
+            r.sync_outcome,
+            r.state_class,
+            &r.scope,
+            &r.reporter_did,
+            &r.counterparty_did,
+            &r.local_digest,
+            r.observed_at,
+            r.freshness_valid_until,
+            r.divergence_evidence_hash,
+            r.private_content_implication,
+            &r.report_nonce,
+        );
+        assert!(
+            !r.verify_binding(),
+            "verify_binding() must reject unsupported schema_version even when the hash matches"
+        );
+    }
+
+    // ---- PeerSyncReport: outcome / divergence-link structural rules ----
+
+    fn _build_with_outcome(
+        outcome: PeerSyncOutcome,
+        divergence_hash: Option<Hash>,
+    ) -> Result<PeerSyncReport, PeerSyncReportError> {
+        let probe = sample_probe();
+        PeerSyncReport::new(
+            probe.probe_hash,
+            outcome,
+            probe.state_class,
+            probe.target_scope.clone(),
+            "did:icn:responder456".to_string(),
+            probe.prober_did.clone(),
+            sample_responder_local_digest(),
+            1_715_000_005,
+            1_715_000_035,
+            divergence_hash,
+            false,
+            [0xAB; 32],
+        )
+    }
+
+    #[test]
+    fn peer_sync_report_matching_rejects_divergence_evidence_link() {
+        let err = _build_with_outcome(PeerSyncOutcome::Matching, Some([0x42; 32])).unwrap_err();
+        assert!(matches!(
+            err,
+            PeerSyncReportError::DivergenceEvidenceHashNotAllowed { outcome } if outcome == "matching"
+        ));
+    }
+
+    #[test]
+    fn peer_sync_report_unknown_out_of_scope_rejects_divergence_evidence_link() {
+        for reason in [
+            UnknownOutOfScopeReason::StaleProbe,
+            UnknownOutOfScopeReason::ScopeMismatch,
+            UnknownOutOfScopeReason::InsufficientAuthority,
+            UnknownOutOfScopeReason::UnknownStateClass,
+        ] {
+            let err =
+                _build_with_outcome(PeerSyncOutcome::UnknownOutOfScope(reason), Some([0x42; 32]))
+                    .unwrap_err();
+            assert!(matches!(
+                err,
+                PeerSyncReportError::DivergenceEvidenceHashNotAllowed {
+                    outcome
+                } if outcome == "unknown_out_of_scope"
+            ));
+        }
+    }
+
+    #[test]
+    fn peer_sync_report_missing_on_local_may_carry_divergence_link() {
+        let r = _build_with_outcome(PeerSyncOutcome::MissingOnLocal, Some([0x33; 32]))
+            .expect("MissingOnLocal + divergence link is structurally legal");
+        assert_eq!(r.divergence_evidence_hash, Some([0x33; 32]));
+        assert!(r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_missing_on_remote_may_carry_divergence_link() {
+        let r = _build_with_outcome(PeerSyncOutcome::MissingOnRemote, Some([0x33; 32]))
+            .expect("MissingOnRemote + divergence link is structurally legal");
+        assert_eq!(r.divergence_evidence_hash, Some([0x33; 32]));
+        assert!(r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_divergent_may_carry_divergence_link() {
+        let r = _build_with_outcome(PeerSyncOutcome::Divergent, Some([0x33; 32]))
+            .expect("Divergent + divergence link is structurally legal");
+        assert_eq!(r.divergence_evidence_hash, Some([0x33; 32]));
+        assert!(r.verify_binding());
+    }
+
+    #[test]
+    fn peer_sync_report_non_matching_outcomes_round_trip_without_link() {
+        // Reports may be emitted before classification runs; the link
+        // is optional for non-matching outcomes.
+        for outcome in [
+            PeerSyncOutcome::MissingOnLocal,
+            PeerSyncOutcome::MissingOnRemote,
+            PeerSyncOutcome::Divergent,
+        ] {
+            let r = _build_with_outcome(outcome, None)
+                .unwrap_or_else(|_| panic!("{outcome:?} + None is structurally legal"));
+            let json = serde_json::to_string(&r).unwrap();
+            let restored: PeerSyncReport = serde_json::from_str(&json).unwrap();
+            assert_eq!(r, restored);
+            assert!(restored.verify_binding());
+            assert!(restored.divergence_evidence_hash.is_none());
+        }
+    }
+
+    #[test]
+    fn peer_sync_report_wire_rejects_matching_with_divergence_link() {
+        // Even a hash-consistent wire shape must be refused before
+        // construction. Closes the "manually-crafted wire payload"
+        // bypass.
+        let probe = sample_probe();
+        let scope = probe.target_scope.clone();
+        let reporter = "did:icn:responder456".to_string();
+        let counterparty = probe.prober_did.clone();
+        let local_digest = sample_responder_local_digest();
+        let recomputed = PeerSyncReport::compute_report_hash(
+            PEER_SYNC_REPORT_SCHEMA_VERSION,
+            probe.probe_hash,
+            PeerSyncOutcome::Matching,
+            probe.state_class,
+            &scope,
+            &reporter,
+            &counterparty,
+            &local_digest,
+            1_715_000_005,
+            1_715_000_035,
+            Some([0x42; 32]),
+            false,
+            &[0xAB; 32],
+        );
+        let wire = PeerSyncReportWireShape {
+            schema_version: PEER_SYNC_REPORT_SCHEMA_VERSION,
+            probe_hash: probe.probe_hash,
+            sync_outcome: PeerSyncOutcome::Matching,
+            state_class: probe.state_class,
+            scope: &scope,
+            reporter_did: &reporter,
+            counterparty_did: &counterparty,
+            local_digest: &local_digest,
+            observed_at: 1_715_000_005,
+            freshness_valid_until: 1_715_000_035,
+            divergence_evidence_hash: Some([0x42; 32]),
+            private_content_implication: false,
+            report_nonce: [0xAB; 32],
+            report_hash: recomputed,
+            signature: Signature::new(Vec::new()),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<PeerSyncReport, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed_bin: Result<PeerSyncReport, _> = bincode::deserialize(&bytes);
+        assert!(parsed_bin.is_err());
+    }
+
+    // ---- PeerSyncReport: domain-tag separation ----
+
+    #[test]
+    fn peer_sync_report_domain_tag_distinct_from_other_records() {
+        assert_ne!(PeerSyncReport::DOMAIN_TAG, AntiEntropyProbe::DOMAIN_TAG);
+        assert_ne!(PeerSyncReport::DOMAIN_TAG, DivergenceEvidence::DOMAIN_TAG);
+        assert_ne!(PeerSyncReport::DOMAIN_TAG, RepairPlan::DOMAIN_TAG);
+        assert_ne!(PeerSyncReport::DOMAIN_TAG, RepairReceipt::DOMAIN_TAG);
+        assert_ne!(PeerSyncReport::DOMAIN_TAG, ArtifactReceipt::DOMAIN_TAG);
+    }
+
+    #[test]
+    fn peer_sync_report_domain_tag_affects_hash() {
+        let r = sample_peer_sync_report();
+        let binding = PeerSyncReportBinding {
+            schema_version: r.schema_version,
+            probe_hash: r.probe_hash,
+            sync_outcome: r.sync_outcome,
+            state_class: r.state_class,
+            scope: &r.scope,
+            reporter_did: &r.reporter_did,
+            counterparty_did: &r.counterparty_did,
+            local_digest: &r.local_digest,
+            observed_at: r.observed_at,
+            freshness_valid_until: r.freshness_valid_until,
+            divergence_evidence_hash: r.divergence_evidence_hash,
+            private_content_implication: r.private_content_implication,
+            report_nonce: r.report_nonce,
+        };
+        let payload = bincode::serialize(&binding).unwrap();
+        let mut hasher = blake3::Hasher::new();
+        // Deliberately omit DOMAIN_TAG.
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        let without_tag: Hash = *hasher.finalize().as_bytes();
+        assert_ne!(r.report_hash, without_tag);
+    }
+
+    // ---- PeerSyncReport: cross-link to probe + privacy contract ----
+
+    #[test]
+    fn peer_sync_report_links_to_probe_hash() {
+        let probe = sample_probe();
+        let r = sample_peer_sync_report();
+        assert_eq!(r.probe_hash, probe.probe_hash);
+        // If the probe is rebuilt with a different nonce, the link breaks.
+        let probe_v2 = AntiEntropyProbe::new(
+            probe.state_class,
+            probe.target_scope.clone(),
+            probe.digest.clone(),
+            probe.prober_did.clone(),
+            probe.trigger_source,
+            probe.freshness_emitted_at,
+            probe.freshness_valid_until,
+            probe.requested_response,
+            [0xEE; 32], // distinct nonce
+        );
+        assert_ne!(r.probe_hash, probe_v2.probe_hash);
+    }
+
+    #[test]
+    fn peer_sync_report_private_content_implication_round_trips() {
+        let probe = sample_probe();
+        let r = PeerSyncReport::new(
+            probe.probe_hash,
+            PeerSyncOutcome::Divergent,
+            probe.state_class,
+            probe.target_scope.clone(),
+            "did:icn:scoped-vault-steward".to_string(),
+            probe.prober_did.clone(),
+            // The responder's local digest is a bounded projection —
+            // hashes / counts only, never raw object bodies. The
+            // private_content_implication flag tells renderers to
+            // gate technical detail.
+            StateDigest::ShortList(ShortDigestList::from_hashes(vec![
+                [0xAA; 32], [0xBB; 32], [0xCC; 32],
+            ])),
+            1_715_000_005,
+            1_715_000_035,
+            None,
+            true,
+            [0x55; 32],
+        )
+        .expect("private-content report is structurally consistent");
+        assert!(r.private_content_implication);
+        assert!(r.verify_binding());
+        // Structurally: the only field that could carry private data is
+        // `local_digest`, which is a `StateDigest` enum whose every
+        // projection is hashes / counts / Merkle root / vector clock.
+        // There is no body / payload / raw_bytes / secret field on the
+        // record.
+        let json = serde_json::to_string(&r).unwrap();
+        let restored: PeerSyncReport = serde_json::from_str(&json).unwrap();
+        assert!(restored.private_content_implication);
+        assert!(restored.verify_binding());
     }
 }
 
