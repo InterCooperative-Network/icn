@@ -3,8 +3,9 @@
 //! Implements `docs/spec/network-anti-entropy-proof-loops.md` §"First safe
 //! proof-loop / dogfood slice" → Slice A. This is the first end-to-end
 //! exercise of the schema chain landed by #1843 (`AntiEntropyProbe` +
-//! `StateDigest` family) and #1844 (`DivergenceEvidence` + `RepairPlan` +
-//! 18-class `DivergenceClass`).
+//! `StateDigest` family), #1844 (`DivergenceEvidence` + `RepairPlan` +
+//! 18-class `DivergenceClass`), #1850 (`RepairReceipt`), and
+//! #1853 (`PeerSyncReport`).
 //!
 //! # What this is
 //!
@@ -16,7 +17,11 @@
 //! Peer A has r1, r2, r3.
 //! Peer B has r1, r2.
 //! Peer A probes the receipt-index state class.
-//! Fixture compare detects B missing r3.
+//! Fixture compare detects B missing r3 (peer_b is the responder; the
+//! responder's local index is missing entries the prober has).
+//! Public PeerSyncReport (#1852) with PeerSyncOutcome::MissingOnLocal is
+//! constructed from peer_b's POV; verify_binding() passes; the
+//! cross-link resolves back to the probe via probe_hash.
 //! Fixture classify produces DivergenceEvidence { class: MissingReceipt }.
 //! Fixture plan produces RepairPlan { action: FetchMissing }.
 //! Fixture apply copies only public fixture receipt r3 into B's index.
@@ -42,10 +47,14 @@
 //! * Not a chaos test (`#1010` owns that).
 //! * Not a production claim. No clause of this fixture is an assertion
 //!   that ICN-native anti-entropy operates today against real peers.
-//! * Not a `PeerSyncReport` implementation. That identifier remains
-//!   design-level per spec §"Proof artifacts"; the fixture uses a
-//!   private `FixtureSyncOutcome` enum scoped to this file for the
-//!   compare-phase result, distinct from the resolved repair artifact.
+//! * Not a runtime `PeerSyncReport` emission. The public report
+//!   (#1853) is constructed in-process from the same in-memory peer
+//!   indexes; no live network comparison happens. The fixture also
+//!   retains its private `FixtureSyncOutcome` enum — but only as a
+//!   compare-math helper that carries the explicit hash list the
+//!   apply phase needs. The public `PeerSyncReport` carries the
+//!   categorical outcome the spec specifies; the two are not in
+//!   conflict.
 //! * Not a live repair. The `RepairReceipt` constructed at phase 7 is
 //!   evidence of what a fixture peer would have produced; no real
 //!   `FetchMissing` ran against a real peer.
@@ -56,8 +65,9 @@ use icn_gossip::{to_bloom_projection, BloomFilter};
 use icn_kernel_api::{
     AntiEntropyProbe, AuthorityBasis, BoundaryRuleRef, BoundaryRuleSet, Did, DigestMismatch,
     DivergenceClass, DivergenceEvidence, EffectOutcome, ExpectedRepairReceiptClass, Hash, PeerSet,
-    PolicyClauseRef, ProbeScope, ReceiptDigest, RepairAction, RepairPlan, RepairReceipt,
-    RepairReceiptClass, RequestedResponseClass, StateClass, StateDigest, TriggerSource,
+    PeerSyncOutcome, PeerSyncReport, PolicyClauseRef, ProbeScope, ReceiptDigest, RepairAction,
+    RepairPlan, RepairReceipt, RepairReceiptClass, RequestedResponseClass, StateClass, StateDigest,
+    TriggerSource,
 };
 
 // ---------------------------------------------------------------------------
@@ -153,11 +163,24 @@ impl FixturePeer {
     }
 }
 
-/// Result of comparing two fixture receipt indexes.
+/// Fixture compare-math helper: result of comparing two in-memory
+/// receipt indexes.
 ///
-/// **Private to this test file.** The public `PeerSyncReport` identifier
-/// from the spec is still design-level. When the kernel lands its real
-/// wire-stable comparison record, this enum will be deleted or replaced.
+/// **Private to this test file.** Distinct from the public
+/// [`PeerSyncReport`] (#1853): this enum is the compare-math helper
+/// that carries the *explicit hash lists* the apply phase needs (e.g.,
+/// "fetch r3 from the prober"). The public `PeerSyncReport` is the
+/// wire-stable categorical evidence record produced from the same
+/// comparison — it carries the spec's five outcome categories and
+/// bounded digests, not hash lists. The two are not in conflict; this
+/// fixture builds both from the same in-memory peer indexes.
+///
+/// Naming: `MissingOn{Remote,Local}` here matches the public type's
+/// orientation — "X is missing these entries" — but the local/remote
+/// roles in this helper's argument list (`local, remote`) are caller-
+/// supplied, not tied to the prober/responder roles the public
+/// `PeerSyncReport` is built from. The Slice A test wires both
+/// orientations explicitly.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum FixtureSyncOutcome {
     /// Both peers' receipt-index hash sets are equal.
@@ -308,6 +331,13 @@ fn slice_a_receipt_index_probe_classify_plan_apply_surface() {
     assert_eq!(*receipt_digest.digest(), peer_a.state_digest());
 
     // ---- 2. Compare ----
+    //
+    // The fixture's compare-math helper produces the symmetric
+    // difference from peer_a's POV (peer_a as `local`, peer_b as
+    // `remote`). The result carries the explicit hash list the apply
+    // phase needs: `MissingOnRemote { missing: [r3] }` means peer_b
+    // (the "remote" peer in this call) is missing r3 that peer_a (the
+    // "local" peer) has.
     let outcome = fixture_compare_receipt_indexes(&peer_a, &peer_b);
     let missing = match &outcome {
         FixtureSyncOutcome::MissingOnRemote { missing } => missing.clone(),
@@ -318,6 +348,63 @@ fn slice_a_receipt_index_probe_classify_plan_apply_surface() {
         missing[0], r3.receipt_hash,
         "the missing receipt should be r3"
     );
+
+    // ---- 2b. PeerSyncReport (public evidence, #1853) ----
+    //
+    // The wire-stable evidence form of the same comparison. The
+    // responder in Slice A is peer_b — the peer answering peer_a's
+    // probe. From peer_b's POV, peer_b's local index is missing r3
+    // that peer_a (the prober) has, so the public outcome is
+    // `MissingOnLocal` per spec §"Compare":
+    //   "missing on local — peer has entries the responder does not."
+    //
+    // The report carries the categorical outcome and the responder's
+    // local digest (the bounded `StateDigest` projection peer_b
+    // produced when answering the probe); it does NOT carry the
+    // explicit missing-hash list. That list stays on the compare-math
+    // helper (`FixtureSyncOutcome`) where the apply phase consumes it.
+    // The downstream `DivergenceEvidence` carries bounded
+    // `DigestMismatch` projections (Bloom / Merkle root / vector clock
+    // / short list of refs), not explicit hash lists either — the
+    // proof rail keeps the explicit lists out of the wire-stable
+    // records on purpose.
+    //
+    // `divergence_evidence_hash` is `None` here because classification
+    // has not yet run (classification is phase 4, below). After
+    // classification produces evidence, a second report — or an
+    // updated record at the app layer — may carry the link; the spec
+    // permits but does not require it.
+    let peer_sync_report = PeerSyncReport::new(
+        probe.probe_hash,
+        PeerSyncOutcome::MissingOnLocal,
+        StateClass::ReceiptIndex,
+        scope.clone(),
+        peer_b.did.clone(), // responder
+        peer_a.did.clone(), // counterparty (prober)
+        peer_b.state_digest(),
+        1_715_000_001,
+        1_715_000_031,
+        None, // pre-classification: no DivergenceEvidence link yet
+        false,
+        [0xCC; 32],
+    )
+    .expect("Slice A PeerSyncReport is structurally consistent");
+    assert!(peer_sync_report.verify_binding());
+    assert_eq!(
+        peer_sync_report.probe_hash, probe.probe_hash,
+        "report cross-links back to the probe"
+    );
+    assert_eq!(peer_sync_report.state_class, probe.state_class);
+    assert_eq!(peer_sync_report.scope, probe.target_scope);
+    assert_eq!(
+        peer_sync_report.sync_outcome,
+        PeerSyncOutcome::MissingOnLocal
+    );
+    assert_eq!(peer_sync_report.reporter_did, peer_b.did);
+    assert_eq!(peer_sync_report.counterparty_did, peer_a.did);
+    assert!(peer_sync_report.divergence_evidence_hash.is_none());
+    assert!(!peer_sync_report.private_content_implication);
+    assert!(peer_sync_report.is_fresh(peer_sync_report.observed_at));
 
     // ---- 3. Classify ----
     let evidence = DivergenceEvidence::new(
@@ -351,6 +438,19 @@ fn slice_a_receipt_index_probe_classify_plan_apply_surface() {
         evidence_peers.windows(2).all(|w| w[0] < w[1]),
         "PeerSet must be sorted"
     );
+
+    // NOTE: The fixture does not build a post-classification
+    // `PeerSyncReport` that carries `divergence_evidence_hash`. The
+    // pre-classification report above is built from peer_b's responder
+    // POV (`MissingOnLocal`), while the `evidence` constructed below
+    // uses the fixture's compare-helper orientation (peer_a as
+    // "local", `DigestMismatch::MissingOnRemote { local: peer_a... }`).
+    // Linking the two would conflate two different local/remote
+    // framings of the same divergence — the schema permits the cross-
+    // link structurally, but the fixture keeps the records honest by
+    // not asserting an orientation-mismatched link. The optional-link
+    // case is exercised in the PeerSyncReport schema's own tests
+    // (`peer_sync_report_missing_on_local_may_carry_divergence_link`).
 
     // ---- 4. Plan ----
     let plan = RepairPlan::new(
