@@ -5,7 +5,8 @@
 //! the cockpit rendering surface over the proof rail landed by
 //! #1843 (`AntiEntropyProbe` + `StateDigest`),
 //! #1844 (`DivergenceEvidence` + `RepairPlan`),
-//! and #1845 (receipt-index anti-entropy Slice A fixture).
+//! #1845 (receipt-index anti-entropy Slice A fixture),
+//! and #1850 (`RepairReceipt` wire-stable schema, issue #1849).
 //!
 //! # What this is
 //!
@@ -18,8 +19,8 @@
 //! One open DivergenceEvidence (class: MissingReceipt) over the
 //! receipt-index state class, surfaced as a Bloom-filter set-difference.
 //! One RepairPlan (action: FetchMissing) linked to the evidence by hash.
-//! One fixture RepairOutcome (EffectOutcome::Applied) recorded as a
-//! test-private stand-in for the spec's still-design-level RepairReceipt.
+//! One public RepairReceipt (#1849) with EffectOutcome::Applied,
+//! verify_binding() passing, cross-linked to evidence + plan by hash.
 //! Cockpit view renders all NINE required fields per spec §"Network /
 //! Federation surface". Member-impact summary attached, exact strings.
 //! Twelve-category accessibility gate evaluated and passing.
@@ -43,20 +44,23 @@
 //! * Not a member shell implementation (`#1839`). The fixture attaches
 //!   the member-impact summary string verbatim from the spec's mapping
 //!   but does not render the member-shell surface itself.
-//! * Not a public `RepairReceipt` schema. That identifier remains
-//!   design-level after #1845; the fixture uses a private
-//!   `FixtureRepairOutcome` and documents the substitution.
+//! * Not a public `PeerSyncReport` schema. That identifier remains
+//!   design-level; the fixture compares peer indexes directly rather
+//!   than constructing a wire-stable `PeerSyncReport`.
 //! * Not a production-readiness claim, live-federation claim, or NYCN
-//!   pilot claim.
+//!   pilot claim. The repair did not run against a live network; the
+//!   `RepairReceipt` records what a fixture peer would have produced
+//!   had the bounded `FetchMissing` action been executed against
+//!   real peers.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use icn_gossip::{to_bloom_projection, BloomFilter};
 use icn_kernel_api::{
     AntiEntropyProbe, AuthorityBasis, BoundaryRuleRef, BoundaryRuleSet, Did, DigestMismatch,
-    DivergenceClass, DivergenceEvidence, ExpectedRepairReceiptClass, Hash, PeerSet,
-    PolicyClauseRef, ProbeScope, RepairAction, RepairPlan, RequestedResponseClass, StateClass,
-    StateDigest, TriggerSource,
+    DivergenceClass, DivergenceEvidence, EffectOutcome, ExpectedRepairReceiptClass, Hash, PeerSet,
+    PolicyClauseRef, ProbeScope, RepairAction, RepairPlan, RepairReceipt, RepairReceiptClass,
+    RequestedResponseClass, StateClass, StateDigest, TriggerSource,
 };
 
 // ===========================================================================
@@ -209,25 +213,49 @@ enum FixtureEscalationStatus {
     EscalatedToGovernanceReview,
 }
 
-/// Test-private stand-in for the spec's still-design-level
-/// `RepairReceipt`. After #1845, `RepairReceipt` remains forward work;
-/// this fixture asserts after-state plus a linked outcome hash instead
-/// of producing a wire-stable receipt.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct FixtureRepairOutcome {
-    /// `EffectOutcome::Applied` style label. Test-private.
-    effect_outcome: &'static str,
-    /// `evidence_hash` of the `DivergenceEvidence` this outcome resolves.
-    divergence_evidence_hash: Hash,
-    /// `plan_hash` of the `RepairPlan` that produced this outcome.
-    repair_plan_hash: Hash,
-    /// State-class digest after the fixture apply (for a future
-    /// `verify_convergence` step).
-    after_state_digest: StateDigest,
-    /// Fixture timestamp; deterministic.
+/// Build the public `RepairReceipt` (#1849) the cockpit view links to.
+///
+/// Constructs the wire-stable receipt with `EffectOutcome::Applied`,
+/// the cross-link hashes from `evidence` and `plan`, the fixture
+/// after-state digest from `peer_b`, and the fixture actor DID. The
+/// resulting receipt is the canonical evidence artifact the cockpit
+/// row renders against — replacing the test-private stand-in this
+/// fixture used to carry before #1850 landed.
+fn build_repair_receipt(
+    evidence: &DivergenceEvidence,
+    plan: &RepairPlan,
+    peer_b: &FixturePeer,
+    actor_did: &str,
     applied_at: u64,
-    /// Fixture actor — the steward who recorded the outcome.
-    actor_did: Did,
+) -> RepairReceipt {
+    RepairReceipt::new(
+        RepairReceiptClass::FetchMissingReceipt,
+        EffectOutcome::Applied,
+        evidence.evidence_hash,
+        plan.plan_hash,
+        StateClass::ReceiptIndex,
+        fixture_scope(),
+        actor_did.to_string(),
+        AuthorityBasis::DomainPolicyClause(fixture_policy_clause()),
+        BoundaryRuleSet::from_rules(vec![
+            BoundaryRuleRef::NoRepairBeyondAuthority,
+            BoundaryRuleRef::NoLocalityOrDisclosureWidening,
+        ]),
+        // Slice A's "before" digest is implied (peer A's index); the
+        // fixture's decisive evidence is the after-state digest. The
+        // public RepairReceipt accepts an optional before; we omit it
+        // here because the before-state digest the spec describes is
+        // the divergent peer's index *before* fetch-missing, and the
+        // fixture does not retain that snapshot.
+        None,
+        Some(peer_b.state_digest()),
+        applied_at,
+        applied_at + 30,
+        false,
+        None,
+        [0xEF; 32],
+    )
+    .expect("Slice A repair receipt is structurally consistent")
 }
 
 /// Steward cockpit rendering of a single open divergence row.
@@ -328,10 +356,16 @@ struct FixtureEvidenceLinks {
     evidence_hash: Hash,
     /// `RepairPlan::plan_hash`.
     plan_hash: Hash,
-    /// `FixtureRepairOutcome` reference, present only on the resolved
-    /// view. Production-direction `RepairReceipt` will replace this
-    /// field with a wire-stable hash; until then the cockpit fixture
-    /// renders the fixture-local outcome's identity directly.
+    /// Cross-link to the public `RepairReceipt` (#1849), present only
+    /// on the resolved view. Records the receipt's binding hash and
+    /// actor DID so the cockpit row can chase the chain back to the
+    /// resolved repair evidence without surfacing the receipt's
+    /// internal field set.
+    repair_receipt_hash: Option<Hash>,
+    /// Actor DID recorded on the resolved view alongside the receipt
+    /// hash. Spec §"Network / Federation surface" field 8 lists this
+    /// alongside the evidence and plan hashes; the kernel does not
+    /// validate it against any real registry.
     repair_outcome_actor: Option<Did>,
 }
 
@@ -705,6 +739,7 @@ fn render_cockpit_open(
         receipts_and_evidence: FixtureEvidenceLinks {
             evidence_hash: evidence.evidence_hash,
             plan_hash: plan.plan_hash,
+            repair_receipt_hash: None,
             repair_outcome_actor: None,
         },
         escalation_status: FixtureEscalationStatus::NotEscalated,
@@ -716,7 +751,7 @@ fn render_cockpit_open(
 
 fn render_cockpit_resolved(
     open_view: &FixtureStewardCockpitView,
-    outcome: &FixtureRepairOutcome,
+    receipt: &RepairReceipt,
 ) -> FixtureStewardCockpitView {
     let state = FixtureOperatorState::RepairApplied;
     FixtureStewardCockpitView {
@@ -726,7 +761,8 @@ fn render_cockpit_resolved(
         receipts_and_evidence: FixtureEvidenceLinks {
             evidence_hash: open_view.receipts_and_evidence.evidence_hash,
             plan_hash: open_view.receipts_and_evidence.plan_hash,
-            repair_outcome_actor: Some(outcome.actor_did.clone()),
+            repair_receipt_hash: Some(receipt.receipt_hash),
+            repair_outcome_actor: Some(receipt.actor_did.clone()),
         },
         ..open_view.clone()
     }
@@ -843,23 +879,27 @@ fn cockpit_slice_a_renders_all_nine_fields_and_passes_accessibility_gate() {
     assert_eq!(peer_b.receipt_index.len(), 3);
     assert_eq!(peer_a.receipt_hash_set(), peer_b.receipt_hash_set());
 
-    // ---- Fixture repair outcome (test-private stand-in for the
-    // design-level RepairReceipt; cockpit links to it via the evidence
-    // hash + plan hash + actor DID) ----
-    let outcome = FixtureRepairOutcome {
-        effect_outcome: "Applied",
-        divergence_evidence_hash: evidence.evidence_hash,
-        repair_plan_hash: plan.plan_hash,
-        after_state_digest: peer_b.state_digest(),
-        applied_at: 1_715_000_003,
-        actor_did: "did:icn:fixture:c".to_string(),
-    };
-    assert_eq!(outcome.effect_outcome, "Applied");
-    assert_eq!(outcome.divergence_evidence_hash, evidence.evidence_hash);
-    assert_eq!(outcome.repair_plan_hash, plan.plan_hash);
+    // ---- Public RepairReceipt (#1849) for the applied repair ----
+    let receipt = build_repair_receipt(
+        &evidence,
+        &plan,
+        &peer_b,
+        "did:icn:fixture:c",
+        1_715_000_003,
+    );
+    assert!(receipt.verify_binding(), "fresh receipt verifies");
+    assert_eq!(receipt.effect_outcome, EffectOutcome::Applied);
+    assert_eq!(receipt.divergence_evidence_hash, evidence.evidence_hash);
+    assert_eq!(receipt.repair_plan_hash, plan.plan_hash);
+    assert_eq!(
+        receipt.repair_receipt_class,
+        RepairReceiptClass::FetchMissingReceipt
+    );
+    assert!(receipt.failure_reason.is_none());
+    assert!(receipt.after_state_digest.is_some());
 
     // ---- Render resolved cockpit view ----
-    let resolved_view = render_cockpit_resolved(&open_view, &outcome);
+    let resolved_view = render_cockpit_resolved(&open_view, &receipt);
     assert!(!resolved_view.open);
     assert_eq!(
         resolved_view.operator_state,
@@ -869,7 +909,8 @@ fn cockpit_slice_a_renders_all_nine_fields_and_passes_accessibility_gate() {
         resolved_view.member_impact_summary,
         "Members see: Receipt available."
     );
-    // The cross-link chain persists across the transition.
+    // The cross-link chain persists across the transition and now
+    // anchors on the public RepairReceipt binding hash.
     assert_eq!(
         resolved_view.receipts_and_evidence.evidence_hash,
         evidence.evidence_hash
@@ -877,6 +918,10 @@ fn cockpit_slice_a_renders_all_nine_fields_and_passes_accessibility_gate() {
     assert_eq!(
         resolved_view.receipts_and_evidence.plan_hash,
         plan.plan_hash
+    );
+    assert_eq!(
+        resolved_view.receipts_and_evidence.repair_receipt_hash,
+        Some(receipt.receipt_hash)
     );
     assert_eq!(
         resolved_view.receipts_and_evidence.repair_outcome_actor,
@@ -1051,10 +1096,11 @@ fn missing_receipt_with_named_authority_does_not_escalate() {
 }
 
 #[test]
-fn fixture_repair_outcome_links_evidence_and_plan_by_hash() {
-    // FixtureRepairOutcome is the test-private stand-in for the still
-    // design-level RepairReceipt. It must carry the cross-link hashes
-    // so an auditor can chase the chain back to the open divergence.
+fn repair_receipt_links_evidence_and_plan_by_hash() {
+    // The public RepairReceipt (#1849) replaces the prior test-private
+    // FixtureRepairOutcome stand-in. It carries the cross-link hashes so
+    // an auditor can chase the chain back to the open divergence, and
+    // verify_binding() proves the binding has not been tampered with.
     let (peer_a, mut peer_b, peer_c) = build_three_peer_slice_a();
     let evidence = build_divergence_evidence(&peer_a, &peer_b, &peer_c);
     let plan = build_repair_plan(&evidence);
@@ -1064,16 +1110,16 @@ fn fixture_repair_outcome_links_evidence_and_plan_by_hash() {
         .copied()
         .collect();
     peer_b.fixture_apply_fetch_missing(&peer_a, &missing);
-    let outcome = FixtureRepairOutcome {
-        effect_outcome: "Applied",
-        divergence_evidence_hash: evidence.evidence_hash,
-        repair_plan_hash: plan.plan_hash,
-        after_state_digest: peer_b.state_digest(),
-        applied_at: 1_715_000_003,
-        actor_did: "did:icn:fixture:c".to_string(),
-    };
-    assert_eq!(outcome.divergence_evidence_hash, evidence.evidence_hash);
-    assert_eq!(outcome.repair_plan_hash, plan.plan_hash);
+    let receipt = build_repair_receipt(
+        &evidence,
+        &plan,
+        &peer_b,
+        "did:icn:fixture:c",
+        1_715_000_003,
+    );
+    assert!(receipt.verify_binding());
+    assert_eq!(receipt.divergence_evidence_hash, evidence.evidence_hash);
+    assert_eq!(receipt.repair_plan_hash, plan.plan_hash);
     // If the evidence is rebuilt with a different nonce, the link breaks.
     let rebuilt_evidence = DivergenceEvidence::new(
         evidence.divergence_class,
@@ -1088,7 +1134,7 @@ fn fixture_repair_outcome_links_evidence_and_plan_by_hash() {
         [0xEE; 32], // different nonce
     );
     assert_ne!(
-        outcome.divergence_evidence_hash,
+        receipt.divergence_evidence_hash,
         rebuilt_evidence.evidence_hash
     );
 }
@@ -1103,7 +1149,6 @@ fn fixture_view_has_no_runtime_state_fields() {
         std::mem::size_of::<FixtureStewardCockpitView>() < 1024,
         "FixtureStewardCockpitView must remain a plain data struct"
     );
-    assert!(std::mem::size_of::<FixtureRepairOutcome>() < 512);
     assert!(std::mem::size_of::<FixtureAccessibilityCheck>() < 256);
 }
 

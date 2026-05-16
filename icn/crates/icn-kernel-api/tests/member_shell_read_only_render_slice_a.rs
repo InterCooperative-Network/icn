@@ -6,7 +6,8 @@
 //! #1843 (`AntiEntropyProbe` + `StateDigest`),
 //! #1844 (`DivergenceEvidence` + `RepairPlan`),
 //! #1845 (receipt-index anti-entropy Slice A fixture),
-//! and #1846 (steward cockpit divergence-render Slice A fixture).
+//! #1846 (steward cockpit divergence-render Slice A fixture),
+//! and #1850 (`RepairReceipt` wire-stable schema, issue #1849).
 //!
 //! # What this is
 //!
@@ -50,11 +51,13 @@
 //!   existence + scope + access path only. There is no body, content,
 //!   payload, raw bytes, or secret field on the rendering type by
 //!   construction.
-//! * Not a public `RepairReceipt` schema. That identifier remains
-//!   design-level after #1845 and #1846; the resolved view shows the
-//!   plain-language "Receipt available" sync status without claiming a
-//!   wire-stable receipt has landed.
-//! * Not a public `PeerSyncReport` schema. Also still design-level.
+//! * Not a member-facing surface for the wire-stable receipt. The
+//!   public `RepairReceipt` (#1849) now anchors the resolved card's
+//!   opaque `receipt_ref_hash` so an auditor can chase the chain back
+//!   to the resolved repair evidence. No member-facing string surfaces
+//!   the receipt's internal field set; the closed plain-language
+//!   vocabulary stays intact.
+//! * Not a public `PeerSyncReport` schema. Still design-level.
 //! * Not a steward cockpit surface. That fixture (#1840 / PR #1846)
 //!   renders the operator-facing technical detail; this fixture renders
 //!   the member-facing plain-language projection of the same proof rail.
@@ -66,8 +69,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use icn_gossip::{to_bloom_projection, BloomFilter};
 use icn_kernel_api::{
     AuthorityBasis, BoundaryRuleRef, BoundaryRuleSet, Did, DigestMismatch, DivergenceClass,
-    DivergenceEvidence, ExpectedRepairReceiptClass, Hash, PeerSet, PolicyClauseRef, ProbeScope,
-    RepairAction, RepairPlan, StateClass, StateDigest,
+    DivergenceEvidence, EffectOutcome, ExpectedRepairReceiptClass, Hash, PeerSet, PolicyClauseRef,
+    ProbeScope, RepairAction, RepairPlan, RepairReceipt, RepairReceiptClass, StateClass,
+    StateDigest,
 };
 
 // ===========================================================================
@@ -160,6 +164,48 @@ fn build_slice_a_repair_plan(evidence: &DivergenceEvidence) -> RepairPlan {
         1_715_000_032,
         [0xCC; 32],
     )
+}
+
+/// Build the public `RepairReceipt` (#1849) the resolved member-shell
+/// view anchors on.
+///
+/// Constructs the wire-stable receipt with `EffectOutcome::Applied`,
+/// cross-linked to `evidence` and `plan` by hash, over a deterministic
+/// fixture after-state digest. The resulting `receipt_hash` is what the
+/// resolved card's opaque `receipt_ref_hash` points at — the member
+/// never reads it, but an auditor can chase the chain back to the
+/// resolved repair evidence.
+///
+/// Kernel-level only: no live network, no live repair. The receipt
+/// records what a fixture peer would have produced had the bounded
+/// `FetchMissing` action run against real peers.
+fn build_slice_a_repair_receipt(evidence: &DivergenceEvidence, plan: &RepairPlan) -> RepairReceipt {
+    let r1 = fixture_receipt_hash("r1", 0x01);
+    let r2 = fixture_receipt_hash("r2", 0x02);
+    let r3 = fixture_receipt_hash("r3", 0x03);
+    let after = fixture_bloom_digest(&[r1.receipt_hash, r2.receipt_hash, r3.receipt_hash]);
+    RepairReceipt::new(
+        RepairReceiptClass::FetchMissingReceipt,
+        EffectOutcome::Applied,
+        evidence.evidence_hash,
+        plan.plan_hash,
+        StateClass::ReceiptIndex,
+        fixture_scope(),
+        "did:icn:fixture:repair-actor".to_string(),
+        AuthorityBasis::DomainPolicyClause(fixture_policy_clause()),
+        BoundaryRuleSet::from_rules(vec![
+            BoundaryRuleRef::NoRepairBeyondAuthority,
+            BoundaryRuleRef::NoLocalityOrDisclosureWidening,
+        ]),
+        None,
+        Some(after),
+        1_715_000_040,
+        1_715_000_070,
+        false,
+        None,
+        [0xDD; 32],
+    )
+    .expect("Slice A member-shell receipt is structurally consistent")
 }
 
 // ===========================================================================
@@ -1054,7 +1100,15 @@ fn render_open_view() -> FixtureMemberShellView {
 /// Render the resolved view: the Slice A repair has landed; the paused
 /// card and the surface rollup transition to `Receipt available`. The
 /// member-facing strings stay in the closed vocabulary.
-fn render_resolved_view(open_view: &FixtureMemberShellView) -> FixtureMemberShellView {
+///
+/// `receipt` is the public, wire-stable `RepairReceipt` (#1849) whose
+/// `receipt_hash` anchors the resolved card's opaque
+/// `receipt_ref_hash`. The member never reads this hash — it is the
+/// auditor-facing cross-link to the resolved repair evidence.
+fn render_resolved_view(
+    open_view: &FixtureMemberShellView,
+    receipt: &RepairReceipt,
+) -> FixtureMemberShellView {
     let mut resolved = open_view.clone();
     for card in resolved.action_cards.iter_mut() {
         if matches!(card.state, FixtureActionLifecycle::OpenButPaused) {
@@ -1065,15 +1119,16 @@ fn render_resolved_view(open_view: &FixtureMemberShellView) -> FixtureMemberShel
                 "This card has been recorded as completed. The plain receipt summary is shown.";
             // Receipt has landed — the pre-receipt expected-receipt
             // label is no longer applicable; the receipt_summary below
-            // is the rendered post-confirm artifact.
+            // is the rendered post-confirm artifact, anchored on the
+            // public RepairReceipt binding hash.
             card.expected_receipt_label = None;
             card.receipt_summary = Some(FixtureReceiptSummary {
                 plain_summary:
                     "Your action item was completed for the example fixture action item.",
                 receipt_class_label: FixtureReceiptClassLabel::ActionCompleted,
                 scope_label: "Example Local Domain",
-                applied_at: 1_715_000_040,
-                receipt_ref_hash: [0xEE; 32],
+                applied_at: receipt.applied_at,
+                receipt_ref_hash: receipt.receipt_hash,
             });
         }
     }
@@ -1263,7 +1318,20 @@ fn member_shell_slice_a_renders_read_only_surface_and_action_cards() {
     assert_eq!(categories.len(), 12);
 
     // ---- Resolved transition: paused → Receipt available ----
-    let resolved_view = render_resolved_view(&open_view);
+    // Construct the public RepairReceipt (#1849) and anchor the
+    // resolved card's opaque receipt_ref_hash on it. The receipt's
+    // verify_binding() proves the artifact has not been tampered
+    // with; the resolved view's audit-facing cross-link points back
+    // to it. No member-facing string surfaces the receipt's internal
+    // field set.
+    let evidence = build_slice_a_divergence();
+    let plan = build_slice_a_repair_plan(&evidence);
+    let receipt = build_slice_a_repair_receipt(&evidence, &plan);
+    assert!(receipt.verify_binding());
+    assert_eq!(receipt.effect_outcome, EffectOutcome::Applied);
+    assert_eq!(receipt.divergence_evidence_hash, evidence.evidence_hash);
+    assert_eq!(receipt.repair_plan_hash, plan.plan_hash);
+    let resolved_view = render_resolved_view(&open_view, &receipt);
     assert_eq!(
         resolved_view.surface_sync_status.label(),
         "Receipt available"
@@ -1277,6 +1345,14 @@ fn member_shell_slice_a_renders_read_only_surface_and_action_cards() {
         was_paused_now_confirmed.state,
         FixtureActionLifecycle::Confirmed
     ));
+    // The opaque audit-facing receipt_ref_hash on the resolved card
+    // anchors on the public RepairReceipt binding hash.
+    let resolved_summary = was_paused_now_confirmed
+        .receipt_summary
+        .as_ref()
+        .expect("resolved card carries a receipt summary");
+    assert_eq!(resolved_summary.receipt_ref_hash, receipt.receipt_hash);
+    assert_eq!(resolved_summary.applied_at, receipt.applied_at);
     assert_eq!(
         was_paused_now_confirmed.sync_status.label(),
         "Receipt available"
@@ -1474,7 +1550,10 @@ fn member_facing_strings_contain_no_protocol_jargon() {
     // table calls v0 violation on "raw scheduler, runtime, or cockpit
     // jargon." This test locks the bar.
     let open_view = render_open_view();
-    let resolved_view = render_resolved_view(&open_view);
+    let evidence = build_slice_a_divergence();
+    let plan = build_slice_a_repair_plan(&evidence);
+    let receipt = build_slice_a_repair_receipt(&evidence, &plan);
+    let resolved_view = render_resolved_view(&open_view, &receipt);
 
     for (label, view) in [("open", &open_view), ("resolved", &resolved_view)] {
         for s in view.all_member_facing_strings() {
@@ -1731,7 +1810,10 @@ fn slice_a_resolved_view_surface_status_is_receipt_available() {
     // Slice A's decisive resolved string is "Receipt available." Lock
     // it.
     let open_view = render_open_view();
-    let resolved_view = render_resolved_view(&open_view);
+    let evidence = build_slice_a_divergence();
+    let plan = build_slice_a_repair_plan(&evidence);
+    let receipt = build_slice_a_repair_receipt(&evidence, &plan);
+    let resolved_view = render_resolved_view(&open_view, &receipt);
     assert_eq!(
         resolved_view.surface_sync_status,
         FixtureSyncStatus::ReceiptAvailable
@@ -1764,28 +1846,38 @@ fn four_owning_entity_classes_match_the_merged_taxonomy() {
 }
 
 #[test]
-fn proof_rail_records_remain_design_level_in_the_member_view() {
-    // The fixture builds the same `DivergenceEvidence` / `RepairPlan`
-    // that the cockpit fixture (#1846) renders. The member shell must
-    // *not* surface any of those records' typed fields. Slice A asserts
-    // that the `DivergenceEvidence::evidence_hash` and
-    // `RepairPlan::plan_hash` are NOT embedded as visible strings in
-    // the rendered view, and that no `RepairReceipt` schema is
-    // claimed.
+fn proof_rail_records_stay_off_member_facing_strings() {
+    // The fixture builds the same `DivergenceEvidence` / `RepairPlan` /
+    // `RepairReceipt` chain that the cockpit fixture (#1846) and
+    // receipt-index fixture (#1845) render against. The member shell
+    // anchors the resolved card's opaque `receipt_ref_hash` on the
+    // receipt's binding hash so an auditor can chase the chain — but
+    // none of those records' typed fields appear as member-facing
+    // strings. Slice A asserts that none of the binding hashes leak
+    // through as visible text on either view.
     let divergence = build_slice_a_divergence();
     let plan = build_slice_a_repair_plan(&divergence);
+    let receipt = build_slice_a_repair_receipt(&divergence, &plan);
     let evidence_hex = hex::encode(divergence.evidence_hash);
     let plan_hex = hex::encode(plan.plan_hash);
-    let view = render_open_view();
-    for s in view.all_member_facing_strings() {
-        assert!(
-            !s.contains(&evidence_hex),
-            "member-facing string leaks evidence_hash: `{s}`"
-        );
-        assert!(
-            !s.contains(&plan_hex),
-            "member-facing string leaks plan_hash: `{s}`"
-        );
+    let receipt_hex = hex::encode(receipt.receipt_hash);
+    let open_view = render_open_view();
+    let resolved_view = render_resolved_view(&open_view, &receipt);
+    for (label, view) in [("open", &open_view), ("resolved", &resolved_view)] {
+        for s in view.all_member_facing_strings() {
+            assert!(
+                !s.contains(&evidence_hex),
+                "{label} member-facing string leaks evidence_hash: `{s}`"
+            );
+            assert!(
+                !s.contains(&plan_hex),
+                "{label} member-facing string leaks plan_hash: `{s}`"
+            );
+            assert!(
+                !s.contains(&receipt_hex),
+                "{label} member-facing string leaks receipt_hash: `{s}`"
+            );
+        }
     }
     // The plan still carries its expected receipt class, but that
     // identifier is the cockpit's surface, not the member's. The
@@ -1793,5 +1885,10 @@ fn proof_rail_records_remain_design_level_in_the_member_view() {
     assert_eq!(
         plan.expected_repair_receipt_class,
         ExpectedRepairReceiptClass::FetchMissingReceipt
+    );
+    // The receipt's class maps 1:1 back to the plan's expected class.
+    assert_eq!(
+        ExpectedRepairReceiptClass::from(receipt.repair_receipt_class),
+        plan.expected_repair_receipt_class
     );
 }
