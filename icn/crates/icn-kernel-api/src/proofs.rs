@@ -1984,6 +1984,643 @@ impl SyncDegradedStatus {
 }
 
 // ============================================================================
+// FederationSyncWindow + QuorumSyncCheck — federation-scope proof
+// primitives (issue #1860)
+//
+// Wire-stable records for spec §"Boundary rules" 6 + 7. A
+// `QuorumSyncCheck` proves that a quorum of named federation peers
+// exchanged matching `StateDigest`s within a stated freshness window
+// for a stated state class. A `FederationSyncWindow` is the policy
+// parameter the check's freshness is measured against, named per
+// state class (e.g., settlement records may require a stricter window
+// than artifact-registry metadata).
+//
+// Boundary rule 6: federation- and commons-scope placement requires a
+// fresh `QuorumSyncCheck` within the relevant `FederationSyncWindow`.
+// Boundary rule 7: settlement finality requires a fresh
+// `QuorumSyncCheck` over the relevant state classes.
+//
+// Per spec line 220: these records ride inside an existing Stage 5
+// `EffectDispatchEvidence` envelope. No new top-level ADR-0026
+// receipt class is introduced.
+// ============================================================================
+
+/// Schema version for `FederationSyncWindow`. Increment on any
+/// wire-affecting change to the binding.
+pub const FEDERATION_SYNC_WINDOW_SCHEMA_VERSION: u32 = 1;
+
+/// Schema version for `QuorumSyncCheck`. Increment on any
+/// wire-affecting change to the binding.
+pub const QUORUM_SYNC_CHECK_SCHEMA_VERSION: u32 = 1;
+
+// ----------------------------------------------------------------------------
+// FederationSyncWindow
+// ----------------------------------------------------------------------------
+
+/// Structural validation errors a `FederationSyncWindow` can produce.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum FederationSyncWindowError {
+    /// `schema_version` did not match
+    /// [`FEDERATION_SYNC_WINDOW_SCHEMA_VERSION`].
+    #[error("unsupported FederationSyncWindow schema_version: got {got}, supported {supported}")]
+    UnsupportedSchemaVersion {
+        /// The version observed on the wire / at construction.
+        got: u32,
+        /// The version this build supports.
+        supported: u32,
+    },
+    /// `window_duration_secs` was zero. A zero-duration window is not
+    /// a meaningful freshness bound.
+    #[error("FederationSyncWindow window_duration_secs must be > 0")]
+    ZeroWindowDuration,
+}
+
+impl From<FederationSyncWindowError> for String {
+    fn from(err: FederationSyncWindowError) -> Self {
+        err.to_string()
+    }
+}
+
+/// Policy-defined freshness window for a `QuorumSyncCheck`, named per
+/// state class.
+///
+/// Per spec line 235: "the freshness window the domain's policy
+/// requires for `QuorumSyncCheck` to count as fresh; named per state
+/// class (e.g., settlement records may require a stricter window than
+/// artifact-registry metadata)."
+///
+/// The kernel does not decide what window a domain's policy requires
+/// — that is the policy oracle's job. The kernel only records the
+/// per-state-class policy decision so a downstream `QuorumSyncCheck`
+/// can be measured against it.
+///
+/// # Self-authentication
+///
+/// `window_hash` is a blake3 binding under
+/// `DOMAIN_TAG = b"icn:federation-sync-window:v1"`, length-prefixed,
+/// over a canonical bincode encoding of the bound fields. Deserialization
+/// rejects unsupported schema versions AND zero-duration windows.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "RawFederationSyncWindow")]
+pub struct FederationSyncWindow {
+    /// Wire schema version. See [`FEDERATION_SYNC_WINDOW_SCHEMA_VERSION`].
+    pub schema_version: u32,
+    /// State class this window applies to.
+    pub state_class: StateClass,
+    /// Window duration in Unix seconds. MUST be `> 0`.
+    pub window_duration_secs: u64,
+    /// blake3 binding hash over all bound fields.
+    pub window_hash: Hash,
+}
+
+#[derive(Deserialize)]
+struct RawFederationSyncWindow {
+    schema_version: u32,
+    state_class: StateClass,
+    window_duration_secs: u64,
+    window_hash: Hash,
+}
+
+impl TryFrom<RawFederationSyncWindow> for FederationSyncWindow {
+    type Error = String;
+
+    fn try_from(raw: RawFederationSyncWindow) -> Result<Self, Self::Error> {
+        if raw.schema_version != FEDERATION_SYNC_WINDOW_SCHEMA_VERSION {
+            return Err(FederationSyncWindowError::UnsupportedSchemaVersion {
+                got: raw.schema_version,
+                supported: FEDERATION_SYNC_WINDOW_SCHEMA_VERSION,
+            }
+            .to_string());
+        }
+        if raw.window_duration_secs == 0 {
+            return Err(FederationSyncWindowError::ZeroWindowDuration.to_string());
+        }
+        Ok(Self {
+            schema_version: raw.schema_version,
+            state_class: raw.state_class,
+            window_duration_secs: raw.window_duration_secs,
+            window_hash: raw.window_hash,
+        })
+    }
+}
+
+/// Canonical binding fields for `FederationSyncWindow::window_hash`.
+#[derive(Serialize)]
+struct FederationSyncWindowBinding {
+    schema_version: u32,
+    state_class: StateClass,
+    window_duration_secs: u64,
+}
+
+impl FederationSyncWindow {
+    /// Domain-separation tag for `window_hash`. Distinct from all
+    /// other proof records.
+    pub const DOMAIN_TAG: &'static [u8] = b"icn:federation-sync-window:v1";
+
+    /// Construct a new window with computed `window_hash`.
+    ///
+    /// Returns [`FederationSyncWindowError::ZeroWindowDuration`] if
+    /// `window_duration_secs == 0`.
+    pub fn new(
+        state_class: StateClass,
+        window_duration_secs: u64,
+    ) -> Result<Self, FederationSyncWindowError> {
+        if window_duration_secs == 0 {
+            return Err(FederationSyncWindowError::ZeroWindowDuration);
+        }
+        let window_hash = Self::compute_window_hash(
+            FEDERATION_SYNC_WINDOW_SCHEMA_VERSION,
+            state_class,
+            window_duration_secs,
+        );
+        Ok(Self {
+            schema_version: FEDERATION_SYNC_WINDOW_SCHEMA_VERSION,
+            state_class,
+            window_duration_secs,
+            window_hash,
+        })
+    }
+
+    /// Compute the binding hash from the significant fields.
+    pub fn compute_window_hash(
+        schema_version: u32,
+        state_class: StateClass,
+        window_duration_secs: u64,
+    ) -> Hash {
+        let binding = FederationSyncWindowBinding {
+            schema_version,
+            state_class,
+            window_duration_secs,
+        };
+        let payload = bincode::serialize(&binding)
+            .expect("FederationSyncWindowBinding serialization is infallible");
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        *hasher.finalize().as_bytes()
+    }
+
+    /// `true` iff `schema_version == FEDERATION_SYNC_WINDOW_SCHEMA_VERSION`.
+    pub fn is_supported_schema_version(&self) -> bool {
+        self.schema_version == FEDERATION_SYNC_WINDOW_SCHEMA_VERSION
+    }
+
+    /// Verify the stored `window_hash` and `schema_version`. Fails
+    /// closed on unsupported versions.
+    pub fn verify_binding(&self) -> bool {
+        if !self.is_supported_schema_version() {
+            return false;
+        }
+        let recomputed = Self::compute_window_hash(
+            self.schema_version,
+            self.state_class,
+            self.window_duration_secs,
+        );
+        self.window_hash == recomputed
+    }
+}
+
+// ----------------------------------------------------------------------------
+// QuorumSyncCheck
+// ----------------------------------------------------------------------------
+
+/// Structural validation errors a `QuorumSyncCheck` can produce.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum QuorumSyncCheckError {
+    /// `schema_version` did not match [`QUORUM_SYNC_CHECK_SCHEMA_VERSION`].
+    #[error("unsupported QuorumSyncCheck schema_version: got {got}, supported {supported}")]
+    UnsupportedSchemaVersion {
+        /// The version observed on the wire / at construction.
+        got: u32,
+        /// The version this build supports.
+        supported: u32,
+    },
+    /// `federation_scope` is `LocalDomain` or `PeerPair`. Per spec,
+    /// `QuorumSyncCheck` only applies to federation- or commons-scope
+    /// work.
+    #[error(
+        "QuorumSyncCheck federation_scope must be Federation or Commons; \
+         got a non-federation scope"
+    )]
+    InvalidFederationScope,
+    /// `quorum_size < quorum_threshold`. A check that records fewer
+    /// matching peers than the policy threshold is not a "quorum
+    /// reached" proof.
+    #[error(
+        "QuorumSyncCheck quorum_size={quorum_size} is less than \
+         quorum_threshold={quorum_threshold}"
+    )]
+    QuorumThresholdNotMet {
+        /// Matching peer count recorded.
+        quorum_size: u32,
+        /// Policy threshold.
+        quorum_threshold: u32,
+    },
+    /// `quorum_size != participating_peers.dids().len()`. The
+    /// recorded count must equal the canonicalized peer set length.
+    #[error(
+        "QuorumSyncCheck quorum_size={quorum_size} does not equal \
+         participating_peers length {peers_len}"
+    )]
+    QuorumSizePeerCountMismatch {
+        /// Recorded matching count.
+        quorum_size: u32,
+        /// Canonicalized peer-set length.
+        peers_len: u32,
+    },
+    /// `observed_at > freshness_valid_until`. The freshness window
+    /// must end at or after the observation.
+    #[error(
+        "QuorumSyncCheck observed_at={observed_at} is after \
+         freshness_valid_until={freshness_valid_until}"
+    )]
+    ObservedAfterFreshness {
+        /// Observation timestamp.
+        observed_at: u64,
+        /// Freshness expiry.
+        freshness_valid_until: u64,
+    },
+    /// The recorded freshness span exceeds the policy
+    /// `FederationSyncWindow.window_duration_secs`.
+    #[error(
+        "QuorumSyncCheck freshness span={span_secs} exceeds \
+         federation_sync_window.window_duration_secs={window_secs}"
+    )]
+    FreshnessExceedsPolicyWindow {
+        /// The span `freshness_valid_until - observed_at`.
+        span_secs: u64,
+        /// The policy window's `window_duration_secs`.
+        window_secs: u64,
+    },
+    /// `federation_sync_window.state_class` does not match the
+    /// check's `state_class`.
+    #[error(
+        "QuorumSyncCheck federation_sync_window.state_class={window_state_class:?} does not \
+         match check state_class={check_state_class:?}"
+    )]
+    WindowStateClassMismatch {
+        /// The window's `state_class`.
+        window_state_class: StateClass,
+        /// The check's `state_class`.
+        check_state_class: StateClass,
+    },
+}
+
+impl From<QuorumSyncCheckError> for String {
+    fn from(err: QuorumSyncCheckError) -> Self {
+        err.to_string()
+    }
+}
+
+/// Proof that a quorum of named federation peers exchanged matching
+/// `StateDigest`s within a `FederationSyncWindow` for a state class.
+///
+/// Per spec line 234: "the gate for federation-bound placement and
+/// federation settlement." Boundary rule 6 (federation/commons
+/// placement) and boundary rule 7 (settlement finality) both require
+/// a fresh `QuorumSyncCheck` over the relevant state classes.
+///
+/// # Privacy
+///
+/// `QuorumSyncCheck` MUST NOT carry raw state. The `matching_digest`
+/// is a bounded `StateDigest` projection (Bloom / Merkle root /
+/// vector clock / short list of refs); never bodies. For checks
+/// derived from comparisons over private state,
+/// `private_content_implication` is set.
+///
+/// # Self-authentication
+///
+/// `check_hash` is a blake3 binding under
+/// `DOMAIN_TAG = b"icn:quorum-sync-check:v1"`, length-prefixed, over
+/// a canonical bincode encoding of all bound fields (excluding
+/// `check_hash` and `signature`). Deserialization rejects unsupported
+/// schema versions AND structural rule violations.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(try_from = "RawQuorumSyncCheck")]
+pub struct QuorumSyncCheck {
+    /// Wire schema version. See [`QUORUM_SYNC_CHECK_SCHEMA_VERSION`].
+    pub schema_version: u32,
+    /// State class the quorum agreed on.
+    pub state_class: StateClass,
+    /// Scope of the quorum. MUST be `Federation { federation_id }`
+    /// or `Commons`.
+    pub federation_scope: ProbeScope,
+    /// Canonicalized set of peers in the quorum.
+    pub participating_peers: PeerSet,
+    /// The bounded `StateDigest` projection all peers in the quorum
+    /// agreed on.
+    pub matching_digest: StateDigest,
+    /// The policy `FederationSyncWindow` this check is measured
+    /// against. Its `state_class` MUST match the check's `state_class`.
+    pub federation_sync_window: FederationSyncWindow,
+    /// DID of the reporter that recorded the proof.
+    pub reporter_did: Did,
+    /// Unix seconds when the quorum was observed.
+    pub observed_at: u64,
+    /// Unix seconds beyond which this check is stale. Constrained by
+    /// `federation_sync_window.window_duration_secs`.
+    pub freshness_valid_until: u64,
+    /// Count of peers that matched. MUST equal
+    /// `participating_peers.dids().len()` and be `>= quorum_threshold`.
+    pub quorum_size: u32,
+    /// Policy threshold the quorum size is measured against.
+    pub quorum_threshold: u32,
+    /// `true` if the comparison touched private state.
+    pub private_content_implication: bool,
+    /// 32-byte random nonce.
+    pub check_nonce: [u8; 32],
+    /// blake3 binding hash.
+    pub check_hash: Hash,
+    /// Reporter signature (empty until signed by a higher layer).
+    pub signature: Signature,
+}
+
+#[derive(Deserialize)]
+struct RawQuorumSyncCheck {
+    schema_version: u32,
+    state_class: StateClass,
+    federation_scope: ProbeScope,
+    participating_peers: PeerSet,
+    matching_digest: StateDigest,
+    federation_sync_window: FederationSyncWindow,
+    reporter_did: Did,
+    observed_at: u64,
+    freshness_valid_until: u64,
+    quorum_size: u32,
+    quorum_threshold: u32,
+    private_content_implication: bool,
+    check_nonce: [u8; 32],
+    check_hash: Hash,
+    signature: Signature,
+}
+
+impl TryFrom<RawQuorumSyncCheck> for QuorumSyncCheck {
+    type Error = String;
+
+    fn try_from(raw: RawQuorumSyncCheck) -> Result<Self, Self::Error> {
+        if raw.schema_version != QUORUM_SYNC_CHECK_SCHEMA_VERSION {
+            return Err(QuorumSyncCheckError::UnsupportedSchemaVersion {
+                got: raw.schema_version,
+                supported: QUORUM_SYNC_CHECK_SCHEMA_VERSION,
+            }
+            .to_string());
+        }
+        QuorumSyncCheck::validate_structural_invariants(
+            &raw.federation_scope,
+            &raw.participating_peers,
+            raw.state_class,
+            &raw.federation_sync_window,
+            raw.observed_at,
+            raw.freshness_valid_until,
+            raw.quorum_size,
+            raw.quorum_threshold,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(Self {
+            schema_version: raw.schema_version,
+            state_class: raw.state_class,
+            federation_scope: raw.federation_scope,
+            participating_peers: raw.participating_peers,
+            matching_digest: raw.matching_digest,
+            federation_sync_window: raw.federation_sync_window,
+            reporter_did: raw.reporter_did,
+            observed_at: raw.observed_at,
+            freshness_valid_until: raw.freshness_valid_until,
+            quorum_size: raw.quorum_size,
+            quorum_threshold: raw.quorum_threshold,
+            private_content_implication: raw.private_content_implication,
+            check_nonce: raw.check_nonce,
+            check_hash: raw.check_hash,
+            signature: raw.signature,
+        })
+    }
+}
+
+/// Canonical binding fields for `QuorumSyncCheck::check_hash`.
+#[derive(Serialize)]
+struct QuorumSyncCheckBinding<'a> {
+    schema_version: u32,
+    state_class: StateClass,
+    federation_scope: &'a ProbeScope,
+    participating_peers: &'a PeerSet,
+    matching_digest: &'a StateDigest,
+    federation_sync_window: &'a FederationSyncWindow,
+    reporter_did: &'a Did,
+    observed_at: u64,
+    freshness_valid_until: u64,
+    quorum_size: u32,
+    quorum_threshold: u32,
+    private_content_implication: bool,
+    check_nonce: [u8; 32],
+}
+
+impl QuorumSyncCheck {
+    /// Domain-separation tag for `check_hash`. Distinct from all
+    /// other proof records.
+    pub const DOMAIN_TAG: &'static [u8] = b"icn:quorum-sync-check:v1";
+
+    /// Construct a new check with computed `check_hash` and empty
+    /// signature.
+    ///
+    /// Returns [`QuorumSyncCheckError`] if structural invariants are
+    /// violated (see [`Self::validate_structural_invariants`]).
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        state_class: StateClass,
+        federation_scope: ProbeScope,
+        participating_peers: PeerSet,
+        matching_digest: StateDigest,
+        federation_sync_window: FederationSyncWindow,
+        reporter_did: Did,
+        observed_at: u64,
+        freshness_valid_until: u64,
+        quorum_size: u32,
+        quorum_threshold: u32,
+        private_content_implication: bool,
+        check_nonce: [u8; 32],
+    ) -> Result<Self, QuorumSyncCheckError> {
+        Self::validate_structural_invariants(
+            &federation_scope,
+            &participating_peers,
+            state_class,
+            &federation_sync_window,
+            observed_at,
+            freshness_valid_until,
+            quorum_size,
+            quorum_threshold,
+        )?;
+        let check_hash = Self::compute_check_hash(
+            QUORUM_SYNC_CHECK_SCHEMA_VERSION,
+            state_class,
+            &federation_scope,
+            &participating_peers,
+            &matching_digest,
+            &federation_sync_window,
+            &reporter_did,
+            observed_at,
+            freshness_valid_until,
+            quorum_size,
+            quorum_threshold,
+            private_content_implication,
+            &check_nonce,
+        );
+        Ok(Self {
+            schema_version: QUORUM_SYNC_CHECK_SCHEMA_VERSION,
+            state_class,
+            federation_scope,
+            participating_peers,
+            matching_digest,
+            federation_sync_window,
+            reporter_did,
+            observed_at,
+            freshness_valid_until,
+            quorum_size,
+            quorum_threshold,
+            private_content_implication,
+            check_nonce,
+            check_hash,
+            signature: Signature::new(Vec::new()),
+        })
+    }
+
+    /// Validate structural invariants:
+    ///
+    /// - `federation_scope` MUST be `Federation` or `Commons`.
+    /// - `quorum_size >= quorum_threshold`.
+    /// - `quorum_size == participating_peers.dids().len()`.
+    /// - `observed_at <= freshness_valid_until`.
+    /// - `freshness_valid_until - observed_at <= federation_sync_window.window_duration_secs`.
+    /// - `federation_sync_window.state_class == state_class`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn validate_structural_invariants(
+        federation_scope: &ProbeScope,
+        participating_peers: &PeerSet,
+        state_class: StateClass,
+        federation_sync_window: &FederationSyncWindow,
+        observed_at: u64,
+        freshness_valid_until: u64,
+        quorum_size: u32,
+        quorum_threshold: u32,
+    ) -> Result<(), QuorumSyncCheckError> {
+        if !matches!(
+            federation_scope,
+            ProbeScope::Federation { .. } | ProbeScope::Commons
+        ) {
+            return Err(QuorumSyncCheckError::InvalidFederationScope);
+        }
+        if quorum_size < quorum_threshold {
+            return Err(QuorumSyncCheckError::QuorumThresholdNotMet {
+                quorum_size,
+                quorum_threshold,
+            });
+        }
+        let peers_len = participating_peers.dids().len() as u32;
+        if quorum_size != peers_len {
+            return Err(QuorumSyncCheckError::QuorumSizePeerCountMismatch {
+                quorum_size,
+                peers_len,
+            });
+        }
+        if observed_at > freshness_valid_until {
+            return Err(QuorumSyncCheckError::ObservedAfterFreshness {
+                observed_at,
+                freshness_valid_until,
+            });
+        }
+        let span_secs = freshness_valid_until - observed_at;
+        if span_secs > federation_sync_window.window_duration_secs {
+            return Err(QuorumSyncCheckError::FreshnessExceedsPolicyWindow {
+                span_secs,
+                window_secs: federation_sync_window.window_duration_secs,
+            });
+        }
+        if federation_sync_window.state_class != state_class {
+            return Err(QuorumSyncCheckError::WindowStateClassMismatch {
+                window_state_class: federation_sync_window.state_class,
+                check_state_class: state_class,
+            });
+        }
+        Ok(())
+    }
+
+    /// Compute the binding hash from the significant fields.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_check_hash(
+        schema_version: u32,
+        state_class: StateClass,
+        federation_scope: &ProbeScope,
+        participating_peers: &PeerSet,
+        matching_digest: &StateDigest,
+        federation_sync_window: &FederationSyncWindow,
+        reporter_did: &Did,
+        observed_at: u64,
+        freshness_valid_until: u64,
+        quorum_size: u32,
+        quorum_threshold: u32,
+        private_content_implication: bool,
+        check_nonce: &[u8; 32],
+    ) -> Hash {
+        let binding = QuorumSyncCheckBinding {
+            schema_version,
+            state_class,
+            federation_scope,
+            participating_peers,
+            matching_digest,
+            federation_sync_window,
+            reporter_did,
+            observed_at,
+            freshness_valid_until,
+            quorum_size,
+            quorum_threshold,
+            private_content_implication,
+            check_nonce: *check_nonce,
+        };
+        let payload = bincode::serialize(&binding)
+            .expect("QuorumSyncCheckBinding serialization is infallible");
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        hasher.update(&(payload.len() as u64).to_le_bytes());
+        hasher.update(&payload);
+        *hasher.finalize().as_bytes()
+    }
+
+    /// `true` iff `schema_version == QUORUM_SYNC_CHECK_SCHEMA_VERSION`.
+    pub fn is_supported_schema_version(&self) -> bool {
+        self.schema_version == QUORUM_SYNC_CHECK_SCHEMA_VERSION
+    }
+
+    /// Verify the stored `check_hash` and `schema_version`. Fails
+    /// closed on unsupported versions.
+    pub fn verify_binding(&self) -> bool {
+        if !self.is_supported_schema_version() {
+            return false;
+        }
+        let recomputed = Self::compute_check_hash(
+            self.schema_version,
+            self.state_class,
+            &self.federation_scope,
+            &self.participating_peers,
+            &self.matching_digest,
+            &self.federation_sync_window,
+            &self.reporter_did,
+            self.observed_at,
+            self.freshness_valid_until,
+            self.quorum_size,
+            self.quorum_threshold,
+            self.private_content_implication,
+            &self.check_nonce,
+        );
+        self.check_hash == recomputed
+    }
+
+    /// `true` if `now_unix_seconds <= freshness_valid_until`.
+    pub fn is_fresh(&self, now_unix_seconds: u64) -> bool {
+        now_unix_seconds <= self.freshness_valid_until
+    }
+}
+
+// ============================================================================
 // DivergenceEvidence and RepairPlan records (issue #1835)
 //
 // Wire-stable record shapes for the next two design-level identifiers from
@@ -5418,6 +6055,709 @@ mod anti_entropy_tests {
         // / payload / raw_bytes / secret field by construction.
         let json = serde_json::to_string(&s).unwrap();
         let restored: SyncDegradedStatus = serde_json::from_str(&json).unwrap();
+        assert!(restored.private_content_implication);
+        assert!(restored.verify_binding());
+    }
+
+    // =========================================================================
+    // FederationSyncWindow + QuorumSyncCheck (issue #1860)
+    // =========================================================================
+
+    fn sample_federation_sync_window() -> FederationSyncWindow {
+        FederationSyncWindow::new(StateClass::ReceiptIndex, 300)
+            .expect("sample window has positive duration")
+    }
+
+    fn sample_quorum_peers() -> PeerSet {
+        PeerSet::from_dids(vec![
+            "did:icn:fed:peer-a".to_string(),
+            "did:icn:fed:peer-b".to_string(),
+            "did:icn:fed:peer-c".to_string(),
+        ])
+    }
+
+    fn sample_quorum_sync_check() -> QuorumSyncCheck {
+        let window = sample_federation_sync_window();
+        let peers = sample_quorum_peers();
+        let peer_count = peers.dids().len() as u32;
+        QuorumSyncCheck::new(
+            StateClass::ReceiptIndex,
+            ProbeScope::Federation {
+                federation_id: "fixture-federation".to_string(),
+            },
+            peers,
+            StateDigest::Bloom(BloomProjection {
+                bits: vec![0b0001_0101, 0, 0, 0, 0, 0, 0, 0],
+                num_hashes: 1,
+                size: 64,
+                hint_count: 4,
+            }),
+            window,
+            "did:icn:fed:reporter".to_string(),
+            1_715_000_000,
+            1_715_000_120,
+            peer_count,
+            2,
+            false,
+            [0xA1; 32],
+        )
+        .expect("sample QuorumSyncCheck is structurally consistent")
+    }
+
+    // ---- FederationSyncWindow: binding + tamper + schema-version ----
+
+    #[test]
+    fn federation_sync_window_binding_is_deterministic() {
+        let w1 = sample_federation_sync_window();
+        let w2 = sample_federation_sync_window();
+        assert_eq!(w1.window_hash, w2.window_hash);
+        assert_ne!(w1.window_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn federation_sync_window_verify_binding_succeeds_for_fresh() {
+        let w = sample_federation_sync_window();
+        assert!(w.verify_binding());
+    }
+
+    #[test]
+    fn federation_sync_window_json_round_trip_preserves_hash() {
+        let w = sample_federation_sync_window();
+        let json = serde_json::to_string(&w).unwrap();
+        let restored: FederationSyncWindow = serde_json::from_str(&json).unwrap();
+        assert_eq!(w, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn federation_sync_window_bincode_round_trip_preserves_hash() {
+        let w = sample_federation_sync_window();
+        let bytes = bincode::serialize(&w).unwrap();
+        let restored: FederationSyncWindow = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(w, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn federation_sync_window_state_class_tamper_detected() {
+        let mut w = sample_federation_sync_window();
+        w.state_class = StateClass::ArtifactRegistryMetadata;
+        assert!(!w.verify_binding());
+    }
+
+    #[test]
+    fn federation_sync_window_duration_tamper_detected() {
+        let mut w = sample_federation_sync_window();
+        w.window_duration_secs += 1;
+        assert!(!w.verify_binding());
+    }
+
+    #[test]
+    fn federation_sync_window_rejects_zero_duration_at_construction() {
+        let err = FederationSyncWindow::new(StateClass::ReceiptIndex, 0).unwrap_err();
+        assert!(matches!(err, FederationSyncWindowError::ZeroWindowDuration));
+    }
+
+    #[derive(Serialize)]
+    struct FederationSyncWindowWireShape {
+        schema_version: u32,
+        state_class: StateClass,
+        window_duration_secs: u64,
+        window_hash: Hash,
+    }
+
+    #[test]
+    fn federation_sync_window_rejects_zero_duration_on_decode() {
+        // Hash-consistent wire payload with zero duration must be
+        // refused before any value is constructed.
+        let recomputed = FederationSyncWindow::compute_window_hash(
+            FEDERATION_SYNC_WINDOW_SCHEMA_VERSION,
+            StateClass::ReceiptIndex,
+            0,
+        );
+        let wire = FederationSyncWindowWireShape {
+            schema_version: FEDERATION_SYNC_WINDOW_SCHEMA_VERSION,
+            state_class: StateClass::ReceiptIndex,
+            window_duration_secs: 0,
+            window_hash: recomputed,
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        let parsed: Result<FederationSyncWindow, _> = serde_json::from_str(&json);
+        assert!(parsed.is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        let parsed_bin: Result<FederationSyncWindow, _> = bincode::deserialize(&bytes);
+        assert!(parsed_bin.is_err());
+    }
+
+    #[test]
+    fn federation_sync_window_rejects_future_schema_version_on_decode() {
+        let bogus = FEDERATION_SYNC_WINDOW_SCHEMA_VERSION + 1;
+        let recomputed =
+            FederationSyncWindow::compute_window_hash(bogus, StateClass::ReceiptIndex, 300);
+        let wire = FederationSyncWindowWireShape {
+            schema_version: bogus,
+            state_class: StateClass::ReceiptIndex,
+            window_duration_secs: 300,
+            window_hash: recomputed,
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        assert!(serde_json::from_str::<FederationSyncWindow>(&json).is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        assert!(bincode::deserialize::<FederationSyncWindow>(&bytes).is_err());
+    }
+
+    #[test]
+    fn federation_sync_window_verify_binding_fails_closed_on_manual_bogus_version() {
+        let mut w = sample_federation_sync_window();
+        let bogus = FEDERATION_SYNC_WINDOW_SCHEMA_VERSION + 7;
+        w.schema_version = bogus;
+        w.window_hash =
+            FederationSyncWindow::compute_window_hash(bogus, w.state_class, w.window_duration_secs);
+        assert!(
+            !w.verify_binding(),
+            "must fail closed even when the hash matches under bogus version"
+        );
+    }
+
+    // ---- QuorumSyncCheck: binding + tamper ----
+
+    #[test]
+    fn quorum_sync_check_binding_is_deterministic() {
+        let c1 = sample_quorum_sync_check();
+        let c2 = sample_quorum_sync_check();
+        assert_eq!(c1.check_hash, c2.check_hash);
+        assert_ne!(c1.check_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn quorum_sync_check_verify_binding_succeeds_for_fresh() {
+        let c = sample_quorum_sync_check();
+        assert!(c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_json_round_trip_preserves_hash() {
+        let c = sample_quorum_sync_check();
+        let json = serde_json::to_string(&c).unwrap();
+        let restored: QuorumSyncCheck = serde_json::from_str(&json).unwrap();
+        assert_eq!(c, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_bincode_round_trip_preserves_hash() {
+        let c = sample_quorum_sync_check();
+        let bytes = bincode::serialize(&c).unwrap();
+        let restored: QuorumSyncCheck = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(c, restored);
+        assert!(restored.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_signature_starts_empty() {
+        let c = sample_quorum_sync_check();
+        assert!(c.signature.as_bytes().is_empty());
+    }
+
+    #[test]
+    fn quorum_sync_check_freshness_helper() {
+        let c = sample_quorum_sync_check();
+        assert!(c.is_fresh(c.observed_at));
+        assert!(c.is_fresh(c.freshness_valid_until));
+        assert!(!c.is_fresh(c.freshness_valid_until + 1));
+    }
+
+    #[test]
+    fn quorum_sync_check_state_class_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.state_class = StateClass::ArtifactRegistryMetadata;
+        assert!(!c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_federation_scope_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.federation_scope = ProbeScope::Commons;
+        assert!(!c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_participating_peers_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.participating_peers = PeerSet::from_dids(vec!["did:icn:attacker".to_string()]);
+        assert!(!c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_matching_digest_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.matching_digest = StateDigest::MerkleRoot(MerkleRootProjection {
+            root: [0xFF; 32],
+            leaf_count: 1,
+        });
+        assert!(!c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_window_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.federation_sync_window =
+            FederationSyncWindow::new(StateClass::ReceiptIndex, 600).unwrap();
+        assert!(!c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_reporter_did_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.reporter_did = "did:icn:attacker".to_string();
+        assert!(!c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_observed_at_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.observed_at += 1;
+        assert!(!c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_freshness_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.freshness_valid_until -= 1;
+        assert!(!c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_quorum_size_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.quorum_size += 1;
+        assert!(!c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_quorum_threshold_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.quorum_threshold -= 1;
+        assert!(!c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_private_implication_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.private_content_implication = !c.private_content_implication;
+        assert!(!c.verify_binding());
+    }
+
+    #[test]
+    fn quorum_sync_check_nonce_tamper_detected() {
+        let mut c = sample_quorum_sync_check();
+        c.check_nonce = [0xFF; 32];
+        assert!(!c.verify_binding());
+    }
+
+    // ---- QuorumSyncCheck: structural rules ----
+
+    fn _attempt_check(
+        federation_scope: ProbeScope,
+        peers: PeerSet,
+        state_class: StateClass,
+        window: FederationSyncWindow,
+        observed_at: u64,
+        freshness_valid_until: u64,
+        quorum_size: u32,
+        quorum_threshold: u32,
+    ) -> Result<QuorumSyncCheck, QuorumSyncCheckError> {
+        QuorumSyncCheck::new(
+            state_class,
+            federation_scope,
+            peers,
+            StateDigest::Bloom(BloomProjection {
+                bits: vec![0b0001_0101, 0, 0, 0, 0, 0, 0, 0],
+                num_hashes: 1,
+                size: 64,
+                hint_count: 4,
+            }),
+            window,
+            "did:icn:fed:reporter".to_string(),
+            observed_at,
+            freshness_valid_until,
+            quorum_size,
+            quorum_threshold,
+            false,
+            [0xA1; 32],
+        )
+    }
+
+    #[test]
+    fn quorum_sync_check_rejects_local_domain_scope() {
+        let err = _attempt_check(
+            ProbeScope::LocalDomain {
+                domain_id: "local".to_string(),
+            },
+            sample_quorum_peers(),
+            StateClass::ReceiptIndex,
+            sample_federation_sync_window(),
+            1_715_000_000,
+            1_715_000_120,
+            3,
+            2,
+        )
+        .unwrap_err();
+        assert!(matches!(err, QuorumSyncCheckError::InvalidFederationScope));
+    }
+
+    #[test]
+    fn quorum_sync_check_rejects_peer_pair_scope() {
+        let err = _attempt_check(
+            ProbeScope::PeerPair {
+                left: "did:icn:a".to_string(),
+                right: "did:icn:b".to_string(),
+            },
+            sample_quorum_peers(),
+            StateClass::ReceiptIndex,
+            sample_federation_sync_window(),
+            1_715_000_000,
+            1_715_000_120,
+            3,
+            2,
+        )
+        .unwrap_err();
+        assert!(matches!(err, QuorumSyncCheckError::InvalidFederationScope));
+    }
+
+    #[test]
+    fn quorum_sync_check_accepts_federation_scope() {
+        _attempt_check(
+            ProbeScope::Federation {
+                federation_id: "f1".to_string(),
+            },
+            sample_quorum_peers(),
+            StateClass::ReceiptIndex,
+            sample_federation_sync_window(),
+            1_715_000_000,
+            1_715_000_120,
+            3,
+            2,
+        )
+        .expect("federation scope is valid");
+    }
+
+    #[test]
+    fn quorum_sync_check_accepts_commons_scope() {
+        _attempt_check(
+            ProbeScope::Commons,
+            sample_quorum_peers(),
+            StateClass::ReceiptIndex,
+            sample_federation_sync_window(),
+            1_715_000_000,
+            1_715_000_120,
+            3,
+            2,
+        )
+        .expect("commons scope is valid");
+    }
+
+    #[test]
+    fn quorum_sync_check_rejects_threshold_above_size() {
+        let err = _attempt_check(
+            ProbeScope::Federation {
+                federation_id: "f1".to_string(),
+            },
+            sample_quorum_peers(),
+            StateClass::ReceiptIndex,
+            sample_federation_sync_window(),
+            1_715_000_000,
+            1_715_000_120,
+            3,
+            5, // threshold > size
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            QuorumSyncCheckError::QuorumThresholdNotMet {
+                quorum_size: 3,
+                quorum_threshold: 5,
+            }
+        ));
+    }
+
+    #[test]
+    fn quorum_sync_check_rejects_size_peer_count_mismatch() {
+        let err = _attempt_check(
+            ProbeScope::Federation {
+                federation_id: "f1".to_string(),
+            },
+            sample_quorum_peers(), // 3 peers
+            StateClass::ReceiptIndex,
+            sample_federation_sync_window(),
+            1_715_000_000,
+            1_715_000_120,
+            2, // size disagrees with peer count
+            2,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            QuorumSyncCheckError::QuorumSizePeerCountMismatch {
+                quorum_size: 2,
+                peers_len: 3,
+            }
+        ));
+    }
+
+    #[test]
+    fn quorum_sync_check_rejects_observed_after_freshness() {
+        let err = _attempt_check(
+            ProbeScope::Federation {
+                federation_id: "f1".to_string(),
+            },
+            sample_quorum_peers(),
+            StateClass::ReceiptIndex,
+            sample_federation_sync_window(),
+            1_715_000_200, // observed_at
+            1_715_000_120, // freshness < observed
+            3,
+            2,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            QuorumSyncCheckError::ObservedAfterFreshness { .. }
+        ));
+    }
+
+    #[test]
+    fn quorum_sync_check_rejects_freshness_exceeding_window() {
+        // window = 300, span = 400
+        let err = _attempt_check(
+            ProbeScope::Federation {
+                federation_id: "f1".to_string(),
+            },
+            sample_quorum_peers(),
+            StateClass::ReceiptIndex,
+            sample_federation_sync_window(),
+            1_715_000_000,
+            1_715_000_400, // span = 400 > 300
+            3,
+            2,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            QuorumSyncCheckError::FreshnessExceedsPolicyWindow {
+                span_secs: 400,
+                window_secs: 300,
+            }
+        ));
+    }
+
+    #[test]
+    fn quorum_sync_check_rejects_window_state_class_mismatch() {
+        // window is for ReceiptIndex; check declares ArtifactRegistryMetadata
+        let err = _attempt_check(
+            ProbeScope::Federation {
+                federation_id: "f1".to_string(),
+            },
+            sample_quorum_peers(),
+            StateClass::ArtifactRegistryMetadata,
+            sample_federation_sync_window(),
+            1_715_000_000,
+            1_715_000_120,
+            3,
+            2,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            QuorumSyncCheckError::WindowStateClassMismatch { .. }
+        ));
+    }
+
+    // ---- QuorumSyncCheck: schema-version policing ----
+
+    #[derive(Serialize)]
+    struct QuorumSyncCheckWireShape<'a> {
+        schema_version: u32,
+        state_class: StateClass,
+        federation_scope: &'a ProbeScope,
+        participating_peers: &'a PeerSet,
+        matching_digest: &'a StateDigest,
+        federation_sync_window: &'a FederationSyncWindow,
+        reporter_did: &'a Did,
+        observed_at: u64,
+        freshness_valid_until: u64,
+        quorum_size: u32,
+        quorum_threshold: u32,
+        private_content_implication: bool,
+        check_nonce: [u8; 32],
+        check_hash: Hash,
+        signature: Signature,
+    }
+
+    #[test]
+    fn quorum_sync_check_rejects_future_schema_version_on_decode() {
+        let c = sample_quorum_sync_check();
+        let bogus = QUORUM_SYNC_CHECK_SCHEMA_VERSION + 1;
+        let recomputed = QuorumSyncCheck::compute_check_hash(
+            bogus,
+            c.state_class,
+            &c.federation_scope,
+            &c.participating_peers,
+            &c.matching_digest,
+            &c.federation_sync_window,
+            &c.reporter_did,
+            c.observed_at,
+            c.freshness_valid_until,
+            c.quorum_size,
+            c.quorum_threshold,
+            c.private_content_implication,
+            &c.check_nonce,
+        );
+        let wire = QuorumSyncCheckWireShape {
+            schema_version: bogus,
+            state_class: c.state_class,
+            federation_scope: &c.federation_scope,
+            participating_peers: &c.participating_peers,
+            matching_digest: &c.matching_digest,
+            federation_sync_window: &c.federation_sync_window,
+            reporter_did: &c.reporter_did,
+            observed_at: c.observed_at,
+            freshness_valid_until: c.freshness_valid_until,
+            quorum_size: c.quorum_size,
+            quorum_threshold: c.quorum_threshold,
+            private_content_implication: c.private_content_implication,
+            check_nonce: c.check_nonce,
+            check_hash: recomputed,
+            signature: c.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        assert!(serde_json::from_str::<QuorumSyncCheck>(&json).is_err());
+        let bytes = bincode::serialize(&wire).unwrap();
+        assert!(bincode::deserialize::<QuorumSyncCheck>(&bytes).is_err());
+    }
+
+    #[test]
+    fn quorum_sync_check_verify_binding_fails_closed_on_manual_bogus_version() {
+        let mut c = sample_quorum_sync_check();
+        let bogus = QUORUM_SYNC_CHECK_SCHEMA_VERSION + 11;
+        c.schema_version = bogus;
+        c.check_hash = QuorumSyncCheck::compute_check_hash(
+            bogus,
+            c.state_class,
+            &c.federation_scope,
+            &c.participating_peers,
+            &c.matching_digest,
+            &c.federation_sync_window,
+            &c.reporter_did,
+            c.observed_at,
+            c.freshness_valid_until,
+            c.quorum_size,
+            c.quorum_threshold,
+            c.private_content_implication,
+            &c.check_nonce,
+        );
+        assert!(
+            !c.verify_binding(),
+            "must fail closed even when hash matches under bogus version"
+        );
+    }
+
+    #[test]
+    fn quorum_sync_check_wire_rejects_local_domain_scope() {
+        // Hash-consistent wire payload with LocalDomain scope must be
+        // refused before any value is constructed.
+        let c = sample_quorum_sync_check();
+        let bad_scope = ProbeScope::LocalDomain {
+            domain_id: "local".to_string(),
+        };
+        let recomputed = QuorumSyncCheck::compute_check_hash(
+            QUORUM_SYNC_CHECK_SCHEMA_VERSION,
+            c.state_class,
+            &bad_scope,
+            &c.participating_peers,
+            &c.matching_digest,
+            &c.federation_sync_window,
+            &c.reporter_did,
+            c.observed_at,
+            c.freshness_valid_until,
+            c.quorum_size,
+            c.quorum_threshold,
+            c.private_content_implication,
+            &c.check_nonce,
+        );
+        let wire = QuorumSyncCheckWireShape {
+            schema_version: QUORUM_SYNC_CHECK_SCHEMA_VERSION,
+            state_class: c.state_class,
+            federation_scope: &bad_scope,
+            participating_peers: &c.participating_peers,
+            matching_digest: &c.matching_digest,
+            federation_sync_window: &c.federation_sync_window,
+            reporter_did: &c.reporter_did,
+            observed_at: c.observed_at,
+            freshness_valid_until: c.freshness_valid_until,
+            quorum_size: c.quorum_size,
+            quorum_threshold: c.quorum_threshold,
+            private_content_implication: c.private_content_implication,
+            check_nonce: c.check_nonce,
+            check_hash: recomputed,
+            signature: c.signature.clone(),
+        };
+        let json = serde_json::to_string(&wire).unwrap();
+        assert!(serde_json::from_str::<QuorumSyncCheck>(&json).is_err());
+    }
+
+    // ---- Domain-tag separation ----
+
+    #[test]
+    fn quorum_sync_check_and_window_domain_tags_distinct() {
+        assert_ne!(
+            QuorumSyncCheck::DOMAIN_TAG,
+            FederationSyncWindow::DOMAIN_TAG
+        );
+        assert_ne!(QuorumSyncCheck::DOMAIN_TAG, PeerSyncReport::DOMAIN_TAG);
+        assert_ne!(QuorumSyncCheck::DOMAIN_TAG, AntiEntropyProbe::DOMAIN_TAG);
+        assert_ne!(QuorumSyncCheck::DOMAIN_TAG, DivergenceEvidence::DOMAIN_TAG);
+        assert_ne!(QuorumSyncCheck::DOMAIN_TAG, RepairPlan::DOMAIN_TAG);
+        assert_ne!(QuorumSyncCheck::DOMAIN_TAG, RepairReceipt::DOMAIN_TAG);
+        assert_ne!(QuorumSyncCheck::DOMAIN_TAG, SyncDegradedStatus::DOMAIN_TAG);
+        assert_ne!(QuorumSyncCheck::DOMAIN_TAG, ArtifactReceipt::DOMAIN_TAG);
+        assert_ne!(
+            FederationSyncWindow::DOMAIN_TAG,
+            AntiEntropyProbe::DOMAIN_TAG
+        );
+        assert_ne!(FederationSyncWindow::DOMAIN_TAG, RepairReceipt::DOMAIN_TAG);
+    }
+
+    // ---- QuorumSyncCheck: privacy ----
+
+    #[test]
+    fn quorum_sync_check_private_content_implication_round_trips() {
+        let window = FederationSyncWindow::new(StateClass::ScopedVaultReference, 120).unwrap();
+        let peers = sample_quorum_peers();
+        let peer_count = peers.dids().len() as u32;
+        let c = QuorumSyncCheck::new(
+            StateClass::ScopedVaultReference,
+            ProbeScope::Federation {
+                federation_id: "fixture-federation".to_string(),
+            },
+            peers,
+            StateDigest::ShortList(ShortDigestList::from_hashes(vec![
+                [0xAA; 32], [0xBB; 32], [0xCC; 32],
+            ])),
+            window,
+            "did:icn:scoped-vault-steward".to_string(),
+            1_715_000_000,
+            1_715_000_120,
+            peer_count,
+            2,
+            true,
+            [0x55; 32],
+        )
+        .expect("private-content quorum check is structurally consistent");
+        assert!(c.private_content_implication);
+        assert!(c.verify_binding());
+        let json = serde_json::to_string(&c).unwrap();
+        let restored: QuorumSyncCheck = serde_json::from_str(&json).unwrap();
         assert!(restored.private_content_implication);
         assert!(restored.verify_binding());
     }
