@@ -169,12 +169,15 @@ fn build_slice_a_repair_plan(evidence: &DivergenceEvidence) -> RepairPlan {
 /// Build the public `RepairReceipt` (#1849) the resolved member-shell
 /// view anchors on.
 ///
-/// Constructs the wire-stable receipt with `EffectOutcome::Applied`,
-/// cross-linked to `evidence` and `plan` by hash, over a deterministic
-/// fixture after-state digest. The resulting `receipt_hash` is what the
-/// resolved card's opaque `receipt_ref_hash` points at — the member
-/// never reads it, but an auditor can chase the chain back to the
-/// resolved repair evidence.
+/// Constructs the wire-stable receipt with `EffectOutcome::Applied`
+/// over a deterministic fixture after-state digest. The
+/// `affected_state_class` is sourced from `evidence`; `scope`,
+/// `authority_basis`, and `boundary_rules` are sourced from `plan` so
+/// any drift in the evidence/plan→receipt chain would diverge the
+/// binding hash. The resulting `receipt_hash` is what the resolved
+/// card's opaque `receipt_ref_hash` points at — the member never
+/// reads it, but an auditor can chase the chain back to the resolved
+/// repair evidence.
 ///
 /// Kernel-level only: no live network, no live repair. The receipt
 /// records what a fixture peer would have produced had the bounded
@@ -185,23 +188,20 @@ fn build_slice_a_repair_receipt(evidence: &DivergenceEvidence, plan: &RepairPlan
     let r3 = fixture_receipt_hash("r3", 0x03);
     let after = fixture_bloom_digest(&[r1.receipt_hash, r2.receipt_hash, r3.receipt_hash]);
     RepairReceipt::new(
-        RepairReceiptClass::FetchMissingReceipt,
+        RepairReceiptClass::from(plan.expected_repair_receipt_class),
         EffectOutcome::Applied,
         evidence.evidence_hash,
         plan.plan_hash,
-        StateClass::ReceiptIndex,
-        fixture_scope(),
+        evidence.affected_state_class,
+        plan.scope.clone(),
         "did:icn:fixture:repair-actor".to_string(),
-        AuthorityBasis::DomainPolicyClause(fixture_policy_clause()),
-        BoundaryRuleSet::from_rules(vec![
-            BoundaryRuleRef::NoRepairBeyondAuthority,
-            BoundaryRuleRef::NoLocalityOrDisclosureWidening,
-        ]),
+        plan.authority_basis.clone(),
+        plan.boundary_rules.clone(),
         None,
         Some(after),
         1_715_000_040,
         1_715_000_070,
-        false,
+        evidence.private_content_implication,
         None,
         [0xDD; 32],
     )

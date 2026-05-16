@@ -215,12 +215,14 @@ enum FixtureEscalationStatus {
 
 /// Build the public `RepairReceipt` (#1849) the cockpit view links to.
 ///
-/// Constructs the wire-stable receipt with `EffectOutcome::Applied`,
-/// the cross-link hashes from `evidence` and `plan`, the fixture
-/// after-state digest from `peer_b`, and the fixture actor DID. The
-/// resulting receipt is the canonical evidence artifact the cockpit
-/// row renders against — replacing the test-private stand-in this
-/// fixture used to carry before #1850 landed.
+/// Constructs the wire-stable receipt with `EffectOutcome::Applied`
+/// and the fixture's after-state digest. `scope`, `authority_basis`,
+/// and `boundary_rules` are sourced directly from `plan` so a
+/// drift between plan and receipt cannot pass verify_binding(); the
+/// affected state class is sourced from `evidence`. The receipt is
+/// the canonical evidence artifact the cockpit row renders against —
+/// replacing the test-private stand-in this fixture used to carry
+/// before #1850 landed.
 fn build_repair_receipt(
     evidence: &DivergenceEvidence,
     plan: &RepairPlan,
@@ -229,18 +231,15 @@ fn build_repair_receipt(
     applied_at: u64,
 ) -> RepairReceipt {
     RepairReceipt::new(
-        RepairReceiptClass::FetchMissingReceipt,
+        RepairReceiptClass::from(plan.expected_repair_receipt_class),
         EffectOutcome::Applied,
         evidence.evidence_hash,
         plan.plan_hash,
-        StateClass::ReceiptIndex,
-        fixture_scope(),
+        evidence.affected_state_class,
+        plan.scope.clone(),
         actor_did.to_string(),
-        AuthorityBasis::DomainPolicyClause(fixture_policy_clause()),
-        BoundaryRuleSet::from_rules(vec![
-            BoundaryRuleRef::NoRepairBeyondAuthority,
-            BoundaryRuleRef::NoLocalityOrDisclosureWidening,
-        ]),
+        plan.authority_basis.clone(),
+        plan.boundary_rules.clone(),
         // Slice A's "before" digest is implied (peer A's index); the
         // fixture's decisive evidence is the after-state digest. The
         // public RepairReceipt accepts an optional before; we omit it
@@ -251,7 +250,7 @@ fn build_repair_receipt(
         Some(peer_b.state_digest()),
         applied_at,
         applied_at + 30,
-        false,
+        evidence.private_content_implication,
         None,
         [0xEF; 32],
     )
@@ -577,9 +576,9 @@ impl FixtureAccessibilityChecklist {
             // 3.10 Privacy-preserving accommodation path — the row never
             // surfaces private artifact bodies. For Slice A the
             // `private_content_implication` flag is false anyway, but
-            // the structural absence of body fields on
-            // `FixtureRepairOutcome` and `FixtureDigestMismatchSummary`
-            // satisfies the doc's process-boundary requirement.
+            // the structural absence of body fields on `RepairReceipt`
+            // and `FixtureDigestMismatchSummary` satisfies the doc's
+            // process-boundary requirement.
             item(Cat::PrivacyPreservingAccommodationPath, Pass),
             // 3.11 Receipts / provenance / evidence access — the row
             // carries `evidence_hash` and `plan_hash` so an auditor can
@@ -1097,9 +1096,9 @@ fn missing_receipt_with_named_authority_does_not_escalate() {
 
 #[test]
 fn repair_receipt_links_evidence_and_plan_by_hash() {
-    // The public RepairReceipt (#1849) replaces the prior test-private
-    // FixtureRepairOutcome stand-in. It carries the cross-link hashes so
-    // an auditor can chase the chain back to the open divergence, and
+    // The public RepairReceipt (#1849) is the cockpit row's resolved
+    // evidence artifact. It carries the cross-link hashes so an auditor
+    // can chase the chain back to the open divergence, and
     // verify_binding() proves the binding has not been tampered with.
     let (peer_a, mut peer_b, peer_c) = build_three_peer_slice_a();
     let evidence = build_divergence_evidence(&peer_a, &peer_b, &peer_c);

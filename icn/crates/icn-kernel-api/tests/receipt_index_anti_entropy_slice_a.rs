@@ -463,27 +463,28 @@ fn slice_a_receipt_index_probe_classify_plan_apply_surface() {
     // for the resolved repair. The fixture builds the receipt over
     // peer B's now-converged state digest, cross-linked back to the
     // evidence and the plan; verify_binding() proves the receipt has
-    // not been tampered with. No live network, no live repair: the
-    // receipt records what a fixture peer would have produced had the
-    // bounded FetchMissing action run against real peers.
+    // not been tampered with. The receipt's `affected_state_class`,
+    // `scope`, `authority_basis`, and `boundary_rules` are sourced
+    // directly from `evidence` and `plan` so any drift in the plan→
+    // receipt chain would diverge the binding hash. No live network,
+    // no live repair: the receipt records what a fixture peer would
+    // have produced had the bounded FetchMissing action run against
+    // real peers.
     let repair_receipt = RepairReceipt::new(
-        RepairReceiptClass::FetchMissingReceipt,
+        RepairReceiptClass::from(plan.expected_repair_receipt_class),
         EffectOutcome::Applied,
         evidence.evidence_hash,
         plan.plan_hash,
-        StateClass::ReceiptIndex,
-        scope.clone(),
+        evidence.affected_state_class,
+        plan.scope.clone(),
         "did:icn:fixture:repair-actor".to_string(),
-        AuthorityBasis::DomainPolicyClause(policy.clone()),
-        BoundaryRuleSet::from_rules(vec![
-            BoundaryRuleRef::NoRepairBeyondAuthority,
-            BoundaryRuleRef::NoLocalityOrDisclosureWidening,
-        ]),
+        plan.authority_basis.clone(),
+        plan.boundary_rules.clone(),
         None,
         Some(peer_b.state_digest()),
         1_715_000_003,
         1_715_000_033,
-        false,
+        evidence.private_content_implication,
         None,
         [0xEE; 32],
     )
