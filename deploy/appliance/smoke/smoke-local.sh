@@ -325,8 +325,23 @@ run_in_vm() {
 }
 
 log "Verifying icn-appliance-firstboot.service ran (oneshot; check marker)..."
-if ! run_in_vm "sudo test -f /var/lib/icn/.firstboot-complete"; then
-    err "firstboot marker missing at /var/lib/icn/.firstboot-complete."
+# Bounded wait. icn-appliance-firstboot.service is Before=icnd.service in the
+# image's systemd unit, but that ordering is NOT relative to cloud-init / SSH.
+# On slower boots SSH can be reachable before the oneshot finishes writing
+# the marker. Mirror the bounded-wait pattern used below for icnd.service and
+# /v1/health so a healthy image doesn't fail on the marker check.
+FIRSTBOOT_DEADLINE=$(( $(date +%s) + 120 ))
+FIRSTBOOT_OK=0
+while [ "$(date +%s)" -lt "$FIRSTBOOT_DEADLINE" ]; do
+    if run_in_vm "sudo test -f /var/lib/icn/.firstboot-complete"; then
+        FIRSTBOOT_OK=1
+        break
+    fi
+    sleep 3
+done
+if [ "$FIRSTBOOT_OK" -ne 1 ]; then
+    err "firstboot marker still missing at /var/lib/icn/.firstboot-complete after 120s."
+    run_in_vm "sudo systemctl status icn-appliance-firstboot.service --no-pager" || true
     run_in_vm "sudo journalctl -u icn-appliance-firstboot.service --no-pager -n 100" || true
     exit 7
 fi
