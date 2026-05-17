@@ -1,8 +1,11 @@
-# Appliance Smoke (scaffold)
+# Appliance Smoke (real local one-VM)
 
-> **Status: scaffold.** This directory describes the acceptance path the
-> first real ICN appliance image must satisfy. Nothing here builds or
-> boots an image today.
+> **Status: real local boot smoke.** `smoke-local.sh --real` boots the
+> appliance QCOW2 under QEMU user-mode networking, waits for SSH,
+> verifies firstboot ran, confirms `icnd` is active, and confirms
+> `/v1/health` returns 200 on port 8080 — all inside the disposable VM.
+> A PASS here means the local dev image works. It does NOT mean the
+> appliance is production, signed, or fit for partner federation.
 
 ## Future acceptance path
 
@@ -26,29 +29,44 @@ The first three items are the **minimum acceptance bar** for promoting
 the appliance from "Unbuilt scaffold" to "Bootable dev image" per
 [`DEBIAN_APPLIANCE_MODEL.md`](../../../docs/architecture/DEBIAN_APPLIANCE_MODEL.md).
 
-## What this PR delivers
+## What this slice delivers
 
-- This README explaining the path.
-- `smoke-local.sh` as a dry-run scaffold that prints the planned smoke
-  steps. It does **not** boot a VM or run any health checks today.
+- `smoke-local.sh --dry-run` (unchanged behavior; still prints the plan).
+- `smoke-local.sh --real`: boots the appliance QCOW2 in QEMU user-mode
+  networking, waits for SSH, runs verification commands inside the VM
+  via SSH, captures journalctl on failure, kills the VM via trap.
+- `cloud-init/{user-data,meta-data}.example.yaml` — smoke-only cloud-init
+  seed examples. The placeholder SSH key in `user-data.example.yaml` is
+  intentionally invalid; the smoke script refuses to use the example
+  unless the operator has replaced the placeholder with a real
+  smoke-only key.
 
-## What this PR does NOT deliver
+## What this slice does NOT deliver
 
-- No real VM boot.
-- No real health verification.
-- No real fixture application.
-- No CI integration. The smoke is intentionally non-CI for now: it
-  needs hardware-assisted virt or qemu-system on the runner, neither of
-  which we want to take on in a scaffold PR.
+- No real federation contact. The VM uses user-mode networking only.
+- No partner / NYCN fixture application.
+- No CI integration. Running QEMU on CI requires hardware-assisted virt
+  or accepting nested-virt + slow runs; we are not taking that on yet.
+- No SSH key embedded in the appliance image. Operator supplies their
+  own via cloud-init, per-VM, never committed.
 
-## How to run today
+## How to run
+
+Dry-run (no tools required):
 
 ```bash
 bash deploy/appliance/smoke/smoke-local.sh --dry-run
 ```
 
-The script will print what the future real smoke will do, then exit
-cleanly without booting anything.
+Real (see `../README.md` §"Real local build + boot smoke" for the full
+recipe):
+
+```bash
+export ICN_APPLIANCE_IMAGE=/path/to/built/qcow2
+export ICN_APPLIANCE_SSH_KEY=/path/to/smoke-private-key
+export ICN_APPLIANCE_CLOUD_INIT_SEED=/path/to/seed.iso
+bash deploy/appliance/smoke/smoke-local.sh --real
+```
 
 ## Cross-references
 

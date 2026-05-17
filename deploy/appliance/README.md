@@ -1,10 +1,11 @@
-# ICN Debian Appliance (scaffold)
+# ICN Debian Appliance (dev image)
 
-> **Status: scaffold.** This directory is the future home of the ICN Debian
-> appliance / installable node image. It currently contains design
-> documentation, manifest templates, role-profile examples, and a
-> non-destructive first-boot scaffold. It does **not** produce a
-> production-ready operating system image yet.
+> **Status: bootable dev image.** The scaffold from PR #1865 plus a real
+> local QCOW2 build path (`build-image.sh --real`) and a real one-VM
+> boot smoke (`smoke/smoke-local.sh --real`). The dev image is **not**
+> production: unsigned, not immutable, no A-B updates, no claim flow, no
+> partner federation activation. The scaffold contents from PR #1865 are
+> unchanged; this slice adds the build and smoke implementations.
 
 ## What this is
 
@@ -163,29 +164,90 @@ deploy/appliance/
     └── icn-appliance-firstboot.service         # oneshot unit, runs before icnd.service
 ```
 
-## How to use this scaffold (today)
+## How to use this slice
 
-You cannot build a production image from this scaffold today. You can:
+Two paths, depending on what you have locally:
 
-1. Read [`DEBIAN_APPLIANCE_MODEL.md`](../../docs/architecture/DEBIAN_APPLIANCE_MODEL.md)
-   to understand the model.
-2. Inspect the manifest and role-profile examples to see what fields the
-   model expects.
-3. Run the first-boot scaffold on a disposable VM or container to see what
-   directories and config it would create:
+### Dry-run (no tools required)
 
-   ```bash
-   bash deploy/appliance/scripts/icn-appliance-firstboot.sh --dry-run
-   ```
+```bash
+bash deploy/appliance/build-image.sh --dry-run
+bash deploy/appliance/smoke/smoke-local.sh --dry-run
+bash deploy/appliance/scripts/icn-appliance-firstboot.sh --dry-run
+bash deploy/appliance/check.sh
+```
 
-4. Run the build scaffold to see what the eventual build path will do:
+Each prints the planned steps and exits cleanly. No files are mutated.
 
-   ```bash
-   bash deploy/appliance/build-image.sh --dry-run
-   ```
+### Real local build + boot smoke
 
-   The scaffold prints the planned steps and exits. It does **not** download
-   a Debian base image, install binaries, or produce a qcow2.
+Required tools (Debian/Ubuntu package in parentheses):
+
+| Tool | Package |
+|---|---|
+| `qemu-img` | `qemu-utils` |
+| `virt-customize` | `libguestfs-tools` |
+| `virt-sysprep` | `libguestfs-tools` |
+| `qemu-system-x86_64` | `qemu-system-x86` |
+| `cloud-localds` | `cloud-image-utils` |
+| `sha256sum` | `coreutils` |
+| `cargo` | `rustup` or `rust-toolchain` |
+| `ssh`, `curl` | `openssh-client`, `curl` |
+
+Required inputs:
+
+- A staged Debian cloud base image (e.g. `debian-12-genericcloud-amd64.qcow2`).
+  The build script does **not** download anything; you stage it manually.
+- An SSH keypair dedicated to disposable smoke VMs (not your daily key).
+
+Build a local dev image:
+
+```bash
+export ICN_APPLIANCE_BASE_IMAGE=/path/to/debian-12-genericcloud-amd64.qcow2
+export ICN_APPLIANCE_OUTPUT_DIR=$HOME/icn-appliance-build
+export ICN_APPLIANCE_VERSION=0.0.1-dev
+# Optional but recommended:
+export ICN_APPLIANCE_BASE_SHA256=$(sha256sum "$ICN_APPLIANCE_BASE_IMAGE" | awk '{print $1}')
+
+bash deploy/appliance/build-image.sh --real
+# -> $ICN_APPLIANCE_OUTPUT_DIR/icn-appliance-0.0.1-dev-amd64.qcow2
+# -> $ICN_APPLIANCE_OUTPUT_DIR/icn-appliance-0.0.1-dev-amd64.manifest.json
+```
+
+Boot smoke the image:
+
+```bash
+# Prepare your smoke-only SSH keypair:
+ssh-keygen -t ed25519 -f /tmp/icn-smoke-key -N ""
+# Edit deploy/appliance/smoke/cloud-init/user-data.example.yaml,
+# replace the placeholder with the contents of /tmp/icn-smoke-key.pub,
+# and save somewhere safe (NOT in the repo). Then build a seed ISO:
+cp deploy/appliance/smoke/cloud-init/user-data.example.yaml /tmp/user-data
+$EDITOR /tmp/user-data
+cloud-localds /tmp/seed.iso /tmp/user-data deploy/appliance/smoke/cloud-init/meta-data.example.yaml
+
+export ICN_APPLIANCE_IMAGE=$HOME/icn-appliance-build/icn-appliance-0.0.1-dev-amd64.qcow2
+export ICN_APPLIANCE_SSH_KEY=/tmp/icn-smoke-key
+export ICN_APPLIANCE_CLOUD_INIT_SEED=/tmp/seed.iso
+
+bash deploy/appliance/smoke/smoke-local.sh --real
+# Expected: SSH up -> firstboot marker present -> icnd active -> /v1/health 200 -> PASS.
+```
+
+### Per-instance secrets
+
+The image itself contains **zero** secrets. On first boot,
+`icn-appliance-firstboot.service` (oneshot) generates:
+
+- A random JWT secret (`openssl rand -hex 32`).
+- A random keystore passphrase (`openssl rand -base64 32`).
+
+Both are written to `/etc/icn/icnd.env` (mode `600`, owned `icn:icn`).
+`icnd --init` runs once to create the keystore. Then `icnd.service` picks
+up the env file and starts normally.
+
+To rotate: remove `/var/lib/icn/.firstboot-complete` AND the keystore at
+`/var/lib/icn/.icn/`, then reboot or rerun firstboot.
 
 ## Security posture (scaffold-only)
 

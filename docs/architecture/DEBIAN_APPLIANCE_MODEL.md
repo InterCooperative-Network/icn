@@ -6,12 +6,15 @@ Last Reviewed: 2026-05-16
 
 # Debian Appliance Model
 
-> **Status: design direction, scaffold-only.** This document names how ICN
-> should distribute a node: as a single Debian-based appliance image that
-> boots, runs `icnd`, and can later be claimed, role-profiled, and used as a
-> substrate for governed service hosting. It is not an implementation
-> report. It does not declare any appliance live and does not authorize
-> mutation of K3s, DNS, Forgejo, GitHub, or homelab state.
+> **Status: bootable dev image, not production.** This document names how
+> ICN distributes a node: as a single Debian-based appliance image that
+> boots, runs `icnd`, and can later be claimed, role-profiled, and used as
+> a substrate for governed service hosting. As of the QCOW2-build-and-smoke
+> slice, a local dev image can be built and a one-VM smoke can verify
+> `icnd` health on port 8080. The dev image is **not** production: unsigned,
+> not immutable, no A-B updates, no claim flow, no partner federation
+> activation. It does not authorize mutation of K3s, DNS, Forgejo, GitHub,
+> or homelab state.
 
 ## Purpose
 
@@ -83,14 +86,15 @@ node have separate stage progressions; both are listed below.
 
 | Stage | What exists | What does not |
 |---|---|---|
-| **Unbuilt scaffold** (today) | Docs, manifest templates, role examples, first-boot scaffold, dry-run build script. | No image. No partner consumer. |
-| **Bootable dev image** | A local QCOW2 image that boots Debian + `icnd`, exposes `/v1/health` on 8080. | Not signed. Not reproducible. Not for partner hands. |
+| **Unbuilt scaffold** | Docs, manifest templates, role examples, first-boot scaffold, dry-run build script. (Landed PR #1865.) | No image. No partner consumer. |
+| **Bootable dev image** (today) | A local QCOW2 image that boots Debian + `icnd`, generates per-instance secrets at first boot, runs `icnd --init`, and exposes `/v1/health` on 8080. A `smoke-local.sh --real` one-VM smoke verifies the path. | Not signed. Not reproducible. Not for partner hands. |
 | **Reproducible build** | A build path (Packer / debos / live-build) that produces the same image hash from the same inputs. | Still not signed. Still not immutable. |
 | **Signed release** | The reproducible build emits a signature operators can verify. | Still not immutable. No A-B updates. |
 | **Production-signed appliance** | Signed updates, immutable rootfs, A-B updates, measured boot, TPM-backed identity material. | — |
 
-Today is **Unbuilt scaffold**. The first implementation slice after this
-scaffold lands is **Bootable dev image** plus a one-VM boot smoke.
+Today is **Bootable dev image**. The next implementation slice after this
+is role-profile application so a booted appliance can join a local devnet
+under the `sandbox` or `genesis` profile.
 
 ### Node-instance states
 
@@ -190,9 +194,10 @@ must hold; they do not declare that posture implemented.
 
 | Concern | Posture |
 |---|---|
-| **Embedded secrets** | None. No JWT, keystore passphrase, TLS key, or partner-shared material is in the image, in this repo, or in any build output. |
+| **Embedded secrets** | None. No JWT, keystore passphrase, TLS key, or partner-shared material is in the image, in this repo, or in any build output. The image as built contains zero secrets. |
 | **Private data** | Not in repo. Any institution-specific material lives in partner repos under partner-controlled access. |
-| **First-boot material** | Generated locally on the appliance, after first boot, by the operator. Mirrors `deploy/install.sh` behavior; the appliance does not generate or vend passphrases. |
+| **First-boot material** | Generated locally on the appliance, *per VM, on first boot*, by `icn-appliance-firstboot.service`. JWT secret (`openssl rand -hex 32`) and keystore passphrase (`openssl rand -base64 32`) are written to `/etc/icn/icnd.env` mode `600` owned `icn:icn`, then `icnd --init` runs once. Mirrors `deploy/install.sh`'s JWT-generation pattern; extended to also bootstrap the keystore so the dev image's `icnd.service` can start without manual operator intervention. The operator opts out via `ICN_FIRSTBOOT_INIT_IDENTITY=0`. To rotate, remove the marker and the keystore and reboot. |
+| **SSH access** | Not granted by the image. The dev smoke uses cloud-init to inject an operator-supplied smoke-only SSH key per VM. The image has no embedded SSH keys, no default password, and `disable_root: true` / `ssh_pwauth: false`. |
 | **Signed updates** | Future work. Until signed updates land, an appliance is updated by replacing the image. |
 | **Immutable rootfs** | Future work. The first dev image is mutable. |
 | **A-B updates** | Future work. |
@@ -213,26 +218,30 @@ local build is working.
 | **debos** | Native Debian; designed for declarative image builds. | Smaller community; more bespoke pipeline. |
 | **live-build** | Official Debian project. | Older tooling style; documentation rougher. |
 
-The dry-run build scaffold (`deploy/appliance/build-image.sh`) does not pick
-yet. The first slice will use Debian cloud image + `virt-customize` because
-it is the smallest credible step.
+`deploy/appliance/build-image.sh` now picks **Debian cloud image +
+`virt-customize`**: it is the smallest credible step, and it is what the
+`--real` path implements. The longer-term choice between Packer / debos /
+live-build is deferred until reproducibility becomes the focus.
 
-## Acceptance for the first real image
+## Acceptance for the bootable dev image
 
-The first non-scaffold appliance image is accepted when, on a disposable
-local VM:
+The dev image is accepted when, on a disposable local VM:
 
 1. The image boots Debian to a usable login state.
 2. The first-boot unit runs once and is marked complete (does not run on
    subsequent boots).
 3. `icnd.service` starts.
-4. `/v1/health` on port `8080` returns HTTP `200` to a request from the
-   host.
+4. `/v1/health` on port `8080` returns HTTP `200` to a request **from
+   inside the VM** via SSH (the dev image does not bind the gateway to
+   non-loopback addresses, preserving systemd hardening).
 5. The appliance can be cleanly destroyed and rebuilt without manual
    intervention.
 
-That is the gate for promoting from **Unbuilt scaffold** to **Bootable dev
-image**. Nothing in this PR claims that gate is met.
+`deploy/appliance/smoke/smoke-local.sh --real` performs exactly this
+acceptance loop. Required tools and inputs (staged Debian base image,
+smoke SSH key, cloud-init seed) are listed in
+[`../../deploy/appliance/README.md`](../../deploy/appliance/README.md)
+§"Real local build + boot smoke".
 
 ## Honest non-claims (repeated for clarity)
 
