@@ -49,7 +49,7 @@ flag as assumptions.
    ("Before you start: list the three hard constraints that apply to this job.")
 6. Review the deliverable. Flag anything that asserts capability the kernel can't prove
    (tier-1 truthfulness rule).
-7. Save the deliverable into docs/design/assets/sketches/ if it's worth keeping.
+7. If the deliverable is worth keeping, route it through the asset lifecycle in [`assets/README.md`](assets/README.md) — register the asset in [`assets/ASSET_REGISTER.md`](assets/ASSET_REGISTER.md), write a brief under [`assets/briefs/`](assets/briefs/), and (for generated-image exploration) place sketches under that brief's own `sketches/` folder. Sketches are never load-bearing and never enter `website/src/assets/` — see [`ICN_VISUAL_EXPLAINER_BIBLE.md`](ICN_VISUAL_EXPLAINER_BIBLE.md) §11.
 ```
 
 ### 1.3 Job-card templates

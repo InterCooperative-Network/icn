@@ -629,6 +629,22 @@ domain_tags = ["architecture", "kernel"]
 recommended_action = "keep"
 last_reviewed = "2026-03-26"
 
+[docs."docs/DESIGN_PRINCIPLES.md"]
+category = "architecture"
+status = "canonical"
+title = "ICN Design Principles"
+description = "Canonical three-tier index of operational invariants, firewall contract, and frozen-core governance invariants. Pairs with the design system entry point as the kernel-side counterpart."
+last_updated = "2026-05-17"
+owner = "matt"
+audiences = ["developers", "architects", "designers"]
+truth_class = "normative"
+role = "architecture"
+canonical = "yes"
+freshness = "current"
+domain_tags = ["architecture", "kernel", "design"]
+recommended_action = "keep"
+last_reviewed = "2026-05-17"
+
 [docs."docs/INDEX.md"]
 category = "reference"
 status = "canonical"

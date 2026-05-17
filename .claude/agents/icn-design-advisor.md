@@ -36,11 +36,11 @@ For any job, **always read ICN_DESIGN_SYSTEM.md first**. It points at everything
 
 These ADRs bind design choices. Cite them when relevant:
 
-- **[ADR-0026](docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md)** — receipt and provenance proof envelope
-- **[ADR-0027](docs/adr/ADR-0027-action-card-contract.md)** — action card contract (mandate + reversibility + receipt before confirm)
-- **[ADR-0028](docs/adr/ADR-0028-accessibility-baseline-for-member-interfaces.md)** — accessibility baseline for member interfaces
-- **[ADR-0032](docs/adr/ADR-0032-website-truth-boundary.md)** — website truth boundary (no asserted-but-unbuilt capability)
-- **[ADR-0033](docs/adr/ADR-0033-public-maturity-claims-and-evidence-links.md)** — public maturity claims and evidence links
+- **[ADR-0026](../../docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md)** — receipt and provenance proof envelope
+- **[ADR-0027](../../docs/adr/ADR-0027-action-card-contract.md)** — action card contract (mandate + reversibility + receipt before confirm)
+- **[ADR-0028](../../docs/adr/ADR-0028-accessibility-baseline-for-member-interfaces.md)** — accessibility baseline for member interfaces
+- **[ADR-0032](../../docs/adr/ADR-0032-website-truth-boundary.md)** — website truth boundary (no asserted-but-unbuilt capability)
+- **[ADR-0033](../../docs/adr/ADR-0033-public-maturity-claims-and-evidence-links.md)** — public maturity claims and evidence links
 
 ## Hard constraints (non-negotiable)
 
