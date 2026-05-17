@@ -50,7 +50,7 @@ Living docs that make up the system. Read in order on first pass:
 | 7 | [docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md](ICN_VISUAL_EXPLAINER_BIBLE.md) | Control plane for every visual explainer — source hierarchy, truth labels, brief gate, generated-image workflow |
 | 8 | [docs/design/assets/ASSET_REGISTER.md](assets/ASSET_REGISTER.md) | Live register of planned and tracked visual assets (one row per asset, briefs in `assets/briefs/`) |
 | 9 | [docs/design/CLAUDE_DESIGN_CONTEXT.md](CLAUDE_DESIGN_CONTEXT.md) | Self-contained briefing for paste into Claude Design or any external collaborator — brand, tokens, vocabulary, surface inventory, kernel binding |
-| 10 | [docs/design/CLAUDE_DESIGN_SETUP.md](CLAUDE_DESIGN_SETUP.md) | How to use Claude Design — external paste flow, local `/design:*` skills, mixed-mode workflow, job-card templates |
+| 10 | [docs/design/CLAUDE_DESIGN_SETUP.md](CLAUDE_DESIGN_SETUP.md) | How to use Claude Design — external paste flow, local `icn-design-advisor` agent (repo-shipped), optional `design` plugin pack, mixed-mode workflow, job-card templates |
 
 ADRs that bind this work:
 
@@ -147,7 +147,7 @@ The eight primitives ([ADR-001 §"The Eight Primitives"](../strategy/ADR-001-Wha
 
 - Building a new ICN-native UI? Start with the visual system, then the language brief, then the accessibility baseline.
 - Building an institution package (NYCN, Summit, future federations)? Inherit the design system, add your own brand layer, do not modify ICN-side primitives.
-- Bringing in an external collaborator (Claude Design, agency, contributor)? Hand them [CLAUDE_DESIGN_CONTEXT.md](CLAUDE_DESIGN_CONTEXT.md) verbatim. For the full workflow (paste-flow templates, doc-to-job attachment table, local `/design:*` skills, failure modes), see [CLAUDE_DESIGN_SETUP.md](CLAUDE_DESIGN_SETUP.md).
+- Bringing in an external collaborator (Claude Design, agency, contributor)? Hand them [CLAUDE_DESIGN_CONTEXT.md](CLAUDE_DESIGN_CONTEXT.md) verbatim. For the full workflow (paste-flow templates, doc-to-job attachment table, repo-shipped `icn-design-advisor` agent, optional `design` plugin pack, failure modes), see [CLAUDE_DESIGN_SETUP.md](CLAUDE_DESIGN_SETUP.md).
 - Adding a new public claim to the website? It is bound by ADR-0032 and ADR-0033 — claim only what proof supports.
 
 ## See also

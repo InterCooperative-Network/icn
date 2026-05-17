@@ -89,7 +89,7 @@ If a design change would make the UI assert something the kernel cannot prove (o
 
 ## Claude Design workflow
 
-Two modes — **external** (claude.ai paste flow) and **local** (this repo's `/design:*` skills). Full setup in `CLAUDE_DESIGN_SETUP.md`.
+Two modes — **external** (claude.ai paste flow) and **local** (this repo, Claude Code). Full setup in `CLAUDE_DESIGN_SETUP.md`.
 
 **External quick start:**
 1. Paste `CLAUDE_DESIGN_CONTEXT.md` (the briefing).
@@ -98,9 +98,9 @@ Two modes — **external** (claude.ai paste flow) and **local** (this repo's `/d
 4. Ask Claude to acknowledge constraints before producing.
 5. Run the §1.5 pre-ship flag list on the deliverable.
 
-**Local quick start:** invoke `/design:design-system`, `/design:design-critique`, `/design:accessibility-review`, `/design:ux-copy`, or `/design:design-handoff`. These skills are file-aware and read ICN doctrine directly.
+**Local quick start (no plugins required):** in this repo, dispatch *this* agent (`icn-design-advisor`) via the `Task`/`Agent` tool. The `.claude/rules/design.md` rule also auto-loads ICN doctrine when files under `docs/design/**`, `docs/design-language/**`, `docs/mobile/**`, `website/src/**`, `web/**`, or `sdk/react-native/**` are touched.
 
-When the user invokes a `/design:*` skill in this repo, point them at `CLAUDE_DESIGN_SETUP.md §2.1` if they want to prefix the invocation to make doctrine reading explicit.
+**Local quick start (if the `design` plugin pack is installed):** the optional `design` Claude Code plugin adds `/design:design-system`, `/design:design-critique`, `/design:accessibility-review`, `/design:ux-copy`, `/design:design-handoff`, `/design:user-research`, and `/design:research-synthesis` slash commands. These are generic — to bind them to ICN doctrine, either prefix the invocation with "read `docs/design/CLAUDE_DESIGN_CONTEXT.md` first" or just dispatch this agent instead. See `CLAUDE_DESIGN_SETUP.md §2.2` for installation.
 
 ## Common review tasks
 

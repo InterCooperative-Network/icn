@@ -17,7 +17,7 @@ There are two modes. Pick the one that matches the surface you're at.
 | Mode | Surface | Use when |
 |------|---------|----------|
 | **External** | claude.ai (web app) or any non-repo Claude session | Producing visual artifacts, exploring a concept, getting a second opinion outside the codebase |
-| **Local** | Claude Code in this repo, `/design:*` skills | Reviewing code-adjacent design, auditing live components, applying decisions to files |
+| **Local** | Claude Code in this repo, `icn-design-advisor` agent (repo-shipped) and optionally the `design` Claude Code plugin pack | Reviewing code-adjacent design, auditing live components, applying decisions to files |
 
 ---
 
@@ -150,34 +150,50 @@ A deliverable with any of these is a draft, not a ship.
 
 ---
 
-## 2. Local mode — Claude Code design skills
+## 2. Local mode — Claude Code design routing
 
-Claude Code ships design skills under the `design:` namespace. Each one is invoked by
-the user and operates on this repo with full file access.
+Local mode runs design work inside Claude Code in this repo, with full file access.
+Unlike external mode, **what's bundled by this repo and what comes from a Claude Code
+plugin are different surfaces**. Be precise about which you're invoking.
 
-| Skill | When to invoke | What it does |
-|-------|----------------|--------------|
-| `/design:design-system` | Audit, document, or extend a component | Runs against the current ICN doctrine; produces audit/spec/extension output |
-| `/design:design-critique` | Get critique on a mockup or design choice | Structured feedback against ICN principles |
-| `/design:accessibility-review` | WCAG 2.2 AA audit on a design or live page | Pass/fail per criterion with fixes |
-| `/design:ux-copy` | Write or review microcopy | Applies CONTENT_STYLE_GUIDE.md voice and vocabulary |
-| `/design:design-handoff` | Generate dev handoff spec | Layout, tokens, props, states, breakpoints, edge cases |
-| `/design:user-research` | Plan a research effort | Interview guides, usability tests, survey design |
-| `/design:research-synthesis` | Synthesize interview/test notes | Themes, insights, prioritized recommendations |
+### 2.1 What this repo ships (always available)
 
-### 2.1 Setup (one-time, already done if you're reading this)
+These are committed under `.claude/` and work the moment you're in this worktree:
 
-The local design skills work out of the box. Three things make them work well for ICN:
+| Surface | Path | What it does |
+|---------|------|--------------|
+| **`icn-design-advisor` agent** | `.claude/agents/icn-design-advisor.md` | Specialist agent for ICN design work — knows the doctrine, hard constraints, kernel binding, and pre-ship flag list. Dispatch via the `Task`/`Agent` tool with `subagent_type: icn-design-advisor`. |
+| **Design rule** | `.claude/rules/design.md` | Auto-loads when files under `docs/design/**`, `docs/design-language/**`, `docs/mobile/**`, `website/src/**`, `web/**`, or `sdk/react-native/**` are touched. Surfaces the required reading and hard constraints inline. |
+| **ICN-specific slash commands** | `.claude/commands/` | `/icn-audit`, `/icn-demo-check`, `/icn-state-sync`, `/icn-trace`. None are design-specific; listed so you know what *is* repo-shipped. |
+| **ICN-specific skills** | `.claude/skills/` | `bench`, `changelog`, `demo-validate`, `devnet`, `push`, `pr-create`, etc. None are design-specific. |
 
-1. **`docs/design/CLAUDE_DESIGN_CONTEXT.md` exists** — the briefing the skill agents
-   can read directly. ✅ done.
-2. **`docs/design/ICN_DESIGN_SYSTEM.md` is the entry point and references all
-   doctrine** — including the kernel binding. ✅ done.
-3. **The `design:` skills know to look in `docs/design/` and `docs/design-language/`** —
-   they are file-aware and follow the entry-point doc.
+If you're working in this repo with Claude Code, the agent and rule above are loaded
+automatically — that alone is enough to do design review, copy review, accessibility
+review, and component spec work without any plugins.
 
-If you want a skill to be more aggressive about reading ICN context first, prefix the
-invocation:
+### 2.2 What requires the `design` plugin (optional)
+
+The richer `/design:*` slash commands — `/design:design-system`,
+`/design:design-critique`, `/design:accessibility-review`, `/design:ux-copy`,
+`/design:design-handoff`, `/design:user-research`, `/design:research-synthesis` — are
+**not bundled by this repo**. They come from a Claude Code plugin pack (the `design`
+plugin in the Claude Code marketplace).
+
+If you have the plugin installed, you'll see those commands offered when you type `/`.
+If you don't, the commands won't resolve. To check what's available in your current
+session, run `/help` or type `/` and inspect the autocomplete.
+
+**Install path** (if you want them):
+
+```
+# In Claude Code, from the marketplace UI:
+#   Settings → Plugins → install "design"
+# Or via CLI (varies by Claude Code version):
+claude plugins install design
+```
+
+The plugin's design skills are generic (not ICN-aware). To bind them to ICN doctrine,
+prefix the invocation:
 
 ```
 /design:design-critique Before critiquing, read docs/design/CLAUDE_DESIGN_CONTEXT.md
@@ -185,23 +201,28 @@ and docs/design/ICN_DESIGN_SYSTEM.md so your critique is bound to ICN doctrine.
 Then critique: <paste mockup link or description>
 ```
 
-### 2.2 Local-mode workflow
+Or — and this is the better path — just dispatch the `icn-design-advisor` agent
+described in §2.1 above. It already knows the doctrine.
+
+### 2.3 Local-mode workflow (preferred — no plugins required)
 
 ```
-1. Be in this repo. (Working directory matters — skills are file-aware.)
-2. Invoke the right /design:* skill from the table above.
-3. Hand it the artifact: a path, a paste, or a URL.
-4. The skill will read the relevant doctrine docs as needed.
+1. Be in this repo. (Working directory matters — the design rule is path-scoped.)
+2. Dispatch the icn-design-advisor agent, OR work directly with file edits and let
+   the .claude/rules/design.md auto-load doctrine.
+3. Hand the agent the artifact: a path, a paste, or a description.
+4. The agent reads ICN doctrine docs and applies the hard constraints from §3 of
+   CLAUDE_DESIGN_CONTEXT.md.
 5. Review the result. If it touches a file, verify before commit (per CLAUDE.md).
 ```
 
-### 2.3 When local mode is better than external mode
+### 2.4 When local mode is better than external mode
 
 - The job needs to touch live files (component code, copy in the codebase, ADR draft).
-- The job needs to verify against current implementation (token usage, accessibility lints).
+- The job needs to verify against current implementation (token usage, content audit).
 - The job is review-shaped (critique, audit, handoff) more than create-shaped.
 
-### 2.4 When external mode is better than local mode
+### 2.5 When external mode is better than local mode
 
 - The job is producing a visual composition (Claude Code is not a visual canvas).
 - The job is concept exploration (multiple variants, no file touch needed).
@@ -214,15 +235,18 @@ Then critique: <paste mockup link or description>
 The realistic workflow is: **explore externally, decide, then apply locally.**
 
 ```
-External: /design:design-critique a mockup in claude.ai → get 3 directions
+External: claude.ai paste flow → critique a mockup → get 3 directions
          ↓
 You:      pick one
          ↓
-Local:   /design:design-system extend → produce the spec in docs/design/components/<name>.md
+Local:   dispatch icn-design-advisor agent → produce the spec in docs/design/components/<name>.md
+         (or `/design:design-system extend` if the `design` plugin is installed)
          ↓
-Local:   /design:design-handoff → produce dev-ready spec for the website team
+Local:   icn-design-advisor handoff mode → produce dev-ready spec for the website team
+         (or `/design:design-handoff` if installed)
          ↓
-Local:   verify with /design:accessibility-review against the live preview
+Local:   icn-design-advisor accessibility-audit mode against the live preview
+         (or `/design:accessibility-review` if installed)
 ```
 
 If you only ever use one mode, the doctrine works. Mixing is more powerful for new
