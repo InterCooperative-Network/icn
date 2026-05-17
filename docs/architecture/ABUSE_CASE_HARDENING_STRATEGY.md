@@ -16,6 +16,8 @@ This document codifies the durable hardening doctrine that prevents ICN from bec
 
 The doctrine is not a security checklist for transport encryption, key management, or replay defense. Those live in [`../security/production-hardening.md`](../security/production-hardening.md). This is the upstream layer that asks whether a procedurally clean record actually corresponds to an institutionally legitimate outcome — and what the substrate must do, in code and in surfaces, so the answer cannot be "no" while the receipt still looks like "yes."
 
+<!-- truth: descriptive -->
+
 ## 0. Status and non-claims
 
 - **Status**: descriptive strategy. No runtime behavior is changed by this document.
@@ -24,6 +26,8 @@ The doctrine is not a security checklist for transport encryption, key managemen
 - **No production-readiness claim, no live-federation claim, no formal-NYCN-pilot claim, no Phase 2 completion claim.** Phase 2 (see [`../PHASE_PROGRESS.md`](../PHASE_PROGRESS.md)) remains ⏳ and partner-bound; this document sequences hardening work that must precede a partner-formalization step that does not exist yet.
 - **No K3s, DNS, Forgejo, gateway-deploy, or NYCN partner-data mutation.**
 - **Code anchors below are pinned to `main` at session start (`d57ff1d6e`).** They may drift; re-verify before citing in follow-up PRs.
+
+<!-- truth: descriptive -->
 
 ## 1. Why this exists
 
@@ -38,6 +42,8 @@ A worked example, written from code currently in `main`:
 3. Each individual step has a corresponding receipt; each receipt is structurally valid; the audit-verify CLI says everything checks out. The institution that emerged from the sequence may already be captured.
 
 This document writes the doctrine, invariants, and follow-up tracks that prevent that sequence from ever being procedurally clean — without widening the meaning firewall, without importing domain semantics into the kernel, and without inventing a SaaS-style RBAC pyramid that ignores ICN's mandate / capability model.
+
+<!-- truth: descriptive -->
 
 ## 2. Core doctrine
 
@@ -85,6 +91,8 @@ Member shell and steward cockpit are designed to render real states: degraded, p
 
 A receipt may exist in the primary store and be missing from a secondary index. In the opaque receipt store this is impossible by construction (atomic primary + index + bind writes). On older typed-receipt paths it is currently possible. Absence from index must never silently become absence from truth.
 
+<!-- truth: descriptive -->
+
 ## 3. Abuse stories
 
 Each story below is short on purpose. Each maps to a hardening track in §4. Each cites at least one code anchor so a follow-up PR has somewhere to start.
@@ -128,6 +136,8 @@ A rendering layer in the cockpit, or a "debug preview" in the shell, dereference
 ### 3.10 Index-skew invisibility
 
 A crash mid-write on an older typed-receipt path leaves the primary record durable but the secondary index missing. The opaque receipt store is atomic by construction; `icn/apps/governance/src/receipt_backend.rs:173-210` documents that the **default** `put_mandate_with_grants` is **not atomic** and depends on the sled-backed gateway override. Other typed write paths have not been inventoried for the same invariant.
+
+<!-- truth: descriptive -->
 
 ## 4. Hardening tracks
 
@@ -350,6 +360,8 @@ Fixture / dev / test bands are explicit and labeled in every surface that touche
 
 **Anchors.** `icn/apps/governance/src/receipt_backend.rs:42, 80, 106, 146, 178-210, 248` (typed write entry points; default `put_mandate_with_grants` is documented as **not atomic** at lines 178-190).
 
+<!-- truth: descriptive -->
+
 ## 5. Production invariants
 
 The substrate refuses to serve the listed write paths unless the listed resolver / checker / config is wired and healthy. Fixture, dev, and test builds carve explicit exceptions; the exception is visibly labeled in every surface it touches.
@@ -363,6 +375,8 @@ The substrate refuses to serve the listed write paths unless the listed resolver
 - **No direct membership mutation in production without the bootstrap shortcut artifact (§4.2) and the `production-allowed` flag set.**
 
 The production / fixture / dev classification is driven by an explicit deployment posture (env var, config field, or build feature) that is visible at startup. Surfaces render the posture; a "production posture but fixture wiring" combination is itself a degraded state.
+
+<!-- truth: descriptive -->
 
 ## 6. Closed lifecycle vocabulary (draft)
 
@@ -387,6 +401,8 @@ The vocabulary is draft. The intent is one closed set adopted by the API surface
 
 The hard rule remains: a receipt of any kind never means "legitimate and complete" by default. Receipts prove specific events under specific authority bases; the surface vocabulary states which event.
 
+<!-- truth: descriptive -->
+
 ## 7. Authority shortcut policy
 
 ### 7.1 What is an authority shortcut
@@ -407,6 +423,8 @@ Every shortcut emits an administrative receipt (the artifact draft in §4.2 / §
 
 Each shortcut carries two flags in its administrative receipt: `production-allowed` and `post-pilot-allowed`. Deployment posture (§5) governs which flags are honored. A shortcut whose `production-allowed: false` flag is set refuses to execute in production deployments and surfaces an explicit "this path is bootstrap-only" error.
 
+<!-- truth: descriptive -->
+
 ## 8. Resolver / checker fail-closed policy
 
 Production semantics, per §3.3 abuse story:
@@ -419,6 +437,8 @@ Production semantics, per §3.3 abuse story:
 | Steward authority checker | fail-closed (steward authority paths refuse) | fail-blocked | fail-degraded |
 
 The current inline "fail-open on resolver errors" trade-off (`handlers.rs:1267-1268`) is a known production gap. The follow-up PR that lands per-site policy resolves it explicitly.
+
+<!-- truth: descriptive -->
 
 ## 9. Receipt semantics policy
 
@@ -436,6 +456,8 @@ Per §2.1 doctrine, receipts state what they prove. Receipt rendering layers in 
 
 No surface flattens any of these into a single "Receipt issued" affirmation.
 
+<!-- truth: descriptive -->
+
 ## 10. Governance parameter sanity strategy
 
 Per §4.7. The follow-up PR fills in the per-band bounds; this section names the bands and the gate.
@@ -445,6 +467,8 @@ Per §4.7. The follow-up PR fills in the per-band bounds; this section names the
 - `production-valid` — meets pilot-valid plus the post-pilot tightening the institution declared in its CCL.
 
 A domain whose config is below its declared band refuses member-facing operation and renders as `Degraded/InsufficientGovernanceConfig` in both surfaces.
+
+<!-- truth: descriptive -->
 
 ## 11. Shell / cockpit fixture matrix
 
@@ -460,6 +484,8 @@ For every state listed in §6 and every shortcut listed in §7, a fixture assert
 
 The matrix runs as part of the testkit. A v0 violation (cockpit and shell disagree) fails the build.
 
+<!-- truth: descriptive -->
+
 ## 12. Privacy / ScopedVault abuse prevention
 
 Per §4.9 and §2.9 doctrine. The regression test set covers:
@@ -470,6 +496,8 @@ Per §4.9 and §2.9 doctrine. The regression test set covers:
 - access / export receipts are themselves first-class records and render as such.
 
 The existing digest-only rendering in `icn/crates/icn-kernel-api/src/proofs.rs:646-661` is the positive-precedent anchor.
+
+<!-- truth: descriptive -->
 
 ## 13. Typed-receipt atomicity inventory
 
@@ -485,6 +513,8 @@ Entry points (`icn/apps/governance/src/receipt_backend.rs`):
 - `put_mandate_with_grants` (l. 195) — composite; **default is NOT atomic** per the comment at lines 178-190; sled-backed gateway must override.
 
 For each: classify, document the gap (or lack of gap), and either migrate to opaque-store-grade atomicity, add a repair scan, or accept and document the weaker guarantee with an explicit reason.
+
+<!-- truth: descriptive -->
 
 ## 14. Implementation issue roster
 
@@ -526,6 +556,8 @@ Candidate follow-up issues, grouped by priority. **Names are descriptive; no iss
 | `feat(receipts): repair scans for index skew on typed paths` | §4.10, §13 | same |
 | `refactor(receipts): migrate typed paths toward opaque-store-grade atomicity` | §4.10, §13 | same |
 
+<!-- truth: descriptive -->
+
 ## 15. Open questions
 
 The questions below are genuinely open; the strategy doc is descriptive of what production must look like, not prescriptive of how to encode the answer.
@@ -535,6 +567,8 @@ The questions below are genuinely open; the strategy doc is descriptive of what 
 - **Closed lifecycle vocabulary owner.** Does the vocabulary in §6 live in `icn-kernel-api` proofs (kernel-side, with apps emitting these states) or in the governance app (app-side, kernel sees only `Accepted` / `Rejected`)? The kernel/app boundary in [`KERNEL_APP_SEPARATION.md`](KERNEL_APP_SEPARATION.md) argues both ways depending on whether the state is a generic constraint or a domain semantic.
 - **Degraded-state record class.** Does resolver-degraded governance use the existing `SyncDegradedStatus` precedent (`icn/crates/icn-kernel-api/src/proofs.rs:1699-1739`) or introduce a separate `GovernanceDegradedStatus`?
 - **Direct-mutation lifetime.** After pilot formalization, does direct membership mutation remain as a labeled bootstrap path indefinitely, or is it removed entirely? The doctrine in §4.2 supports either; the institution that adopts ICN decides.
+
+<!-- truth: descriptive -->
 
 ## 16. Recommended sequencing
 
@@ -580,6 +614,8 @@ Implementation order, designed so the production-safety floor is in place before
 4. Bootstrap-member threshold.
 5. Notification / accessibility requirements (cross-link to `ARCHITECTURE_DUE_DILIGENCE.md` §3.B).
 
+<!-- truth: descriptive -->
+
 ## 17. Non-claims preserved
 
 This document does not imply or claim:
@@ -595,7 +631,11 @@ This document does not imply or claim:
 
 NYCN remains the **intended first cooperative partner**, not a committed formal pilot.
 
+<!-- truth: descriptive -->
+
 ## 18. See also
+
+<!-- truth: descriptive -->
 
 - [`ARCHITECTURE_DUE_DILIGENCE.md`](ARCHITECTURE_DUE_DILIGENCE.md) — twin upstream doctrines (convenience-vs-authority, participation-access); this document is the institutional-legitimacy-layer companion.
 - [`KERNEL_APP_SEPARATION.md`](KERNEL_APP_SEPARATION.md) — meaning firewall; this document does not widen it.
