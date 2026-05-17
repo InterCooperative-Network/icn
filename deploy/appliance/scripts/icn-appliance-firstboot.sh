@@ -7,16 +7,21 @@
 #   - Creates /etc/icn, /var/lib/icn, /var/log/icn if missing.
 #   - Creates or validates the `icn` system user (if run as root).
 #   - Writes a minimal /etc/icn/appliance.env ONLY if it is absent.
+#   - When ICN_FIRSTBOOT_INIT_IDENTITY=1 (default), generates a per-instance
+#     JWT secret + keystore passphrase, writes them to /etc/icn/icnd.env
+#     (mode 600, owned icn:icn), and runs `icnd --init` to seal the
+#     keystore + write config.toml/genesis.json under /var/lib/icn.
+#     The image itself contains NO secrets; everything is generated on
+#     this specific boot.
 #   - Optionally installs the icnd.service unit if it can be found
 #     and ICN_FIRSTBOOT_INSTALL_UNIT=1 is set.
 #   - Drops a marker file so subsequent runs no-op.
 #   - Prints next steps for an operator.
 #
 # What this does NOT do:
-#   - Generate or store any secret. No JWT, no keystore passphrase.
-#   - Initialize an `icnd` identity. The operator runs `icnctl id init`
-#     deliberately, mirroring deploy/install.sh.
-#   - Start or enable icnd.service. The operator does that explicitly.
+#   - Embed any secret in the image. JWT + passphrase are generated per-VM.
+#   - Start or enable icnd.service. The image's build step does that;
+#     this script never invokes `systemctl start`.
 #   - Replace existing config. Overwrite requires
 #     ICN_FIRSTBOOT_FORCE_OVERWRITE=1.
 #   - Talk to a real federation. No network calls.
@@ -47,7 +52,9 @@
 #   keystore-passphrase material the first time it runs. These values are
 #   NOT embedded in the appliance image; they are generated per-VM on first
 #   boot and written to /etc/icn/icnd.env (mode 600). To rotate, remove
-#   /var/lib/icn/.firstboot-complete AND the keystore, then re-run.
+#   /var/lib/icn/.firstboot-complete AND the keystore file
+#   (/var/lib/icn/identity.age plus config.toml/genesis.json in the same
+#   directory), then re-run.
 #
 # This script is intended to be safe to re-run. It will no-op once the
 # marker file at $ICN_DATA_DIR/.firstboot-complete exists, unless the
@@ -60,6 +67,12 @@ ICN_DATA_DIR="${ICN_DATA_DIR:-/var/lib/icn}"
 ICN_CONFIG_DIR="${ICN_CONFIG_DIR:-/etc/icn}"
 ICN_LOG_DIR="${ICN_LOG_DIR:-/var/log/icn}"
 ICN_USER="${ICN_USER:-icn}"
+
+# Ports written into the generated config.toml. These match the runtime
+# binds in deploy/icnd.service (--gateway-bind 127.0.0.1:8080) and the
+# scaffold defaults in /etc/icn/appliance.env. Override via env if needed.
+ICN_FIRSTBOOT_INIT_GATEWAY_PORT="${ICN_FIRSTBOOT_INIT_GATEWAY_PORT:-8080}"
+ICN_FIRSTBOOT_INIT_GOSSIP_PORT="${ICN_FIRSTBOOT_INIT_GOSSIP_PORT:-7777}"
 
 # Resolved at runtime; not pinned at script-author time.
 MARKER_FILE="$ICN_DATA_DIR/.firstboot-complete"
@@ -234,16 +247,21 @@ init_identity_block() {
         return 0
     fi
     # Bail if identity already exists (operator did it by hand, or a prior
-    # firstboot already ran).
-    if [ -d "$ICN_DATA_DIR/.icn" ] || [ -f "$ICND_ENV_FILE" ]; then
-        log "Identity material already present at $ICN_DATA_DIR/.icn or $ICND_ENV_FILE; not regenerating."
+    # firstboot already ran). The keystore is a file at
+    # ${ICN_DATA_DIR}/identity.age (per icnd --init in icn/bins/icnd/src/main.rs),
+    # not a directory. We also bail if /etc/icn/icnd.env exists, since that
+    # env file is paired with the keystore passphrase.
+    local keystore_file="$ICN_DATA_DIR/identity.age"
+    if [ -f "$keystore_file" ] || [ -f "$ICND_ENV_FILE" ]; then
+        log "Identity material already present at $keystore_file or $ICND_ENV_FILE; not regenerating."
         return 0
     fi
 
     log "Generating per-instance JWT secret + keystore passphrase (NOT embedded in image)."
     if [ "$DRY_RUN" -eq 1 ]; then
         printf '[firstboot] (dry-run) would generate JWT + keystore passphrase, write %s mode 600.\n' "$ICND_ENV_FILE"
-        printf '[firstboot] (dry-run) would run: ICN_KEYSTORE_PASSPHRASE=... sudo -u %s icnd --init --data-dir %s\n' "$ICN_USER" "$ICN_DATA_DIR"
+        printf '[firstboot] (dry-run) would run: ICN_KEYSTORE_PASSPHRASE=... sudo -u %s icnd --init --data-dir %s --init-gateway-port %s --init-gossip-port %s\n' \
+            "$ICN_USER" "$ICN_DATA_DIR" "$ICN_FIRSTBOOT_INIT_GATEWAY_PORT" "$ICN_FIRSTBOOT_INIT_GOSSIP_PORT"
         return 0
     fi
 
@@ -269,12 +287,23 @@ init_identity_block() {
     log "Wrote $ICND_ENV_FILE (mode 600, $ICN_USER:$ICN_USER)."
 
     # Run icnd --init as the icn user. The passphrase comes from env, so
-    # the call is non-interactive. icnd --init creates identity, config,
-    # and genesis under $ICN_DATA_DIR, then exits.
+    # the call is non-interactive. icnd --init creates identity.age,
+    # config.toml, and genesis.json under $ICN_DATA_DIR, then exits.
+    #
+    # --init-gateway-port / --init-gossip-port are written into the generated
+    # config.toml so the persisted config matches deploy/icnd.service's
+    # runtime --gateway-bind and the appliance.env scaffold defaults. Without
+    # these, icnd --init defaults to gateway:8000 / gossip:9000, which would
+    # drift from the runtime bind and from appliance.env's documented ports.
+    # The runtime --gateway-bind flag in deploy/icnd.service still wins for
+    # the bind address; this just keeps the on-disk config honest.
     log "Initializing icnd identity (icnd --init) as $ICN_USER..."
     if ICN_KEYSTORE_PASSPHRASE="$pass" \
         sudo -u "$ICN_USER" -E env "ICN_KEYSTORE_PASSPHRASE=$pass" \
-        icnd --init --data-dir "$ICN_DATA_DIR"; then
+        icnd --init \
+            --data-dir "$ICN_DATA_DIR" \
+            --init-gateway-port "$ICN_FIRSTBOOT_INIT_GATEWAY_PORT" \
+            --init-gossip-port "$ICN_FIRSTBOOT_INIT_GOSSIP_PORT"; then
         log "icnd --init succeeded."
     else
         warn "icnd --init failed. icnd.service may not start until identity is initialized."
@@ -323,7 +352,8 @@ cat <<'EOF_NEXT'
   1) Per-instance secrets and identity have been generated at /etc/icn/icnd.env
      (mode 600) and /var/lib/icn/ — these are local to this VM only and were
      NOT in the appliance image. To rotate, remove the firstboot marker AND
-     the keystore directory, then re-run.
+     the keystore file (/var/lib/icn/identity.age plus config.toml/genesis.json
+     in the same directory), then re-run.
 
   2) Select a role profile from /etc/icn/roles/ and apply it deliberately.
      The appliance scaffold does NOT auto-apply a role.

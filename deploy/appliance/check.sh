@@ -73,9 +73,14 @@ fi
 # The scanner itself lists the forbidden vocabulary in this very file, so
 # we exclude check.sh from the scan (its own enumeration is a known false
 # positive).
+#
+# Word-boundary is expressed via -w (whole-word match) rather than the
+# regex escape `\b`: in BRE/ERE, `\b` is interpreted as a literal backspace
+# (0x08), not a word boundary, so older revisions of this scan were
+# silently inert. -w is portable across GNU and BSD grep.
 section "forbidden vocabulary scan"
-FORBIDDEN_PATTERN='\b(payment|wallet|currency|balance|token|blockchain|crypto|timebank)\b'
-HITS="$(grep -rniE "$FORBIDDEN_PATTERN" "$APPLIANCE_DIR" \
+FORBIDDEN_PATTERN='(payment|wallet|currency|balance|token|blockchain|crypto|timebank)'
+HITS="$(grep -rwniE "$FORBIDDEN_PATTERN" "$APPLIANCE_DIR" \
     --exclude="check.sh" 2>/dev/null || true)"
 if [ -z "$HITS" ]; then
     ok "no forbidden ICN-native vocabulary present"

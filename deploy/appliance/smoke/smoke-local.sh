@@ -161,7 +161,10 @@ require_tool() {
     fi
 }
 MISSING=0
-for t in qemu-system-x86_64 ssh curl sha256sum qemu-img; do
+# sha256sum was previously listed but never used; the smoke validates the
+# image by booting it, not by hashing it. Re-add if we ever log/verify the
+# image hash here.
+for t in qemu-system-x86_64 ssh curl qemu-img; do
     if ! require_tool "$t"; then
         MISSING=1
     fi
@@ -242,9 +245,24 @@ else
 fi
 
 # Image overlay so we never mutate the source qcow2.
+# The overlay itself is always qcow2 (we need copy-on-write semantics), but
+# the BACKING image format must match whatever build-image.sh produced —
+# ICN_APPLIANCE_IMAGE_FORMAT defaults to qcow2 but can be raw. Detect the
+# real format from the file so `-F` is honest; otherwise qemu-img errors out
+# with "Backing file specified without explicit format" on a raw base.
+BACKING_FORMAT="$(qemu-img info --output=json "$ICN_APPLIANCE_IMAGE" 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("format","qcow2"))' \
+    2>/dev/null || echo qcow2)"
+case "$BACKING_FORMAT" in
+    qcow2|raw|vmdk|vdi|vhdx) ;;
+    *)
+        warn "Unrecognized backing-image format '$BACKING_FORMAT' from qemu-img info; defaulting to qcow2."
+        BACKING_FORMAT="qcow2"
+        ;;
+esac
 OVERLAY="$WORK_DIR/vm-overlay.qcow2"
-log "Creating disposable overlay $OVERLAY ..."
-qemu-img create -f qcow2 -b "$ICN_APPLIANCE_IMAGE" -F qcow2 "$OVERLAY" >/dev/null
+log "Creating disposable overlay $OVERLAY (backing format: $BACKING_FORMAT) ..."
+qemu-img create -f qcow2 -b "$ICN_APPLIANCE_IMAGE" -F "$BACKING_FORMAT" "$OVERLAY" >/dev/null
 
 # Launch QEMU under user-mode networking. We do NOT touch host networking.
 log "Launching QEMU (user-mode net, hostfwd ${SSH_PORT}->22)..."

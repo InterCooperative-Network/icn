@@ -299,21 +299,30 @@ Both are written to `/etc/icn/icnd.env` (mode `600`, owned `icn:icn`).
 `icnd --init` runs once to create the keystore. Then `icnd.service` picks
 up the env file and starts normally.
 
-To rotate: remove `/var/lib/icn/.firstboot-complete` AND the keystore at
-`/var/lib/icn/.icn/`, then reboot or rerun firstboot.
+To rotate: remove `/var/lib/icn/.firstboot-complete` AND the keystore
+file `/var/lib/icn/identity.age` (plus `config.toml` / `genesis.json` in
+the same directory), then reboot or rerun firstboot.
 
-## Security posture (scaffold-only)
+## Security posture (dev-image, not production)
 
-- No secrets are committed in this directory.
-- The first-boot script never writes a passphrase or JWT into a file.
-- The devnet's `devnet-insecure` shared secrets are explicitly **not** used
-  by the appliance. The appliance has no embedded credentials.
-- First-boot material (keystore passphrase, JWT secret) is expected to be
-  generated locally by an operator, per `deploy/install.sh`'s existing
-  pattern. The appliance does not pretend to manage operator secrets yet.
-- Signed updates, A-B updates, immutable rootfs, TPM-backed keys, and
-  measured boot are all named in the model document as future work. None of
-  that is implemented here.
+- **No secrets are committed in this directory or embedded in the image.**
+  `appliance.env`, role examples, cloud-init examples, and the firstboot
+  script all use placeholders or generate values at runtime.
+- **Per-instance secrets are generated on first boot, not in the image.**
+  `icn-appliance-firstboot.service` writes a fresh JWT secret and keystore
+  passphrase to `/etc/icn/icnd.env` (mode `600`, owned `icn:icn`) and runs
+  `icnd --init` to seal the keystore. Two different VMs from the same
+  image get two different identities and two different JWT secrets.
+- **`devnet-insecure` shared secrets are explicitly NOT used** by the
+  appliance. The appliance has no embedded credentials.
+- **`icnd.service` is enabled at image build time** but cannot start until
+  firstboot has run; the systemd `Before=icnd.service` dependency enforces
+  ordering. There is no auto-pairing, no federation contact, no remote
+  enrollment.
+- **Not implemented here, named in `DEBIAN_APPLIANCE_MODEL.md` as future
+  work:** signed updates, A-B updates, immutable rootfs, TPM-backed keys,
+  measured boot, attested federation enrollment. This image is a local
+  dev-VM artifact, not a partner-distributable appliance.
 
 ## Next implementation slice
 
