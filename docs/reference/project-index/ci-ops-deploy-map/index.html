@@ -159,6 +159,11 @@ View source on GitHub →
 <td>Helm chart for ICN.</td>
 </tr>
 <tr>
+<td>Debian appliance (<strong>dev image, NOT production</strong>)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/appliance/">`deploy/appliance/`</a></td>
+<td>Local dev ICN node image. <code>build-image.sh --real</code> produces a QCOW2 + manifest JSON from a staged Debian base; <code>smoke/smoke-local.sh --real</code> boots it under QEMU user-mode net and verifies <code>/v1/health</code> on 8080. Unsigned, not immutable, no claim flow, no partner federation. See <a href="/docs/architecture/DEBIAN_APPLIANCE_MODEL">`docs/architecture/DEBIAN_APPLIANCE_MODEL.md`</a>.</td>
+</tr>
+<tr>
 <td><strong>Live K3s cluster</strong></td>
 <td>(homelab)</td>
 <td>Deployed since 2025-12-03. See <a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`</a>.</td>

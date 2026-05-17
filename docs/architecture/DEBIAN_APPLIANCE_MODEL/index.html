@@ -1,0 +1,532 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Debian Appliance Model | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DEBIAN APPLIANCE MODEL</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/DEBIAN_APPLIANCE_MODEL.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Debian Appliance Model</h1>
+<blockquote>
+<p><strong>Status: bootable dev image, not production.</strong> This document names how
+ICN distributes a node: as a single Debian-based appliance image that
+boots, runs <code>icnd</code>, and can later be claimed, role-profiled, and used as
+a substrate for governed service hosting. As of the QCOW2-build-and-smoke
+slice, a local dev image can be built and a one-VM smoke can verify
+<code>icnd</code> health on port 8080. The dev image is <strong>not</strong> production: unsigned,
+not immutable, no A-B updates, no claim flow, no partner federation
+activation. It does not authorize mutation of K3s, DNS, Forgejo, GitHub,
+or homelab state.</p>
+</blockquote>
+<h2>Purpose</h2>
+<p>ICN currently ships as a daemon that an operator installs into an existing
+Debian/Ubuntu host (<code>deploy/install.sh</code>, <code>deploy/icnd.service</code>) or runs as a
+multi-container devnet (<code>deploy/devnet/</code>). Neither of those is a node unit
+that a partner cooperative can claim and place into operation without
+becoming an operating-system administrator.</p>
+<p>The appliance addresses that gap: <strong>one bootable image, one node, one
+operator action to bring it on-line</strong>. The same image is used for every
+role; the role is a declarative profile applied to the running appliance,
+not a different image.</p>
+<p>This document records the model. The appliance itself does not exist yet.</p>
+<h2>Non-goals</h2>
+<p>This document and the scaffold it accompanies explicitly do <strong>not</strong>:</p>
+<ul>
+<li>Introduce any Rust types or wire formats.</li>
+<li>Re-implement <code>GovernedServiceBinding</code>, <code>WorkloadManifest</code>, or
+<code>RuntimeProvider</code> from <code>docs/spec/governed-service-binding.md</code>. Those
+remain forward-direction primitives.</li>
+<li>Re-implement the service-hosting stages from
+<code>docs/architecture/SERVICE_HOSTING_MODEL.md</code>.</li>
+<li>Replace the existing native install (<code>deploy/install.sh</code>,
+<code>deploy/icnd.service</code>) or the existing 3-node devnet
+(<code>deploy/devnet/</code>). Both continue to be supported until the appliance
+reaches a comparable acceptance bar.</li>
+<li>Claim production readiness.</li>
+<li>Claim a signed release.</li>
+<li>Claim a live federation or activated partner cooperative.</li>
+<li>Claim Phase 2 completion.</li>
+<li>Treat NYCN as production-activated.</li>
+<li>Embed secrets, keystore passphrases, JWT secrets, or any other private
+material in the image, in repo, or in build artifacts.</li>
+</ul>
+<h2>Relationship to existing architecture</h2>
+<p>This document extends, but does not replace:</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SERVICE_HOSTING_MODEL">`SERVICE_HOSTING_MODEL.md`</a> — hosted →
+governed → ICN-native service progression. Appliance hosts the
+substrate; service hosting layers above it.</li>
+<li><a href="/docs/spec/governed-service-binding">`../spec/governed-service-binding.md`</a>
+— abstract <code>GovernedServiceBinding</code>, <code>WorkloadManifest</code>,
+<code>RuntimeProvider</code>. The appliance hosts one or more runtime providers; it
+does not redefine the primitives.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a> — meaning
+firewall. The appliance image is a substrate concern; nothing in the
+image teaches the kernel to read domain types.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/icnd.service">`../../deploy/icnd.service`</a> — the systemd
+unit the appliance reuses unmodified for <code>icnd</code> itself.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/install.sh">`../../deploy/install.sh`</a> — the existing
+native install path. The appliance&#39;s first-boot scaffold mirrors its
+directory layout (<code>/var/lib/icn</code>, <code>/etc/icn</code>, <code>icn</code> system user).</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/devnet/">`../../deploy/devnet/`</a> — the existing Docker
+devnet. Appliance behavior should eventually converge with devnet
+behavior (3-node bootstrap, gossip convergence, health) but the first
+acceptance target is a single boot.</li>
+</ul>
+<h2>Lifecycle stages</h2>
+<p>A given appliance moves through stages. The image artifact and the running
+node have separate stage progressions; both are listed below.</p>
+<h3>Image artifact stages</h3>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>What exists</th>
+<th>What does not</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Unbuilt scaffold</strong></td>
+<td>Docs, manifest templates, role examples, first-boot scaffold, dry-run build script. (Landed PR #1865.)</td>
+<td>No image. No partner consumer.</td>
+</tr>
+<tr>
+<td><strong>Bootable dev image</strong> (today)</td>
+<td>A local QCOW2 image that boots Debian + <code>icnd</code>, generates per-instance secrets at first boot, runs <code>icnd --init</code>, and exposes <code>/v1/health</code> on 8080. A <code>smoke-local.sh --real</code> one-VM smoke verifies the path.</td>
+<td>Not signed. Not reproducible. Not for partner hands.</td>
+</tr>
+<tr>
+<td><strong>Reproducible build</strong></td>
+<td>A build path (Packer / debos / live-build) that produces the same image hash from the same inputs.</td>
+<td>Still not signed. Still not immutable.</td>
+</tr>
+<tr>
+<td><strong>Signed release</strong></td>
+<td>The reproducible build emits a signature operators can verify.</td>
+<td>Still not immutable. No A-B updates.</td>
+</tr>
+<tr>
+<td><strong>Production-signed appliance</strong></td>
+<td>Signed updates, immutable rootfs, A-B updates, measured boot, TPM-backed identity material.</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<p>Today is <strong>Bootable dev image</strong>. The next implementation slice after this
+is role-profile application so a booted appliance can join a local devnet
+under the <code>sandbox</code> or <code>genesis</code> profile.</p>
+<h3>Node-instance states</h3>
+<p>Once an appliance is running, the node moves through:</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>unclaimed</strong></td>
+<td>The appliance has booted but no operator has claimed it. <code>icnd</code> may not be running, or is running in an unconfigured state.</td>
+</tr>
+<tr>
+<td><strong>claimed</strong></td>
+<td>An operator has performed the claim action: identity initialized, keystore created, role profile selected. The node knows what it is.</td>
+</tr>
+<tr>
+<td><strong>configured</strong></td>
+<td>The role profile&#39;s expected configuration has been applied (peers, gateway binding, observability, role-specific units).</td>
+</tr>
+<tr>
+<td><strong>running</strong></td>
+<td><code>icnd</code> is running, <code>/v1/health</code> returns OK, role-specific services are alive.</td>
+</tr>
+<tr>
+<td><strong>degraded</strong></td>
+<td>One or more role-specific services are unhealthy, or the node has diverged from federation state, or anti-entropy probes are failing. The node continues to serve what it can.</td>
+</tr>
+<tr>
+<td><strong>suspended</strong></td>
+<td>Authority to act has been revoked (operator pause, governance decision, or emergency stop). The node holds state but does not dispatch effects.</td>
+</tr>
+<tr>
+<td><strong>decommissioned</strong></td>
+<td>The node has been removed from operation. Custody handoff and data export have been performed per the appliance manifest&#39;s exit policy.</td>
+</tr>
+</tbody></table>
+<p>State transitions are operational facts. None of them is an authority
+transition by itself; authority changes flow through governance acts per
+<code>docs/spec/governed-service-binding.md</code>.</p>
+<h2>Role profiles</h2>
+<p>Initial role-profile vocabulary. A role is a <strong>declared shape</strong> the
+appliance is being used as, not a different image and not a different
+binary. The role is applied as a manifest reference; the appliance reads
+the role profile and starts (or refuses to start) the matching unit set.</p>
+<table>
+<thead>
+<tr>
+<th>Profile</th>
+<th>Purpose</th>
+<th>Initial expected services</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>genesis</strong></td>
+<td>First node in a new local domain. Bootstraps identity and the local genesis state.</td>
+<td><code>icnd</code> only. No peers yet.</td>
+</tr>
+<tr>
+<td><strong>witness-archive</strong></td>
+<td>Observes a federation, retains state, serves no policy authority.</td>
+<td><code>icnd</code>, observability, retention.</td>
+</tr>
+<tr>
+<td><strong>commons-executor</strong></td>
+<td>Runs commons compute workloads under the existing compute admission policy (ADR-0031).</td>
+<td><code>icnd</code>, compute provider.</td>
+</tr>
+<tr>
+<td><strong>domain-host</strong></td>
+<td>Runs the substrate for one institutional domain (<code>docs/spec/institutional-domain.md</code>).</td>
+<td><code>icnd</code>, domain-scoped storage, member-shell endpoint.</td>
+</tr>
+<tr>
+<td><strong>service-host</strong></td>
+<td>Hosts governed services declared by <code>GovernedServiceBinding</code>s once those land. Today: no services.</td>
+<td><code>icnd</code>, future runtime providers.</td>
+</tr>
+<tr>
+<td><strong>ingress</strong></td>
+<td>Public-facing entry point for institutional domains. Routes member-shell and steward-cockpit traffic.</td>
+<td><code>icnd</code>, reverse-proxy adapter.</td>
+</tr>
+<tr>
+<td><strong>storage</strong></td>
+<td>Holds durable storage for a domain (custody-class storage per <code>docs/spec/storage-durability-policies.md</code>).</td>
+<td><code>icnd</code>, storage backend.</td>
+</tr>
+<tr>
+<td><strong>forge-build</strong></td>
+<td>Build runner for the sovereign forge once it exists. Today: not implemented.</td>
+<td><code>icnd</code>, build executor (future).</td>
+</tr>
+<tr>
+<td><strong>observability</strong></td>
+<td>Aggregates metrics, traces, and audit evidence for a federation.</td>
+<td><code>icnd</code>, Prometheus, log shipper.</td>
+</tr>
+<tr>
+<td><strong>sandbox</strong></td>
+<td>Disposable node for rehearsals, fixture work, and local proof-loops. <strong>Never production.</strong></td>
+<td><code>icnd</code>, devnet-style overrides allowed.</td>
+</tr>
+</tbody></table>
+<p>Roles are <strong>not authority</strong>. A node profiled as <code>service-host</code> does not gain
+authority to host services; it gains the capacity to host them once a
+<code>GovernedServiceBinding</code> selects it as the substrate. The kernel does not
+consult role profiles. Role profiles are a substrate-layer config artifact.</p>
+<h2>Runtime provider roadmap</h2>
+<p>Each runtime class named in <code>docs/spec/governed-service-binding.md</code>
+§&quot;Runtime classes&quot; eventually has at least one provider implementation on
+the appliance. The appliance does <strong>not</strong> implement providers; it hosts
+them.</p>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>systemd / native</strong></td>
+<td>First-class baseline</td>
+<td><code>icnd.service</code> plus role-specific unit files. The appliance ships with this.</td>
+</tr>
+<tr>
+<td><strong>oci-container</strong></td>
+<td>Future</td>
+<td>Hosts containerized governed services (forge, auth, status, metrics, registry, docs). Likely backed by <code>podman</code> or <code>containerd</code>, not Docker, to keep the substrate auditable.</td>
+</tr>
+<tr>
+<td><strong>k3s</strong></td>
+<td>Optional, future</td>
+<td>For roles that need clustered orchestration. Not baseline. An appliance does not require k3s to run.</td>
+</tr>
+<tr>
+<td><strong>wasm</strong></td>
+<td>Future</td>
+<td>Deterministic legitimacy compute (per ADR-0021) and utility computation. Runs sandboxed in-process or via a dedicated runtime.</td>
+</tr>
+<tr>
+<td><strong>microvm</strong></td>
+<td>Future</td>
+<td>Stronger-isolation provider for untrusted code paths.</td>
+</tr>
+<tr>
+<td><strong>accelerator</strong></td>
+<td>Future</td>
+<td>For hardware-accelerated workloads where the appliance is provisioned with the relevant hardware.</td>
+</tr>
+<tr>
+<td><strong>external-bridge</strong></td>
+<td>Future</td>
+<td>Integrations with non-ICN systems, granted only by explicit policy.</td>
+</tr>
+</tbody></table>
+<p>The appliance manifest declares which providers are present on a given
+image. Adding a provider is an image change; granting a binding to use a
+provider is a governance act.</p>
+<h2>Service-hosting future</h2>
+<p>The appliance is not just <code>icnd</code>. The longer-term posture is:</p>
+<pre><code class="language-text">appliance image
+        ↓
+icnd (substrate daemon)        ← already runs here
+        ↓
+runtime providers              ← hosted by the appliance
+        ↓
+GovernedServiceBindings        ← chosen by governance
+        ↓
+governed services              ← forge, auth, status, metrics, registry, docs, institution-hosted
+</code></pre>
+<p>The discipline is the same one <code>SERVICE_HOSTING_MODEL.md</code> already states:</p>
+<blockquote>
+<p><strong>ICN owns authority. Services expose functions. Adapters translate
+service events. Receipts prove transitions. Compute produces evidence.
+Governance authorizes power.</strong></p>
+</blockquote>
+<p>The appliance is below all of that. It boots, runs the daemon, exposes the
+provider surface, and lets governance decide what to do with it. Operator
+scope (who runs the appliance) does <strong>not</strong> become institutional authority
+(who authorizes what runs on it).</p>
+<h2>Security notes</h2>
+<p>These are scaffold-stage statements. They define the posture the appliance
+must hold; they do not declare that posture implemented.</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Posture</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Embedded secrets</strong></td>
+<td>None. No JWT, keystore passphrase, TLS key, or partner-shared material is in the image, in this repo, or in any build output. The image as built contains zero secrets.</td>
+</tr>
+<tr>
+<td><strong>Private data</strong></td>
+<td>Not in repo. Any institution-specific material lives in partner repos under partner-controlled access.</td>
+</tr>
+<tr>
+<td><strong>First-boot material</strong></td>
+<td>Generated locally on the appliance, <em>per VM, on first boot</em>, by <code>icn-appliance-firstboot.service</code>. JWT secret (<code>openssl rand -hex 32</code>) and keystore passphrase (<code>openssl rand -base64 32</code>) are written to <code>/etc/icn/icnd.env</code> mode <code>600</code> owned <code>icn:icn</code>, then <code>icnd --init</code> runs once. Mirrors <code>deploy/install.sh</code>&#39;s JWT-generation pattern; extended to also bootstrap the keystore so the dev image&#39;s <code>icnd.service</code> can start without manual operator intervention. The operator opts out via <code>ICN_FIRSTBOOT_INIT_IDENTITY=0</code>. To rotate, remove the marker and the keystore and reboot.</td>
+</tr>
+<tr>
+<td><strong>SSH access</strong></td>
+<td>Not granted by the image. The dev smoke uses cloud-init to inject an operator-supplied smoke-only SSH key per VM. The image has no embedded SSH keys, no default password, and <code>disable_root: true</code> / <code>ssh_pwauth: false</code>.</td>
+</tr>
+<tr>
+<td><strong>Signed updates</strong></td>
+<td>Future work. Until signed updates land, an appliance is updated by replacing the image.</td>
+</tr>
+<tr>
+<td><strong>Immutable rootfs</strong></td>
+<td>Future work. The first dev image is mutable.</td>
+</tr>
+<tr>
+<td><strong>A-B updates</strong></td>
+<td>Future work.</td>
+</tr>
+<tr>
+<td><strong>TPM-backed identity</strong></td>
+<td>Future work. Identity material is held in <code>~icn/.icn/keystore.age</code> (per the existing pattern), Age-encrypted, passphrase-derived.</td>
+</tr>
+<tr>
+<td><strong>Measured boot</strong></td>
+<td>Future work.</td>
+</tr>
+<tr>
+<td><strong>Devnet shared secrets</strong></td>
+<td>Explicitly <strong>never</strong> used by the appliance. The devnet&#39;s <code>devnet-insecure</code> shared secrets exist only in <code>deploy/devnet/</code>. The appliance does not import them, copy them, or accept them as defaults.</td>
+</tr>
+</tbody></table>
+<h2>Build path posture</h2>
+<p>The first build target is a single local QCOW2 image. The longer-term
+posture supports multiple backends; the choice is deferred until the first
+local build is working.</p>
+<table>
+<thead>
+<tr>
+<th>Candidate backend</th>
+<th>Strength</th>
+<th>Weakness</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Debian cloud image + <code>virt-customize</code></strong></td>
+<td>Smallest jump from existing native install; reuses official Debian images.</td>
+<td>Single-shot; less reproducible.</td>
+</tr>
+<tr>
+<td><strong>Packer (HashiCorp / community)</strong></td>
+<td>Mature, well-documented, multi-format output.</td>
+<td>Tooling overhead; license/governance review required for HashiCorp lineage.</td>
+</tr>
+<tr>
+<td><strong>debos</strong></td>
+<td>Native Debian; designed for declarative image builds.</td>
+<td>Smaller community; more bespoke pipeline.</td>
+</tr>
+<tr>
+<td><strong>live-build</strong></td>
+<td>Official Debian project.</td>
+<td>Older tooling style; documentation rougher.</td>
+</tr>
+</tbody></table>
+<p><code>deploy/appliance/build-image.sh</code> now picks <strong>Debian cloud image +
+<code>virt-customize</code></strong>: it is the smallest credible step, and it is what the
+<code>--real</code> path implements. The longer-term choice between Packer / debos /
+live-build is deferred until reproducibility becomes the focus.</p>
+<h2>Acceptance for the bootable dev image</h2>
+<p>The dev image is accepted when, on a disposable local VM:</p>
+<ol>
+<li>The image boots Debian to a usable login state.</li>
+<li>The first-boot unit runs once and is marked complete (does not run on
+subsequent boots).</li>
+<li><code>icnd.service</code> starts.</li>
+<li><code>/v1/health</code> on port <code>8080</code> returns HTTP <code>200</code> to a request <strong>from
+inside the VM</strong> via SSH (the dev image does not bind the gateway to
+non-loopback addresses, preserving systemd hardening).</li>
+<li>The appliance can be cleanly destroyed and rebuilt without manual
+intervention.</li>
+</ol>
+<p><code>deploy/appliance/smoke/smoke-local.sh --real</code> performs exactly this
+acceptance loop. Required tools and inputs (staged Debian base image,
+smoke SSH key, cloud-init seed) are listed in
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/appliance/README">`../../deploy/appliance/README.md`</a>
+§&quot;Real local build + boot smoke&quot;.</p>
+<h2>Honest non-claims (repeated for clarity)</h2>
+<ul>
+<li>No production image exists.</li>
+<li>No signed release exists.</li>
+<li>No <code>GovernedServiceBinding</code> runtime implementation lives here.</li>
+<li>No partner-federation activation exists.</li>
+<li>NYCN is not production-activated under appliance primitives.</li>
+<li>No K3s, DNS, Forgejo, GitHub, or homelab state is mutated by this
+document or the accompanying scaffold.</li>
+<li>No claim that the existing systemd / Docker / K8s deploy paths are
+deprecated; they remain primary.</li>
+</ul>
+<h2>Related documents</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SERVICE_HOSTING_MODEL">`SERVICE_HOSTING_MODEL.md`</a> — hosted →
+governed → native stages, service definition shape, authority model,
+data custody classes.</li>
+<li><a href="/docs/spec/governed-service-binding">`../spec/governed-service-binding.md`</a>
+— <code>WorkloadManifest</code>, <code>GovernedServiceBinding</code>, <code>RuntimeProvider</code>,
+runtime classes, lifecycle.</li>
+<li><a href="/docs/spec/institutional-domain">`../spec/institutional-domain.md`</a> —
+<code>InstitutionalDomain</code> and <code>DomainPolicy</code>. Role profiles <code>domain-host</code>,
+<code>ingress</code>, <code>storage</code> exist to host these.</li>
+<li><a href="/docs/spec/storage-durability-policies">`../spec/storage-durability-policies.md`</a>
+— custody classes the <code>storage</code> role profile must honor.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a> — kernel never
+imports appliance, role profile, or runtime-provider types.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/icnd.service">`../../deploy/icnd.service`</a>,
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/install.sh">`../../deploy/install.sh`</a>,
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/devnet/">`../../deploy/devnet/`</a> — the existing deploy
+surfaces the appliance reuses or layers above.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/appliance/">`../../deploy/appliance/`</a> — the accompanying
+scaffold directory (manifest template, role examples, first-boot, build
+scaffold, smoke scaffold).</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
