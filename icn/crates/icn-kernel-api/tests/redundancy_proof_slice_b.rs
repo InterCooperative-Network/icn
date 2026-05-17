@@ -58,7 +58,7 @@ use icn_kernel_api::{
     AuthorityBasis, BoundaryRuleRef, BoundaryRuleSet, Did, DigestMismatch, DivergenceClass,
     DivergenceEvidence, EffectOutcome, ExpectedRepairReceiptClass, Hash, PeerSet, PolicyClauseRef,
     ProbeScope, RedundancyOutcome, RedundancyProof, RepairAction, RepairPlan, RepairReceipt,
-    RepairReceiptClass, StateClass,
+    RepairReceiptClass, ShortDigestList, StateClass, StateDigest,
 };
 
 // ---------------------------------------------------------------------------
@@ -127,6 +127,33 @@ fn peers_holding(peers: &[&FixturePeer], artifact: &FixtureArtifact) -> PeerSet 
         .filter(|p| p.holds(artifact))
         .map(|p| p.did.clone());
     PeerSet::from_dids(dids)
+}
+
+/// Build a deterministic 32-byte marker for a single `(artifact, peer)`
+/// replica. The fixture uses the artifact's content hash as the base and
+/// stamps the peer-distinguishing byte from the end of the DID into the
+/// low byte. Two distinct peers holding the same artifact produce two
+/// distinct markers; the same peer always produces the same marker. The
+/// scheme is deterministic and reviewable; no hashing dependency is
+/// introduced for the fixture.
+fn replica_marker(artifact: &FixtureArtifact, peer: &FixturePeer) -> Hash {
+    let mut marker = artifact.artifact_hash;
+    let peer_byte = peer.did.as_bytes().last().copied().unwrap_or(0);
+    marker[31] = marker[31].wrapping_add(peer_byte);
+    marker
+}
+
+/// Build a bounded `StateDigest` over a replica peer set as a short list
+/// of per-replica markers. The cardinality of the list mirrors the
+/// observed replica count, so a later probe can structurally distinguish
+/// a 2-replica state from a 3-replica state without revealing the
+/// underlying peer DIDs in the digest body.
+fn replica_state_digest(artifact: &FixtureArtifact, replicas: &[&FixturePeer]) -> StateDigest {
+    let markers: Vec<Hash> = replicas
+        .iter()
+        .map(|p| replica_marker(artifact, p))
+        .collect();
+    StateDigest::ShortList(ShortDigestList::from_hashes(markers))
 }
 
 /// Deterministic fixture policy clause used throughout Slice B.
@@ -353,14 +380,14 @@ fn slice_b_redundancy_proof_below_target_to_applied_repair() {
     //
     // The wire-stable evidence artifact for the resolved repair. Cross-
     // linked back to the evidence and plan; verify_binding() proves
-    // the receipt has not been tampered with. `before_state_digest` and
-    // `after_state_digest` are left `None` — the fixture does not model
-    // a `StateDigest` projection over the storage-replica-verification
-    // state class; the replica-count transition is fully captured by
-    // the before/after `RedundancyProof` pair above, and the `Applied`
-    // outcome accepts `None` for the digests per schema. The receipt is
-    // structurally valid evidence of what a fixture peer would have
-    // produced had a bounded ReReplicate action run against real peers.
+    // the receipt has not been tampered with. `after_state_digest` is a
+    // bounded `StateDigest::ShortList` over the post-replication peer
+    // set per spec §"Evidence" line 187 ("the after-state digest (so a
+    // later probe can confirm convergence)"); this mirrors the Slice A
+    // precedent (`receipt_index_anti_entropy_slice_a.rs:604`) of
+    // asserting `after_state_digest.is_some()` on an Applied receipt.
+    // `before_state_digest` is left `None` to match Slice A.
+    let after_state_digest = replica_state_digest(&artifact, &[&peer_a, &peer_b, &peer_c]);
     let repair_receipt = RepairReceipt::new(
         RepairReceiptClass::from(plan.expected_repair_receipt_class),
         EffectOutcome::Applied,
@@ -371,8 +398,8 @@ fn slice_b_redundancy_proof_below_target_to_applied_repair() {
         "did:icn:fixture:b-repair-actor".to_string(),
         plan.authority_basis.clone(),
         plan.boundary_rules.clone(),
-        None, // before-state digest: not modeled in this fixture
-        None, // after-state digest: not modeled in this fixture
+        None, // before-state digest: not modeled (matches Slice A)
+        Some(after_state_digest),
         1_715_001_004,
         1_715_001_034,
         evidence.private_content_implication,
@@ -392,6 +419,12 @@ fn slice_b_redundancy_proof_below_target_to_applied_repair() {
     );
     assert_eq!(repair_receipt.repair_plan_hash, plan.plan_hash);
     assert!(repair_receipt.failure_reason.is_none());
+    // Applied → after-state digest is present (spec §"Evidence" line
+    // 187; matches Slice A line 604).
+    assert!(
+        repair_receipt.after_state_digest.is_some(),
+        "Applied RepairReceipt must carry the after-state digest per spec"
+    );
     // The receipt's class matches the plan's expected receipt class
     // (1:1 from ExpectedRepairReceiptClass per #1850).
     assert_eq!(
