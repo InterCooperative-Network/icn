@@ -47,6 +47,7 @@ For most CI failures, fix the smallest thing CI is asking for. The full table li
 | Local devnet | [`deploy/devnet/`](../../../deploy/devnet/) | Local 3-node Docker Compose cluster. See the `devnet` skill at [`.claude/skills/devnet/SKILL.md`](../../../.claude/skills/devnet/SKILL.md). |
 | Kubernetes | [`deploy/k8s/`](../../../deploy/k8s/), [`deploy/kubernetes/`](../../../deploy/kubernetes/) | Plain manifests. |
 | Helm | [`deploy/helm/`](../../../deploy/helm/) | Helm chart for ICN. |
+| Debian appliance (**dev image, NOT production**) | [`deploy/appliance/`](../../../deploy/appliance/) | Local dev ICN node image. `build-image.sh --real` produces a QCOW2 + manifest JSON from a staged Debian base; `smoke/smoke-local.sh --real` boots it under QEMU user-mode net and verifies `/v1/health` on 8080. Unsigned, not immutable, no claim flow, no partner federation. See [`docs/architecture/DEBIAN_APPLIANCE_MODEL.md`](../../architecture/DEBIAN_APPLIANCE_MODEL.md). |
 | **Live K3s cluster** | (homelab) | Deployed since 2025-12-03. See [`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`](../../operations/deployment/HOMELAB_DEPLOYMENT.md). |
 
 ```bash

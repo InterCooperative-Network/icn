@@ -1,0 +1,57 @@
+# Role profile: domain-host (EXAMPLE)
+#
+# Declarative example only. Not wired to runtime code.
+#
+# Domain-host runs the substrate for one institutional domain
+# (docs/spec/institutional-domain.md). It is the most common
+# partner-cooperative deployment shape.
+
+profile:
+  id: "domain-host"
+  display_name: "Institutional domain host"
+  purpose: >
+    Runs icnd plus the substrate the institutional domain expects:
+    domain-scoped storage, member-shell endpoint surface, and the
+    runtime providers governed bindings will select.
+
+enabled_services:
+  - "icnd.service"
+  # Future:
+  #   - icn-member-shell-endpoint.service
+  #   - icn-domain-storage.service
+
+expected_ports:
+  gateway: 8080            # member-facing REST + WebSocket and /v1/health
+  peer_transport: 7777
+  rpc: 5601
+  metrics: 9100
+  # member-shell and steward-cockpit surfaces ride on the gateway port.
+
+storage_expectations:
+  data_dir: "/var/lib/icn"
+  custody_classes:
+    - "local-domain-state"
+    - "member-state"
+    - "scoped-vault"        # per docs/spec/artifact-registry-and-scoped-vault.md
+  retention: "policy-defined; see docs/spec/storage-durability-policies.md"
+  backup_required: true
+  backup_path: "operator-chosen; backup policy is a forward-direction primitive (#1816)"
+
+governed_service_responsibilities:
+  current: []
+  future:
+    - "Host the member-shell endpoint for the domain (per docs/spec/member-shell-v0.md)."
+    - "Host the steward-cockpit endpoint for the domain (per docs/spec/steward-cockpit-v0.md)."
+    - "Provide the runtime provider one or more GovernedServiceBindings select."
+    - "Emit Stage-5 EffectDispatchEvidence for accepted-proposal effect dispatch."
+
+non_claims:
+  - "Does not own institutional authority; authority remains in DIDs and mandates."
+  - "Does not declare partner-federation activation."
+  - "Does not implement GovernedServiceBinding runtime; that is forward-direction."
+
+production_warning: >
+  Domain-host is the role partner cooperatives will eventually adopt.
+  The scaffold image is NOT ready for partner hands. Wait for signed
+  releases and rehearsed claim flow before applying this role to any
+  real member-serving appliance.

@@ -1,0 +1,13 @@
+# ICN appliance smoke — cloud-init meta-data EXAMPLE
+#
+# Smoke / dev only. Not production.
+#
+# cloud-init's NoCloud data source expects this file alongside user-data
+# in a seed ISO. The fields are minimal; the values matter only for
+# logging legibility inside the disposable smoke VM.
+#
+# Local IDs only. Nothing here implies federation membership or any
+# binding to real ICN identity.
+
+instance-id: icn-appliance-smoke-local-001
+local-hostname: icn-appliance-smoke

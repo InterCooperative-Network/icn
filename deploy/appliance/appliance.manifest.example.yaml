@@ -1,0 +1,161 @@
+# ICN Appliance Manifest — EXAMPLE
+#
+# This is a declarative template that describes what an ICN appliance image
+# is and what it expects from the host it runs on. It is NOT a runtime
+# schema. No Rust code reads this file today.
+#
+# The first real appliance image will pick a subset of these fields and
+# turn them into a wire-stable manifest. Until then, this example exists
+# to settle vocabulary and so reviewers can argue about field shape before
+# implementation.
+#
+# See:
+#   docs/architecture/DEBIAN_APPLIANCE_MODEL.md  (design)
+#   docs/architecture/SERVICE_HOSTING_MODEL.md   (where services attach)
+#   docs/spec/governed-service-binding.md        (forward-direction primitives)
+
+# Stable identifier for this appliance image. Operator-meaningful; not a
+# DID. Future signed releases may bind a DID-style identifier here.
+appliance_id: "icn-appliance-example-v0"
+
+# Human label. Not load-bearing.
+display_name: "ICN Appliance (example, scaffold-only, not for production)"
+
+# Status of this manifest, not of the image. Allowed values today:
+#   "scaffold"     — this directory's posture; no image artifact exists.
+#   "dev-image"    — a local QCOW2 exists but is not signed.
+#   "reproducible" — build is reproducible from named inputs.
+#   "signed"       — a signed release artifact exists.
+#   "production"   — signed, immutable, A-B updates, measured boot.
+status: "scaffold"
+
+# Base operating system the appliance is layered on. The appliance does
+# not bundle its own kernel; it consumes a Debian release.
+base_os:
+  family: "debian"
+  release: "bookworm"            # 12; tracked here for the first dev image
+  variant: "cloud"                # debian-12-genericcloud-amd64
+  architecture: "amd64"           # future arm64 variant tracked separately
+
+# Image formats the build path is expected to emit. Today nothing is
+# emitted; this lists future targets.
+image_format_targets:
+  - "qcow2"      # local libvirt / Proxmox
+  - "raw"        # bare metal write
+  # - "ova"      # future
+  # - "iso"      # future, for installable media
+
+# Binaries the appliance must contain. Paths reflect the existing native
+# install layout (deploy/install.sh).
+installed_binaries:
+  - path: "/usr/local/bin/icnd"
+    source: "icn/target/release/icnd"
+    required: true
+  - path: "/usr/local/bin/icnctl"
+    source: "icn/target/release/icnctl"
+    required: true
+  - path: "/usr/local/bin/icn-health-check"
+    source: "deploy/health-check.sh"
+    required: false
+  - path: "/usr/local/bin/icn-console"
+    source: "icn/target/release/icn-console"
+    required: false
+
+# System user the appliance runs `icnd` as. Matches deploy/install.sh.
+system_user:
+  name: "icn"
+  shell: "/bin/false"
+  home: "/var/lib/icn"
+  create_if_missing: true
+
+# Directories the appliance expects to exist after first-boot. The
+# first-boot scaffold creates these.
+data_dirs:
+  - "/var/lib/icn"           # state
+  - "/var/log/icn"           # logs (when not journal-only)
+config_dirs:
+  - "/etc/icn"               # config
+static_dirs:
+  - "/usr/share/icn/static"  # gateway static assets
+
+# Default network surfaces. Anchored to icn-core defaults, NOT devnet
+# overrides. See ports table in deploy/appliance/README.md.
+default_ports:
+  gateway: 8080              # icn-core/src/config/gateway.rs default
+  peer_transport: 7777       # icn-core/src/config/mod.rs default
+  rpc: 5601                  # docs/reference/project-index/ci-ops-deploy-map.md
+  metrics: 9100              # docs/reference/project-index/ci-ops-deploy-map.md
+  # Health is the gateway surface at /v1/health on `gateway`. Never 8000.
+
+# What the appliance does on first boot. The unit name matches
+# deploy/appliance/systemd/icn-appliance-firstboot.service.
+first_boot_service:
+  unit: "icn-appliance-firstboot.service"
+  oneshot: true
+  marker_file: "/var/lib/icn/.firstboot-complete"
+  runs_before: "icnd.service"
+  # Idempotent: re-running the unit after the marker exists must be a
+  # no-op. Removing the marker re-runs the unit.
+
+# Role profiles the appliance supports out of the box. The profile is
+# selected after first-boot by the operator; the image itself is role-
+# agnostic. See deploy/appliance/roles/ for examples.
+supported_role_profiles:
+  - "genesis"
+  - "witness-archive"
+  - "commons-executor"
+  - "domain-host"
+  - "service-host"
+  - "ingress"
+  - "storage"
+  - "forge-build"
+  - "observability"
+  - "sandbox"
+
+# Runtime providers present in this image. Adding a provider is an image
+# change. Granting a binding to use a provider is a governance act and
+# does NOT live in this manifest.
+runtime_providers:
+  - id: "systemd-native"
+    status: "baseline"
+    notes: "icnd.service plus role-specific units. First-class."
+  - id: "oci-container"
+    status: "future"
+    notes: "Hosts containerized governed services. Likely podman."
+  - id: "k3s"
+    status: "future-optional"
+    notes: "Not baseline. An appliance does not require k3s to run."
+  - id: "wasm"
+    status: "future"
+    notes: "Deterministic legitimacy compute and utility computation."
+  - id: "microvm"
+    status: "future"
+    notes: "Stronger-isolation provider."
+
+# Things this manifest explicitly does NOT cover. Listed so reviewers do
+# not infer them.
+non_goals:
+  - "Not a signed release artifact descriptor."
+  - "Not a runtime schema; nothing in Rust reads this file."
+  - "Does not define GovernedServiceBinding, WorkloadManifest, or RuntimeProvider records."
+  - "Does not embed secrets, keys, passphrases, or partner-shared material."
+  - "Does not authorize binding adoption."
+  - "Does not declare which institutional domains exist."
+  - "Does not declare partner-federation activation."
+
+# Security features the production appliance is intended to gain. They
+# are NOT in any current build.
+future_security_features:
+  - "Signed update channel with operator-verifiable signatures."
+  - "Immutable rootfs with overlay for mutable state."
+  - "A-B updates with rollback."
+  - "TPM-backed identity material; passphrase-less keystore unlock."
+  - "Measured boot with attestation."
+  - "Reproducible builds with public input hashes."
+
+# Operator/governance separation. This appliance distinguishes them and
+# documents it; it does not enforce them yet.
+authority_separation:
+  operator_scope: "ssh / sudo on the host; the operator runs the appliance."
+  governance_scope: "DIDs, mandates, and decisions inside ICN; governance authorizes what runs."
+  rule: "Operator scope is not institutional authority. The appliance image must never collapse them."
