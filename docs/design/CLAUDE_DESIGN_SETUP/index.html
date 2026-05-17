@@ -1,0 +1,440 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Claude Design — ICN Setup and Workflow | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>CLAUDE DESIGN SETUP</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/CLAUDE_DESIGN_SETUP.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Claude Design — ICN Setup and Workflow</h1>
+<p>How to use Claude for design work on ICN, reliably, without re-explaining the system
+every time.</p>
+<p>There are two modes. Pick the one that matches the surface you&#39;re at.</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Surface</th>
+<th>Use when</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>External</strong></td>
+<td>claude.ai (web app) or any non-repo Claude session</td>
+<td>Producing visual artifacts, exploring a concept, getting a second opinion outside the codebase</td>
+</tr>
+<tr>
+<td><strong>Local</strong></td>
+<td>Claude Code in this repo, <code>icn-design-advisor</code> agent (repo-shipped) and optionally the <code>design</code> Claude Code plugin pack</td>
+<td>Reviewing code-adjacent design, auditing live components, applying decisions to files</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>1. External mode — claude.ai paste flow</h2>
+<h3>1.1 Setup (one-time, ~2 minutes)</h3>
+<p>You will paste three things at the start of every Claude Design session. Have them ready
+as a project file, a snippet manager entry, or a saved gist:</p>
+<ol>
+<li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_CONTEXT">`docs/design/CLAUDE_DESIGN_CONTEXT.md`</a></strong> — the briefing.
+Self-contained: brand position, tokens, vocabulary, surface inventory, kernel binding.</li>
+<li><strong>A &quot;job card&quot;</strong> — one paragraph stating what you want produced (artifact, audience,
+constraints, deliverable format). Templates in §1.3 below.</li>
+<li><strong>Reference attachments</strong> — the one or two reading-order docs from CONTEXT §9 that
+are most relevant to this specific job. Do not attach all seven; pick by need.</li>
+</ol>
+<p>That&#39;s it. The briefing already tells Claude what kind of artifact to return and what to
+flag as assumptions.</p>
+<h3>1.2 Per-session workflow</h3>
+<pre><code>1. New Claude.ai conversation.
+2. Paste CLAUDE_DESIGN_CONTEXT.md.
+3. Paste the job card (§1.3 templates).
+4. Attach the 1–2 reference docs (§1.4 doc-to-job table).
+5. Ask Claude to acknowledge constraints before producing.
+   (&quot;Before you start: list the three hard constraints that apply to this job.&quot;)
+6. Review the deliverable. Flag anything that asserts capability the kernel can&#39;t prove
+   (tier-1 truthfulness rule).
+7. If the deliverable is worth keeping, route it through the asset lifecycle in [`assets/README.md`](assets/README.md) — register the asset in [`assets/ASSET_REGISTER.md`](assets/ASSET_REGISTER.md), write a brief under [`assets/briefs/`](assets/briefs/), and (for generated-image exploration) place sketches under that brief&#39;s own `sketches/` folder. Sketches are never load-bearing and never enter `website/src/assets/` — see [`ICN_VISUAL_EXPLAINER_BIBLE.md`](ICN_VISUAL_EXPLAINER_BIBLE.md) §11.
+</code></pre>
+<h3>1.3 Job-card templates</h3>
+<p>Paste one of these after the context doc. Fill in <code>&lt;brackets&gt;</code>.</p>
+<p><strong>Visual design (new artifact)</strong></p>
+<pre><code>JOB: Visual design — &lt;surface name&gt;.
+TARGET: &lt;breakpoint&gt;, &lt;theme&gt;.
+INCLUDES: &lt;what must be on screen — e.g. &quot;status pill, mandate line, primary action, secondary action, dismissed receipt link&quot;&gt;
+DELIVERABLE: &lt;single PNG mock | annotated HTML/CSS | SVG composition&gt;
+RATIONALE: One paragraph explaining choices against §2 (Brand) and §3 (Constraints) of the briefing.
+ASSUMPTIONS: Flag anything you assumed about data, capability, or behavior.
+LABEL: &lt;concept | UX direction | implementation-ready&gt;  (per ADR-0033)
+</code></pre>
+<p><strong>Component spec</strong></p>
+<pre><code>JOB: Component spec — &lt;component name from CONTEXT §6 &quot;not yet built&quot; list&gt;.
+FORMAT: Markdown spec — variants, states, props, accessibility notes, code example.
+TOKENS: Use the tokens in CONTEXT §4. Do not invent new colors.
+ACCESSIBILITY: WCAG 2.2 AA. Reduced motion. 44×44 tap targets. Color is not the only carrier.
+DELIVERABLE: A single Markdown table block per section. No screenshots.
+</code></pre>
+<p><strong>Copy review</strong></p>
+<pre><code>JOB: Copy review.
+INPUT:
+  &lt;paste the copy, one string per line&gt;
+RULES: Apply CONTEXT §5 vocabulary and CONTENT_STYLE_GUIDE.md voice rules.
+DELIVERABLE: For each string — PASS | FLAG &lt;reason&gt; | REWRITE &lt;new version&gt;.
+DO NOT REWRITE strings that already pass. Pass-through is signal.
+</code></pre>
+<p><strong>Accessibility audit</strong></p>
+<pre><code>JOB: Accessibility audit against WCAG 2.2 Level AA.
+INPUT:
+  &lt;paste HTML or describe the surface&gt;
+RULES: Apply ACCESSIBILITY_BASELINE.md per-surface obligations + design-language/accessibility.md component rules.
+DELIVERABLE: WCAG criterion | PASS | FAIL &lt;evidence&gt; | FIX &lt;proposed change&gt;
+INCLUDE: Color contrast (with computed ratios), keyboard reachability, screen reader semantics, tap targets, motion handling, plain language.
+</code></pre>
+<p><strong>Design critique</strong></p>
+<pre><code>JOB: Critique against ICN design principles.
+INPUT: &lt;link or paste of the mockup&gt;
+RULES: Apply CONTEXT §2 (brand), §3 (constraints), §7 (kernel binding) and ICN_DESIGN_SYSTEM.md &quot;Design principles (compact)&quot; list.
+DELIVERABLE: 3–5 specific, prioritized observations. Each observation cites the principle violated and proposes a fix.
+DO NOT: produce a redesign. Critique only.
+</code></pre>
+<p><strong>Concept exploration</strong></p>
+<pre><code>JOB: Concept exploration for &lt;unbuilt primitive from CONTEXT §6&gt;.
+DIRECTIONS: 3, each in a different visual register.
+LABEL: All three are concept art, not implementation. Mark accordingly per ICN_VISUAL_EXPLAINER_BIBLE.md.
+DELIVERABLE: For each direction — one composition + one paragraph rationale + one assumption flag.
+</code></pre>
+<h3>1.4 Doc-to-job attachment table</h3>
+<p>Beyond the briefing, attach only what the job needs:</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Always attach (in addition to CONTEXT)</th>
+<th>Often useful</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Visual design</td>
+<td><code>ICN_VISUAL_SYSTEM.md</code></td>
+<td><code>brief-v0.md</code> if creating a new primitive</td>
+</tr>
+<tr>
+<td>Component spec</td>
+<td><code>accessibility.md</code>, <code>brief-v0.md</code> §6 (visual primitives)</td>
+<td><code>ACCESSIBILITY_BASELINE.md</code></td>
+</tr>
+<tr>
+<td>Copy review</td>
+<td><code>CONTENT_STYLE_GUIDE.md</code></td>
+<td><code>concept-map.md</code></td>
+</tr>
+<tr>
+<td>Accessibility audit</td>
+<td><code>ACCESSIBILITY_BASELINE.md</code>, <code>accessibility.md</code></td>
+<td><code>ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> for member surfaces</td>
+</tr>
+<tr>
+<td>Design critique</td>
+<td><code>ICN_DESIGN_SYSTEM.md</code></td>
+<td>the principles section of <code>brief-v0.md</code></td>
+</tr>
+<tr>
+<td>Concept exploration</td>
+<td><code>ICN_VISUAL_EXPLAINER_BIBLE.md</code></td>
+<td><code>brief-v0.md</code></td>
+</tr>
+<tr>
+<td>Diagram or explainer</td>
+<td><code>ICN_VISUAL_EXPLAINER_BIBLE.md</code>, <code>assets/VISUAL_REVIEW_CHECKLIST.md</code></td>
+<td>a relevant <code>assets/briefs/VE-*.md</code> for prior art</td>
+</tr>
+<tr>
+<td>Mobile surface</td>
+<td><code>mobile/icn-mobile-ux-spec-v1.md</code></td>
+<td><code>ACCESSIBILITY_BASELINE.md</code></td>
+</tr>
+</tbody></table>
+<h3>1.5 What to flag in the deliverable</h3>
+<p>Before saving anything Claude Design produces, scan for:</p>
+<ul>
+<li>Asserted capability the kernel can&#39;t prove → mark concept-only or remove (ADR-0032, ADR-0033)</li>
+<li>Forbidden vocabulary from CONTEXT §5 &quot;Words to avoid&quot;</li>
+<li>NYCN / Summit references on anything that isn&#39;t an institution package</li>
+<li>Color-only meaning (run grayscale preview mentally — or actually)</li>
+<li>Tap targets under 44×44</li>
+<li>Motion that doesn&#39;t honor <code>prefers-reduced-motion</code></li>
+<li>A dangerous action without mandate / reversibility / receipt declared before confirm</li>
+</ul>
+<p>A deliverable with any of these is a draft, not a ship.</p>
+<hr>
+<h2>2. Local mode — Claude Code design routing</h2>
+<p>Local mode runs design work inside Claude Code in this repo, with full file access.
+Unlike external mode, <strong>what&#39;s bundled by this repo and what comes from a Claude Code
+plugin are different surfaces</strong>. Be precise about which you&#39;re invoking.</p>
+<h3>2.1 What this repo ships (always available)</h3>
+<p>These are committed under <code>.claude/</code> and work the moment you&#39;re in this worktree:</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Path</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><code>icn-design-advisor</code> agent</strong></td>
+<td><code>.claude/agents/icn-design-advisor.md</code></td>
+<td>Specialist agent for ICN design work — knows the doctrine, hard constraints, kernel binding, and pre-ship flag list. Dispatch via the <code>Task</code>/<code>Agent</code> tool with <code>subagent_type: icn-design-advisor</code>.</td>
+</tr>
+<tr>
+<td><strong>Design rule</strong></td>
+<td><code>.claude/rules/design.md</code></td>
+<td>Auto-loads when files under <code>docs/design/**</code>, <code>docs/design-language/**</code>, <code>docs/mobile/**</code>, <code>website/src/**</code>, <code>web/**</code>, or <code>sdk/react-native/**</code> are touched. Surfaces the required reading and hard constraints inline.</td>
+</tr>
+<tr>
+<td><strong>ICN-specific slash commands</strong></td>
+<td><code>.claude/commands/</code></td>
+<td><code>/icn-audit</code>, <code>/icn-demo-check</code>, <code>/icn-state-sync</code>, <code>/icn-trace</code>. None are design-specific; listed so you know what <em>is</em> repo-shipped.</td>
+</tr>
+<tr>
+<td><strong>ICN-specific skills</strong></td>
+<td><code>.claude/skills/</code></td>
+<td><code>bench</code>, <code>changelog</code>, <code>demo-validate</code>, <code>devnet</code>, <code>push</code>, <code>pr-create</code>, etc. None are design-specific.</td>
+</tr>
+</tbody></table>
+<p>If you&#39;re working in this repo with Claude Code, the agent and rule above are loaded
+automatically — that alone is enough to do design review, copy review, accessibility
+review, and component spec work without any plugins.</p>
+<h3>2.2 What requires the <code>design</code> plugin (optional)</h3>
+<p>The richer <code>/design:*</code> slash commands — <code>/design:design-system</code>,
+<code>/design:design-critique</code>, <code>/design:accessibility-review</code>, <code>/design:ux-copy</code>,
+<code>/design:design-handoff</code>, <code>/design:user-research</code>, <code>/design:research-synthesis</code> — are
+<strong>not bundled by this repo</strong>. They come from a Claude Code plugin pack (the <code>design</code>
+plugin in the Claude Code marketplace).</p>
+<p>If you have the plugin installed, you&#39;ll see those commands offered when you type <code>/</code>.
+If you don&#39;t, the commands won&#39;t resolve. To check what&#39;s available in your current
+session, run <code>/help</code> or type <code>/</code> and inspect the autocomplete.</p>
+<p><strong>Install path</strong> (if you want them):</p>
+<pre><code># In Claude Code, from the marketplace UI:
+#   Settings → Plugins → install &quot;design&quot;
+# Or via CLI (varies by Claude Code version):
+claude plugins install design
+</code></pre>
+<p>The plugin&#39;s design skills are generic (not ICN-aware). To bind them to ICN doctrine,
+prefix the invocation:</p>
+<pre><code>/design:design-critique Before critiquing, read docs/design/CLAUDE_DESIGN_CONTEXT.md
+and docs/design/ICN_DESIGN_SYSTEM.md so your critique is bound to ICN doctrine.
+Then critique: &lt;paste mockup link or description&gt;
+</code></pre>
+<p>Or — and this is the better path — just dispatch the <code>icn-design-advisor</code> agent
+described in §2.1 above. It already knows the doctrine.</p>
+<h3>2.3 Local-mode workflow (preferred — no plugins required)</h3>
+<pre><code>1. Be in this repo. (Working directory matters — the design rule is path-scoped.)
+2. Dispatch the icn-design-advisor agent, OR work directly with file edits and let
+   the .claude/rules/design.md auto-load doctrine.
+3. Hand the agent the artifact: a path, a paste, or a description.
+4. The agent reads ICN doctrine docs and applies the hard constraints from §3 of
+   CLAUDE_DESIGN_CONTEXT.md.
+5. Review the result. If it touches a file, verify before commit (per CLAUDE.md).
+</code></pre>
+<h3>2.4 When local mode is better than external mode</h3>
+<ul>
+<li>The job needs to touch live files (component code, copy in the codebase, ADR draft).</li>
+<li>The job needs to verify against current implementation (token usage, content audit).</li>
+<li>The job is review-shaped (critique, audit, handoff) more than create-shaped.</li>
+</ul>
+<h3>2.5 When external mode is better than local mode</h3>
+<ul>
+<li>The job is producing a visual composition (Claude Code is not a visual canvas).</li>
+<li>The job is concept exploration (multiple variants, no file touch needed).</li>
+<li>The job needs a long uninterrupted session with rich image attachments.</li>
+</ul>
+<hr>
+<h2>3. Mixing modes (the common pattern)</h2>
+<p>The realistic workflow is: <strong>explore externally, decide, then apply locally.</strong></p>
+<pre><code>External: claude.ai paste flow → critique a mockup → get 3 directions
+         ↓
+You:      pick one
+         ↓
+Local:   dispatch icn-design-advisor agent → produce the spec in docs/design/components/&lt;name&gt;.md
+         (or `/design:design-system extend` if the `design` plugin is installed)
+         ↓
+Local:   icn-design-advisor handoff mode → produce dev-ready spec for the website team
+         (or `/design:design-handoff` if installed)
+         ↓
+Local:   icn-design-advisor accessibility-audit mode against the live preview
+         (or `/design:accessibility-review` if installed)
+</code></pre>
+<p>If you only ever use one mode, the doctrine works. Mixing is more powerful for new
+primitives because external mode is faster for visual iteration and local mode is
+stricter about the rules.</p>
+<hr>
+<h2>4. Common failure modes and what they signal</h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Likely cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Deliverable uses crypto / fintech vocabulary</td>
+<td>Briefing not pasted, or attachment doc wasn&#39;t read</td>
+<td>Re-paste CONTEXT.md §5 explicitly; ask Claude to acknowledge §3 constraint #2 before continuing</td>
+</tr>
+<tr>
+<td>Deliverable invents new color hex values</td>
+<td>Tokens section ignored</td>
+<td>Point at CONTEXT.md §4; ask to redo using only the listed tokens</td>
+</tr>
+<tr>
+<td>Deliverable depicts capability the system doesn&#39;t have</td>
+<td>ADR-0032 / ADR-0033 not loaded</td>
+<td>Add ADR-0032 and ADR-0033 to attachments; require explicit truth label</td>
+</tr>
+<tr>
+<td>Action card omits mandate / reversibility / receipt</td>
+<td>ADR-0027 + content style guide §&quot;Dangerous-action copy&quot; missing</td>
+<td>Attach CONTENT_STYLE_GUIDE.md; require the dangerous-action template</td>
+</tr>
+<tr>
+<td>Mobile design forgets one-handed reachability</td>
+<td>Mobile spec not attached</td>
+<td>Attach <code>mobile/icn-mobile-ux-spec-v1.md</code></td>
+</tr>
+<tr>
+<td>Critique is generic (&quot;looks good, consider hierarchy&quot;)</td>
+<td>Doctrine-bound criticism not asked for</td>
+<td>Reframe job: &quot;Critique against ICN_DESIGN_SYSTEM.md design principles, cite the principle for each observation&quot;</td>
+</tr>
+<tr>
+<td>Deliverable conflates cooperatives / communities / federations</td>
+<td>Scope coequality constraint missed</td>
+<td>Point at CONTEXT.md §3 constraint #7; ask for a redo</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. The institution-package boundary</h2>
+<p>ICN design work is <strong>not</strong> NYCN design work, and not Summit design work. Those are
+institution packages that consume ICN primitives and tokens but bring their own brand,
+copy, and surfaces.</p>
+<p>When using Claude Design for institution-package work:</p>
+<ul>
+<li>Do not paste <code>CLAUDE_DESIGN_CONTEXT.md</code> (it&#39;s the ICN substrate, not a package brand).</li>
+<li>Use the package&#39;s own brief from its private repo.</li>
+<li>ICN tokens, vocabulary, and accessibility floor still apply as inheritance, but the
+brand layer is the package&#39;s.</li>
+</ul>
+<p>If you&#39;re not sure which one you&#39;re doing: <strong>if the surface ever ships to a member
+without an NYCN or Summit logo on it, it&#39;s ICN-substrate work, and CONTEXT.md applies.</strong></p>
+<hr>
+<h2>6. Maintenance</h2>
+<p>Keep this doc and <code>CLAUDE_DESIGN_CONTEXT.md</code> in sync with:</p>
+<ul>
+<li>The token list in <code>website/src/styles/global.css</code></li>
+<li>The concept vocabulary in <code>docs/design-language/concept-map.md</code></li>
+<li>Surface state (built vs spec-only) in <code>docs/design/ICN_DESIGN_SYSTEM.md</code></li>
+<li>New ADRs binding design (currently 0026, 0027, 0028, 0032, 0033)</li>
+</ul>
+<p>Re-review on: any of the above changing, or quarterly, whichever is sooner.</p>
+<hr>
+<h2>7. See also</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_CONTEXT">CLAUDE_DESIGN_CONTEXT.md</a> — the paste briefing</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_DESIGN_SYSTEM">ICN_DESIGN_SYSTEM.md</a> — design system entry point</li>
+<li><a href="/docs/DESIGN_PRINCIPLES">../DESIGN_PRINCIPLES.md</a> — kernel-side counterpart</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_EXPLAINER_BIBLE">ICN_VISUAL_EXPLAINER_BIBLE.md</a> — for diagrams and infographics specifically</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/assets/VISUAL_REVIEW_CHECKLIST">assets/VISUAL_REVIEW_CHECKLIST.md</a> — pre-ship review for visual deliverables</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

@@ -1,0 +1,587 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Design Principles | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>DESIGN PRINCIPLES</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/DESIGN_PRINCIPLES.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Design Principles</h1>
+<p>This is the canonical index of ICN&#39;s design principles. The principles already exist — they are
+encoded in code (<code>icn-kernel-api/src/invariants.rs</code>), enforced in CI
+(<code>.github/scripts/firewall_denylist.py</code>), surfaced at session start
+(<code>adversarial-by-default | determinism | canonical-encodings | no-panics | kernel/app-boundaries</code>),
+and explained at length in adjacent documents. This document consolidates them into a single
+three-tier hierarchy and points to the authoritative source for each.</p>
+<blockquote>
+<p><strong>The frame:</strong> ICN is a P2P <strong>constraint engine</strong>. Apps translate meaning into constraints; the
+kernel enforces constraints without understanding meaning. Every principle below either
+protects that frame, makes it verifiable, or makes it survivable.</p>
+</blockquote>
+<hr>
+<h2>The three tiers</h2>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Concern</th>
+<th>Count</th>
+<th>Authority</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1. Operational invariants</strong></td>
+<td>Kernel quality — what the daemon must always do</td>
+<td>5</td>
+<td><a href="#1-operational-invariants-tier-1">Section 1</a></td>
+</tr>
+<tr>
+<td><strong>2. Firewall contract</strong></td>
+<td>Kernel/app boundary — what the kernel must never know</td>
+<td>6</td>
+<td><a href="/docs/architecture/KERNEL_APP_SEPARATION">`docs/architecture/KERNEL_APP_SEPARATION.md`</a> §Firewall Contract</td>
+</tr>
+<tr>
+<td><strong>3. Frozen-core invariants</strong></td>
+<td>Sovereignty / anti-capture / economic safety</td>
+<td>10</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-kernel-api/src/invariants.rs">`icn/crates/icn-kernel-api/src/invariants.rs`</a></td>
+</tr>
+</tbody></table>
+<p>Tier 1 governs <em>how</em> the kernel runs. Tier 2 governs <em>what</em> the kernel is allowed to know. Tier 3
+governs <em>what governance and ledger apps are allowed to do to people</em>. Tier 1 violations are bugs.
+Tier 2 violations are architectural drift. Tier 3 violations are constitutional failures.</p>
+<hr>
+<h2>1. Operational invariants (tier 1)</h2>
+<p>These are the five invariants printed at every session start. They apply to all protocol-path code.</p>
+<h3>1.1 Adversarial-by-default</h3>
+<p><strong>Definition.</strong> Every peer is untrusted until trust is established through verifiable participation.
+No code path may assume good faith from a remote DID.</p>
+<p><strong>Forbids.</strong> Accepting unsigned messages on protocol paths. Skipping replay-guard checks. Granting
+capabilities by network position. Trusting transport-layer identity without DID-TLS binding. Using
+default-trust shortcuts in non-test code.</p>
+<p><strong>Enforced by.</strong> <code>SignedEnvelope</code> + <code>ReplayGuard</code> in <code>icn-net/src/envelope.rs</code>. DID-TLS binding in
+<code>icn-net</code> session setup. Trust-gated rate limiting (Tier 2 → <code>PolicyOracle</code> → <code>RateLimit</code>).
+Three-layer security model (Transport / Message / Application — see CLAUDE.md §Security).</p>
+<p><strong>Violation pattern.</strong></p>
+<pre><code class="language-rust">// ❌ Accepting payload before envelope verification
+async fn handle(msg: NetworkMessage) {
+    self.process(msg.payload).await;        // skipped SignedEnvelope check
+}
+</code></pre>
+<hr>
+<h3>1.2 Determinism</h3>
+<p><strong>Definition.</strong> Same inputs produce same outputs. Two nodes processing the same log arrive at the
+same state. No floating point in consensus or hash inputs. RNG is seeded. Serialization is
+canonical.</p>
+<p><strong>Forbids.</strong> <code>HashMap</code> iteration order in any hashed/signed output. <code>SystemTime::now()</code> inside
+deterministic code paths (use logical clocks). <code>f64</code> arithmetic in ledger or consensus paths.
+Unseeded <code>rand::thread_rng()</code> in protocol code. Non-deterministic CBOR/JSON encoders.</p>
+<p><strong>Enforced by.</strong> <code>icn-encoding</code> canonical serialization. <code>BTreeMap</code> over <code>HashMap</code> in serialized
+types. Frozen <code>report_version</code> on <code>InvariantReport</code>. CCL fuel metering + sandbox.</p>
+<p><strong>Violation pattern.</strong></p>
+<pre><code class="language-rust">// ❌ HashMap iteration order leaks into hashed output
+let map: HashMap&lt;Did, u64&gt; = ...;
+let bytes = serde_json::to_vec(&amp;map)?;
+let hash = blake3::hash(&amp;bytes);          // hash depends on insertion order
+</code></pre>
+<hr>
+<h3>1.3 Canonical encodings</h3>
+<p><strong>Definition.</strong> One valid byte representation per value. No ambiguity in wire format, proof
+format, or storage format.</p>
+<p><strong>Forbids.</strong> Indefinite-length CBOR. Unsorted map keys. Multiple equivalent integer encodings.
+Floating-point in canonical contexts. Per-implementation field ordering for signed objects.</p>
+<p><strong>Enforced by.</strong> <a href="/docs/architecture/CANONICAL_ENCODING">`docs/architecture/CANONICAL_ENCODING.md`</a>
+(normative spec). CBOR RFC 8949 with definite-length encoding, shortest-form integers, bytewise-sorted
+map keys. <code>icn-encoding</code> provides the canonical codecs.</p>
+<p><strong>Violation pattern.</strong></p>
+<pre><code class="language-rust">// ❌ HashMap → CBOR — keys not deterministically ordered
+let h: HashMap&lt;&amp;str, i64&gt; = [(&quot;b&quot;, 1), (&quot;a&quot;, 2)].into();
+serde_cbor::to_vec(&amp;h)?;                  // key order undefined → hash drifts
+</code></pre>
+<hr>
+<h3>1.4 No panics in protocol paths</h3>
+<p><strong>Definition.</strong> The daemon does not crash on bad input. Protocol/network/actor/deserialization
+paths return <code>Result&lt;T, E&gt;</code>. Failures are handled, logged, metricized, and degraded against —
+never propagated as a panic.</p>
+<p><strong>Forbids.</strong> <code>.unwrap()</code> / <code>.expect()</code> outside <code>#[cfg(test)]</code>. <code>panic!()</code> in message handlers.
+<code>array[i]</code> indexing without bounds check on attacker-controlled input. <code>assert!()</code> on remote data.
+<code>todo!()</code> / <code>unimplemented!()</code> in shipped code.</p>
+<p><strong>Enforced by.</strong> <code>.claude/rules/rust-core.md</code> §Error Handling. <code>thiserror</code> for crate-local errors,
+<code>anyhow</code> at binary boundaries, <code>ErrCode</code> from <code>icn-kernel-api</code> for protocol-level rejections.
+Clippy lints (<code>-D warnings</code> in CI).</p>
+<p><strong>Violation pattern.</strong></p>
+<pre><code class="language-rust">// ❌ Attacker-controlled deserialization can panic the actor
+let parsed: GossipMessage = serde_cbor::from_slice(&amp;bytes).unwrap();
+</code></pre>
+<hr>
+<h3>1.5 Kernel/app boundary is inviolable</h3>
+<p><strong>Definition.</strong> The dependency graph enforces it. Kernel crates may not import domain crates.
+The Meaning Firewall is structural, not aspirational.</p>
+<p><strong>Forbids.</strong> Importing <code>icn-trust</code>, <code>icn-governance</code>, <code>icn-ccl</code>, <code>icn-coop</code>, <code>icn-community</code>,
+<code>icn-ledger</code> (internals), or <code>apps/*</code> from any kernel crate. Reconstructing domain semantics inside
+the kernel from <code>ConstraintSet.custom</code> keys. Bridge/adapter layers that quietly carry domain
+meaning across the firewall.</p>
+<p><strong>Enforced by.</strong> <a href="/docs/architecture/KERNEL_APP_SEPARATION">`docs/architecture/KERNEL_APP_SEPARATION.md`</a>
+(full contract). <code>.github/scripts/firewall_denylist.py</code> (CI enforcement, currently advisory during
+waves 2–6 migration). <code>.claude/rules/kernel-boundary.md</code> (agent guardrails).</p>
+<p><strong>This invariant is the gateway to tier 2.</strong> Tier 2 is the same rule, decomposed into six concrete
+mechanical sub-rules a reviewer can check on a PR.</p>
+<hr>
+<h2>2. Firewall contract (tier 2)</h2>
+<p>The six invariants that operationalize 1.5. Defined and exhaustively exampled in
+<a href="/docs/architecture/KERNEL_APP_SEPARATION">`docs/architecture/KERNEL_APP_SEPARATION.md`</a>
+§Firewall Contract.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Invariant</th>
+<th>One-line rule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>No kernel→domain imports</strong></td>
+<td>Kernel crates&#39; Cargo deps must not include domain crates</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Pure data only at kernel entrypoints</strong></td>
+<td>Kernel APIs accept <code>ConstraintSet</code> / <code>Did</code> / <code>Hash</code>, not <code>&amp;TrustGraph</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Semantic lookup only in <code>PolicyOracle</code></strong></td>
+<td>Trust/role/membership decisions happen in app oracles, not kernel code</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>No pattern-matching on <code>ConstraintSet.custom</code></strong></td>
+<td>Kernel reads typed fields; <code>custom</code> is an app-to-app channel</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Kernel owns mechanism, app owns value</strong></td>
+<td>Kernel ships the rate limiter; app decides 200/sec vs 20/sec</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Opaque receipt storage</strong></td>
+<td>Kernel persists typed receipts as <code>(class, record_hash) → bytes</code> and never parses the body</td>
+</tr>
+</tbody></table>
+<p><strong>Status.</strong> Wave 1 (contract + CI script) complete as of 2026-02-01. Waves 2–6 migrate 10 known
+kernel→domain dependencies. CI gate is currently <code>continue-on-error: true</code> and flips to a hard
+gate once waves complete. See KERNEL_APP_SEPARATION.md §6.0 for the wave schedule.</p>
+<hr>
+<h2>3. Frozen-core invariants (tier 3)</h2>
+<p>Ten invariants that protect the sovereignty of identities and the conservation of value, regardless
+of which governance app is running. They live in code as <code>InvariantId</code> in
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-kernel-api/src/invariants.rs">`icn/crates/icn-kernel-api/src/invariants.rs`</a> and
+are evaluated by app-layer code; the kernel verifies attestation presence + hash linkage but never
+re-evaluates the predicates (consistent with tier-2 invariant #6).</p>
+<h3>3.1 SovereigntyCore (#1–#3)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Name</th>
+<th>What it forbids</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>RightOfExit</code></td>
+<td>A rule that prevents an identity from leaving an entity</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>NoRetroactiveObligations</code></td>
+<td>Rules applying to actions before their activation block</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>ExplicitCryptographicEntry</code></td>
+<td>Adding an identity to an entity without their signature</td>
+</tr>
+</tbody></table>
+<h3>3.2 AntiCaptureCore (#4–#7)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Name</th>
+<th>What it forbids</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>4</td>
+<td><code>NoSilentPowerChanges</code></td>
+<td>Authz changes that don&#39;t include a computable capability delta</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>BoundedAuthority</code></td>
+<td>Wildcard capabilities across all resources</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>MandatoryExecutionDelay</code></td>
+<td>Skipping the timelock on economic / capability changes</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>CapabilityConservation</code></td>
+<td>Delegating capabilities you do not possess</td>
+</tr>
+</tbody></table>
+<h3>3.3 EconomicCore (#8–#10)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Name</th>
+<th>What it forbids</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>8</td>
+<td><code>MutualCreditConservation</code></td>
+<td>A credit loop that does not net to zero</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>SovereignSignatureRequirement</code></td>
+<td>Moving funds without owner signature or pre-consented dispute hook</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>UniversalReceiptGeneration</code></td>
+<td>A state transition that emits no immutable receipt</td>
+</tr>
+</tbody></table>
+<p><strong>Operational note.</strong> Invariant #10 is the universal-receipt rule. It is enforced today through
+the opaque receipt cascade described in tier-2 #6 (PRs #1755–#1759). It is currently classed as a
+governance invariant, but every successful state transition in the system already depends on it —
+see the <em>Audit findings</em> §A2 below.</p>
+<hr>
+<h2>4. The eight primitives</h2>
+<p>The kernel provides exactly eight mechanical primitives. Adding a ninth requires an ADR amending
+<a href="/docs/strategy/ADR-001-What-ICN-Is">`docs/strategy/ADR-001-What-ICN-Is.md`</a>. Everything else is an
+app.</p>
+<table>
+<thead>
+<tr>
+<th>Primitive</th>
+<th>Crates</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Identity</strong></td>
+<td><code>icn-crypto</code>, <code>icn-crypto-pq</code></td>
+<td>Create, sign, verify, resolve DIDs</td>
+</tr>
+<tr>
+<td><strong>Authorization</strong></td>
+<td><code>icn-authz</code></td>
+<td>Issue/check unforgeable capability tokens</td>
+</tr>
+<tr>
+<td><strong>State</strong></td>
+<td><code>icn-store</code>, <code>icn-encoding</code>, <code>icn-snapshot</code></td>
+<td>Append-only logs, blobs, KV — content-addressed</td>
+</tr>
+<tr>
+<td><strong>Compute</strong></td>
+<td>(CCL runtime in <code>icn-ccl</code> interpreter layer)</td>
+<td>Deterministic sandboxed execution with fuel metering</td>
+</tr>
+<tr>
+<td><strong>Communication</strong></td>
+<td><code>icn-net</code>, <code>icn-gossip</code>, <code>icn-rpc</code>, <code>icn-gateway</code>, <code>icn-protocol</code>, <code>icn-privacy</code></td>
+<td>Pub/sub, request/response, streaming over QUIC/TLS</td>
+</tr>
+<tr>
+<td><strong>Time</strong></td>
+<td><code>icn-time</code></td>
+<td>Logical clocks, scheduling, leases</td>
+</tr>
+<tr>
+<td><strong>Coordination</strong></td>
+<td>(in <code>icn-core</code> supervisor + actor patterns)</td>
+<td>Consensus groups, CRDT merge, conflict resolution</td>
+</tr>
+<tr>
+<td><strong>Naming</strong></td>
+<td>(trait in <code>icn-kernel-api</code>; impl in <code>icn-naming</code> straddles firewall)</td>
+<td>Hierarchical name resolution</td>
+</tr>
+</tbody></table>
+<p>&quot;Apps that ship with <code>icnd</code>&quot; today: governance, ledger, membership, trust, federation (see
+ADR-001 for the full descope table). Apps are not ICN — they are the first things built on it.</p>
+<hr>
+<h2>5. Meta-principles (the <em>why</em> behind the rules)</h2>
+<p>These are not invariants. They are the dispositions a contributor should adopt before writing
+code that touches the kernel.</p>
+<ol>
+<li><p><strong>Principle of Least Kernel.</strong> When in doubt, push it into an app. The kernel acquires
+features by adding semantic knowledge, and semantic knowledge is the thing the Meaning
+Firewall exists to prevent.</p>
+</li>
+<li><p><strong>Mechanism in the kernel, value in the app.</strong> &quot;Token bucket algorithm&quot; is a mechanism — it
+lives in <code>icn-net</code>. &quot;200 messages per second for Federated trust&quot; is a value — it lives in
+<code>apps/trust</code>. Mistaking value for mechanism is the most common firewall violation
+(<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/KERNEL_APP_SEPARATION#invariant-5-kernel-contains-enforcement-mechanisms-not-policy-decisions#invariant-5-kernel-contains-enforcement-mechanisms-not-policy-decisions">KERNEL_APP_SEPARATION.md §Invariant 5</a>).</p>
+</li>
+<li><p><strong>Constraints, not configuration.</strong> The kernel does not read config to decide policy. Apps
+evaluate policy and emit a <code>ConstraintSet</code>. The kernel enforces the <code>ConstraintSet</code>. If you
+reach for a config flag inside the kernel to express domain meaning, you are about to violate
+tier-2 invariant #5.</p>
+</li>
+<li><p><strong>Pipes, not policies.</strong> The kernel provides pipes. Apps provide policies. This is the
+one-sentence form of the Meaning Firewall.</p>
+</li>
+<li><p><strong>Receipts are the unit of truth.</strong> If a state transition matters, it emits a receipt. If it
+doesn&#39;t matter enough to emit a receipt, it doesn&#39;t belong in shared state. This is the
+operational form of tier-3 invariant #10.</p>
+</li>
+</ol>
+<hr>
+<h2>6. Where each principle lives in the codebase</h2>
+<table>
+<thead>
+<tr>
+<th>Principle</th>
+<th>Code</th>
+<th>Doc</th>
+<th>CI</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1.1 Adversarial-by-default</td>
+<td><code>icn-net/src/envelope.rs</code></td>
+<td>KERNEL_APP_SEPARATION.md §Invariant 5</td>
+<td><code>cargo test -p icn-net</code></td>
+</tr>
+<tr>
+<td>1.2 Determinism</td>
+<td><code>icn-encoding</code>, frozen <code>report_version</code></td>
+<td>CANONICAL_ENCODING.md</td>
+<td><code>cargo test --workspace</code></td>
+</tr>
+<tr>
+<td>1.3 Canonical encodings</td>
+<td><code>icn-encoding</code></td>
+<td>CANONICAL_ENCODING.md (normative)</td>
+<td>Drift checks via <code>Check API Types Drift</code></td>
+</tr>
+<tr>
+<td>1.4 No panics</td>
+<td><code>.claude/rules/rust-core.md</code></td>
+<td>(rule file is normative)</td>
+<td><code>cargo clippy -- -D warnings</code></td>
+</tr>
+<tr>
+<td>1.5 Kernel/app boundary</td>
+<td><code>icn-kernel-api</code>, <code>kernel_surface.toml</code></td>
+<td>KERNEL_APP_SEPARATION.md</td>
+<td><code>.github/scripts/firewall_denylist.py</code></td>
+</tr>
+<tr>
+<td>Tier 2 (×6)</td>
+<td>(per-invariant)</td>
+<td>KERNEL_APP_SEPARATION.md §Firewall Contract</td>
+<td><code>firewall_denylist.py</code> (advisory)</td>
+</tr>
+<tr>
+<td>Tier 3 (×10)</td>
+<td><code>icn-kernel-api/src/invariants.rs</code></td>
+<td>this doc + invariants.rs</td>
+<td><code>cargo test -p icn-kernel-api invariants</code></td>
+</tr>
+<tr>
+<td>8 primitives</td>
+<td>(cross-crate — see §4)</td>
+<td>ADR-001-What-ICN-Is.md</td>
+<td>(no automated check)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>7. Audit findings (2026-05-17)</h2>
+<p>This document was produced by auditing the corpus of existing principles. The audit surfaced
+the following gaps. None of them block any current work; they are noted here so future
+contributors can address them deliberately.</p>
+<h3>A1. Quick-ref drift</h3>
+<p><a href="/docs/architecture/ARCHITECTURE_QUICK_REF">`docs/architecture/ARCHITECTURE_QUICK_REF.md`</a>
+(snapshot dated December 2025) lists 25 crates. The workspace currently has 34 (per CLAUDE.md
+§Workspace Structure). It also lists trust class ranges (<code>Unknown / Known / Colleague / Close / Intimate</code>) that differ from the canonical thresholds in <code>icn-kernel-api/src/services.rs</code>
+(<code>Isolated / Known / Partner / Federated</code>). The doc is correctly marked as a historical snapshot,
+but downstream readers may quote it. <strong>Action:</strong> add a header pointing readers to this file plus
+<code>KERNEL_APP_SEPARATION.md</code> §3.2 for current trust thresholds, or regenerate the snapshot.</p>
+<h3>A2. Receipt universality is structurally a tier-1 invariant</h3>
+<p>Tier-3 #10 (<code>UniversalReceiptGeneration</code>) is currently classified as a governance invariant,
+but every successful state transition in the system already depends on it — the entire opaque
+receipt cascade (tier-2 #6, PRs #1755–#1759) exists to make it cheap. <strong>Recommendation (not yet
+applied):</strong> promote it to a sixth tier-1 invariant (&quot;Receipts are the unit of truth&quot;) and keep
+its frozen-core slot as the governance-app-facing form. Requires consensus before edit — see
+also Meta-principle §5.5.</p>
+<h3>A3. No machine-readable principles registry</h3>
+<p>Principles are documented in prose. The <code>kernel_surface.toml</code> file referenced in ADR-001 is the
+closest thing to a machine-readable principles registry, but it audits crates against the
+firewall, not principles against code. <strong>Recommendation:</strong> if future enforcement wants to assert
+<em>&quot;every kernel crate has a doc-comment header citing the tier-1 invariants it depends on,&quot;</em> that
+will need a registry. Not needed yet.</p>
+<h3>A4. &quot;Adversarial-by-default&quot; lacks a single-page operational definition</h3>
+<p>The principle is named everywhere but never decomposed into a checklist a reviewer could use on
+a PR. Tier-1 §1.1 above is the first such decomposition; it should be exercised on a few real PR
+reviews before being treated as load-bearing.</p>
+<h3>A5. The CCL boundary question is answered but not surfaced in tier hierarchy</h3>
+<p>ADR-001 cleanly resolves where CCL lives (interpreter = kernel via Compute primitive; contracts
+= apps). Neither tier 1 nor tier 2 has an invariant that names this boundary, so a future
+contributor adding CCL features could violate it without tripping any documented rule.
+<strong>Recommendation:</strong> add a tier-2 invariant #7, <em>&quot;CCL contracts may not be re-exported as Rust
+types from kernel crates,&quot;</em> once CCL contract authoring becomes a regular activity.</p>
+<hr>
+<h2>8. UI/UX surface counterpart</h2>
+<p>The design system that renders this kernel architecture to humans lives in
+<a href="/docs/design/ICN_DESIGN_SYSTEM">`docs/design/ICN_DESIGN_SYSTEM.md`</a> (entry point) and is built from:</p>
+<ul>
+<li><a href="/docs/design-language/brief-v0">`design-language/brief-v0.md`</a> — the canonical visual design language</li>
+<li><a href="/docs/design-language/concept-map">`design-language/concept-map.md`</a> — canonical → public → local term mapping</li>
+<li><a href="/docs/design-language/accessibility">`design-language/accessibility.md`</a> — component-level WCAG 2.2 AA rules</li>
+<li><a href="/docs/design/ICN_VISUAL_SYSTEM">`design/ICN_VISUAL_SYSTEM.md`</a> — stable visual doctrine across surfaces</li>
+<li><a href="/docs/design/ACCESSIBILITY_BASELINE">`design/ACCESSIBILITY_BASELINE.md`</a> — per-surface accessibility floor</li>
+<li><a href="/docs/design/CONTENT_STYLE_GUIDE">`design/CONTENT_STYLE_GUIDE.md`</a> — voice, vocabulary, dangerous-action copy</li>
+<li><a href="/docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">`design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`</a> — 12-category PR-time gate</li>
+<li><a href="/docs/mobile/icn-mobile-ux-spec-v1">`mobile/icn-mobile-ux-spec-v1.md`</a> — mobile member UX spec (5-tab navigation)</li>
+</ul>
+<p>ICN_DESIGN_SYSTEM.md §&quot;Kernel architecture binding&quot; carries the load-bearing mapping between this
+document&#39;s invariants and that document&#39;s design principles + product surfaces. A change to the
+firewall contract or the frozen-core invariants implies a review of that section.</p>
+<h2>9. Maintenance</h2>
+<p>This document is normative for the meta-principles (§5) and audit findings (§7). For the actual
+invariants, the linked authoritative sources win on conflict:</p>
+<table>
+<thead>
+<tr>
+<th>If tier 1 disagrees with…</th>
+<th>…trust this</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Session-start preamble</td>
+<td>session preamble</td>
+<td>The preamble is the live runtime contract</td>
+</tr>
+<tr>
+<td>KERNEL_APP_SEPARATION.md</td>
+<td>KERNEL_APP_SEPARATION.md</td>
+<td>It is the wave-1 firewall contract, gated by CI</td>
+</tr>
+<tr>
+<td><code>invariants.rs</code></td>
+<td><code>invariants.rs</code></td>
+<td>Code wins for tier-3 (it is checked by tests)</td>
+</tr>
+<tr>
+<td>ADR-001</td>
+<td>ADR-001 for scoping, this doc for kernel-runtime invariants</td>
+<td>ADR sets descope, doesn&#39;t enumerate runtime rules</td>
+</tr>
+</tbody></table>
+<p><strong>Last Reviewed:</strong> 2026-05-17. Re-review on any of: change to <code>invariants.rs</code>, merge of a Wave-2+
+PR, or amendment to ADR-001.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

@@ -113,7 +113,12 @@ View source on GitHub →
 <tr>
 <td>9</td>
 <td><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_CONTEXT">docs/design/CLAUDE_DESIGN_CONTEXT.md</a></td>
-<td>Ready-to-paste design context for Claude Design / external collaborators</td>
+<td>Self-contained briefing for paste into Claude Design or any external collaborator — brand, tokens, vocabulary, surface inventory, kernel binding</td>
+</tr>
+<tr>
+<td>10</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_SETUP">docs/design/CLAUDE_DESIGN_SETUP.md</a></td>
+<td>How to use Claude Design — external paste flow, local <code>icn-design-advisor</code> agent (repo-shipped), optional <code>design</code> plugin pack, mixed-mode workflow, job-card templates</td>
 </tr>
 </tbody></table>
 <p>ADRs that bind this work:</p>
@@ -150,6 +155,157 @@ View source on GitHub →
 <li><strong>Federation/operator surfaces</strong>: power asymmetry is shown plainly; operators see the same provenance the member sees, never more.</li>
 <li><strong>Compute/commons surfaces</strong>: workload manifest is the member-readable contract, not a hidden config blob.</li>
 </ul>
+<h2>Kernel architecture binding</h2>
+<p>The design system is not free-standing. It is the human-layer expression of ICN&#39;s kernel architecture. Every load-bearing design choice encodes a kernel invariant at the surface a member can see and act on.</p>
+<p>The mapping is documented in <a href="/docs/DESIGN_PRINCIPLES">`docs/DESIGN_PRINCIPLES.md`</a>, which catalogs the three-tier invariant hierarchy (operational / firewall / frozen-core) and the eight kernel primitives (<a href="/docs/strategy/ADR-001-What-ICN-Is">ADR-001</a>). The table below shows which design principle expresses which kernel invariant. A change on one side implies review on the other.</p>
+<h3>Design principle → kernel invariant</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Design principle (from §&quot;Design principles (compact)&quot;)</th>
+<th>Kernel tier and invariant</th>
+<th>What the surface is enforcing</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Make the invisible visible</td>
+<td>Tier-3 #10 <code>UniversalReceiptGeneration</code> + Tier-2 #6 opaque receipt cascade</td>
+<td>If the kernel cannot show proof, the UI must not assert legitimacy</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Member-first</td>
+<td>ADR-001 entity model + Tier-3 #1 <code>RightOfExit</code></td>
+<td>The DID is the anchor; the institution is a changing context the member can leave</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Scope coequality</td>
+<td>ADR-001 entity model (no civilizational ladder)</td>
+<td>Cooperatives, communities, federations are co-equal kernel entities, not nested</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Proof must be understandable</td>
+<td>Tier-1 §1.3 canonical encodings + Tier-3 #10</td>
+<td>The receipt is canonical; the summary is the UI affordance over it</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Civic seriousness without bureaucratic deadness</td>
+<td>(no kernel binding — tone choice)</td>
+<td>Tone is the only fully app-layer principle in this list</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Mobile-first and low-bandwidth</td>
+<td>Tier-1 §1.1 adversarial-by-default</td>
+<td>A member on a 2 Mbps link on a 5-year-old phone is the threat-modeled participant</td>
+</tr>
+<tr>
+<td>7</td>
+<td>No fake futurism</td>
+<td><a href="/docs/strategy/ICN-Definition">ICN-Definition.md §"What ICN Is Not"</a></td>
+<td>The kernel is not a blockchain or a platform; the UI must not imply it is</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Plain language is required</td>
+<td>Tier-3 #4 <code>NoSilentPowerChanges</code> + <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTENT_STYLE_GUIDE">`CONTENT_STYLE_GUIDE.md`</a> §&quot;Regulatory-safe vocabulary&quot;</td>
+<td>Authz changes must be legible as plain power deltas, not jargon</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Receipts are first-class UI</td>
+<td>Tier-3 #10 <code>UniversalReceiptGeneration</code></td>
+<td>If a transition matters, the kernel emits a receipt; the UI exposes it</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Reduced motion and large tap targets are defaults</td>
+<td>Tier-1 §1.4 no-panics (extended to participation: the surface does not &quot;panic&quot; the member)</td>
+<td>The accessibility floor is part of institutional legitimacy, not polish</td>
+</tr>
+</tbody></table>
+<h3>Product surface → kernel primitive(s)</h3>
+<p>The eight primitives (<a href="/docs/strategy/ADR-001-What-ICN-Is">ADR-001 §"The Eight Primitives"</a>) are not visible to members. They surface through the product surfaces below. A surface that renders a primitive is responsible for not silently extending it past what the kernel can prove.</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Primary primitive</th>
+<th>Secondary</th>
+<th>Surface responsibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Public website</td>
+<td>(none — descriptive only)</td>
+<td>Naming</td>
+<td>Must not claim capabilities the kernel cannot prove (bound by <a href="/docs/adr/ADR-0032-website-truth-boundary">ADR-0032</a>, <a href="/docs/adr/ADR-0033-public-maturity-claims-and-evidence-links">ADR-0033</a>)</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>(none — descriptive only)</td>
+<td>—</td>
+<td>Same truth-boundary rule as website</td>
+</tr>
+<tr>
+<td>Member shell</td>
+<td>Identity</td>
+<td>Authorization, Naming</td>
+<td>Anchors the DID; renders capability set; switches scope without losing identity</td>
+</tr>
+<tr>
+<td>Standing view</td>
+<td>Authorization</td>
+<td>Identity, State</td>
+<td>Renders the member&#39;s capability graph in plain language. App-layer trust scores → UI bands</td>
+</tr>
+<tr>
+<td>Action cards</td>
+<td>Authorization</td>
+<td>State, Coordination</td>
+<td>Every card declares the mandate (<a href="/docs/adr/ADR-0027-action-card-contract">ADR-0027</a>) — the capability that backs it — before confirm</td>
+</tr>
+<tr>
+<td>Receipts / provenance</td>
+<td>State</td>
+<td>Identity</td>
+<td>Renders the opaque receipt cascade. Progressive disclosure: summary → explanation → raw record</td>
+</tr>
+<tr>
+<td>Governance flows</td>
+<td>Coordination</td>
+<td>State, Time, Authorization, Communication</td>
+<td>The &quot;Governance&quot; app renders here. UI must not imply consensus the app has not reached</td>
+</tr>
+<tr>
+<td>Federation / operator surfaces</td>
+<td>Communication</td>
+<td>Coordination, Naming</td>
+<td>Renders inter-entity coordination. Operators see no more provenance than members on shared records</td>
+</tr>
+<tr>
+<td>Compute / commons surfaces</td>
+<td>Compute</td>
+<td>State, Authorization</td>
+<td>Workload manifest is the member-readable contract — the same artifact the kernel runs</td>
+</tr>
+</tbody></table>
+<h3>Bidirectional rule</h3>
+<ul>
+<li><strong>Kernel changes that affect a primitive imply UI review.</strong> A new ConstraintSet field, a new opaque-receipt class, or a Wave-2+ firewall extraction may require copy, vocabulary, or component changes in the surface that renders it.</li>
+<li><strong>UI changes must not violate the firewall.</strong> Adding a UI affordance that shows information the kernel cannot prove (or that depends on app-layer semantics leaking into a kernel response) is a tier-2 violation expressed at the human layer — not just a content bug.</li>
+</ul>
+<h3>What this binding does not do</h3>
+<ul>
+<li>It does not promote the design system to a kernel-enforced surface. Design doctrine remains app-layer, evolved through ADRs and the accessibility gate.</li>
+<li>It does not lock product navigation. The mapping above is per-surface-category, not per-screen.</li>
+<li>It does not constrain institution packages (NYCN, Summit, future federations), which bring their own brand layer on top of the ICN substrate.</li>
+</ul>
 <h2>Non-goals</h2>
 <ul>
 <li>Not a brand kit for a specific institution.</li>
@@ -161,17 +317,19 @@ View source on GitHub →
 <ul>
 <li>Building a new ICN-native UI? Start with the visual system, then the language brief, then the accessibility baseline.</li>
 <li>Building an institution package (NYCN, Summit, future federations)? Inherit the design system, add your own brand layer, do not modify ICN-side primitives.</li>
-<li>Bringing in an external collaborator (Claude Design, agency, contributor)? Hand them <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_CONTEXT">CLAUDE_DESIGN_CONTEXT.md</a> verbatim.</li>
+<li>Bringing in an external collaborator (Claude Design, agency, contributor)? Hand them <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_CONTEXT">CLAUDE_DESIGN_CONTEXT.md</a> verbatim. For the full workflow (paste-flow templates, doc-to-job attachment table, repo-shipped <code>icn-design-advisor</code> agent, optional <code>design</code> plugin pack, failure modes), see <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_SETUP">CLAUDE_DESIGN_SETUP.md</a>.</li>
 <li>Adding a new public claim to the website? It is bound by ADR-0032 and ADR-0033 — claim only what proof supports.</li>
 </ul>
 <h2>See also</h2>
 <ul>
+<li><a href="/docs/DESIGN_PRINCIPLES">docs/DESIGN_PRINCIPLES.md</a> — canonical three-tier kernel invariant index (the kernel-side counterpart to this document)</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_EXPLAINER_BIBLE">docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md</a> — visual explainer control plane (doctrine for diagrams, infographics, generated images, source assets)</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/assets/ASSET_REGISTER">docs/design/assets/ASSET_REGISTER.md</a> — live register of planned and tracked visual assets</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/assets/VISUAL_REVIEW_CHECKLIST">docs/design/assets/VISUAL_REVIEW_CHECKLIST.md</a> — pre-ship review for every visual explainer</li>
 <li><a href="/docs/strategy/ICN_CONSTITUTIONAL_ROADMAP">docs/strategy/ICN_CONSTITUTIONAL_ROADMAP.md</a></li>
 <li><a href="/docs/architecture/KERNEL_APP_SEPARATION">docs/architecture/KERNEL_APP_SEPARATION.md</a></li>
 <li><a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md</a></li>
+<li><a href="/docs/strategy/ADR-001-What-ICN-Is">docs/strategy/ADR-001-What-ICN-Is.md</a> — the eight kernel primitives this design system renders</li>
 </ul>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');

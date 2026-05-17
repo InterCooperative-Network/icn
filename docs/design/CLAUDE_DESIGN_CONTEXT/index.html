@@ -39,37 +39,487 @@
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>CLAUDE DESIGN CONTEXT</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/CLAUDE_DESIGN_CONTEXT.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Claude Design — ICN Context</h1>
-<p>This file exists to be pasted into Claude Design (or a similar tool) whenever someone produces ICN-side design work. Keep it short. Link to richer docs only after the paste.</p>
+<p>Paste this file at the start of any Claude Design session that produces ICN-side design
+work. It contains everything Claude needs to make decisions without re-asking the user.
+Detail lives in the linked docs; this file is the briefing.</p>
 <hr>
-<h2>Company / design system name</h2>
-<p><strong>InterCooperative Network / ICN Commons Design System</strong></p>
-<h2>Blurb</h2>
-<p>ICN is infrastructure for democratic institutions: governance, membership, federation, resource coordination, receipts, provenance, CCL-defined institutional rules, and member-facing participation surfaces. The visual system should feel trustworthy, civic, legible, cooperative, technical without being cold, and accessible on low-end devices.</p>
-<h2>Primary surfaces</h2>
-<p>Public website, documentation, member shell, action cards, standing views, receipt and provenance views, governance flows, federation and operator views, compute and commons views.</p>
-<h2>Design priorities</h2>
-<p>Accessibility, clarity, institutional seriousness, mobile-first participation, low-bandwidth use, plain-language explanation, visible provenance. Avoid: crypto-bro aesthetics, corporate SaaS sludge, fintech dashboard styling, gamified social patterns, neon futurism, or &quot;AI sheen&quot; without meaning.</p>
-<h2>Hard constraints</h2>
+<h2>1. What ICN is</h2>
+<p>InterCooperative Network (ICN) is <strong>P2P infrastructure for democratic institutions</strong>.
+Not a blockchain. Not a SaaS platform. Not a fintech product. Not a crypto wallet. It is
+a kernel that enforces constraints, plus a small set of apps that translate institutional
+meaning into those constraints. Cooperatives, communities, and federations run it on
+their own hardware to prove their decisions, own their records, and coordinate without
+a landlord.</p>
+<p>If a design choice would imply ICN is any of the things in the &quot;Not&quot; list, the design
+choice is wrong.</p>
+<hr>
+<h2>2. Brand position</h2>
+<p><strong>Yes</strong>: civic, trustworthy, cooperative, calm, durable, technical, accessible,
+serious without being dead.</p>
+<p><strong>No</strong>: crypto-bro, SaaS dashboard, fintech, govtech-portal, hacker-terminal,
+glassmorphism, neon, gamified, surveillance-heavy, mystical, &quot;AI sheen.&quot;</p>
+<p>ICN should feel like <strong>public infrastructure for collective self-rule</strong>.</p>
+<hr>
+<h2>3. Hard constraints (non-negotiable)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Constraint</th>
+<th>Source of truth</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>WCAG 2.2 Level AA is the floor.</strong> Contrast, keyboard, screen reader, 44×44 tap targets, reduced motion, 200% zoom, no color-only meaning.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/ACCESSIBILITY_BASELINE">ACCESSIBILITY_BASELINE.md</a></td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>No payment / wallet / balance / currency / token vocabulary for ICN-native primitives.</strong> Use the vocabulary in §6 below.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTENT_STYLE_GUIDE">CONTENT_STYLE_GUIDE.md</a></td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>No NYCN, &quot;New York Cooperative Network,&quot; &quot;Summit,&quot; or &quot;reference federation&quot; language on the public ICN website.</strong> ICN is generic substrate; NYCN/Summit are separate institution packages.</td>
+<td><a href="/docs/adr/ADR-0032-website-truth-boundary">ADR-0032</a></td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Maturity-band honesty.</strong> Do not depict capabilities, flows, or polish that don&#39;t exist in the implementation. Concept art is allowed, but must be labeled as such.</td>
+<td><a href="/docs/adr/ADR-0033-public-maturity-claims-and-evidence-links">ADR-0033</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_EXPLAINER_BIBLE">ICN_VISUAL_EXPLAINER_BIBLE.md</a></td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Receipts are first-class UI.</strong> Every action that creates an obligation, casts a vote, settles, or rotates a key must declare its mandate, reversibility, and the receipt it will produce — before confirm.</td>
+<td><a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a>, <a href="/docs/adr/ADR-0027-action-card-contract">ADR-0027</a></td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Member-first, not institution-first.</strong> The person persists across institutional contexts; the institution is the changing context, not the anchor.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_DESIGN_SYSTEM">ICN_DESIGN_SYSTEM.md</a> §&quot;Design principles&quot;</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Scope coequality.</strong> Cooperatives, communities, and federations are co-equal forms with different jobs — never a ladder, never a hierarchy.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_DESIGN_SYSTEM">ICN_DESIGN_SYSTEM.md</a></td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>Mobile-first, low-bandwidth.</strong> Design target: a 5-year-old phone on a 2 Mbps link, in three languages the member chose, when the member is tired and skeptical.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/ACCESSIBILITY_BASELINE">ACCESSIBILITY_BASELINE.md</a> §&quot;Bandwidth and device&quot;</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>4. Design tokens (current website implementation)</h2>
+<p>These are the live tokens from <code>website/src/styles/global.css</code>. Never invent new color hex
+values; use these. Both themes pass WCAG AA independently.</p>
+<h3>4.1 Color</h3>
+<pre><code>                           Dark (default)     Light
+Backgrounds
+  --bg-primary             #06090f            #ffffff
+  --bg-secondary           #0c1118            #f8fafc
+  --bg-card                #111827            #ffffff
+  --bg-surface             #0f1620            #f1f5f9
+
+Text
+  --text-primary           #e8edf5            #0f172a
+  --text-heading           #f1f5f9            #020617
+  --text-secondary         #a3b0c2            #475569
+  --text-muted             #8b99ad            #64748b
+
+Accents (one per closure-loop concept group)
+  --accent-teal            #2dd4bf            #0d9488   (identity, standing, authority)
+  --accent-amber           #fb923c            #c2410c   (governance, policy, execution, member experience)
+  --accent-blue            #38bdf8            #0369a1   (accounting)
+  --accent-green           #4ade80            #15803d   (provenance, receipts)
+  --accent-purple          #a78bfa            #7c3aed   (reserved)
+  --accent-rose            #fb7185            #be123c   (reserved, dangerous action)
+</code></pre>
+<p>Color is never the only carrier of meaning. Every color-coded state has a text or icon
+companion.</p>
+<h3>4.2 Typography</h3>
 <ul>
-<li><strong>WCAG 2.2 AA is the floor</strong> — color contrast, keyboard navigation, screen reader semantics, large tap targets, reduced motion, low-bandwidth mode, plain language. Detail in <a href="https://github.com/InterCooperative-Network/icn/blob/main/ACCESSIBILITY_BASELINE">ACCESSIBILITY_BASELINE.md</a>.</li>
-<li><strong>No payment/wallet/balance/currency vocabulary for ICN-native primitives.</strong> Use: obligation, allocation, settlement, unit, position, settlement asset, external settlement instruction, bridge receipt. See <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTENT_STYLE_GUIDE">CONTENT_STYLE_GUIDE.md</a>.</li>
-<li><strong>No NYCN, &quot;New York Cooperative Network&quot;, &quot;Summit&quot;, or &quot;reference federation&quot; language on the public ICN website.</strong> ICN is generic substrate; NYCN is a separate institution package in a separate private repo.</li>
-<li><strong>Maturity-band honesty.</strong> Public claims must match implementation reality. See <a href="/docs/adr/ADR-0032-website-truth-boundary">ADR-0032 — Website Truth Boundary</a>.</li>
-<li><strong>Receipts are first-class UI.</strong> Any action shown must have a path to its provenance. See <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026 — Receipt and Provenance Proof Envelope</a>.</li>
+<li><strong>Body</strong>: Inter, system-ui fallback.</li>
+<li><strong>Headings</strong>: Outfit, Inter fallback.</li>
+<li><strong>Mono / labels / receipts</strong>: JetBrains Mono, Fira Code fallback.</li>
+<li>Base size 16px. Body line-height 1.6. Headings use <code>clamp()</code> for fluid scale.</li>
 </ul>
-<h2>Brand position (compact)</h2>
+<h3>4.3 Spacing scale</h3>
+<pre><code>--space-xs   0.25rem      4px
+--space-sm   0.5rem       8px
+--space-md   1rem         16px   ← default gap
+--space-lg   1.5rem       24px
+--space-xl   2rem         32px
+--space-2xl  3rem         48px
+--space-3xl  4rem         64px
+--space-4xl  6rem         96px
+</code></pre>
+<h3>4.4 Radii</h3>
+<pre><code>--radius-sm   0.375rem
+--radius-md   0.5rem
+--radius-lg   0.75rem    ← default for cards
+--radius-xl   1rem
+--radius-2xl  1.5rem
+</code></pre>
+<h3>4.5 Motion</h3>
+<pre><code>--duration-fast   150ms
+--duration-normal 250ms   ← default
+--duration-slow   400ms
+--ease-out        cubic-bezier(0.16, 1, 0.3, 1)
+</code></pre>
+<p>All motion is gated by <code>@media (prefers-reduced-motion: reduce)</code> — designs must work
+without it.</p>
+<hr>
+<h2>5. Concept vocabulary (the words to use)</h2>
+<p>These are the 25 canonical concepts. Public-facing surfaces use the <strong>Public</strong> label by
+default; technical surfaces may use the <strong>Canonical</strong> label paired with the Public label
+on first use. Full localization notes in <a href="/docs/design-language/concept-map">concept-map.md</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Canonical</th>
+<th>Public (English default)</th>
+<th>One-line meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>identity</code></td>
+<td><em>Who you are</em></td>
+<td>Self-held cryptographic anchor; not a platform account</td>
+</tr>
+<tr>
+<td><code>standing</code></td>
+<td><em>Your recognized status</em></td>
+<td>Provable participation in a scope</td>
+</tr>
+<tr>
+<td><code>authority</code></td>
+<td><em>What you are allowed to do</em></td>
+<td>Action-space granted by scope rules</td>
+</tr>
+<tr>
+<td><code>governance</code></td>
+<td><em>How group decisions are made</em></td>
+<td>Proposals, deliberation, decisions</td>
+</tr>
+<tr>
+<td><code>policy</code></td>
+<td><em>The rules this follows</em></td>
+<td>Binding rules the institution has adopted</td>
+</tr>
+<tr>
+<td><code>accounting</code></td>
+<td><em>How resources and obligations are tracked</em></td>
+<td>Relational social accounting (not commercial finance)</td>
+</tr>
+<tr>
+<td><code>execution</code></td>
+<td><em>What actually happens</em></td>
+<td>Where decisions become operational fact</td>
+</tr>
+<tr>
+<td><code>provenance</code></td>
+<td><em>History and proof</em></td>
+<td>Verifiable chain from decision to outcome</td>
+</tr>
+<tr>
+<td><code>member_experience</code></td>
+<td><em>What people can do and see</em></td>
+<td>The surface a person interacts with</td>
+</tr>
+<tr>
+<td><code>scope</code></td>
+<td><em>Where you are acting</em></td>
+<td>A recognized institutional context</td>
+</tr>
+<tr>
+<td><code>cooperative</code></td>
+<td><em>A cooperative</em></td>
+<td>Member-owned, member-governed institution</td>
+</tr>
+<tr>
+<td><code>community</code></td>
+<td><em>A community</em></td>
+<td>Civic institution with shared rules and purpose</td>
+</tr>
+<tr>
+<td><code>federation</code></td>
+<td><em>How groups work together</em></td>
+<td>Voluntary coordinating scope; never centralized</td>
+</tr>
+<tr>
+<td><code>commons</code></td>
+<td><em>Shared resources</em></td>
+<td>Governed shared resources</td>
+</tr>
+<tr>
+<td><code>agreement</code></td>
+<td><em>A formal relationship</em></td>
+<td>Recorded understanding between scopes/members</td>
+</tr>
+<tr>
+<td><code>allocation</code></td>
+<td><em>What has been assigned</em></td>
+<td>A decision to direct resources or authority</td>
+</tr>
+<tr>
+<td><code>obligation</code></td>
+<td><em>What is owed or required</em></td>
+<td>A structured claim one party has on another</td>
+</tr>
+<tr>
+<td><code>settlement</code></td>
+<td><em>How accounts are resolved</em></td>
+<td>Discharging an obligation per its terms</td>
+</tr>
+<tr>
+<td><code>attestation</code></td>
+<td><em>A verified claim</em></td>
+<td>A signed statement another party can rely on</td>
+</tr>
+<tr>
+<td><code>role</code></td>
+<td><em>Your function in this context</em></td>
+<td>Named bundle of authority and responsibility</td>
+</tr>
+<tr>
+<td><code>membership</code></td>
+<td><em>Your place in the group</em></td>
+<td>Recognized participation in a scope</td>
+</tr>
+<tr>
+<td><code>resource</code></td>
+<td><em>Something shared, used, or governed</em></td>
+<td>An asset the institution tracks</td>
+</tr>
+<tr>
+<td><code>mandate</code></td>
+<td>(no public label needed — used on Action Cards)</td>
+<td>The capability that authorizes an action</td>
+</tr>
+<tr>
+<td><code>receipt</code></td>
+<td><em>A record of what happened</em></td>
+<td>Provenance-bearing record of an act</td>
+</tr>
+<tr>
+<td><code>unit</code></td>
+<td>(used with a number)</td>
+<td>Generic accounting unit (avoid &quot;currency,&quot; &quot;token,&quot; &quot;coin&quot;)</td>
+</tr>
+</tbody></table>
+<h3>Words to avoid for ICN-native primitives</h3>
+<table>
+<thead>
+<tr>
+<th>Avoid</th>
+<th>Use instead</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>payment, transfer, payout</td>
+<td>settlement</td>
+<td>&quot;Payment&quot; implies commercial finance; settlement is generic</td>
+</tr>
+<tr>
+<td>balance, wallet, account</td>
+<td>position</td>
+<td>&quot;Wallet&quot; implies custody; position is value-neutral</td>
+</tr>
+<tr>
+<td>debt, IOU, balance owed</td>
+<td>obligation</td>
+<td>&quot;Debt&quot; loads commercial connotations</td>
+</tr>
+<tr>
+<td>currency, token, coin</td>
+<td>unit</td>
+<td>&quot;Currency&quot; implies money; unit is generic</td>
+</tr>
+<tr>
+<td>permission, role-grant</td>
+<td>mandate, authority</td>
+<td>&quot;Permission&quot; sounds platform-y; authority is institutional</td>
+</tr>
+<tr>
+<td>confirmation, transaction</td>
+<td>receipt</td>
+<td>&quot;Transaction&quot; implies commerce</td>
+</tr>
+<tr>
+<td>user, account holder</td>
+<td>member</td>
+<td>&quot;User&quot; implies platform; member implies institution</td>
+</tr>
+<tr>
+<td>reputation, rank</td>
+<td>standing</td>
+<td>&quot;Reputation&quot; is social; standing is institutional</td>
+</tr>
+</tbody></table>
+<p>External systems may be named for what they are (a bank transfer is a bank transfer). The
+rule is: ICN-native primitives use ICN-native vocabulary.</p>
+<hr>
+<h2>6. Surface inventory (what exists, what doesn&#39;t)</h2>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>State</th>
+<th>Implementation</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Public website</td>
+<td>Live</td>
+<td>Astro 5 + TypeScript at <code>website/</code></td>
+<td>Deployed to intercooperative.network</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>Live</td>
+<td>Astro pages reading <code>docs/*.md</code> at build time</td>
+<td>Same site as website</td>
+</tr>
+<tr>
+<td>Member shell</td>
+<td>Spec only</td>
+<td>—</td>
+<td>Anchored to gateway API in <a href="/docs/mobile/icn-mobile-ux-spec-v1">icn-mobile-ux-spec-v1.md</a></td>
+</tr>
+<tr>
+<td>Standing view</td>
+<td>Spec only</td>
+<td>—</td>
+<td>Source: <code>GET /v1/gov/me/standing</code></td>
+</tr>
+<tr>
+<td>Action cards</td>
+<td>Spec only</td>
+<td>—</td>
+<td>Source: <code>GET /v1/gov/me/action-cards</code>; contract: <a href="/docs/adr/ADR-0027-action-card-contract">ADR-0027</a></td>
+</tr>
+<tr>
+<td>Receipts / provenance</td>
+<td>Spec only</td>
+<td>—</td>
+<td>Progressive disclosure mandatory; export and share are first-class</td>
+</tr>
+<tr>
+<td>Governance flows</td>
+<td>Spec only</td>
+<td>—</td>
+<td>Proposal → deliberation → threshold → decision → receipt</td>
+</tr>
+<tr>
+<td>Mobile app (CoopWallet)</td>
+<td>Prototype</td>
+<td>React Native at <code>sdk/react-native/examples/CoopWallet/</code></td>
+<td>5-tab navigation per spec</td>
+</tr>
+<tr>
+<td>Pilot UI</td>
+<td>Legacy</td>
+<td>Vanilla HTML/CSS at <code>web/pilot-ui/</code></td>
+<td>Does <strong>not</strong> inherit the design system; do not redesign without explicit ask</td>
+</tr>
+</tbody></table>
+<h3>Visual primitives — built vs not built</h3>
+<p><strong>Built</strong> (use these): institutional card (<code>.inst-card</code>), closure-loop station marker
+(<code>ClosureLoop</code>), eyebrow label (<code>.eyebrow</code>), icon component (<code>Icon.astro</code> with 10 icons
+covering the closure loop), maturity bands with text + color, skip link, focus-visible
+ring, reduced-motion handling.</p>
+<p><strong>Not yet built</strong> (design opportunities): scope container, agreement connector,
+provenance trail / receipt strip, truth-state band as reusable component, resource /
+commons field, federation relation line, role / authority badge, action block, system
+divider, section frame, icons for the 15 non-closure-loop concepts.</p>
+<hr>
+<h2>7. Where this design system fits the kernel</h2>
+<p>This is load-bearing. ICN is a kernel + apps. Design choices encode kernel invariants at
+the human layer. Full mapping in
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_DESIGN_SYSTEM">`ICN_DESIGN_SYSTEM.md`</a> §&quot;Kernel architecture binding&quot; and
+<a href="/docs/DESIGN_PRINCIPLES">`DESIGN_PRINCIPLES.md`</a>.</p>
+<p>Key bindings a designer must respect:</p>
 <ul>
-<li><strong>Yes</strong>: civic, trustworthy, cooperative, calm, durable, technical.</li>
-<li><strong>No</strong>: crypto, SaaS dashboard, fintech, govtech-portal, hacker-terminal, glassmorphism, neon.</li>
+<li><strong>&quot;Make the invisible visible&quot;</strong> ↔ the kernel emits a receipt for every state
+transition. If the kernel cannot prove it, the UI must not assert it.</li>
+<li><strong>&quot;Plain language is required&quot;</strong> ↔ governance changes must read as plain power
+deltas, never as jargon.</li>
+<li><strong>&quot;Receipts are first-class UI&quot;</strong> ↔ the opaque receipt cascade exists so every
+action has provenance. Bury a receipt and the institution has not actually happened.</li>
+<li><strong>&quot;Scope coequality&quot;</strong> ↔ cooperatives, communities, and federations are co-equal
+kernel entities. Never depict them as nested or as a ladder.</li>
+<li><strong>&quot;Mandate before confirm&quot;</strong> ↔ every action card declares the capability that backs
+it before the member can confirm.</li>
 </ul>
-<h2>When in doubt</h2>
-<p>Read the canonical files in this order:</p>
+<p>If a design change would make the UI assert something the kernel cannot prove (or
+silently leak app-layer semantics into a kernel surface), it is a tier-2 firewall
+violation expressed at the human layer.</p>
+<hr>
+<h2>8. Output expectations</h2>
+<p>Tell Claude Design what kind of artifact you want. Common ones:</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>What to ask for</th>
+<th>Example prompt</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Visual design</td>
+<td>A static composition (PNG/SVG/HTML mock). Specify surface, breakpoint, theme.</td>
+<td>&quot;Design the Action Card detail view for mobile, dark theme, using the tokens above.&quot;</td>
+</tr>
+<tr>
+<td>Component spec</td>
+<td>Variants, states, props, accessibility notes. Markdown table format.</td>
+<td>&quot;Spec the <code>provenance trail</code> component: variants, states, ARIA, code snippet.&quot;</td>
+</tr>
+<tr>
+<td>Copy review</td>
+<td>Pass/flag/rewrite each string against §5 and the content style guide.</td>
+<td>&quot;Review this copy against the regulatory-safe vocabulary table.&quot;</td>
+</tr>
+<tr>
+<td>Accessibility audit</td>
+<td>WCAG 2.2 AA pass/fail per criterion, with fixes.</td>
+<td>&quot;Audit this layout against WCAG 2.2 AA. Report findings and fixes.&quot;</td>
+</tr>
+<tr>
+<td>Design critique</td>
+<td>Specific, prioritized feedback against the 10 design principles.</td>
+<td>&quot;Critique this mockup against ICN_DESIGN_SYSTEM.md design principles.&quot;</td>
+</tr>
+<tr>
+<td>Concept exploration</td>
+<td>Multiple directions for an unbuilt primitive (§6). Label clearly as concept art.</td>
+<td>&quot;Three concept directions for the federation relation line. Label as concept, not implementation.&quot;</td>
+</tr>
+</tbody></table>
+<p>Default deliverable: <strong>a single artifact + a one-paragraph rationale + a flagged list of
+assumptions or unknowns</strong>. No multi-page narrative.</p>
+<hr>
+<h2>9. Reading order (when the briefing isn&#39;t enough)</h2>
+<p>In order, only as deep as the job requires:</p>
 <ol>
-<li><a href="/docs/design-language/brief-v0">docs/design-language/brief-v0.md</a> — design language</li>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_SYSTEM">docs/design/ICN_VISUAL_SYSTEM.md</a> — visual doctrine</li>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ACCESSIBILITY_BASELINE">docs/design/ACCESSIBILITY_BASELINE.md</a> — accessibility floor</li>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTENT_STYLE_GUIDE">docs/design/CONTENT_STYLE_GUIDE.md</a> — voice, vocabulary, dangerous-action copy</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_DESIGN_SYSTEM">docs/design/ICN_DESIGN_SYSTEM.md</a> — entry point, design principles, surface obligations, <strong>kernel architecture binding</strong></li>
+<li><a href="/docs/design-language/brief-v0">docs/design-language/brief-v0.md</a> — canonical design language, visual primitives, icon system rules</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_SYSTEM">docs/design/ICN_VISUAL_SYSTEM.md</a> — stable visual doctrine, anti-patterns, vocabulary guidance</li>
+<li><a href="/docs/design-language/accessibility">docs/design-language/accessibility.md</a> — component-level WCAG rules, do/don&#39;t examples</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ACCESSIBILITY_BASELINE">docs/design/ACCESSIBILITY_BASELINE.md</a> — per-surface accessibility floor</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTENT_STYLE_GUIDE">docs/design/CONTENT_STYLE_GUIDE.md</a> — voice, dangerous-action copy template, error patterns</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</a> — 12-category PR-time review checklist</li>
+<li><a href="/docs/mobile/icn-mobile-ux-spec-v1">docs/mobile/icn-mobile-ux-spec-v1.md</a> — mobile member UX spec (5-tab navigation)</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_EXPLAINER_BIBLE">docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md</a> — truth labels, brief gate, generated-image workflow (for diagrams and infographics specifically)</li>
 </ol>
+<hr>
+<h2>10. Setup and workflow</h2>
+<p>For how to set Claude Design up and which docs to attach for which job, see
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_SETUP">CLAUDE_DESIGN_SETUP.md</a>.</p>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
