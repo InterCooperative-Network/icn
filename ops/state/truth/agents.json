@@ -16,6 +16,12 @@
       "not_for": []
     },
     {
+      "name": "icn-design-advisor",
+      "path": ".claude/agents/icn-design-advisor.md",
+      "routing_triggers": ["docs/design", "docs/design-language", "website styles", "design system", "design tokens", "design language", "visual primitives", "closure loop", "accessibility audit", "WCAG", "content style", "regulatory-safe vocabulary", "action card", "receipt UI", "Claude Design", "design briefing", "concept map"],
+      "not_for": ["mobile-specific (use icn-mobile-advisor)", "kernel architecture (use icn-architect)"]
+    },
+    {
       "name": "icn-economics-advisor",
       "path": ".claude/agents/icn-economics-advisor.md",
       "routing_triggers": ["icn-ledger", "apps/ledger", "commons credit", "JournalEntry", "settlement flow", "EarningTracker", "credit ceiling", "commons earn", "commons spend"],

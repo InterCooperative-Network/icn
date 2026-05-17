@@ -78,6 +78,9 @@ Essential reading for all ICN users and contributors.
 |----------|-------------|
 | [README.md](README.md) | Documentation overview and structure |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Comprehensive system architecture (160KB+) |
+| [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md) | Canonical three-tier index of operational, firewall, and frozen-core invariants |
+| [design/ICN_DESIGN_SYSTEM.md](design/ICN_DESIGN_SYSTEM.md) | UI/UX/visual/accessibility design system entry point (kernel-bound via §"Kernel architecture binding") |
+| [design/CLAUDE_DESIGN_SETUP.md](design/CLAUDE_DESIGN_SETUP.md) | How to use Claude Design with ICN — paste flow, local `/design:*` skills, job-card templates, failure modes |
 | [GETTING_STARTED.md](GETTING_STARTED.md) | Quick start guide for developers |
 | [PHASE_HISTORY.md](PHASE_HISTORY.md) | Development phase completion history |
 | [PHASE_PROGRESS.md](PHASE_PROGRESS.md) | Active phase tracking and cross-cutting metrics |
