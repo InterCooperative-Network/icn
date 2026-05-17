@@ -65,8 +65,22 @@ recipe):
 export ICN_APPLIANCE_IMAGE=/path/to/built/qcow2
 export ICN_APPLIANCE_SSH_KEY=/path/to/smoke-private-key
 export ICN_APPLIANCE_CLOUD_INIT_SEED=/path/to/seed.iso
+# WSL2: 2222/2223 are reserved by Windows on many setups — override:
+# export ICN_APPLIANCE_SSH_PORT=22222
 bash deploy/appliance/smoke/smoke-local.sh --real
 ```
+
+### Known smoke gotchas
+
+- **glibc skew between build host and base image.** If `icnd`
+  restart-loops with `libc.so.6: version 'GLIBC_2.x' not found`, the
+  base image's glibc is older than the build host's. See
+  [`../README.md`](../README.md) §"Host / image compatibility".
+- **WSL2 + QEMU host port reservations.** Ports `2222`/`2223` may be
+  held by Windows-side exclusions. Use `ICN_APPLIANCE_SSH_PORT=22222`
+  or similar.
+- **KVM permission denied is non-fatal.** QEMU falls back to TCG.
+  Smoke still works; it's slower.
 
 ## Cross-references
 

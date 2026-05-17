@@ -234,6 +234,59 @@ bash deploy/appliance/smoke/smoke-local.sh --real
 # Expected: SSH up -> firstboot marker present -> icnd active -> /v1/health 200 -> PASS.
 ```
 
+### Host / image compatibility
+
+`icnd` is dynamically linked. The **build host's glibc version must be
+less than or equal to the appliance base image's glibc**, or `icnd` will
+restart-loop on the image with:
+
+```
+/usr/local/bin/icnd: /lib/x86_64-linux-gnu/libc.so.6: version 'GLIBC_2.39' not found
+```
+
+Reference points (as of 2026-05):
+
+| Environment | glibc |
+|---|---|
+| Debian 12 bookworm (genericcloud) | 2.36 |
+| Debian 13 trixie (genericcloud) | 2.41 |
+| Ubuntu 22.04 jammy (cloud-image) | 2.35 |
+| Ubuntu 24.04 noble (cloud-image) | 2.39 |
+
+If your build host is Ubuntu 24.04 / Debian trixie / similar, either:
+
+- Use a base image with matching-or-newer glibc (e.g. Debian trixie
+  cloud image), or
+- Build `icnd` inside a Debian-12-matching container so the binary
+  links against an older glibc, or
+- Defer until a static / musl build target is wired (future work).
+
+Either path is the operator's call; the build script doesn't pick.
+
+### WSL2 quirks
+
+If you're building on WSL2 (Ubuntu/Debian under Windows), the following
+have been observed:
+
+- **`virt-customize` / `virt-sysprep` may need a real kernel.** WSL2's
+  default kernel may not be enough for libguestfs's appliance. Install
+  `linux-image-generic` so `/boot/vmlinuz-*` exists.
+- **`/boot/vmlinuz-*` may need `chmod 0644`** so the non-root user
+  running `virt-customize` can read it.
+- **`LIBGUESTFS_BACKEND=direct`** may be required: WSL2 doesn't run
+  `libvirtd`, so libguestfs's libvirt backend fails to start. Set
+  `export LIBGUESTFS_BACKEND=direct` before running `build-image.sh
+  --real`.
+- **`/dev/kvm` permission denied is non-fatal.** WSL2 may expose
+  `/dev/kvm` as `root:kvm 0660`. If your user is not in the `kvm`
+  group, libguestfs and QEMU fall back to TCG. The build still works;
+  it's just slower.
+- **Windows reserves ephemeral ports.** Ports `2222` and `2223` are
+  commonly held by Windows-side Hyper-V / NAT exclusions and `qemu`
+  cannot bind to them even though Linux `ss -ltn` shows nothing.
+  Override the smoke SSH port to something higher:
+  `export ICN_APPLIANCE_SSH_PORT=22222` before `smoke-local.sh --real`.
+
 ### Per-instance secrets
 
 The image itself contains **zero** secrets. On first boot,
