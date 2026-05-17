@@ -791,6 +791,7 @@ Specialized agents in `.claude/agents/` auto-activate based on crate scope. Invo
 | `icn-governance-advisor` | `icn-governance`, `icn-ccl`, `icn-community`, `icn-coop`, `icn-entity`, `apps/governance`, proposals, voting, CCL semantics, threshold mechanics, civic engine rules. |
 | `icn-identity-iam-advisor` | `icn-identity`, `icn-naming`, `icn-entity`, DID lifecycle, keystore, key rotation, capability tokens, DID-TLS binding, bearer tokens, membership-gated access. |
 | `icn-invariants-guardian` | Reviewing proposed changes against the 5 ICN invariants and cross-doc consistency. Blocks changes that violate safety properties. Use before merging significant changes. |
+| `icn-design-advisor` | `docs/design/`, `docs/design-language/`, `website/` styles or components, accessibility audits, UI copy review, action card / receipt UI doctrine, Claude Design briefing prep. NOT mobile-specific (use `icn-mobile-advisor`). |
 | `icn-mobile-advisor` | `sdk/react-native/`, mobile UX, CoopWallet app screens, mobile gateway API, offline-first patterns, mobile identity/signing, five-tab navigation. |
 | `icn-ops` | K3s cluster state, demo flow validation, CI/CD health, pod diagnostics, release readiness, pre-deployment checks. NOT protocol design (use `icn-architect`). |
 | `icn-planner` | Strategic planning with task breakdown, dependency analysis, risk assessment, merge ordering. Does NOT implement — plans only. |
