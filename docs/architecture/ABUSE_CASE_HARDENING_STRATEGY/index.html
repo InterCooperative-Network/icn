@@ -1,0 +1,789 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Abuse-case hardening strategy | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ABUSE CASE HARDENING STRATEGY</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Abuse-case hardening strategy</h1>
+<blockquote>
+<p><strong>Receipts prove events. They do not prove legitimacy.</strong></p>
+<p><strong>Authority shortcuts must label themselves as shortcuts.</strong></p>
+<p><strong>Unresolved standing is not standing in production.</strong></p>
+</blockquote>
+<p>This document codifies the durable hardening doctrine that prevents ICN from becoming an administrative panel with receipts. It sits alongside <a href="https://github.com/InterCooperative-Network/icn/blob/main/ARCHITECTURE_DUE_DILIGENCE">`ARCHITECTURE_DUE_DILIGENCE.md`</a> (twin doctrines: convenience-vs-authority, participation-access-is-architecture) and extends that reflex into the institutional-legitimacy layer.</p>
+<p>The doctrine is not a security checklist for transport encryption, key management, or replay defense. Those live in <a href="/docs/security/production-hardening">`../security/production-hardening.md`</a>. This is the upstream layer that asks whether a procedurally clean record actually corresponds to an institutionally legitimate outcome — and what the substrate must do, in code and in surfaces, so the answer cannot be &quot;no&quot; while the receipt still looks like &quot;yes.&quot;</p>
+<!-- truth: descriptive -->
+
+<h2>0. Status and non-claims</h2>
+<ul>
+<li><strong>Status</strong>: descriptive strategy. No runtime behavior is changed by this document.</li>
+<li><strong>No new ADR.</strong> The doctrine extends <code>ARCHITECTURE_DUE_DILIGENCE.md</code>; the operational decisions are deferred to follow-up PRs that may file ADRs as the design firms up.</li>
+<li><strong>No new contract URN, no new schema field, no new wire format.</strong> Candidate vocabulary in §6 and §10 is <strong>draft</strong> and explicitly marked as such.</li>
+<li><strong>No production-readiness claim, no live-federation claim, no formal-NYCN-pilot claim, no Phase 2 completion claim.</strong> Phase 2 (see <a href="/docs/PHASE_PROGRESS">`../PHASE_PROGRESS.md`</a>) remains ⏳ and partner-bound; this document sequences hardening work that must precede a partner-formalization step that does not exist yet.</li>
+<li><strong>No K3s, DNS, Forgejo, gateway-deploy, or NYCN partner-data mutation.</strong></li>
+<li><strong>Code anchors below are pinned to <code>main</code> at session start (<code>d57ff1d6e</code>).</strong> They may drift; re-verify before citing in follow-up PRs.</li>
+</ul>
+<!-- truth: descriptive -->
+
+<h2>1. Why this exists</h2>
+<p>The strongest current red-team finding against ICN is not that someone might corrupt the receipt store or forge a signature. Those failure modes are already addressed by the opaque hash-keyed receipt store, the <code>SignedEnvelope</code> replay-guard pattern, the QUIC/TLS DID-binding layer, and the regular audit verification CLI.</p>
+<p>The stronger finding is that someone can use ICN&#39;s primitives <strong>correctly</strong> — issue a capability token that has the right scope, call a route that the gateway is happy to authorize, file a proposal whose decision hash binds cleanly, watch the effect dispatch chain produce an evidence record — and end up with procedurally clean machinery that proves an institutionally illegitimate outcome.</p>
+<p>A worked example, written from code currently in <code>main</code>:</p>
+<ol>
+<li>A single broad capability string <code>governance:write</code> (<code>icn/crates/icn-rpc/src/auth.rs:947</code>) gates roughly twelve mutation endpoints in <code>icn/apps/governance/src/http/handlers.rs</code> — among them <code>create_domain</code> (l. 386), <code>activate_charter</code> (l. 694), <code>create_proposal</code> (l. 751), <code>cast_vote</code> (l. 1695), <code>add_domain_member</code> (l. 548), <code>remove_domain_member</code> (l. 593), <code>create_structure</code> (l. 3415), <code>create_meeting</code> (l. 3678), and <code>create_action_item</code> (l. 2550).</li>
+<li>A capability token carrying that scope can create a plausible domain, activate a permissive charter via the direct path, seed a member list, file proposals against rules it just authored, mutate membership directly between proposals, and produce procedurally clean receipts the whole way through.</li>
+<li>Each individual step has a corresponding receipt; each receipt is structurally valid; the audit-verify CLI says everything checks out. The institution that emerged from the sequence may already be captured.</li>
+</ol>
+<p>This document writes the doctrine, invariants, and follow-up tracks that prevent that sequence from ever being procedurally clean — without widening the meaning firewall, without importing domain semantics into the kernel, and without inventing a SaaS-style RBAC pyramid that ignores ICN&#39;s mandate / capability model.</p>
+<!-- truth: descriptive -->
+
+<h2>2. Core doctrine</h2>
+<blockquote>
+<p>The danger is not only that someone might break the machinery. The danger is that someone might use the machinery correctly to prove the wrong thing.</p>
+</blockquote>
+<p>The doctrine below is the upstream version of the more specific rules in §3–§13. Each line is a sentence reviewers are expected to be able to quote at design time.</p>
+<h3>2.1 Receipts prove events, not legitimacy</h3>
+<p>A receipt establishes that some specific event occurred under some specific authority basis. It does not, on its own, establish that the event was institutionally legitimate. A reviewer reading a receipt must always be able to recover the authority basis, the actor identity, the standing at the time, and any administrative-shortcut flag — and must be able to challenge the receipt without challenging the substrate.</p>
+<h3>2.2 Authority shortcuts must label themselves as shortcuts</h3>
+<p>Some paths in the substrate are intentionally not democratic: direct charter activation, direct membership mutation, bootstrap onboarding, fixture-mode seeding. These exist for legitimate reasons. They must never look like ordinary governance in any surface — not in receipts, not in member shell, not in the steward cockpit, not in API responses. The convenience of the shortcut does not buy the legitimacy of the long path.</p>
+<h3>2.3 Unresolved standing is not standing in production</h3>
+<p>If the substrate cannot resolve whether an actor has standing, the production answer is not &quot;yes by default.&quot; Trust-threshold membership, suspension state, steward authority, delegation eligibility — each of these has a resolver or checker today. In production, the absence of a resolver, an unreachable resolver, or a stale resolver answer must not cause the substrate to act as though standing is established.</p>
+<h3>2.4 Accepted is not applied</h3>
+<p>A proposal can be <code>Accepted</code> and still have produced no effect. The effect dispatch chain (decision → mandate → effect plan → dispatch → application) has many ways to halt or partially complete, several of which are honestly recorded as <code>EmittedOnly</code>, <code>ExecutionEvidenced</code>, or <code>ExecutionFailed</code> in <code>icn/apps/governance/src/dispatch_evidence.rs:131–169</code>. A surface that renders <code>Accepted</code> as <code>done</code> is laundering uncertainty into confidence.</p>
+<h3>2.5 Convenience paths must not become authority paths</h3>
+<p>A surface introduced for convenience — a direct admin endpoint, a fixture-mode shortcut, a debug bypass — must not silently become the path institutional decisions travel through. This is the legitimacy-layer analogue of <code>ARCHITECTURE_DUE_DILIGENCE.md</code> §2.1; that doctrine names DNS and SaaS; this one names admin scopes and bootstrap flags.</p>
+<h3>2.6 Bootstrap is not democracy</h3>
+<p>The substrate must be bootstrappable. The first charter, the first member set, the first steward have to come from somewhere outside the governance loop. That somewhere is administrative, by definition. Bootstrap artifacts must be visibly bootstrap artifacts, not retroactively dressed as democratic outputs.</p>
+<h3>2.7 A token is not a mandate</h3>
+<p>Capability scopes (<code>governance:write</code>, etc.) are kernel-side enforcement primitives. They are not, on their own, institutional mandates. The institution authorizes by mandate; the substrate authorizes by capability. Where the two diverge, the institution&#39;s view wins, and the surface must show the divergence.</p>
+<h3>2.8 A UI must not launder uncertainty into confidence</h3>
+<p>Member shell and steward cockpit are designed to render real states: degraded, partial, stale, disputed, emitted-only, challenge-window-open, awaiting-evidence, reversed. A surface that renders any of these as a clean green checkmark fails the doctrine — even if every receipt under it is real.</p>
+<h3>2.9 Privacy posture is not private content</h3>
+<p><code>ScopedVault</code> and <code>PrivateEvidence</code> define what bodies a surface may read. Existence, scope, access path, authority basis, access receipts — these are renderable. Body bytes are not. Debug convenience cannot lift a body byte into a rendering layer; if it has, the surface has become a surveillance panel by accident.</p>
+<h3>2.10 Index absence is not record absence</h3>
+<p>A receipt may exist in the primary store and be missing from a secondary index. In the opaque receipt store this is impossible by construction (atomic primary + index + bind writes). On older typed-receipt paths it is currently possible. Absence from index must never silently become absence from truth.</p>
+<!-- truth: descriptive -->
+
+<h2>3. Abuse stories</h2>
+<p>Each story below is short on purpose. Each maps to a hardening track in §4. Each cites at least one code anchor so a follow-up PR has somewhere to start.</p>
+<h3>3.1 The broad-scope institution factory</h3>
+<p>A member with <code>governance:write</code> mints a new <code>LocalDomain</code> via <code>create_domain</code> (<code>handlers.rs:386</code>), activates a permissive charter directly via <code>activate_charter</code> (<code>handlers.rs:694</code>), seeds a member list with <code>add_domain_member</code> (<code>handlers.rs:548</code>), files and closes proposals under rules they just authored, and produces a complete trail of clean receipts. Anchor: <code>icn/crates/icn-rpc/src/auth.rs:947</code> (single broad scope).</p>
+<h3>3.2 Membership coup by direct mutation</h3>
+<p>A member with <code>governance:write</code> calls <code>add_domain_member</code> to add allies and <code>remove_domain_member</code> (<code>handlers.rs:593</code>) to remove opposition, then files a decisive proposal against the altered electorate. Both endpoints fail-open on <code>TrustThreshold</code> membership domains (<code>handlers.rs:572</code> for add, <code>:617</code> for remove); the resolver, if any, is consulted only at proposal-close time (<code>:1269</code>), never at mutation time.</p>
+<h3>3.3 Resolver-outage democracy</h3>
+<p>A <code>TrustThreshold</code> domain comes up with <code>MemberStandingChecker</code> (<code>configure.rs:197-201</code>), <code>SuspensionChecker</code> (<code>configure.rs:214-218</code>), or <code>MembershipResolver</code> (<code>configure.rs:264</code>) unwired, miswired, or degraded. Write paths short-circuit to <code>true</code> (<code>handlers.rs:78, 572, 617, 1111, 1203</code>). Suspended or non-eligible actors influence governance, and the evidence trail is internally consistent but institutionally wrong. The existing inline comment at <code>handlers.rs:1267–1268</code> (&quot;Fail-open on resolver errors&quot;) is a known trade-off that has not yet been re-evaluated against a production threat model.</p>
+<h3>3.4 Admin monarchy with YAML</h3>
+<p>A privileged operator calls <code>POST /charters</code> → <code>activate_charter</code> (<code>handlers.rs:694–744</code>). The handler constructs a synthetic provenance string <code>direct-activation:{charter_id}</code> and proceeds without the ratified-proposal decision hash, without an <code>InstitutionalEffectRecord</code>, and without <code>EffectDispatchEvidence</code>. The charter activates; the substrate begins enforcing it; the authority basis is &quot;someone with <code>governance:write</code> did it.&quot;</p>
+<h3>3.5 The receipt halo effect</h3>
+<p>A member opens the member shell, sees a row labeled &quot;Accepted,&quot; and concludes the institution decided the matter. In fact the proposal may be <code>Accepted</code> and <code>EmittedOnly</code> (no evidence yet), <code>Accepted</code> and <code>ExecutionFailed</code> (anchor: <code>dispatch_evidence.rs:146</code>), <code>Accepted</code> and partial, <code>Accepted</code> and pending a challenge window, or <code>Accepted</code> and reversed. The current API surface and the rendering layers above it do not consistently expose this distinction.</p>
+<h3>3.6 Retry / restart / partial-effect ambiguity</h3>
+<p>A high-impact effect partially applies before a restart. The substrate retries. One subsystem no-ops correctly; another mutates a second time; a third returns opaque evidence. The current idempotency key for institutional effects is at institutional-effect granularity, not per-effect granularity; the stronger <code>(decision_hash, manifest_hash, effect_index)</code> key named by <a href="/docs/spec/effect-dispatch-contract">`../spec/effect-dispatch-contract.md`</a> is future schema work and is not yet in the dispatch path.</p>
+<h3>3.7 The fake-domain factory</h3>
+<p>A domain is created with technically valid but institutionally garbage governance parameters — quorum 1, approval threshold 1, voting period zero, no challenge window, no notification requirement. Current CCL governance validation (<code>icn/crates/icn-ccl/src/governance.rs:146-163</code>) is semantic-only; there are no pilot-readiness sanity bounds and no escape-hatch labeling for fixture-mode permissive configs.</p>
+<h3>3.8 Visual greenwashing</h3>
+<p>Implementation drift between <a href="/docs/spec/member-shell-v0">`../spec/member-shell-v0.md`</a> and <a href="/docs/spec/steward-cockpit-v0">`../spec/steward-cockpit-v0.md`</a> lets a degraded, partial, stale, or disputed state render as a clean green checkmark in member shell while the cockpit shows red. The v0 spec already flags this as a failure-table violation; the fixture matrix that catches it before merge does not yet exist.</p>
+<h3>3.9 Surveillance by debug</h3>
+<p>A rendering layer in the cockpit, or a &quot;debug preview&quot; in the shell, dereferences a <code>PrivateEvidence</code> body when it should be displaying only existence + scope + authority basis + access receipts. The current digest-only rendering boundary in <code>icn/crates/icn-kernel-api/src/proofs.rs:646-661</code> (<code>ArtifactDigest::scoped_vault_reference</code>) is clean; the abuse case is the regression test that doesn&#39;t yet exist.</p>
+<h3>3.10 Index-skew invisibility</h3>
+<p>A crash mid-write on an older typed-receipt path leaves the primary record durable but the secondary index missing. The opaque receipt store is atomic by construction; <code>icn/apps/governance/src/receipt_backend.rs:173-210</code> documents that the <strong>default</strong> <code>put_mandate_with_grants</code> is <strong>not atomic</strong> and depends on the sled-backed gateway override. Other typed write paths have not been inventoried for the same invariant.</p>
+<!-- truth: descriptive -->
+
+<h2>4. Hardening tracks</h2>
+<p>Each subsection has the same shape: problem, hardening goal, doctrine line for future PRs to quote, draft design (explicitly marked draft), and code anchors.</p>
+<h3>4.1 Narrow production authority scopes</h3>
+<p><strong>Problem.</strong> <code>governance:write</code> is a single broad capability across ~12 mutation endpoints; one capability token is an institution factory.</p>
+<p><strong>Hardening goal.</strong> Production write authority is decomposed so the surface that issues a capability can describe what the capability actually authorizes — at the level of an institutional act, not &quot;all of governance.&quot;</p>
+<p><strong>Doctrine.</strong> <em>A capability scope must describe an act the institution can authorize, not a directory of routes the gateway can dispatch.</em></p>
+<p><strong>Draft design.</strong> Two complementary approaches; both are draft.</p>
+<ul>
+<li><strong>Scope decomposition (the SaaS-shaped option, retained for kernel-side enforcement).</strong> Candidate scopes, names not minted:<ul>
+<li><code>governance:domain:create</code></li>
+<li><code>governance:charter:activate</code> (bootstrap-only, see §4.4)</li>
+<li><code>governance:membership:mutate</code> (bootstrap-only, see §4.2)</li>
+<li><code>governance:proposal:create</code></li>
+<li><code>governance:proposal:lifecycle</code></li>
+<li><code>governance:vote:cast</code></li>
+<li><code>governance:action-item:mutate</code></li>
+<li><code>governance:meeting:mutate</code></li>
+<li><code>governance:structure:mutate</code></li>
+<li><code>governance:federation:propose</code></li>
+<li><code>governance:sdis:propose</code></li>
+</ul>
+</li>
+<li><strong>Mandate-bundle gating (the ICN-native option, preferred where the model supports it).</strong> Where the act being authorized is institutional rather than purely technical, the gate is a mandate or authority grant from the governance app, not a kernel-side capability string. The kernel still enforces; the gate is just &quot;does the actor hold a mandate that authorizes this act in this domain at this height&quot; — which is constraint enforcement, not domain semantics inside the kernel.</li>
+</ul>
+<p>The two are not in tension: the kernel-side enforcement primitive is the capability; the institutional gate that produces the capability is the mandate. The split is <strong>where the institution authorizes</strong> versus <strong>how the kernel enforces</strong>.</p>
+<p><strong>Anchors.</strong> <code>icn/crates/icn-rpc/src/auth.rs:947</code> (scope string), <code>icn/apps/governance/src/http/handlers.rs:283–2342</code> (route handlers gated by it).</p>
+<h3>4.2 Direct membership mutation as bootstrap-only</h3>
+<p><strong>Problem.</strong> <code>add_domain_member</code> and <code>remove_domain_member</code> mutate the electorate without proposal → decision → mandate → effect → evidence, and fail-open on <code>TrustThreshold</code> domains.</p>
+<p><strong>Hardening goal.</strong> Production membership mutation flows through the governance loop. Direct mutation, if it remains in production, is classified as a bootstrap / administrative shortcut and labels itself as one in every surface it touches.</p>
+<p><strong>Doctrine.</strong> <em>Direct membership mutation is not a normal democratic act. Authority shortcuts must label themselves as shortcuts.</em></p>
+<p><strong>Draft design.</strong> Direct mutation, where retained, emits an administrative receipt that includes:</p>
+<ul>
+<li>signer DID and capability used,</li>
+<li>authority basis (text, e.g. &quot;bootstrap charter activation&quot; / &quot;ratified administrative carve-out&quot;),</li>
+<li>reason (free-text, required),</li>
+<li>previous-membership snapshot hash,</li>
+<li>resulting-membership snapshot hash,</li>
+<li>affected-member set,</li>
+<li>notification path (which subjects were notified, by which channel),</li>
+<li>challenge / review path,</li>
+<li><code>is_administrative_shortcut: true</code> flag,</li>
+<li>cockpit rendering directive (<code>degraded-action</code>),</li>
+<li>member-shell rendering directive (<code>administrative-action-applied</code>),</li>
+<li>production-allowed flag (driven by deployment posture, see §5),</li>
+<li>post-pilot-allowed flag.</li>
+</ul>
+<p>Membership mutation triggered by a ratified proposal does not emit this artifact; it emits the ordinary <code>EffectDispatchEvidence</code> chain.</p>
+<p><strong>Anchors.</strong> <code>icn/apps/governance/src/http/handlers.rs:548-635</code> (handlers), <code>:572, :617</code> (fail-open TrustThreshold), <code>:1245-1294</code> (resolver-aware delegation exclusion that already exists at close-time, as positive precedent).</p>
+<h3>4.3 Fail-closed resolver / checker policy in production</h3>
+<p><strong>Problem.</strong> <code>MemberStandingChecker</code>, <code>SuspensionChecker</code>, and <code>MembershipResolver</code> are <code>Option&lt;...&gt;</code>; nothing in production startup currently asserts they are wired and healthy.</p>
+<p><strong>Hardening goal.</strong> Production runtime refuses to serve write paths whose institutional correctness depends on an unwired or unhealthy resolver. Test and fixture builds carve explicit, visibly labeled exceptions.</p>
+<p><strong>Doctrine.</strong> <em>Unresolved standing is not standing in production.</em></p>
+<p><strong>Draft design.</strong> Startup invariants in §5 plus runtime state that maps to existing <code>SyncDegradedStatus</code> precedent in <code>icn/crates/icn-kernel-api/src/proofs.rs:1699-1739</code>. Where the institutional check cannot be resolved, the write path either:</p>
+<ul>
+<li><strong>fail-closed</strong> — refuses to act and emits a <code>governance-degraded</code> artifact;</li>
+<li><strong>fail-degraded with banner</strong> — performs the act but emits the act under <code>Accepted/AdministrativeShortcut</code> semantics and marks the surface;</li>
+<li><strong>fail-blocked</strong> — refuses to act and routes the actor to the institutional path that does not require the missing resolver.</li>
+</ul>
+<p>The choice per call site is design work in the follow-up PR; this strategy lists the menu and the invariants, not the per-site policy.</p>
+<p><strong>Anchors.</strong> <code>icn/apps/governance/src/http/configure.rs:197-264</code> (optional checker types), <code>handlers.rs:78, 572, 617, 1111, 1203</code> (fail-open sites), <code>handlers.rs:1267–1268</code> (existing inline comment acknowledging the trade-off).</p>
+<h3>4.4 Direct charter activation as bootstrap-only</h3>
+<p><strong>Problem.</strong> <code>POST /charters</code> activates a charter outside the ratified proposal path, with synthetic provenance <code>direct-activation:{charter_id}</code>, no institutional-effect record, and no dispatch evidence.</p>
+<p><strong>Hardening goal.</strong> Direct activation is classified as bootstrap-only. Where retained, it emits a clearly distinct administrative artifact and is gated by a separate, narrow scope (or, preferably, a bootstrap mandate).</p>
+<p><strong>Doctrine.</strong> <em>A charter that bypasses governance must never look like one ratified by governance.</em></p>
+<p><strong>Draft design.</strong> A candidate administrative artifact — <strong>name draft, not minted</strong> — <code>BootstrapCharterActivationReceipt</code> or the equivalent extension of an existing administrative receipt class, carrying:</p>
+<ul>
+<li>signer DID,</li>
+<li>capability used (e.g. <code>governance:charter:activate</code>),</li>
+<li>authority basis,</li>
+<li>activation mode (<code>bootstrap</code> / <code>administrative-override</code> / <code>replay-after-incident</code> / etc.),</li>
+<li>previous-charter hash (if any),</li>
+<li>new-charter hash,</li>
+<li><code>activated_at</code>,</li>
+<li>scope (domain / federation / institution),</li>
+<li><code>is_administrative_shortcut: true</code>,</li>
+<li>review / challenge path,</li>
+<li>production-allowed flag,</li>
+<li>post-pilot-allowed flag,</li>
+<li>cockpit and member-shell rendering directives.</li>
+</ul>
+<p>Whether the artifact is a new receipt class or a discriminator on an existing one is an <strong>open question</strong> (§15).</p>
+<p><strong>Anchors.</strong> <code>handlers.rs:694-744</code> (handler), <code>:647, :725</code> (synthetic provenance string).</p>
+<h3>4.5 Closed lifecycle vocabulary for accepted-vs-applied</h3>
+<p><strong>Problem.</strong> The current dispatch evidence layer produces <code>EmittedOnly</code>, <code>ExecutionEvidenced</code>, and <code>ExecutionFailed</code> (<code>dispatch_evidence.rs:131-169</code>), but surfaces (member shell, cockpit, API consumers) can flatten these to &quot;Accepted&quot; and lose the distinction.</p>
+<p><strong>Hardening goal.</strong> A closed lifecycle vocabulary is defined once and adopted consistently across API, member shell, and cockpit. &quot;Accepted&quot; never carries the implicit meaning &quot;applied and reconciled.&quot;</p>
+<p><strong>Doctrine.</strong> <em>Accepted is not applied. Receipt exists is not complete.</em></p>
+<p><strong>Draft set, not minted.</strong></p>
+<ul>
+<li><code>Draft</code></li>
+<li><code>Open</code></li>
+<li><code>Accepted/PendingEffect</code></li>
+<li><code>Accepted/EmittedOnly</code></li>
+<li><code>Accepted/EvidencePending</code></li>
+<li><code>Accepted/AppliedWithEvidence</code></li>
+<li><code>Accepted/PartialEffect</code></li>
+<li><code>Accepted/DispatchFailed</code></li>
+<li><code>Accepted/Challenged</code></li>
+<li><code>Accepted/Reversed</code></li>
+<li><code>Accepted/AdministrativeShortcut</code> (the §4.2/§4.4 case)</li>
+<li><code>Rejected</code></li>
+<li><code>NoQuorum</code></li>
+<li><code>Degraded/UnresolvedStanding</code> (the §4.3 case)</li>
+</ul>
+<p>Where this vocabulary lives — kernel-api proofs vs governance-app types — is an <strong>open question</strong> (§15).</p>
+<p><strong>Anchors.</strong> <code>icn/apps/governance/src/dispatch_evidence.rs:131-169</code> (existing reconciliation status).</p>
+<h3>4.6 Per-effect idempotency</h3>
+<p><strong>Problem.</strong> Effect dispatch can partially apply, retries on restart, and currently keys idempotency at institutional-effect granularity. The stronger key <code>(decision_hash, manifest_hash, effect_index)</code> is named in the spec but not yet in code.</p>
+<p><strong>Hardening goal.</strong> Every effect carries a stable per-effect idempotency key. Subsystems contract for duplicate dispatch behavior: a duplicate dispatch returns the prior outcome, never mutates a second time, and emits a <code>Duplicate</code> evidence record rather than a fresh applied-evidence record.</p>
+<p><strong>Doctrine.</strong> <em>Retries are governance events when effects are not provably idempotent.</em></p>
+<p><strong>Draft design.</strong> Candidate key <code>decision_hash + manifest_hash + effect_index</code>. Per-subsystem contract: idempotent / read-after-write idempotent / not idempotent (requires governance decision before retry). Evidence records distinguish first application from duplicate.</p>
+<p><strong>Anchors.</strong> <code>icn/apps/governance/src/dispatch_evidence.rs:34-87</code> (<code>EffectDispatchEvidence</code> struct, current granularity), <a href="/docs/spec/effect-dispatch-contract">`../spec/effect-dispatch-contract.md`</a> (spec calling for the stronger key).</p>
+<h3>4.7 Governance parameter sanity bounds</h3>
+<p><strong>Problem.</strong> CCL governance parameter validation is semantic-only; pilot-readiness sanity bounds do not exist and there is no explicit fixture-mode escape hatch.</p>
+<p><strong>Hardening goal.</strong> Governance configs are classified into bands: <code>technically-valid</code>, <code>fixture-valid</code>, <code>pilot-valid</code>, <code>production-valid</code>. Member-facing institutions whose configs fail the band test render as <code>Degraded/InsufficientGovernanceConfig</code> and refuse member-facing operation until corrected.</p>
+<p><strong>Doctrine.</strong> <em>A technically valid institution can still be democratically fake.</em></p>
+<p><strong>Draft design.</strong> Per-band bounds (numbers explicitly draft):</p>
+<ul>
+<li>minimum quorum &gt; 0; pilot-valid ≥ a small positive fraction; production-valid bound set by the institution&#39;s CCL.</li>
+<li>minimum approval threshold &gt; 0; pilot-valid ≥ a non-trivial fraction.</li>
+<li>minimum voting period &gt; some pilot-band floor (must allow member notification + response).</li>
+<li>maximum voting period bounded to prevent indefinite &quot;open&quot; proposals.</li>
+<li>explicit challenge / review window required for high-impact effects.</li>
+<li>bootstrap-member threshold required for a domain to graduate from <code>bootstrap</code> band to <code>pilot-valid</code> band.</li>
+<li>notification requirement: at least one notification path bound for each band above <code>fixture-valid</code>.</li>
+</ul>
+<p>Fixture / dev / test bands are explicit and labeled in every surface that touches them.</p>
+<p><strong>Anchors.</strong> <code>icn/crates/icn-ccl/src/governance.rs:146-163</code> (current quorum check).</p>
+<h3>4.8 Shell / cockpit fixture matrix (no greenwashing)</h3>
+<p><strong>Problem.</strong> Implementation drift between member shell and cockpit can let degraded / partial / stale / disputed states render as clean.</p>
+<p><strong>Hardening goal.</strong> A fixture matrix asserts member-shell rendering against cockpit rendering for every degraded state, every administrative shortcut, every pending challenge, every emitted-only effect, every stale resolver answer. If cockpit shows degraded, member shell must show degraded — in member vocabulary.</p>
+<p><strong>Doctrine.</strong> <em>The UI must not launder uncertainty into confidence.</em></p>
+<p><strong>Draft matrix axes.</strong></p>
+<ul>
+<li>cockpit-degraded / shell-degraded parity,</li>
+<li>cockpit-evidence-pending / shell-evidence-pending parity,</li>
+<li>cockpit-resolver-down / shell-action-paused parity,</li>
+<li>direct-bootstrap-path / shell-shortcut-banner parity,</li>
+<li>partial-effect-applied / shell-partial-applied parity,</li>
+<li>challenge-window-open / shell-challenge-banner parity,</li>
+<li>private-evidence-exists / shell-body-bytes-absent (regression test),</li>
+<li>irreversible-action / shell-explicit-confirmation parity,</li>
+<li>signed-but-unacknowledged / shell-says-sent-not-confirmed parity.</li>
+</ul>
+<p><strong>Anchors.</strong> <a href="/docs/spec/member-shell-v0">`../spec/member-shell-v0.md`</a> (design principle 9 + failure-table row), <a href="/docs/spec/steward-cockpit-v0">`../spec/steward-cockpit-v0.md`</a> (cockpit-degraded → shell-degraded rule).</p>
+<h3>4.9 PrivateEvidence non-rendering regression</h3>
+<p><strong>Problem.</strong> Debug convenience can promote a <code>PrivateEvidence</code> body byte into a rendering layer.</p>
+<p><strong>Hardening goal.</strong> A regression test asserts that no rendering layer (member shell fixture, cockpit fixture) ever receives a private body. Rendering layers receive existence, scope, authority basis, access path, access-holder identity (where policy permits), access / export receipts — and nothing else.</p>
+<p><strong>Doctrine.</strong> <em>Privacy posture is not private content. Debug convenience cannot become surveillance authority.</em></p>
+<p><strong>Anchors.</strong> <code>icn/crates/icn-kernel-api/src/proofs.rs:646-661</code> (<code>ArtifactDigest::scoped_vault_reference</code>, current digest-only boundary).</p>
+<h3>4.10 Typed-receipt atomicity inventory</h3>
+<p><strong>Problem.</strong> Opaque receipt storage is atomic by construction; typed receipt paths are not uniformly atomic.</p>
+<p><strong>Hardening goal.</strong> Every typed receipt write path is classified and remediated. The classification matrix below is filled in by a follow-up PR; the doctrine here is that no typed write path is allowed to silently fall outside the atomicity guarantees of the opaque store without an explicit named exception.</p>
+<p><strong>Classification axes</strong> (one row per typed write entry point):</p>
+<ul>
+<li>atomic primary + index,</li>
+<li>non-atomic primary + index,</li>
+<li>write-once-by-hash,</li>
+<li>overwrite risk,</li>
+<li>index-skew risk,</li>
+<li>repair-scan availability,</li>
+<li>silent-absence-from-index treated as absence-from-truth.</li>
+</ul>
+<p><strong>Doctrine.</strong> <em>Index absence must not silently become record absence.</em></p>
+<p><strong>Anchors.</strong> <code>icn/apps/governance/src/receipt_backend.rs:42, 80, 106, 146, 178-210, 248</code> (typed write entry points; default <code>put_mandate_with_grants</code> is documented as <strong>not atomic</strong> at lines 178-190).</p>
+<!-- truth: descriptive -->
+
+<h2>5. Production invariants</h2>
+<p>The substrate refuses to serve the listed write paths unless the listed resolver / checker / config is wired and healthy. Fixture, dev, and test builds carve explicit exceptions; the exception is visibly labeled in every surface it touches.</p>
+<ul>
+<li><strong>TrustThreshold write paths require <code>MemberStandingChecker</code>.</strong> No write to a <code>TrustThreshold</code> domain proceeds unless <code>ctx.member_checker</code> is <code>Some</code> and recent. Affected sites: <code>handlers.rs:78, 572, 617, 1111, 1203</code>.</li>
+<li><strong>Suspension-sensitive paths require <code>SuspensionChecker</code>.</strong> No proposal close, vote tally, or delegation exclusion proceeds without it for domains whose CCL declares suspension-sensitivity. Affected site: <code>handlers.rs:1245-1294</code>.</li>
+<li><strong>TrustThreshold close-time delegation exclusion requires <code>MembershipResolver</code>.</strong> The fail-open-on-error inline trade-off at <code>handlers.rs:1267-1268</code> is re-evaluated in production posture: production resolver errors are fail-blocked, not fail-open.</li>
+<li><strong>Steward authority paths require steward checker.</strong> Pending the steward authority wiring; named here so the invariant is in place when the checker lands.</li>
+<li><strong>No domain transitions from <code>bootstrap</code> band to <code>pilot-valid</code> band without §4.7 sanity bounds passing.</strong></li>
+<li><strong>No charter activates via the direct path in production without the bootstrap shortcut artifact (§4.4) and the <code>production-allowed</code> flag set.</strong></li>
+<li><strong>No direct membership mutation in production without the bootstrap shortcut artifact (§4.2) and the <code>production-allowed</code> flag set.</strong></li>
+</ul>
+<p>The production / fixture / dev classification is driven by an explicit deployment posture (env var, config field, or build feature) that is visible at startup. Surfaces render the posture; a &quot;production posture but fixture wiring&quot; combination is itself a degraded state.</p>
+<!-- truth: descriptive -->
+
+<h2>6. Closed lifecycle vocabulary (draft)</h2>
+<p>The vocabulary is draft. The intent is one closed set adopted by the API surface, member shell, and steward cockpit so consumers do not invent their own collapses of &quot;Accepted&quot; or &quot;Applied.&quot;</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Member-shell rendering</th>
+<th>Cockpit rendering</th>
+<th>Does NOT imply</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Draft</code></td>
+<td>&quot;Being prepared&quot;</td>
+<td>&quot;Draft&quot;</td>
+<td>governance has seen it</td>
+</tr>
+<tr>
+<td><code>Open</code></td>
+<td>&quot;Open for input&quot;</td>
+<td>&quot;Open&quot;</td>
+<td>a quorum exists</td>
+</tr>
+<tr>
+<td><code>Accepted/PendingEffect</code></td>
+<td>&quot;Accepted, effect pending&quot;</td>
+<td>&quot;Accepted, effect-plan emitted&quot;</td>
+<td>the effect has run</td>
+</tr>
+<tr>
+<td><code>Accepted/EmittedOnly</code></td>
+<td>&quot;Accepted, no evidence yet&quot;</td>
+<td>&quot;EmittedOnly&quot;</td>
+<td>the effect has applied</td>
+</tr>
+<tr>
+<td><code>Accepted/EvidencePending</code></td>
+<td>&quot;Accepted, awaiting evidence&quot;</td>
+<td>&quot;Evidence pending&quot;</td>
+<td>application succeeded</td>
+</tr>
+<tr>
+<td><code>Accepted/AppliedWithEvidence</code></td>
+<td>&quot;Applied&quot;</td>
+<td>&quot;Applied with evidence&quot;</td>
+<td>the act is final or non-reversible</td>
+</tr>
+<tr>
+<td><code>Accepted/PartialEffect</code></td>
+<td>&quot;Partially applied&quot;</td>
+<td>&quot;Partial effect&quot;</td>
+<td>the institution is in a clean state</td>
+</tr>
+<tr>
+<td><code>Accepted/DispatchFailed</code></td>
+<td>&quot;Failed to apply&quot;</td>
+<td>&quot;ExecutionFailed&quot;</td>
+<td>the proposal was rejected</td>
+</tr>
+<tr>
+<td><code>Accepted/Challenged</code></td>
+<td>&quot;Challenged&quot;</td>
+<td>&quot;Challenge window open&quot;</td>
+<td>the proposal is final</td>
+</tr>
+<tr>
+<td><code>Accepted/Reversed</code></td>
+<td>&quot;Reversed&quot;</td>
+<td>&quot;Reversed by subsequent decision&quot;</td>
+<td>the original act left no trace</td>
+</tr>
+<tr>
+<td><code>Accepted/AdministrativeShortcut</code></td>
+<td>&quot;Administrative action applied&quot;</td>
+<td>&quot;Administrative shortcut&quot;</td>
+<td>a ratified governance loop occurred</td>
+</tr>
+<tr>
+<td><code>Degraded/UnresolvedStanding</code></td>
+<td>&quot;Action paused until standing resolves&quot;</td>
+<td>&quot;Standing resolver degraded&quot;</td>
+<td>the actor has been judged ineligible</td>
+</tr>
+<tr>
+<td><code>Rejected</code></td>
+<td>&quot;Rejected&quot;</td>
+<td>&quot;Rejected&quot;</td>
+<td>the act cannot be re-proposed</td>
+</tr>
+<tr>
+<td><code>NoQuorum</code></td>
+<td>&quot;No quorum&quot;</td>
+<td>&quot;No quorum&quot;</td>
+<td>the institution is dysfunctional</td>
+</tr>
+</tbody></table>
+<p>The hard rule remains: a receipt of any kind never means &quot;legitimate and complete&quot; by default. Receipts prove specific events under specific authority bases; the surface vocabulary states which event.</p>
+<!-- truth: descriptive -->
+
+<h2>7. Authority shortcut policy</h2>
+<h3>7.1 What is an authority shortcut</h3>
+<p>A surface is an authority shortcut if it produces an institutional effect without traversing the proposal → decision → mandate → effect → evidence chain. Current shortcuts in the substrate:</p>
+<ul>
+<li><code>add_domain_member</code> / <code>remove_domain_member</code> (<code>handlers.rs:548-635</code>)</li>
+<li><code>activate_charter</code> direct path (<code>handlers.rs:694-744</code>)</li>
+<li>The single broad <code>governance:write</code> capability (<code>auth.rs:947</code>) when used to exercise any of the above</li>
+</ul>
+<p>Future shortcuts must be evaluated against this list and either added (with labeling) or rejected.</p>
+<h3>7.2 Labeling requirements</h3>
+<p>Every shortcut emits an administrative receipt (the artifact draft in §4.2 / §4.4). The receipt is rendered as <code>Accepted/AdministrativeShortcut</code> in surfaces (§6). API consumers receive a structured discriminator, not a free-text annotation; the surface is responsible for translating the discriminator to member-readable text.</p>
+<h3>7.3 Production allow-list</h3>
+<p>Each shortcut carries two flags in its administrative receipt: <code>production-allowed</code> and <code>post-pilot-allowed</code>. Deployment posture (§5) governs which flags are honored. A shortcut whose <code>production-allowed: false</code> flag is set refuses to execute in production deployments and surfaces an explicit &quot;this path is bootstrap-only&quot; error.</p>
+<!-- truth: descriptive -->
+
+<h2>8. Resolver / checker fail-closed policy</h2>
+<p>Production semantics, per §3.3 abuse story:</p>
+<table>
+<thead>
+<tr>
+<th>Resolver / checker</th>
+<th>Production absence</th>
+<th>Production unhealthy</th>
+<th>Production stale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>MemberStandingChecker</code></td>
+<td>fail-closed (write paths refuse)</td>
+<td>fail-degraded with banner</td>
+<td>fail-degraded with banner</td>
+</tr>
+<tr>
+<td><code>SuspensionChecker</code></td>
+<td>fail-closed (suspension-sensitive paths refuse)</td>
+<td>fail-blocked (route to non-suspension-sensitive path)</td>
+<td>fail-degraded</td>
+</tr>
+<tr>
+<td><code>MembershipResolver</code></td>
+<td>fail-closed for <code>TrustThreshold</code> write + close</td>
+<td>fail-blocked</td>
+<td>fail-degraded</td>
+</tr>
+<tr>
+<td>Steward authority checker</td>
+<td>fail-closed (steward authority paths refuse)</td>
+<td>fail-blocked</td>
+<td>fail-degraded</td>
+</tr>
+</tbody></table>
+<p>The current inline &quot;fail-open on resolver errors&quot; trade-off (<code>handlers.rs:1267-1268</code>) is a known production gap. The follow-up PR that lands per-site policy resolves it explicitly.</p>
+<!-- truth: descriptive -->
+
+<h2>9. Receipt semantics policy</h2>
+<p>Per §2.1 doctrine, receipts state what they prove. Receipt rendering layers in member shell and cockpit must distinguish:</p>
+<ul>
+<li><strong>Application receipts</strong> — the effect ran and applied.</li>
+<li><strong>Failure receipts</strong> — the effect ran and did not apply.</li>
+<li><strong>Partial receipts</strong> — the effect ran and applied to a known subset.</li>
+<li><strong>Emitted-only receipts</strong> — the effect plan exists; no subsystem has yet reported back.</li>
+<li><strong>Duplicate receipts</strong> — a retry produced a <code>Duplicate</code> outcome, not a fresh apply.</li>
+<li><strong>Administrative receipts</strong> — an authority shortcut ran; this is the §4.2 / §4.4 artifact.</li>
+<li><strong>Privacy-preserving existence receipts</strong> — a <code>PrivateEvidence</code> body exists; its scope, authority basis, and access path are renderable; its body is not.</li>
+<li><strong>Challenge receipts</strong> — a challenge has been filed; the original decision is not yet final.</li>
+<li><strong>Reversal receipts</strong> — a subsequent decision reversed an earlier one; the original receipts remain in the trail.</li>
+</ul>
+<p>No surface flattens any of these into a single &quot;Receipt issued&quot; affirmation.</p>
+<!-- truth: descriptive -->
+
+<h2>10. Governance parameter sanity strategy</h2>
+<p>Per §4.7. The follow-up PR fills in the per-band bounds; this section names the bands and the gate.</p>
+<ul>
+<li><code>fixture-valid</code> — anything that parses. Explicitly labeled in every surface.</li>
+<li><code>pilot-valid</code> — meets the minimum sanity bounds; safe for partner-bound rehearsal.</li>
+<li><code>production-valid</code> — meets pilot-valid plus the post-pilot tightening the institution declared in its CCL.</li>
+</ul>
+<p>A domain whose config is below its declared band refuses member-facing operation and renders as <code>Degraded/InsufficientGovernanceConfig</code> in both surfaces.</p>
+<!-- truth: descriptive -->
+
+<h2>11. Shell / cockpit fixture matrix</h2>
+<p>Per §4.8. Implementation lives in the testkit; the matrix here is the design contract.</p>
+<p>For every state listed in §6 and every shortcut listed in §7, a fixture asserts:</p>
+<ul>
+<li>the cockpit rendering name,</li>
+<li>the member-shell rendering name (member vocabulary),</li>
+<li>the receipt class actually emitted,</li>
+<li>the API discriminator returned,</li>
+<li>the parity invariant (if cockpit is degraded / shortcut / partial / pending / challenged, the shell is correspondingly so).</li>
+</ul>
+<p>The matrix runs as part of the testkit. A v0 violation (cockpit and shell disagree) fails the build.</p>
+<!-- truth: descriptive -->
+
+<h2>12. Privacy / ScopedVault abuse prevention</h2>
+<p>Per §4.9 and §2.9 doctrine. The regression test set covers:</p>
+<ul>
+<li>no <code>PrivateEvidence</code> body byte reaches any rendering layer,</li>
+<li>no &quot;debug preview&quot; path in any surface dereferences a private body,</li>
+<li>no API response includes a private body unless the caller holds the corresponding access mandate,</li>
+<li>access / export receipts are themselves first-class records and render as such.</li>
+</ul>
+<p>The existing digest-only rendering in <code>icn/crates/icn-kernel-api/src/proofs.rs:646-661</code> is the positive-precedent anchor.</p>
+<!-- truth: descriptive -->
+
+<h2>13. Typed-receipt atomicity inventory</h2>
+<p>Per §4.10. The follow-up PR fills in the matrix; this section lists the entry points to inventory.</p>
+<p>Entry points (<code>icn/apps/governance/src/receipt_backend.rs</code>):</p>
+<ul>
+<li><code>put_governance</code> (l. 42) — <code>GovernanceDecisionReceipt</code>.</li>
+<li><code>put_institutional_effect</code> (l. 80) — <code>InstitutionalEffectRecord</code>; default no-op (line 80 onward).</li>
+<li><code>put_effect_dispatch_evidence</code> (l. 106) — <code>EffectDispatchEvidence</code>; default no-op.</li>
+<li><code>put_mandate</code> (l. 146) — <code>Mandate</code>.</li>
+<li><code>put_authority_grant</code> (l. 248) — <code>AuthorityGrant</code>.</li>
+<li><code>put_mandate_with_grants</code> (l. 195) — composite; <strong>default is NOT atomic</strong> per the comment at lines 178-190; sled-backed gateway must override.</li>
+</ul>
+<p>For each: classify, document the gap (or lack of gap), and either migrate to opaque-store-grade atomicity, add a repair scan, or accept and document the weaker guarantee with an explicit reason.</p>
+<!-- truth: descriptive -->
+
+<h2>14. Implementation issue roster</h2>
+<p>Candidate follow-up issues, grouped by priority. <strong>Names are descriptive; no issue numbers are minted by this document.</strong> Each row names the track section, a code anchor, and a candidate label set (existing labels in the repo include <code>epic:trust-hardening</code>, <code>tier:1-correctness</code>, etc., per <code>.github/ISSUE_POLICY.md</code>).</p>
+<h3>P0 — production invariants and authority shortcuts</h3>
+<table>
+<thead>
+<tr>
+<th>Candidate title</th>
+<th>Track</th>
+<th>Anchor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>feat(rpc): split governance:write into per-act scopes (or mandate gating)</code></td>
+<td>§4.1</td>
+<td><code>icn/crates/icn-rpc/src/auth.rs:947</code></td>
+</tr>
+<tr>
+<td><code>feat(governance): emit BootstrapMembershipMutationReceipt on direct add/remove</code></td>
+<td>§4.2</td>
+<td><code>icn/apps/governance/src/http/handlers.rs:548-635</code></td>
+</tr>
+<tr>
+<td><code>feat(governance): emit BootstrapCharterActivationReceipt on /charters POST</code></td>
+<td>§4.4</td>
+<td><code>handlers.rs:694-744</code></td>
+</tr>
+<tr>
+<td><code>feat(runtime): production startup guard for optional checkers / resolvers</code></td>
+<td>§4.3, §5</td>
+<td><code>icn/apps/governance/src/http/configure.rs:197-264</code></td>
+</tr>
+</tbody></table>
+<h3>P1 — evidence and execution correctness</h3>
+<table>
+<thead>
+<tr>
+<th>Candidate title</th>
+<th>Track</th>
+<th>Anchor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>feat(governance): per-effect idempotency key (decision_hash, manifest_hash, effect_index)</code></td>
+<td>§4.6</td>
+<td><code>icn/apps/governance/src/dispatch_evidence.rs:34-87</code></td>
+</tr>
+<tr>
+<td><code>feat(governance): closed lifecycle vocabulary across API / shell / cockpit</code></td>
+<td>§4.5, §6</td>
+<td><code>dispatch_evidence.rs:131-169</code></td>
+</tr>
+<tr>
+<td><code>feat(governance): emitted_only / partial / failed API surface treatment</code></td>
+<td>§4.5, §9</td>
+<td><code>dispatch_evidence.rs:131-169</code></td>
+</tr>
+<tr>
+<td><code>feat(governance): resolver-degraded governance lifecycle (Degraded/UnresolvedStanding)</code></td>
+<td>§4.3, §6, §8</td>
+<td><code>handlers.rs:1267-1268</code></td>
+</tr>
+</tbody></table>
+<h3>P2 — surface regression</h3>
+<table>
+<thead>
+<tr>
+<th>Candidate title</th>
+<th>Track</th>
+<th>Anchor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>test(testkit): member shell / cockpit parity fixture matrix</code></td>
+<td>§4.8, §11</td>
+<td><code>docs/spec/member-shell-v0.md</code>, <code>docs/spec/steward-cockpit-v0.md</code></td>
+</tr>
+<tr>
+<td><code>test(testkit): no-greenwashing degraded-state assertions</code></td>
+<td>§4.8, §11</td>
+<td>same</td>
+</tr>
+<tr>
+<td><code>test(testkit): PrivateEvidence non-rendering regression</code></td>
+<td>§4.9, §12</td>
+<td><code>icn/crates/icn-kernel-api/src/proofs.rs:646-661</code></td>
+</tr>
+<tr>
+<td><code>test(testkit): stale / degraded / offline rendering parity</code></td>
+<td>§4.8, §11</td>
+<td>same</td>
+</tr>
+</tbody></table>
+<h3>P3 — governance sanity and receipt-store consistency</h3>
+<table>
+<thead>
+<tr>
+<th>Candidate title</th>
+<th>Track</th>
+<th>Anchor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>feat(ccl): pilot-ready governance profile bands and gate</code></td>
+<td>§4.7, §10</td>
+<td><code>icn/crates/icn-ccl/src/governance.rs:146-163</code></td>
+</tr>
+<tr>
+<td><code>chore(receipts): typed receipt write-path atomicity inventory</code></td>
+<td>§4.10, §13</td>
+<td><code>icn/apps/governance/src/receipt_backend.rs:42-248</code></td>
+</tr>
+<tr>
+<td><code>feat(receipts): repair scans for index skew on typed paths</code></td>
+<td>§4.10, §13</td>
+<td>same</td>
+</tr>
+<tr>
+<td><code>refactor(receipts): migrate typed paths toward opaque-store-grade atomicity</code></td>
+<td>§4.10, §13</td>
+<td>same</td>
+</tr>
+</tbody></table>
+<!-- truth: descriptive -->
+
+<h2>15. Open questions</h2>
+<p>The questions below are genuinely open; the strategy doc is descriptive of what production must look like, not prescriptive of how to encode the answer.</p>
+<ul>
+<li><strong>Scope decomposition vs mandate gating.</strong> Where does the line fall between kernel-side capability strings and ICN-native mandate / authority-grant gating? The doctrine in §4.1 keeps both available; the follow-up design PR picks per call site.</li>
+<li><strong>Administrative receipt class.</strong> Is <code>BootstrapCharterActivationReceipt</code> a new receipt class, or a discriminator on an existing administrative receipt type? The decision touches §4.2 (membership) as well as §4.4 (charters).</li>
+<li><strong>Closed lifecycle vocabulary owner.</strong> Does the vocabulary in §6 live in <code>icn-kernel-api</code> proofs (kernel-side, with apps emitting these states) or in the governance app (app-side, kernel sees only <code>Accepted</code> / <code>Rejected</code>)? The kernel/app boundary in <a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a> argues both ways depending on whether the state is a generic constraint or a domain semantic.</li>
+<li><strong>Degraded-state record class.</strong> Does resolver-degraded governance use the existing <code>SyncDegradedStatus</code> precedent (<code>icn/crates/icn-kernel-api/src/proofs.rs:1699-1739</code>) or introduce a separate <code>GovernanceDegradedStatus</code>?</li>
+<li><strong>Direct-mutation lifetime.</strong> After pilot formalization, does direct membership mutation remain as a labeled bootstrap path indefinitely, or is it removed entirely? The doctrine in §4.2 supports either; the institution that adopts ICN decides.</li>
+</ul>
+<!-- truth: descriptive -->
+
+<h2>16. Recommended sequencing</h2>
+<p>Implementation order, designed so the production-safety floor is in place before the surface-regression and governance-sanity layers land on top.</p>
+<h3>Stage A — documentation / control plane (this PR)</h3>
+<ol>
+<li>Strategy document (this file).</li>
+<li>Abuse-case review checklist embedded in the strategy doc (sections §3, §4).</li>
+<li>Closed lifecycle vocabulary (§6, draft).</li>
+<li>Production invariants (§5).</li>
+<li>Authority shortcut policy (§7).</li>
+</ol>
+<h3>Stage B — safety rails</h3>
+<ol>
+<li>Production config guard for optional checker / resolver wiring (§4.3, §5).</li>
+<li>Scope split design or mandate-gating design (§4.1) — design, then PR.</li>
+<li>Direct charter activation marked bootstrap-only (§4.4).</li>
+<li>Direct membership mutation marked bootstrap-only (§4.2).</li>
+<li>Fixture / dev / test exceptions made explicit and visibly labeled (§5).</li>
+</ol>
+<h3>Stage C — evidence correctness</h3>
+<ol>
+<li>Per-effect idempotency key (§4.6).</li>
+<li>Dispatch lifecycle status — closed vocabulary adoption (§4.5, §6).</li>
+<li>Emitted-only / partial / failed rendering requirements wired through the API (§9).</li>
+<li>Typed receipt atomicity inventory (§4.10, §13).</li>
+<li>Repair-scan strategy where needed.</li>
+</ol>
+<h3>Stage D — surface regression</h3>
+<ol>
+<li>Shell / cockpit fixture matrix (§4.8, §11).</li>
+<li>No-greenwashing degraded-state tests.</li>
+<li>PrivateEvidence non-rendering tests (§4.9, §12).</li>
+<li>Stale / degraded / offline parity tests.</li>
+<li>Bootstrap / direct-path labeling tests (§7.2).</li>
+</ol>
+<h3>Stage E — governance sanity</h3>
+<ol>
+<li>Pilot / member-facing governance profile gate (§4.7, §10).</li>
+<li>Challenge / review window requirement for high-impact effects.</li>
+<li>Minimum quorum / approval / voting-period sanity bands.</li>
+<li>Bootstrap-member threshold.</li>
+<li>Notification / accessibility requirements (cross-link to <code>ARCHITECTURE_DUE_DILIGENCE.md</code> §3.B).</li>
+</ol>
+<!-- truth: descriptive -->
+
+<h2>17. Non-claims preserved</h2>
+<p>This document does not imply or claim:</p>
+<ul>
+<li>production deployment, Phase 2 completion, or formal pilot status for any partner,</li>
+<li>live federation, live K3s / DNS / Forgejo mutation,</li>
+<li>live NYCN partner-data handling,</li>
+<li>new contract URN minting,</li>
+<li>new ADR or RFC creation,</li>
+<li>new runtime behavior, new schema fields, new wire formats,</li>
+<li>security-checklist coverage that overlaps <code>production-hardening.md</code> (transport, key management, replay defense),</li>
+<li>RBAC redesign in isolation from ICN&#39;s mandate / authority-grant model.</li>
+</ul>
+<p>NYCN remains the <strong>intended first cooperative partner</strong>, not a committed formal pilot.</p>
+<!-- truth: descriptive -->
+
+<h2>18. See also</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ARCHITECTURE_DUE_DILIGENCE">`ARCHITECTURE_DUE_DILIGENCE.md`</a> — twin upstream doctrines (convenience-vs-authority, participation-access); this document is the institutional-legitimacy-layer companion.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a> — meaning firewall; this document does not widen it.</li>
+<li><a href="/docs/spec/effect-dispatch-contract">`../spec/effect-dispatch-contract.md`</a> — five-stage chain referenced by §4.5 and §4.6.</li>
+<li><a href="/docs/spec/member-shell-v0">`../spec/member-shell-v0.md`</a> — member rendering vocabulary referenced by §6, §8, §11.</li>
+<li><a href="/docs/spec/steward-cockpit-v0">`../spec/steward-cockpit-v0.md`</a> — cockpit rendering and the cockpit-degraded → shell-degraded rule referenced by §4.8 and §11.</li>
+<li><a href="/docs/security/production-hardening">`../security/production-hardening.md`</a> — transport / crypto / replay layer; complementary, not overlapping.</li>
+<li><a href="/docs/STATE">`../STATE.md`</a> — living state; the sync block records this session&#39;s landing.</li>
+<li><a href="/docs/PHASE_PROGRESS">`../PHASE_PROGRESS.md`</a> — Phase 2 status remains ⏳ and partner-bound.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/.github/ISSUE_POLICY">`.github/ISSUE_POLICY.md`</a> — issue label taxonomy; the §14 roster uses these labels descriptively, not as a filing instruction.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
