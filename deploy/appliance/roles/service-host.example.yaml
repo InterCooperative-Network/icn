@@ -1,0 +1,67 @@
+# Role profile: service-host (EXAMPLE)
+#
+# Declarative example only. Not wired to runtime code.
+#
+# Service-host is the substrate beneath the governed services described
+# in docs/architecture/SERVICE_HOSTING_MODEL.md. Today it hosts nothing,
+# because GovernedServiceBinding is not yet implemented as runtime. The
+# role exists in the vocabulary so the path is settled.
+
+profile:
+  id: "service-host"
+  display_name: "Governed service host"
+  purpose: >
+    Hosts governed services (forge, auth, status, metrics, registry,
+    docs, institution-hosted services) once GovernedServiceBinding
+    becomes runtime. The substrate is ready; the binding mechanism is
+    forward-direction.
+
+enabled_services:
+  - "icnd.service"
+  # Future:
+  #   - icn-runtime-provider-oci.service   (containerized service hosting)
+  #   - icn-service-adapter-bus.service    (event-adapter dispatch)
+  #
+  # Today: no services are bound. Adding one is a governance act, not
+  # an image change.
+
+expected_ports:
+  gateway: 8080
+  peer_transport: 7777
+  rpc: 5601
+  metrics: 9100
+  # Hosted-service ports are declared per-binding, not in the role.
+
+storage_expectations:
+  data_dir: "/var/lib/icn"
+  custody_classes:
+    - "service-projection"   # service-local accounts and caches
+    - "scoped-vault"
+  retention: "per-binding; the binding declares its custody class"
+  backup_required: true
+  backup_path: "per-binding exit policy; see docs/spec/governed-service-binding.md"
+  notes: >
+    A service-host appliance must keep service-projection state distinct
+    from canonical institutional state. Service-local accounts are NOT
+    institutional authority (per SERVICE_HOSTING_MODEL.md §"Authority model").
+
+governed_service_responsibilities:
+  current: []
+  future:
+    - "Provide the oci-container runtime provider."
+    - "Surface service event streams as evidence per docs/architecture/SERVICE_HOSTING_MODEL.md §'Event model'."
+    - "Host the auth-bridge for OIDC sessions that map to DIDs and standing."
+    - "Host the forge once the sovereign forge plan lands."
+    - "Host the status surface, metrics surface, and registry once those bindings exist."
+
+non_claims:
+  - "Does not implement RuntimeProvider in Rust today."
+  - "Does not host the forge today."
+  - "Does not host the auth bridge today."
+  - "Does not authorize any service to run; that requires a GovernedServiceBinding (forward-direction)."
+
+production_warning: >
+  Selecting service-host on a scaffold-stage image does not host any
+  service. It only declares the intent. Real service hosting requires
+  the GovernedServiceBinding primitive and a runtime provider, neither
+  of which exists yet.

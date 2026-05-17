@@ -1,0 +1,46 @@
+[Unit]
+Description=ICN Appliance First-Boot Scaffold (oneshot)
+Documentation=file:///usr/share/doc/icn/DEBIAN_APPLIANCE_MODEL.md
+Documentation=https://github.com/InterCooperative-Network/icn
+# Run before icnd; if icnd isn't installed yet, the dependency is a no-op.
+Before=icnd.service
+# Network not required for the scaffold; first-boot does no remote calls.
+DefaultDependencies=yes
+# Skip if the marker is already present — see ConditionPathExists below.
+ConditionPathExists=!/var/lib/icn/.firstboot-complete
+
+[Service]
+Type=oneshot
+# RemainAfterExit=yes so `systemctl status` shows the unit as "active (exited)"
+# after a successful run, instead of "inactive (dead)". This makes the marker
+# inspectable from systemd and not just from the filesystem.
+RemainAfterExit=yes
+
+# The script is conservative and idempotent. It does not embed secrets,
+# does not start icnd, and does not enable any service. See:
+#   deploy/appliance/scripts/icn-appliance-firstboot.sh
+ExecStart=/usr/local/sbin/icn-appliance-firstboot
+
+# No environment file. The scaffold script writes its own env file to
+# /etc/icn/appliance.env only if absent.
+
+# Defensive defaults. The scaffold does not need write access to most
+# of the filesystem.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+# The scaffold needs to write the data, config, and log dirs.
+ReadWritePaths=/var/lib/icn /etc/icn /var/log/icn /etc/systemd/system
+
+# Bounded timeout. First-boot scaffold is filesystem ops only and should
+# complete in well under 60 seconds even on slow hardware.
+TimeoutStartSec=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=icn-appliance-firstboot
+
+[Install]
+WantedBy=multi-user.target

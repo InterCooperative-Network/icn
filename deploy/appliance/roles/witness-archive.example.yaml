@@ -1,0 +1,54 @@
+# Role profile: witness-archive (EXAMPLE)
+#
+# Declarative example only. Not wired to runtime code.
+#
+# Witness-archive observes a federation, retains state, and serves no
+# policy authority. It is the read-mostly node in a federation.
+
+profile:
+  id: "witness-archive"
+  display_name: "Witness / archive node"
+  purpose: >
+    Observes a federation and retains state for audit, replay, and
+    recovery. Does not exercise execution authority. Does not host
+    governed services that mutate state.
+
+enabled_services:
+  - "icnd.service"
+  # Future: icn-archive-retention.service (configurable retention policy)
+
+expected_ports:
+  gateway: 8080
+  peer_transport: 7777
+  rpc: 5601
+  metrics: 9100
+
+storage_expectations:
+  data_dir: "/var/lib/icn"
+  custody_classes:
+    - "archive-state"
+    - "federation-evidence"
+  retention: "long-lived; operator-configurable"
+  backup_required: true
+  backup_path: "operator-chosen; archive nodes are often the backup substrate themselves"
+  notes: >
+    A witness-archive should be sized for storage growth. Disk pressure
+    on this role degrades the entire federation's audit posture.
+
+governed_service_responsibilities:
+  current: []
+  future:
+    - "Serve as evidence source for steward-cockpit divergence rendering."
+    - "Host the metrics provider for the local-domain federation slice."
+    - "Surface anti-entropy probe results per docs/spec/network-anti-entropy-proof-loops.md."
+
+non_claims:
+  - "Does not vote, propose, or exercise execution authority."
+  - "Does not become canonical state by virtue of holding a copy."
+  - "Does not authorize federation membership; only observes it."
+
+production_warning: >
+  Witness-archive looks safe because it has no authority. It is not
+  safe to deploy a scaffold-stage appliance as a witness in a real
+  federation: divergence detection depends on the witness being honest
+  about what it stored. Use signed images only.

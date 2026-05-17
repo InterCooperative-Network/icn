@@ -1,0 +1,63 @@
+# Role profile: sandbox (EXAMPLE)
+#
+# Declarative example only. Not wired to runtime code.
+#
+# Sandbox is the disposable role. Use it for rehearsals, fixture work,
+# and local proof-loops. NEVER production.
+
+profile:
+  id: "sandbox"
+  display_name: "Sandbox / rehearsal node"
+  purpose: >
+    A disposable appliance used for rehearsals, fixture work, smoke
+    tests, and local proof-loops. State is assumed to be throw-away.
+    May use devnet-style overrides (deterministic identities, relaxed
+    timeouts, looser auth) where explicitly enabled.
+
+enabled_services:
+  - "icnd.service"
+
+# Sandbox accepts looser ports for local convenience but still respects
+# the canonical 8080 gateway floor. Overrides are explicit, not implicit.
+expected_ports:
+  gateway: 8080
+  peer_transport: 7777
+  rpc: 5601
+  metrics: 9100
+
+storage_expectations:
+  data_dir: "/var/lib/icn"
+  custody_classes:
+    - "ephemeral"
+  retention: "discardable"
+  backup_required: false
+  notes: >
+    Sandbox state is ephemeral. Operators should expect to wipe and
+    re-provision freely.
+
+governed_service_responsibilities:
+  current: []
+  future:
+    - "Host rehearsal fixtures (e.g., the receipt-index anti-entropy fixture, the member-shell rendering rehearsal, the steward-cockpit divergence-render fixture)."
+
+# Sandbox is the one role where some devnet patterns are allowed, but
+# they must be explicit, never the default, and never leak.
+sandbox_overrides:
+  allowed:
+    - "Deterministic identity material (operator-supplied seed)."
+    - "Relaxed gossip and anti-entropy timeouts."
+    - "Looser JWT / auth settings for local-only access."
+  forbidden:
+    - "Use of devnet's shared `devnet-insecure` JWT or passphrase."
+    - "Connecting to a real federation peer."
+    - "Holding any real partner / member / organizer data."
+
+non_claims:
+  - "Sandbox does not produce production receipts."
+  - "Sandbox does not participate in real federations."
+  - "Sandbox does not validate production claims; rehearsals are not production rehearsals unless explicitly named so."
+
+production_warning: >
+  SANDBOX IS NOT FOR PRODUCTION. The role exists so the rehearsal and
+  fixture work has an explicit named substrate. Treat any data on a
+  sandbox node as discardable. Treat any receipt emitted as non-binding.

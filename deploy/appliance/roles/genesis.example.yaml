@@ -1,0 +1,58 @@
+# Role profile: genesis (EXAMPLE)
+#
+# Declarative example only. Not wired to runtime code. The appliance does
+# not read this file today.
+#
+# Genesis is the first node in a new local domain. It bootstraps identity
+# and the local genesis state. It does not yet have peers.
+
+profile:
+  id: "genesis"
+  display_name: "Genesis node"
+  purpose: >
+    First node in a new local domain. Bootstraps identity, writes the
+    local genesis state, and serves as the initial peer until additional
+    nodes join.
+
+# Services this role expects to be running once the appliance reaches
+# state `running`. Service names are systemd unit names.
+enabled_services:
+  - "icnd.service"
+  # Future: domain-bootstrap.service (one-shot, governance act)
+
+# Network surfaces the role expects to expose. Anchored to icn-core
+# defaults; never 8000.
+expected_ports:
+  gateway: 8080
+  peer_transport: 7777
+  rpc: 5601
+  metrics: 9100
+
+# Storage expectations for this role.
+storage_expectations:
+  data_dir: "/var/lib/icn"
+  custody_classes:
+    - "local-domain-state"
+  retention: "indefinite-until-decommission"
+  backup_required: true
+  backup_path: "operator-chosen; see deploy/install.sh discipline"
+
+# Governed-service responsibilities. None today. Future genesis nodes may
+# host the initial GovernedServiceBindings for a new domain.
+governed_service_responsibilities:
+  current: []
+  future:
+    - "Host the first GovernedServiceBinding for the new domain (forward-direction)."
+    - "Hold initial steward-cockpit endpoint for the local domain."
+
+# Honest non-claims.
+non_claims:
+  - "No production federation activated by selecting this role."
+  - "No partner cooperative is implied to be running under genesis today."
+  - "Role does not grant authority; it grants substrate capacity only."
+
+production_warning: >
+  A genesis node is consequential. Before applying this profile on an
+  image intended to serve real members, the appliance must have reached
+  at least 'signed' status (see DEBIAN_APPLIANCE_MODEL.md image artifact
+  stages). The scaffold image is NOT signed and NOT for production use.
