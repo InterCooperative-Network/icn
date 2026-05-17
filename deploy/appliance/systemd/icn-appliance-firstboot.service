@@ -32,6 +32,15 @@ ProtectHome=true
 PrivateTmp=true
 
 # The scaffold needs to write the data, config, and log dirs.
+#
+# Account database (/etc/passwd, /etc/shadow, /etc/group, /etc/gshadow) is
+# intentionally NOT in ReadWritePaths: under ProtectSystem=strict the script
+# cannot run `useradd` at runtime. The appliance image's build-image.sh
+# pre-creates the `icn` system user during virt-customize, so the firstboot
+# script's user-creation branch is a no-op on the appliance. The branch is
+# kept for non-appliance invocations of the script (operator runs it manually
+# in a less-restricted environment); under strict mode it would log and exit
+# cleanly because the user already exists.
 ReadWritePaths=/var/lib/icn /etc/icn /var/log/icn /etc/systemd/system
 
 # Bounded timeout. First-boot scaffold is filesystem ops only and should

@@ -228,8 +228,13 @@ APPLIANCE_MANIFEST_EXAMPLE="$APPLIANCE_DIR/appliance.manifest.example.yaml"
 FIRSTBOOT_SCRIPT="$APPLIANCE_DIR/scripts/icn-appliance-firstboot.sh"
 FIRSTBOOT_UNIT="$APPLIANCE_DIR/systemd/icn-appliance-firstboot.service"
 ICND_SERVICE="$DEPLOY_DIR/icnd.service"
+# Appliance-only drop-in for icnd.service that adds Requires=/After=/
+# ConditionPathExists= against icn-appliance-firstboot.service. The base
+# icnd.service from deploy/ is shared with native installs, so we layer
+# the appliance-specific dependency via a drop-in instead of editing it.
+ICND_DROPIN="$APPLIANCE_DIR/systemd/icnd.service.d/10-firstboot-gate.conf"
 
-for f in "$FIRSTBOOT_SCRIPT" "$FIRSTBOOT_UNIT" "$ICND_SERVICE" "$APPLIANCE_MANIFEST_EXAMPLE"; do
+for f in "$FIRSTBOOT_SCRIPT" "$FIRSTBOOT_UNIT" "$ICND_SERVICE" "$ICND_DROPIN" "$APPLIANCE_MANIFEST_EXAMPLE"; do
     if [ ! -f "$f" ]; then
         err "Expected source file missing: $f"
         exit 7
@@ -256,6 +261,10 @@ VIRT_CUSTOMIZE_ARGS=(
 
     --copy-in "$ICND_SERVICE:/etc/systemd/system"
     --copy-in "$FIRSTBOOT_UNIT:/etc/systemd/system"
+
+    # Appliance drop-in that gates icnd.service on firstboot success.
+    --mkdir /etc/systemd/system/icnd.service.d
+    --copy-in "$ICND_DROPIN:/etc/systemd/system/icnd.service.d"
 
     --copy-in "$FIRSTBOOT_SCRIPT:/usr/local/sbin"
     --run-command "chmod +x /usr/local/sbin/icn-appliance-firstboot.sh"
