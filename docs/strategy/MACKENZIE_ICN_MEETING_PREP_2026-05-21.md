@@ -12,6 +12,12 @@ This packet adapts the [Thursday meeting brief](ICN_THURSDAY_MEETING_BRIEF_2026-
 
 Treat Summit-organizing reality as shared ground. No 101 on committees, sponsor outreach, accessibility planning, registration, or handoff pain. Mackenzie knows.
 
+## 0. Why McKenzie is the right person for this conversation
+
+McKenzie Jones has worked the Summit for two-plus years and sits squarely at the **content / logistics seam** — speakers, sessions, the final schedule, room layout, interpretation, presenter support, translated descriptions, the public program, run-of-show, and post-event handoff. That seam is where ICN's spine gets stress-tested most honestly. It is not abstract governance; it is "we said this would happen, did it, how do we prove it, and how does next year's chair learn from it?"
+
+The other reason: McKenzie carries institutional memory across Summit cycles. Most of what ICN is trying to make durable — what a body decided, what it promised, what it actually delivered, what survived the chair rotation — is exactly the load she has been carrying in spreadsheets, threads, and head-state. If the spine looks real from her vantage, the project has a foothold. If it looks wrong, that is the single most useful signal we will get this month.
+
 ## 1. The cooperative-movement problem
 
 Cooperatives have democratic values and almost no owned digital infrastructure to run those values on. Governance lives in Loomio, Google Forms, and Slack threads. Accounting lives in QuickBooks or a spreadsheet. Membership lives in a Mailchimp list. Inter-organizational coordination lives in email. Each piece is owned by a landlord. When the landlord changes terms, prices, or politics, institutional memory walks with them — and there is no way to prove to a funder, accountant, partner co-op, or future organizer that a decision actually happened, by whom, under what authority, without asking them to trust the organization's word for it.
@@ -42,6 +48,21 @@ Summit already contains the real workflow: committees, chairs, sponsor outreach,
 - **Review / federation** — outside verification: a funder, a partner co-op, a future organizer, an accountant. Today: trust the organizer's word. Tomorrow: receipts and provenance the outside party can verify without trusting us.
 
 These are not future promises Mackenzie needs to take on faith. They are the layers ICN is trying to build, and the question for Thursday is whether the layers look real from inside Summit organizing.
+
+## 3a. What the Summit materials show
+
+Looking at NYCN's existing record, the Summit is already shaped like a recurring democratic institution rather than an event:
+
+- A **yearly cycle** that touches recruitment, charter, committee formation, fundraising, content, accessibility, marketing, logistics, run-of-show, post-event feedback, and the carryover into the next year.
+- A **content / logistics seam** that runs from a session idea, through speaker outreach and confirmation, through bio / headshot / description collection, through support and interpretation needs, through room and material needs, through schedule placement and public program publication, through run-of-show, to post-event material collection. This is the part the public sees; it is also the part where memory gets lost most often.
+- A **feedback loop**: raw attendee feedback (much of it private) → anonymized themes → organizer review → decision to act, defer, or reject → next-year planning obligations → evidence the decision was honored.
+- **Accessibility and care obligations** held by a small group, often without durable records that survive a chair rotation. The institution learns slowly across years because the evidence does not travel safely.
+- **Sponsor, funder, and accountability trails** with real obligations on both sides, often tracked in forwarded threads.
+- **Multilingual materials** and translated descriptions whose status (drafted / reviewed / published / outdated) sits in someone's head.
+- A persistent **organizer-load and handoff problem**: exhausted people become the database; when they rotate out, the institutional memory walks with them.
+- **Movement follow-through**: attendees who said they wanted to help, who never got contacted because the list of "people who said yes" did not survive the week after Summit.
+
+The Summit is therefore the first realistic **institutional laboratory** for ICN — not a generic event use case. The point is not to "demo ICN at Summit." The point is that Summit already does the work ICN is trying to make legible, and the question is which slice of that work would benefit from receipts, evidence, and durable obligation memory without making organizers carry yet another tool.
 
 ## 4. The roles ICN intends to fill
 
@@ -115,10 +136,23 @@ Not a launch. Not a pilot announcement. A tabletop walkthrough against fictional
 
 ## 6. The walkthrough — one Summit workflow, through the spine
 
-Two candidates. Pick whichever fits where Mackenzie's earlier answers land. Walk it through the spine in seven short beats; after each beat ask:
+Three candidates. **Candidate A is the primary** — it lives at the content / logistics seam where McKenzie's experience is deepest. Candidate B (sponsor commitment) and Candidate C (accessibility accommodation) are secondary; reach for them only if her earlier answers point that way. Walk whichever candidate is used through the spine, beat by beat; after each beat ask:
 > *How does this happen for you today? What would change if there were a receipt at this step?*
 
-### Candidate A — Sponsor commitment
+### Candidate A — Content / session → public program (PRIMARY)
+*Good for: McKenzie's actual workflow seam — speakers, sessions, run-of-show, multilingual material, post-event collection.*
+
+- **Standing** — the content / program committee, with the session-curation mandate delegated by the steering body, alongside an interpretation / translation steward role.
+- **Authority** — charter section authorizing the committee to issue invitations, confirm slots, request bios / headshots / descriptions, and bind the organization to specific support, interpretation, room, and material commitments within the approved program-track scope.
+- **Decision** — committee accepts a session idea and decides to invite Speaker Y.
+- **Obligation** — Speaker Y owes a bio, a headshot, and a session description (with translation if needed) by date D; the committee owes Speaker Y a slot, a room, listed materials, interpretation if requested, and any agreed support arrangement (compensation, travel logistics, accessibility provisions).
+- **Effect** — bio / headshot / description collected; translation reviewed; schedule slot assigned; public program updated; room and material requests routed to logistics; interpretation booked; run-of-show role assigned; day-of confirmations sent.
+- **Receipt** — each step is acknowledged: speaker confirms, materials received, translation reviewed, schedule entry published, day-of role confirmed, post-event material collected. Each acknowledgement is a small receipt the next chair can audit.
+- **Evidence** — post-Summit, a future program chair can ask "for last year's Summit, which sessions ran, with which speakers, in which slots, with what support arrangements honored, and what was missed?" — and get a readable answer without backchanneling.
+
+This is the candidate to walk first. It pulls on the seam Mackenzie has lived in, surfaces multilingual / accessibility / support obligations naturally, and ends on the handoff problem that recurs every year.
+
+### Candidate B — Sponsor commitment (SECONDARY)
 *Good for: external proof, obligations, future fundraising handoff.*
 
 - **Standing** — the outreach committee, with the sponsorship clause delegated by the steering body.
@@ -129,7 +163,7 @@ Two candidates. Pick whichever fits where Mackenzie's earlier answers land. Walk
 - **Receipt** — each deliverable confirmed; the sponsor's counter-deliverable acknowledged.
 - **Evidence** — post-Summit, the record survives in a form a future fundraising chair can read without backchanneling six people.
 
-### Candidate B — Accessibility accommodation request
+### Candidate C — Accessibility accommodation request (SECONDARY)
 *Good for: privacy boundaries, care obligations, learning across years.*
 
 - **Standing** — the accessibility committee, with charter authority to commit resources for accommodations within the committee's pre-approved scope.
@@ -140,7 +174,7 @@ Two candidates. Pick whichever fits where Mackenzie's earlier answers land. Walk
 - **Receipt** — the requesting party confirms the accommodation met the need.
 - **Evidence** — post-Summit, the record exists in a form that lets next year's accessibility chair learn what worked and what didn't, without seeing private medical or personal details.
 
-Both candidates are intentionally abstract enough to map to anyone's experience. Neither uses real NYCN/Summit private records.
+All three candidates are intentionally abstract enough to map to anyone's Summit experience. None uses real NYCN/Summit private records.
 
 ## 7. The 90-second spoken explanation
 
@@ -156,11 +190,24 @@ Say this out loud. Not to read — to speak in Matt's voice. Direct, serious, no
 
 Ask one at a time. Leave silence after each one. Do not stack questions.
 
-- Where in Summit work have you seen institutional memory actually get lost?
-- Which Summit workflow would be worth rehearsing under this spine — and which would be a waste of it?
-- Which decisions need proof later, and who needs that proof — funders, members, accountants, partner co-ops, future versions of you?
+**On institutional memory and the content / logistics seam:**
+- Where in the session → public program flow does institutional memory actually get lost?
+- What never makes it from one Summit into the next year's planning, even though it should?
+- Which step in speaker outreach / confirmation / support / translation / run-of-show would benefit most from a small durable receipt?
+
+**On feedback becoming next-year obligation:**
+- How does attendee feedback turn into a next-year planning decision today — when it does turn into one at all?
+- What feedback never reaches the committee that could have acted on it?
+- What does the gap between "we heard this" and "we decided to do something about it" look like in practice?
+- What would change if a committee could see "here is the anonymized theme; here is the obligation we accepted last year; here is the evidence we honored it" before this year's planning starts?
+
+**On boundaries:**
 - What must stay human and process-first? Where is the right anti-software boundary?
+- What information should expire, get deleted, or never be public?
 - What would make this trustworthy to organizers — and what would make it untrustworthy?
+
+**On the smallest honest rehearsal:**
+- Which Summit workflow would be worth rehearsing under this spine — and which would be a waste of it?
 - What is the smallest sanitized / tabletop rehearsal that's worth a meeting?
 - Who else should be in this conversation — accountants, lawyers, mutual-aid operators, federation organizers — that we haven't invited yet?
 
