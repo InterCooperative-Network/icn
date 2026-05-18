@@ -67,7 +67,7 @@ git rev-parse --show-toplevel
 test -f Cargo.toml && echo "Rust root" || echo "Not Rust root"
 ```
 
-**Crates** (34 in `icn/crates/`):
+**Crates** (38 in `icn/crates/`; principal crates listed below):
 - `icn-core` - Tokio runtime, supervisor, actor lifecycle management
 - `icn-identity` - DID generation, Ed25519 keypairs, Age-encrypted keystore
 - `icn-trust` - Trust graph storage & transitive trust computation
