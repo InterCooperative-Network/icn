@@ -118,6 +118,36 @@ Blast-radius classification:
 - **Very low blast radius** — social interaction overlay: comments,
   reactions.
 
+### 3.1 Additional `governance:write` surfaces outside `apps/governance`
+
+A workspace-wide search for `"governance:write"` finds 74 references
+total. The 45 handlers in `apps/governance/src/http/handlers.rs` are
+the bulk of those, but three more *gateway* surfaces and one *JSON-RPC*
+surface also gate on `governance:write` and must be migrated (or
+explicitly scoped out) before the retirement step in §10 can run:
+
+- `icn/crates/icn-gateway/src/api/flow_c.rs:52` — `cast_vote_alias`
+  (REST alias for `cast_vote`) → maps to `governance:proposal:write`.
+- `icn/crates/icn-gateway/src/api/registry.rs:497` — `create_meeting`
+  (decision-registry meeting create) → maps to
+  `governance:meeting:write`.
+- `icn/crates/icn-gateway/src/api/registry.rs:593` —
+  `index_decision_endpoint` (decision-registry indexing) → likely maps
+  to `governance:proposal:write` (it records a decision); confirm with
+  the registry owner during migration.
+- `icn/crates/icn-rpc/src/auth.rs:1009-1014` —
+  `required_scope_for_method` maps the JSON-RPC methods
+  `governance.domain.create` → `governance:charter:write`;
+  `governance.proposal.create`, `governance.proposal.open`,
+  `governance.proposal.close`, `governance.vote.cast` →
+  `governance:proposal:write`. The mapping table is the migration
+  point for all five JSON-RPC methods at once.
+
+The retirement step in §10 cannot succeed until each of these is
+migrated or explicitly scoped out. None of them are in the original
+45-handler inventory above because they live outside
+`apps/governance/src/http/handlers.rs`.
+
 ## 4. The three paths
 
 <!-- truth: descriptive -->
@@ -358,7 +388,17 @@ hashes. App-side mandate semantics remain in the app.
    membership.
 9. **Migrate `governance:activity:write`.** Same.
 10. **Migrate `governance:comment:write`.** Same.
-11. **Retire `governance:write` constant** once no handler references it.
+11. **Migrate non-app surfaces.** Before retirement, migrate the
+    three additional gateway routes
+    (`icn-gateway/src/api/flow_c.rs:52`,
+    `icn-gateway/src/api/registry.rs:497, 593`) and update the JSON-RPC
+    method→scope mapping in `icn-rpc/src/auth.rs:1009-1014` so the five
+    governance JSON-RPC methods route to their class-level scopes per
+    §3.1.
+12. **Retire `governance:write` constant** once no production code
+    references it anywhere in the workspace (verified by a workspace-wide
+    `rg '"governance:write"'` returning only test fixtures, archived
+    docs, or this design document).
 
 Each follow-up PR is independently mergeable; the order above is a
 recommendation, not a constraint. The retire step is the only one that
@@ -407,6 +447,9 @@ Reviewers and follow-up PRs answer these. None of them block this design.
 - `icn/crates/icn-rpc/src/auth.rs:947` — `GOVERNANCE_WRITE` constant
 - `icn/crates/icn-gateway/src/validation.rs:42-54` — `ALLOWED_SCOPES` gateway allowlist (must grow with each new class scope; mint step's co-requisite)
 - `icn/crates/icn-gateway/src/api/auth.rs:85-94` — gateway scope-validating auth endpoint that consumes `ALLOWED_SCOPES`
+- `icn/crates/icn-gateway/src/api/flow_c.rs:52` — `cast_vote_alias`, additional `governance:write` site outside `apps/governance`
+- `icn/crates/icn-gateway/src/api/registry.rs:497, 593` — `create_meeting` and `index_decision_endpoint`, additional `governance:write` sites
+- `icn/crates/icn-rpc/src/auth.rs:1009-1014` — `required_scope_for_method` JSON-RPC method→scope mapping; five governance methods bind to `GOVERNANCE_WRITE` and must rebind to class scopes
 - `icn/apps/governance/src/http/handlers.rs:283` — `require_scope` call inside `extract_federation_common` (lines 277-) that gates the seven federation-treaty proposal handlers at `:2927, :2967, :2997, :3034, :3062, :3097, :3125`
 - `icn/apps/governance/src/http/handlers.rs:391, 554, 599, 699, 756, 1090, 1182, 1701, 2211–2812, 3178, 3258, 3421, 3476, 3517, 3684, 3762, 3812, 3854, 3910, 3956, 3997, 4141, 4223, 4304` — inline call sites
 - `docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md` §2.7, §4.1, §4.2, §4.4, §7
