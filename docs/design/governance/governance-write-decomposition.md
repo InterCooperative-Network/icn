@@ -33,13 +33,13 @@ here.
 <!-- truth: descriptive -->
 
 The kernel-side capability scope `GOVERNANCE_WRITE = "governance:write"`
-(`icn/crates/icn-rpc/src/auth.rs:947`) is the single string required by 38
+(`icn/crates/icn-rpc/src/auth.rs:947`) is the single string required by 45
 distinct governance mutation handlers in
 `icn/apps/governance/src/http/handlers.rs`. Any holder of a
-`governance:write`-bearing capability token can call any of them: domain
-creation, charter activation, membership mutation, proposal lifecycle
-transitions, mandate operations, meeting lifecycle, action items, comments,
-reactions.
+`governance:write`-bearing capability call any of them: domain creation,
+charter activation, membership mutation, proposal lifecycle transitions,
+federation-treaty proposals, mandate operations, meeting lifecycle,
+action items, comments, reactions.
 
 The kernel cannot distinguish these acts. No mandate-bundle layer above
 the capability sits between bearer and effect. Whether the long-term fix
@@ -48,7 +48,14 @@ gating (app-side enforcement) is the open question recorded in
 `ABUSE_CASE_HARDENING_STRATEGY.md` §4.1.
 
 The original issue text undercounted the gated handlers as roughly 12;
-the actual count from a fresh enumeration is **38**.
+a fresh enumeration finds **45** — 38 with inline `require_scope` calls,
+plus 7 federation-proposal handlers (`create_join_federation_proposal`,
+`create_leave_federation_proposal`, `create_establish_clearing_proposal`,
+`create_terminate_clearing_proposal`, `create_vouch_proposal`,
+`create_revoke_vouch_proposal`, `create_update_federation_policy_proposal`)
+that route through the `extract_federation_common` helper
+(`handlers.rs:277`), whose own `require_scope` call (line 283) gates the
+entire family.
 
 ## 2. Doctrine
 
@@ -77,9 +84,14 @@ mandate is what the institution proves.
 
 <!-- truth: descriptive -->
 
-Enumerated from `icn/apps/governance/src/http/handlers.rs` by walking each
-`require_scope::<BasicClaims>(_, "governance:write")` call site to its
-enclosing handler. 38 unique handlers, 38 call sites.
+Enumerated from `icn/apps/governance/src/http/handlers.rs` by two passes:
+(1) walking each `require_scope::<BasicClaims>(_, "governance:write")`
+call site to its enclosing handler, and (2) finding every public handler
+that calls `extract_federation_common` (`handlers.rs:277`), which itself
+holds a `require_scope` at line 283. The second pass is necessary because
+federation-proposal handlers delegate their scope check to that helper
+and therefore have no inline `require_scope` line of their own. **45**
+unique handlers in total — 38 inline + 7 via the helper.
 
 | Group | Handlers |
 |---|---|
@@ -87,6 +99,7 @@ enclosing handler. 38 unique handlers, 38 call sites.
 | **Proposal lifecycle** | `create_proposal`, `open_proposal`, `close_proposal`, `cast_vote` |
 | **Steward proposals** | `create_appoint_steward_proposal`, `create_remove_steward_proposal`, `assign_role` |
 | **Delegation** | `create_delegation`, `revoke_delegation` |
+| **Federation-treaty proposals** (gated via `extract_federation_common`) | `create_join_federation_proposal`, `create_leave_federation_proposal`, `create_establish_clearing_proposal`, `create_terminate_clearing_proposal`, `create_vouch_proposal`, `create_revoke_vouch_proposal`, `create_update_federation_policy_proposal` |
 | **Meeting lifecycle** | `create_meeting`, `start_meeting`, `end_meeting`, `add_agenda_item`, `update_agenda_item`, `add_attendee`, `mark_attendance` |
 | **Action items** | `create_action_item`, `update_action_item`, `update_action_item_status`, `delete_action_item`, `add_action_item_note` |
 | **Activities / programs / structures / milestones** | `create_activity`, `create_program`, `create_structure`, `create_milestone`, `update_milestone_status`, `update_program_status`, `link_activity_to_program`, `unlink_activity_from_program` |
@@ -96,7 +109,8 @@ Blast-radius classification:
 
 - **High blast radius** — alters who governs or what authority exists:
   `create_domain`, `activate_charter`, `add_domain_member`,
-  `remove_domain_member`, `assign_role`.
+  `remove_domain_member`, `assign_role`, and the federation-treaty
+  proposal handlers (cross-cooperative authority).
 - **Medium blast radius** — alters decisions, mandates, or delegations:
   proposal lifecycle, steward proposals, delegation, milestone status.
 - **Low blast radius** — alters institutional record but not authority:
@@ -115,7 +129,7 @@ Each handler gets its own scope string. Kernel sees finer evidence.
 - *Pro.* Kernel evidence is precise; tokens describe specific acts.
 - *Pro.* Mechanically simple — a single-line const plus a per-handler
   string change.
-- *Con.* Scope explosion. 38 handlers means 38 scopes, with churn every
+- *Con.* Scope explosion. 45 handlers means 45 scopes, with churn every
   time a handler is added.
 - *Con.* A capability holder still has unbounded authority *within* the
   chosen scope. `governance:proposal:cast_vote` lets the bearer vote on
@@ -169,9 +183,9 @@ beyond ordinary membership.
 <!-- truth: normative -->
 
 **Adopt the hybrid (§4.3).** Decompose to a small class-level scope set
-plus an app-side mandate gate for high- and medium-blast-radius acts.
-Low-blast-radius acts (comments, reactions, ordinary meeting record
-keeping) are mandate-exempt but still class-gated.
+(seven proposed classes — see §6) plus an app-side mandate gate for high-
+and medium-blast-radius acts. Low-blast-radius acts (comments, reactions,
+ordinary meeting record-keeping) are mandate-exempt but still class-gated.
 
 Rationale:
 
@@ -179,7 +193,7 @@ Rationale:
    are not in tension"). The hybrid is the literal reading of the
    strategy.
 2. Per-action scopes (§4.1) trade one big problem (broad capability) for
-   38 small problems (per-action authority that still cannot bind to a
+   45 small problems (per-action authority that still cannot bind to a
    target). The hybrid keeps the kernel surface small.
 3. Pure mandate gating (§4.2) leaves the broad kernel capability in place;
    one missed mandate-check call is a full bypass. The hybrid narrows the
@@ -191,14 +205,18 @@ Rationale:
 
 <!-- truth: descriptive -->
 
-Six class-level scopes. The strings are proposals; the follow-up issue
-that mints them will RFC the names.
+Seven class-level scopes. The strings are proposals; the follow-up issue
+that mints them will RFC the names. The federation class is sanctioned by
+`ABUSE_CASE_HARDENING_STRATEGY.md` §4.1 (candidate
+`governance:federation:propose`); the binding here uses the broader
+`:write` suffix for symmetry with the other six classes.
 
 | Scope (proposed) | Handlers | Mandate required (in production) |
 |---|---|---|
 | `governance:charter:write` | `create_domain`, `activate_charter`, `add_domain_member`, `remove_domain_member` | Yes — every act is high blast radius. For bootstrap, see §4.4 of `ABUSE_CASE_HARDENING_STRATEGY.md` (administrative shortcut artifact). |
 | `governance:proposal:write` | `create_proposal`, `open_proposal`, `close_proposal`, `cast_vote`, `create_appoint_steward_proposal`, `create_remove_steward_proposal`, `create_delegation`, `revoke_delegation` | Yes for close/cast and steward proposals; ratified-membership-only for proposal creation and delegation (mandate equivalent to membership-in-good-standing). |
-| `governance:steward:write` | `assign_role` (and any future direct-mutation steward operations) | Yes — steward authority cannot be granted by a bare token. |
+| `governance:steward:write` | `assign_role` (and any future direct-mutation steward operations) | Yes — steward authority cannot be granted by a bare capability. |
+| `governance:federation:write` | `create_join_federation_proposal`, `create_leave_federation_proposal`, `create_establish_clearing_proposal`, `create_terminate_clearing_proposal`, `create_vouch_proposal`, `create_revoke_vouch_proposal`, `create_update_federation_policy_proposal` | Yes — every act alters cross-cooperative authority. Mandate equivalent to "ratified domain authority to bind this domain into a federation treaty". The `extract_federation_common` helper at `handlers.rs:277` is the single migration point for this class. |
 | `governance:meeting:write` | `create_meeting`, `start_meeting`, `end_meeting`, `add_agenda_item`, `update_agenda_item`, `add_attendee`, `mark_attendance`, `create_action_item`, `update_action_item`, `update_action_item_status`, `delete_action_item`, `add_action_item_note` | No mandate beyond membership-in-good-standing for routine meeting record-keeping. Steward-only meeting acts (if any are added later) escalate to `governance:steward:write`. |
 | `governance:activity:write` | `create_activity`, `create_program`, `create_structure`, `create_milestone`, `update_milestone_status`, `update_program_status`, `link_activity_to_program`, `unlink_activity_from_program` | No mandate beyond membership-in-good-standing for routine activity record-keeping. |
 | `governance:comment:write` | `add_comment`, `edit_comment`, `delete_comment`, `add_reaction`, `remove_reaction` | No mandate beyond membership-in-good-standing. Edit/delete is restricted to the original author; this is an app-level check, not a kernel check. |
@@ -246,7 +264,7 @@ This document only touches the write side. Read scopes
 
 | Property | Before | After |
 |---|---|---|
-| Capability strings recorded per write | 1 (`governance:write`) | 1 of 6 class-level scopes |
+| Capability strings recorded per write | 1 (`governance:write`) | 1 of 7 class-level scopes |
 | Per-class evidence on the kernel side | None | Yes — kernel records which class scope was presented |
 | Mandate reference in receipt | None | High/medium-blast acts: `MandateGrant` hash recorded; low-blast: explicit `no_mandate_required` discriminator |
 | Per-target binding visible to kernel | None | None — still in the app. The kernel does not learn what `domain_id` or `proposal_id` mean. |
@@ -266,9 +284,12 @@ hashes. App-side mandate semantics remain in the app.
 - `governance:read` and all other capability scopes
   (`network:write`, `ledger:write`, `contract:write`, …).
 - The `require_scope` helper in `icn-rpc`. It still takes a `&str`. The
-  six class-level scopes are added as constants alongside
+  seven class-level scopes are added as constants alongside
   `GOVERNANCE_WRITE`; the old constant remains until every handler is
-  migrated.
+  migrated. The `extract_federation_common` helper at `handlers.rs:277`
+  switches from `governance:write` to `governance:federation:write` as
+  the single change point that migrates all seven federation-proposal
+  routes.
 - The administrative-shortcut artifact shape from
   `ABUSE_CASE_HARDENING_STRATEGY.md` §4.2 / §4.4. The hybrid path is
   orthogonal to whether `add_domain_member`/`activate_charter` remain
@@ -299,7 +320,7 @@ hashes. App-side mandate semantics remain in the app.
 
 <!-- truth: descriptive -->
 
-1. **Mint the six class-level scope constants.** Pure addition; old
+1. **Mint the seven class-level scope constants.** Pure addition; old
    constant retained. No handler changes.
 2. **Migrate `governance:charter:write`** — `create_domain`,
    `activate_charter`, `add_domain_member`, `remove_domain_member`. Pairs
@@ -307,18 +328,23 @@ hashes. App-side mandate semantics remain in the app.
    #1870 (TrustThreshold fail-open on direct membership mutation), both
    already open.
 3. **Migrate `governance:steward:write`** — `assign_role`. Small.
-4. **Build the `MandateGate` trait, types, and persistence backing.**
+4. **Migrate `governance:federation:write`** — single edit to
+   `extract_federation_common` at `handlers.rs:277` migrates all seven
+   federation-proposal handlers at once. Pairs naturally with any
+   federation-treaty hardening (`icn-federation` invariants).
+5. **Build the `MandateGate` trait, types, and persistence backing.**
    Independent of any handler migration; lands before any handler starts
    calling it.
-5. **Wire the mandate-check for `governance:charter:write` acts.**
-   First class to require mandates.
-6. **Migrate `governance:proposal:write`.** Pairs with mandate-check for
+6. **Wire the mandate-check for `governance:charter:write` and
+   `governance:federation:write` acts.** First two classes to require
+   mandates.
+7. **Migrate `governance:proposal:write`.** Pairs with mandate-check for
    close/cast/steward-proposal acts.
-7. **Migrate `governance:meeting:write`.** No mandate-check beyond
+8. **Migrate `governance:meeting:write`.** No mandate-check beyond
    membership.
-8. **Migrate `governance:activity:write`.** Same.
-9. **Migrate `governance:comment:write`.** Same.
-10. **Retire `governance:write` constant** once no handler references it.
+9. **Migrate `governance:activity:write`.** Same.
+10. **Migrate `governance:comment:write`.** Same.
+11. **Retire `governance:write` constant** once no handler references it.
 
 Each follow-up PR is independently mergeable; the order above is a
 recommendation, not a constraint. The retire step is the only one that
@@ -344,14 +370,19 @@ nothing in the implementation phase has invalidated them.
 
 <!-- truth: descriptive -->
 
-1. Are six classes the right granularity, or should `activity` and
+1. Are seven classes the right granularity, or should `activity` and
    `meeting` collapse into one `governance:org:write`?
 2. Should `assign_role` move under `governance:charter:write` (since it
    alters who has authority) instead of its own `governance:steward:write`?
-3. Should the mandate-check for `cast_vote` be the same shape as the
+3. Should federation-treaty proposals route through `governance:proposal:write`
+   instead of their own class, since each is technically a *proposal*?
+   Counter-argument: the blast radius is cross-cooperative, which is
+   categorically different from intra-domain proposals, and the
+   `extract_federation_common` helper already makes them a natural unit.
+4. Should the mandate-check for `cast_vote` be the same shape as the
    mandate-check for `close_proposal`, or do they need different
    `MandateAct` variants?
-4. Comment/reaction edit-restriction-to-author is an app-level
+5. Comment/reaction edit-restriction-to-author is an app-level
    per-resource check. Should it route through `MandateGate` for
    symmetry, or stay as a direct ownership check?
 
@@ -360,6 +391,7 @@ Reviewers and follow-up PRs answer these. None of them block this design.
 ## Anchors
 
 - `icn/crates/icn-rpc/src/auth.rs:947` — `GOVERNANCE_WRITE` constant
-- `icn/apps/governance/src/http/handlers.rs:283, 391, 554, 599, 699, 756, 1090, 1182, 1701, 2211–2812, 3178, 3258, 3421, 3476, 3517, 3684, 3762, 3812, 3854, 3910, 3956, 3997, 4141, 4223, 4304` — call sites
+- `icn/apps/governance/src/http/handlers.rs:283` — `require_scope` call inside `extract_federation_common` (lines 277-) that gates the seven federation-treaty proposal handlers at `:2927, :2967, :2997, :3034, :3062, :3097, :3125`
+- `icn/apps/governance/src/http/handlers.rs:391, 554, 599, 699, 756, 1090, 1182, 1701, 2211–2812, 3178, 3258, 3421, 3476, 3517, 3684, 3762, 3812, 3854, 3910, 3956, 3997, 4141, 4223, 4304` — inline call sites
 - `docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md` §2.7, §4.1, §4.2, §4.4, §7
 - Related open issues: #1869 (direct charter activation bootstrap labeling), #1870 (TrustThreshold fail-open), #1871 (production startup guard for optional standing checkers), #1872 (receipt backend non-atomic mandate/grant boundary), #1873 (ReconciliationStatus accepted-is-not-applied)
