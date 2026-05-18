@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Launch + ICN — Formation-to-Governance Discovery — 2026-05-21</title>
+<meta name="description" content="Visual notes page for the 2026-05-21 Launch + ICN formation-to-governance discovery conversation. Companion to the prep packet and one-page aid.">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --ink: #1a1d21;
+    --ink-soft: #4a4f55;
+    --line: #d9dde2;
+    --line-soft: #eceff3;
+    --paper: #fcfcfa;
+    --accent: #2b5876;
+    --accent-soft: #eaf1f6;
+    --warn: #a23a2e;
+    --warn-soft: #fbeeec;
+    --note: #6b6354;
+    --note-soft: #f7f3ea;
+    --launch: #2d6a4f;
+    --launch-soft: #e6f0eb;
+    --rule-dash: repeating-linear-gradient(to right, #c8ccd2 0 6px, transparent 6px 12px);
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 16px; }
+  body {
+    margin: 0;
+    background: #f3f1eb;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", "Inter", system-ui, sans-serif;
+    line-height: 1.45;
+  }
+  .page {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 36px 40px 60px;
+    background: var(--paper);
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    box-shadow: 0 0 24px rgba(0,0,0,0.04);
+  }
+  header.top { border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 28px; }
+  header.top h1 { margin: 0; font-size: 1.7rem; letter-spacing: -0.01em; line-height: 1.2; }
+  header.top .meta { margin-top: 6px; font-size: 0.85rem; color: var(--ink-soft); letter-spacing: 0.04em; text-transform: uppercase; }
+  header.top .strap { margin-top: 14px; font-size: 0.95rem; color: var(--ink-soft); max-width: 60ch; }
+  section { margin: 28px 0; page-break-inside: avoid; }
+  section h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin: 0 0 10px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+  section h3 { font-size: 0.98rem; margin: 18px 0 6px; color: var(--ink); }
+  p { margin: 0 0 10px; }
+  .lead { font-size: 1.02rem; }
+
+  /* Posture banner */
+  .posture { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; background: var(--accent-soft); border: 1px solid #cdd9e0; border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 4px; font-size: 0.92rem; }
+  .posture .row { display: flex; gap: 10px; align-items: baseline; }
+  .posture .label { font-weight: 600; color: var(--accent); min-width: 4.5em; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* Launch context */
+  .launch-context { background: var(--launch-soft); border: 1px solid #b9d1c2; border-left: 4px solid var(--launch); padding: 12px 16px; border-radius: 4px; font-size: 0.92rem; }
+  .launch-context .label { font-weight: 700; color: var(--launch); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .launch-context .body { color: var(--ink); }
+  .launch-context ul { margin: 4px 0 0; padding-left: 18px; }
+  .launch-context li { margin: 2px 0; }
+
+  /* Spine */
+  .spine { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0 4px; padding: 12px 14px; background: #fff; border: 1px solid var(--line); border-radius: 4px; font-size: 0.95rem; }
+  .spine .node { padding: 5px 9px; border: 1px solid var(--ink); border-radius: 3px; background: var(--paper); font-weight: 500; white-space: nowrap; }
+  .spine .arrow { color: var(--ink-soft); font-weight: 700; font-size: 0.95rem; }
+  .spine-caption { font-size: 0.82rem; color: var(--ink-soft); margin-top: 4px; }
+
+  /* Translation table */
+  table.translation { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 8px 0; background: #fff; }
+  table.translation th, table.translation td { border: 1px solid var(--line); padding: 8px 10px; vertical-align: top; text-align: left; }
+  table.translation th { background: var(--line-soft); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 700; }
+  table.translation td:first-child { font-weight: 600; color: var(--launch); background: #fcfdfb; }
+
+  /* Script blocks */
+  .script { background: #fff; border-left: 3px solid var(--accent); padding: 12px 16px; margin: 8px 0; font-size: 0.96rem; line-height: 1.55; }
+  .script p { margin: 0 0 8px; }
+  .script p:last-child { margin-bottom: 0; }
+  .ask { background: #fff; border-left: 3px solid var(--warn); padding: 8px 16px; margin: 8px 0; font-size: 0.95rem; font-style: italic; }
+  .ask::before { content: "ASK "; font-style: normal; font-weight: 700; font-size: 0.72rem; letter-spacing: 0.1em; color: var(--warn); margin-right: 6px; vertical-align: 0.05em; }
+
+  /* Walkthrough beats */
+  .beats { list-style: none; padding: 0; margin: 8px 0; counter-reset: beat; }
+  .beat { counter-increment: beat; display: grid; grid-template-columns: 38px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px dashed var(--line); }
+  .beat:last-child { border-bottom: none; }
+  .beat::before { content: counter(beat); grid-column: 1; align-self: start; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 600; margin-top: 2px; }
+  .beat .body { grid-column: 2; }
+  .beat .body strong { display: block; font-weight: 600; margin-bottom: 2px; }
+  .beat .body .qpair { font-size: 0.88rem; color: var(--ink-soft); margin: 2px 0; }
+  .beat .body .qpair .lbl { font-weight: 700; color: var(--launch); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 6px; }
+  .beat .body .qpair.icn .lbl { color: var(--accent); }
+  .beat .notes { margin-top: 6px; height: 28px; background-image: linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--line) calc(50% - 0.5px), var(--line) calc(50% + 0.5px), transparent calc(50% + 0.5px)), linear-gradient(to bottom, transparent calc(100% - 0.5px), var(--line) calc(100% - 0.5px)); }
+
+  /* Branches */
+  .branches { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 8px 0; }
+  .branches .card { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; font-size: 0.85rem; }
+  .branches .card h4 { margin: 0 0 4px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .branches .card.economic h4 { color: var(--note); }
+  .branches .card.advisor h4 { color: var(--accent); }
+  .branches .card.summit h4 { color: var(--launch); }
+  .branches .card ul { margin: 4px 0 0; padding-left: 16px; }
+  .branches .card li { margin: 2px 0; }
+  .branches .card .warn { font-size: 0.78rem; color: var(--warn); margin-top: 6px; font-style: italic; }
+
+  /* Questions */
+  .qs { margin: 6px 0; }
+  .q-group { margin: 12px 0; }
+  .q-group .heading { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 700; margin: 6px 0 4px; }
+  .q { padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px; margin: 6px 0; background: #fff; font-size: 0.9rem; }
+  .q .prompt { font-style: italic; }
+  .q .prompt::before { content: "Q "; font-style: normal; font-weight: 700; font-size: 0.7rem; letter-spacing: 0.1em; color: var(--accent); margin-right: 4px; }
+  .q .notes { margin-top: 6px; height: 40px; background-image: repeating-linear-gradient(to bottom, transparent 0 19px, var(--line-soft) 19px 20px); }
+
+  /* Claims-not panel */
+  .nodo { background: var(--warn-soft); border: 1px solid #e9c2bd; border-left: 4px solid var(--warn); padding: 12px 16px 8px; border-radius: 4px; font-size: 0.9rem; }
+  .nodo h2 { color: var(--warn); border-color: #e9c2bd; }
+  .nodo ul { margin: 0; padding-left: 18px; }
+  .nodo li { margin: 4px 0; }
+
+  /* Boundary callout */
+  .boundary { background: var(--note-soft); border: 1px solid #e3d7bd; border-left: 4px solid var(--note); padding: 10px 14px; border-radius: 4px; font-size: 0.9rem; }
+  .boundary strong { color: var(--note); }
+
+  /* Post-meeting capture */
+  .capture { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .capture .cell { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; min-height: 90px; }
+  .capture .cell h4 { margin: 0 0 6px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
+  .capture .lines { background-image: repeating-linear-gradient(to bottom, transparent 0 22px, var(--line-soft) 22px 23px); height: 70px; }
+
+  footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 0.78rem; color: var(--ink-soft); }
+
+  /* Print styles */
+  @media print {
+    html, body { background: #fff; }
+    .page { max-width: 100%; margin: 0; padding: 22px; box-shadow: none; border: none; }
+    section { page-break-inside: auto; }
+    .beat, .q, .nodo, .posture, .spine, .capture, .launch-context, table.translation, .branches { page-break-inside: avoid; }
+    h2 { page-break-after: avoid; }
+  }
+
+  /* Small-screen */
+  @media (max-width: 720px) {
+    .page { padding: 20px; }
+    .posture, .capture { grid-template-columns: 1fr; }
+    .branches { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+
+  <header class="top">
+    <h1>Launch + ICN — Formation-to-Governance Discovery</h1>
+    <div class="meta">Thursday 2026-05-21 · 10:30–11:30 AM ET · 60 minutes</div>
+    <p class="strap">Visual notes page. Use to keep the conversation on the seam: formation workflow → durable institutional memory.</p>
+  </header>
+
+  <section>
+    <h2>Posture</h2>
+    <div class="posture">
+      <div class="row"><span class="label">Goal</span><span>Find whether the formation workflow has a clean seam with ICN's durable governance / memory layer.</span></div>
+      <div class="row"><span class="label">Not</span><span>A launch. A pitch. A pilot. A product demo. A replacement for Launch.</span></div>
+      <div class="row"><span class="label">Talk</span><span>1–2 min per beat, then listen 5+ min.</span></div>
+      <div class="row"><span class="label">Win</span><span>One smallest sanitized rehearsal target — or a clear "not useful yet."</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What Launch appears to focus on</h2>
+    <div class="launch-context">
+      <div class="label">Launch context (from public material)</div>
+      <ul>
+        <li>Guided onboarding / decision-tree framing for co-op formation</li>
+        <li>Teams, co-founders, task assignment, comments on steps</li>
+        <li>Documents, change history, secure document portal</li>
+        <li>Advisors / TA providers / lawyers / CPAs / co-op networks</li>
+        <li>Mobile, print, multilingual access (English + Spanish, expandable)</li>
+        <li>Reducing TA bottlenecks <em>without</em> replacing TA providers</li>
+        <li>Framing: <em>"make the ask feel doable."</em></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>The institutional spine</h2>
+    <div class="spine">
+      <span class="node">Standing</span><span class="arrow">→</span>
+      <span class="node">Authority</span><span class="arrow">→</span>
+      <span class="node">Decision</span><span class="arrow">→</span>
+      <span class="node">Obligation</span><span class="arrow">→</span>
+      <span class="node">Effect</span><span class="arrow">→</span>
+      <span class="node">Receipt</span><span class="arrow">→</span>
+      <span class="node">Evidence</span><span class="arrow">→</span>
+      <span class="node">Review</span>
+    </div>
+    <div class="spine-caption">Eight words. Introduce in one breath. Ask whether the order matches how formation work actually moves into ongoing governance.</div>
+  </section>
+
+  <section>
+    <h2>Launch translation of the spine</h2>
+    <table class="translation">
+      <thead><tr><th>Launch surface</th><th>ICN substrate question</th></tr></thead>
+      <tbody>
+        <tr><td>Founding team / co-founders</td><td>Who has standing?</td></tr>
+        <tr><td>Roles / advisor relationship</td><td>Who can act, review, guide, or certify?</td></tr>
+        <tr><td>Formation path selected</td><td>What process is this group actually in?</td></tr>
+        <tr><td>Governance doc drafted</td><td>What artifact exists, and under whose authority?</td></tr>
+        <tr><td>Task assigned</td><td>Who owes what by when?</td></tr>
+        <tr><td>Service provider engaged</td><td>What obligation exists across the boundary?</td></tr>
+        <tr><td>Milestone completed</td><td>What effect happened?</td></tr>
+        <tr><td>Approval / confirmation</td><td>What receipt exists?</td></tr>
+        <tr><td>Document / change history</td><td>What evidence survives?</td></tr>
+        <tr><td>Launch → operating co-op handoff</td><td>What standing / authority carries forward?</td></tr>
+        <tr><td>Patronage / internal capital / accounting records</td><td>What is governance evidence vs. accounting record?</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>60-second opener</h2>
+    <div class="script">
+      <p>From what I understand, Launch is trying to make co-op formation less like wandering through a legal, financial, and governance junk drawer with a flashlight dying in your mouth.</p>
+      <p>You are breaking the process into steps people can actually move through: teams, documents, tasks, advisors, service providers, and milestones.</p>
+      <p>ICN is coming at the next layer: once those steps become real institutional facts, how does the co-op remember them? Who has standing? Who was authorized? What decision happened? What obligation followed? What evidence survives when the advisor, organizer, or founding team rotates out?</p>
+      <p>I am not here to pitch ICN as a replacement for Launch. I want to understand whether there is a clean seam between Launch's formation workflow and ICN's durable governance / memory layer — or whether that seam does not exist yet.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Primary walkthrough — formation → durable governance handoff</h2>
+    <p class="lead">Walk one beat at a time. After each beat ask: <em>How does this happen today? What state needs to persist? Who needs to trust it later? Where would a receipt help, and where would it become bureaucracy?</em></p>
+    <ol class="beats">
+      <li class="beat"><div class="body"><strong>Group enters Launch onboarding</strong><div class="qpair"><span class="lbl">Today</span>Decision-tree intake / wizard.</div><div class="qpair icn"><span class="lbl">ICN</span>First institutional record that this group exists and is forming?</div><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Founding team / co-founders identified</strong><div class="qpair"><span class="lbl">Today</span>Roster inside Launch.</div><div class="qpair icn"><span class="lbl">ICN</span>When do these people gain standing — and what kind?</div><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Roles &amp; advisor / TA / provider relationships established</strong><div class="qpair"><span class="lbl">Today</span>Relationship records in Launch.</div><div class="qpair icn"><span class="lbl">ICN</span>Who can act with what authority, on whose behalf, with what professional scope?</div><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Formation path selected</strong><div class="qpair"><span class="lbl">Today</span>Co-op model / legal entity track chosen.</div><div class="qpair icn"><span class="lbl">ICN</span>What process is this group in, and what authority does that selection carry?</div><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Governance documents drafted</strong><div class="qpair"><span class="lbl">Today</span>Drafts in document portal.</div><div class="qpair icn"><span class="lbl">ICN</span>Under whose authority, and what receipt when adopted?</div><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Tasks assigned to co-founders / advisors / providers</strong><div class="qpair"><span class="lbl">Today</span>Task surface in Launch.</div><div class="qpair icn"><span class="lbl">ICN</span>Each task is an obligation — by whom, to whom, owed by when, completed by what evidence?</div><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Legal / accounting / co-op-developer service provider loop triggered</strong><div class="qpair"><span class="lbl">Today</span>Vendor / advisor engagement, often outside Launch.</div><div class="qpair icn"><span class="lbl">ICN</span>What crosses the boundary, what comes back, what record proves both?</div><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Decision or milestone completed</strong><div class="qpair"><span class="lbl">Today</span>Checked box / signed doc / meeting minute.</div><div class="qpair icn"><span class="lbl">ICN</span>What effect did it have, against what authority, with what receipt?</div><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Member standing / board authority / operating roles established</strong><div class="qpair"><span class="lbl">Today</span>The moment Launch hands off to "the co-op exists now."</div><div class="qpair icn"><span class="lbl">ICN</span>What carries forward — and what is silently dropped?</div><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Economic participation / patronage / allocation records become relevant</strong><div class="qpair"><span class="lbl">Today</span>Usually CPA / bookkeeper territory.</div><div class="qpair icn"><span class="lbl">ICN</span>Where does governance evidence meet accounting record? See economic branch below.</div><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Handoff into durable institutional memory / ongoing governance</strong><div class="qpair"><span class="lbl">Today</span>Fuzzy moment where Launch's role recedes.</div><div class="qpair icn"><span class="lbl">ICN</span>What record survives the handoff that next year's board, a funder, a regulator, or a future member can verify?</div><div class="notes"></div></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Branches — open only if asked</h2>
+    <div class="branches">
+      <div class="card economic">
+        <h4>Economic / patronage / internal capital</h4>
+        <ul>
+          <li>Internal capital account records as institutional memory</li>
+          <li>Patronage / allocation records as provenance</li>
+          <li>Settlement intent / position views</li>
+          <li>Boundary between governance evidence and accounting record</li>
+        </ul>
+        <div class="warn">Inquiry only. ICN is not an accounting system, bank, payment app, wallet, or money transmitter.</div>
+      </div>
+      <div class="card advisor">
+        <h4>Advisor / service provider</h4>
+        <ul>
+          <li>What lawyers / CPAs / bookkeepers / TA providers need to see</li>
+          <li>What they can attest to</li>
+          <li>What stays under their professional authority</li>
+          <li>Cross-boundary obligation records</li>
+        </ul>
+      </div>
+      <div class="card summit">
+        <h4>NYCN / Summit (backup example only)</h4>
+        <ul>
+          <li>Session → public program</li>
+          <li>Feedback → next-year obligation</li>
+          <li>Accessibility accommodation</li>
+          <li>Sponsor commitment</li>
+        </ul>
+        <div class="warn">Use only if the formation seam feels too abstract.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Questions to ask</h2>
+    <div class="qs">
+      <div class="q-group">
+        <div class="heading">On Launch's workflow</div>
+        <div class="q"><span class="prompt">Where does a formation workflow lose institutional memory?</span><div class="notes"></div></div>
+        <div class="q"><span class="prompt">What records matter <em>after</em> the co-op is formed?</span><div class="notes"></div></div>
+        <div class="q"><span class="prompt">Where do teams / tasks / docs / advisor notes need continuity?</span><div class="notes"></div></div>
+        <div class="q"><span class="prompt">What milestones are legally / accounting- / governance-meaningful?</span><div class="notes"></div></div>
+      </div>
+      <div class="q-group">
+        <div class="heading">On standing / authority</div>
+        <div class="q"><span class="prompt">When does someone become a member / founder / board actor / officer / advisor?</span><div class="notes"></div></div>
+        <div class="q"><span class="prompt">Who can authorize a document, filing, provider engagement, or milestone?</span><div class="notes"></div></div>
+      </div>
+      <div class="q-group">
+        <div class="heading">On advisors / service providers</div>
+        <div class="q"><span class="prompt">What do lawyers, CPAs, bookkeepers, TA providers, or co-op developers need to see and attest to?</span><div class="notes"></div></div>
+        <div class="q"><span class="prompt">What must remain under professional authority, not ICN's?</span><div class="notes"></div></div>
+      </div>
+      <div class="q-group">
+        <div class="heading">On patronage / internal capital (only if opened)</div>
+        <div class="q"><span class="prompt">Where do internal capital account / patronage / allocation records first enter the workflow?</span><div class="notes"></div></div>
+        <div class="q"><span class="prompt">What is governance evidence vs. accounting record vs. professional execution? What should ICN never touch?</span><div class="notes"></div></div>
+      </div>
+      <div class="q-group">
+        <div class="heading">On anti-software boundaries &amp; next step</div>
+        <div class="q"><span class="prompt">What must stay human / process-first? What should expire? Never be public? Need explicit consent?</span><div class="notes"></div></div>
+        <div class="q"><span class="prompt">Smallest fictional / sanitized formation-to-governance rehearsal worth doing? Who else should be in that room?</span><div class="notes"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="boundary">
+      <strong>When critique lands, do not defend.</strong> Capture the objection. Translate it into a design question. Ask what would make the thing safer or more useful. The meeting's value is calibration, not persuasion.
+    </div>
+  </section>
+
+  <section class="nodo">
+    <h2>Claims NOT to make</h2>
+    <ul>
+      <li>Not replacing Launch.</li>
+      <li>Not replacing TA providers, lawyers, CPAs, bookkeepers, or co-op developers.</li>
+      <li>Not production-ready. Not externally audited. Not legally / regulatorily certified.</li>
+      <li>Not a live federation. Not an end-to-end federation lifecycle.</li>
+      <li>Not a formally committed cooperative pilot. NYCN is an active partnership track. Launch is a discovery conversation, not a pilot.</li>
+      <li>Not a live member app. Not a live steward cockpit dashboard. Not a signed production appliance.</li>
+      <li>Not accounting software. Not payment / banking / wallet software.</li>
+      <li>Receipts alone do not prove legitimacy. Authority shortcuts must label themselves.</li>
+      <li>Vocabulary: <strong>settlement, obligation, allocation, unit, position, receipt, provenance, evidence.</strong> Avoid the forbidden financial / crypto vocabulary listed in the Thursday brief.</li>
+      <li>Community-infra (Matrix / n8n / bridge / etc.) is a separate workstream — do not mention unless asked.</li>
+      <li>No real Launch, NYCN, or private partner data has been or will be put in git.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>After the meeting — capture</h2>
+    <div class="capture">
+      <div class="cell"><h4>Real / useful</h4><div class="lines"></div></div>
+      <div class="cell"><h4>Wrong / overbuilt / unclear</h4><div class="lines"></div></div>
+      <div class="cell"><h4>Clean seam identified (formation → governance)</h4><div class="lines"></div></div>
+      <div class="cell"><h4>Seam rejected / not ready</h4><div class="lines"></div></div>
+      <div class="cell"><h4>Smallest rehearsal candidate</h4><div class="lines"></div></div>
+      <div class="cell"><h4>Economic / patronage / accounting questions</h4><div class="lines"></div></div>
+      <div class="cell"><h4>Who else should join</h4><div class="lines"></div></div>
+      <div class="cell"><h4>Follow-up action / cadence</h4><div class="lines"></div></div>
+    </div>
+  </section>
+
+  <footer>
+    Status: descriptive · Canonical: no · Last reviewed 2026-05-18 · No private partner / NYCN data. Companion to <code>docs/strategy/COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md</code> and <code>docs/strategy/COOPERATIVE_FORMATION_PLATFORM_ONE_PAGE_AID_2026-05-21.md</code>.
+  </footer>
+
+</main>
+</body>
+</html>

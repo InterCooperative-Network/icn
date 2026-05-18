@@ -20,6 +20,8 @@ ICN is the infrastructure layer that tries to give democratic organizations some
 
 The project is not finished. Most of the *institutional* surface — member-facing app, operator cockpit, federation-wide proof loops, cooperative pilots — is design and rehearsal, not production. The substrate and the proof architecture under it are mature enough to evaluate seriously and rehearse against fictional or sanitized data. They are not mature enough to entrust real institutional decisions to without more hardening, partner review, and explicit pilot formalization.
 
+**Reader-specific adaptations.** For the 2026-05-21 Launch / cooperative-formation-platform conversation, use [`COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md`](COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md) and the matching [one-page aid](COOPERATIVE_FORMATION_PLATFORM_ONE_PAGE_AID_2026-05-21.md) / [visual notes](COOPERATIVE_FORMATION_PLATFORM_VISUAL_AID_2026-05-21.html) / [PDF](COOPERATIVE_FORMATION_PLATFORM_VISUAL_AID_2026-05-21.pdf). That packet retargets the brief toward formation → governance handoff, advisor / service-provider workflows, member standing, obligation / evidence continuity, and patronage / allocation questions. A separate **NYCN / Summit organizer variant** lives in [`NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md`](NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md) and its companion artifacts; that variant is now a secondary surface, not the Thursday primary. The Thursday brief still controls project-state facts and non-claims for both.
+
 ## What exists today
 
 | Area | Current repo truth | Meeting-safe claim | Do not claim |
