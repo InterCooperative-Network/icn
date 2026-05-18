@@ -214,7 +214,7 @@ that mints them will RFC the names. The federation class is sanctioned by
 | Scope (proposed) | Handlers | Mandate required (in production) |
 |---|---|---|
 | `governance:charter:write` | `create_domain`, `activate_charter`, `add_domain_member`, `remove_domain_member` | Yes — every act is high blast radius. For bootstrap, see §4.4 of `ABUSE_CASE_HARDENING_STRATEGY.md` (administrative shortcut artifact). |
-| `governance:proposal:write` | `create_proposal`, `open_proposal`, `close_proposal`, `cast_vote`, `create_appoint_steward_proposal`, `create_remove_steward_proposal`, `create_delegation`, `revoke_delegation` | Yes for close/cast and steward proposals; ratified-membership-only for proposal creation and delegation (mandate equivalent to membership-in-good-standing). |
+| `governance:proposal:write` | `create_proposal`, `open_proposal`, `close_proposal`, `cast_vote`, `create_appoint_steward_proposal`, `create_remove_steward_proposal`, `create_delegation`, `revoke_delegation` | Yes for close/cast, steward proposals, and delegation lifecycle (consistent with the medium-blast-radius classification in §3 and §5). Proposal *creation* may use a lighter mandate equivalent to membership-in-good-standing; the exact mandate shape per act is left to §12 Q4 and the follow-up PR that wires the gate. |
 | `governance:steward:write` | `assign_role` (and any future direct-mutation steward operations) | Yes — steward authority cannot be granted by a bare capability. |
 | `governance:federation:write` | `create_join_federation_proposal`, `create_leave_federation_proposal`, `create_establish_clearing_proposal`, `create_terminate_clearing_proposal`, `create_vouch_proposal`, `create_revoke_vouch_proposal`, `create_update_federation_policy_proposal` | Yes — every act alters cross-cooperative authority. Mandate equivalent to "ratified domain authority to bind this domain into a federation treaty". The `extract_federation_common` helper at `handlers.rs:277` is the single migration point for this class. |
 | `governance:meeting:write` | `create_meeting`, `start_meeting`, `end_meeting`, `add_agenda_item`, `update_agenda_item`, `add_attendee`, `mark_attendance`, `create_action_item`, `update_action_item`, `update_action_item_status`, `delete_action_item`, `add_action_item_note` | No mandate beyond membership-in-good-standing for routine meeting record-keeping. Steward-only meeting acts (if any are added later) escalate to `governance:steward:write`. |
@@ -290,6 +290,11 @@ hashes. App-side mandate semantics remain in the app.
   switches from `governance:write` to `governance:federation:write` as
   the single change point that migrates all seven federation-proposal
   routes.
+- The gateway scope allowlist
+  (`icn/crates/icn-gateway/src/validation.rs:42-54`) and the scope-issuing
+  auth endpoint (`icn/crates/icn-gateway/src/api/auth.rs:87-94`) keep
+  their existing shape; only the contents of `ALLOWED_SCOPES` grow with
+  each class. The validation function itself does not change.
 - The administrative-shortcut artifact shape from
   `ABUSE_CASE_HARDENING_STRATEGY.md` §4.2 / §4.4. The hybrid path is
   orthogonal to whether `add_domain_member`/`activate_charter` remain
@@ -320,8 +325,17 @@ hashes. App-side mandate semantics remain in the app.
 
 <!-- truth: descriptive -->
 
-1. **Mint the seven class-level scope constants.** Pure addition; old
-   constant retained. No handler changes.
+1. **Mint the seven class-level scope constants and extend the gateway
+   allowlist.** Pure addition; old constant retained. No handler changes.
+   The seven new strings are added as constants in
+   `icn/crates/icn-rpc/src/auth.rs` alongside `GOVERNANCE_WRITE` *and* as
+   new entries in the `ALLOWED_SCOPES` list in
+   `icn/crates/icn-gateway/src/validation.rs:42-54` so that the gateway
+   auth endpoint (`icn/crates/icn-gateway/src/api/auth.rs:87-94`) will
+   issue capabilities with the new strings. Without the gateway allowlist
+   update, clients cannot request a capability containing the new class
+   scope and migrated routes become unreachable. Validation tests in
+   `icn-gateway` cover the new strings.
 2. **Migrate `governance:charter:write`** — `create_domain`,
    `activate_charter`, `add_domain_member`, `remove_domain_member`. Pairs
    with #1869 (direct charter activation bootstrap-path labeling) and
@@ -391,6 +405,8 @@ Reviewers and follow-up PRs answer these. None of them block this design.
 ## Anchors
 
 - `icn/crates/icn-rpc/src/auth.rs:947` — `GOVERNANCE_WRITE` constant
+- `icn/crates/icn-gateway/src/validation.rs:42-54` — `ALLOWED_SCOPES` gateway allowlist (must grow with each new class scope; mint step's co-requisite)
+- `icn/crates/icn-gateway/src/api/auth.rs:85-94` — gateway scope-validating auth endpoint that consumes `ALLOWED_SCOPES`
 - `icn/apps/governance/src/http/handlers.rs:283` — `require_scope` call inside `extract_federation_common` (lines 277-) that gates the seven federation-treaty proposal handlers at `:2927, :2967, :2997, :3034, :3062, :3097, :3125`
 - `icn/apps/governance/src/http/handlers.rs:391, 554, 599, 699, 756, 1090, 1182, 1701, 2211–2812, 3178, 3258, 3421, 3476, 3517, 3684, 3762, 3812, 3854, 3910, 3956, 3997, 4141, 4223, 4304` — inline call sites
 - `docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md` §2.7, §4.1, §4.2, §4.4, §7
