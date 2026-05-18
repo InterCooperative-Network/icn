@@ -60,7 +60,7 @@ View source on GitHub →
 </thead>
 <tbody><tr>
 <td><strong>Core daemon / substrate (<code>icnd</code>)</strong></td>
-<td>Tokio actor runtime, supervisor, kernel/app separation, gateway on port 8080, 34 crates in workspace. Identity (Ed25519 + Age keystore), networking (QUIC/TLS with DID-binding, mDNS), gossip with vector clocks and Bloom filters, double-entry mutual-credit ledger, CCL interpreter, governance proposal/vote primitives.</td>
+<td>Tokio actor runtime, supervisor, kernel/app separation, gateway on port 8080, 44 declared workspace members (37 in <code>crates/</code>, 4 in <code>apps/</code>, 3 in <code>bins/</code>; one additional <code>crates/</code> directory, <code>icn-baseline-lock-guest</code>, is on disk but not declared). Identity (Ed25519 + Age keystore), networking (QUIC/TLS with DID-binding, mDNS), gossip with vector clocks and Bloom filters, double-entry mutual-credit ledger, CCL interpreter, governance proposal/vote primitives.</td>
 <td>A daemon you build and run on your own hardware; identity, networking, ledger, governance primitives, and the gateway are working at the substrate level. Local + 3-node K3s convergence is tested.</td>
 <td>&quot;Production-ready.&quot; &quot;Audited.&quot; &quot;Scaling-tested past 10 nodes.&quot; &quot;Hosted instance you can sign up for.&quot;</td>
 </tr>
