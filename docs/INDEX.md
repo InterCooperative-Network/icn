@@ -446,6 +446,7 @@ Strategic direction and gap analysis (March 2026):
 - [NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md](strategy/NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md) - Human-facing prep packet adapting the Thursday brief for the 2026-05-21 conversation with the NYCN/Summit organizer
 - [NYCN_ORGANIZER_MEETING_ONE_PAGE_AID_2026-05-21.md](strategy/NYCN_ORGANIZER_MEETING_ONE_PAGE_AID_2026-05-21.md) - One-page printable conversation aid for the 2026-05-21 meeting (spine + primary walkthrough + three questions + non-claims)
 - [NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.html](strategy/NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.html) - Standalone HTML visual notes page for the 2026-05-21 meeting (opener, 90s, spine, 11-beat walkthrough, backup workflows, questions with note space, claims-not, post-meeting capture). Open in any browser; print-friendly.
+- [NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.pdf](strategy/NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.pdf) - Same visual notes page in PDF (7 pages, letter size, portrait). Attachment-ready: email, print, or share.
 
 ### Current Status Reports (`status/`)
 
