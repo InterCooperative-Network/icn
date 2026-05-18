@@ -443,6 +443,7 @@ Strategic direction and gap analysis (March 2026):
 - [ICN-Scenarios.md](strategy/ICN-Scenarios.md) - Six working scenarios with API calls
 - [ICN-Evolution-Arc.md](strategy/ICN-Evolution-Arc.md) - Two-year project history
 - [ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md](strategy/ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) - Meeting-prep truth packet for the 2026-05-21 cooperative / Launch / ICN conversation
+- [NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md](strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) - Project-shaping record: NYCN/Summit as ICN's first institutional laboratory (recurring democratic institution, not an event demo)
 
 ### Current Status Reports (`status/`)
 
