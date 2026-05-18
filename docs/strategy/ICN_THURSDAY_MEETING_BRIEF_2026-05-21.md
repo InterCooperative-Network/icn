@@ -20,6 +20,8 @@ ICN is the infrastructure layer that tries to give democratic organizations some
 
 The project is not finished. Most of the *institutional* surface — member-facing app, operator cockpit, federation-wide proof loops, cooperative pilots — is design and rehearsal, not production. The substrate and the proof architecture under it are mature enough to evaluate seriously and rehearse against fictional or sanitized data. They are not mature enough to entrust real institutional decisions to without more hardening, partner review, and explicit pilot formalization.
 
+**Reader-specific adaptation.** For the 2026-05-21 conversation with Mackenzie Jones (NYCN/Summit organizer), see [`MACKENZIE_ICN_MEETING_PREP_2026-05-21.md`](MACKENZIE_ICN_MEETING_PREP_2026-05-21.md), which assumes summit-organizing fluency and maps the spine onto concrete committee, outreach, and accessibility practice. The brief controls facts; the packet controls conversational shape.
+
 ## What exists today
 
 | Area | Current repo truth | Meeting-safe claim | Do not claim |
