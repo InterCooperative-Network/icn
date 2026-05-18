@@ -258,7 +258,7 @@ Filled in after Thursday — kept here so it isn't drafted under time pressure.
 
 | Date | Repo | Change | Does it change Thursday claims? | Action needed |
 |------|------|--------|---------------------------------|---------------|
-|      |      |        |                                 |               |
+| _(no entries yet — fill in as deltas land on `main`)_ | — | — | — | — |
 
 ## Related reading (meeting-safe order)
 

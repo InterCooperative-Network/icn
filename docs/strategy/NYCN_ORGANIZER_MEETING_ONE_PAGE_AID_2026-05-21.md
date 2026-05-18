@@ -47,4 +47,4 @@ The Summit already has the shape of a democratic institution. ICN is trying to h
 
 - [Thursday meeting brief](ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md)
 - [NYCN/Summit organizer meeting prep packet](NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md)
-- [NYCN/Summit reference institution strategy](NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md)
+- [NYCN/Summit reference institution strategy](https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) — lands on `main` via companion PR [icn#1883](https://github.com/InterCooperative-Network/icn/pull/1883)

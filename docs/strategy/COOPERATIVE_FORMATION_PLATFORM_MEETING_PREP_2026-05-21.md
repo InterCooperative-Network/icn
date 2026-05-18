@@ -159,7 +159,7 @@ Useful Summit example branches:
 - **Accessibility accommodation** — privacy and care obligation boundary
 - **Sponsor commitment** — external proof / fundraising handoff
 
-These are good to gesture at, not to lead with. The full Summit reference work lives at [`NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md`](NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) and in the [NYCN repo](https://github.com/InterCooperative-Network/nycn).
+These are good to gesture at, not to lead with. The full Summit reference work lives at [`NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md`](https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) (via companion PR [icn#1883](https://github.com/InterCooperative-Network/icn/pull/1883); lands on `main` when that PR merges) and in the [NYCN repo](https://github.com/InterCooperative-Network/nycn).
 
 ## 8. Economic / patronage branch — only if opened
 
@@ -314,4 +314,4 @@ Fill within 24 hours. Sanitized only.
 4. [`../PHASE_PROGRESS.md`](../PHASE_PROGRESS.md) — Phase 2 ⏳.
 5. [`../OVERVIEW.md`](../OVERVIEW.md) — eight primitives, receipt chain, meaning firewall.
 6. [`../architecture/ABUSE_CASE_HARDENING_STRATEGY.md`](../architecture/ABUSE_CASE_HARDENING_STRATEGY.md) — receipts prove events, not legitimacy.
-7. **Backup**: [`NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md`](NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md), [`NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md`](NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md) — NYCN/Summit organizer variant; demoted to secondary surface.
+7. **Backup**: [`NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md`](https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) (via companion PR [icn#1883](https://github.com/InterCooperative-Network/icn/pull/1883); lands on `main` when that PR merges), [`NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md`](NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md) — NYCN/Summit organizer variant; demoted to secondary surface.
