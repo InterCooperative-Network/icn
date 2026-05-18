@@ -4,23 +4,21 @@ Canonical: no
 Last Reviewed: 2026-05-18
 ---
 
-# Mackenzie ICN Meeting Prep — 2026-05-21
+# NYCN/Summit Organizer Meeting Prep — 2026-05-21
 
 > A reading-frame for one conversation with someone who knows the work.
 
-This packet adapts the [Thursday meeting brief](ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) for the 2026-05-21 conversation with McKenzie Jones (NYCN/Summit organizer, two-plus years inside the work). If the two disagree, the Thursday brief controls ICN repo-state facts for this meeting; this packet controls the conversational shape. Project-level truth still lives in the source-of-truth docs.
+This packet adapts the [Thursday meeting brief](ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) for the 2026-05-21 conversation with a NYCN/Summit organizer (two-plus years inside the work). If the two disagree, the Thursday brief controls ICN repo-state facts for this meeting; this packet controls the conversational shape. Project-level truth still lives in the source-of-truth docs.
 
-Treat Summit-organizing reality as shared ground. No 101 on committees, sponsor outreach, accessibility planning, registration, or handoff pain. McKenzie knows.
+Treat Summit-organizing reality as shared ground. No 101 on committees, sponsor outreach, accessibility planning, registration, or handoff pain. The organizer knows.
 
-## 0. Why McKenzie is the right person for this conversation
+## 0. Why this organizer is the right person for this conversation
 
-McKenzie Jones has worked the Summit for two-plus years and sits squarely at the **content / logistics seam** — speakers, sessions, the final schedule, room layout, interpretation, presenter support, translated descriptions, the public program, run-of-show, and post-event handoff. That seam is where ICN's spine gets stress-tested most honestly. It is not abstract governance; it is "we said this would happen, did it, how do we prove it, and how does next year's chair learn from it?"
+The organizer has worked the Summit for two-plus years and sits squarely at the **content / logistics seam** — speakers, sessions, the final schedule, room layout, interpretation, presenter support, translated descriptions, the public program, run-of-show, and post-event handoff. That seam is where ICN's spine gets stress-tested most honestly. It is not abstract governance; it is "we said this would happen, did it, how do we prove it, and how does next year's chair learn from it?"
 
-The other reason: McKenzie carries institutional memory across Summit cycles. Most of what ICN is trying to make durable — what a body decided, what it promised, what it actually delivered, what survived the chair rotation — is exactly the load she has been carrying in spreadsheets, threads, and head-state. If the spine looks real from her vantage, the project has a foothold. If it looks wrong, that is the single most useful signal we will get this month.
+The other reason: this organizer carries institutional memory across Summit cycles. Most of what ICN is trying to make durable — what a body decided, what it promised, what it actually delivered, what survived the chair rotation — is exactly the load they have been carrying in spreadsheets, threads, and head-state. If the spine looks real from inside that vantage, the project has a foothold. If it looks wrong, that is the single most useful signal we will get this month.
 
-The point is not to persuade McKenzie that the spine is right. The point is to find where it breaks when it touches real Summit work.
-
-*Naming note: this packet's filename uses "Mackenzie" but the surrounding prose and live-meeting context use "McKenzie Jones." Filename normalization is a future-cleanup item; do not churn it before Thursday.*
+The point is not to persuade the organizer that the spine is right. The point is to find where it breaks when it touches real Summit work.
 
 ## 1. The cooperative-movement problem
 
@@ -43,7 +41,7 @@ A real substrate exists: daemon, identity, ledger, governance primitives, gatewa
 Summit already contains the real workflow: committees, chairs, sponsor outreach, speakers, venues, accessibility planning, registration, logistics, follow-up, document sprawl, organizer memory, post-Summit handoff. The ICN spine maps onto that world. Each layer below is a thing Summit already does — the column on the right is what ICN is trying to let Summit eventually own without trusting a vendor with it.
 
 - **Standing** — who sits on which committee with which authority class. Today: a holder-label in a roster doc. ICN direction: queryable standing the next chair can verify.
-- **Authority** — which clause or mandate lets a chair commit a venue or sign a sponsor letter. Today: implicit, sometimes "I'll ask McKenzie." ICN direction: the authority basis is on the action before it's signed.
+- **Authority** — which clause or mandate lets a chair commit a venue or sign a sponsor letter. Today: implicit, sometimes "I'll ask the chair." ICN direction: the authority basis is on the action before it's signed.
 - **Decisions** — a committee deciding "we book Venue X / accept Sponsor Y / publish Speaker Z." Today: a Google Doc minute. ICN direction: a governance decision with cited mandate.
 - **Obligations** — sponsor commitments, speaker honoraria, venue contracts, accessibility accommodations promised, day-of logistics. Today: forwarded threads + organizer memory. ICN direction: tracked from creation through fulfillment.
 - **Effects** — the bookings, the agreements, the published program, the accommodations actually arranged. Today: a calendar + an email. ICN direction: an effect dispatched against the cited mandate.
@@ -78,9 +76,9 @@ The Summit is therefore the first realistic **institutional laboratory** for ICN
 
 ## 5. The conversation — shape, not script
 
-A back-and-forth structure, not a monologue. Each beat is *show → ask → listen*, in that order. Each beat should be one or two minutes of Matt talking, then five-plus minutes of McKenzie talking. If Matt is talking more than half the meeting, the structure is failing.
+A back-and-forth structure, not a monologue. Each beat is *show → ask → listen*, in that order. Each beat should be one or two minutes of Matt talking, then five-plus minutes of the organizer talking. If Matt is talking more than half the meeting, the structure is failing.
 
-**Ask less, listen more — and do not defend in the first round.** When a critique lands, do not argue. Capture the objection, translate it into a design question, and ask what would make the thing safer or more useful. The meeting's value is calibration, not persuasion. If something sounds wrong to McKenzie, that signal is more valuable than any in-the-room explanation Matt could give.
+**Ask less, listen more — and do not defend in the first round.** When a critique lands, do not argue. Capture the objection, translate it into a design question, and ask what would make the thing safer or more useful. The meeting's value is calibration, not persuasion. If something sounds wrong to the organizer, that signal is more valuable than any in-the-room explanation Matt could give.
 
 ### Beat 1 — Open with the problem, not the product
 
@@ -94,7 +92,7 @@ Listen. The answer becomes the anchor for the next two beats.
 
 ### Beat 2 — Mirror it back
 
-Take whatever McKenzie names and reflect it in ICN-spine terms:
+Take whatever the organizer names and reflect it in ICN-spine terms:
 > *What you're describing is a standing problem* (or an authority problem, or an evidence problem, or a handoff problem).
 
 This is the moment of legibility, not the moment of pitch. Do not introduce vocabulary she hasn't already implicitly used.
@@ -131,7 +129,7 @@ Then ask:
 Where should ICN stay out? What stays human and process-first and should not be automated? Ask:
 > *What is the right anti-software boundary?*
 
-Anti-features are as load-bearing as features in this kind of project. The most useful thing McKenzie can do is name one.
+Anti-features are as load-bearing as features in this kind of project. The most useful thing the organizer can do is name one.
 
 ### Beat 7 — Close on the smallest honest rehearsal
 
@@ -140,11 +138,11 @@ Not a launch. Not a pilot announcement. A tabletop walkthrough against fictional
 
 ## 6. The walkthrough — one Summit workflow, through the spine
 
-Three candidates. **Candidate A is the primary** — it lives at the content / logistics seam where McKenzie's experience is deepest. Candidate B (sponsor commitment) and Candidate C (accessibility accommodation) are secondary; reach for them only if her earlier answers point that way. Walk whichever candidate is used through the spine, beat by beat; after each beat ask:
+Three candidates. **Candidate A is the primary** — it lives at the content / logistics seam where the organizer's experience is deepest. Candidate B (sponsor commitment) and Candidate C (accessibility accommodation) are secondary; reach for them only if the organizer's earlier answers point that way. Walk whichever candidate is used through the spine, beat by beat; after each beat ask:
 > *How does this happen for you today? What would change if there were a receipt at this step?*
 
 ### Candidate A — Content / session → public program (PRIMARY)
-*Good for: McKenzie's actual workflow seam — speakers, sessions, run-of-show, multilingual material, post-event collection.*
+*Good for: the organizer's actual workflow seam — speakers, sessions, run-of-show, multilingual material, post-event collection.*
 
 - **Standing** — the content / program committee, with the session-curation mandate delegated by the steering body, alongside an interpretation / translation steward role.
 - **Authority** — charter section authorizing the committee to issue invitations, confirm slots, request bios / headshots / descriptions, and bind the organization to specific support, interpretation, room, and material commitments within the approved program-track scope.
@@ -154,7 +152,7 @@ Three candidates. **Candidate A is the primary** — it lives at the content / l
 - **Receipt** — each step is acknowledged: speaker confirms, materials received, translation reviewed, schedule entry published, day-of role confirmed, post-event material collected. Each acknowledgement is a small receipt the next chair can audit.
 - **Evidence** — post-Summit, a future program chair can ask "for last year's Summit, which sessions ran, with which speakers, in which slots, with what support arrangements honored, and what was missed?" — and get a readable answer without backchanneling.
 
-This is the candidate to walk first. It pulls on the seam McKenzie has lived in, surfaces multilingual / accessibility / support obligations naturally, and ends on the handoff problem that recurs every year.
+This is the candidate to walk first. It pulls on the seam the organizer has lived in, surfaces multilingual / accessibility / support obligations naturally, and ends on the handoff problem that recurs every year.
 
 ### Candidate B — Sponsor commitment (SECONDARY)
 *Good for: external proof, obligations, future fundraising handoff.*
@@ -190,7 +188,7 @@ Say this out loud. Not to read — to speak in Matt's voice. Direct, serious, no
 >
 > A real substrate exists: daemon, identity, ledger, governance primitives, gateway, and proof-bearing receipt paths. But most of the human-facing surface — the app a member would actually use, the dashboard an organizer would actually open — is still design and fixture rehearsal, not production. NYCN is the partnership track that's helping shape what that surface should look like. I'm not here to ship anything. I'm here to ask whether the spine looks real from inside Summit work, and what the smallest honest rehearsal would be. The cleanest test is the part of Summit work you already know: how a session becomes a public program, a set of obligations, a run-of-show, and something next year's organizers can inherit.
 
-## 8. Questions to ask McKenzie
+## 8. Questions to ask the organizer
 
 Ask one at a time. Leave silence after each one. Do not stack questions.
 
@@ -231,7 +229,7 @@ Matt reads this list before the call. This is muscle memory, not background.
 
 ## 10. The freeze rule (Tuesday onward)
 
-After Tuesday's rehearsal, the **human-facing story is frozen**. No new claims, no updated framing, no Thursday-facing changes to this packet or the Thursday brief unless something on `main` materially changes a stated fact. Normal ICN development continues on branches. Repo-detail rabbit holes are out of scope for Thursday unless McKenzie explicitly asks.
+After Tuesday's rehearsal, the **human-facing story is frozen**. No new claims, no updated framing, no Thursday-facing changes to this packet or the Thursday brief unless something on `main` materially changes a stated fact. Normal ICN development continues on branches. Repo-detail rabbit holes are out of scope for Thursday unless the organizer explicitly asks.
 
 ## 11. Tuesday rehearsal checklist
 
@@ -250,8 +248,8 @@ Matt runs this Tuesday afternoon:
 
 Filled in after Thursday — kept here so it isn't drafted under time pressure.
 
-- What McKenzie identified as **real**:
-- What she identified as **wrong / overbuilt / unclear**:
+- What the organizer identified as **real**:
+- What the organizer identified as **wrong / overbuilt / unclear**:
 - The **smallest rehearsal** chosen:
 - Who else she said should be in the next conversation:
 - What needs to change in the spine doctrine, the specs, or the NYCN docs:
@@ -272,4 +270,4 @@ If anyone wants to read the underlying material before Thursday:
 4. [`docs/spec/network-anti-entropy-proof-loops.md`](../spec/network-anti-entropy-proof-loops.md) — the proof rail; eight phases, wire-stable records, not yet emitted in runtime.
 5. [`docs/spec/member-shell-v0.md`](../spec/member-shell-v0.md) and [`docs/spec/steward-cockpit-v0.md`](../spec/steward-cockpit-v0.md) — the human-facing contracts. Specs, not implementations.
 6. [`docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md`](../architecture/ABUSE_CASE_HARDENING_STRATEGY.md) — doctrine. Receipts prove events, not legitimacy. Authority shortcuts must label themselves. Unresolved standing is not standing in production.
-7. NYCN [`README.md`](https://github.com/InterCooperative-Network/nycn/blob/main/README.md) and [`docs/ORGANIZER-USER-READINESS.md`](https://github.com/InterCooperative-Network/nycn/blob/main/docs/ORGANIZER-USER-READINESS.md) — McKenzie's side of the partnership track.
+7. NYCN [`README.md`](https://github.com/InterCooperative-Network/nycn/blob/main/README.md) and [`docs/ORGANIZER-USER-READINESS.md`](https://github.com/InterCooperative-Network/nycn/blob/main/docs/ORGANIZER-USER-READINESS.md) — the organizer's side of the partnership track.

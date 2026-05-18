@@ -6,7 +6,7 @@ Last Reviewed: 2026-05-18
 
 # ICN + NYCN/Summit: one conversation aid
 
-> One-page printable aid for the 2026-05-21 conversation with McKenzie Jones. Not a deck. Not strategy. Use alongside the [McKenzie meeting prep packet](MACKENZIE_ICN_MEETING_PREP_2026-05-21.md).
+> One-page printable aid for the 2026-05-21 conversation with the NYCN/Summit organizer. Not a deck. Not strategy. Use alongside the [NYCN/Summit organizer meeting prep packet](NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md).
 
 ## Frame
 
@@ -46,5 +46,5 @@ The Summit already has the shape of a democratic institution. ICN is trying to h
 ## Read more
 
 - [Thursday meeting brief](ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md)
-- [McKenzie meeting prep packet](MACKENZIE_ICN_MEETING_PREP_2026-05-21.md)
+- [NYCN/Summit organizer meeting prep packet](NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md)
 - [NYCN/Summit reference institution strategy](NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md)
