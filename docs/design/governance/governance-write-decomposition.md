@@ -1,0 +1,365 @@
+# Governance:Write Decomposition — Design
+
+**Status**: Design draft (Phase A — design only; no code change in this PR)
+**Last Updated**: 2026-05-18
+**Issue**: #1868
+**Doctrine source**: [`docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md`](../../architecture/ABUSE_CASE_HARDENING_STRATEGY.md) §4.1, §7
+
+This document picks the decomposition path for the single broad
+`governance:write` capability, lists every handler currently gated by it,
+and names the per-action scope strings and the mandate-binding surface that
+follow-up PRs will land. It is design only; no runtime behavior changes
+here.
+
+## 0. Non-claims
+
+<!-- truth: descriptive -->
+
+- This is a design proposal. It does not change runtime behavior.
+- It does not claim production readiness, live federation readiness, or
+  NYCN/partner activation.
+- It does not widen the meaning firewall. The kernel still enforces strings
+  blindly. The mandate-binding surface lives in apps, not in the kernel.
+- It does not introduce or alter regulatory terminology. The vocabulary
+  (obligation / allocation / settlement / unit / position / receipt /
+  provenance) is unchanged.
+- It does not commit any handler to a specific implementation. The map in
+  §6 is the proposed binding; per-handler scope and mandate work lands in
+  named follow-up PRs (§10).
+- It does not decide whether an ADR is required. §11 names the trigger.
+
+## 1. Problem
+
+<!-- truth: descriptive -->
+
+The kernel-side capability scope `GOVERNANCE_WRITE = "governance:write"`
+(`icn/crates/icn-rpc/src/auth.rs:947`) is the single string required by 38
+distinct governance mutation handlers in
+`icn/apps/governance/src/http/handlers.rs`. Any holder of a
+`governance:write`-bearing capability token can call any of them: domain
+creation, charter activation, membership mutation, proposal lifecycle
+transitions, mandate operations, meeting lifecycle, action items, comments,
+reactions.
+
+The kernel cannot distinguish these acts. No mandate-bundle layer above
+the capability sits between bearer and effect. Whether the long-term fix
+is per-action capabilities (kernel-side decomposition) or mandate-bundle
+gating (app-side enforcement) is the open question recorded in
+`ABUSE_CASE_HARDENING_STRATEGY.md` §4.1.
+
+The original issue text undercounted the gated handlers as roughly 12;
+the actual count from a fresh enumeration is **38**.
+
+## 2. Doctrine
+
+<!-- truth: normative -->
+
+From `ABUSE_CASE_HARDENING_STRATEGY.md`:
+
+- §2.7 — *A token is not a mandate.* A capability scope describes what the
+  kernel will allow the bearer to attempt; it does not describe an
+  institutional authorization.
+- §4.1 — *A capability scope must describe an act the institution can
+  authorize, not a directory of routes the gateway can dispatch.*
+- §4.1 — *The kernel-side enforcement primitive is the capability; the
+  institutional gate that produces the capability is the mandate. The
+  split is where the institution authorizes versus how the kernel
+  enforces.*
+- §7 — `governance:write` is listed as an authority shortcut whenever it
+  is used to exercise the bootstrap-only paths (`add_domain_member`,
+  `remove_domain_member`, `activate_charter`).
+
+The doctrine does not pit scope decomposition and mandate gating against
+each other. They are complementary: scope is what the kernel sees;
+mandate is what the institution proves.
+
+## 3. Current handler inventory
+
+<!-- truth: descriptive -->
+
+Enumerated from `icn/apps/governance/src/http/handlers.rs` by walking each
+`require_scope::<BasicClaims>(_, "governance:write")` call site to its
+enclosing handler. 38 unique handlers, 38 call sites.
+
+| Group | Handlers |
+|---|---|
+| **Charter / domain lifecycle** | `create_domain`, `activate_charter`, `add_domain_member`, `remove_domain_member` |
+| **Proposal lifecycle** | `create_proposal`, `open_proposal`, `close_proposal`, `cast_vote` |
+| **Steward proposals** | `create_appoint_steward_proposal`, `create_remove_steward_proposal`, `assign_role` |
+| **Delegation** | `create_delegation`, `revoke_delegation` |
+| **Meeting lifecycle** | `create_meeting`, `start_meeting`, `end_meeting`, `add_agenda_item`, `update_agenda_item`, `add_attendee`, `mark_attendance` |
+| **Action items** | `create_action_item`, `update_action_item`, `update_action_item_status`, `delete_action_item`, `add_action_item_note` |
+| **Activities / programs / structures / milestones** | `create_activity`, `create_program`, `create_structure`, `create_milestone`, `update_milestone_status`, `update_program_status`, `link_activity_to_program`, `unlink_activity_from_program` |
+| **Comments / reactions (low-stakes social)** | `add_comment`, `edit_comment`, `delete_comment`, `add_reaction`, `remove_reaction` |
+
+Blast-radius classification:
+
+- **High blast radius** — alters who governs or what authority exists:
+  `create_domain`, `activate_charter`, `add_domain_member`,
+  `remove_domain_member`, `assign_role`.
+- **Medium blast radius** — alters decisions, mandates, or delegations:
+  proposal lifecycle, steward proposals, delegation, milestone status.
+- **Low blast radius** — alters institutional record but not authority:
+  meeting lifecycle, action items, activities/programs/structures.
+- **Very low blast radius** — social interaction overlay: comments,
+  reactions.
+
+## 4. The three paths
+
+<!-- truth: descriptive -->
+
+### 4.1 Per-action capability scopes (pure kernel decomposition)
+
+Each handler gets its own scope string. Kernel sees finer evidence.
+
+- *Pro.* Kernel evidence is precise; tokens describe specific acts.
+- *Pro.* Mechanically simple — a single-line const plus a per-handler
+  string change.
+- *Con.* Scope explosion. 38 handlers means 38 scopes, with churn every
+  time a handler is added.
+- *Con.* A capability holder still has unbounded authority *within* the
+  chosen scope. `governance:proposal:cast_vote` lets the bearer vote on
+  every proposal, in every domain, indefinitely. The kernel cannot bind
+  the capability to a target, a time window, or a role.
+- *Con.* Capability ≠ mandate. Per §2.7, this path alone does not produce
+  a governance gate; it produces a finer-grained authentication gate.
+
+### 4.2 Mandate-bundle gating (pure app-side enforcement)
+
+Keep `governance:write` as the kernel capability. Add an app-layer policy
+oracle that consults a mandate registry: "does this actor hold a ratified
+mandate authorizing this act on this target at this height?"
+
+- *Pro.* This is the ICN-native path. The mandate is the governance
+  artifact; the capability is just the kernel's pre-authentication.
+- *Pro.* The kernel learns nothing new. The meaning firewall stays
+  exactly where it is.
+- *Pro.* Per-target, per-time, per-role binding fall out of the mandate
+  shape; the kernel does not have to model any of it.
+- *Con.* The kernel-level capability remains broad. Capability leakage
+  still grants broad write authority *if the mandate-check is bypassed by
+  a bug*. Defense in depth is weaker.
+- *Con.* Mandate machinery does not exist yet in the form this gating
+  requires. It is design and implementation work, not a flag flip.
+
+### 4.3 Hybrid — narrow capability classes + mandate gate
+
+Decompose `governance:write` into a small, finite set of **class-level**
+scopes (5–7), each of which still requires a mandate for high- and
+medium-blast-radius acts; low-blast-radius acts may not require a mandate
+beyond ordinary membership.
+
+- *Pro.* Kernel evidence becomes meaningful at the class level (records
+  which *kind* of write happened, not just that a governance write
+  happened) without leaking semantics into the kernel — the class is just
+  a string.
+- *Pro.* Defense in depth: a capability leak limits the bearer to one
+  class; the mandate gate still blocks specific acts.
+- *Pro.* Scope set is bounded and stable. Adding a 39th handler does not
+  add a 39th scope.
+- *Pro.* Honors the §4.1 doctrine literally — capability decomposition
+  *and* mandate gating, both at the layer they belong.
+- *Con.* More moving parts than either pure path. Each class adds one
+  rotation surface and one error path.
+- *Con.* Class boundaries are a judgment call. The class set proposed in
+  §6 is open to refinement.
+
+## 5. Recommended path
+
+<!-- truth: normative -->
+
+**Adopt the hybrid (§4.3).** Decompose to a small class-level scope set
+plus an app-side mandate gate for high- and medium-blast-radius acts.
+Low-blast-radius acts (comments, reactions, ordinary meeting record
+keeping) are mandate-exempt but still class-gated.
+
+Rationale:
+
+1. The doctrine explicitly endorses the layered structure (§4.1: "the two
+   are not in tension"). The hybrid is the literal reading of the
+   strategy.
+2. Per-action scopes (§4.1) trade one big problem (broad capability) for
+   38 small problems (per-action authority that still cannot bind to a
+   target). The hybrid keeps the kernel surface small.
+3. Pure mandate gating (§4.2) leaves the broad kernel capability in place;
+   one missed mandate-check call is a full bypass. The hybrid narrows the
+   blast radius of that mistake to one class.
+4. A finite class set survives churn. Handler-level scope strings
+   wouldn't.
+
+## 6. Proposed scope set and handler mapping
+
+<!-- truth: descriptive -->
+
+Six class-level scopes. The strings are proposals; the follow-up issue
+that mints them will RFC the names.
+
+| Scope (proposed) | Handlers | Mandate required (in production) |
+|---|---|---|
+| `governance:charter:write` | `create_domain`, `activate_charter`, `add_domain_member`, `remove_domain_member` | Yes — every act is high blast radius. For bootstrap, see §4.4 of `ABUSE_CASE_HARDENING_STRATEGY.md` (administrative shortcut artifact). |
+| `governance:proposal:write` | `create_proposal`, `open_proposal`, `close_proposal`, `cast_vote`, `create_appoint_steward_proposal`, `create_remove_steward_proposal`, `create_delegation`, `revoke_delegation` | Yes for close/cast and steward proposals; ratified-membership-only for proposal creation and delegation (mandate equivalent to membership-in-good-standing). |
+| `governance:steward:write` | `assign_role` (and any future direct-mutation steward operations) | Yes — steward authority cannot be granted by a bare token. |
+| `governance:meeting:write` | `create_meeting`, `start_meeting`, `end_meeting`, `add_agenda_item`, `update_agenda_item`, `add_attendee`, `mark_attendance`, `create_action_item`, `update_action_item`, `update_action_item_status`, `delete_action_item`, `add_action_item_note` | No mandate beyond membership-in-good-standing for routine meeting record-keeping. Steward-only meeting acts (if any are added later) escalate to `governance:steward:write`. |
+| `governance:activity:write` | `create_activity`, `create_program`, `create_structure`, `create_milestone`, `update_milestone_status`, `update_program_status`, `link_activity_to_program`, `unlink_activity_from_program` | No mandate beyond membership-in-good-standing for routine activity record-keeping. |
+| `governance:comment:write` | `add_comment`, `edit_comment`, `delete_comment`, `add_reaction`, `remove_reaction` | No mandate beyond membership-in-good-standing. Edit/delete is restricted to the original author; this is an app-level check, not a kernel check. |
+
+### 6.1 Mandate-binding surface (app-side)
+
+The app-side mandate gate exposes a trait roughly shaped as:
+
+```text
+trait MandateGate {
+    fn require(
+        actor: &Did,
+        domain: &DomainId,
+        act: MandateAct,
+        target: MandateTarget,
+        at_height: BlockHeight,
+    ) -> Result<MandateGrant, MandateRejection>;
+}
+```
+
+- `MandateAct` enumerates the institutional acts (a finite, named set —
+  e.g. `AddDomainMember`, `RemoveDomainMember`, `ActivateCharter`,
+  `CastVote`, `CloseProposal`, `AppointSteward`).
+- `MandateTarget` binds the mandate to the subject of the act (domain,
+  proposal, role).
+- `MandateGrant` is a signed reference returned to the handler; the
+  handler records its hash in the resulting receipt so that the artifact
+  trail captures both *which mandate* authorized the act and *which
+  capability* the bearer used.
+- `MandateRejection` carries a structured reason (no-mandate,
+  expired-mandate, wrong-target, wrong-actor, suspended) for the surface
+  to render.
+
+The trait, its types, and its persistence backing are unbuilt. They are
+named here so that the follow-up implementation PRs have a fixed target.
+
+### 6.2 Read-side scopes
+
+This document only touches the write side. Read scopes
+(`governance:read`) are unchanged.
+
+## 7. Kernel evidence delta
+
+<!-- truth: descriptive -->
+
+| Property | Before | After |
+|---|---|---|
+| Capability strings recorded per write | 1 (`governance:write`) | 1 of 6 class-level scopes |
+| Per-class evidence on the kernel side | None | Yes — kernel records which class scope was presented |
+| Mandate reference in receipt | None | High/medium-blast acts: `MandateGrant` hash recorded; low-blast: explicit `no_mandate_required` discriminator |
+| Per-target binding visible to kernel | None | None — still in the app. The kernel does not learn what `domain_id` or `proposal_id` mean. |
+| Per-act semantics in kernel | None | None — class names are opaque strings to the kernel |
+| Forensic question "which kind of write happened" | Cannot be answered from kernel evidence alone | Answered from kernel evidence alone |
+| Forensic question "was this act authorized by governance" | Cannot be answered from kernel evidence | Answered from mandate reference in the artifact chain (app + kernel together) |
+
+The meaning firewall is preserved: the kernel sees only strings and
+hashes. App-side mandate semantics remain in the app.
+
+## 8. What does not change
+
+<!-- truth: descriptive -->
+
+- The kernel/app meaning firewall. The kernel still enforces strings
+  blindly; only apps know what `governance:charter:write` *means*.
+- `governance:read` and all other capability scopes
+  (`network:write`, `ledger:write`, `contract:write`, …).
+- The `require_scope` helper in `icn-rpc`. It still takes a `&str`. The
+  six class-level scopes are added as constants alongside
+  `GOVERNANCE_WRITE`; the old constant remains until every handler is
+  migrated.
+- The administrative-shortcut artifact shape from
+  `ABUSE_CASE_HARDENING_STRATEGY.md` §4.2 / §4.4. The hybrid path is
+  orthogonal to whether `add_domain_member`/`activate_charter` remain
+  bootstrap-only; this design assumes they remain bootstrap-only per §7.
+- Existing tests gated on `governance:write`. They continue to pass while
+  the old constant is retained; per-handler tests migrate alongside each
+  handler's scope change.
+- The CCL policy oracle's input shape. Mandate-gate calls land beside it,
+  not inside it.
+
+## 9. Out of scope for this design
+
+<!-- truth: descriptive -->
+
+- The exact wire format of `MandateGrant`. Picked in the follow-up PR
+  that builds the mandate persistence backing.
+- Whether mandates are stored as opaque receipts under
+  `(class, record_hash) → bytes` (consistent with the receipt cascade) or
+  as their own typed surface. Picked at implementation time.
+- The migration sequence — which class moves first. §10 lists the
+  proposed sequence; the exact PR boundaries are picked when the first
+  implementation PR lands.
+- Read-side scope decomposition. Not relevant to the abuse story in §4.1.
+- Network-layer or ledger-layer capability work. Out of scope for the
+  governance epic.
+
+## 10. Follow-up PRs
+
+<!-- truth: descriptive -->
+
+1. **Mint the six class-level scope constants.** Pure addition; old
+   constant retained. No handler changes.
+2. **Migrate `governance:charter:write`** — `create_domain`,
+   `activate_charter`, `add_domain_member`, `remove_domain_member`. Pairs
+   with #1869 (direct charter activation bootstrap-path labeling) and
+   #1870 (TrustThreshold fail-open on direct membership mutation), both
+   already open.
+3. **Migrate `governance:steward:write`** — `assign_role`. Small.
+4. **Build the `MandateGate` trait, types, and persistence backing.**
+   Independent of any handler migration; lands before any handler starts
+   calling it.
+5. **Wire the mandate-check for `governance:charter:write` acts.**
+   First class to require mandates.
+6. **Migrate `governance:proposal:write`.** Pairs with mandate-check for
+   close/cast/steward-proposal acts.
+7. **Migrate `governance:meeting:write`.** No mandate-check beyond
+   membership.
+8. **Migrate `governance:activity:write`.** Same.
+9. **Migrate `governance:comment:write`.** Same.
+10. **Retire `governance:write` constant** once no handler references it.
+
+Each follow-up PR is independently mergeable; the order above is a
+recommendation, not a constraint. The retire step is the only one that
+must be last.
+
+## 11. Does this need an ADR?
+
+<!-- truth: descriptive -->
+
+Yes, after this design lands and the class-level scope names are RFC-ed.
+The ADR records:
+
+- The class-level scope set as a frozen contract surface (consumers of
+  capability tokens may key off these names).
+- The `MandateGate` trait shape as a frozen app-facing interface.
+- The retirement schedule for `governance:write`.
+
+The ADR follows the implementation, not this design. This design is the
+*draft*; the ADR is the *commitment* once the strings are stable and
+nothing in the implementation phase has invalidated them.
+
+## 12. Open questions for review
+
+<!-- truth: descriptive -->
+
+1. Are six classes the right granularity, or should `activity` and
+   `meeting` collapse into one `governance:org:write`?
+2. Should `assign_role` move under `governance:charter:write` (since it
+   alters who has authority) instead of its own `governance:steward:write`?
+3. Should the mandate-check for `cast_vote` be the same shape as the
+   mandate-check for `close_proposal`, or do they need different
+   `MandateAct` variants?
+4. Comment/reaction edit-restriction-to-author is an app-level
+   per-resource check. Should it route through `MandateGate` for
+   symmetry, or stay as a direct ownership check?
+
+Reviewers and follow-up PRs answer these. None of them block this design.
+
+## Anchors
+
+- `icn/crates/icn-rpc/src/auth.rs:947` — `GOVERNANCE_WRITE` constant
+- `icn/apps/governance/src/http/handlers.rs:283, 391, 554, 599, 699, 756, 1090, 1182, 1701, 2211–2812, 3178, 3258, 3421, 3476, 3517, 3684, 3762, 3812, 3854, 3910, 3956, 3997, 4141, 4223, 4304` — call sites
+- `docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md` §2.7, §4.1, §4.2, §4.4, §7
+- Related open issues: #1869 (direct charter activation bootstrap labeling), #1870 (TrustThreshold fail-open), #1871 (production startup guard for optional standing checkers), #1872 (receipt backend non-atomic mandate/grant boundary), #1873 (ReconciliationStatus accepted-is-not-applied)
