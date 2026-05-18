@@ -17,10 +17,13 @@ boots.
 
 This directory establishes the **vocabulary, layout, and honest
 non-claims** for that work. The scaffold (PR #1865) and the real local QCOW2
-build + one-VM boot smoke (PR #1866) have both landed. The scripts exist;
-no real QCOW2 has been produced in the current verified session. Running
-the real path still requires an operator-staged Debian base image and
-explicit authorization — see "Real local build + boot smoke" below.
+build + one-VM boot smoke (PR #1866) have both landed. The repo does not
+ship a prebuilt QCOW2 artifact; the operator must stage a Debian base
+image and invoke `build-image.sh --real` to produce one. The script does
+not download the base image, but the `--real` path's in-image
+`virt-customize --update --install` step does fetch Debian apt packages
+from the base image's configured repos — so the real path is not
+network-free. See "Real local build + boot smoke" below.
 
 For the full design including lifecycle stages, node states, role-profile
 vocabulary, and runtime-provider roadmap, see
@@ -144,11 +147,13 @@ hosted-service installation, smoke fixtures) is layered on after.
 The scripts for **Bootable dev image** (real build) and the one-VM boot
 smoke that verifies `/v1/health` on 8080 are present and landed via PR
 #1866. Whether a given clone has produced an actual QCOW2 artifact depends
-on operator action: the build does not run automatically, downloads
-nothing, and requires an operator-staged base image plus explicit
-invocation with `--real`. See the suggested follow-on stages at the bottom
-of `DEBIAN_APPLIANCE_MODEL.md` and the next-step list at the bottom of
-this README.
+on operator action: the build does not run automatically and requires an
+operator-staged base image plus explicit invocation with `--real`. The
+build script itself does not download the base image; the `--real` path's
+in-image `virt-customize --update --install` step does fetch apt packages
+from the base image's configured repos. See the suggested follow-on
+stages at the bottom of `DEBIAN_APPLIANCE_MODEL.md` and the next-step list
+at the bottom of this README.
 
 ## Layout
 
@@ -346,12 +351,16 @@ What has landed:
    built image and verifies `icnd` is alive and `/v1/health` responds on
    8080 (PR #1866).
 
-What has *not* been verified in the current session:
+Caveats on the real path:
 
-- No real QCOW2 artifact has been produced by this clone in the current
-  verified session. The scripts are present but the operator must
-  explicitly stage a Debian base image and invoke `--real` to actually
-  build or smoke. The build downloads nothing on its own.
+- The repo does not ship a prebuilt QCOW2 artifact. The scripts are
+  present, but producing one requires the operator to stage a Debian
+  base image and invoke `--real` explicitly.
+- The build script does not download the base image. The `--real` path's
+  in-image `virt-customize --update --install` step does fetch apt
+  packages from the base image's configured repos, so the real path is
+  not network-free even though the script never downloads the base
+  image itself.
 
 What is still ahead:
 
