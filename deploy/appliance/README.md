@@ -15,9 +15,12 @@ role-profiled into a member node, witness, domain host, or future service
 host. The same image is used everywhere; the role is applied after the image
 boots.
 
-Today this directory establishes the **vocabulary, layout, and honest
-non-claims** for that work so that the next slice — a real local QCOW2 build
-and a one-VM boot smoke — can drop into a settled structure.
+This directory establishes the **vocabulary, layout, and honest
+non-claims** for that work. The scaffold (PR #1865) and the real local QCOW2
+build + one-VM boot smoke (PR #1866) have both landed. The scripts exist;
+no real QCOW2 has been produced in the current verified session. Running
+the real path still requires an operator-staged Debian base image and
+explicit authorization — see "Real local build + boot smoke" below.
 
 For the full design including lifecycle stages, node states, role-profile
 vocabulary, and runtime-provider roadmap, see
@@ -131,16 +134,21 @@ hosted-service installation, smoke fixtures) is layered on after.
 
 | Stage | What the appliance is |
 |---|---|
-| **Unbuilt scaffold** (today) | Docs, templates, scripts, no image artifact. |
-| **Bootable dev image** | Local QCOW2 image that boots, runs `icnd`, passes health. |
+| **Unbuilt scaffold** | Docs, templates, scripts, no image artifact. |
+| **Bootable dev image** (today, for operators who stage a base image) | Local QCOW2 image that boots, runs `icnd`, passes health. |
 | **Claimed devnet node** | The image after a devnet operator runs first-boot and joins a local devnet. |
 | **Role-profiled node** | Same image, declared role applied via the appliance manifest. |
 | **Governed service host** | A `RuntimeProvider` hosts services under `GovernedServiceBinding`. |
 | **Production-signed appliance** | Signed updates, immutable rootfs, A-B updates, measured boot. |
 
-Today is **Unbuilt scaffold**. Next slice is **Bootable dev image** plus a
-boot smoke that verifies `/v1/health` on 8080. See the suggested next slice
-at the bottom of `DEBIAN_APPLIANCE_MODEL.md`.
+The scripts for **Bootable dev image** (real build) and the one-VM boot
+smoke that verifies `/v1/health` on 8080 are present and landed via PR
+#1866. Whether a given clone has produced an actual QCOW2 artifact depends
+on operator action: the build does not run automatically, downloads
+nothing, and requires an operator-staged base image plus explicit
+invocation with `--real`. See the suggested follow-on stages at the bottom
+of `DEBIAN_APPLIANCE_MODEL.md` and the next-step list at the bottom of
+this README.
 
 ## Layout
 
@@ -148,7 +156,8 @@ at the bottom of `DEBIAN_APPLIANCE_MODEL.md`.
 deploy/appliance/
 ├── README.md                                   # this file
 ├── appliance.manifest.example.yaml             # declarative manifest template
-├── build-image.sh                              # dry-run build scaffold (no real build yet)
+├── build-image.sh                              # dry-run by default; `--real` builds a QCOW2 from an operator-staged base image
+├── check.sh                                    # script + manifest sanity check
 ├── roles/
 │   ├── genesis.example.yaml
 │   ├── witness-archive.example.yaml
@@ -159,7 +168,8 @@ deploy/appliance/
 │   └── icn-appliance-firstboot.sh              # POSIX bash, idempotent, no secrets
 ├── smoke/
 │   ├── README.md
-│   └── smoke-local.sh                          # dry-run scaffold for next PR
+│   ├── cloud-init/                             # example user-data / meta-data for the smoke VM (placeholders only)
+│   └── smoke-local.sh                          # dry-run by default; `--real` boots the built QCOW2 and checks `/v1/health`
 └── systemd/
     └── icn-appliance-firstboot.service         # oneshot unit, runs before icnd.service
 ```
@@ -324,16 +334,35 @@ the same directory), then reboot or rerun firstboot.
   measured boot, attested federation enrollment. This image is a local
   dev-VM artifact, not a partner-distributable appliance.
 
-## Next implementation slice
+## What has landed and what is still ahead
 
-After this scaffold lands:
+What has landed:
 
-1. Turn `build-image.sh` into a real local QCOW2 build path using Debian
-   cloud-image customization (`virt-customize` or equivalent).
-2. Add a one-VM boot smoke under `smoke/` that boots the image and verifies
-   `icnd` is alive and `/v1/health` responds on 8080.
-3. Decide on Packer vs debos vs live-build as the longer-term backend after
-   the first qcow2 path is working.
+1. The scaffold — docs, manifest template, role examples, firstboot script,
+   systemd unit, dry-run check (PR #1865).
+2. A real local QCOW2 build path implemented in `build-image.sh --real`
+   using Debian cloud-image customization via `virt-customize` (PR #1866).
+3. A one-VM boot smoke under `smoke/smoke-local.sh --real` that boots the
+   built image and verifies `icnd` is alive and `/v1/health` responds on
+   8080 (PR #1866).
+
+What has *not* been verified in the current session:
+
+- No real QCOW2 artifact has been produced by this clone in the current
+  verified session. The scripts are present but the operator must
+  explicitly stage a Debian base image and invoke `--real` to actually
+  build or smoke. The build downloads nothing on its own.
+
+What is still ahead:
+
+1. Decide on Packer vs debos vs live-build as the longer-term backend now
+   that the first qcow2 path is working.
+2. Signed releases, A-B updates, immutable rootfs, TPM-backed keys,
+   measured boot, attested federation enrollment — see the future-work
+   list in `DEBIAN_APPLIANCE_MODEL.md`. These are not implemented here.
+3. Convergence between appliance and devnet behavior; the appliance does
+   not yet replace `deploy/install.sh` + `deploy/icnd.service` or
+   `deploy/devnet/`.
 
 ## Cross-references
 
