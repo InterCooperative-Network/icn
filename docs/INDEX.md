@@ -442,11 +442,15 @@ Strategic direction and gap analysis (March 2026):
 - [ICN-Pitch.md](strategy/ICN-Pitch.md) - Cooperative organizer pitch
 - [ICN-Scenarios.md](strategy/ICN-Scenarios.md) - Six working scenarios with API calls
 - [ICN-Evolution-Arc.md](strategy/ICN-Evolution-Arc.md) - Two-year project history
-- [ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md](strategy/ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) - Meeting-prep truth packet for the 2026-05-21 cooperative / Launch / ICN conversation
-- [NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md](strategy/NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md) - Human-facing prep packet adapting the Thursday brief for the 2026-05-21 conversation with the NYCN/Summit organizer
-- [NYCN_ORGANIZER_MEETING_ONE_PAGE_AID_2026-05-21.md](strategy/NYCN_ORGANIZER_MEETING_ONE_PAGE_AID_2026-05-21.md) - One-page printable conversation aid for the 2026-05-21 meeting (spine + primary walkthrough + three questions + non-claims)
-- [NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.html](strategy/NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.html) - Standalone HTML visual notes page for the 2026-05-21 meeting (opener, 90s, spine, 11-beat walkthrough, backup workflows, questions with note space, claims-not, post-meeting capture). Open in any browser; print-friendly.
-- [NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.pdf](strategy/NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.pdf) - Same visual notes page in PDF (7 pages, letter size, portrait). Attachment-ready: email, print, or share.
+- [ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md](strategy/ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) - Meeting-prep truth packet for the 2026-05-21 cooperative-developer / formation-platform / ICN conversation (controls project-state facts and non-claims)
+- [COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md](strategy/COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md) - **Thursday primary** — human-facing prep packet retargeting the Thursday brief toward the formation-to-governance seam (formation workflow → standing / authority / obligation / evidence / handoff)
+- [COOPERATIVE_FORMATION_PLATFORM_ONE_PAGE_AID_2026-05-21.md](strategy/COOPERATIVE_FORMATION_PLATFORM_ONE_PAGE_AID_2026-05-21.md) - One-page printable summary for the formation-to-governance conversation (spine + Launch translation + 3 questions + non-claims)
+- [COOPERATIVE_FORMATION_PLATFORM_VISUAL_AID_2026-05-21.html](strategy/COOPERATIVE_FORMATION_PLATFORM_VISUAL_AID_2026-05-21.html) - Standalone HTML visual notes page for the formation-to-governance conversation (posture / Launch context / spine / translation / 60s opener / 11-beat walkthrough with Today + ICN lines / branches / questions with note space / claims-not / capture grid). Open in any browser; print-friendly.
+- [COOPERATIVE_FORMATION_PLATFORM_VISUAL_AID_2026-05-21.pdf](strategy/COOPERATIVE_FORMATION_PLATFORM_VISUAL_AID_2026-05-21.pdf) - Same visual notes page in PDF (6 pages, letter size, portrait). Attachment-ready: email, print, or share.
+- [NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md](strategy/NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md) - **Secondary / backup variant** — NYCN/Summit organizer prep packet (formerly Thursday primary; now demoted to backup example surface)
+- [NYCN_ORGANIZER_MEETING_ONE_PAGE_AID_2026-05-21.md](strategy/NYCN_ORGANIZER_MEETING_ONE_PAGE_AID_2026-05-21.md) - Secondary variant one-page aid (NYCN/Summit organizer surface)
+- [NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.html](strategy/NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.html) - Secondary variant HTML visual notes (NYCN/Summit organizer surface)
+- [NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.pdf](strategy/NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.pdf) - Secondary variant PDF (NYCN/Summit organizer surface)
 
 ### Current Status Reports (`status/`)
 
