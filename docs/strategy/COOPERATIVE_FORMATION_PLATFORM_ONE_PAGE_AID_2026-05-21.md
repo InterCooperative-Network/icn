@@ -12,6 +12,10 @@ Last Reviewed: 2026-05-18
 
 Launch helps make co-op formation doable. ICN asks what durable institutional memory, standing, authority, obligations, and evidence should survive after formation.
 
+## Layering
+
+**ICN = substrate.** **NYCN/Summit = first reference institution.** **Institution packages = reusable templates / examples.** **Launch conversation = possible formation-to-governance package seam.** See [`ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md`](ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md).
+
 ## The spine
 
 **Standing → Authority → Decision → Obligation → Effect → Receipt → Evidence → Review**

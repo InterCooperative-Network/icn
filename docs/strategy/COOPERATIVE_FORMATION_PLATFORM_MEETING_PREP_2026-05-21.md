@@ -142,6 +142,18 @@ Walk one beat at a time. After each beat, ask:
 
 The walkthrough's purpose is to find the beat where the room says "**that** is where it breaks today."
 
+## 6a. ICN vs NYCN vs institution packages
+
+A frame to keep in the room: ICN, NYCN, and any future formation work sit on **different layers**, and collapsing them is a recurring source of confusion.
+
+- **ICN is the substrate.** Generic primitives — identity, standing, authority, obligations, receipts, evidence, federation hooks — and the constraint engine that enforces them. It does not know what a Summit, a session, a sponsor, a worker-coop formation path, or a patronage record *means*.
+- **NYCN / Summit is the first reference institution.** A real cooperative ecosystem whose recurring work lets ICN stress-test whether its generic primitives can support actual democratic institutional life. It is not "the ICN demo" in the toy sense, and it is not the universal model.
+- **Institution packages are the reusable meaning layer in between.** Role maps, workflow templates, obligation patterns, privacy defaults, fixtures, rehearsal scripts, onboarding docs — versioned, forkable, governable. The long-term goal is a *library* of packages (worker co-op formation, board governance, recurring events, federation membership, mutual aid, fiscal sponsorship, etc.), not one NYCN-shaped system.
+
+What this means for Thursday: the Launch conversation may reveal a future **worker-cooperative-formation** or **formation-to-governance** package — not a Launch replacement, but a forkable shape that models the handoff from formation steps into durable governance. That seam is what the primary walkthrough in §6 is trying to surface.
+
+Full clarification: [`ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md`](ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md).
+
 ## 7. Secondary example — NYCN / Summit as rehearsal surface
 
 Summit remains a useful concrete institutional laboratory, but it is **not** the meeting identity today.
