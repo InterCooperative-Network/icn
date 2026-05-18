@@ -71,4 +71,4 @@ Launch helps make co-op formation doable. ICN asks what durable institutional me
 
 - [Thursday meeting brief](ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md)
 - [Cooperative formation-platform meeting prep packet](COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md)
-- [NYCN/Summit as ICN reference institution](https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) — backup example; lands on `main` via companion PR [icn#1883](https://github.com/InterCooperative-Network/icn/pull/1883)
+- [NYCN/Summit as ICN reference institution](https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) — backup example (landed via [icn#1883](https://github.com/InterCooperative-Network/icn/pull/1883))

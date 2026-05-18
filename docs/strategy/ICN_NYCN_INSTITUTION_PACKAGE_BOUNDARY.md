@@ -28,7 +28,7 @@ That role gives NYCN/Summit two responsibilities:
 - **Stress-test ICN primitives** by running real institutional seams against them — committees, sponsors, sessions, accessibility, feedback, follow-up, handoff, recurring cycles.
 - **Not leak Summit-specific concepts into ICN core.** If NYCN ever needs an ICN primitive that does not exist, the work goes into the kernel as a *generic* primitive; the Summit-specific shape stays in the NYCN package.
 
-The reference-institution thesis is recorded separately in [`NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md`](https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) (via companion PR [icn#1883](https://github.com/InterCooperative-Network/icn/pull/1883); lands on `main` when that PR merges).
+The reference-institution thesis is recorded separately in [`NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md`](https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) (landed via companion PR [icn#1883](https://github.com/InterCooperative-Network/icn/pull/1883)).
 
 ## 3. Institution packages
 
@@ -102,6 +102,6 @@ The Thursday meeting is about whether the formation/development platform's workf
 - [`COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md`](COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md) — Thursday primary prep packet (formation-to-governance discovery).
 - [`ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md`](ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) — controls meeting-safe project-state facts.
 - [`NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md`](NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md) — secondary / backup NYCN/Summit organizer variant.
-- [`NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md`](https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) — reference-institution thesis (via companion PR [icn#1883](https://github.com/InterCooperative-Network/icn/pull/1883); lands on `main` when that PR merges).
+- [`NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md`](https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) — reference-institution thesis (landed via companion PR [icn#1883](https://github.com/InterCooperative-Network/icn/pull/1883)).
 - [NYCN repo `README.md`](https://github.com/InterCooperative-Network/nycn/blob/main/README.md) — what NYCN already does today.
 - NYCN [`#67`](https://github.com/InterCooperative-Network/nycn/pull/67) — Summit recurring-institution model + sanitized rehearsals.
