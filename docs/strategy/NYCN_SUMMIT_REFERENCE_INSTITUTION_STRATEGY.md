@@ -73,7 +73,7 @@ Three workflows are the most useful first rehearsals. Each is small enough to be
 
 ### 5.1 Content / session → public program (PRIMARY)
 
-The McKenzie-relevant content/logistics seam. From session idea through speaker outreach, support, interpretation, schedule, public program, run-of-show, day-of confirmation, post-event material collection. This is the highest-leverage rehearsal because it exercises every spine layer in a single recurring workflow.
+The content/logistics seam most relevant to a Summit content/program organizer. From session idea through speaker outreach, support, interpretation, schedule, public program, run-of-show, day-of confirmation, post-event material collection. This is the highest-leverage rehearsal because it exercises every spine layer in a single recurring workflow.
 
 ### 5.2 Feedback → next-year obligation (PRIMARY-2)
 
@@ -124,7 +124,7 @@ If NYCN/Summit is the reference institution, several priorities reorder:
 These are the small, safe slices that follow from this thesis. None is a pilot. All are sanitized / tabletop / design-only unless explicitly upgraded later.
 
 1. **ICN repo (this PR)** — record the thesis durably in `docs/strategy/`.
-2. **McKenzie meeting packet** ([`MACKENZIE_ICN_MEETING_PREP_2026-05-21.md`](MACKENZIE_ICN_MEETING_PREP_2026-05-21.md), landed on [icn#1882](https://github.com/InterCooperative-Network/icn/pull/1882)) — already aligned with this thesis: content/program rehearsal is primary; feedback-to-obligation questions are explicit. The packet filename retains the older "MACKENZIE" spelling; the prose discipline elsewhere is "McKenzie Jones" (filename normalization is a deferred cleanup item).
+2. **NYCN/Summit organizer meeting packet** ([`NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md`](NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md), landed on [icn#1882](https://github.com/InterCooperative-Network/icn/pull/1882)) — already aligned with this thesis: content/program rehearsal is primary; feedback-to-obligation questions are explicit.
 3. **NYCN repo** — sanitized rehearsal docs and the recurring-institution model:
    - `docs/strategy/SUMMIT_RECURRING_INSTITUTION_MODEL.md`
    - `docs/rehearsals/CONTENT_TO_PROGRAM_REHEARSAL.md`
@@ -133,12 +133,12 @@ These are the small, safe slices that follow from this thesis. None is a pilot. 
 5. **icn-community-bridge repo** — a small design note at `docs/nycn-summit-followup-bridge.md` on consented post-event follow-up boundaries and what must never be bridged.
 6. **Network-ops repo** — no changes. Rehearsal work must not imply live infrastructure readiness.
 
-Any further slice (real fixture wiring, runtime integration, formal pilot framing) is gated on McKenzie's Thursday conversation and explicit subsequent decisions.
+Any further slice (real fixture wiring, runtime integration, formal pilot framing) is gated on the Thursday conversation with the NYCN/Summit organizer and explicit subsequent decisions.
 
 ## 10. Related reading
 
 - [`docs/strategy/ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md`](ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) — meeting-safe ICN facts for the 2026-05-21 conversation.
-- [`docs/strategy/MACKENZIE_ICN_MEETING_PREP_2026-05-21.md`](MACKENZIE_ICN_MEETING_PREP_2026-05-21.md) — human-facing prep packet built on this thesis.
+- [`docs/strategy/NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md`](NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md) — human-facing prep packet built on this thesis.
 - [`docs/PHASE_PROGRESS.md`](../PHASE_PROGRESS.md) — Phase 2 is ⏳; NYCN partnership track sits inside Phase 2.
 - [`docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md`](../architecture/ABUSE_CASE_HARDENING_STRATEGY.md) — doctrine for honest authority, shortcuts, and legitimacy.
 - [`docs/spec/member-shell-v0.md`](../spec/member-shell-v0.md) and [`docs/spec/steward-cockpit-v0.md`](../spec/steward-cockpit-v0.md) — surfaces that should be shaped by the institutional load described here.
