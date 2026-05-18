@@ -124,7 +124,7 @@ If NYCN/Summit is the reference institution, several priorities reorder:
 These are the small, safe slices that follow from this thesis. None is a pilot. All are sanitized / tabletop / design-only unless explicitly upgraded later.
 
 1. **ICN repo (this PR)** — record the thesis durably in `docs/strategy/`.
-2. **Mackenzie meeting packet** ([`MACKENZIE_ICN_MEETING_PREP_2026-05-21.md`](MACKENZIE_ICN_MEETING_PREP_2026-05-21.md), landed on [icn#1882](https://github.com/InterCooperative-Network/icn/pull/1882)) — already aligned with this thesis: content/program rehearsal is primary; feedback-to-obligation questions are explicit.
+2. **McKenzie meeting packet** ([`MACKENZIE_ICN_MEETING_PREP_2026-05-21.md`](MACKENZIE_ICN_MEETING_PREP_2026-05-21.md), landed on [icn#1882](https://github.com/InterCooperative-Network/icn/pull/1882)) — already aligned with this thesis: content/program rehearsal is primary; feedback-to-obligation questions are explicit. The packet filename retains the older "MACKENZIE" spelling; the prose discipline elsewhere is "McKenzie Jones" (filename normalization is a deferred cleanup item).
 3. **NYCN repo** — sanitized rehearsal docs and the recurring-institution model:
    - `docs/strategy/SUMMIT_RECURRING_INSTITUTION_MODEL.md`
    - `docs/rehearsals/CONTENT_TO_PROGRAM_REHEARSAL.md`
