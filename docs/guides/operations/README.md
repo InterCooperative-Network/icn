@@ -7,6 +7,7 @@ This directory contains operational guides for running and maintaining ICN nodes
 - **backup-and-recovery.md** - Backup and disaster recovery procedures
 - **troubleshooting.md** - Troubleshooting common issues
 - **operations-guide.md** - General operations guide
+- **community-infrastructure.md** - Public-safe ICN community infrastructure posture
 - **replication-operations.md** - Storage replication operations
 - **pilot-smoke.md** - One-command pilot linkage smoke verification
 
