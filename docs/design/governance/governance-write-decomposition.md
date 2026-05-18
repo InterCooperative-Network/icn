@@ -292,15 +292,33 @@ This document only touches the write side. Read scopes
 
 <!-- truth: descriptive -->
 
-| Property | Before | After |
+The "After" column assumes the receipt-schema work in §10 step 2 has
+landed; until then, the kernel-side audit log carries the scope string
+but the receipt body does not. The split is named in §7.1.
+
+| Property | Before | After (assumes §10 step 2 has landed) |
 |---|---|---|
-| Capability strings recorded per write | 1 (`governance:write`) | 1 of 7 class-level scopes |
-| Per-class evidence on the kernel side | None | Yes — kernel records which class scope was presented |
-| Mandate reference in receipt | None | High/medium-blast acts: `MandateGrant` hash recorded; low-blast: explicit `no_mandate_required` discriminator |
+| Capability strings recorded per write (audit log) | 1 (`governance:write`) | 1 of 7 class-level scopes |
+| Per-class evidence on the kernel side (audit log) | None | Yes — audit log records which class scope was presented |
+| Capability scope recorded in *receipt body* | No — receipt body has no scope field | Yes — new `capability_scope_presented` field; canonical decision/action/attendance hash is recomputed over the extended field set |
+| Mandate reference in receipt body | No — receipt body has no mandate field | High/medium-blast acts: `MandateGrant` hash recorded; low-blast: explicit `no_mandate_required` discriminator. Old receipts without these fields remain replayable; new receipts include them under a new domain-separation tag (`icn:gov:decision:v2`, …) |
 | Per-target binding visible to kernel | None | None — still in the app. The kernel does not learn what `domain_id` or `proposal_id` mean. |
 | Per-act semantics in kernel | None | None — class names are opaque strings to the kernel |
-| Forensic question "which kind of write happened" | Cannot be answered from kernel evidence alone | Answered from kernel evidence alone |
-| Forensic question "was this act authorized by governance" | Cannot be answered from kernel evidence | Answered from mandate reference in the artifact chain (app + kernel together) |
+| Forensic question "which kind of write happened" | Cannot be answered from kernel evidence alone | Answered from kernel evidence alone *after* §10 step 2; before that, answerable from the audit log but not from the receipt body |
+| Forensic question "was this act authorized by governance" | Cannot be answered from kernel evidence | Answered from mandate reference in the artifact chain (app + kernel together) *after* §10 step 2 |
+
+### 7.1 Why the receipt body is in scope
+
+The existing governance receipts (`GovernanceDecisionReceipt`,
+`ActionItemCompletionReceipt`, `MeetingAttendanceReceipt` in
+`icn/crates/icn-governance/src/proof.rs:224, :509, :628`) hash only
+proposal/action/meeting data plus actors and tallies; they do not carry
+the capability scope or any mandate reference. The current
+`require_scope` helper is an admission gate, not a record on the
+receipt. Without the receipt-schema work, the forensic claim "you can
+read which kind of write happened from the receipt alone" is false —
+even after handler migration — because the receipt body never carried
+that field. That work is therefore lifted into §10 step 2.
 
 The meaning firewall is preserved: the kernel sees only strings and
 hashes. App-side mandate semantics remain in the app.
@@ -366,36 +384,52 @@ hashes. App-side mandate semantics remain in the app.
    update, clients cannot request a capability containing the new class
    scope and migrated routes become unreachable. Validation tests in
    `icn-gateway` cover the new strings.
-2. **Migrate `governance:charter:write`** — `create_domain`,
+2. **Extend governance receipt types to carry capability scope and
+   mandate-grant hash.** Wire-format migration on
+   `GovernanceDecisionReceipt`, `ActionItemCompletionReceipt`, and
+   `MeetingAttendanceReceipt` in
+   `icn/crates/icn-governance/src/proof.rs:224, :509, :628`. New fields:
+   `capability_scope_presented: String` and
+   `mandate_grant: Option<MandateGrantRef>` (where `MandateGrantRef`
+   carries the grant hash and a structured discriminator for
+   `no_mandate_required` low-blast cases). Each receipt's canonical
+   hash function is forked: existing receipts continue to verify under
+   the v1 domain-separation tag (`icn:gov:decision:v1`, etc.); receipts
+   produced by migrated handlers use a new v2 tag
+   (`icn:gov:decision:v2`, etc.). Verifiers accept either tag. Without
+   this step, the strong forensic claims in §7 are unachievable even
+   after every handler is migrated, because the receipt body has
+   nowhere to record the scope.
+3. **Migrate `governance:charter:write`** — `create_domain`,
    `activate_charter`, `add_domain_member`, `remove_domain_member`. Pairs
    with #1869 (direct charter activation bootstrap-path labeling) and
    #1870 (TrustThreshold fail-open on direct membership mutation), both
    already open.
-3. **Migrate `governance:steward:write`** — `assign_role`. Small.
-4. **Migrate `governance:federation:write`** — single edit to
+4. **Migrate `governance:steward:write`** — `assign_role`. Small.
+5. **Migrate `governance:federation:write`** — single edit to
    `extract_federation_common` at `handlers.rs:277` migrates all seven
    federation-proposal handlers at once. Pairs naturally with any
    federation-treaty hardening (`icn-federation` invariants).
-5. **Build the `MandateGate` trait, types, and persistence backing.**
+6. **Build the `MandateGate` trait, types, and persistence backing.**
    Independent of any handler migration; lands before any handler starts
    calling it.
-6. **Wire the mandate-check for `governance:charter:write` and
+7. **Wire the mandate-check for `governance:charter:write` and
    `governance:federation:write` acts.** First two classes to require
    mandates.
-7. **Migrate `governance:proposal:write`.** Pairs with mandate-check for
+8. **Migrate `governance:proposal:write`.** Pairs with mandate-check for
    close/cast/steward-proposal acts.
-8. **Migrate `governance:meeting:write`.** No mandate-check beyond
+9. **Migrate `governance:meeting:write`.** No mandate-check beyond
    membership.
-9. **Migrate `governance:activity:write`.** Same.
-10. **Migrate `governance:comment:write`.** Same.
-11. **Migrate non-app surfaces.** Before retirement, migrate the
+10. **Migrate `governance:activity:write`.** Same.
+11. **Migrate `governance:comment:write`.** Same.
+12. **Migrate non-app surfaces.** Before retirement, migrate the
     three additional gateway routes
     (`icn-gateway/src/api/flow_c.rs:52`,
     `icn-gateway/src/api/registry.rs:497, 593`) and update the JSON-RPC
     method→scope mapping in `icn-rpc/src/auth.rs:1009-1014` so the five
     governance JSON-RPC methods route to their class-level scopes per
     §3.1.
-12. **Retire `governance:write` constant** once no production code
+13. **Retire `governance:write` constant** once no production code
     references it anywhere in the workspace (verified by a workspace-wide
     `rg '"governance:write"'` returning only test fixtures, archived
     docs, or this design document).
