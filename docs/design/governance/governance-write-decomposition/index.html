@@ -1,0 +1,660 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance:Write Decomposition — Design | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>governance</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>governance write decomposition</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/governance/governance-write-decomposition.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Governance:Write Decomposition — Design</h1>
+<p><strong>Status</strong>: Design draft (Phase A — design only; no code change in this PR)
+<strong>Last Updated</strong>: 2026-05-18
+<strong>Issue</strong>: #1868
+<strong>Doctrine source</strong>: <a href="/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY">`docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md`</a> §4.1, §7</p>
+<p>This document picks the decomposition path for the single broad
+<code>governance:write</code> capability, lists every handler currently gated by it,
+and names the per-action scope strings and the mandate-binding surface that
+follow-up PRs will land. It is design only; no runtime behavior changes
+here.</p>
+<h2>0. Non-claims</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li>This is a design proposal. It does not change runtime behavior.</li>
+<li>It does not claim production readiness, live federation readiness, or
+NYCN/partner activation.</li>
+<li>It does not widen the meaning firewall. The kernel still enforces strings
+blindly. The mandate-binding surface lives in apps, not in the kernel.</li>
+<li>It does not introduce or alter regulatory terminology. The vocabulary
+(obligation / allocation / settlement / unit / position / receipt /
+provenance) is unchanged.</li>
+<li>It does not commit any handler to a specific implementation. The map in
+§6 is the proposed binding; per-handler scope and mandate work lands in
+named follow-up PRs (§10).</li>
+<li>It does not decide whether an ADR is required. §11 names the trigger.</li>
+</ul>
+<h2>1. Problem</h2>
+<!-- truth: descriptive -->
+
+<p>The kernel-side capability scope <code>GOVERNANCE_WRITE = &quot;governance:write&quot;</code>
+(<code>icn/crates/icn-rpc/src/auth.rs:947</code>) is the single string required by 45
+distinct governance mutation handlers in
+<code>icn/apps/governance/src/http/handlers.rs</code>. Any holder of a
+<code>governance:write</code>-bearing capability call any of them: domain creation,
+charter activation, membership mutation, proposal lifecycle transitions,
+federation-treaty proposals, mandate operations, meeting lifecycle,
+action items, comments, reactions.</p>
+<p>The kernel cannot distinguish these acts. No mandate-bundle layer above
+the capability sits between bearer and effect. Whether the long-term fix
+is per-action capabilities (kernel-side decomposition) or mandate-bundle
+gating (app-side enforcement) is the open question recorded in
+<code>ABUSE_CASE_HARDENING_STRATEGY.md</code> §4.1.</p>
+<p>The original issue text undercounted the gated handlers as roughly 12;
+a fresh enumeration finds <strong>45</strong> — 38 with inline <code>require_scope</code> calls,
+plus 7 federation-proposal handlers (<code>create_join_federation_proposal</code>,
+<code>create_leave_federation_proposal</code>, <code>create_establish_clearing_proposal</code>,
+<code>create_terminate_clearing_proposal</code>, <code>create_vouch_proposal</code>,
+<code>create_revoke_vouch_proposal</code>, <code>create_update_federation_policy_proposal</code>)
+that route through the <code>extract_federation_common</code> helper
+(<code>handlers.rs:277</code>), whose own <code>require_scope</code> call (line 283) gates the
+entire family.</p>
+<h2>2. Doctrine</h2>
+<!-- truth: normative -->
+
+<p>From <code>ABUSE_CASE_HARDENING_STRATEGY.md</code>:</p>
+<ul>
+<li>§2.7 — <em>A token is not a mandate.</em> A capability scope describes what the
+kernel will allow the bearer to attempt; it does not describe an
+institutional authorization.</li>
+<li>§4.1 — <em>A capability scope must describe an act the institution can
+authorize, not a directory of routes the gateway can dispatch.</em></li>
+<li>§4.1 — <em>The kernel-side enforcement primitive is the capability; the
+institutional gate that produces the capability is the mandate. The
+split is where the institution authorizes versus how the kernel
+enforces.</em></li>
+<li>§7 — <code>governance:write</code> is listed as an authority shortcut whenever it
+is used to exercise the bootstrap-only paths (<code>add_domain_member</code>,
+<code>remove_domain_member</code>, <code>activate_charter</code>).</li>
+</ul>
+<p>The doctrine does not pit scope decomposition and mandate gating against
+each other. They are complementary: scope is what the kernel sees;
+mandate is what the institution proves.</p>
+<h2>3. Current handler inventory</h2>
+<!-- truth: descriptive -->
+
+<p>Enumerated from <code>icn/apps/governance/src/http/handlers.rs</code> by two passes:
+(1) walking each <code>require_scope::&lt;BasicClaims&gt;(_, &quot;governance:write&quot;)</code>
+call site to its enclosing handler, and (2) finding every public handler
+that calls <code>extract_federation_common</code> (<code>handlers.rs:277</code>), which itself
+holds a <code>require_scope</code> at line 283. The second pass is necessary because
+federation-proposal handlers delegate their scope check to that helper
+and therefore have no inline <code>require_scope</code> line of their own. <strong>45</strong>
+unique handlers in total — 38 inline + 7 via the helper.</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Handlers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Charter / domain lifecycle</strong></td>
+<td><code>create_domain</code>, <code>activate_charter</code>, <code>add_domain_member</code>, <code>remove_domain_member</code></td>
+</tr>
+<tr>
+<td><strong>Proposal lifecycle</strong></td>
+<td><code>create_proposal</code>, <code>open_proposal</code>, <code>close_proposal</code>, <code>cast_vote</code></td>
+</tr>
+<tr>
+<td><strong>Steward proposals</strong></td>
+<td><code>create_appoint_steward_proposal</code>, <code>create_remove_steward_proposal</code>, <code>assign_role</code></td>
+</tr>
+<tr>
+<td><strong>Delegation</strong></td>
+<td><code>create_delegation</code>, <code>revoke_delegation</code></td>
+</tr>
+<tr>
+<td><strong>Federation-treaty proposals</strong> (gated via <code>extract_federation_common</code>)</td>
+<td><code>create_join_federation_proposal</code>, <code>create_leave_federation_proposal</code>, <code>create_establish_clearing_proposal</code>, <code>create_terminate_clearing_proposal</code>, <code>create_vouch_proposal</code>, <code>create_revoke_vouch_proposal</code>, <code>create_update_federation_policy_proposal</code></td>
+</tr>
+<tr>
+<td><strong>Meeting lifecycle</strong></td>
+<td><code>create_meeting</code>, <code>start_meeting</code>, <code>end_meeting</code>, <code>add_agenda_item</code>, <code>update_agenda_item</code>, <code>add_attendee</code>, <code>mark_attendance</code></td>
+</tr>
+<tr>
+<td><strong>Action items</strong></td>
+<td><code>create_action_item</code>, <code>update_action_item</code>, <code>update_action_item_status</code>, <code>delete_action_item</code>, <code>add_action_item_note</code></td>
+</tr>
+<tr>
+<td><strong>Activities / programs / structures / milestones</strong></td>
+<td><code>create_activity</code>, <code>create_program</code>, <code>create_structure</code>, <code>create_milestone</code>, <code>update_milestone_status</code>, <code>update_program_status</code>, <code>link_activity_to_program</code>, <code>unlink_activity_from_program</code></td>
+</tr>
+<tr>
+<td><strong>Comments / reactions (low-stakes social)</strong></td>
+<td><code>add_comment</code>, <code>edit_comment</code>, <code>delete_comment</code>, <code>add_reaction</code>, <code>remove_reaction</code></td>
+</tr>
+</tbody></table>
+<p>Blast-radius classification:</p>
+<ul>
+<li><strong>High blast radius</strong> — alters who governs or what authority exists:
+<code>create_domain</code>, <code>activate_charter</code>, <code>add_domain_member</code>,
+<code>remove_domain_member</code>, <code>assign_role</code>, and the federation-treaty
+proposal handlers (cross-cooperative authority).</li>
+<li><strong>Medium blast radius</strong> — alters decisions, mandates, or delegations:
+proposal lifecycle, steward proposals, delegation, milestone status.</li>
+<li><strong>Low blast radius</strong> — alters institutional record but not authority:
+meeting lifecycle, action items, activities/programs/structures.</li>
+<li><strong>Very low blast radius</strong> — social interaction overlay: comments,
+reactions.</li>
+</ul>
+<h3>3.1 Additional <code>governance:write</code> surfaces outside <code>apps/governance</code></h3>
+<p>A workspace-wide search for <code>&quot;governance:write&quot;</code> finds 74 references
+total. The 45 handlers in <code>apps/governance/src/http/handlers.rs</code> are
+the bulk of those, but three more <em>gateway</em> surfaces and one <em>JSON-RPC</em>
+surface also gate on <code>governance:write</code> and must be migrated (or
+explicitly scoped out) before the retirement step in §10 can run:</p>
+<ul>
+<li><code>icn/crates/icn-gateway/src/api/flow_c.rs:52</code> — <code>cast_vote_alias</code>
+(REST alias for <code>cast_vote</code>) → maps to <code>governance:proposal:write</code>.</li>
+<li><code>icn/crates/icn-gateway/src/api/registry.rs:497</code> — <code>create_meeting</code>
+(decision-registry meeting create) → maps to
+<code>governance:meeting:write</code>.</li>
+<li><code>icn/crates/icn-gateway/src/api/registry.rs:593</code> —
+<code>index_decision_endpoint</code> (decision-registry indexing) → likely maps
+to <code>governance:proposal:write</code> (it records a decision); confirm with
+the registry owner during migration.</li>
+<li><code>icn/crates/icn-rpc/src/auth.rs:1009-1014</code> —
+<code>required_scope_for_method</code> maps the JSON-RPC methods
+<code>governance.domain.create</code> → <code>governance:charter:write</code>;
+<code>governance.proposal.create</code>, <code>governance.proposal.open</code>,
+<code>governance.proposal.close</code>, <code>governance.vote.cast</code> →
+<code>governance:proposal:write</code>. The mapping table is the migration
+point for all five JSON-RPC methods at once.</li>
+</ul>
+<p>The retirement step in §10 cannot succeed until each of these is
+migrated or explicitly scoped out. None of them are in the original
+45-handler inventory above because they live outside
+<code>apps/governance/src/http/handlers.rs</code>.</p>
+<h2>4. The three paths</h2>
+<!-- truth: descriptive -->
+
+<h3>4.1 Per-action capability scopes (pure kernel decomposition)</h3>
+<p>Each handler gets its own scope string. Kernel sees finer evidence.</p>
+<ul>
+<li><em>Pro.</em> Kernel evidence is precise; tokens describe specific acts.</li>
+<li><em>Pro.</em> Mechanically simple — a single-line const plus a per-handler
+string change.</li>
+<li><em>Con.</em> Scope explosion. 45 handlers means 45 scopes, with churn every
+time a handler is added.</li>
+<li><em>Con.</em> A capability holder still has unbounded authority <em>within</em> the
+chosen scope. <code>governance:proposal:cast_vote</code> lets the bearer vote on
+every proposal, in every domain, indefinitely. The kernel cannot bind
+the capability to a target, a time window, or a role.</li>
+<li><em>Con.</em> Capability ≠ mandate. Per §2.7, this path alone does not produce
+a governance gate; it produces a finer-grained authentication gate.</li>
+</ul>
+<h3>4.2 Mandate-bundle gating (pure app-side enforcement)</h3>
+<p>Keep <code>governance:write</code> as the kernel capability. Add an app-layer policy
+oracle that consults a mandate registry: &quot;does this actor hold a ratified
+mandate authorizing this act on this target at this height?&quot;</p>
+<ul>
+<li><em>Pro.</em> This is the ICN-native path. The mandate is the governance
+artifact; the capability is just the kernel&#39;s pre-authentication.</li>
+<li><em>Pro.</em> The kernel learns nothing new. The meaning firewall stays
+exactly where it is.</li>
+<li><em>Pro.</em> Per-target, per-time, per-role binding fall out of the mandate
+shape; the kernel does not have to model any of it.</li>
+<li><em>Con.</em> The kernel-level capability remains broad. Capability leakage
+still grants broad write authority <em>if the mandate-check is bypassed by
+a bug</em>. Defense in depth is weaker.</li>
+<li><em>Con.</em> Mandate machinery does not exist yet in the form this gating
+requires. It is design and implementation work, not a flag flip.</li>
+</ul>
+<h3>4.3 Hybrid — narrow capability classes + mandate gate</h3>
+<p>Decompose <code>governance:write</code> into a small, finite set of <strong>class-level</strong>
+scopes (5–7), each of which still requires a mandate for high- and
+medium-blast-radius acts; low-blast-radius acts may not require a mandate
+beyond ordinary membership.</p>
+<ul>
+<li><em>Pro.</em> Kernel evidence becomes meaningful at the class level (records
+which <em>kind</em> of write happened, not just that a governance write
+happened) without leaking semantics into the kernel — the class is just
+a string.</li>
+<li><em>Pro.</em> Defense in depth: a capability leak limits the bearer to one
+class; the mandate gate still blocks specific acts.</li>
+<li><em>Pro.</em> Scope set is bounded and stable. Adding a 39th handler does not
+add a 39th scope.</li>
+<li><em>Pro.</em> Honors the §4.1 doctrine literally — capability decomposition
+<em>and</em> mandate gating, both at the layer they belong.</li>
+<li><em>Con.</em> More moving parts than either pure path. Each class adds one
+rotation surface and one error path.</li>
+<li><em>Con.</em> Class boundaries are a judgment call. The class set proposed in
+§6 is open to refinement.</li>
+</ul>
+<h2>5. Recommended path</h2>
+<!-- truth: normative -->
+
+<p><strong>Adopt the hybrid (§4.3).</strong> Decompose to a small class-level scope set
+(seven proposed classes — see §6) plus an app-side mandate gate for high-
+and medium-blast-radius acts. Low-blast-radius acts (comments, reactions,
+ordinary meeting record-keeping) are mandate-exempt but still class-gated.</p>
+<p>Rationale:</p>
+<ol>
+<li>The doctrine explicitly endorses the layered structure (§4.1: &quot;the two
+are not in tension&quot;). The hybrid is the literal reading of the
+strategy.</li>
+<li>Per-action scopes (§4.1) trade one big problem (broad capability) for
+45 small problems (per-action authority that still cannot bind to a
+target). The hybrid keeps the kernel surface small.</li>
+<li>Pure mandate gating (§4.2) leaves the broad kernel capability in place;
+one missed mandate-check call is a full bypass. The hybrid narrows the
+blast radius of that mistake to one class.</li>
+<li>A finite class set survives churn. Handler-level scope strings
+wouldn&#39;t.</li>
+</ol>
+<h2>6. Proposed scope set and handler mapping</h2>
+<!-- truth: descriptive -->
+
+<p>Seven class-level scopes. The strings are proposals; the follow-up issue
+that mints them will RFC the names. The federation class is sanctioned by
+<code>ABUSE_CASE_HARDENING_STRATEGY.md</code> §4.1 (candidate
+<code>governance:federation:propose</code>); the binding here uses the broader
+<code>:write</code> suffix for symmetry with the other six classes.</p>
+<table>
+<thead>
+<tr>
+<th>Scope (proposed)</th>
+<th>Handlers</th>
+<th>Mandate required (in production)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>governance:charter:write</code></td>
+<td><code>create_domain</code>, <code>activate_charter</code>, <code>add_domain_member</code>, <code>remove_domain_member</code></td>
+<td>Yes — every act is high blast radius. For bootstrap, see §4.4 of <code>ABUSE_CASE_HARDENING_STRATEGY.md</code> (administrative shortcut artifact).</td>
+</tr>
+<tr>
+<td><code>governance:proposal:write</code></td>
+<td><code>create_proposal</code>, <code>open_proposal</code>, <code>close_proposal</code>, <code>cast_vote</code>, <code>create_appoint_steward_proposal</code>, <code>create_remove_steward_proposal</code>, <code>create_delegation</code>, <code>revoke_delegation</code></td>
+<td>Yes for close/cast, steward proposals, and delegation lifecycle (consistent with the medium-blast-radius classification in §3 and §5). Proposal <em>creation</em> may use a lighter mandate equivalent to membership-in-good-standing; the exact mandate shape per act is left to §12 Q4 and the follow-up PR that wires the gate.</td>
+</tr>
+<tr>
+<td><code>governance:steward:write</code></td>
+<td><code>assign_role</code> (and any future direct-mutation steward operations)</td>
+<td>Yes — steward authority cannot be granted by a bare capability.</td>
+</tr>
+<tr>
+<td><code>governance:federation:write</code></td>
+<td><code>create_join_federation_proposal</code>, <code>create_leave_federation_proposal</code>, <code>create_establish_clearing_proposal</code>, <code>create_terminate_clearing_proposal</code>, <code>create_vouch_proposal</code>, <code>create_revoke_vouch_proposal</code>, <code>create_update_federation_policy_proposal</code></td>
+<td>Yes — every act alters cross-cooperative authority. Mandate equivalent to &quot;ratified domain authority to bind this domain into a federation treaty&quot;. The <code>extract_federation_common</code> helper at <code>handlers.rs:277</code> is the single migration point for this class.</td>
+</tr>
+<tr>
+<td><code>governance:meeting:write</code></td>
+<td><code>create_meeting</code>, <code>start_meeting</code>, <code>end_meeting</code>, <code>add_agenda_item</code>, <code>update_agenda_item</code>, <code>add_attendee</code>, <code>mark_attendance</code>, <code>create_action_item</code>, <code>update_action_item</code>, <code>update_action_item_status</code>, <code>delete_action_item</code>, <code>add_action_item_note</code></td>
+<td>No mandate beyond membership-in-good-standing for routine meeting record-keeping. Steward-only meeting acts (if any are added later) escalate to <code>governance:steward:write</code>.</td>
+</tr>
+<tr>
+<td><code>governance:activity:write</code></td>
+<td><code>create_activity</code>, <code>create_program</code>, <code>create_structure</code>, <code>create_milestone</code>, <code>update_milestone_status</code>, <code>update_program_status</code>, <code>link_activity_to_program</code>, <code>unlink_activity_from_program</code></td>
+<td>No mandate beyond membership-in-good-standing for routine record-keeping (create/link/unlink). Status-transition acts (<code>update_milestone_status</code>, <code>update_program_status</code>) match the §3 medium-blast classification — they assert a milestone or program has reached a new state — and require the mandate gate.</td>
+</tr>
+<tr>
+<td><code>governance:comment:write</code></td>
+<td><code>add_comment</code>, <code>edit_comment</code>, <code>delete_comment</code>, <code>add_reaction</code>, <code>remove_reaction</code></td>
+<td>No mandate beyond membership-in-good-standing. Edit/delete is restricted to the original author; this is an app-level check, not a kernel check.</td>
+</tr>
+</tbody></table>
+<h3>6.1 Mandate-binding surface (app-side)</h3>
+<p>The app-side mandate gate exposes a trait roughly shaped as:</p>
+<pre><code class="language-text">trait MandateGate {
+    fn require(
+        actor: &amp;Did,
+        domain: &amp;DomainId,
+        act: MandateAct,
+        target: MandateTarget,
+        at_height: BlockHeight,
+    ) -&gt; Result&lt;MandateGrant, MandateRejection&gt;;
+}
+</code></pre>
+<ul>
+<li><code>MandateAct</code> enumerates the institutional acts (a finite, named set —
+e.g. <code>AddDomainMember</code>, <code>RemoveDomainMember</code>, <code>ActivateCharter</code>,
+<code>CastVote</code>, <code>CloseProposal</code>, <code>AppointSteward</code>).</li>
+<li><code>MandateTarget</code> binds the mandate to the subject of the act (domain,
+proposal, role).</li>
+<li><code>MandateGrant</code> is a signed reference returned to the handler; the
+handler records its hash in the resulting receipt so that the artifact
+trail captures both <em>which mandate</em> authorized the act and <em>which
+capability</em> the bearer used.</li>
+<li><code>MandateRejection</code> carries a structured reason (no-mandate,
+expired-mandate, wrong-target, wrong-actor, suspended) for the surface
+to render.</li>
+</ul>
+<p>The trait, its types, and its persistence backing are unbuilt. They are
+named here so that the follow-up implementation PRs have a fixed target.</p>
+<h3>6.2 Read-side scopes</h3>
+<p>This document only touches the write side. Read scopes
+(<code>governance:read</code>) are unchanged.</p>
+<h2>7. Kernel evidence delta</h2>
+<!-- truth: descriptive -->
+
+<p>The &quot;After&quot; column assumes the receipt-schema work in §10 step 2 has
+landed; until then, the kernel-side audit log carries the scope string
+but the receipt body does not. The split is named in §7.1.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Before</th>
+<th>After (assumes §10 step 2 has landed)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Capability strings recorded per write (audit log)</td>
+<td>1 (<code>governance:write</code>)</td>
+<td>1 of 7 class-level scopes</td>
+</tr>
+<tr>
+<td>Per-class evidence on the kernel side (audit log)</td>
+<td>None</td>
+<td>Yes — audit log records which class scope was presented</td>
+</tr>
+<tr>
+<td>Capability scope recorded in <em>receipt body</em></td>
+<td>No — receipt body has no scope field</td>
+<td>Yes — new <code>capability_scope_presented</code> field; canonical decision/action/attendance hash is recomputed over the extended field set</td>
+</tr>
+<tr>
+<td>Mandate reference in receipt body</td>
+<td>No — receipt body has no mandate field</td>
+<td>High/medium-blast acts: <code>MandateGrant</code> hash recorded; low-blast: explicit <code>no_mandate_required</code> discriminator. Old receipts without these fields remain replayable; new receipts include them under a new domain-separation tag (<code>icn:gov:decision:v2</code>, …)</td>
+</tr>
+<tr>
+<td>Per-target binding visible to kernel</td>
+<td>None</td>
+<td>None — still in the app. The kernel does not learn what <code>domain_id</code> or <code>proposal_id</code> mean.</td>
+</tr>
+<tr>
+<td>Per-act semantics in kernel</td>
+<td>None</td>
+<td>None — class names are opaque strings to the kernel</td>
+</tr>
+<tr>
+<td>Forensic question &quot;which kind of write happened&quot;</td>
+<td>Cannot be answered from kernel evidence alone</td>
+<td>Answered from kernel evidence alone <em>after</em> §10 step 2; before that, answerable from the audit log but not from the receipt body</td>
+</tr>
+<tr>
+<td>Forensic question &quot;was this act authorized by governance&quot;</td>
+<td>Cannot be answered from kernel evidence</td>
+<td>Answered from mandate reference in the artifact chain (app + kernel together) <em>after</em> §10 step 2</td>
+</tr>
+</tbody></table>
+<h3>7.1 Why the receipt body is in scope</h3>
+<p>The existing governance receipts (<code>GovernanceDecisionReceipt</code>,
+<code>ActionItemCompletionReceipt</code>, <code>MeetingAttendanceReceipt</code> in
+<code>icn/crates/icn-governance/src/proof.rs:224, :509, :628</code>) hash only
+proposal/action/meeting data plus actors and tallies; they do not carry
+the capability scope or any mandate reference. The current
+<code>require_scope</code> helper is an admission gate, not a record on the
+receipt. Without the receipt-schema work, the forensic claim &quot;you can
+read which kind of write happened from the receipt alone&quot; is false —
+even after handler migration — because the receipt body never carried
+that field. That work is therefore lifted into §10 step 2.</p>
+<p>The meaning firewall is preserved: the kernel sees only strings and
+hashes. App-side mandate semantics remain in the app.</p>
+<h2>8. What does not change</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li>The kernel/app meaning firewall. The kernel still enforces strings
+blindly; only apps know what <code>governance:charter:write</code> <em>means</em>.</li>
+<li><code>governance:read</code> and all other capability scopes
+(<code>network:write</code>, <code>ledger:write</code>, <code>contract:write</code>, …).</li>
+<li>The <code>require_scope</code> helper in <code>icn-rpc</code>. It still takes a <code>&amp;str</code>. The
+seven class-level scopes are added as constants alongside
+<code>GOVERNANCE_WRITE</code>; the old constant remains until every handler is
+migrated. The <code>extract_federation_common</code> helper at <code>handlers.rs:277</code>
+switches from <code>governance:write</code> to <code>governance:federation:write</code> as
+the single change point that migrates all seven federation-proposal
+routes.</li>
+<li>The gateway scope allowlist
+(<code>icn/crates/icn-gateway/src/validation.rs:42-54</code>) and the scope-issuing
+auth endpoint (<code>icn/crates/icn-gateway/src/api/auth.rs:87-94</code>) keep
+their existing shape; only the contents of <code>ALLOWED_SCOPES</code> grow with
+each class. The validation function itself does not change.</li>
+<li>The administrative-shortcut artifact shape from
+<code>ABUSE_CASE_HARDENING_STRATEGY.md</code> §4.2 / §4.4. The hybrid path is
+orthogonal to whether <code>add_domain_member</code>/<code>activate_charter</code> remain
+bootstrap-only; this design assumes they remain bootstrap-only per §7.</li>
+<li>Existing tests gated on <code>governance:write</code>. They continue to pass while
+the old constant is retained; per-handler tests migrate alongside each
+handler&#39;s scope change.</li>
+<li>The CCL policy oracle&#39;s input shape. Mandate-gate calls land beside it,
+not inside it.</li>
+</ul>
+<h2>9. Out of scope for this design</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li>The exact wire format of <code>MandateGrant</code>. Picked in the follow-up PR
+that builds the mandate persistence backing.</li>
+<li>Whether mandates are stored as opaque receipts under
+<code>(class, record_hash) → bytes</code> (consistent with the receipt cascade) or
+as their own typed surface. Picked at implementation time.</li>
+<li>The migration sequence — which class moves first. §10 lists the
+proposed sequence; the exact PR boundaries are picked when the first
+implementation PR lands.</li>
+<li>Read-side scope decomposition. Not relevant to the abuse story in §4.1.</li>
+<li>Network-layer or ledger-layer capability work. Out of scope for the
+governance epic.</li>
+</ul>
+<h2>10. Follow-up PRs</h2>
+<!-- truth: descriptive -->
+
+<ol>
+<li><strong>Mint the seven class-level scope constants and extend the gateway
+allowlist.</strong> Pure addition; old constant retained. No handler changes.
+The seven new strings are added as constants in
+<code>icn/crates/icn-rpc/src/auth.rs</code> alongside <code>GOVERNANCE_WRITE</code> <em>and</em> as
+new entries in the <code>ALLOWED_SCOPES</code> list in
+<code>icn/crates/icn-gateway/src/validation.rs:42-54</code> so that the gateway
+auth endpoint (<code>icn/crates/icn-gateway/src/api/auth.rs:87-94</code>) will
+issue capabilities with the new strings. Without the gateway allowlist
+update, clients cannot request a capability containing the new class
+scope and migrated routes become unreachable. Validation tests in
+<code>icn-gateway</code> cover the new strings.</li>
+<li><strong>Extend governance receipt types to carry capability scope and
+mandate-grant hash.</strong> Wire-format migration on
+<code>GovernanceDecisionReceipt</code>, <code>ActionItemCompletionReceipt</code>, and
+<code>MeetingAttendanceReceipt</code> in
+<code>icn/crates/icn-governance/src/proof.rs:224, :509, :628</code>. New fields:
+<code>capability_scope_presented: String</code> and
+<code>mandate_grant: Option&lt;MandateGrantRef&gt;</code> (where <code>MandateGrantRef</code>
+carries the grant hash and a structured discriminator for
+<code>no_mandate_required</code> low-blast cases). Each receipt&#39;s canonical
+hash function is forked: existing receipts continue to verify under
+the v1 domain-separation tag (<code>icn:gov:decision:v1</code>, etc.); receipts
+produced by migrated handlers use a new v2 tag
+(<code>icn:gov:decision:v2</code>, etc.). Verifiers accept either tag. Without
+this step, the strong forensic claims in §7 are unachievable even
+after every handler is migrated, because the receipt body has
+nowhere to record the scope.</li>
+<li><strong>Migrate <code>governance:charter:write</code></strong> — <code>create_domain</code>,
+<code>activate_charter</code>, <code>add_domain_member</code>, <code>remove_domain_member</code>. Pairs
+with #1869 (direct charter activation bootstrap-path labeling) and
+#1870 (TrustThreshold fail-open on direct membership mutation), both
+already open.</li>
+<li><strong>Migrate <code>governance:steward:write</code></strong> — <code>assign_role</code>. Small.</li>
+<li><strong>Migrate <code>governance:federation:write</code></strong> — single edit to
+<code>extract_federation_common</code> at <code>handlers.rs:277</code> migrates all seven
+federation-proposal handlers at once. Pairs naturally with any
+federation-treaty hardening (<code>icn-federation</code> invariants).</li>
+<li><strong>Build the <code>MandateGate</code> trait, types, and persistence backing.</strong>
+Independent of any handler migration; lands before any handler starts
+calling it.</li>
+<li><strong>Wire the mandate-check for <code>governance:charter:write</code> and
+<code>governance:federation:write</code> acts.</strong> First two classes to require
+mandates.</li>
+<li><strong>Migrate <code>governance:proposal:write</code>.</strong> Pairs with mandate-check for
+close/cast/steward-proposal acts.</li>
+<li><strong>Migrate <code>governance:meeting:write</code>.</strong> No mandate-check beyond
+membership.</li>
+<li><strong>Migrate <code>governance:activity:write</code>.</strong> Same.</li>
+<li><strong>Migrate <code>governance:comment:write</code>.</strong> Same.</li>
+<li><strong>Migrate non-app surfaces.</strong> Before retirement, migrate the
+three additional gateway routes
+(<code>icn-gateway/src/api/flow_c.rs:52</code>,
+<code>icn-gateway/src/api/registry.rs:497, 593</code>) and update the JSON-RPC
+method→scope mapping in <code>icn-rpc/src/auth.rs:1009-1014</code> so the five
+governance JSON-RPC methods route to their class-level scopes per
+§3.1.</li>
+<li><strong>Retire <code>governance:write</code> constant</strong> once no production code
+references it anywhere in the workspace (verified by a workspace-wide
+<code>rg &#39;&quot;governance:write&quot;&#39;</code> returning only test fixtures, archived
+docs, or this design document).</li>
+</ol>
+<p>Each follow-up PR is independently mergeable; the order above is a
+recommendation, not a constraint. The retire step is the only one that
+must be last.</p>
+<h2>11. Does this need an ADR?</h2>
+<!-- truth: descriptive -->
+
+<p>Yes, after this design lands and the class-level scope names are RFC-ed.
+The ADR records:</p>
+<ul>
+<li>The class-level scope set as a frozen contract surface (consumers of
+capability tokens may key off these names).</li>
+<li>The <code>MandateGate</code> trait shape as a frozen app-facing interface.</li>
+<li>The retirement schedule for <code>governance:write</code>.</li>
+</ul>
+<p>The ADR follows the implementation, not this design. This design is the
+<em>draft</em>; the ADR is the <em>commitment</em> once the strings are stable and
+nothing in the implementation phase has invalidated them.</p>
+<h2>12. Open questions for review</h2>
+<!-- truth: descriptive -->
+
+<ol>
+<li>Are seven classes the right granularity, or should <code>activity</code> and
+<code>meeting</code> collapse into one <code>governance:org:write</code>?</li>
+<li>Should <code>assign_role</code> move under <code>governance:charter:write</code> (since it
+alters who has authority) instead of its own <code>governance:steward:write</code>?</li>
+<li>Should federation-treaty proposals route through <code>governance:proposal:write</code>
+instead of their own class, since each is technically a <em>proposal</em>?
+Counter-argument: the blast radius is cross-cooperative, which is
+categorically different from intra-domain proposals, and the
+<code>extract_federation_common</code> helper already makes them a natural unit.</li>
+<li>Should the mandate-check for <code>cast_vote</code> be the same shape as the
+mandate-check for <code>close_proposal</code>, or do they need different
+<code>MandateAct</code> variants?</li>
+<li>Comment/reaction edit-restriction-to-author is an app-level
+per-resource check. Should it route through <code>MandateGate</code> for
+symmetry, or stay as a direct ownership check?</li>
+</ol>
+<p>Reviewers and follow-up PRs answer these. None of them block this design.</p>
+<h2>Anchors</h2>
+<ul>
+<li><code>icn/crates/icn-rpc/src/auth.rs:947</code> — <code>GOVERNANCE_WRITE</code> constant</li>
+<li><code>icn/crates/icn-gateway/src/validation.rs:42-54</code> — <code>ALLOWED_SCOPES</code> gateway allowlist (must grow with each new class scope; mint step&#39;s co-requisite)</li>
+<li><code>icn/crates/icn-gateway/src/api/auth.rs:85-94</code> — gateway scope-validating auth endpoint that consumes <code>ALLOWED_SCOPES</code></li>
+<li><code>icn/crates/icn-gateway/src/api/flow_c.rs:52</code> — <code>cast_vote_alias</code>, additional <code>governance:write</code> site outside <code>apps/governance</code></li>
+<li><code>icn/crates/icn-gateway/src/api/registry.rs:497, 593</code> — <code>create_meeting</code> and <code>index_decision_endpoint</code>, additional <code>governance:write</code> sites</li>
+<li><code>icn/crates/icn-rpc/src/auth.rs:1009-1014</code> — <code>required_scope_for_method</code> JSON-RPC method→scope mapping; five governance methods bind to <code>GOVERNANCE_WRITE</code> and must rebind to class scopes</li>
+<li><code>icn/apps/governance/src/http/handlers.rs:283</code> — <code>require_scope</code> call inside <code>extract_federation_common</code> (lines 277-) that gates the seven federation-treaty proposal handlers at <code>:2927, :2967, :2997, :3034, :3062, :3097, :3125</code></li>
+<li><code>icn/apps/governance/src/http/handlers.rs:391, 554, 599, 699, 756, 1090, 1182, 1701, 2211–2812, 3178, 3258, 3421, 3476, 3517, 3684, 3762, 3812, 3854, 3910, 3956, 3997, 4141, 4223, 4304</code> — inline call sites</li>
+<li><code>docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md</code> §2.7, §4.1, §4.2, §4.4, §7</li>
+<li>Related open issues: #1869 (direct charter activation bootstrap labeling), #1870 (TrustThreshold fail-open), #1871 (production startup guard for optional standing checkers), #1872 (receipt backend non-atomic mandate/grant boundary), #1873 (ReconciliationStatus accepted-is-not-applied)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
