@@ -444,6 +444,7 @@ Strategic direction and gap analysis (March 2026):
 - [ICN-Evolution-Arc.md](strategy/ICN-Evolution-Arc.md) - Two-year project history
 - [ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md](strategy/ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) - Meeting-prep truth packet for the 2026-05-21 cooperative / Launch / ICN conversation
 - [MACKENZIE_ICN_MEETING_PREP_2026-05-21.md](strategy/MACKENZIE_ICN_MEETING_PREP_2026-05-21.md) - Human-facing prep packet adapting the Thursday brief for the 2026-05-21 conversation with Mackenzie Jones (NYCN/Summit organizer)
+- [MCKENZIE_MEETING_ONE_PAGE_AID_2026-05-21.md](strategy/MCKENZIE_MEETING_ONE_PAGE_AID_2026-05-21.md) - One-page printable conversation aid for the 2026-05-21 meeting (spine + primary walkthrough + three questions + non-claims)
 
 ### Current Status Reports (`status/`)
 
