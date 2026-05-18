@@ -52,6 +52,18 @@ pub const ALLOWED_SCOPES: &[&str] = &[
     // Governance operations
     "governance:read",
     "governance:write",
+    // Governance class-level write scopes (subdivisions of `governance:write`).
+    // Minted by §10 step 1 of `docs/design/governance/governance-write-decomposition.md`.
+    // No handler in `apps/governance/src/http/handlers.rs` references these
+    // yet; handler migration happens in later steps. The broad
+    // `governance:write` remains in the allowlist during the migration.
+    "governance:charter:write",
+    "governance:proposal:write",
+    "governance:steward:write",
+    "governance:federation:write",
+    "governance:meeting:write",
+    "governance:activity:write",
+    "governance:comment:write",
     // Settlement operations
     "settlements:read",
     "settlements:write",
@@ -801,6 +813,49 @@ mod tests {
 
         let too_many_scopes: Vec<String> = (0..31).map(|_| "ledger:read".to_string()).collect();
         assert!(validate_scopes(&too_many_scopes).is_err());
+    }
+
+    /// Each governance class-level scope minted by §10 step 1 of the
+    /// `governance:write` decomposition design must be requestable via the
+    /// gateway auth endpoint. The broad `governance:write` and `governance:read`
+    /// remain accepted; an obviously bogus governance subscope is rejected.
+    ///
+    /// This is a structural test: passing it asserts the allowlist contains
+    /// the seven class strings, not that any handler enforces them. Handler
+    /// migration is a separate PR (see §10 steps 3+ of the design doc).
+    #[test]
+    fn test_validate_scopes_governance_class_level() {
+        // All seven class-level scopes are accepted, both individually and
+        // together in a single token request.
+        let class_scopes = [
+            "governance:charter:write",
+            "governance:proposal:write",
+            "governance:steward:write",
+            "governance:federation:write",
+            "governance:meeting:write",
+            "governance:activity:write",
+            "governance:comment:write",
+        ];
+        for scope in class_scopes.iter() {
+            assert!(
+                validate_scopes(&[scope.to_string()]).is_ok(),
+                "class-level scope {scope} must be allowlisted"
+            );
+        }
+        let bundled: Vec<String> = class_scopes.iter().map(|s| s.to_string()).collect();
+        assert!(
+            validate_scopes(&bundled).is_ok(),
+            "all seven class-level scopes must be acceptable in a single request"
+        );
+
+        // Broad scopes remain accepted during migration.
+        assert!(validate_scopes(&["governance:read".to_string()]).is_ok());
+        assert!(validate_scopes(&["governance:write".to_string()]).is_ok());
+
+        // An obviously bogus governance subscope is rejected.
+        assert!(validate_scopes(&["governance:nonexistent:write".to_string()]).is_err());
+        assert!(validate_scopes(&["governance:charter".to_string()]).is_err());
+        assert!(validate_scopes(&["governance:charter:admin".to_string()]).is_err());
     }
 
     #[test]
