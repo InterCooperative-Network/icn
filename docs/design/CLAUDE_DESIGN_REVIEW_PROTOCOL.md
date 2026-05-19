@@ -190,7 +190,7 @@ When a new seed arrives:
 3. Walk the gates in §3 against each named artifact. Record findings in [`claude-design-seed/REVIEW_NOTES.md`](claude-design-seed/REVIEW_NOTES.md).
 4. Update [`claude-design-seed/CHANGELOG.md`](claude-design-seed/CHANGELOG.md) with the seed version, key findings, and final status counts (how many `candidate doctrine`, how many `illustrative direction`, how many `do not use`).
 5. For each `candidate doctrine`, open a small, scope-locked repo PR against the canonical path.
-6. Leave the rest of the seed where it is: under `docs/design/claude-design-seed/` as `generated seed`, labeled and archived.
+6. Leave the rest of the seed in its external bundle location (typically `$CLAUDE_JOB_DIR` or a separate scratch directory) — do **not** copy preview HTML, UI kits, generated assets, screenshots, or imported references into the repo. Only the governance trail — the seed's entry in [`claude-design-seed/CHANGELOG.md`](claude-design-seed/CHANGELOG.md) and its section in [`claude-design-seed/REVIEW_NOTES.md`](claude-design-seed/REVIEW_NOTES.md) — lives in the canonical repo. The bundle URL plus the review trail is sufficient record.
 
 ---
 

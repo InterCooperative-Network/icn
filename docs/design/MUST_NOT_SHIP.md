@@ -160,7 +160,7 @@ A Claude Design seed produces polished output. Polished output is not canonical 
 
 - **At review time:** [CLAUDE_DESIGN_REVIEW_PROTOCOL.md](CLAUDE_DESIGN_REVIEW_PROTOCOL.md) §3 includes the truth-label, accessibility, vocabulary, implementation-status, language/RTL, low-bandwidth/reduced-motion/large-text, and source-doc drift gates. This file is the rejection floor those gates default to.
 - **At PR time:** the design rule in [`.claude/rules/design.md`](../../.claude/rules/design.md) auto-loads doctrine when design paths are touched. Reviewers cite item numbers from this file when blocking a PR.
-- **At marketing/comms time:** anyone preparing a public asset of ICN against this list before publish. The seed's `MUST_NOT_SHIP.md` was originally a self-check for the seed author; the repo-side version is a self-check for every contributor.
+- **At marketing/comms time:** anyone preparing a public asset of ICN checks it against this list before publishing. The seed's `MUST_NOT_SHIP.md` was originally a self-check for the seed author; the repo-side version is a self-check for every contributor.
 
 A surface that violates any of the twelve items is not shipped. There is no "we'll fix it later" path that ends in canonical promotion of a violating surface.
 
