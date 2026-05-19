@@ -1,0 +1,66 @@
+name: Governance / process
+description: Issue about how the project itself is governed — decision-making, contributor process, repo or org hygiene, project conduct
+labels: ["area:governance"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template is for **how the project is run**, not for governance features inside ICN itself.
+        For governance code, contracts, or CCL semantics, use the Work Item or RFC template with `area:governance`.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is this about
+      options:
+        - "Decision needed — direction or trade-off the maintainer(s) should weigh in on"
+        - "Process change — how PRs, issues, RFCs, or releases work"
+        - "Repo / org hygiene — labels, templates, branch protection, settings"
+        - "Contributor experience — onboarding, docs, accessibility of the project itself"
+        - "Conduct / community — see CODE_OF_CONDUCT.md for in-scope items"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What's the situation? Quote the docs, PRs, or threads that motivated this.
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: The question or proposal
+      description: What specifically are you asking the maintainer(s) to decide or do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Options under consideration
+      description: If this is a decision, list the realistic options and what each implies. If it's a proposal, state the recommendation and the runner-up.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: How urgent is this
+      options:
+        - "Blocking active work"
+        - "Should resolve this week"
+        - "Background — next time we touch this area"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confidentiality
+    attributes:
+      label: Confidentiality
+      options:
+        - label: "This issue contains nothing private. It is fine to discuss in public."
+          required: true

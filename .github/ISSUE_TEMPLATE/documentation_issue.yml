@@ -1,0 +1,66 @@
+name: Documentation issue
+description: Something in docs is wrong, missing, outdated, or hard to navigate
+labels: ["area:docs"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of documentation issue
+      options:
+        - "Factually wrong / contradicts code"
+        - "Out of date / stale"
+        - "Missing — should exist but doesn't"
+        - "Hard to find / discoverability"
+        - "Unclear writing — content is correct but readers get lost"
+        - "Cross-doc inconsistency"
+        - "Other"
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Where in the docs
+      description: "File path(s) under docs/ or URL on intercooperative.network. Multiple locations OK."
+      placeholder: "docs/ARCHITECTURE.md §3, docs/STATE.md, intercooperative.network/whats-real-now"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong
+      description: Quote the offending text or describe the gap. Concrete is better than abstract.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested
+    attributes:
+      label: Suggested fix
+      description: A correction, a replacement paragraph, a pointer to the right canonical source — whatever you have. Leave blank if you don't know yet.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: truth-class
+    attributes:
+      label: Truth class of the affected doc (if known)
+      description: "See docs/DOCUMENTATION_CONTROL_SYSTEM.md. Skip if unsure."
+      options:
+        - "Unknown / unsure"
+        - "normative"
+        - "descriptive"
+        - "operational"
+        - "historical"
+        - "draft"
+    validations:
+      required: false
+
+  - type: textarea
+    id: depends
+    attributes:
+      label: Depends on
+      description: "Blocking issues, if any: - [ ] #NNN"
+    validations:
+      required: false

@@ -42,6 +42,7 @@ This directory is a **show-ready orientation layer** for the ICN repository. Its
 | [`current-truth-map.md`](current-truth-map.md) | What is real, what is not, what gates remain — pointing at `STATE.md` / `PHASE_PROGRESS.md` for the per-PR record. |
 | [`source-of-truth-map.md`](source-of-truth-map.md) | Which sources outrank which when repo material disagrees; conflict rules, overclaim guardrails, and status labels. |
 | [`source-tree-map.md`](source-tree-map.md) | Top-level repo surfaces and what each is for. |
+| [`repository-map.md`](repository-map.md) | Cross-repo map: `icn`, `nycn`, `icn-learn`, `icn-community-bridge` — roles, visibility, merge order. |
 | [`rust-workspace-map.md`](rust-workspace-map.md) | The Rust workspace under `icn/` grouped by rough layer (kernel/identity/networking/ledger/governance/etc.). |
 | [`docs-control-map.md`](docs-control-map.md) | How `docs/INDEX.md`, `docs/registry.toml`, `DOCUMENT_REGISTRY.md`, and `doc_control_check.py` relate; truth classes; how to add a doc. |
 | [`runtime-surface-map.md`](runtime-surface-map.md) | Real runtime surfaces a member or app actually touches today (`/me/standing`, `/me/action-cards`, completion-receipt retrieval, etc.). |

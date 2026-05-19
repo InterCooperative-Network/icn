@@ -1,0 +1,37 @@
+name: Security issue — DO NOT FILE HERE
+description: Stop and read. Suspected vulnerabilities must not be filed as public issues.
+title: "[DO NOT FILE — see SECURITY.md]"
+labels: ["security-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Stop.
+
+        **A suspected vulnerability does not belong in a public issue.**
+
+        Please close this template and report through one of the private channels:
+
+        - **Preferred**: [Report a vulnerability privately on GitHub](https://github.com/InterCooperative-Network/icn/security/advisories/new).
+          This routes to maintainers and is not visible to the public.
+        - **Fallback**: see the maintainer contact in [SECURITY.md](https://github.com/InterCooperative-Network/icn/blob/main/SECURITY.md).
+
+        Public security issues are closed and redirected. Filing privately is faster for everyone.
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirm you read the above
+      options:
+        - label: "I understand this is NOT the place for a suspected vulnerability and I will file through the private channel in SECURITY.md."
+          required: true
+        - label: "This issue is NOT a vulnerability report. It is a non-sensitive security-adjacent topic (hardening question, public threat-model discussion, audit follow-up that has already been disclosed)."
+          required: true
+
+  - type: textarea
+    id: topic
+    attributes:
+      label: What is this issue about
+      description: Describe the security-adjacent topic. Remember — do not include details of an unpatched vulnerability here.
+    validations:
+      required: true
