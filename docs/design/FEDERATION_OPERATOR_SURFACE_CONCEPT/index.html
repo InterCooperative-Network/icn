@@ -1,0 +1,287 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Federation / Operator Surface — Concept | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>FEDERATION OPERATOR SURFACE CONCEPT</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/FEDERATION_OPERATOR_SURFACE_CONCEPT.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Federation / Operator Surface — Concept</h1>
+<blockquote>
+<p><strong>Truth label:</strong> <em>illustrative direction.</em></p>
+<p>This surface is <strong>not shipped</strong>. The kernel hooks for federation reconciliation, scope-health probes, and receipt emission exist in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-federation">`icn-federation`</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-trust">`icn-trust`</a>, and <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-net">`icn-net`</a>; the unified operator-facing surface that renders them does not. This concept is the design exploration the ICN repo tracks as &quot;behind the system&quot; maturity for federation-operator work.</p>
+<p>Promoted from the v0.2 Claude Design seed (<code>seed/FEDERATION_OPERATOR_CONCEPT.md</code>) per <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/CHANGELOG">`claude-design-seed/CHANGELOG.md`</a>.</p>
+</blockquote>
+<h2>What this surface is</h2>
+<p>A <strong>stewardship surface.</strong> The operator of a federation runs reconciliations, acknowledges degraded scope states, re-emits stale receipts, and processes the federation&#39;s own action queue. They do <em>not</em> hold private member data, do <em>not</em> see member positions inside cooperatives, and do <em>not</em> have powers the federation charter did not grant.</p>
+<p>The vocabulary is <code>operator</code> and <code>steward</code>, not <code>admin</code>. The role is bound by the federation&#39;s charter; it is not an escalation path.</p>
+<h2>What this surface is not</h2>
+<table>
+<thead>
+<tr>
+<th>Anti-pattern</th>
+<th>Why ICN rejects it</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Cockpit</strong></td>
+<td>A cockpit centralizes attention and authority on one operator. Federations are co-equal scopes; the surface is mostly for <em>seeing</em>, not steering. (<a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 7)</td>
+</tr>
+<tr>
+<td><strong>Surveillance console</strong></td>
+<td>Operators see no more than members see on shared records. No drill-down into private member state.</td>
+</tr>
+<tr>
+<td><strong>Admin god-panel</strong></td>
+<td>Federations do not have admins. They have stewards bound by the federation charter.</td>
+</tr>
+<tr>
+<td><strong>&quot;Control center&quot; aesthetic</strong></td>
+<td>Glowing world maps, pulsing nodes, stats walls — reject. The surface looks like a member surface, scoped up. (<a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 8)</td>
+</tr>
+<tr>
+<td><strong>Glowing network globe</strong></td>
+<td>Three co-equal scopes, no hub, no animated network theater. (<a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 9)</td>
+</tr>
+<tr>
+<td><strong>Faux-government seal</strong></td>
+<td>No round seals, no laurels, no shield motifs. (<a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 10)</td>
+</tr>
+</tbody></table>
+<h2>Surface inventory</h2>
+<p>The concept renders five regions, all in the same visual language as the member shell — same tokens, same primitives, same vocabulary.</p>
+<h3>1 · Member roster (federation health)</h3>
+<p>A list of every member coop / community participating in this federation, with three columns of state per row:</p>
+<ul>
+<li><strong>Scope health</strong> — chip: healthy · degraded · partition. Text + icon, never color-only.</li>
+<li><strong>Last seen</strong> — when the federation last successfully reconciled with this scope.</li>
+<li><strong>Action state</strong> — sync chip: synced · pending · queued.</li>
+</ul>
+<p>The roster is the only surface where the operator sees aggregate-by-scope state. Color reinforces; chip text names the state.</p>
+<h3>2 · Stewardship panels (receipt health · reconciliation queue · disputes)</h3>
+<p>Three small panels with one number and one sentence each:</p>
+<ul>
+<li><strong>Receipt health</strong> — emitted-vs-expected over the last 7d, plus stale / re-emitted count.</li>
+<li><strong>Reconciliation queue</strong> — scopes waiting to reconverge.</li>
+<li><strong>Disputes open</strong> — disputes raised at federation scope (not coop-internal).</li>
+</ul>
+<p>No vanity metrics. Every number is a thing the steward might need to act on.</p>
+<h3>3 · Operator action queue</h3>
+<p>The steward&#39;s work surface. A list of named operator actions, each:</p>
+<ul>
+<li>An <strong>operator action card</strong> rendered against <a href="/docs/spec/member-shell-v0">`docs/spec/member-shell-v0.md`</a> §&quot;ActionCard rendering contract&quot; and its &quot;v0.2 rendering refinements&quot; — same 14-field ADR-0027 schema, same sync-state chip, same &quot;unavailable&quot; rendering rule, same stale/degraded scope behavior. Operator cards inherit the member shell&#39;s contract; they are not a parallel surface.</li>
+<li><strong>Mandate column</strong> names the federation-charter clause that authorizes the steward to perform the action. Operators cannot perform actions that no charter clause authorizes.</li>
+</ul>
+<h3>4 · Provenance ledger (federation-scope receipts)</h3>
+<p>A receipt strip rendering federation-scope receipts only:</p>
+<ul>
+<li>Cross-coop clearings.</li>
+<li>Federation-level governance decisions.</li>
+<li>Federation-level allocations.</li>
+<li>Charter changes.</li>
+</ul>
+<p>Coop-internal receipts do not appear on the operator surface. They are visible to the coop&#39;s members through their own member shells.</p>
+<h3>5 · &quot;Can see / cannot see&quot; disclosure</h3>
+<p>Every operator surface carries an explicit visible disclosure of what the operator <em>can</em> and <em>cannot</em> see at this scope. This is doctrine, not chrome. A federation operator who cannot remember what they cannot see is dangerous; the surface reminds them every screen.</p>
+<h3>6 · Member-visible degradation correspondence</h3>
+<p>When the federation enters degraded mode, the operator surface and every member shell affected by it render the <strong>same banner copy</strong> with the same remediation expectations. Members and operators read the same words. This preserves the &quot;operators see no more than members&quot; rule even during failure.</p>
+<p>The shared banner is the contract in <a href="/docs/spec/member-shell-v0">`docs/spec/member-shell-v0.md`</a> §&quot;Stale, sync-in-flight, degraded scope (network honesty)&quot; — the operator surface does not invent a parallel degradation vocabulary.</p>
+<h2>Component primitives the concept reuses</h2>
+<ul>
+<li><strong>Scope frame</strong> — every panel declares it lives at federation scope.</li>
+<li><strong>Mandate line</strong> — every operator action card names the charter clause that authorizes it.</li>
+<li><strong>Sync-state chip</strong> — same six states as the member shell (<a href="/docs/spec/member-shell-v0">`docs/spec/member-shell-v0.md`</a> §&quot;v0.2 rendering refinements&quot;).</li>
+<li><strong>Provenance trail</strong> — operators inspect the same chain members can.</li>
+<li><strong>Truth label</strong> — persistent strip on the surface.</li>
+<li><strong>Degraded banner</strong> — same banner copy as members see.</li>
+<li><strong>Challenge / review / exit</strong> — disputes can be raised from the operator surface against federation-scope decisions; the dispute path is the same path a member uses.</li>
+</ul>
+<p>These are pattern names from the design system, not canonical concept ids (<a href="/docs/design-language/concept-map">`docs/design-language/concept-map.md`</a>) — they remain design-system patterns per the v0.2 seed&#39;s D3 decision.</p>
+<h2>Privacy boundaries</h2>
+<table>
+<thead>
+<tr>
+<th>Boundary</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Operator cannot see member positions inside coops</td>
+<td>Federation-scope receipts only · no drill-down to coop-internal mutual-credit positions</td>
+</tr>
+<tr>
+<td>Operator cannot see coop-internal proposals</td>
+<td>Federation queue surfaces only federation-charter-bound proposals</td>
+</tr>
+<tr>
+<td>Operator cannot see member communications</td>
+<td>No communications visible at any scope above the participants&#39; own</td>
+</tr>
+<tr>
+<td>Operator cannot escalate beyond charter</td>
+<td>Every operator action declares the charter clause; actions without a clause are not offered</td>
+</tr>
+<tr>
+<td>Operator cannot suppress dispute paths</td>
+<td>&quot;Challenge&quot; affordance reachable on every operator action card; the dispute resolves at the appropriate scope, never at the operator&#39;s discretion</td>
+</tr>
+</tbody></table>
+<p>These boundaries are doctrine for the concept. The kernel&#39;s scope-isolation guarantees are the ground truth; any implementation must verify against them before claiming this surface as shipped.</p>
+<h2>Audit / export paths</h2>
+<ul>
+<li>Every federation-scope receipt is exportable by any member of the federation, not only by the operator. Operators do not have privileged export access.</li>
+<li>The operator action queue is itself receipt-generating; the federation can audit the operator the same way the operator audits the federation.</li>
+</ul>
+<h2>Accessibility / language obligations</h2>
+<ul>
+<li><strong>Truth-label strip</strong> persistent across every operator screen.</li>
+<li><strong>Sync-state chips</strong> named, never color-only.</li>
+<li><strong>Scope health chips</strong> named, never color-only.</li>
+<li>Renders correctly in all 4 themes × 2 modes — the production wiring for <code>hc-dark</code> / <code>hc-light</code> and <code>data-mode</code> attributes remains a separate architecture decision per the v0.2 seed&#39;s D1 and D2 decisions; the design assumes them.</li>
+<li>Long-string locales (German, Finnish) — every roster row wraps, every chip flexes.</li>
+<li>RTL flow — chip order reverses with <code>dir=&quot;rtl&quot;</code>; roster columns flip.</li>
+<li>Language selector — explicit, member-chosen, persists per-device.</li>
+</ul>
+<h2>Rejected pattern notes (specific to this surface)</h2>
+<table>
+<thead>
+<tr>
+<th>Reject</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Map view with glowing nodes for each federation member</td>
+<td>Tabular roster with named scopes, health chips, last-seen timestamps</td>
+</tr>
+<tr>
+<td>Pulsing &quot;live&quot; indicator</td>
+<td>Static &quot;last reconciled HH:MM ago&quot; timestamp</td>
+</tr>
+<tr>
+<td>&quot;Active users&quot; or &quot;online members&quot; count</td>
+<td>No member-presence count at federation scope; presence is not a federation concern</td>
+</tr>
+<tr>
+<td>&quot;Force sync&quot; / &quot;Override&quot; buttons</td>
+<td>Reconciliation runs are receipt-emitting actions, not overrides. Every operator action is bound to a charter clause.</td>
+</tr>
+<tr>
+<td>Operator-only chat / messaging</td>
+<td>No member communications visible at any scope; operator-only channels are out of scope</td>
+</tr>
+</tbody></table>
+<p>These render as additions to <a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_EXPLAINER_BIBLE#appendix-b--rejected-patterns-side-by-side-comparison#appendix-b--rejected-patterns-side-by-side-comparison">`ICN_VISUAL_EXPLAINER_BIBLE.md` Appendix B</a> for the federation surface specifically. Reviewers can cite this section when blocking a future production-implementation PR.</p>
+<h2>Claude Code handoff note</h2>
+<p>This concept is <strong>docs-only material</strong>. Do not implement the surface from this file. Per <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_REVIEW_PROTOCOL">`CLAUDE_DESIGN_REVIEW_PROTOCOL.md`</a>, production implementation is a downstream PR with its own scope and review gates. The truth label <code>illustrative direction</code> carries through every render of any artifact derived from this concept.</p>
+<h2>Promotion gate (before any production-implementation follow-up)</h2>
+<p>Before any PR that ships a real federation operator surface lands:</p>
+<ul>
+<li>Federation operator role definition exists in <a href="/docs/design-language/concept-map">`docs/design-language/concept-map.md`</a> or in an ADR.</li>
+<li>Privacy boundaries cross-referenced against the kernel&#39;s actual scope-isolation guarantees in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-federation">`icn-federation`</a> and <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-trust">`icn-trust`</a>.</li>
+<li>Truth label <code>illustrative direction</code> carries through every render until end-to-end implementation is verified.</li>
+<li>No screenshots ship as &quot;current state of federation operator UI&quot; — per <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 11.</li>
+<li>Reviewers cite the &quot;operator sees no more than members&quot; rule when evaluating any future implementation PR.</li>
+</ul>
+<h2>See also</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_DESIGN_SYSTEM">`ICN_DESIGN_SYSTEM.md`</a> — design subsystems index (row 16)</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_EXPLAINER_BIBLE#appendix-b--rejected-patterns-side-by-side-comparison#appendix-b--rejected-patterns-side-by-side-comparison">`ICN_VISUAL_EXPLAINER_BIBLE.md` Appendix B</a> — rejected patterns</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> items 7 (dashboard), 8 (AI sheen / glassmorphism), 9 (glowing-globe / central-hub), 10 (faux-government seal), 11 (screenshots as proof)</li>
+<li><a href="/docs/spec/member-shell-v0">`docs/spec/member-shell-v0.md`</a> — ActionCard rendering contract the operator queue inherits</li>
+<li><a href="/docs/design-language/concept-map">`docs/design-language/concept-map.md`</a> — canonical concepts</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_REVIEW_PROTOCOL">`CLAUDE_DESIGN_REVIEW_PROTOCOL.md`</a> — gates that govern promotion</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/CHANGELOG">`claude-design-seed/CHANGELOG.md`</a> — seed identity and provenance</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
