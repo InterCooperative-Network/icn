@@ -64,6 +64,8 @@ Labels are **not** marketing copy. Do not soften, blur, or skip them. If a visua
 
 A visual without a label is **not shippable**.
 
+> **See also:** [Appendix A](#appendix-a--truth-label-band-seven-canonical-states) formalizes the seven labels as a renderable band, with visual treatment notes and the mandatory carry-through rule (a version that hides its chip is rejected).
+
 ## 4. Visual doctrine (compact)
 
 The [visual system](ICN_VISUAL_SYSTEM.md) and the [brief](../design-language/brief-v0.md) are the long-form doctrine. The bible reuses those rules in compact form:
@@ -302,3 +304,137 @@ The rule:
 - Truth-label changes propagate down to every asset that carries the label and every brief that uses it.
 
 The bible is `Last Reviewed` quarterly at minimum, and after any phase transition in `PHASE_PROGRESS.md`.
+
+---
+
+## Appendix A · Truth-label band (seven canonical states)
+
+> **Status:** promoted from the v0.2 Claude Design seed (`seed/VISUAL_EXPLAINER_APPENDIX.md`) per [`claude-design-seed/CHANGELOG.md`](claude-design-seed/CHANGELOG.md). Formalizes the seven labels from §3 as a renderable band with visual treatment and carry-through rule.
+
+### Why this exists
+
+Every visual explainer asserts something about the system. The truth-label band names what is being asserted — implemented, illustrative, archived — so the reader can calibrate trust before reading. A version of an asset that hides its truth label is rejected.
+
+### The seven states
+
+| Label | When to use | Public-claim safety |
+|---|---|---|
+| **strong today** | Implemented, integrated, load-bearing. Evidence-linked (code + test + runtime). | Public · safe to assert |
+| **advancing now** | Actively being built. Real progress, not yet reliable. | Internal disclosure only |
+| **real but maturing** | Implementation exists; some surfaces or integrations still lag. | Public · qualified |
+| **illustrative direction** | Concept art for an unshipped surface. Direction, not implementation. | Concept · always labeled |
+| **behind the system** | Capability exists underneath; the interface is catching up. | Honest disclosure |
+| **not yet** | Scoped, not currently active. No timeline implied. | Roadmap · descoped-safe |
+| **deprecated · do not ship** | Retained for reference only. Removed from active product. | Archive · no public use |
+
+These states map onto — and refine — the seven `truth label` values enumerated in §3. The §3 table remains the canonical naming surface; this band is the formal *renderable* shape. Where the two disagree, §3 wins.
+
+### Visual treatment
+
+The chip carries the label text and an accent that reinforces the state:
+
+- green for `strong today`
+- teal for `advancing now`
+- amber for `real but maturing` and `illustrative direction`
+- muted neutral for `behind the system` and `not yet`
+- rose for `deprecated · do not ship`
+
+Color reinforces; the **text label is load-bearing**. A grayscale render must still distinguish the seven states by structure, copy, and (where present) icon. This is the §6 accessibility floor applied to the chip itself.
+
+### Mandatory carry-through
+
+- Every illustrative asset ships with a visible truth-label chip.
+- Every export of an illustrative asset retains the chip; a version that hides it is rejected per [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) item 2.
+- For static assets that can be circulated outside their host page, the chip is part of the SVG file itself (the placeholder logo's stamped "PLACEHOLDER · NOT FINAL" caption is the reference pattern).
+
+### Cross-references
+
+- [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) item 2 — member-app screenshots without an illustrative truth label
+- [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) item 11 — screenshots cited as implementation evidence
+- [ADR-0033](../adr/ADR-0033-public-maturity-claims-and-evidence-links.md) — public maturity claims and linked evidence
+- [`assets/VISUAL_REVIEW_CHECKLIST.md`](assets/VISUAL_REVIEW_CHECKLIST.md) §2 — the pre-ship truth-label check
+
+---
+
+## Appendix B · Rejected patterns (side-by-side comparison)
+
+> **Status:** promoted from the v0.2 Claude Design seed (`seed/VISUAL_EXPLAINER_APPENDIX.md`). Renders the anti-patterns enumerated in [`ICN_VISUAL_SYSTEM.md`](ICN_VISUAL_SYSTEM.md) §7 and the rejection floor in [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) as concrete side-by-side comparisons. Prose anti-pattern lists are easy to skim; side-by-side comparisons hold under code review pressure.
+
+Each pattern is named, shown in its rejected form, and paired with the correct ICN response. The right-hand "Use" column is the corrected form a reviewer should expect to see in a passing PR.
+
+### Pattern 1 · Glassmorphism + fintech identity
+
+| Reject | Use |
+|---|---|
+| "Your wallet · $1,247.50 · ↑ 12% this week" on a blurred gradient card | Governed social accounting: "Mutual-credit position · 142h contributed · 38h allocated · 2 open obligations" |
+
+Reads as fintech / crypto. ICN does not custody value; the kernel has no "balance". Use governed social accounting: position over wallet, obligation over debt, settlement over payment, unit over currency. Rule source: [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) item 6 (crypto / wallet / token framing).
+
+### Pattern 2 · "AI sheen" + decorative glow
+
+| Reject | Use |
+|---|---|
+| "⚡ AI · POWERED · Smart governance assistant" with gradient text and glowing borders | Calm civic seriousness: "Three proposals to review this week. Each links its mandate, threshold, and the receipt it will produce." |
+
+Spectacle replaces substance. Glow implies certainty the kernel cannot prove. The institution is not "smart"; the member is. Surface copy that helps the member decide; skip the chrome. Rule source: [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) item 8.
+
+### Pattern 3 · Glowing network-globe / central hub map
+
+| Reject | Use |
+|---|---|
+| A glowing globe with random connecting lines and floating nodes labeled "Global decentralized network" | Three co-equal scopes side-by-side: cooperative, community, federation — each with its concept icon and a one-line description, no central node, no hub |
+
+No people, no institutions, no causality. Reads as crypto marketing. Three scopes, three icons, three names. No hub. Color reinforces; text names. Rule source: [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) item 9.
+
+### Pattern 4 · Faux-foundation seal
+
+| Reject | Use |
+|---|---|
+| Heraldic crest with "★ ESTABLISHED · MMXXVI ★" in faux-Latin | Restrained provisional mark with truth-label caption ("PLACEHOLDER MARK · PROVISIONAL · NOT FINAL IDENTITY") |
+
+Invented heraldry overclaims institutional maturity. The mark is provisional; pretending otherwise is dishonest. One color, one line weight, no English text, no false age. Honest about being temporary. Rule source: [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) item 10.
+
+### Pattern 5 · Color-only status
+
+| Reject | Use |
+|---|---|
+| A row of cards where status is conveyed only by border color (red = rejected, green = accepted) with no text label | The same cards, each carrying a labeled chip ("Accepted · 5 for 1 against", "Rejected · quorum not reached") and a concept icon |
+
+Color reinforces; it never carries. Removing color must leave the surface fully legible. Test: drop saturation to 0 — if state distinction collapses, the surface fails. Rule source: [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) item 4; [`design-language/accessibility.md`](../design-language/accessibility.md) §3.1.
+
+### Pattern 6 · English-only fixed-width UI
+
+| Reject | Use |
+|---|---|
+| A button labeled "OK" in a 64px-wide fixed container that clips at any non-English string longer than two characters | A button with `min-width` and flexible padding, designed against the longest plausible localized form (~1.5× English) |
+
+ICN is global infrastructure. A surface that breaks at long-string locales (German, Finnish) or that fixed-pixels its containers so non-English content gets clipped is not member-ready. Verify with Spanish, German, Arabic + RTL. Rule source: [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) item 5.
+
+### Pattern 7 · Screenshots as proof
+
+| Reject | Use |
+|---|---|
+| A blog post asserts "ICN ships X" and links a screenshot as evidence | The same claim links the kernel code, the test, the receipt that the kernel emitted, and the maturity band on `whats-real-now` |
+
+A clean PNG does not certify a behavior; on-device verification does. Screenshots are artifacts, not implementation evidence. Every "shipped" claim links the proving code or ADR. Rule source: [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) item 11; [ADR-0033](../adr/ADR-0033-public-maturity-claims-and-evidence-links.md).
+
+### Pattern 8 · "Dashboard"
+
+| Reject | Use |
+|---|---|
+| A "Governance Dashboard" with stacked metric tiles ("Active proposals · 12", "Members online · 348", "Decisions this week · 7") | Named surfaces: "Standing view" (who you are, where recognized), "Action queue" (what needs you now), "Activity" (what happened, with proof), "Position" (what you have contributed and what you can draw on) |
+
+ICN does not have a dashboard. "Dashboard" implies metrics-over-meaning, optimization-over-accountability, and platform-over-institution. Name surfaces by what they do. Rule source: [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) item 7.
+
+### Carry-through
+
+- [`ICN_VISUAL_SYSTEM.md`](ICN_VISUAL_SYSTEM.md) §7 enumerates these patterns in prose; this appendix is the canonical side-by-side reference.
+- [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) is the rejection floor; this appendix is its visual carry-through.
+- [`assets/VISUAL_REVIEW_CHECKLIST.md`](assets/VISUAL_REVIEW_CHECKLIST.md) §8 includes a checklist row per pattern so reviewers can cite a specific row when blocking a PR.
+
+### Sources used to draft this appendix
+
+- [`ICN_VISUAL_SYSTEM.md`](ICN_VISUAL_SYSTEM.md) §7 — anti-patterns and banned aesthetics
+- [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) — twelve-item rejection floor
+- The v0.2 Claude Design seed's `seed/VISUAL_EXPLAINER_APPENDIX.md` and the `preview/rejected-patterns.html` side-by-side renders
+- The v0.2 Claude Design seed's `preview/truth-bands.html` for the seven-state band

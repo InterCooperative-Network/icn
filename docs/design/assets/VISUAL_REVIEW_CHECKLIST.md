@@ -73,6 +73,15 @@ A visual that fails any item is not shippable. Document the failure on the brief
 - [ ] Iconography drawn from the canonical symbol family in [`website/src/data/icons.ts`](../../../website/src/data/icons.ts) and [`Icon.astro`](../../../website/src/components/Icon.astro). No parallel icon systems.
 - [ ] Layout obeys the design language: civic, calm, legible, mobile-first.
 - [ ] No anti-patterns from [`ICN_VISUAL_SYSTEM.md`](../ICN_VISUAL_SYSTEM.md) §7 (corporate SaaS sludge, crypto-bro futurism, network-globe nonsense, bureaucratic deadness, custodial-finance framing).
+- [ ] Rejected-pattern self-check against [`ICN_VISUAL_EXPLAINER_BIBLE.md` Appendix B](../ICN_VISUAL_EXPLAINER_BIBLE.md#appendix-b--rejected-patterns-side-by-side-comparison):
+  - [ ] **Pattern 1 — Glassmorphism + fintech identity:** no wallet / balance / fintech card framing
+  - [ ] **Pattern 2 — "AI sheen" + decorative glow:** no gradient text, no glowing borders, no "powered by AI" chrome
+  - [ ] **Pattern 3 — Glowing network-globe / central hub:** no globe, no hub-and-spoke, no random connecting lines
+  - [ ] **Pattern 4 — Faux-foundation seal:** no heraldic crest, no fake-Latin, no invented age
+  - [ ] **Pattern 5 — Color-only status:** every state has a text + icon companion (grayscale-pass)
+  - [ ] **Pattern 6 — English-only fixed-width UI:** flex containers, longest-localized-form sized, RTL-tested
+  - [ ] **Pattern 7 — Screenshots as proof:** no screenshot cited as implementation evidence; code / test / ADR link instead
+  - [ ] **Pattern 8 — "Dashboard":** no "dashboard" / "admin panel" framing; surfaces named by what they do
 
 ## 9. Generated-image rules (where applicable)
 
