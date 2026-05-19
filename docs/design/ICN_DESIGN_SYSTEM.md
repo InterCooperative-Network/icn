@@ -51,6 +51,10 @@ Living docs that make up the system. Read in order on first pass:
 | 8 | [docs/design/assets/ASSET_REGISTER.md](assets/ASSET_REGISTER.md) | Live register of planned and tracked visual assets (one row per asset, briefs in `assets/briefs/`) |
 | 9 | [docs/design/CLAUDE_DESIGN_CONTEXT.md](CLAUDE_DESIGN_CONTEXT.md) | Self-contained briefing for paste into Claude Design or any external collaborator — brand, tokens, vocabulary, surface inventory, kernel binding |
 | 10 | [docs/design/CLAUDE_DESIGN_SETUP.md](CLAUDE_DESIGN_SETUP.md) | How to use Claude Design — external paste flow, local `icn-design-advisor` agent (repo-shipped), optional `design` plugin pack, mixed-mode workflow, job-card templates |
+| 11 | [docs/design/CLAUDE_DESIGN_REVIEW_PROTOCOL.md](CLAUDE_DESIGN_REVIEW_PROTOCOL.md) | Seven-gate review protocol for promoting Claude Design seed artifacts to canonical — holds the canonical-vs-generated boundary |
+| 12 | [docs/design/CLAUDE_DESIGN_HANDOFF_TEMPLATE.md](CLAUDE_DESIGN_HANDOFF_TEMPLATE.md) | Seed-level handoff template (seed → Claude Code) — fill one copy per seed before any promotion work |
+| 13 | [docs/design/MUST_NOT_SHIP.md](MUST_NOT_SHIP.md) | Hard rejection floor — twelve patterns and artifacts that disqualify a surface from production |
+| 14 | [docs/design/claude-design-seed/README.md](claude-design-seed/README.md) | Seed directory workflow — what a seed is, where canonical truth lives, how seeds are reviewed and promoted (companions: `CHANGELOG.md`, `REVIEW_NOTES.md`) |
 
 ADRs that bind this work:
 
