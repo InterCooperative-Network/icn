@@ -111,10 +111,12 @@ Every mobile view renders projections of real ICN types. Cards are rendering pri
 | Status | `proposal.status` | `Draft`, `Open`, `Accepted`, `Rejected`, `NoQuorum` |
 | Summary | `proposal.description` (truncated) | First 2-3 sentences |
 | Impact line | Derived from payload type | Budget: "Allocate X units to Y". Membership: "Add/remove Z". Config: "Change K to V" |
-| Threshold info | From governance domain | "Requires 2/3 approval, 5 of 7 quorum" (charter-derived) |
+| Threshold info | From governance domain | "Requires 2/3 approval, 5 of 7 quorum" (charter-derived); rendered above the confirm step, not hidden under details (v0.2) |
 | Deadline | `proposal.voting_period_days` + created timestamp | "Closes in 3 days" |
 | Primary action | Based on status + member role | `Vote` (if Open + eligible), `Review` (if Draft + author), `View Result` (if closed) |
 | Proof affordance | Link to `/v1/gov/proposals/{id}/proof` | "View proof" button on closed proposals |
+| Sync-state chip (v0.2) | Local sync queue + gateway WS | "Vote sent · awaiting confirmation"; one of drafted / saved on device / sent / confirmed / offline queued / rejected with reason — text + icon, never color-only |
+| Stale-confirmation row (v0.2) | Gateway timestamp | "Last confirmed 7 minutes ago" when > 5 min; pair with a degraded-scope banner if the gateway reports degraded consensus |
 
 **Appears in:** Home (if vote needed), Participate (always in active scope)
 
@@ -127,11 +129,15 @@ Every mobile view renders projections of real ICN types. Cards are rendering pri
 | Title | Obligation summary | Derived from originating proposal/allocation |
 | Type badge | `obligation` | |
 | Scope chip | Entity context | |
-| Status | Obligation state | Color-coded: Issued (blue), Accepted (green), Disputed (red) |
+| Status | Obligation state | Color-coded **and** text-labeled: Issued (blue + "Issued"), Accepted (green + "Accepted"), Disputed (red + "Disputed"). Color reinforces; text label is load-bearing. |
 | Provenance link | `ProvenanceRef` on originating `JournalEntry` | "Authorized by Proposal #X" |
 | Primary action | Based on state | `Accept` (if Issued to me), `Confirm Settlement` (if Accepted), `Dispute` (if concerned) |
+| Sync-state chip (v0.2) | Local sync queue + gateway WS | "Acceptance sent · awaiting confirmation"; one of drafted / saved on device / sent / confirmed / offline queued / rejected with reason — text + icon, never color-only |
+| Stale-confirmation row (v0.2) | Gateway timestamp | "Last confirmed 7 minutes ago" when > 5 min; pair with a degraded-scope banner if the gateway reports degraded consensus |
 
 **Appears in:** Home (if action needed), Participate (in active scope)
+
+> **v0.2 refinement.** Sync-state chip and stale-confirmation row apply to **every** ActionCard the shell renders, not just proposals and obligations. See [`docs/spec/member-shell-v0.md`](../spec/member-shell-v0.md) §"v0.2 rendering refinements" for the contract. Promoted from the v0.2 Claude Design seed per [`docs/design/claude-design-seed/CHANGELOG.md`](../design/claude-design-seed/CHANGELOG.md).
 
 ### 3.3 GovernanceProof → Detail Panel (Participate + Activity)
 

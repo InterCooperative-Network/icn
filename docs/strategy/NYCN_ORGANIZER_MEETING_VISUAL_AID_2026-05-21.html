@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NYCN/Summit Organizer Meeting — 2026-05-21</title>
+<meta name="description" content="Visual notes page for the 2026-05-21 conversation with the NYCN/Summit organizer. Companion to the prep packet and one-page aid.">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --ink: #1a1d21;
+    --ink-soft: #4a4f55;
+    --line: #d9dde2;
+    --line-soft: #eceff3;
+    --paper: #fcfcfa;
+    --accent: #2b5876;
+    --accent-soft: #eaf1f6;
+    --warn: #a23a2e;
+    --warn-soft: #fbeeec;
+    --note: #6b6354;
+    --note-soft: #f7f3ea;
+    --rule-dash: repeating-linear-gradient(to right, #c8ccd2 0 6px, transparent 6px 12px);
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 16px; }
+  body {
+    margin: 0;
+    background: #f3f1eb;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", "Inter", system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+    line-height: 1.45;
+  }
+  .page {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 36px 40px 60px;
+    background: var(--paper);
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    box-shadow: 0 0 24px rgba(0,0,0,0.04);
+  }
+  header.top {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 14px;
+    margin-bottom: 28px;
+  }
+  header.top h1 {
+    margin: 0;
+    font-size: 1.7rem;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  header.top .meta {
+    margin-top: 6px;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  header.top .strap {
+    margin-top: 14px;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    max-width: 60ch;
+  }
+  section { margin: 28px 0; page-break-inside: avoid; }
+  section h2 {
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin: 0 0 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  section h3 {
+    font-size: 0.98rem;
+    margin: 18px 0 6px;
+    color: var(--ink);
+  }
+  p { margin: 0 0 10px; }
+  .lead { font-size: 1.02rem; color: var(--ink); }
+
+  /* Posture banner */
+  .posture {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 24px;
+    background: var(--accent-soft);
+    border: 1px solid #cdd9e0;
+    border-left: 4px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-size: 0.92rem;
+  }
+  .posture .row { display: flex; gap: 10px; align-items: baseline; }
+  .posture .label {
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 4.5em;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Spine */
+  .spine {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin: 10px 0 4px;
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-size: 0.95rem;
+  }
+  .spine .node {
+    padding: 5px 9px;
+    border: 1px solid var(--ink);
+    border-radius: 3px;
+    background: var(--paper);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .spine .arrow {
+    color: var(--ink-soft);
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .spine-caption {
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin-top: 4px;
+  }
+
+  /* Script blocks */
+  .script {
+    background: #fff;
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    margin: 8px 0;
+    font-size: 0.96rem;
+    line-height: 1.55;
+  }
+  .script p { margin: 0 0 8px; }
+  .script p:last-child { margin-bottom: 0; }
+  .ask {
+    background: #fff;
+    border-left: 3px solid var(--warn);
+    padding: 8px 16px;
+    margin: 8px 0;
+    font-size: 0.95rem;
+    font-style: italic;
+    color: var(--ink);
+  }
+  .ask::before {
+    content: "ASK ";
+    font-style: normal;
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    color: var(--warn);
+    margin-right: 6px;
+    vertical-align: 0.05em;
+  }
+
+  /* Walkthrough beats */
+  .beats { list-style: none; padding: 0; margin: 8px 0; counter-reset: beat; }
+  .beat {
+    counter-increment: beat;
+    display: grid;
+    grid-template-columns: 38px 1fr;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .beat:last-child { border-bottom: none; }
+  .beat::before {
+    content: counter(beat);
+    grid-column: 1;
+    align-self: start;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+  .beat .body { grid-column: 2; }
+  .beat .body strong { display: block; font-weight: 600; margin-bottom: 2px; }
+  .beat .body p { margin: 0 0 6px; font-size: 0.94rem; }
+  .beat .notes {
+    margin-top: 4px;
+    height: 28px;
+    background: var(--rule-dash);
+    background-size: auto 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    background-image: linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--line) calc(50% - 0.5px), var(--line) calc(50% + 0.5px), transparent calc(50% + 0.5px)), linear-gradient(to bottom, transparent calc(100% - 0.5px), var(--line) calc(100% - 0.5px));
+  }
+
+  /* Backup workflows */
+  .backup {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 8px 0;
+  }
+  .backup .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-size: 0.88rem;
+  }
+  .backup .card h4 {
+    margin: 0 0 4px;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+  }
+  .backup .card .good {
+    font-size: 0.78rem;
+    font-style: italic;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  .backup ul { margin: 0; padding-left: 18px; }
+  .backup li { margin: 2px 0; }
+
+  /* Questions */
+  .qs { margin: 6px 0; }
+  .q {
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    margin: 8px 0;
+    background: #fff;
+  }
+  .q .prompt {
+    font-style: italic;
+    font-size: 0.96rem;
+    color: var(--ink);
+  }
+  .q .prompt::before {
+    content: "Q ";
+    font-style: normal;
+    font-weight: 700;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin-right: 6px;
+    vertical-align: 0.08em;
+  }
+  .q .notes {
+    margin-top: 8px;
+    background-image: repeating-linear-gradient(to bottom, transparent 0 23px, var(--line-soft) 23px 24px);
+    height: 72px;
+  }
+
+  /* Claims-not-to-make */
+  .nodo {
+    background: var(--warn-soft);
+    border: 1px solid #e9c2bd;
+    border-left: 4px solid var(--warn);
+    padding: 12px 16px 8px;
+    border-radius: 4px;
+    font-size: 0.92rem;
+  }
+  .nodo h2 { color: var(--warn); border-color: #e9c2bd; }
+  .nodo ul { margin: 0; padding-left: 18px; }
+  .nodo li { margin: 4px 0; }
+
+  /* Boundary callout */
+  .boundary {
+    background: var(--note-soft);
+    border: 1px solid #e3d7bd;
+    border-left: 4px solid var(--note);
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: var(--ink);
+  }
+  .boundary strong { color: var(--note); }
+
+  /* Post-meeting capture */
+  .capture { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .capture .cell {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 12px;
+    min-height: 100px;
+  }
+  .capture .cell h4 {
+    margin: 0 0 6px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+  }
+  .capture .lines {
+    background-image: repeating-linear-gradient(to bottom, transparent 0 23px, var(--line-soft) 23px 24px);
+    height: 80px;
+  }
+
+  footer {
+    margin-top: 36px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+  }
+
+  /* Print styles */
+  @media print {
+    html, body { background: #fff; }
+    .page {
+      max-width: 100%;
+      margin: 0;
+      padding: 24px;
+      box-shadow: none;
+      border: none;
+    }
+    .toc-toggle, .top-bar { display: none; }
+    section { page-break-inside: auto; }
+    .beat, .q, .nodo, .posture, .spine, .capture { page-break-inside: avoid; }
+    h2 { page-break-after: avoid; }
+  }
+
+  /* Small-screen */
+  @media (max-width: 640px) {
+    .page { padding: 20px; }
+    .posture, .capture, .backup { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+
+  <header class="top">
+    <h1>NYCN/Summit Organizer Meeting — 2026-05-21</h1>
+    <div class="meta">Thursday · 10:30–11:30 AM ET · 60 minutes</div>
+    <p class="strap">Visual notes page. Companion to the meeting prep packet and one-page aid. Use to scan, stay on shape, and write in the margins.</p>
+  </header>
+
+  <section>
+    <h2>Posture</h2>
+    <div class="posture">
+      <div class="row"><span class="label">Goal</span><span>Find where the spine breaks when it touches real Summit work.</span></div>
+      <div class="row"><span class="label">Not</span><span>A launch. A pitch. A pilot. A persuasion exercise.</span></div>
+      <div class="row"><span class="label">Talk</span><span>1–2 min per beat, then listen 5+ min.</span></div>
+      <div class="row"><span class="label">Win</span><span>One smallest sanitized rehearsal target chosen together.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The institutional spine</h2>
+    <div class="spine">
+      <span class="node">Standing</span><span class="arrow">→</span>
+      <span class="node">Authority</span><span class="arrow">→</span>
+      <span class="node">Decision</span><span class="arrow">→</span>
+      <span class="node">Obligation</span><span class="arrow">→</span>
+      <span class="node">Effect</span><span class="arrow">→</span>
+      <span class="node">Receipt</span><span class="arrow">→</span>
+      <span class="node">Evidence</span><span class="arrow">→</span>
+      <span class="node">Review</span>
+    </div>
+    <div class="spine-caption">Eight words. Introduce in one breath after the opener. Ask whether the order matches how Summit work actually moves.</div>
+  </section>
+
+  <section>
+    <h2>60-second opener</h2>
+    <div class="script">
+      <p>Cooperatives have democratic values, but most of the digital infrastructure available to them was not built to hold democratic institutions together. Loomio, Forms, Slack threads, QuickBooks, mailing lists — each piece can be useful, but when the vendor changes or a chair rotates, the institutional spine walks.</p>
+      <p>There's no way to prove to a funder or a partner co-op that a decision actually happened, by whom, under what authority, without asking them to trust our word for it.</p>
+    </div>
+    <div class="ask">Where in Summit work have you seen institutional memory actually get lost? Chair rotation, fiscal sponsor change, end-of-year handoff, platform migration — what gets dropped?</div>
+  </section>
+
+  <section>
+    <h2>90-second explanation</h2>
+    <div class="script">
+      <p>Cooperatives have spent decades building democratic values and almost no time building the digital infrastructure those values need. Every piece of the institutional spine — who's a member, who has authority, what was decided, what was promised, what was delivered — sits in someone else's product. When that product changes hands, when a chair rotates, when a fiscal sponsor leaves, the cooperative's memory walks. And we have no way to prove to a funder or a partner co-op that a decision actually happened, by whom, under what authority, without asking them to trust our word.</p>
+      <p>ICN is an attempt to build the infrastructure layer cooperatives actually need to own: a substrate for standing, authority, decisions, obligations, receipts, evidence, and federation. Not a vote app. Not a payment app. Not a blockchain. A constraint-enforcement engine the cooperative runs, where the rules come from a charter the members ratify, and the records are signed in a way an outside party can verify later without trusting us.</p>
+      <p>A real substrate exists: daemon, identity, ledger, governance primitives, gateway, proof-bearing receipt paths. Most of the human-facing surface — the app a member would actually use, the dashboard an organizer would actually open — is still design and fixture rehearsal, not production. NYCN is the partnership track helping shape what that surface should look like. The cleanest test is the part of Summit work you already know: how a session becomes a public program, a set of obligations, a run-of-show, and something next year's organizers can inherit.</p>
+    </div>
+    <div class="ask">Does that order match the order of how Summit work actually moves through your committees?</div>
+  </section>
+
+  <section>
+    <h2>Primary walkthrough — content / session → public program</h2>
+    <p class="lead">Walk one beat at a time. After each beat, ask the same prompt:</p>
+    <div class="ask">How does this happen for you today? What would change if there were a receipt at this step?</div>
+    <ol class="beats">
+      <li class="beat"><div class="body"><strong>Session idea proposed</strong><p>Program committee intake. Today: email? doc? meeting?</p><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Committee decides to invite a speaker</strong><p>Charter clause authorizing the invitation.</p><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Outreach + confirmation</strong><p>Bilateral obligation forms: speaker owes bio/headshot/description; committee owes slot/room/support.</p><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Missing-info loop</strong><p>Headshot late, translation missing, A/V unclear. Where does the list live today?</p><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Support / interpretation / room / materials</strong><p>Each becomes a separate vendor/committee obligation with its own receipt.</p><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Schedule slot assigned</strong><p>Public program draft entry created.</p><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Public program update</strong><p>Each entry backstoppable by its obligation chain.</p><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Run-of-show assignment</strong><p>Day-of role assigned to a steward.</p><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Day-of confirmation</strong><p>Steward confirms; session runs; attendance recorded (count only by default).</p><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Post-event collection</strong><p>Materials, feedback, incident log — sanitized into EvidencePacket.</p><div class="notes"></div></div></li>
+      <li class="beat"><div class="body"><strong>Feedback review (hand off)</strong><p>Hands off to the feedback-to-obligation loop.</p><div class="notes"></div></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Backup workflows (only if their answers point that way)</h2>
+    <div class="backup">
+      <div class="card">
+        <h4>Candidate B — Sponsor commitment</h4>
+        <div class="good">good for: external proof, fundraising handoff</div>
+        <ul>
+          <li>Outreach committee standing</li>
+          <li>Charter scope for sponsorship policy</li>
+          <li>Bilateral obligation at agreed tier</li>
+          <li>Visibility deliverables A/B/C</li>
+          <li>Sponsor deliverable acknowledged</li>
+          <li>Post-Summit fundraising-chair handoff</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Candidate C — Accessibility accommodation</h4>
+        <div class="good">good for: privacy boundaries, care obligations</div>
+        <ul>
+          <li>Accessibility committee standing</li>
+          <li>Charter scope for accommodations</li>
+          <li>Per-attendee specifics never default-public</li>
+          <li>Vendor booked, day-of confirmation</li>
+          <li>Requester confirms need was met</li>
+          <li>Next-year accessibility-chair learning</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Questions to ask</h2>
+    <div class="qs">
+      <div class="q"><div class="prompt">Where in Summit work have you seen institutional memory actually get lost?</div><div class="notes"></div></div>
+      <div class="q"><div class="prompt">Which Summit workflow would be worth rehearsing under this spine — and which would be a waste of it?</div><div class="notes"></div></div>
+      <div class="q"><div class="prompt">Which decisions need proof later, and who needs that proof — funders, members, accountants, partner co-ops, future versions of you?</div><div class="notes"></div></div>
+      <div class="q"><div class="prompt">How does attendee feedback turn into a next-year planning decision today — when it does turn into one at all?</div><div class="notes"></div></div>
+      <div class="q"><div class="prompt">What must stay human and process-first? Where is the right anti-software boundary?</div><div class="notes"></div></div>
+      <div class="q"><div class="prompt">What would make this trustworthy to organizers — and what would make it untrustworthy?</div><div class="notes"></div></div>
+      <div class="q"><div class="prompt">What is the smallest sanitized / tabletop rehearsal that's worth a meeting?</div><div class="notes"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="boundary">
+      <strong>When critique lands, do not defend.</strong> Capture the objection. Translate it into a design question. Ask what would make the thing safer or more useful. The meeting's value is calibration, not persuasion.
+    </div>
+  </section>
+
+  <section class="nodo">
+    <h2>Claims NOT to make</h2>
+    <ul>
+      <li>Not production-ready. Not externally audited. Not legally / regulatorily certified.</li>
+      <li>Not a live federation. Not an end-to-end federation lifecycle.</li>
+      <li>Not a formally committed cooperative pilot. NYCN is an active partnership track.</li>
+      <li>Not a live member app. Not a live steward cockpit dashboard.</li>
+      <li>Not a signed appliance. Dev image only.</li>
+      <li>Receipts alone do not prove legitimacy. Authority shortcuts must label themselves.</li>
+      <li>Vocabulary: <strong>settlement, obligation, allocation, unit, position, receipt, provenance, evidence.</strong> Avoid the forbidden financial / crypto vocabulary listed in the Thursday brief.</li>
+      <li>Community-infra (Matrix / n8n / bridge / etc.) is a separate workstream — do not mention unless asked.</li>
+      <li>No real NYCN private data has been or will be put in git for this work.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>After the meeting — capture</h2>
+    <div class="capture">
+      <div class="cell"><h4>What they identified as real</h4><div class="lines"></div></div>
+      <div class="cell"><h4>What they identified as wrong / overbuilt / unclear</h4><div class="lines"></div></div>
+      <div class="cell"><h4>Smallest rehearsal chosen</h4><div class="lines"></div></div>
+      <div class="cell"><h4>Who else should be in the next conversation</h4><div class="lines"></div></div>
+      <div class="cell"><h4>What needs to change in spine doctrine / specs / NYCN docs</h4><div class="lines"></div></div>
+      <div class="cell"><h4>Follow-up cadence / next contact</h4><div class="lines"></div></div>
+    </div>
+  </section>
+
+  <footer>
+    Status: descriptive · Canonical: no · Last reviewed 2026-05-18 · Companion to <code>docs/strategy/NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md</code> and <code>docs/strategy/NYCN_ORGANIZER_MEETING_ONE_PAGE_AID_2026-05-21.md</code>. No raw NYCN/Summit private data appears in this page.
+  </footer>
+
+</main>
+</body>
+</html>

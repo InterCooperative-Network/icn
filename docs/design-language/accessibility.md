@@ -98,9 +98,9 @@ This document defines the rules every public surface must meet.
 
 **WCAG:** 2.4.7 Focus Visible (Level AA), 2.4.11 Focus Not Obscured (Level AA)
 
-**Current state:** the site has no `:focus-visible` rules. Keyboard users cannot see where they are as they tab through.
+**Current state:** implemented. [`website/src/styles/global.css`](../../website/src/styles/global.css) §"Accessibility foundations" defines a global `*:focus-visible` ring (2px `var(--accent-teal)` outline, 3px offset, `var(--radius-sm)` corner radius), plus per-element selectors for `a`, `button`, `[role="button"]`, `input`, `textarea`, `select`, `summary`, and a dedicated skip-link / `#main-content` focus treatment.
 
-**Required fix:** add a global `:focus-visible` rule with a visible ring (outline or box-shadow), applied to links, buttons, form controls, and interactive cards.
+**Ongoing obligation:** every new interactive element inherits the global rule; new component styles must not override it without providing an equivalent ring. Verify on PRs that touch new interactive controls.
 
 ### 3.4 Motion respects user preferences
 
@@ -225,7 +225,7 @@ See `docs/design-language/brief-v0.md §7a` for the full icon system rules.
 
 These are the accessibility failures identified in the latest assessment. Each should be addressed in the accessibility foundation pass.
 
-1. **No `:focus-visible` styles anywhere.** Keyboard users cannot see where they are. Fails 2.4.7.
+1. ~~No `:focus-visible` styles anywhere.~~ **Resolved.** A global `:focus-visible` ring and per-element selectors now live in [`website/src/styles/global.css`](../../website/src/styles/global.css) §"Accessibility foundations". Carry-forward: new interactive components inherit the ring; do not override it without an equivalent treatment.
 2. **No skip-to-main-content link.** Screen reader users tab through the full nav on every page load. Fails 2.4.1.
 3. **Hamburger menu lacks `aria-expanded`.** Screen reader users cannot tell if the menu is open. Fails 4.1.2.
 4. **No `prefers-reduced-motion` handling.** The `.reveal` animation and theme toggle ignore user preferences. Fails 2.3.3.

@@ -68,6 +68,18 @@ Control plane for ICN's visual explainer system — the doctrine, asset register
 - **[design/assets/VISUAL_REVIEW_CHECKLIST.md](design/assets/VISUAL_REVIEW_CHECKLIST.md)** — the gate every visual explainer clears before shipping
 - **[design/assets/briefs/](design/assets/briefs/)** — per-asset briefs (closure loop, scope model, decision-to-receipt, member shell concept, kernel/app separation)
 
+### Claude Design — seed review and handoff
+
+Governance scaffold for taking Claude Design seed artifacts into the canonical repo without confusing generated output with repo truth. Default: a seed is a proposal, not a design system:
+
+- **[design/CLAUDE_DESIGN_REVIEW_PROTOCOL.md](design/CLAUDE_DESIGN_REVIEW_PROTOCOL.md)** — seven review gates (truth-label, accessibility, vocabulary, implementation-status, language/RTL, low-bandwidth/reduced-motion/large-text, source-doc drift); holds the canonical-vs-generated boundary
+- **[design/CLAUDE_DESIGN_HANDOFF_TEMPLATE.md](design/CLAUDE_DESIGN_HANDOFF_TEMPLATE.md)** — seed-level handoff template for passing a Claude Design seed to Claude Code (one filled copy per seed)
+- **[design/MUST_NOT_SHIP.md](design/MUST_NOT_SHIP.md)** — twelve-item hard rejection floor for design artifacts
+- **[design/claude-design-seed/README.md](design/claude-design-seed/README.md)** — seed directory workflow; what canonical truth is and how it is preserved
+- **[design/claude-design-seed/CHANGELOG.md](design/claude-design-seed/CHANGELOG.md)** — imported seed versions, one entry per seed
+- **[design/claude-design-seed/REVIEW_NOTES.md](design/claude-design-seed/REVIEW_NOTES.md)** — human-readable per-seed review summary
+- **[design/icons/CANDIDATES.md](design/icons/CANDIDATES.md)** — 14 candidate icons proposed for promotion into the production icon set; companion contact sheet at [`design/icons/contact-sheet.svg`](design/icons/contact-sheet.svg)
+
 ---
 
 ## 📚 Core Documentation
@@ -442,7 +454,17 @@ Strategic direction and gap analysis (March 2026):
 - [ICN-Pitch.md](strategy/ICN-Pitch.md) - Cooperative organizer pitch
 - [ICN-Scenarios.md](strategy/ICN-Scenarios.md) - Six working scenarios with API calls
 - [ICN-Evolution-Arc.md](strategy/ICN-Evolution-Arc.md) - Two-year project history
-- [ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md](strategy/ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) - Meeting-prep truth packet for the 2026-05-21 cooperative / Launch / ICN conversation
+- [ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md](strategy/ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) - Meeting-prep truth packet for the 2026-05-21 cooperative-developer / formation-platform / ICN conversation (controls project-state facts and non-claims)
+- [NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md](strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) - Project-shaping record: NYCN/Summit as ICN's first institutional laboratory (recurring democratic institution, not an event demo)
+- [ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md](strategy/ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md) - Short conceptual clarification: ICN is the substrate, NYCN/Summit is the first reference institution, institution packages are the reusable meaning layer in between. Four-layer table.
+- [COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md](strategy/COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md) - **Thursday primary** — human-facing prep packet retargeting the Thursday brief toward the formation-to-governance seam (formation workflow → standing / authority / obligation / evidence / handoff)
+- [COOPERATIVE_FORMATION_PLATFORM_ONE_PAGE_AID_2026-05-21.md](strategy/COOPERATIVE_FORMATION_PLATFORM_ONE_PAGE_AID_2026-05-21.md) - One-page printable summary for the formation-to-governance conversation (spine + Launch translation + 3 questions + non-claims)
+- [COOPERATIVE_FORMATION_PLATFORM_VISUAL_AID_2026-05-21.html](strategy/COOPERATIVE_FORMATION_PLATFORM_VISUAL_AID_2026-05-21.html) - Standalone HTML visual notes page for the formation-to-governance conversation (posture / Launch context / spine / translation / 60s opener / 11-beat walkthrough with Today + ICN lines / branches / questions with note space / claims-not / capture grid). Open in any browser; print-friendly.
+- [COOPERATIVE_FORMATION_PLATFORM_VISUAL_AID_2026-05-21.pdf](strategy/COOPERATIVE_FORMATION_PLATFORM_VISUAL_AID_2026-05-21.pdf) - Same visual notes page in PDF (6 pages, letter size, portrait). Attachment-ready: email, print, or share.
+- [NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md](strategy/NYCN_ORGANIZER_MEETING_PREP_2026-05-21.md) - **Secondary / backup variant** — NYCN/Summit organizer prep packet (formerly Thursday primary; now demoted to backup example surface)
+- [NYCN_ORGANIZER_MEETING_ONE_PAGE_AID_2026-05-21.md](strategy/NYCN_ORGANIZER_MEETING_ONE_PAGE_AID_2026-05-21.md) - Secondary variant one-page aid (NYCN/Summit organizer surface)
+- [NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.html](strategy/NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.html) - Secondary variant HTML visual notes (NYCN/Summit organizer surface)
+- [NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.pdf](strategy/NYCN_ORGANIZER_MEETING_VISUAL_AID_2026-05-21.pdf) - Secondary variant PDF (NYCN/Summit organizer surface)
 
 ### Current Status Reports (`status/`)
 
