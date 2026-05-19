@@ -205,7 +205,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <tr>
 <td>Threshold info</td>
 <td>From governance domain</td>
-<td>&quot;Requires 2/3 approval, 5 of 7 quorum&quot; (charter-derived)</td>
+<td>&quot;Requires 2/3 approval, 5 of 7 quorum&quot; (charter-derived); rendered above the confirm step, not hidden under details (v0.2)</td>
 </tr>
 <tr>
 <td>Deadline</td>
@@ -221,6 +221,16 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <td>Proof affordance</td>
 <td>Link to <code>/v1/gov/proposals/{id}/proof</code></td>
 <td>&quot;View proof&quot; button on closed proposals</td>
+</tr>
+<tr>
+<td>Sync-state chip (v0.2)</td>
+<td>Local sync queue + gateway WS</td>
+<td>&quot;Vote sent · awaiting confirmation&quot;; one of drafted / saved on device / sent / confirmed / offline queued / rejected with reason — text + icon, never color-only</td>
+</tr>
+<tr>
+<td>Stale-confirmation row (v0.2)</td>
+<td>Gateway timestamp</td>
+<td>&quot;Last confirmed 7 minutes ago&quot; when &gt; 5 min; pair with a degraded-scope banner if the gateway reports degraded consensus</td>
 </tr>
 </tbody></table>
 <p><strong>Appears in:</strong> Home (if vote needed), Participate (always in active scope)</p>
@@ -252,7 +262,7 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <tr>
 <td>Status</td>
 <td>Obligation state</td>
-<td>Color-coded: Issued (blue), Accepted (green), Disputed (red)</td>
+<td>Color-coded <strong>and</strong> text-labeled: Issued (blue + &quot;Issued&quot;), Accepted (green + &quot;Accepted&quot;), Disputed (red + &quot;Disputed&quot;). Color reinforces; text label is load-bearing.</td>
 </tr>
 <tr>
 <td>Provenance link</td>
@@ -264,8 +274,21 @@ ICN mobile is a member-centered semantic layer that projects real protocol objec
 <td>Based on state</td>
 <td><code>Accept</code> (if Issued to me), <code>Confirm Settlement</code> (if Accepted), <code>Dispute</code> (if concerned)</td>
 </tr>
+<tr>
+<td>Sync-state chip (v0.2)</td>
+<td>Local sync queue + gateway WS</td>
+<td>&quot;Acceptance sent · awaiting confirmation&quot;; one of drafted / saved on device / sent / confirmed / offline queued / rejected with reason — text + icon, never color-only</td>
+</tr>
+<tr>
+<td>Stale-confirmation row (v0.2)</td>
+<td>Gateway timestamp</td>
+<td>&quot;Last confirmed 7 minutes ago&quot; when &gt; 5 min; pair with a degraded-scope banner if the gateway reports degraded consensus</td>
+</tr>
 </tbody></table>
 <p><strong>Appears in:</strong> Home (if action needed), Participate (in active scope)</p>
+<blockquote>
+<p><strong>v0.2 refinement.</strong> Sync-state chip and stale-confirmation row apply to <strong>every</strong> ActionCard the shell renders, not just proposals and obligations. See <a href="/docs/spec/member-shell-v0">`docs/spec/member-shell-v0.md`</a> §&quot;v0.2 rendering refinements&quot; for the contract. Promoted from the v0.2 Claude Design seed per <a href="/docs/design/claude-design-seed/CHANGELOG">`docs/design/claude-design-seed/CHANGELOG.md`</a>.</p>
+</blockquote>
 <h3>3.3 GovernanceProof → Detail Panel (Participate + Activity)</h3>
 <p><strong>Source:</strong> <code>GET /v1/gov/proposals/{id}/proof</code></p>
 <p>Renders the provenance chain for a closed proposal:</p>

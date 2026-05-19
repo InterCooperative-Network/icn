@@ -129,8 +129,11 @@ View source on GitHub →
 <li>The mandate or authority that backs it (named, linked).</li>
 <li>A reversibility statement: reversible / appealable / final.</li>
 <li>The receipt that will be produced, named in advance.</li>
-<li>A confirm step that requires explicit user input (not a default-yes button).</li>
+<li><strong>(v0.2)</strong> The action&#39;s current sync state, named — one of <code>drafted</code>, <code>saved on device</code>, <code>sent to network</code>, <code>confirmed</code>, <code>offline queued</code>, <code>rejected with reason</code>. No silent failure; no spinner without a label.</li>
+<li><strong>(v0.2, governance actions only)</strong> The decision threshold required and the current tally — rendered above the confirm step, not hidden under &quot;details.&quot;</li>
+<li>A confirm step that requires explicit member input (not a default-yes button).</li>
 </ol>
+<p>Fields 5 and 6 were added per the v0.2 Claude Design seed and the <a href="/docs/spec/member-shell-v0">`docs/spec/member-shell-v0.md`</a> &quot;v0.2 rendering refinements&quot; section. They elaborate <a href="/docs/adr/ADR-0027-action-card-contract">ADR-0027 (Action Card Contract)</a> at the copy layer.</p>
 <p>Example pattern:</p>
 <blockquote>
 <p><strong>You are about to:</strong> record the obligation <strong>&quot;Buy 200 print flyers from co-op press&quot;</strong> under mandate <strong>&quot;Summit print budget Q2&quot;</strong>.</p>

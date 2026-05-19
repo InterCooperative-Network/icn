@@ -263,6 +263,41 @@ View source on GitHub →
 </ul>
 <h3>Reserved source paths</h3>
 <p>Per ADR-0027 the closed <code>source_kind</code> taxonomy reserves <code>signal_rule</code> and <code>obligation_lifecycle</code> against <code>#1631</code> and <code>#1634</code>. The shell <strong>must not</strong> render either source path as live until the corresponding implementation lands. Until then, those values are inert at the rendering layer.</p>
+<h3>v0.2 rendering refinements</h3>
+<blockquote>
+<p>Promoted from the v0.2 Claude Design seed (<code>seed/MEMBER_SHELL_v0.2_PATCH.md</code>) per <a href="/docs/design/claude-design-seed/CHANGELOG">`docs/design/claude-design-seed/CHANGELOG.md`</a>. Refinements only — the 14-field ADR-0027 schema stays canonical. This section tightens the contract on how the shell <strong>renders</strong> uncertain network state, gated cards, and the decision-threshold preamble.</p>
+</blockquote>
+<h4>Sync-state chip (every card)</h4>
+<p>Every ActionCard carries a <strong>sync-state chip</strong> that names the action&#39;s current state in the local-sync queue and the gateway. Six named states; no silent failure; no spinner without a label:</p>
+<ul>
+<li><strong>drafted</strong> — the member started the action; nothing left the device</li>
+<li><strong>saved on device</strong> — the action is durable locally but not yet sent</li>
+<li><strong>sent to network</strong> — the action left the device; awaiting confirmation</li>
+<li><strong>confirmed</strong> — the gateway accepted the action and emitted the expected receipt</li>
+<li><strong>offline queued</strong> — the device is offline; the action will replay when network returns</li>
+<li><strong>rejected with reason</strong> — the gateway rejected the action; the reason is named on the card</li>
+</ul>
+<p>The chip is text + icon. Color reinforces; the named state is load-bearing. A grayscale render must still distinguish the six states.</p>
+<h4>Stale, sync-in-flight, degraded scope (network honesty)</h4>
+<p>When the gateway state is uncertain, every affected card surfaces it explicitly:</p>
+<ul>
+<li><strong>Stale</strong> — last gateway confirmation &gt; 5 minutes ago. The card renders a &quot;last confirmed&quot; timestamp below the sync-state chip.</li>
+<li><strong>Sync in flight</strong> — the action has been sent but not confirmed. The sync-state chip reads &quot;Sent · awaiting confirmation&quot; with a sub-line counting elapsed time.</li>
+<li><strong>Degraded scope</strong> — the gateway reports degraded mode for the scope (reduced consensus, partition-tolerant). A scope-level banner above the affected cards reads &quot;This scope is operating in degraded mode. Decisions may delay.&quot; Dismissible per session; reappears on every relevant card until the gateway clears the flag.</li>
+</ul>
+<p>Each state has a text companion; no color-only signaling, no motion-only signaling.</p>
+<h4>&quot;Unavailable&quot; — gated cards never hide, they explain</h4>
+<p>When an action is gated and the member cannot perform it, the card renders in an explicit unavailable state that <strong>names the missing condition</strong>:</p>
+<ul>
+<li>&quot;Action unavailable. Mandate <code>Charter §4.2</code> requires <code>recognized-member</code> standing. Your standing in <code>Brightworks Collective</code> is <code>applicant</code>.&quot;</li>
+<li>&quot;Action unavailable. Quorum not reached. 4 of 7 votes recorded.&quot;</li>
+<li>&quot;Action unavailable. Offline. Action will queue until network reconnects.&quot;</li>
+</ul>
+<p>The card never silently disables the action. It always names why. This refines the existing &quot;Closed: insufficient authority&quot; state by requiring the missing-condition text be plain language and member-actionable.</p>
+<h4>Threshold + tally above confirm (governance actions)</h4>
+<p>For governance ActionCards, the <strong>decision threshold</strong> required (quorum, supermajority, simple majority) and the <strong>current tally</strong> are rendered above the confirm step — not hidden under &quot;details.&quot; Source: the governance domain&#39;s charter-derived rule (already shown in <a href="/docs/mobile/icn-mobile-ux-spec-v1">`docs/mobile/icn-mobile-ux-spec-v1.md`</a> §3.1 as the <code>Threshold info</code> row). The refinement is placement: the member sees the decision rule before casting a vote, not after.</p>
+<h4>Cross-reference</h4>
+<p>These v0.2 refinements elaborate <a href="/docs/adr/ADR-0027-action-card-contract">ADR-0027 (Action Card Contract)</a> at the rendering layer. ADR-0027 remains the canonical schema; this section is the rendering contract&#39;s v0.2 update. See also <a href="/docs/design/CONTENT_STYLE_GUIDE">`docs/design/CONTENT_STYLE_GUIDE.md`</a> &quot;Dangerous-action copy&quot; template, which has been updated to require sync state and threshold + tally before the confirm step.</p>
 <h2>Standing surface</h2>
 <p>The Standing surface renders <code>/me/standing</code> (per ADR-0020) at v0. The shell must surface:</p>
 <ul>
