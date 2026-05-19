@@ -55,6 +55,7 @@ Living docs that make up the system. Read in order on first pass:
 | 12 | [docs/design/CLAUDE_DESIGN_HANDOFF_TEMPLATE.md](CLAUDE_DESIGN_HANDOFF_TEMPLATE.md) | Seed-level handoff template (seed → Claude Code) — fill one copy per seed before any promotion work |
 | 13 | [docs/design/MUST_NOT_SHIP.md](MUST_NOT_SHIP.md) | Hard rejection floor — twelve patterns and artifacts that disqualify a surface from production |
 | 14 | [docs/design/claude-design-seed/README.md](claude-design-seed/README.md) | Seed directory workflow — what a seed is, where canonical truth lives, how seeds are reviewed and promoted (companions: `CHANGELOG.md`, `REVIEW_NOTES.md`) |
+| 15 | [docs/design/icons/CANDIDATES.md](icons/CANDIDATES.md) | Candidate icon family review package — 14 candidate icons proposed for promotion into `website/src/data/icons.ts`, with per-icon rationale, ARIA usage, distinct-silhouette test, and "do not ship until" checklist (companion: `contact-sheet.svg`) |
 
 ADRs that bind this work:
 
