@@ -287,7 +287,84 @@ without an NYCN or Summit logo on it, it's ICN-substrate work, and CONTEXT.md ap
 
 ---
 
-## 6. Maintenance
+## 6. Seed import, review, and promotion workflow
+
+Claude Design now produces **seeds** — packaged bundles that include generated docs, HTML preview cards, CSS token files, UI kit recreations, illustrative screenshots, and the bundle's own governance trail. A seed is a *proposal* for ICN design, not a design system in itself. Canonical truth still lives in the upstream repo paths; the seed waits for review.
+
+This section covers the workflow for handing a seed off to Claude Code without contaminating canonical truth with generated polish.
+
+### 6.1 What a seed is, what it is not
+
+- **A seed is:** the output of an external Claude Design session — markdown, HTML, CSS, screenshots, prose, illustrations, plus a self-describing governance bundle (the seed's own `INVENTORY.md`, `PROMOTION_MAP.md`, `DRIFT_REPORT.md`, `PRODUCTION_READINESS.md`, `MUST_NOT_SHIP.md`, and a `CLAUDE_CODE_BUNDLE.md` handoff).
+- **A seed is not:** canonical truth, brand decision, implementation evidence, sanctioned source of CSS / components / assets for production paths, or a place from which to import code into `website/src/`, `web/pilot-ui/`, or `sdk/`.
+
+Default status of every seed artifact is `generated seed`. Promotion is an explicit, gated step — see §6.4 below.
+
+### 6.2 Generated-vs-canonical boundary
+
+This boundary is asymmetric and unconditional:
+
+- Canonical truth lives in the upstream ICN repo paths declared in [`docs/registry.toml`](../registry.toml) `[control].canonical_doc_paths` and the `Canonical: yes` rows in [`docs/INDEX.md`](../INDEX.md).
+- Generated Claude Design files are not canonical by default.
+- Imported repo docs inside a seed may be stale; trust the live repo.
+- Screenshots are not implementation evidence.
+- UI kits are illustrative unless explicitly promoted.
+- Polish is not evidence.
+
+The full version of this boundary, with the rule-of-thumb, lives in [CLAUDE_DESIGN_REVIEW_PROTOCOL.md](CLAUDE_DESIGN_REVIEW_PROTOCOL.md) §2. The hard rejection floor lives in [MUST_NOT_SHIP.md](MUST_NOT_SHIP.md).
+
+### 6.3 Docs / protocol-first handoff
+
+The first PR for any new seed is **docs-only**. It establishes the protocol scaffold (or extends it), records the seed's drift findings, and updates `claude-design-seed/CHANGELOG.md` + `REVIEW_NOTES.md`. It does not touch production UI, CSS, SDK, or assets.
+
+The shape of the handoff is [CLAUDE_DESIGN_HANDOFF_TEMPLATE.md](CLAUDE_DESIGN_HANDOFF_TEMPLATE.md). Fill in a fresh copy per seed; the template's §6 (non-goals), §12 (allowed paths), and §13 (forbidden paths) are load-bearing — they override any inferred scope the seed's preview HTML might suggest.
+
+### 6.4 When Claude Code should implement docs only
+
+Default. Every new seed lands as docs-only first. Specifically:
+
+- Adopting the protocol / handoff template / rejection floor / skill scaffold ← **first PR, docs-only**
+- Fixing seed-identified drift in canonical docs (e.g., the seed's `DRIFT_REPORT.md` entries) ← **docs-only, scope-locked**
+- Adding seed workflow files under `docs/design/claude-design-seed/` ← **docs-only**
+
+Claude Code in docs-only mode does **not** recreate generated prototypes pixel-perfectly, does **not** migrate React / JSX recreations from a seed, does **not** adopt placeholder logo or icon assets, and does **not** create production CSS from seed tokens.
+
+### 6.5 When production UI implementation is allowed
+
+Only after:
+
+1. The relevant promotion candidate has been reviewed via [CLAUDE_DESIGN_REVIEW_PROTOCOL.md](CLAUDE_DESIGN_REVIEW_PROTOCOL.md) §3.
+2. The human decisions in [`claude-design-seed/REVIEW_NOTES.md`](claude-design-seed/REVIEW_NOTES.md) §"What requires human decision" are resolved.
+3. A separate, scope-locked PR is opened against the appropriate canonical path (`website/src/`, `sdk/`, etc.).
+4. That PR carries the full per-PR member-surface checklist (the seed's `HANDOFF.md` shape, retained here as the per-PR template) — accessibility obligations, vocabulary scan, truth-label requirements, member-rights affordances, sync-state honesty, verification commands.
+
+A production-UI PR is not a continuation of the seed-promotion PR. It is a downstream artifact with its own scope, review, and approval.
+
+### 6.6 How to use the handoff template
+
+1. Copy [CLAUDE_DESIGN_HANDOFF_TEMPLATE.md](CLAUDE_DESIGN_HANDOFF_TEMPLATE.md) into a scratch location (typically `$CLAUDE_JOB_DIR/handoff-<seed-version>.md` or a worktree).
+2. Fill every section: seed identity, source docs the bundle was produced against, generated files, imported references, proposed upstream promotions, explicit non-goals, truth labels, accessibility obligations, vocabulary scan result, drift report summary, unresolved human decisions, allowed paths, forbidden paths, verification commands, PR title / branch guidance, sign-off.
+3. Link the filled handoff from [`claude-design-seed/REVIEW_NOTES.md`](claude-design-seed/REVIEW_NOTES.md). A seed without a filled handoff is not ready for promotion work.
+4. Update [`claude-design-seed/CHANGELOG.md`](claude-design-seed/CHANGELOG.md) once review closes.
+
+### 6.7 How to use the review protocol
+
+The protocol enumerates seven required review gates: truth-label, accessibility, vocabulary, implementation-status, language/RTL readiness, low-bandwidth / reduced-motion / large-text, and source-doc drift. A piece of generated seed content can only be promoted after every applicable gate closes green.
+
+The reviewer's loop:
+
+1. Read the bundle's authoritative handoff docs in order: `CLAUDE_CODE_BUNDLE.md`, `INVENTORY.md`, `PROMOTION_MAP.md`, `DRIFT_REPORT.md`, `PRODUCTION_READINESS.md`, `MUST_NOT_SHIP.md` from the seed. Open preview HTML last.
+2. Open [CLAUDE_DESIGN_HANDOFF_TEMPLATE.md](CLAUDE_DESIGN_HANDOFF_TEMPLATE.md) and fill in a fresh copy.
+3. Walk the gates in [CLAUDE_DESIGN_REVIEW_PROTOCOL.md](CLAUDE_DESIGN_REVIEW_PROTOCOL.md) §3 against each named artifact.
+4. Record findings in [`claude-design-seed/REVIEW_NOTES.md`](claude-design-seed/REVIEW_NOTES.md).
+5. Append a row to [`claude-design-seed/CHANGELOG.md`](claude-design-seed/CHANGELOG.md).
+6. Open scope-locked promotion PRs.
+
+Full protocol detail in [CLAUDE_DESIGN_REVIEW_PROTOCOL.md](CLAUDE_DESIGN_REVIEW_PROTOCOL.md). Rejection floor in [MUST_NOT_SHIP.md](MUST_NOT_SHIP.md). Workflow narrative in [`claude-design-seed/README.md`](claude-design-seed/README.md).
+
+---
+
+## 7. Maintenance
 
 Keep this doc and `CLAUDE_DESIGN_CONTEXT.md` in sync with:
 
@@ -300,9 +377,15 @@ Re-review on: any of the above changing, or quarterly, whichever is sooner.
 
 ---
 
-## 7. See also
+## 8. See also
 
 - [CLAUDE_DESIGN_CONTEXT.md](CLAUDE_DESIGN_CONTEXT.md) — the paste briefing
+- [CLAUDE_DESIGN_REVIEW_PROTOCOL.md](CLAUDE_DESIGN_REVIEW_PROTOCOL.md) — seed → canonical review gates
+- [CLAUDE_DESIGN_HANDOFF_TEMPLATE.md](CLAUDE_DESIGN_HANDOFF_TEMPLATE.md) — seed-level handoff template
+- [MUST_NOT_SHIP.md](MUST_NOT_SHIP.md) — hard rejection floor
+- [claude-design-seed/README.md](claude-design-seed/README.md) — seed directory workflow
+- [claude-design-seed/CHANGELOG.md](claude-design-seed/CHANGELOG.md) — imported seed versions
+- [claude-design-seed/REVIEW_NOTES.md](claude-design-seed/REVIEW_NOTES.md) — per-seed human review summary
 - [ICN_DESIGN_SYSTEM.md](ICN_DESIGN_SYSTEM.md) — design system entry point
 - [../DESIGN_PRINCIPLES.md](../DESIGN_PRINCIPLES.md) — kernel-side counterpart
 - [ICN_VISUAL_EXPLAINER_BIBLE.md](ICN_VISUAL_EXPLAINER_BIBLE.md) — for diagrams and infographics specifically

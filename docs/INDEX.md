@@ -68,6 +68,17 @@ Control plane for ICN's visual explainer system — the doctrine, asset register
 - **[design/assets/VISUAL_REVIEW_CHECKLIST.md](design/assets/VISUAL_REVIEW_CHECKLIST.md)** — the gate every visual explainer clears before shipping
 - **[design/assets/briefs/](design/assets/briefs/)** — per-asset briefs (closure loop, scope model, decision-to-receipt, member shell concept, kernel/app separation)
 
+### Claude Design — seed review and handoff
+
+Governance scaffold for taking Claude Design seed artifacts into the canonical repo without confusing generated output with repo truth. Default: a seed is a proposal, not a design system:
+
+- **[design/CLAUDE_DESIGN_REVIEW_PROTOCOL.md](design/CLAUDE_DESIGN_REVIEW_PROTOCOL.md)** — seven review gates (truth-label, accessibility, vocabulary, implementation-status, language/RTL, low-bandwidth/reduced-motion/large-text, source-doc drift); holds the canonical-vs-generated boundary
+- **[design/CLAUDE_DESIGN_HANDOFF_TEMPLATE.md](design/CLAUDE_DESIGN_HANDOFF_TEMPLATE.md)** — seed-level handoff template for passing a Claude Design seed to Claude Code (one filled copy per seed)
+- **[design/MUST_NOT_SHIP.md](design/MUST_NOT_SHIP.md)** — twelve-item hard rejection floor for design artifacts
+- **[design/claude-design-seed/README.md](design/claude-design-seed/README.md)** — seed directory workflow; what canonical truth is and how it is preserved
+- **[design/claude-design-seed/CHANGELOG.md](design/claude-design-seed/CHANGELOG.md)** — imported seed versions, one entry per seed
+- **[design/claude-design-seed/REVIEW_NOTES.md](design/claude-design-seed/REVIEW_NOTES.md)** — human-readable per-seed review summary
+
 ---
 
 ## 📚 Core Documentation
