@@ -120,6 +120,9 @@ View source on GitHub →
 </tbody></table>
 <p>Labels are <strong>not</strong> marketing copy. Do not soften, blur, or skip them. If a visual sits between two labels, it carries the <strong>less optimistic</strong> one.</p>
 <p>A visual without a label is <strong>not shippable</strong>.</p>
+<blockquote>
+<p><strong>See also:</strong> <a href="#appendix-a--truth-label-band-seven-canonical-states">Appendix A</a> formalizes the seven labels as a renderable band, with visual treatment notes and the mandatory carry-through rule (a version that hides its chip is rejected).</p>
+</blockquote>
 <h2>4. Visual doctrine (compact)</h2>
 <p>The <a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_SYSTEM">visual system</a> and the <a href="/docs/design-language/brief-v0">brief</a> are the long-form doctrine. The bible reuses those rules in compact form:</p>
 <ol>
@@ -384,6 +387,213 @@ View source on GitHub →
 <li>Truth-label changes propagate down to every asset that carries the label and every brief that uses it.</li>
 </ul>
 <p>The bible is <code>Last Reviewed</code> quarterly at minimum, and after any phase transition in <code>PHASE_PROGRESS.md</code>.</p>
+<hr>
+<h2>Appendix A · Truth-label band (seven canonical states)</h2>
+<blockquote>
+<p><strong>Status:</strong> promoted from the v0.2 Claude Design seed (<code>seed/VISUAL_EXPLAINER_APPENDIX.md</code>) per <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/CHANGELOG">`claude-design-seed/CHANGELOG.md`</a>. Formalizes the seven labels from §3 as a renderable band with visual treatment and carry-through rule.</p>
+</blockquote>
+<h3>Why this exists</h3>
+<p>Every visual explainer asserts something about the system. The truth-label band names what is being asserted — implemented, illustrative, archived — so the reader can calibrate trust before reading. A version of an asset that hides its truth label is rejected.</p>
+<h3>The seven states</h3>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>When to use</th>
+<th>Public-claim safety</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>strong today</strong></td>
+<td>Implemented, integrated, load-bearing. Evidence-linked (code + test + runtime).</td>
+<td>Public · safe to assert</td>
+</tr>
+<tr>
+<td><strong>advancing now</strong></td>
+<td>Actively being built. Real progress, not yet reliable.</td>
+<td>Internal disclosure only</td>
+</tr>
+<tr>
+<td><strong>real but maturing</strong></td>
+<td>Implementation exists; some surfaces or integrations still lag.</td>
+<td>Public · qualified</td>
+</tr>
+<tr>
+<td><strong>illustrative direction</strong></td>
+<td>Concept art for an unshipped surface. Direction, not implementation.</td>
+<td>Concept · always labeled</td>
+</tr>
+<tr>
+<td><strong>behind the system</strong></td>
+<td>Capability exists underneath; the interface is catching up.</td>
+<td>Honest disclosure</td>
+</tr>
+<tr>
+<td><strong>not yet</strong></td>
+<td>Scoped, not currently active. No timeline implied.</td>
+<td>Roadmap · descoped-safe</td>
+</tr>
+<tr>
+<td><strong>deprecated · do not ship</strong></td>
+<td>Retained for reference only. Removed from active product.</td>
+<td>Archive · no public use</td>
+</tr>
+</tbody></table>
+<p>These states map onto — and refine — the seven <code>truth label</code> values enumerated in §3. The §3 table remains the canonical naming surface; this band is the formal <em>renderable</em> shape. Where the two disagree, §3 wins.</p>
+<h3>Visual treatment</h3>
+<p>The chip carries the label text and an accent that reinforces the state:</p>
+<ul>
+<li>green for <code>strong today</code></li>
+<li>teal for <code>advancing now</code></li>
+<li>amber for <code>real but maturing</code> and <code>illustrative direction</code></li>
+<li>muted neutral for <code>behind the system</code> and <code>not yet</code></li>
+<li>rose for <code>deprecated · do not ship</code></li>
+</ul>
+<p>Color reinforces; the <strong>text label is load-bearing</strong>. A grayscale render must still distinguish the seven states by structure, copy, and (where present) icon. This is the §6 accessibility floor applied to the chip itself.</p>
+<h3>Mandatory carry-through</h3>
+<ul>
+<li>Every illustrative asset ships with a visible truth-label chip.</li>
+<li>Every export of an illustrative asset retains the chip; a version that hides it is rejected per <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 2.</li>
+<li>For static assets that can be circulated outside their host page, the chip is part of the SVG file itself (the placeholder logo&#39;s stamped &quot;PLACEHOLDER · NOT FINAL&quot; caption is the reference pattern).</li>
+</ul>
+<h3>Cross-references</h3>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 2 — member-app screenshots without an illustrative truth label</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 11 — screenshots cited as implementation evidence</li>
+<li><a href="/docs/adr/ADR-0033-public-maturity-claims-and-evidence-links">ADR-0033</a> — public maturity claims and linked evidence</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/assets/VISUAL_REVIEW_CHECKLIST">`assets/VISUAL_REVIEW_CHECKLIST.md`</a> §2 — the pre-ship truth-label check</li>
+</ul>
+<hr>
+<h2>Appendix B · Rejected patterns (side-by-side comparison)</h2>
+<blockquote>
+<p><strong>Status:</strong> promoted from the v0.2 Claude Design seed (<code>seed/VISUAL_EXPLAINER_APPENDIX.md</code>). Renders the anti-patterns enumerated in <a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_SYSTEM">`ICN_VISUAL_SYSTEM.md`</a> §7 and the rejection floor in <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> as concrete side-by-side comparisons. Prose anti-pattern lists are easy to skim; side-by-side comparisons hold under code review pressure.</p>
+</blockquote>
+<p>Each pattern is named, shown in its rejected form, and paired with the correct ICN response. The right-hand &quot;Use&quot; column is the corrected form a reviewer should expect to see in a passing PR.</p>
+<h3>Pattern 1 · Glassmorphism + fintech identity</h3>
+<table>
+<thead>
+<tr>
+<th>Reject</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&quot;Your wallet · $1,247.50 · ↑ 12% this week&quot; on a blurred gradient card</td>
+<td>Governed social accounting: &quot;Mutual-credit position · 142h contributed · 38h allocated · 2 open obligations&quot;</td>
+</tr>
+</tbody></table>
+<p>Reads as fintech / crypto. ICN does not custody value; the kernel has no &quot;balance&quot;. Use governed social accounting: position over wallet, obligation over debt, settlement over payment, unit over currency. Rule source: <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 6 (crypto / wallet / token framing).</p>
+<h3>Pattern 2 · &quot;AI sheen&quot; + decorative glow</h3>
+<table>
+<thead>
+<tr>
+<th>Reject</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&quot;⚡ AI · POWERED · Smart governance assistant&quot; with gradient text and glowing borders</td>
+<td>Calm civic seriousness: &quot;Three proposals to review this week. Each links its mandate, threshold, and the receipt it will produce.&quot;</td>
+</tr>
+</tbody></table>
+<p>Spectacle replaces substance. Glow implies certainty the kernel cannot prove. The institution is not &quot;smart&quot;; the member is. Surface copy that helps the member decide; skip the chrome. Rule source: <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 8.</p>
+<h3>Pattern 3 · Glowing network-globe / central hub map</h3>
+<table>
+<thead>
+<tr>
+<th>Reject</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A glowing globe with random connecting lines and floating nodes labeled &quot;Global decentralized network&quot;</td>
+<td>Three co-equal scopes side-by-side: cooperative, community, federation — each with its concept icon and a one-line description, no central node, no hub</td>
+</tr>
+</tbody></table>
+<p>No people, no institutions, no causality. Reads as crypto marketing. Three scopes, three icons, three names. No hub. Color reinforces; text names. Rule source: <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 9.</p>
+<h3>Pattern 4 · Faux-foundation seal</h3>
+<table>
+<thead>
+<tr>
+<th>Reject</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Heraldic crest with &quot;★ ESTABLISHED · MMXXVI ★&quot; in faux-Latin</td>
+<td>Restrained provisional mark with truth-label caption (&quot;PLACEHOLDER MARK · PROVISIONAL · NOT FINAL IDENTITY&quot;)</td>
+</tr>
+</tbody></table>
+<p>Invented heraldry overclaims institutional maturity. The mark is provisional; pretending otherwise is dishonest. One color, one line weight, no English text, no false age. Honest about being temporary. Rule source: <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 10.</p>
+<h3>Pattern 5 · Color-only status</h3>
+<table>
+<thead>
+<tr>
+<th>Reject</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A row of cards where status is conveyed only by border color (red = rejected, green = accepted) with no text label</td>
+<td>The same cards, each carrying a labeled chip (&quot;Accepted · 5 for 1 against&quot;, &quot;Rejected · quorum not reached&quot;) and a concept icon</td>
+</tr>
+</tbody></table>
+<p>Color reinforces; it never carries. Removing color must leave the surface fully legible. Test: drop saturation to 0 — if state distinction collapses, the surface fails. Rule source: <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 4; <a href="/docs/design-language/accessibility">`design-language/accessibility.md`</a> §3.1.</p>
+<h3>Pattern 6 · English-only fixed-width UI</h3>
+<table>
+<thead>
+<tr>
+<th>Reject</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A button labeled &quot;OK&quot; in a 64px-wide fixed container that clips at any non-English string longer than two characters</td>
+<td>A button with <code>min-width</code> and flexible padding, designed against the longest plausible localized form (~1.5× English)</td>
+</tr>
+</tbody></table>
+<p>ICN is global infrastructure. A surface that breaks at long-string locales (German, Finnish) or that fixed-pixels its containers so non-English content gets clipped is not member-ready. Verify with Spanish, German, Arabic + RTL. Rule source: <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 5.</p>
+<h3>Pattern 7 · Screenshots as proof</h3>
+<table>
+<thead>
+<tr>
+<th>Reject</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A blog post asserts &quot;ICN ships X&quot; and links a screenshot as evidence</td>
+<td>The same claim links the kernel code, the test, the receipt that the kernel emitted, and the maturity band on <code>whats-real-now</code></td>
+</tr>
+</tbody></table>
+<p>A clean PNG does not certify a behavior; on-device verification does. Screenshots are artifacts, not implementation evidence. Every &quot;shipped&quot; claim links the proving code or ADR. Rule source: <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 11; <a href="/docs/adr/ADR-0033-public-maturity-claims-and-evidence-links">ADR-0033</a>.</p>
+<h3>Pattern 8 · &quot;Dashboard&quot;</h3>
+<table>
+<thead>
+<tr>
+<th>Reject</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A &quot;Governance Dashboard&quot; with stacked metric tiles (&quot;Active proposals · 12&quot;, &quot;Members online · 348&quot;, &quot;Decisions this week · 7&quot;)</td>
+<td>Named surfaces: &quot;Standing view&quot; (who you are, where recognized), &quot;Action queue&quot; (what needs you now), &quot;Activity&quot; (what happened, with proof), &quot;Position&quot; (what you have contributed and what you can draw on)</td>
+</tr>
+</tbody></table>
+<p>ICN does not have a dashboard. &quot;Dashboard&quot; implies metrics-over-meaning, optimization-over-accountability, and platform-over-institution. Name surfaces by what they do. Rule source: <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> item 7.</p>
+<h3>Carry-through</h3>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_SYSTEM">`ICN_VISUAL_SYSTEM.md`</a> §7 enumerates these patterns in prose; this appendix is the canonical side-by-side reference.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> is the rejection floor; this appendix is its visual carry-through.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/assets/VISUAL_REVIEW_CHECKLIST">`assets/VISUAL_REVIEW_CHECKLIST.md`</a> §8 includes a checklist row per pattern so reviewers can cite a specific row when blocking a PR.</li>
+</ul>
+<h3>Sources used to draft this appendix</h3>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_SYSTEM">`ICN_VISUAL_SYSTEM.md`</a> §7 — anti-patterns and banned aesthetics</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">`MUST_NOT_SHIP.md`</a> — twelve-item rejection floor</li>
+<li>The v0.2 Claude Design seed&#39;s <code>seed/VISUAL_EXPLAINER_APPENDIX.md</code> and the <code>preview/rejected-patterns.html</code> side-by-side renders</li>
+<li>The v0.2 Claude Design seed&#39;s <code>preview/truth-bands.html</code> for the seven-state band</li>
+</ul>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
