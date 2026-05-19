@@ -122,7 +122,7 @@ A glowing globe with arcs is not a network diagram; it is a venture-pitch motif.
 
 **How to detect:** any diagram that uses a sphere, a globe, or a single central node radiating to peripheral nodes. Animated arcs traveling along great-circle routes. World maps with pulsing dots.
 
-**What to do instead:** depict ICN's actual topology — peers in named scopes, federations of co-equal entities, provenance threads between participants. The "persistent member across institutional contexts" motif from the design language is the right primitive. Reference: [ICN_VISUAL_EXPLAINER_BIBLE.md](ICN_VISUAL_EXPLAINER_BIBLE.md).
+**What to do instead:** depict ICN's actual topology — peers in named scopes, federations of co-equal entities, provenance threads between participants. The "persistent member across institutional contexts" motif from the design language is the right primitive. Reference: [ICN_VISUAL_EXPLAINER_BIBLE.md](ICN_VISUAL_EXPLAINER_BIBLE.md). For the federation-operator surface specifically — the most common place this anti-pattern reappears — see [FEDERATION_OPERATOR_SURFACE_CONCEPT.md](FEDERATION_OPERATOR_SURFACE_CONCEPT.md) §"What this surface is not" and §"Rejected pattern notes," which enumerate map-view, pulsing-node, and "control center" rejections specific to that surface.
 
 ---
 
