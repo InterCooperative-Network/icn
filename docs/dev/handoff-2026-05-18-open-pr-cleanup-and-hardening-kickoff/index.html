@@ -1,0 +1,352 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Session Handoff — 2026-05-18 — Open-PR cleanup + hardening kickoff | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>dev</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>handoff 2026 05 18 open pr cleanup and hardening kickoff</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/dev/handoff-2026-05-18-open-pr-cleanup-and-hardening-kickoff.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Session Handoff — 2026-05-18 — Open-PR cleanup + hardening kickoff</h1>
+<blockquote>
+<p><strong>Per <code>AGENTS.md</code> L301</strong>: this file is for context continuity and is intentionally <em>not</em> committed via PR in this session. It exists under <code>docs/dev/</code> so future sessions can read it; if the operator decides to commit it, that is a separate action.</p>
+</blockquote>
+<h2>1. Session goal</h2>
+<p>Close or clearly block every currently open PR, then land the smallest safe follow-up PR that advances the open hardening/appliance work without overclaiming.</p>
+<h2>2. Final git state</h2>
+<ul>
+<li>Branch: <code>main</code></li>
+<li><code>git status --short</code> (after all work):<pre><code>?? docs/dev/handoff-2026-05-15-anti-entropy-probe-digest.md
+</code></pre>
+The untracked handoff above was present at session start; it is not from this session.</li>
+<li>Latest local main commits:<pre><code>c69c32318 docs(appliance): record verified host toolchain + base-image staging gap (#1876)
+63b533f05 docs(strategy): add Thursday meeting truth packet (#1875)
+f9a98a2f4 test(devnet): add RedundancyProof Slice B fixture
+</code></pre>
+</li>
+</ul>
+<h2>3. PRs merged this session</h2>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Title</th>
+<th>Merge commit</th>
+<th>Method</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1875</td>
+<td>docs(strategy): add Thursday meeting truth packet</td>
+<td><code>63b533f05</code></td>
+<td><code>--squash --delete-branch</code></td>
+<td><strong>Merged before inline review check</strong> — error surfaced afterward; Codex left a P1 (handoff-commit per AGENTS.md L301, contradicted by 22 prior precedents) and a P2 (stale &quot;34 crates&quot; — actual 44 workspace members). The P2 stale fact is fixed by PR #1878 in this same session.</td>
+</tr>
+<tr>
+<td>#1876</td>
+<td>docs(appliance): operator handoff — verified host toolchain + base-image staging gap</td>
+<td><code>c69c32318</code></td>
+<td><code>--squash --delete-branch --admin</code> (head was BEHIND after #1875 merged; auto-merge not enabled on repo; docs-only with zero file overlap)</td>
+<td>Zero inline review comments. Only an automated docs-freshness bot report unrelated to this PR&#39;s content.</td>
+</tr>
+</tbody></table>
+<h2>4. PRs closed/stale this session</h2>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1791 (Dependabot ts-sdk dev-deps)</td>
+<td>Auto-closed by Dependabot at 2026-05-18T04:02:27Z when <code>@dependabot rebase</code> was requested. Replaced by #1877 (<code>across 1 directory with 5 updates</code>).</td>
+</tr>
+</tbody></table>
+<h2>5. PRs opened this session</h2>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>URL</th>
+<th>State</th>
+<th>Mergeable</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1878</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1878" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/pull/1878</a> — docs(strategy): fix stale crate count in Thursday brief and CLAUDE.md</td>
+<td>OPEN</td>
+<td>MERGEABLE, BLOCKED (awaiting required checks)</td>
+</tr>
+<tr>
+<td>#1879</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1879" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/pull/1879</a> — docs(appliance): reconcile README with landed scaffold + real build/smoke</td>
+<td>OPEN</td>
+<td>MERGEABLE, BLOCKED</td>
+</tr>
+<tr>
+<td>#1880</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1880" target="_blank" rel="noopener">https://github.com/InterCooperative-Network/icn/pull/1880</a> — docs(design): governance:write decomposition — pick hybrid path (Refs #1868)</td>
+<td>OPEN</td>
+<td>MERGEABLE</td>
+</tr>
+</tbody></table>
+<h2>6. Dependabot PRs needing operator attention</h2>
+<p>Both rebases requested this session via <code>@dependabot rebase</code>. State as of session close:</p>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>State</th>
+<th>mergeStateStatus</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#1790 (<code>/web/pilot-ui</code>, 3 updates)</td>
+<td>OPEN, MERGEABLE</td>
+<td><strong>CLEAN</strong> (rebased)</td>
+<td>Ready to merge after operator-confirmed targeted local validation (<code>cd web/pilot-ui &amp;&amp; npm ci &amp;&amp; &lt;existing scripts&gt;</code>). Inspect <code>package.json</code> first; do not invent npm scripts.</td>
+</tr>
+<tr>
+<td>#1877 (<code>/sdk/typescript</code>, 5 updates — supersedes #1791)</td>
+<td>OPEN, MERGEABLE</td>
+<td><strong>CLEAN</strong></td>
+<td>Same. <code>cd sdk/typescript &amp;&amp; npm ci &amp;&amp; npm run check-types &amp;&amp; npm test &amp;&amp; npm run build</code> is the documented path; confirm against <code>package.json</code> before invoking.</td>
+</tr>
+</tbody></table>
+<p>Neither was merged in this session because targeted local validation (npm install + tests) is its own multi-step procedure that should be confirmed before merge.</p>
+<h2>7. Validation commands and results</h2>
+<p>Every PR opened this session passed the same five-validator suite locally.</p>
+<h3>#1878 (crate count fix)</h3>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>git diff --check</code></td>
+<td>clean</td>
+</tr>
+<tr>
+<td><code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict</code></td>
+<td>OK (827 docs; 55 pre-existing yaml-mismatch warnings unrelated to this edit)</td>
+</tr>
+<tr>
+<td><code>PYTHONIOENCODING=utf-8 python3 .github/scripts/compliance_linter.py</code></td>
+<td>No compliance violations</td>
+</tr>
+<tr>
+<td><code>ops/scripts/drift-check.sh</code></td>
+<td>STATUS: PASS</td>
+</tr>
+</tbody></table>
+<h3>#1879 (appliance README drift)</h3>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>git diff --check</code></td>
+<td>clean</td>
+</tr>
+<tr>
+<td><code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict</code></td>
+<td>OK (827 docs; same pre-existing warnings)</td>
+</tr>
+<tr>
+<td><code>PYTHONIOENCODING=utf-8 python3 .github/scripts/compliance_linter.py</code></td>
+<td>No compliance violations</td>
+</tr>
+<tr>
+<td><code>ops/scripts/drift-check.sh</code></td>
+<td>STATUS: PASS</td>
+</tr>
+</tbody></table>
+<h3>#1880 (#1868 design doc — governance:write decomposition)</h3>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>python3 docs/scripts/lint-arch.py docs/design/governance/governance-write-decomposition.md --cargo icn/Cargo.toml</code></td>
+<td>CLEAN: No violations found (after fixing 3 soft-forbidden &quot;token&quot; → &quot;capability&quot; replacements)</td>
+</tr>
+<tr>
+<td><code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict</code></td>
+<td>OK (828 docs; same pre-existing warnings)</td>
+</tr>
+<tr>
+<td><code>PYTHONIOENCODING=utf-8 python3 .github/scripts/compliance_linter.py</code></td>
+<td>No compliance violations</td>
+</tr>
+<tr>
+<td><code>ops/scripts/drift-check.sh</code></td>
+<td>STATUS: PASS</td>
+</tr>
+<tr>
+<td><code>git diff --check</code></td>
+<td>clean</td>
+</tr>
+</tbody></table>
+<h2>8. Remaining open hardening issues (recommended order)</h2>
+<p>Per the session prompt, #1868 (now PR #1880) was the first slice of the hardening queue. Suggested follow-on order, given dependencies:</p>
+<ol>
+<li><strong>#1868 follow-on PRs</strong> (depend on #1880 design landing first):<ol>
+<li>Mint the six class-level scope constants. Pure addition. No handler changes.</li>
+<li>Migrate <code>governance:charter:write</code> (pairs with #1869, #1870).</li>
+<li>Migrate <code>governance:steward:write</code>. Small.</li>
+<li>Build the <code>MandateGate</code> trait, types, and persistence backing.</li>
+<li>Wire mandate-check for <code>governance:charter:write</code> acts.</li>
+<li>Migrate <code>governance:proposal:write</code> + mandate-check for close/cast/steward-proposal.</li>
+<li>Migrate <code>governance:meeting:write</code>, then <code>:activity:write</code>, then <code>:comment:write</code>.</li>
+<li>Retire <code>governance:write</code> constant.</li>
+</ol>
+</li>
+<li><strong>#1871</strong> (production startup guard for optional standing checkers) — gives #1870 a Bootstrap/Production mode distinction to depend on.</li>
+<li><strong>#1870</strong> (TrustThreshold fail-open on direct membership mutation) — wait until #1871&#39;s mode distinction exists.</li>
+<li><strong>#1869</strong> (direct charter activation bootstrap-path labeling) — can land alongside #1870 once the bootstrap-mode shape is established.</li>
+<li><strong>#1872</strong> (receipt backend non-atomic mandate/grant boundary tests) — tests-only; no dependency on the above.</li>
+<li><strong>#1873</strong> (ReconciliationStatus accepted-is-not-applied surface tests) — tests-only; no dependency on the above.</li>
+</ol>
+<p>Stale-fact follow-up (not assigned to any open issue):</p>
+<ul>
+<li>Additional <code>34 crates</code> references survive in current docs after #1878. Out-of-scope for this session; named in #1878 PR description:<ul>
+<li><code>docs/planning/icn-ecosystem-map.md:277</code></li>
+<li><code>docs/status.toml:241</code></li>
+<li><code>docs/strategy/grants/grant-narrative-core.md:71</code></li>
+<li><code>docs/strategy/grants/grant-one-pager.md:27</code></li>
+<li><code>docs/state/ICN-Platform-Baseline-2026-03.md:195</code> (dated baseline; may be intentionally frozen)</li>
+</ul>
+</li>
+</ul>
+<h2>9. Facts vs. non-claims (load-bearing)</h2>
+<h3>Facts (verifiable from the repo or <code>gh</code> right now)</h3>
+<ul>
+<li>Two PRs merged: #1875 (squash) and #1876 (admin-squash because head was BEHIND post-#1875).</li>
+<li>Three new PRs opened: #1878, #1879, #1880. All MERGEABLE.</li>
+<li>One Dependabot PR auto-closed by Dependabot: #1791 → replaced by #1877.</li>
+<li>Two Dependabot PRs (#1790, #1877) are now CLEAN/MERGEABLE but not merged this session.</li>
+<li>No code changes were made. No script changes. No schemas, ADRs, or contract URNs added or altered.</li>
+<li>No real appliance build or smoke was run. The appliance README (#1879) explicitly states that no real QCOW2 has been produced in this verified session.</li>
+<li>No regulatory-vocabulary drift. The <code>compliance_linter.py</code> passed on every PR.</li>
+<li>No meaning-firewall change. The kernel sees no new domain semantics.</li>
+</ul>
+<h3>Non-claims (explicitly do <strong>not</strong> assert)</h3>
+<ul>
+<li><strong>Not</strong> production-ready.</li>
+<li><strong>Not</strong> partner-ready.</li>
+<li><strong>Not</strong> live-federation ready.</li>
+<li><strong>Not</strong> NYCN-activated.</li>
+<li><strong>No</strong> real QCOW2 artifact has been built or smoke-tested in this session.</li>
+<li><strong>No</strong> new mandate machinery exists — #1880 is design only; the implementation PRs in §10 of the design doc are unbuilt.</li>
+<li><strong>No</strong> Dependabot dev-dep bump was merged in this session.</li>
+</ul>
+<h2>10. Process note for next session</h2>
+<p>The single error this session was merging #1875 before checking inline review threads. The <code>gh pr view --json reviews</code> blob only contains top-level review bodies; inline thread comments live under <code>gh api repos/.../pulls/&lt;n&gt;/comments</code>. From now on, the pre-merge check sequence is:</p>
+<pre><code class="language-bash">gh pr view &lt;n&gt; --json mergeable,mergeStateStatus,statusCheckRollup,reviews,reviewRequests,comments
+gh api repos/InterCooperative-Network/icn/pulls/&lt;n&gt;/comments --jq &#39;.[] | {user: .user.login, path, line, body}&#39;
+gh api repos/InterCooperative-Network/icn/issues/&lt;n&gt;/comments --jq &#39;.[] | {user: .user.login, body}&#39;
+</code></pre>
+<p>The third command catches issue-style comments (where Codex/Copilot occasionally post summary review feedback) that the first two miss.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
