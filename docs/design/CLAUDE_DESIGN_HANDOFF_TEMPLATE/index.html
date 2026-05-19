@@ -1,0 +1,421 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Claude Design Handoff Template | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>CLAUDE DESIGN HANDOFF TEMPLATE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/CLAUDE_DESIGN_HANDOFF_TEMPLATE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Claude Design Handoff Template</h1>
+<blockquote>
+<p><strong>One sentence.</strong> When Claude Design produces a seed, this template is the contract that hands it to Claude Code without losing the truth boundary.</p>
+</blockquote>
+<p>This is not the per-PR member-surface checklist (that lives separately and travels with each member-facing PR). This is the seed-level handoff: it records what the seed contains, what may be promoted, what must remain seed-only, and which paths Claude Code is allowed to touch.</p>
+<p><strong>Use it like this.</strong> Copy this file into <code>docs/design/claude-design-seed/handoff-&lt;seed-version&gt;.md</code> (or its equivalent in the seed&#39;s review directory), fill every field, and link it from <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/REVIEW_NOTES">`docs/design/claude-design-seed/REVIEW_NOTES.md`</a>. A seed without a filled handoff template is not ready for promotion work.</p>
+<hr>
+<h2>1. Seed identity</h2>
+<ul>
+<li><strong>Design bundle URL:</strong> <code>_______________________</code></li>
+<li><strong>Seed name / version:</strong> _______________________ (e.g. &quot;ICN Commons Design System — Claude Design Seed v0.1&quot;)</li>
+<li><strong>Seed produced on:</strong> YYYY-MM-DD</li>
+<li><strong>Handoff prepared on:</strong> YYYY-MM-DD</li>
+<li><strong>Bundle author / Claude Design session lead:</strong> _______________________</li>
+<li><strong>Handoff reviewer (this template&#39;s author):</strong> _______________________</li>
+</ul>
+<h2>2. Source docs the bundle was produced against</h2>
+<p>List every ICN repo doc the seed was given as input. The seed almost certainly bundled imported copies of these; record the version it bundled vs the live repo version.</p>
+<table>
+<thead>
+<tr>
+<th>Repo doc</th>
+<th>Seed-bundled version (commit / last reviewed)</th>
+<th>Live repo version (commit / last reviewed)</th>
+<th>Drift?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>docs/design/ICN_DESIGN_SYSTEM.md</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>docs/design/CLAUDE_DESIGN_CONTEXT.md</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>docs/design/CLAUDE_DESIGN_SETUP.md</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>docs/design/ACCESSIBILITY_BASELINE.md</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>docs/design/CONTENT_STYLE_GUIDE.md</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>docs/design-language/brief-v0.md</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>docs/design-language/concept-map.md</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>docs/design-language/accessibility.md</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>docs/mobile/icn-mobile-ux-spec-v1.md</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>docs/spec/member-shell-v0.md</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><em>other</em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p>If any row shows drift, file it under §10 &quot;Drift report summary&quot; and treat the live repo version as authoritative.</p>
+<h2>3. Generated files in the seed</h2>
+<p>What the seed produced. Classify every file as <strong>generated seed</strong>, <strong>UI kit / illustrative mock</strong>, <strong>preview card / showcase</strong>, <strong>generated asset</strong>, or <strong>screenshot</strong>. Default status is seed-only.</p>
+<table>
+<thead>
+<tr>
+<th>Path inside the bundle</th>
+<th>What it is</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p>(Add rows as needed. If the bundle ships an <code>INVENTORY.md</code>, this section can summarize that file rather than duplicate it.)</p>
+<h2>4. Imported references</h2>
+<p>Files the seed copied verbatim from the upstream repo for offline reference. Imported ≠ fresh. Use the live repo for authoritative reads.</p>
+<table>
+<thead>
+<tr>
+<th>Path inside the bundle</th>
+<th>Upstream path</th>
+<th>Bundled freshness</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>5. Proposed upstream promotions</h2>
+<p>For each piece of generated seed content the reviewer believes could become canonical, name the proposed upstream path and the gate(s) that still need to close. <strong>Default status is <code>candidate doctrine</code> — not promoted.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Seed artifact</th>
+<th>Proposed upstream path</th>
+<th>Gates outstanding (from REVIEW_PROTOCOL.md §3)</th>
+<th>Reviewer notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p>A row in this table is a proposal, not an authorization. Promotion only happens after the review gates close green and a separate, scope-locked PR lands.</p>
+<h2>6. Explicit non-goals for this handoff</h2>
+<p>State every thing this handoff is <em>not</em> asking Claude Code to do. Be specific. Generic non-goals do not protect the truth boundary.</p>
+<ul>
+<li>Do not recreate generated prototypes pixel-perfectly. <strong>Claude Code should not recreate generated prototypes pixel-perfectly unless a later task specifically asks for production UI implementation.</strong></li>
+<li>Do not migrate seed React / JSX recreations into <code>website/src/</code> or <code>web/pilot-ui/</code>.</li>
+<li>Do not adopt placeholder logo, wordmark, or icon assets from the seed.</li>
+<li>Do not create production CSS from seed tokens in this PR.</li>
+<li>Do not adopt seed pattern names as canonical concept ids without a separate <code>concept-map.md</code> PR.</li>
+<li>Do not claim the seed is canonical.</li>
+<li>Do not claim member surfaces are shipped if the seed depicts them as illustrative.</li>
+<li><em>add seed-specific non-goals here</em></li>
+</ul>
+<h2>7. Truth labels in scope</h2>
+<p>Every artifact this handoff names carries one of the labels from <a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_EXPLAINER_BIBLE">ICN_VISUAL_EXPLAINER_BIBLE.md</a> and <a href="/docs/adr/ADR-0033-public-maturity-claims-and-evidence-links">ADR-0033</a>:</p>
+<ul>
+<li><input disabled="" type="checkbox"> <code>implemented / current UI</code></li>
+<li><input disabled="" type="checkbox"> <code>repo-grounded public explainer</code></li>
+<li><input disabled="" type="checkbox"> <code>repo-grounded architecture explainer</code></li>
+<li><input disabled="" type="checkbox"> <code>illustrative direction</code></li>
+<li><input disabled="" type="checkbox"> <code>future-state / roadmap</code></li>
+<li><input disabled="" type="checkbox"> <code>historical</code></li>
+<li><input disabled="" type="checkbox"> <code>do not use</code></li>
+</ul>
+<p>For each artifact named in §3 or §5, declare the label here. Member-shell mocks default to <code>illustrative direction</code>.</p>
+<h2>8. Accessibility obligations to plan for</h2>
+<p>Claude Code must plan for, even on a docs-only PR:</p>
+<ul>
+<li><input disabled="" type="checkbox"> WCAG 2.2 Level AA minimum (contrast, target size, keyboard, semantics)</li>
+<li><input disabled="" type="checkbox"> High-contrast light and dark themes (not just default dark)</li>
+<li><input disabled="" type="checkbox"> <code>prefers-reduced-motion</code> honored — motion never carries meaning</li>
+<li><input disabled="" type="checkbox"> Large-text / 200% zoom reflow without horizontal scroll or content loss</li>
+<li><input disabled="" type="checkbox"> Low-bandwidth mode (no autoplay video, no heavy hero animation, no required JS for first paint)</li>
+<li><input disabled="" type="checkbox"> Visible keyboard focus on every interactive element</li>
+<li><input disabled="" type="checkbox"> Screen-reader semantics (landmarks, headings, <code>aria-*</code> where required)</li>
+<li><input disabled="" type="checkbox"> Color is not the only carrier of meaning</li>
+<li><input disabled="" type="checkbox"> Room for translated labels (~1.5× English length is the planning floor)</li>
+<li><input disabled="" type="checkbox"> Right-to-left readiness (flow direction, label wrapping, mirrored chrome)</li>
+<li><input disabled="" type="checkbox"> Language selector path is named, even if not wired</li>
+<li><input disabled="" type="checkbox"> Glossary access from member-facing terminology</li>
+<li><input disabled="" type="checkbox"> Three vocabulary layers preserved where relevant: canonical term, public label, local institutional vocabulary</li>
+</ul>
+<p>Floor doc: <a href="https://github.com/InterCooperative-Network/icn/blob/main/ACCESSIBILITY_BASELINE">ACCESSIBILITY_BASELINE.md</a>. Component-level rules: <a href="/docs/design-language/accessibility">docs/design-language/accessibility.md</a>.</p>
+<h2>9. Vocabulary scan result</h2>
+<p>Run a vocabulary scan against the seed&#39;s member-facing strings. Reference: <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTENT_STYLE_GUIDE">CONTENT_STYLE_GUIDE.md</a> §&quot;Regulatory-safe vocabulary&quot; and <a href="/docs/design-language/concept-map">docs/design-language/concept-map.md</a>.</p>
+<ul>
+<li><input disabled="" type="checkbox"> No <code>wallet / balance / currency / crypto / token / payment / payout / debt / user / account holder / dashboard / admin panel</code> in member-facing copy (Reject-pattern examples exempt and labeled)</li>
+<li><input disabled="" type="checkbox"> Canonical terms used consistently: <strong>member, standing, mandate / authority, obligation, allocation, settlement, unit, position, receipt, provenance</strong></li>
+<li><input disabled="" type="checkbox"> Every first-use of a canonical term shows the public label or links the glossary</li>
+<li><input disabled="" type="checkbox"> No invented canonical term (new concepts route through <code>concept-map.md</code> first)</li>
+<li><input disabled="" type="checkbox"> Three vocabulary layers preserved where applicable: canonical / public / local-institutional</li>
+</ul>
+<p>Findings: _______________________</p>
+<h2>10. Drift report summary</h2>
+<p>Summarize the seed&#39;s <code>DRIFT_REPORT.md</code> (if present) and any additional drift found against the live repo.</p>
+<table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Severity</th>
+<th>Live repo source of truth</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p>For each finding: state the drift, name the live repo source that wins, and route the correction to a separate docs PR if needed.</p>
+<h2>11. Unresolved human decisions</h2>
+<p>Decisions that block follow-up PRs until resolved. The seed&#39;s own <code>CLAUDE_CODE_BUNDLE.md</code> typically enumerates these; list them here so they cannot be silently absorbed by a subsequent agent.</p>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Owner</th>
+<th>Why blocking</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>12. Allowed paths Claude Code may touch in this handoff</h2>
+<p>Default is <strong>none</strong>. List every path explicitly. Anything not on this list is forbidden.</p>
+<p>Examples for a docs-only seed-promotion PR:</p>
+<ul>
+<li><code>docs/design/CLAUDE_DESIGN_REVIEW_PROTOCOL.md</code> — create or update</li>
+<li><code>docs/design/CLAUDE_DESIGN_HANDOFF_TEMPLATE.md</code> — create or update</li>
+<li><code>docs/design/MUST_NOT_SHIP.md</code> — create or update</li>
+<li><code>docs/design/CLAUDE_DESIGN_SETUP.md</code> — append section</li>
+<li><code>docs/design/ICN_DESIGN_SYSTEM.md</code> — add references</li>
+<li><code>docs/design/claude-design-seed/README.md</code> — create</li>
+<li><code>docs/design/claude-design-seed/CHANGELOG.md</code> — append entry</li>
+<li><code>docs/design/claude-design-seed/REVIEW_NOTES.md</code> — create or append</li>
+<li><code>docs/design-language/accessibility.md</code> — targeted correction(s) only</li>
+<li><code>docs/INDEX.md</code> — slot new entries under design section</li>
+<li><code>.claude/skills/icn-commons-design/SKILL.md</code> — create or update</li>
+</ul>
+<h2>13. Forbidden paths</h2>
+<p>Hard non-goals. Any change to these paths inside this PR is out of scope and must be removed before merge.</p>
+<ul>
+<li><code>website/src/**</code></li>
+<li><code>website/public/**</code></li>
+<li><code>web/pilot-ui/**</code></li>
+<li><code>sdk/**</code></li>
+<li><code>apps/**</code></li>
+<li><code>crates/**</code></li>
+<li><code>bins/**</code></li>
+<li><code>docs/adr/**</code> (ADRs are architectural decisions, not seed promotions)</li>
+<li>any other production code or production CSS</li>
+</ul>
+<h2>14. Verification commands</h2>
+<p>Run before opening the PR. For a docs-only handoff, the minimum set is:</p>
+<pre><code class="language-bash"># Doc structure / canon / supersession check
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml
+
+# Diff is docs-only
+git status --short
+git diff --stat origin/main...HEAD
+</code></pre>
+<p>If the PR touches a member-facing surface (it should not, for a seed-promotion handoff), additionally use the per-PR member-surface checklist that lives alongside the design system. That checklist enumerates <code>pnpm test</code>, <code>pnpm typecheck</code>, vocabulary linter, axe-core, and visual diff against preview cards.</p>
+<h2>15. PR title and branch guidance</h2>
+<ul>
+<li><strong>Branch:</strong> <code>docs/claude-design-seed-review-protocol</code> (or seed-specific equivalent for a follow-up)</li>
+<li><strong>PR title:</strong> <code>docs(design): add Claude Design seed review and handoff protocol</code> (or scope-specific equivalent)</li>
+<li><strong>Commit style:</strong> ICN&#39;s <code>&lt;type&gt;(&lt;scope&gt;): &lt;summary&gt;</code> convention. Use <code>docs(design)</code> for seed-promotion PRs.</li>
+<li><strong>Co-author:</strong> add the Claude Design session author if attribution is desired; otherwise omit.</li>
+</ul>
+<h2>16. Sign-off</h2>
+<ul>
+<li><strong>Handoff prepared by:</strong> _______________________ on YYYY-MM-DD</li>
+<li><strong>Truth-label / accessibility / vocabulary review by:</strong> _______________________ on YYYY-MM-DD</li>
+<li><strong>Decision to proceed with promotion PR:</strong> yes / no / hold</li>
+</ul>
+<p>If no or hold, record the reason and the unresolved decision in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/REVIEW_NOTES">`claude-design-seed/REVIEW_NOTES.md`</a>. Do not proceed silently.</p>
+<hr>
+<h2>Operating note for Claude Code</h2>
+<p>When Claude Code reads a handoff filled out using this template:</p>
+<ul>
+<li>Treat §6 (non-goals), §12 (allowed paths), and §13 (forbidden paths) as load-bearing constraints. They override any inferred scope from the seed&#39;s preview HTML or visual finish.</li>
+<li><strong>Do not recreate generated prototypes pixel-perfectly</strong> unless a later, separate task explicitly asks for production UI implementation.</li>
+<li>The seed&#39;s polish does not relax the truth boundary. A preview card depicts a pattern; it is not the pattern&#39;s implementation.</li>
+<li>Promotion of any artifact requires the gates in <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_REVIEW_PROTOCOL">CLAUDE_DESIGN_REVIEW_PROTOCOL.md</a> §3 to close green. A &quot;candidate doctrine&quot; row in §5 of this template is a proposal, not authorization.</li>
+<li>Surface findings, drift, and unresolved decisions in the PR description, not silently in commits.</li>
+</ul>
+<hr>
+<h2>See also</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_REVIEW_PROTOCOL">CLAUDE_DESIGN_REVIEW_PROTOCOL.md</a> — review gates this handoff feeds</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">MUST_NOT_SHIP.md</a> — hard rejection floor</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/README">claude-design-seed/README.md</a> — what the seed directory is and how it is organized</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/CHANGELOG">claude-design-seed/CHANGELOG.md</a> — imported seed versions</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/REVIEW_NOTES">claude-design-seed/REVIEW_NOTES.md</a> — per-seed human review summary</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_CONTEXT">CLAUDE_DESIGN_CONTEXT.md</a> — paste briefing for external Claude Design sessions</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_SETUP">CLAUDE_DESIGN_SETUP.md</a> — workflow, external and local modes</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_DESIGN_SYSTEM">ICN_DESIGN_SYSTEM.md</a> — design system entry point</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

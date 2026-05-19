@@ -360,7 +360,67 @@ brand layer is the package&#39;s.</li>
 <p>If you&#39;re not sure which one you&#39;re doing: <strong>if the surface ever ships to a member
 without an NYCN or Summit logo on it, it&#39;s ICN-substrate work, and CONTEXT.md applies.</strong></p>
 <hr>
-<h2>6. Maintenance</h2>
+<h2>6. Seed import, review, and promotion workflow</h2>
+<p>Claude Design now produces <strong>seeds</strong> — packaged bundles that include generated docs, HTML preview cards, CSS token files, UI kit recreations, illustrative screenshots, and the bundle&#39;s own governance trail. A seed is a <em>proposal</em> for ICN design, not a design system in itself. Canonical truth still lives in the upstream repo paths; the seed waits for review.</p>
+<p>This section covers the workflow for handing a seed off to Claude Code without contaminating canonical truth with generated polish.</p>
+<h3>6.1 What a seed is, what it is not</h3>
+<ul>
+<li><strong>A seed is:</strong> the output of an external Claude Design session — markdown, HTML, CSS, screenshots, prose, illustrations, plus a self-describing governance bundle (the seed&#39;s own <code>INVENTORY.md</code>, <code>PROMOTION_MAP.md</code>, <code>DRIFT_REPORT.md</code>, <code>PRODUCTION_READINESS.md</code>, <code>MUST_NOT_SHIP.md</code>, and a <code>CLAUDE_CODE_BUNDLE.md</code> handoff).</li>
+<li><strong>A seed is not:</strong> canonical truth, brand decision, implementation evidence, sanctioned source of CSS / components / assets for production paths, or a place from which to import code into <code>website/src/</code>, <code>web/pilot-ui/</code>, or <code>sdk/</code>.</li>
+</ul>
+<p>Default status of every seed artifact is <code>generated seed</code>. Promotion is an explicit, gated step — see §6.4 below.</p>
+<h3>6.2 Generated-vs-canonical boundary</h3>
+<p>This boundary is asymmetric and unconditional:</p>
+<ul>
+<li>Canonical truth lives in the upstream ICN repo paths declared in <a href="https://github.com/InterCooperative-Network/icn/blob/main/registry.toml">`docs/registry.toml`</a> <code>[control].canonical_doc_paths</code> and the <code>Canonical: yes</code> rows in <a href="/docs/INDEX">`docs/INDEX.md`</a>.</li>
+<li>Generated Claude Design files are not canonical by default.</li>
+<li>Imported repo docs inside a seed may be stale; trust the live repo.</li>
+<li>Screenshots are not implementation evidence.</li>
+<li>UI kits are illustrative unless explicitly promoted.</li>
+<li>Polish is not evidence.</li>
+</ul>
+<p>The full version of this boundary, with the rule-of-thumb, lives in <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_REVIEW_PROTOCOL">CLAUDE_DESIGN_REVIEW_PROTOCOL.md</a> §2. The hard rejection floor lives in <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">MUST_NOT_SHIP.md</a>.</p>
+<h3>6.3 Docs / protocol-first handoff</h3>
+<p>The first PR for any new seed is <strong>docs-only</strong>. It establishes the protocol scaffold (or extends it), records the seed&#39;s drift findings, and updates <code>claude-design-seed/CHANGELOG.md</code> + <code>REVIEW_NOTES.md</code>. It does not touch production UI, CSS, SDK, or assets.</p>
+<p>The shape of the handoff is <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_HANDOFF_TEMPLATE">CLAUDE_DESIGN_HANDOFF_TEMPLATE.md</a>. Fill in a fresh copy per seed; the template&#39;s §6 (non-goals), §12 (allowed paths), and §13 (forbidden paths) are load-bearing — they override any inferred scope the seed&#39;s preview HTML might suggest.</p>
+<h3>6.4 When Claude Code should implement docs only</h3>
+<p>Default. Every new seed lands as docs-only first. Specifically:</p>
+<ul>
+<li>Adopting the protocol / handoff template / rejection floor / skill scaffold ← <strong>first PR, docs-only</strong></li>
+<li>Fixing seed-identified drift in canonical docs (e.g., the seed&#39;s <code>DRIFT_REPORT.md</code> entries) ← <strong>docs-only, scope-locked</strong></li>
+<li>Adding seed workflow files under <code>docs/design/claude-design-seed/</code> ← <strong>docs-only</strong></li>
+</ul>
+<p>Claude Code in docs-only mode does <strong>not</strong> recreate generated prototypes pixel-perfectly, does <strong>not</strong> migrate React / JSX recreations from a seed, does <strong>not</strong> adopt placeholder logo or icon assets, and does <strong>not</strong> create production CSS from seed tokens.</p>
+<h3>6.5 When production UI implementation is allowed</h3>
+<p>Only after:</p>
+<ol>
+<li>The relevant promotion candidate has been reviewed via <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_REVIEW_PROTOCOL">CLAUDE_DESIGN_REVIEW_PROTOCOL.md</a> §3.</li>
+<li>The human decisions in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/REVIEW_NOTES">`claude-design-seed/REVIEW_NOTES.md`</a> §&quot;What requires human decision&quot; are resolved.</li>
+<li>A separate, scope-locked PR is opened against the appropriate canonical path (<code>website/src/</code>, <code>sdk/</code>, etc.).</li>
+<li>That PR carries the full per-PR member-surface checklist (the seed&#39;s <code>HANDOFF.md</code> shape, retained here as the per-PR template) — accessibility obligations, vocabulary scan, truth-label requirements, member-rights affordances, sync-state honesty, verification commands.</li>
+</ol>
+<p>A production-UI PR is not a continuation of the seed-promotion PR. It is a downstream artifact with its own scope, review, and approval.</p>
+<h3>6.6 How to use the handoff template</h3>
+<ol>
+<li>Copy <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_HANDOFF_TEMPLATE">CLAUDE_DESIGN_HANDOFF_TEMPLATE.md</a> into a scratch location (typically <code>$CLAUDE_JOB_DIR/handoff-&lt;seed-version&gt;.md</code> or a worktree).</li>
+<li>Fill every section: seed identity, source docs the bundle was produced against, generated files, imported references, proposed upstream promotions, explicit non-goals, truth labels, accessibility obligations, vocabulary scan result, drift report summary, unresolved human decisions, allowed paths, forbidden paths, verification commands, PR title / branch guidance, sign-off.</li>
+<li>Link the filled handoff from <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/REVIEW_NOTES">`claude-design-seed/REVIEW_NOTES.md`</a>. A seed without a filled handoff is not ready for promotion work.</li>
+<li>Update <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/CHANGELOG">`claude-design-seed/CHANGELOG.md`</a> once review closes.</li>
+</ol>
+<h3>6.7 How to use the review protocol</h3>
+<p>The protocol enumerates seven required review gates: truth-label, accessibility, vocabulary, implementation-status, language/RTL readiness, low-bandwidth / reduced-motion / large-text, and source-doc drift. A piece of generated seed content can only be promoted after every applicable gate closes green.</p>
+<p>The reviewer&#39;s loop:</p>
+<ol>
+<li>Read the bundle&#39;s authoritative handoff docs in order: <code>CLAUDE_CODE_BUNDLE.md</code>, <code>INVENTORY.md</code>, <code>PROMOTION_MAP.md</code>, <code>DRIFT_REPORT.md</code>, <code>PRODUCTION_READINESS.md</code>, <code>MUST_NOT_SHIP.md</code> from the seed. Open preview HTML last.</li>
+<li>Open <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_HANDOFF_TEMPLATE">CLAUDE_DESIGN_HANDOFF_TEMPLATE.md</a> and fill in a fresh copy.</li>
+<li>Walk the gates in <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_REVIEW_PROTOCOL">CLAUDE_DESIGN_REVIEW_PROTOCOL.md</a> §3 against each named artifact.</li>
+<li>Record findings in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/REVIEW_NOTES">`claude-design-seed/REVIEW_NOTES.md`</a>.</li>
+<li>Append a row to <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/CHANGELOG">`claude-design-seed/CHANGELOG.md`</a>.</li>
+<li>Open scope-locked promotion PRs.</li>
+</ol>
+<p>Full protocol detail in <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_REVIEW_PROTOCOL">CLAUDE_DESIGN_REVIEW_PROTOCOL.md</a>. Rejection floor in <a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">MUST_NOT_SHIP.md</a>. Workflow narrative in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/README">`claude-design-seed/README.md`</a>.</p>
+<hr>
+<h2>7. Maintenance</h2>
 <p>Keep this doc and <code>CLAUDE_DESIGN_CONTEXT.md</code> in sync with:</p>
 <ul>
 <li>The token list in <code>website/src/styles/global.css</code></li>
@@ -370,9 +430,15 @@ without an NYCN or Summit logo on it, it&#39;s ICN-substrate work, and CONTEXT.m
 </ul>
 <p>Re-review on: any of the above changing, or quarterly, whichever is sooner.</p>
 <hr>
-<h2>7. See also</h2>
+<h2>8. See also</h2>
 <ul>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_CONTEXT">CLAUDE_DESIGN_CONTEXT.md</a> — the paste briefing</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_REVIEW_PROTOCOL">CLAUDE_DESIGN_REVIEW_PROTOCOL.md</a> — seed → canonical review gates</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE_DESIGN_HANDOFF_TEMPLATE">CLAUDE_DESIGN_HANDOFF_TEMPLATE.md</a> — seed-level handoff template</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/MUST_NOT_SHIP">MUST_NOT_SHIP.md</a> — hard rejection floor</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/README">claude-design-seed/README.md</a> — seed directory workflow</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/CHANGELOG">claude-design-seed/CHANGELOG.md</a> — imported seed versions</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/claude-design-seed/REVIEW_NOTES">claude-design-seed/REVIEW_NOTES.md</a> — per-seed human review summary</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_DESIGN_SYSTEM">ICN_DESIGN_SYSTEM.md</a> — design system entry point</li>
 <li><a href="/docs/DESIGN_PRINCIPLES">../DESIGN_PRINCIPLES.md</a> — kernel-side counterpart</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_VISUAL_EXPLAINER_BIBLE">ICN_VISUAL_EXPLAINER_BIBLE.md</a> — for diagrams and infographics specifically</li>

@@ -120,8 +120,8 @@ View source on GitHub →
 <h3>3.3 Focus states are always visible</h3>
 <p><strong>Rule:</strong> Every interactive element must show a visible focus indicator when reached by keyboard. The indicator must be distinguishable from the default state.</p>
 <p><strong>WCAG:</strong> 2.4.7 Focus Visible (Level AA), 2.4.11 Focus Not Obscured (Level AA)</p>
-<p><strong>Current state:</strong> the site has no <code>:focus-visible</code> rules. Keyboard users cannot see where they are as they tab through.</p>
-<p><strong>Required fix:</strong> add a global <code>:focus-visible</code> rule with a visible ring (outline or box-shadow), applied to links, buttons, form controls, and interactive cards.</p>
+<p><strong>Current state:</strong> implemented. <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/src/styles/global.css">`website/src/styles/global.css`</a> §&quot;Accessibility foundations&quot; defines a global <code>*:focus-visible</code> ring (2px <code>var(--accent-teal)</code> outline, 3px offset, <code>var(--radius-sm)</code> corner radius), plus per-element selectors for <code>a</code>, <code>button</code>, <code>[role=&quot;button&quot;]</code>, <code>input</code>, <code>textarea</code>, <code>select</code>, <code>summary</code>, and a dedicated skip-link / <code>#main-content</code> focus treatment.</p>
+<p><strong>Ongoing obligation:</strong> every new interactive element inherits the global rule; new component styles must not override it without providing an equivalent ring. Verify on PRs that touch new interactive controls.</p>
 <h3>3.4 Motion respects user preferences</h3>
 <p><strong>Rule:</strong> Any non-essential motion (parallax, auto-animations, reveal-on-scroll, hover transitions over 200ms) must be disabled when the user prefers reduced motion.</p>
 <p><strong>WCAG:</strong> 2.3.3 Animation from Interactions (Level AAA)</p>
@@ -220,7 +220,7 @@ View source on GitHub →
 <h2>5. Current known failures</h2>
 <p>These are the accessibility failures identified in the latest assessment. Each should be addressed in the accessibility foundation pass.</p>
 <ol>
-<li><strong>No <code>:focus-visible</code> styles anywhere.</strong> Keyboard users cannot see where they are. Fails 2.4.7.</li>
+<li><del>No <code>:focus-visible</code> styles anywhere.</del> <strong>Resolved.</strong> A global <code>:focus-visible</code> ring and per-element selectors now live in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/src/styles/global.css">`website/src/styles/global.css`</a> §&quot;Accessibility foundations&quot;. Carry-forward: new interactive components inherit the ring; do not override it without an equivalent treatment.</li>
 <li><strong>No skip-to-main-content link.</strong> Screen reader users tab through the full nav on every page load. Fails 2.4.1.</li>
 <li><strong>Hamburger menu lacks <code>aria-expanded</code>.</strong> Screen reader users cannot tell if the menu is open. Fails 4.1.2.</li>
 <li><strong>No <code>prefers-reduced-motion</code> handling.</strong> The <code>.reveal</code> animation and theme toggle ignore user preferences. Fails 2.3.3.</li>
