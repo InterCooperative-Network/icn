@@ -291,6 +291,10 @@ Avoid:
 
 Avoid using bank, wallet, exchange, or custody metaphors as the default way of representing ICN unless the surface is specifically and truthfully about that concept.
 
+### 7.6 See also — rejected-patterns appendix
+
+The eight side-by-side comparisons in [`ICN_VISUAL_EXPLAINER_BIBLE.md` Appendix B](ICN_VISUAL_EXPLAINER_BIBLE.md#appendix-b--rejected-patterns-side-by-side-comparison) render each anti-pattern alongside the correct ICN response. The prose enumeration in this section is the rule; the appendix is the visual carry-through reviewers can cite by pattern number. The twelve-item rejection floor in [`MUST_NOT_SHIP.md`](MUST_NOT_SHIP.md) is the gate.
+
 ---
 
 ## 8. Vocabulary guidance
