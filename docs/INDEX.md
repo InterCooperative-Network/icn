@@ -78,6 +78,7 @@ Governance scaffold for taking Claude Design seed artifacts into the canonical r
 - **[design/claude-design-seed/README.md](design/claude-design-seed/README.md)** — seed directory workflow; what canonical truth is and how it is preserved
 - **[design/claude-design-seed/CHANGELOG.md](design/claude-design-seed/CHANGELOG.md)** — imported seed versions, one entry per seed
 - **[design/claude-design-seed/REVIEW_NOTES.md](design/claude-design-seed/REVIEW_NOTES.md)** — human-readable per-seed review summary
+- **[design/icons/CANDIDATES.md](design/icons/CANDIDATES.md)** — 14 candidate icons proposed for promotion into the production icon set; companion contact sheet at [`design/icons/contact-sheet.svg`](design/icons/contact-sheet.svg)
 
 ---
 

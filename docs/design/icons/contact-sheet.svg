@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 710" width="660" height="710" role="img" aria-label="ICN Commons icon family contact sheet — 25 icons (11 production + 14 candidates).">
+  <title>ICN Commons icon family contact sheet</title>
+  <desc>Five concept families across 25 icons. 11 production icons and 14 v0.2 candidates (amber-marked). Stroke-only, currentColor, 24×24 viewBox per icon. Source: seed/ICON_CANDIDATES.md.</desc>
+  <rect x="0" y="0" width="660" height="710" fill="transparent"/>
+  <text x="30" y="32" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="12" letter-spacing="1.4" fill="currentColor" font-weight="600">ICN COMMONS · ICON FAMILY · 25 ICONS · 11 PRODUCTION + 14 CANDIDATE (V0.2)</text>
+  <text x="30" y="48" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="10" fill="currentColor" opacity="0.55">Candidates marked with amber dot. Renders correctly with color:currentColor.</text>
+  <g transform="translate(30,60)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3.75a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5Z"/><path d="M5.5 20.25c0-3.25 2.9-5.75 6.5-5.75s6.5 2.5 6.5 5.75"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Identity</text>
+  </g>
+  <g transform="translate(150,60)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3.25 5.5 6v5.5c0 4.25 2.75 7.75 6.5 9.25 3.75-1.5 6.5-5 6.5-9.25V6L12 3.25Z"/><path d="m9 11.75 2.25 2.25L15.25 10"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Standing</text>
+  </g>
+  <g transform="translate(270,60)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 7.5A2.5 2.5 0 0 1 7.5 5h9A2.5 2.5 0 0 1 19 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 16.5v-9Z"/><path d="M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"/><path d="M8 19.25h8"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Authority</text>
+  </g>
+  <g transform="translate(390,60)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 6.5h18v11H3z"/><path d="M7.5 11.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path d="M11 9.75h7"/><path d="M11 13h5"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Membership</text>
+  </g>
+  <g transform="translate(510,60)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 10l7-4 7 4"/><path d="M5 15l7-4 7 4"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Role</text>
+  </g>
+  <g transform="translate(30,170)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 4h5v5H3z"/><path d="M4 6.5h3"/><path d="M8 8 14 14"/><path d="M12 13h2v2"/><path d="M18 12a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5Z"/><path d="M14.5 18c0-2 1.5-3.25 3.5-3.25s3.5 1.25 3.5 3.25"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Role grant</text>
+  </g>
+  <g transform="translate(150,170)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 4.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/><path d="M5.5 15a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/><path d="M18.5 15a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/><path d="M12 8.5 12 11.5"/><path d="m7 14.5 4-2"/><path d="m17 14.5-4-2"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Governance</text>
+  </g>
+  <g transform="translate(270,170)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6.75 4.25h8.5l3 3v11.5a1.5 1.5 0 0 1-1.5 1.5H6.75a1.5 1.5 0 0 1-1.5-1.5V5.75a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="M15.25 4.25v3h3"/><path d="M8.5 12h7"/><path d="M8.5 15h7"/><path d="M8.5 9.5h3.5"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Policy</text>
+  </g>
+  <g transform="translate(390,170)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 4h12v16H6z"/><path d="M7.5 7h9"/><path d="M7.5 10h9"/><path d="M7.5 13h6"/><path d="M12 17.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Charter</text>
+  </g>
+  <g transform="translate(510,170)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9h5v6H3z"/><path d="M16 9h5v6h-5z"/><path d="M8 11h8"/><path d="M8 14h8"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Agreement</text>
+  </g>
+  <g transform="translate(30,280)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 8h16"/><path d="M6 13l3 3 9-9"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Attestation</text>
+  </g>
+  <g transform="translate(150,280)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 9h11"/><path d="M12 6.5 15.5 9 12 11.5"/><path d="M20 15H9"/><path d="M12 12.5 8.5 15 12 17.5"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Dispute</text>
+  </g>
+  <g transform="translate(270,280)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 4.25v15.5"/><path d="M5.25 8.25h13.5"/><path d="M5.25 8.25 3 13.5h4.5L5.25 8.25Z"/><path d="M18.75 8.25 16.5 13.5H21l-2.25-5.25Z"/><path d="M8.5 19.75h7"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Accounting</text>
+  </g>
+  <g transform="translate(390,280)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z"/><path d="M12 4v8"/><path d="M12 12l7 4"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Allocation</text>
+  </g>
+  <g transform="translate(510,280)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 8h16v8H4z"/><path d="M10 6h4v12h-4z"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Obligation</text>
+  </g>
+  <g transform="translate(30,390)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 12h11"/><path d="M11 9.5 13.5 12 11 14.5"/><path d="M19 12a3 3 0 1 0 0 0Z"/><path d="M17.5 12l1.5 1.5 2-2"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Settlement</text>
+  </g>
+  <g transform="translate(150,390)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 4 19 8v8l-7 4-7-4V8z"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Unit</text>
+  </g>
+  <g transform="translate(270,390)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 4h16v16H4z"/><path d="M4 9h16"/><path d="M4 15h16"/><path d="M9 4v16"/><path d="M15 4v16"/><path d="M11 11h2v2h-2z"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Commons credit</text>
+  </g>
+  <g transform="translate(390,390)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 7h16v3H4z"/><path d="M4 11h16v3H4z"/><path d="M4 15h16v3H4z"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Resource</text>
+  </g>
+  <g transform="translate(510,390)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5.25 8.5v7"/><path d="M18.75 8.5v7"/><path d="M5.25 12h13.5"/><path d="m15 8.5 3.75 3.5L15 15.5"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Execution</text>
+  </g>
+  <g transform="translate(30,500)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.25 7.75h5v8.5h-5z"/><path d="M9.5 7.75h5v8.5h-5z"/><path d="M15.75 7.75h5v8.5h-5z"/><path d="M8.25 12h1.25"/><path d="M14.5 12h1.25"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Provenance</text>
+  </g>
+  <g transform="translate(150,500)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3.25a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"/><path d="M5.5 14.25a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"/><path d="M18.5 14.25a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"/><path d="M10.5 7 7 13"/><path d="M13.5 7 17 13"/><path d="M8 16.75h8"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Federation</text>
+  </g>
+  <g transform="translate(270,500)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4.25 4.25h15.5v15.5H4.25z"/><path d="M4.25 9.5h15.5"/><path d="M4.25 14.5h15.5"/><path d="M9.5 4.25v15.5"/><path d="M14.5 4.25v15.5"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Commons</text>
+  </g>
+  <g transform="translate(390,500)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1"/>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5.25 5A2.25 2.25 0 0 1 7.5 2.75h9A2.25 2.25 0 0 1 18.75 5v14A2.25 2.25 0 0 1 16.5 21.25h-9A2.25 2.25 0 0 1 5.25 19V5Z"/><path d="M12 8.25a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5Z"/><path d="M8.75 17.25c0-1.75 1.45-3 3.25-3s3.25 1.25 3.25 3"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Member exp.</text>
+  </g>
+  <g transform="translate(510,500)">
+    <rect x="0" y="0" width="112" height="102" rx="6" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="1"/>
+    <circle cx="102" cy="14" r="4" fill="#fb923c"/>
+    <text x="94" y="18" text-anchor="end" font-family="ui-monospace, SF Mono, Menlo, monospace" font-size="8" fill="#fb923c" letter-spacing="0.5">V0.2</text>
+    <g transform="translate(28.0,22) scale(2.3333333333333335)" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 5h16v11H4z"/><path d="M11 16l-3 4v-4"/><path d="M7 9h10"/><path d="M7 12h6"/>
+    </g>
+    <text x="56.0" y="92" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="11" fill="currentColor">Language</text>
+  </g>
+</svg>
