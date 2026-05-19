@@ -53,7 +53,11 @@ Any action that creates an obligation, casts a vote, dispatches a mandate, settl
 2. The mandate or authority that backs it (named, linked).
 3. A reversibility statement: reversible / appealable / final.
 4. The receipt that will be produced, named in advance.
-5. A confirm step that requires explicit user input (not a default-yes button).
+5. **(v0.2)** The action's current sync state, named — one of `drafted`, `saved on device`, `sent to network`, `confirmed`, `offline queued`, `rejected with reason`. No silent failure; no spinner without a label.
+6. **(v0.2, governance actions only)** The decision threshold required and the current tally — rendered above the confirm step, not hidden under "details."
+7. A confirm step that requires explicit member input (not a default-yes button).
+
+Fields 5 and 6 were added per the v0.2 Claude Design seed and the [`docs/spec/member-shell-v0.md`](../spec/member-shell-v0.md) "v0.2 rendering refinements" section. They elaborate [ADR-0027 (Action Card Contract)](../adr/ADR-0027-action-card-contract.md) at the copy layer.
 
 Example pattern:
 
