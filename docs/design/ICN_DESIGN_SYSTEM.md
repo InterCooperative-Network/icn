@@ -56,6 +56,7 @@ Living docs that make up the system. Read in order on first pass:
 | 13 | [docs/design/MUST_NOT_SHIP.md](MUST_NOT_SHIP.md) | Hard rejection floor — twelve patterns and artifacts that disqualify a surface from production |
 | 14 | [docs/design/claude-design-seed/README.md](claude-design-seed/README.md) | Seed directory workflow — what a seed is, where canonical truth lives, how seeds are reviewed and promoted (companions: `CHANGELOG.md`, `REVIEW_NOTES.md`) |
 | 15 | [docs/design/icons/CANDIDATES.md](icons/CANDIDATES.md) | Candidate icon family review package — 14 candidate icons proposed for promotion into `website/src/data/icons.ts`, with per-icon rationale, ARIA usage, distinct-silhouette test, and "do not ship until" checklist (companion: `contact-sheet.svg`) |
+| 16 | [docs/design/FEDERATION_OPERATOR_SURFACE_CONCEPT.md](FEDERATION_OPERATOR_SURFACE_CONCEPT.md) | Illustrative-direction concept for a federation / operator stewardship surface. Surface inventory (member roster, stewardship panels, operator action queue, federation-scope provenance ledger, "can see / cannot see" disclosure, member-visible degradation correspondence), privacy boundaries, and rejected-pattern notes specific to the surface. Carries `illustrative direction` truth label; not shipped |
 
 ADRs that bind this work:
 
