@@ -161,6 +161,51 @@ ADR-0027 defines the canonical ActionCard schema with fourteen fields. The spec 
 
 Per ADR-0027 the closed `source_kind` taxonomy reserves `signal_rule` and `obligation_lifecycle` against `#1631` and `#1634`. The shell **must not** render either source path as live until the corresponding implementation lands. Until then, those values are inert at the rendering layer.
 
+### v0.2 rendering refinements
+
+> Promoted from the v0.2 Claude Design seed (`seed/MEMBER_SHELL_v0.2_PATCH.md`) per [`docs/design/claude-design-seed/CHANGELOG.md`](../design/claude-design-seed/CHANGELOG.md). Refinements only — the 14-field ADR-0027 schema stays canonical. This section tightens the contract on how the shell **renders** uncertain network state, gated cards, and the decision-threshold preamble.
+
+#### Sync-state chip (every card)
+
+Every ActionCard carries a **sync-state chip** that names the action's current state in the local-sync queue and the gateway. Six named states; no silent failure; no spinner without a label:
+
+- **drafted** — the member started the action; nothing left the device
+- **saved on device** — the action is durable locally but not yet sent
+- **sent to network** — the action left the device; awaiting confirmation
+- **confirmed** — the gateway accepted the action and emitted the expected receipt
+- **offline queued** — the device is offline; the action will replay when network returns
+- **rejected with reason** — the gateway rejected the action; the reason is named on the card
+
+The chip is text + icon. Color reinforces; the named state is load-bearing. A grayscale render must still distinguish the six states.
+
+#### Stale, sync-in-flight, degraded scope (network honesty)
+
+When the gateway state is uncertain, every affected card surfaces it explicitly:
+
+- **Stale** — last gateway confirmation > 5 minutes ago. The card renders a "last confirmed" timestamp below the sync-state chip.
+- **Sync in flight** — the action has been sent but not confirmed. The sync-state chip reads "Sent · awaiting confirmation" with a sub-line counting elapsed time.
+- **Degraded scope** — the gateway reports degraded mode for the scope (reduced consensus, partition-tolerant). A scope-level banner above the affected cards reads "This scope is operating in degraded mode. Decisions may delay." Dismissible per session; reappears on every relevant card until the gateway clears the flag.
+
+Each state has a text companion; no color-only signaling, no motion-only signaling.
+
+#### "Unavailable" — gated cards never hide, they explain
+
+When an action is gated and the member cannot perform it, the card renders in an explicit unavailable state that **names the missing condition**:
+
+- "Action unavailable. Mandate `Charter §4.2` requires `recognized-member` standing. Your standing in `Brightworks Collective` is `applicant`."
+- "Action unavailable. Quorum not reached. 4 of 7 votes recorded."
+- "Action unavailable. Offline. Action will queue until network reconnects."
+
+The card never silently disables the action. It always names why. This refines the existing "Closed: insufficient authority" state by requiring the missing-condition text be plain language and member-actionable.
+
+#### Threshold + tally above confirm (governance actions)
+
+For governance ActionCards, the **decision threshold** required (quorum, supermajority, simple majority) and the **current tally** are rendered above the confirm step — not hidden under "details." Source: the governance domain's charter-derived rule (already shown in [`docs/mobile/icn-mobile-ux-spec-v1.md`](../mobile/icn-mobile-ux-spec-v1.md) §3.1 as the `Threshold info` row). The refinement is placement: the member sees the decision rule before casting a vote, not after.
+
+#### Cross-reference
+
+These v0.2 refinements elaborate [ADR-0027 (Action Card Contract)](../adr/ADR-0027-action-card-contract.md) at the rendering layer. ADR-0027 remains the canonical schema; this section is the rendering contract's v0.2 update. See also [`docs/design/CONTENT_STYLE_GUIDE.md`](../design/CONTENT_STYLE_GUIDE.md) "Dangerous-action copy" template, which has been updated to require sync state and threshold + tally before the confirm step.
+
 ## Standing surface
 
 The Standing surface renders `/me/standing` (per ADR-0020) at v0. The shell must surface:
