@@ -132,7 +132,7 @@ Speaker copy (≈60 sec):
 - Evidence.
 - Review.
 
-Speaker copy (≈40 sec):
+Speaker copy (≈40 sec to recite):
 
 > "If I had to compress ICN into seven words, it'd be these. Standing. Authority. Decision. Obligation. Receipt. Evidence. Review."
 >
@@ -140,7 +140,37 @@ Speaker copy (≈40 sec):
 >
 > "Not because every human process should become software. Because some records need to survive turnover, without everyone reconstructing the institution from email, PDFs, and somebody's exhausted memory."
 >
-> [Move on unless she has a question. Do not pitch each word.]
+> [Move on unless she asks. Do not pitch each word.]
+
+**If she asks about any one of them, use these:**
+
+**Standing** — *who has the right to act in this context.*
+- **How it works:** signed records of admission, transition, exit. Cryptographic proof of membership at a moment in time.
+- **Quick:** not membership management. Membership *evidence*. So a new treasurer in 2030 can answer "who actually voted on this in 2027?"
+
+**Authority** — *who can authorize what, under what governance rule.*
+- **How it works:** expressed in CCL (Cooperative Contract Language). The kernel enforces the constraint without understanding the meaning.
+- **Quick:** always reducible to a rule + a role + a threshold. Structural, not personal.
+
+**Decision** — *a choice made under authority, with threshold met.*
+- **How it works:** links the proposal that triggered it, the votes cast, the threshold reached, the effect authorized.
+- **Quick:** a vote is not a decision until the threshold is met AND the result is recorded. The recording IS the decision.
+
+**Obligation** — *a commitment created by a decision.*
+- **How it works:** obligor, obligee, scope, triggering decision, evidence-of-completion.
+- **Quick:** replaces "debt" / "liability" in ICN vocabulary. Advisor agreements, patronage allocations, federation commitments all live here.
+
+**Receipt** — *a verifiable record that an event happened.*
+- **How it works:** signed, content-addressed, everything attached; verifiable independently of any platform.
+- **Quick:** receipts alone do not prove legitimacy. They prove the event. Authority and review are separate.
+
+**Evidence** — *receipts plus context, available later.*
+- **How it works:** receipts plus the chain (charter, governance rules, prior decisions) needed to interpret them; survives platform migration.
+- **Quick:** the difference between "we had a vote" and "we can verify the vote across years and platforms."
+
+**Review** — *anyone can verify the chain.*
+- **How it works:** cryptographic check of signatures + inspection of the contextual chain to confirm authority was real.
+- **Quick:** without review, receipts are files. With review, they are evidence. This is what makes ICN useful as institutional memory.
 
 ---
 
