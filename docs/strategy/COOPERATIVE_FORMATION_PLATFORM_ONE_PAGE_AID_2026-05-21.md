@@ -1,74 +1,95 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-05-18
+Last Reviewed: 2026-05-20
 ---
 
-# Launch + ICN: formation-to-governance conversation aid
+# Launch + ICN: 10-minute conversation cheat sheet
 
-> Printable / shareable one-pager for the 2026-05-21 conversation. Not a deck. Companion to the [meeting prep packet](COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md) and [visual notes page](COOPERATIVE_FORMATION_PLATFORM_VISUAL_AID_2026-05-21.html).
+> Printable cheat sheet for the 2026-05-21 conversation with McKenzie Jones. Companion to the [prep packet](COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md) and the [screen deck](COOPERATIVE_FORMATION_PLATFORM_SCREEN_DECK_2026-05-21.md).
 
-## Frame
+## 1. Posture
 
-Launch helps make co-op formation doable. ICN asks what durable institutional memory, standing, authority, obligations, and evidence should survive after formation.
+Learn Launch's map first. Share ICN only as a possible continuity layer. Ask where the map is wrong.
 
-## Layering
+This is a reciprocal conversation, not a presentation. McKenzie reached out because she wanted to learn more about ICN and share Launch. Both halves matter.
 
-**ICN = substrate.** **NYCN/Summit = first reference institution.** **Institution packages = reusable templates / examples.** **Launch conversation = possible formation-to-governance package seam.** See [`ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md`](ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md).
+## 2. What Launch appears to be solving
 
-## The spine
+Worker co-ops are hard to start, grow, and sustain. Resources are scattered, state rules vary, TA capacity is limited. Launch's public shape:
 
-**Standing → Authority → Decision → Obligation → Effect → Receipt → Evidence → Review**
+- Accessible formation, growth, and sustainability support for worker co-ops in the U.S.
+- Decision-tree onboarding that prompts the right service-provider conversation at the right time.
+- Teams, tasks, comments, documents, secure document portal.
+- Advisor / co-op-developer surface: organize client work, track changes, share with clients, project maps.
+- Mobile, print, multilingual (English + Spanish, expandable).
+- Reduces TA bottlenecks without replacing TA providers.
+- Two user groups: co-op founders and advisors / service providers.
 
-## Primary walkthrough — formation → durable governance handoff
+McKenzie also runs The Worker Place (governance docs, decision-making, membership, conflict resolution, bylaw change) and works with comp.coop (worker-owned tech collective). She has direct co-op development practice. Her vocabulary leads.
 
-- onboarding
-- founding team
-- roles / advisors
-- formation path
-- governance docs
-- tasks / comments
-- service providers
-- milestone completed
-- standing / authority established
-- patronage / allocation / accounting records appear
-- handoff into ongoing governance
+## 3. The seam to test
 
-## Launch translation
+Launch workflow output -> durable governance and continuity records.
 
-| Launch surface | ICN substrate question |
+**The recurring anchor**: a cooperative and solidarity-economy ecosystem should **materially exist as a living network**, not just ideologically exist. The 2025 Summit featured an ecosystem-mapping session as one of its top-rated tracks; the kickoff vision was upstate-to-downstate coordination, cross-sector parity, regional events between summits, and an NY state employee ownership center. The committee's own speaker series called the next wave "**the infrastructure builders designing the legal, technological, and organizational backbone that lets co-ops scale.**" That is the layer ICN is trying to be.
+
+When formation steps become real institutional facts, what record survives founder rotation, advisor turnover, fiscal-year close, and platform migration? That is the seam.
+
+The concrete case opened in the email thread: **patronage and capital-account history**. Those records can live partly in governance decisions, partly in accounting systems, partly in advisor memory, and partly in member expectations. The useful question is where those layers meet, not whether ICN should swallow them.
+
+## 4. ICN in one breath
+
+> ICN is infrastructure for democratic organizations to remember standing, authority, decisions, obligations, receipts, and evidence over time, so that a cooperative ecosystem can govern and coordinate at the scale the ecosystem actually operates.
+
+Not a platform anyone owns. Runs on hardware the cooperative controls. Produces records another cooperative can verify without trusting a vendor. Federation primitives carry inter-cooperative coordination without anyone surrendering autonomy to a common platform.
+
+## 5. Five questions to ask first
+
+1. Where does Launch think formation begins and ends?
+2. What states does a group move through inside Launch, and how do teams, advisors, documents, tasks, comments, and milestones fit those states?
+3. Which records matter only during formation, and which matter later?
+4. Where do patronage, capital accounts, allocations, financial projections, or accounting handoffs show up in the workflow today?
+5. What should Launch never touch, and what should ICN never touch?
+
+If this topic opens, slow down. This is where her lived co-op-development experience matters most.
+
+## 6. Translation table
+
+Read Launch's word first; reach for the ICN question only if she opens the door.
+
+| Launch term | Possible ICN question |
 |---|---|
-| Founding team | Who has standing? |
-| Roles / advisor | Who can act / certify? |
-| Formation path | What process is this group in? |
+| Founding team / co-founders | Who has standing? |
+| Roles / advisor relationship | Who can act, review, or certify? |
+| Formation path selected | What process is this group in? |
 | Governance doc drafted | Under whose authority? |
 | Task assigned | Who owes what by when? |
 | Service provider engaged | What obligation crosses the boundary? |
 | Milestone completed | What effect happened? |
 | Approval / confirmation | What receipt exists? |
 | Document / change history | What evidence survives? |
-| Launch → operating co-op handoff | What carries forward? |
-| Patronage / internal capital records | What is governance vs. accounting? |
+| Launch handoff to operating co-op | What carries forward? |
+| Patronage and capital-account history | What is governance evidence vs. accounting record? |
 
-## Three questions
+## 7. Boundary reminders
 
-1. **Where does formation work need durable memory** after Launch or an advisor steps back?
-2. **Where would a receipt or proof help** founders, advisors, lawyers, CPAs, funders, or future members — and where would it become bureaucracy?
-3. **What is the smallest fictional / sanitized formation-to-governance rehearsal** worth doing?
+Quiet, not defensive. Say only if asked or if she misreads.
 
-## Non-claims
+- Still pre-pilot. Not production-ready, not externally audited.
+- Not replacing Launch, TA providers, lawyers, CPAs, bookkeepers, or co-op developers.
+- Not accounting, payment, banking, or wallet software.
+- No real Launch or private partner data in git.
+- Vocabulary: settlement, obligation, allocation, unit, position, receipt, provenance, evidence.
 
-- Not a launch.
-- Not production-ready.
-- Not a formal pilot.
-- Not replacing Launch or TA providers.
-- Not accounting, payment, or banking software.
-- No real private data in git.
-- Receipts do not prove legitimacy by themselves.
-- Regulatory vocabulary: **settlement, obligation, allocation, unit, position, receipt, provenance, evidence.**
+## 8. Possible follow-up
+
+If a seam is identified and useful, propose one fictional or sanitized walkthrough: pick one workflow, walk it from formation to governance, ask what must survive, ask who needs it later, ask what should stay outside ICN.
+
+Not a pilot ask. Not a commitment. One concrete pattern that either proves the seam or kills it cleanly.
 
 ## Read more
 
-- [Thursday meeting brief](ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md)
-- [Cooperative formation-platform meeting prep packet](COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md)
-- [NYCN/Summit as ICN reference institution](https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) — backup example (landed via [icn#1883](https://github.com/InterCooperative-Network/icn/pull/1883))
+- [Thursday meeting brief](ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) (controls facts and non-claims)
+- [Prep packet](COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md) (private command center)
+- [Screen deck](COOPERATIVE_FORMATION_PLATFORM_SCREEN_DECK_2026-05-21.md) ([browser version](COOPERATIVE_FORMATION_PLATFORM_SCREEN_DECK_2026-05-21.html))
