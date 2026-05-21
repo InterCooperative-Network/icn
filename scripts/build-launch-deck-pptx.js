@@ -19,9 +19,16 @@ function resolvePptxgen() {
   try {
     return require("pptxgenjs");
   } catch (_) {
+    // NODE_PATH may contain multiple directories separated by path.delimiter
+    // (":" on POSIX, ";" on Windows); split before probing.
+    const nodePathDirs = (process.env.NODE_PATH || "")
+      .split(path.delimiter)
+      .filter(Boolean);
+    const appdataDir =
+      process.env.APPDATA && path.join(process.env.APPDATA, "npm", "node_modules");
     const candidates = [
-      process.env.NODE_PATH,
-      process.env.APPDATA && path.join(process.env.APPDATA, "npm", "node_modules"),
+      ...nodePathDirs,
+      appdataDir,
       "/usr/local/lib/node_modules",
       "/usr/lib/node_modules",
     ].filter(Boolean);

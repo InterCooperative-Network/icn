@@ -2,15 +2,58 @@
 """Render a markdown file to a print-styled PDF via headless Chrome.
 
 Usage: md-to-pdf.py <input.md> <output.pdf>
-Writes an intermediate <input>.rendered.html alongside the PDF.
+Writes an intermediate <output>.rendered.html alongside the PDF.
 """
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-import markdown
+try:
+    import markdown
+except ImportError:
+    sys.exit(
+        "md-to-pdf.py: missing dependency 'markdown'. "
+        "Install with: python -m pip install markdown"
+    )
 
-CHROME = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+def resolve_chrome() -> str:
+    """Resolve a Chrome / Chromium executable across Linux, macOS, Windows.
+
+    Order: $CHROME_BIN env var, then PATH lookup for common names, then a
+    handful of well-known install locations as a last resort.
+    """
+    if env := os.environ.get("CHROME_BIN"):
+        if Path(env).exists():
+            return env
+    for name in (
+        "chrome",
+        "google-chrome",
+        "google-chrome-stable",
+        "chromium",
+        "chromium-browser",
+        "msedge",
+    ):
+        if path := shutil.which(name):
+            return path
+    well_known = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    ]
+    for candidate in well_known:
+        if Path(candidate).exists():
+            return candidate
+    sys.exit(
+        "md-to-pdf.py: no Chrome/Chromium found. "
+        "Set CHROME_BIN or install Chrome and put it on PATH."
+    )
+
+
+CHROME = resolve_chrome()
 
 CSS = """
 :root {
@@ -110,15 +153,14 @@ def render(md_path: Path, pdf_path: Path) -> None:
 
     # Use forward-slash URI; Chrome on Windows accepts file:/// + UNC via file://wsl.localhost/...
     file_url = "file:///" + str(html_path.resolve()).replace("\\", "/")
-    cmd = [
-        CHROME,
-        "--headless",
-        "--disable-gpu",
-        "--no-sandbox",
+    cmd = [CHROME, "--headless", "--disable-gpu"]
+    if os.environ.get("MD_TO_PDF_NO_SANDBOX") == "1":
+        cmd.append("--no-sandbox")
+    cmd.extend([
         "--no-pdf-header-footer",
         f"--print-to-pdf={pdf_path}",
         file_url,
-    ]
+    ])
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         print("Chrome stderr:", result.stderr, file=sys.stderr)
