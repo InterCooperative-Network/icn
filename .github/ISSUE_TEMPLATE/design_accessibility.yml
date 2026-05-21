@@ -1,0 +1,73 @@
+name: Design or accessibility issue
+description: A design problem, accessibility regression, or organizer/member-facing UX concern
+labels: ["area:design"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of issue
+      options:
+        - "Accessibility — WCAG / keyboard / screen reader / contrast"
+        - "Information hierarchy / readability"
+        - "Action card / receipt UI"
+        - "Member standing / governance surface"
+        - "Visual / typographic / brand consistency"
+        - "Copy / microcopy / labeling"
+        - "Mobile-specific UX"
+        - "Other"
+    validations:
+      required: true
+
+  - type: input
+    id: surface
+    attributes:
+      label: Affected surface
+      description: "Page, screen, component, or flow. File paths welcome."
+      placeholder: "website/src/pages/whats-real-now/index.astro, /me/action-cards"
+    validations:
+      required: true
+
+  - type: textarea
+    id: observation
+    attributes:
+      label: What you saw
+      description: What is currently happening on this surface that's a problem?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What should the surface do, look like, or read instead?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - "Blocker — keeps an organizer or member from completing a real task"
+        - "Major — confusing or excluding, but a workaround exists"
+        - "Minor — polish, consistency, or future-proofing"
+    validations:
+      required: true
+
+  - type: textarea
+    id: a11y-context
+    attributes:
+      label: Accessibility context (if applicable)
+      description: "Assistive tech used, OS/browser, viewport size, contrast checker readings, any screen reader output."
+      placeholder: "VoiceOver on Safari 17 / iOS 17; minimum touch target 44×44; observed contrast 3.8:1 against #..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: organizer-member-gate
+    attributes:
+      label: Organizer / member accessibility gate
+      description: "See docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md if this PR fixes the issue."
+      options:
+        - label: "This surface is organizer/member-facing — gate applies to any fix PR."
+          required: false
