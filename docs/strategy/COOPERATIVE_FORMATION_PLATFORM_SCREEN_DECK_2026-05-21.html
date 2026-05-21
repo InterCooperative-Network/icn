@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Launch + ICN: From Formation to Continuity (2026-05-21)</title>
+<meta name="description" content="10-minute screen-share deck for the 2026-05-21 Launch + ICN reciprocal conversation. Self-contained, no external assets.">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --ink: #1a1d21;
+    --ink-soft: #4a4f55;
+    --line: #d9dde2;
+    --paper: #fcfcfa;
+    --accent: #2b5876;
+    --accent-soft: #eaf1f6;
+    --note-bg: #f7f3ea;
+    --note-ink: #5a5340;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #ece9e0;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", "Inter", system-ui, sans-serif;
+    line-height: 1.45;
+    font-size: 18px;
+  }
+  .deck { max-width: 1080px; margin: 0 auto; padding: 24px 0; }
+  .slide {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 56px 64px 40px;
+    margin: 0 16px 32px;
+    min-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    page-break-after: always;
+    page-break-inside: avoid;
+  }
+  .slide:last-child { page-break-after: auto; }
+  .slide-num {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+  }
+  .slide h1 {
+    font-size: 2.6rem;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0 0 18px;
+    color: var(--ink);
+  }
+  .slide h2 {
+    font-size: 2rem;
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+    margin: 0 0 18px;
+    color: var(--ink);
+  }
+  .slide .subtitle {
+    font-size: 1.3rem;
+    color: var(--ink-soft);
+    margin: 0 0 24px;
+    line-height: 1.4;
+  }
+  .slide ul {
+    font-size: 1.4rem;
+    line-height: 1.6;
+    padding-left: 28px;
+    margin: 8px 0 20px;
+  }
+  .slide li { margin: 6px 0; }
+  .slide blockquote {
+    font-size: 1.55rem;
+    line-height: 1.45;
+    font-style: italic;
+    color: var(--ink);
+    margin: 16px 0 24px;
+    padding: 16px 24px;
+    border-left: 4px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 0 4px 4px 0;
+  }
+  .slide blockquote p { margin: 0; }
+  .slide .big-line {
+    font-size: 1.7rem;
+    line-height: 1.35;
+    font-weight: 500;
+    color: var(--ink);
+    margin: 16px 0 24px;
+  }
+  .slide .meta {
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+    margin: 0 0 24px;
+  }
+  details.notes {
+    margin-top: auto;
+    background: var(--note-bg);
+    border: 1px solid #e3d7bd;
+    border-radius: 4px;
+    padding: 10px 16px;
+    font-size: 0.95rem;
+    color: var(--note-ink);
+  }
+  details.notes > summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--note-ink);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.78rem;
+    list-style: none;
+    user-select: none;
+  }
+  details.notes > summary::-webkit-details-marker { display: none; }
+  details.notes > summary::after { content: " ▾"; opacity: 0.6; }
+  details.notes[open] > summary::after { content: " ▴"; opacity: 0.6; }
+  details.notes p { margin: 8px 0 0; line-height: 1.55; }
+  .footer {
+    max-width: 1080px;
+    margin: 16px auto 28px;
+    padding: 0 24px;
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+  }
+
+  @media print {
+    body { background: #fff; font-size: 14px; }
+    .deck { padding: 0; max-width: 100%; }
+    .slide {
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      min-height: 95vh;
+      padding: 40px 48px 32px;
+    }
+    .slide h1 { font-size: 2.1rem; }
+    .slide h2 { font-size: 1.6rem; }
+    .slide ul { font-size: 1.1rem; }
+    .slide blockquote, .slide .big-line { font-size: 1.25rem; }
+    details.notes { background: #faf8f2; }
+    details.notes[open] > summary::after,
+    details.notes > summary::after { content: ""; }
+    details.notes > summary { font-size: 0.7rem; }
+    /* Force notes open in print */
+    details.notes { padding-top: 8px; }
+    details.notes > div, details.notes > p { display: block !important; }
+  }
+
+  @media (max-width: 720px) {
+    .slide { padding: 32px 24px 24px; margin: 0 8px 20px; }
+    .slide h1 { font-size: 1.8rem; }
+    .slide h2 { font-size: 1.4rem; }
+    .slide ul { font-size: 1.1rem; }
+    .slide blockquote, .slide .big-line { font-size: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+<main class="deck">
+
+  <section class="slide" id="s1">
+    <div class="slide-num">Slide 1 of 11</div>
+    <h1>From Formation to Continuity</h1>
+    <p class="subtitle">A conversation about what cooperatives need after they begin, and the ecosystem that lets them materially exist.</p>
+    <p class="meta">2026-05-21 · 10 minutes · screen-share · reciprocal · Launch first, ICN second.</p>
+    <details class="notes" open>
+      <summary>Speaker copy (≈45 sec)</summary>
+      <p>"Thanks for making time, McKenzie. Before I share anything else, two quick things. First, who else is on the call with us today?" <em>[Wait. Let her introduce whoever is curious.]</em> "Second, I want to be honest about the shape of this conversation. I want to learn how Launch thinks about the formation workflow, and the bigger ecosystem you and the Worker Place and comp.coop are working toward. I'll share enough of what ICN is trying to be that you can tell me where the map is wrong. But the most useful thing for me today is your map. Sound good?" <em>[Wait for her green light. Then advance.]</em></p>
+    </details>
+  </section>
+
+  <section class="slide" id="s2">
+    <div class="slide-num">Slide 2 of 11</div>
+    <h2>What I understand Launch is solving</h2>
+    <ul>
+      <li>Starting a worker co-op is too hard.</li>
+      <li>Resources are scattered.</li>
+      <li>State rules vary.</li>
+      <li>TA capacity is limited.</li>
+      <li>Groups need the right help at the right time.</li>
+    </ul>
+    <details class="notes" open>
+      <summary>Speaker copy (≈40 sec)</summary>
+      <p>"Here's the read I have from Launch's public material. Starting a worker co-op is too hard. Resources are scattered. State rules vary. TA capacity is limited. Groups need the right help at the right time." <em>[Beat.]</em> "Does that read feel right from inside Launch, or am I missing something fundamental about the problem you're solving?" <em>[Listen. Take notes verbatim. If she corrects the framing, use her language for the rest of the call.]</em></p>
+    </details>
+  </section>
+
+  <section class="slide" id="s3">
+    <div class="slide-num">Slide 3 of 11</div>
+    <h2>Launch's public shape</h2>
+    <ul>
+      <li>Onboarding questions, decision-tree style.</li>
+      <li>Teams, tasks, comments, documents.</li>
+      <li>Advisors and service providers.</li>
+      <li>Secure document portal.</li>
+      <li>Mobile, print, multilingual access.</li>
+    </ul>
+    <details class="notes" open>
+      <summary>Speaker copy (≈25 sec, don't dwell)</summary>
+      <p>"And here's the surface read. Onboarding questions in a decision-tree style. Teams, tasks, comments, documents. Advisors and service providers. Secure document portal. Mobile, print, multilingual." "That's the outside view. I want to know what the inside view looks like — what states a group actually moves through. Let me ask it as five questions on the next slide."</p>
+    </details>
+  </section>
+
+  <section class="slide" id="s4">
+    <div class="slide-num">Slide 4 of 11</div>
+    <h2>What I want to learn from you</h2>
+    <ul>
+      <li>Where does the workflow begin and end?</li>
+      <li>What states does a group move through?</li>
+      <li>What do advisors need to see?</li>
+      <li>What records matter later?</li>
+      <li>What should software never touch?</li>
+    </ul>
+    <details class="notes" open>
+      <summary>Speaker copy (≈3–4 minutes, mostly listening)</summary>
+      <p>"These are the five things I most want to understand from your side. Where does the workflow begin and end? What states does a group move through? What do advisors need to see? What records matter later? What should software never touch?" "Take any of them. Start anywhere. I'm here to listen, not to teach Launch back to you." <em>[Now actually listen. Capture her vocabulary verbatim. This is the most important slide of the meeting. Do not advance until she's done. If she talks a long time here, that is GOOD.]</em></p>
+    </details>
+  </section>
+
+  <section class="slide" id="s5">
+    <div class="slide-num">Slide 5 of 11</div>
+    <h2>The seam I'm exploring</h2>
+    <blockquote>
+      <p>Launch helps cooperatives come into being. ICN is the question of what helps cooperatives continue governing, remembering, coordinating, and federating after formation. The point is for a cooperative and solidarity-economy ecosystem to materially exist, not just ideologically exist.</p>
+    </blockquote>
+    <details class="notes" open>
+      <summary>Speaker copy (≈90 sec, then pause)</summary>
+      <p>"Okay, so let me share where ICN is trying to sit. Just the framing, not a sales pitch." <em>[Read the quote aloud, slowly, with a beat between sentences.]</em> "Launch helps cooperatives come into being. ICN is the question of what helps cooperatives continue governing, remembering, coordinating, and federating after formation. The point is for a cooperative and solidarity-economy ecosystem to materially exist, not just ideologically exist." <em>[Beat. Then say this once, citing the Summit material, not ICN's vocabulary.]</em> "I want to be careful with that word ecosystem, because it's not my framing. The 2025 Summit ran an ecosystem-mapping session as one of its top-rated tracks. The kickoff vision named upstate-downstate bridging, cross-sector parity across worker, consumer, financial, ag, and housing co-ops, regional events between summits, and an NY state employee ownership center. The speaker series that went out under our committee's own name called the next wave 'the infrastructure builders designing the legal, technological, and organizational backbone that lets co-ops scale.' That's the layer ICN is trying to be." "Does that seam feel real from where you sit?" <em>[Pause. Do not fill the silence. Let her answer first.]</em></p>
+    </details>
+  </section>
+
+  <section class="slide" id="s6">
+    <div class="slide-num">Slide 6 of 11</div>
+    <h2>What the ecosystem needs to remember</h2>
+    <ul>
+      <li>Member standing.</li>
+      <li>Decisions and approvals.</li>
+      <li>Governance documents.</li>
+      <li>Advisor and service-provider handoffs.</li>
+      <li>Patronage and capital-account history.</li>
+      <li>Inter-cooperative trade, obligations, and federation evidence.</li>
+      <li>Records future members, boards, CPAs, counsel, or a partner cooperative may need.</li>
+    </ul>
+    <details class="notes" open>
+      <summary>Speaker copy (≈60 sec)</summary>
+      <p>"If I'm right about the seam, here's the work that lives in it. Member standing. Decisions and approvals. Governance documents. Advisor and service-provider handoffs. Patronage and capital-account history. Inter-cooperative trade, obligations, and federation evidence. And records future members, boards, CPAs, counsel, or a partner cooperative may need to verify later." "The pattern: each of these records belongs to a cooperative now, but might need to be verifiable to a partner co-op or federation later. That's the difference between an ecosystem that materially exists and one that's just shared values." "Of that list, what jumps out as the thing your co-op work most needs and least has?" <em>[Listen. The patronage-and-capital-account piece is the doorway she opened in her May 1 email. If she names it, slow down.]</em></p>
+    </details>
+  </section>
+
+  <section class="slide" id="s7">
+    <div class="slide-num">Slide 7 of 11</div>
+    <h2>ICN in one breath</h2>
+    <ul>
+      <li>Standing.</li>
+      <li>Authority.</li>
+      <li>Decision.</li>
+      <li>Obligation.</li>
+      <li>Receipt.</li>
+      <li>Evidence.</li>
+      <li>Review.</li>
+    </ul>
+    <details class="notes" open>
+      <summary>Speaker copy (≈40 sec to recite, plus reference for each word)</summary>
+      <p>"If I had to compress ICN into seven words, it'd be these. Standing. Authority. Decision. Obligation. Receipt. Evidence. Review." <em>[Beat.]</em> "Not because every human process should become software. Because some records need to survive turnover, without everyone reconstructing the institution from email, PDFs, and somebody's exhausted memory." <em>[Move on unless she asks. Do not pitch each word.]</em></p>
+      <p><strong>If she asks about any one of them:</strong></p>
+      <ul>
+        <li><strong>Standing</strong> — who has the right to act in this context. <em>How:</em> signed records of admission, transition, exit; cryptographic proof of membership at a moment in time. <em>Quick:</em> not membership management — membership <em>evidence</em>.</li>
+        <li><strong>Authority</strong> — who can authorize what, under what governance rule. <em>How:</em> expressed in CCL (Cooperative Contract Language); the kernel enforces the constraint without understanding the meaning. <em>Quick:</em> always reducible to a rule + a role + a threshold. Structural, not personal.</li>
+        <li><strong>Decision</strong> — a choice made under authority, with threshold met. <em>How:</em> links the proposal that triggered it, the votes cast, the threshold reached, the effect authorized. <em>Quick:</em> a vote is not a decision until the threshold is met AND the result is recorded. The recording IS the decision.</li>
+        <li><strong>Obligation</strong> — a commitment created by a decision. <em>How:</em> obligor, obligee, scope, triggering decision, evidence-of-completion. <em>Quick:</em> replaces "debt" / "liability" in ICN vocabulary; advisor agreements, patronage allocations, federation commitments all live here.</li>
+        <li><strong>Receipt</strong> — a verifiable record that an event happened. <em>How:</em> signed, content-addressed, everything attached; verifiable independently of any platform. <em>Quick:</em> receipts alone do not prove legitimacy — they prove the event. Authority and review are separate.</li>
+        <li><strong>Evidence</strong> — receipts plus context, available later. <em>How:</em> receipts plus the chain (charter, governance rules, prior decisions) needed to interpret them; survives platform migration. <em>Quick:</em> the difference between "we had a vote" and "we can verify the vote across years and platforms."</li>
+        <li><strong>Review</strong> — anyone can verify the chain. <em>How:</em> cryptographic check of signatures + inspection of the contextual chain to confirm authority was real. <em>Quick:</em> without review, receipts are files; with review, they are evidence. This is what makes ICN useful as institutional memory.</li>
+      </ul>
+    </details>
+  </section>
+
+  <section class="slide" id="s8">
+    <div class="slide-num">Slide 8 of 11</div>
+    <h2>What ICN is not</h2>
+    <ul>
+      <li>Not replacing Launch.</li>
+      <li>Not replacing TA providers, lawyers, CPAs, or co-op developers.</li>
+      <li>Not accounting software.</li>
+      <li>Not financial-intermediary software.</li>
+      <li>Not production-ready or a pilot ask.</li>
+    </ul>
+    <details class="notes" open>
+      <summary>Speaker copy (≈30 sec, short version)</summary>
+      <p>"Quick boundary slide. ICN is not replacing Launch or any of the people who do the human work of forming co-ops. It's not accounting software. It's not a financial-intermediary product. It's not production-ready, and this isn't a pilot ask." <em>[Move on. If she asks directly about wallets, tokens, payments, or crypto:]</em> "No wallet, no token, no payment rail, no speculative crypto frame. ICN uses cryptographic verification as record integrity, not as a casino. If anyone reads 'decentralized' and thinks Web3, they're reading the wrong project." <em>[Then stop. Don't volunteer more.]</em></p>
+    </details>
+  </section>
+
+  <section class="slide" id="s9">
+    <div class="slide-num">Slide 9 of 11</div>
+    <h2>A useful test</h2>
+    <ul>
+      <li>Pick one fictional or sanitized workflow.</li>
+      <li>Walk it from formation to governance.</li>
+      <li>Ask what must survive.</li>
+      <li>Ask who needs it later.</li>
+      <li>Ask what should stay outside ICN.</li>
+    </ul>
+    <details class="notes" open>
+      <summary>Speaker copy (≈35 sec)</summary>
+      <p>"If anything I've said feels like it might be real, here's what a next step might look like. Not a pilot. Not a commitment." "Pick one fictional or sanitized workflow. Walk it from formation to governance. Ask what must survive. Ask who needs it later. Ask what should stay outside ICN." "It's one concrete pattern that either proves the seam or kills it cleanly. Either is useful." <em>[Don't push. The option is on the table.]</em></p>
+    </details>
+  </section>
+
+  <section class="slide" id="s10">
+    <div class="slide-num">Slide 10 of 11</div>
+    <h2>The question for today</h2>
+    <p class="big-line">Where is this map useful, where is it wrong, and what should I learn from Launch before building anything around this seam?</p>
+    <details class="notes" open>
+      <summary>Speaker copy (≈20 sec, then stop talking)</summary>
+      <p>"The question I came in with is on the screen." <em>[Read it aloud, slowly.]</em> "Where is this map useful, where is it wrong, and what should I learn from Launch before building anything around this seam?" <em>[Then stop. Hand the call to her. The whole meeting comes down to what she says next. If she answers with a concrete thing, capture it verbatim. If she answers with another question, follow her. If she says "I need to think," that is also a real answer — propose a follow-up date and end the call cleanly.]</em></p>
+    </details>
+  </section>
+
+  <section class="slide" id="s11">
+    <div class="slide-num">Slide 11 of 11 (optional)</div>
+    <h2>Notes to capture</h2>
+    <ul>
+      <li>Launch validated.</li>
+      <li>Launch rejected.</li>
+      <li>New vocabulary.</li>
+      <li>Privacy boundary.</li>
+      <li>Possible tabletop.</li>
+      <li>No-go zones.</li>
+    </ul>
+    <details class="notes" open>
+      <summary>For Matt, after the call</summary>
+      <p><strong>Do not display this slide to McKenzie.</strong> If short on time, end at slide 10 and skip this. Fill these six buckets within 24 hours of the call, sanitized, into the prep packet's §13 capture grid. Use her exact words for the vocabulary bucket. Do not paraphrase yet.</p>
+    </details>
+  </section>
+
+</main>
+<div class="footer">
+  Status: descriptive · Canonical: no · Last reviewed 2026-05-20 · No real Launch or NYCN data. Companion to <code>COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md</code> and <code>COOPERATIVE_FORMATION_PLATFORM_ONE_PAGE_AID_2026-05-21.md</code>. Scroll or press PageDown to advance slides. Speaker notes expand inline.
+</div>
+</body>
+</html>
