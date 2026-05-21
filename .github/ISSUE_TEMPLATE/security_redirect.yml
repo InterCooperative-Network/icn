@@ -23,9 +23,7 @@ body:
     attributes:
       label: Confirm you read the above
       options:
-        - label: "I understand this is NOT the place for a suspected vulnerability and I will file through the private channel in SECURITY.md."
-          required: true
-        - label: "This issue is NOT a vulnerability report. It is a non-sensitive security-adjacent topic (hardening question, public threat-model discussion, audit follow-up that has already been disclosed)."
+        - label: "I am NOT disclosing an unpatched vulnerability here. This is a non-sensitive security-adjacent topic (hardening question, public threat-model discussion, audit follow-up that has already been disclosed). For an unpatched vulnerability I will close this and file through the private channel in SECURITY.md."
           required: true
 
   - type: textarea

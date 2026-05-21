@@ -12,7 +12,7 @@ Use GitHub's **private vulnerability reporting** for this repository:
 
 This routes directly to maintainers and is not visible to the public.
 
-If GitHub's private reporting is unavailable for some reason, you can email the maintainer instead — see `Maintainer` in [README.md](README.md). Treat the email channel as a fallback, not a default.
+GitHub's private vulnerability reporting is the only supported private channel. If you cannot use it (for example, you do not have a GitHub account), open a placeholder using the [security-redirect issue template](.github/ISSUE_TEMPLATE/security_redirect.yml) asking a maintainer to contact you — do not disclose the vulnerability details in that placeholder.
 
 ## What to Include
 
