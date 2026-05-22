@@ -70,12 +70,13 @@ Read-only inspection of `origin/main` via `git show` and `gh`. The branch `docs/
 
 ### 2. Docs-only truth-sync (this PR)
 
-- `docs/STATE.md` — append `[sync edit] 2026-05-22` block covering #1834 → #1901, label each as docs vs code, repeat the verbatim non-claim block. Extend the "Recently merged" table.
-- `docs/PHASE_PROGRESS.md` — append matching `[sync edit] 2026-05-22` block; keep Phase 2 ⏳ status; update the `Last Updated` date.
+- `docs/STATE.md` — append `[sync edit] 2026-05-22` block covering #1875 → #1901 (21 PR merges + 1 bare handoff commit = 22 commits in the 2026-05-17 → 2026-05-22 window), label each PR as docs vs code, repeat the verbatim non-claim block. Refresh YAML `Last Reviewed: 2026-05-22`.
+- `docs/PHASE_PROGRESS.md` — append matching `[sync edit] 2026-05-22` block; keep Phase 2 ⏳ status; update the `Last Updated` date and the `Current Phase` paragraph to mention the 2026-05-22 governance-hardening cycle + Civic Shell + Debian-13 appliance smoke + Claude Design landings.
 - `docs/status.toml` — fix one literal: `total_crates` on line 241 from `"34 crates + 4 apps + 3 binaries = 41 workspace members"` to `"37 crates + 4 apps + 3 binaries = 44 workspace members"`. Leave `last_full_verification` alone (that's a different attestation).
+- `docs/registry.toml` — refresh the `[docs."docs/STATE.md"]` row's `last_updated` and `last_reviewed` to `2026-05-22` so `doc_control_check.py --strict` agrees with the YAML header. Required by the strict gate; not a content change.
 - `docs/dev/handoff-2026-05-22-current-state-and-next-plan.md` (this file).
 
-That's the entire diff. Four files, all under `docs/`.
+That's the entire diff. Five files, all under `docs/`.
 
 ---
 
