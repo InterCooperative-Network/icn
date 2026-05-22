@@ -21,7 +21,7 @@ The correct v0 name is **ICN Civic Shell**.
 
 A Civic Shell is the public and logged-in **wayfinding layer** for an ICN institution. It gives people a recognizable place to enter, understand, participate, build, steward, communicate, and review records. It does not become the source of authority. Authority remains in standing, mandates, governance decisions, receipts, and the underlying ICN substrate.
 
-Future cleanup before merge should rename the file and registry/index entries from the draft `headquarters` name to `icn-civic-shell-v0.md`. This revision changes the concept first so reviewers can evaluate the corrected frame.
+The file, registry key, and index entries for this document have been renamed from the draft `headquarters` name to `icn-civic-shell-v0.md` in the same PR series. This section is retained to record that the first draft used the rejected metaphor so reviewers can audit the corrected frame in the diff.
 
 ## Purpose
 
@@ -320,7 +320,7 @@ These are suggestions only. The PR introducing this doc does not open them.
 - `docs(project-index): integrate Civic Shell surfaces with proof-level taxonomy`
 - `ops(hosting): reconcile Civic Shell service list with service-hosting definitions`
 - `ux(shell): define Communications Room boundary for Matrix, bridge, and announcements`
-- `docs(spec): rename Civic Shell file and registry/index entries away from headquarters draft path`
+- ~~`docs(spec): rename Civic Shell file and registry/index entries away from headquarters draft path`~~ (completed in this PR — file renamed to `docs/spec/icn-civic-shell-v0.md`; registry key, title, and INDEX entry updated)
 
 ## Review checklist
 
