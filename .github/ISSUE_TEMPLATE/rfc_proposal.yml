@@ -1,0 +1,90 @@
+name: RFC / design proposal
+description: Propose a substantive change — new primitive, architectural shift, cross-crate refactor, or public-claim surface
+labels: ["type:spec"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        RFCs are for **substantive proposals**, not bug fixes or small features.
+        Use this when a change touches a kernel/app boundary, changes a public API or claim, or affects multiple subsystems.
+        For small focused work, use the **Work Item** template instead.
+
+  - type: input
+    id: title
+    attributes:
+      label: One-line summary
+      description: "What is the proposal in a single sentence?"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - "Kernel primitive or kernel API change"
+        - "New PolicyOracle / app"
+        - "Protocol or wire format"
+        - "Identity / trust / governance semantics"
+        - "Economics / ledger / commons resources"
+        - "Public website claim or design language"
+        - "Cross-repo coordination (ICN ↔ NYCN ↔ icn-learn)"
+        - "Process / docs control / RFC mechanics itself"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is the current pain or missing capability? Quote concrete code paths, doc paths, or behaviors that show the gap.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What is being proposed? Keep it scoped — list the specific changes (new types, renamed APIs, new docs, new contracts).
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: At least one. "Do nothing" is a valid alternative — explain why it's worse.
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and trade-offs
+      description: What could go wrong, what's harder after this change, what does it lock in?
+    validations:
+      required: true
+
+  - type: textarea
+    id: boundary
+    attributes:
+      label: Boundary check
+      description: "What this proposal intentionally does NOT do. Especially: does it cross the kernel/app meaning firewall? See docs/architecture/KERNEL_APP_SEPARATION.md."
+    validations:
+      required: true
+
+  - type: textarea
+    id: receipts
+    attributes:
+      label: How this gets verified
+      description: What proof, receipt, test, or doc would make a future reader confident the proposal landed correctly?
+    validations:
+      required: true
+
+  - type: textarea
+    id: depends
+    attributes:
+      label: Depends on
+      description: "Other RFCs, ADRs, or issues this builds on: - [ ] #NNN"
+    validations:
+      required: false

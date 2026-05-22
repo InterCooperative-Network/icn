@@ -16,11 +16,138 @@ use std::sync::Arc;
 use actix_web::web;
 use icn_governance::MembershipResolver;
 use icn_identity::Did;
+use tracing::warn;
 
 use crate::events::GovernanceEventEmitter;
 use crate::manager::GovernanceManager;
 
 use super::handlers;
+
+/// Deployment posture that determines how missing optional standing
+/// checkers and the membership resolver are treated at HTTP context build
+/// time.
+///
+/// The governance HTTP context exposes three optional dependencies:
+/// `member_checker`, `suspension_checker`, and `membership_resolver`. When
+/// any of them is `None`, governance handlers fall through to permissive
+/// behavior (e.g. `TrustThreshold` domains build with
+/// `excluded_delegators = None`). That is acceptable for development,
+/// devnet, and bootstrap contexts; it is unsafe for production and
+/// partner-bound deployments where unresolved member standing must not
+/// implicitly count as standing.
+///
+/// `GovernanceContextBuildMode` makes that distinction legible:
+///
+/// * [`Bootstrap`](Self::Bootstrap) — current dev/devnet behavior.
+///   Missing checkers/resolver emit explicit `tracing::warn!` warnings
+///   at context-validation time. Startup is not rejected.
+/// * [`Production`](Self::Production) — partner/production deployments.
+///   Missing checkers/resolver are a hard configuration error: validation
+///   returns a [`GovernanceContextValidationError`] naming every missing
+///   dependency so the daemon fails fast before serving traffic.
+/// * [`Test`](Self::Test) — explicit test-only mode. Identical permissive
+///   semantics to `Bootstrap`, but distinguishable in logs so test runs
+///   are not mistaken for a production misconfiguration.
+///
+/// **This type does not make governance production-ready.** It only makes
+/// the bootstrap-vs-production distinction legible at startup. The
+/// `TrustThreshold` direct-membership-mutation fail-open path tracked in
+/// issue #1870 remains open and must be resolved before claiming
+/// production readiness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GovernanceContextBuildMode {
+    /// Permissive mode for dev, devnet, and bootstrap contexts.
+    ///
+    /// Missing standing checkers or membership resolver emit explicit
+    /// warnings via `tracing::warn!` but do not reject startup. This is
+    /// the default for backward compatibility with existing constructors
+    /// that do not yet wire the mode explicitly.
+    #[default]
+    Bootstrap,
+
+    /// Strict mode for partner/production deployments.
+    ///
+    /// Missing `MemberStandingChecker`, `SuspensionChecker`, or
+    /// `membership_resolver` cause [`GovernanceContext::validate`] to
+    /// return [`GovernanceContextValidationError`] naming every missing
+    /// dependency. The daemon should fail to start in this case.
+    Production,
+
+    /// Explicit test mode.
+    ///
+    /// Functionally identical to [`Bootstrap`](Self::Bootstrap) — missing
+    /// dependencies do not reject startup — but distinguishable in logs
+    /// so test runs are not confused with production misconfiguration.
+    Test,
+}
+
+impl GovernanceContextBuildMode {
+    /// Resolve a build mode from the `ICN_GOVERNANCE_BUILD_MODE`
+    /// environment variable, falling back to `Bootstrap` when unset or
+    /// unrecognized. The gateway uses this to pick the mode at runtime;
+    /// callers that wire a mode explicitly should use the variants
+    /// directly rather than this helper.
+    ///
+    /// Recognized values (case-insensitive): `bootstrap`, `production`,
+    /// `test`. Unrecognized values fall back to `Bootstrap` to preserve
+    /// existing behavior; the gateway logs the unrecognized value.
+    pub fn from_env() -> Self {
+        match std::env::var("ICN_GOVERNANCE_BUILD_MODE") {
+            Ok(raw) => match raw.trim().to_ascii_lowercase().as_str() {
+                "bootstrap" | "" => Self::Bootstrap,
+                "production" => Self::Production,
+                "test" => Self::Test,
+                other => {
+                    warn!(
+                        mode = %other,
+                        "ICN_GOVERNANCE_BUILD_MODE is set to an unrecognized value; falling back to Bootstrap"
+                    );
+                    Self::Bootstrap
+                }
+            },
+            Err(_) => Self::Bootstrap,
+        }
+    }
+
+    /// Returns `true` if this mode rejects governance contexts that are
+    /// missing optional standing checkers or the membership resolver.
+    pub fn rejects_unresolved_standing(self) -> bool {
+        matches!(self, Self::Production)
+    }
+}
+
+/// Configuration error returned by [`GovernanceContext::validate`] when
+/// the context is built in [`GovernanceContextBuildMode::Production`] but
+/// is missing one or more optional standing dependencies that production
+/// requires.
+///
+/// The error names every missing dependency (not just the first) so the
+/// operator can fix the full configuration in a single pass.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GovernanceContextValidationError {
+    /// Mode the context was built in.
+    pub mode: GovernanceContextBuildMode,
+    /// Names of the missing optional dependencies. Stable strings,
+    /// matching the field names on [`GovernanceContext`].
+    pub missing: Vec<&'static str>,
+}
+
+impl std::fmt::Display for GovernanceContextValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "governance context built in {:?} mode is missing required \
+             standing/resolver dependencies: {}. \
+             Production deployments must wire MemberStandingChecker, \
+             SuspensionChecker, and a MembershipResolver — unresolved \
+             standing must not be treated as standing in production.",
+            self.mode,
+            self.missing.join(", ")
+        )
+    }
+}
+
+impl std::error::Error for GovernanceContextValidationError {}
 
 /// Callback invoked when a `Charter` proposal is accepted.
 ///
@@ -268,6 +395,109 @@ pub struct GovernanceContext<E> {
     /// system (`SystemEvent::ProposalAccepted` → `KernelGovernanceExecutor` → `SdisService`).
     /// Setting this in tests provides a synchronous wiring path without an actor runtime.
     pub sdis_service: Option<Arc<dyn icn_kernel_api::SdisService>>,
+    /// Deployment posture for this governance HTTP context.
+    ///
+    /// Controls how missing optional standing checkers and the membership
+    /// resolver are treated by [`Self::validate`]: warned about in
+    /// `Bootstrap`/`Test`, hard-rejected in `Production`. See
+    /// [`GovernanceContextBuildMode`] for the full contract.
+    ///
+    /// Defaults to [`GovernanceContextBuildMode::Bootstrap`] so existing
+    /// dev/devnet/test constructors continue to compile and behave
+    /// identically without code changes.
+    pub build_mode: GovernanceContextBuildMode,
+}
+
+impl<E> GovernanceContext<E> {
+    /// Return the names of optional standing/resolver dependencies that
+    /// are unset on this context and that production deployments must
+    /// wire. The strings are stable identifiers (matching field names)
+    /// suitable for inclusion in operator-visible error messages and
+    /// log output. Returns an empty vec if everything required is wired.
+    ///
+    /// This is purely an inspection of the field set — it does not
+    /// consult [`Self::build_mode`].
+    pub fn missing_production_dependencies(&self) -> Vec<&'static str> {
+        let mut missing = Vec::new();
+        if self.member_checker.is_none() {
+            missing.push("member_checker");
+        }
+        if self.suspension_checker.is_none() {
+            missing.push("suspension_checker");
+        }
+        if self.membership_resolver.is_none() {
+            missing.push("membership_resolver");
+        }
+        missing
+    }
+
+    /// Validate this governance context against its declared build mode.
+    ///
+    /// In [`GovernanceContextBuildMode::Production`] every missing
+    /// dependency listed by [`Self::missing_production_dependencies`] is
+    /// a hard configuration error and this returns
+    /// [`GovernanceContextValidationError`] naming all of them.
+    ///
+    /// In [`GovernanceContextBuildMode::Bootstrap`] and
+    /// [`GovernanceContextBuildMode::Test`] this emits a `tracing::warn!`
+    /// for each missing dependency (so operators can see the fall-open
+    /// state in logs) but returns `Ok(())`.
+    ///
+    /// Callers should invoke this at daemon/gateway startup before
+    /// routes are registered, not lazily inside a handler.
+    pub fn validate(&self) -> Result<(), GovernanceContextValidationError> {
+        let missing = self.missing_production_dependencies();
+        if missing.is_empty() {
+            return Ok(());
+        }
+
+        match self.build_mode {
+            GovernanceContextBuildMode::Production => Err(GovernanceContextValidationError {
+                mode: self.build_mode,
+                missing,
+            }),
+            mode @ (GovernanceContextBuildMode::Bootstrap | GovernanceContextBuildMode::Test) => {
+                self.warn_missing_dependencies(mode, &missing);
+                Ok(())
+            }
+        }
+    }
+
+    fn warn_missing_dependencies(
+        &self,
+        mode: GovernanceContextBuildMode,
+        missing: &[&'static str],
+    ) {
+        warn!(
+            mode = ?mode,
+            missing = ?missing,
+            "governance context is running in {:?} mode without required \
+             production standing wiring; missing: {}. \
+             Production mode would reject this configuration. \
+             Unresolved standing must not be treated as standing in production.",
+            mode,
+            missing.join(", ")
+        );
+        for dep in missing {
+            match *dep {
+                "member_checker" => warn!(
+                    "governance: MemberStandingChecker is not wired; \
+                     create_proposal will not enforce active Member standing"
+                ),
+                "suspension_checker" => warn!(
+                    "governance: SuspensionChecker is not wired; \
+                     cast_vote will not block suspended members and \
+                     close_proposal will not exclude suspended delegators"
+                ),
+                "membership_resolver" => warn!(
+                    "governance: membership_resolver is not wired; \
+                     TrustThreshold domains will close with excluded_delegators=None \
+                     (fail-open — delegations from suspended members may flow)"
+                ),
+                _ => {}
+            }
+        }
+    }
 }
 
 /// Register all governance routes on `cfg`.
@@ -278,6 +508,26 @@ pub fn configure<E>(cfg: &mut web::ServiceConfig, ctx: GovernanceContext<E>)
 where
     E: GovernanceEventEmitter + Clone + 'static,
 {
+    // Defensive Production-only check: callers (daemon/gateway) are expected
+    // to call `ctx.validate()` themselves and propagate the error up before
+    // reaching this point, so reaching here in `Production` with missing
+    // standing/resolver deps means a programmer skipped that step. We do NOT
+    // call `validate()` here because that would duplicate the Bootstrap/Test
+    // warning logs already emitted by the caller. We only enforce the
+    // Production invariant.
+    if ctx.build_mode == GovernanceContextBuildMode::Production {
+        let missing = ctx.missing_production_dependencies();
+        if !missing.is_empty() {
+            panic!(
+                "{}",
+                GovernanceContextValidationError {
+                    mode: ctx.build_mode,
+                    missing,
+                }
+            );
+        }
+    }
+
     let data = web::Data::new(ctx);
 
     cfg.app_data(data.clone())
@@ -545,4 +795,273 @@ where
             web::resource("/me/action-cards")
                 .route(web::get().to(handlers::get_my_action_cards::<E>)),
         );
+}
+
+#[cfg(test)]
+mod build_mode_tests {
+    //! Unit tests for `GovernanceContextBuildMode` and the
+    //! production-guard logic on `GovernanceContext::validate`.
+    //!
+    //! These tests construct a minimal context without exercising any
+    //! HTTP/actor wiring, so they can be run in isolation under
+    //! `cargo test -p icn-governance-actor`.
+
+    use super::*;
+    use crate::events::NoopEventEmitter;
+    use crate::manager::GovernanceManager;
+
+    fn ctx_with_mode(mode: GovernanceContextBuildMode) -> GovernanceContext<NoopEventEmitter> {
+        GovernanceContext {
+            manager: Arc::new(GovernanceManager::new()),
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver: None,
+            sdis_service: None,
+            build_mode: mode,
+        }
+    }
+
+    fn dummy_member_checker() -> MemberStandingChecker {
+        Arc::new(|_did, _domain| Box::pin(async { true }))
+    }
+
+    fn dummy_suspension_checker() -> SuspensionChecker {
+        Arc::new(|_did, _domain| Box::pin(async { false }))
+    }
+
+    fn dummy_resolver() -> Arc<dyn MembershipResolver> {
+        Arc::new(icn_governance::StaticMembershipResolver::new())
+    }
+
+    #[test]
+    fn default_mode_is_bootstrap() {
+        // Backward-compatibility guard: existing call sites that do not
+        // set `build_mode` should land on Bootstrap, not Production. If
+        // this assertion ever needs to change, every downstream caller
+        // must opt in to Production explicitly first.
+        let mode: GovernanceContextBuildMode = Default::default();
+        assert_eq!(mode, GovernanceContextBuildMode::Bootstrap);
+    }
+
+    #[test]
+    fn production_only_mode_rejects_unresolved_standing() {
+        assert!(GovernanceContextBuildMode::Production.rejects_unresolved_standing());
+        assert!(!GovernanceContextBuildMode::Bootstrap.rejects_unresolved_standing());
+        assert!(!GovernanceContextBuildMode::Test.rejects_unresolved_standing());
+    }
+
+    #[test]
+    fn missing_production_dependencies_lists_unset_optional_fields() {
+        // Empty context → all three deps missing, in stable order.
+        let ctx = ctx_with_mode(GovernanceContextBuildMode::Bootstrap);
+        assert_eq!(
+            ctx.missing_production_dependencies(),
+            vec![
+                "member_checker",
+                "suspension_checker",
+                "membership_resolver"
+            ]
+        );
+    }
+
+    #[test]
+    fn missing_production_dependencies_excludes_wired_fields() {
+        let mut ctx = ctx_with_mode(GovernanceContextBuildMode::Bootstrap);
+        ctx.member_checker = Some(dummy_member_checker());
+        assert_eq!(
+            ctx.missing_production_dependencies(),
+            vec!["suspension_checker", "membership_resolver"]
+        );
+    }
+
+    #[test]
+    fn missing_production_dependencies_empty_when_all_wired() {
+        let mut ctx = ctx_with_mode(GovernanceContextBuildMode::Production);
+        ctx.member_checker = Some(dummy_member_checker());
+        ctx.suspension_checker = Some(dummy_suspension_checker());
+        ctx.membership_resolver = Some(dummy_resolver());
+        assert!(ctx.missing_production_dependencies().is_empty());
+    }
+
+    #[test]
+    fn production_all_missing_returns_error_naming_all() {
+        let ctx = ctx_with_mode(GovernanceContextBuildMode::Production);
+        let result = ctx.validate();
+        let Err(err) = result else {
+            panic!("Production with all deps missing must reject; got Ok");
+        };
+
+        assert_eq!(err.mode, GovernanceContextBuildMode::Production);
+        assert_eq!(
+            err.missing,
+            vec![
+                "member_checker",
+                "suspension_checker",
+                "membership_resolver"
+            ]
+        );
+
+        let msg = err.to_string();
+        assert!(
+            msg.contains("Production"),
+            "error must name the mode: {msg}"
+        );
+        assert!(
+            msg.contains("member_checker"),
+            "error must name member_checker: {msg}"
+        );
+        assert!(
+            msg.contains("suspension_checker"),
+            "error must name suspension_checker: {msg}"
+        );
+        assert!(
+            msg.contains("membership_resolver"),
+            "error must name membership_resolver: {msg}"
+        );
+    }
+
+    #[test]
+    fn production_single_missing_dep_names_only_that_dep() {
+        let mut ctx = ctx_with_mode(GovernanceContextBuildMode::Production);
+        ctx.member_checker = Some(dummy_member_checker());
+        ctx.suspension_checker = Some(dummy_suspension_checker());
+        // membership_resolver still missing
+        let result = ctx.validate();
+        let Err(err) = result else {
+            panic!("Production with one dep missing must reject; got Ok");
+        };
+
+        assert_eq!(err.missing, vec!["membership_resolver"]);
+        let msg = err.to_string();
+        assert!(
+            msg.contains("membership_resolver"),
+            "error must name the missing dep: {msg}"
+        );
+        assert!(
+            !msg.contains("member_checker,"),
+            "must not falsely name wired dep: {msg}"
+        );
+    }
+
+    #[test]
+    fn production_all_wired_validates_ok() {
+        let mut ctx = ctx_with_mode(GovernanceContextBuildMode::Production);
+        ctx.member_checker = Some(dummy_member_checker());
+        ctx.suspension_checker = Some(dummy_suspension_checker());
+        ctx.membership_resolver = Some(dummy_resolver());
+        assert!(ctx.validate().is_ok());
+    }
+
+    #[test]
+    fn bootstrap_with_missing_deps_does_not_reject() {
+        // Bootstrap is the legacy/dev posture. Missing deps emit warnings
+        // (tracing::warn!) but do not fail validation.
+        let ctx = ctx_with_mode(GovernanceContextBuildMode::Bootstrap);
+        assert!(
+            ctx.validate().is_ok(),
+            "Bootstrap mode must not reject startup on missing deps"
+        );
+    }
+
+    #[test]
+    fn test_mode_with_missing_deps_does_not_reject() {
+        // Test mode is functionally identical to Bootstrap — permissive,
+        // but distinguishable in logs.
+        let ctx = ctx_with_mode(GovernanceContextBuildMode::Test);
+        assert!(
+            ctx.validate().is_ok(),
+            "Test mode must not reject startup on missing deps"
+        );
+    }
+
+    #[test]
+    fn validation_error_is_std_error() {
+        // The error must implement `std::error::Error` so callers can
+        // bubble it through `?` and into gateway-level error types.
+        fn assert_is_error<T: std::error::Error>(_: &T) {}
+        let err = GovernanceContextValidationError {
+            mode: GovernanceContextBuildMode::Production,
+            missing: vec!["member_checker"],
+        };
+        assert_is_error(&err);
+    }
+
+    /// Serialize the `from_env_*` tests against each other.
+    ///
+    /// Rust's test harness runs unit tests in parallel by default and these
+    /// three tests mutate `ICN_GOVERNANCE_BUILD_MODE` via `set_var` /
+    /// `remove_var` — without serialization they race on process-wide state
+    /// and assertions become flaky depending on scheduling. A single static
+    /// `Mutex` makes the env-mutating section single-threaded across the
+    /// crate's lib-test process. We poison-tolerate (via `.unwrap_or_else`)
+    /// so a panic in one test does not cascade into the others.
+    static ENV_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Acquire the env-test lock and restore the previous value of
+    /// `ICN_GOVERNANCE_BUILD_MODE` when the guard drops. This keeps
+    /// each test hermetic regardless of order or external env state.
+    struct EnvGuard {
+        prev: Option<String>,
+        _lock: std::sync::MutexGuard<'static, ()>,
+    }
+
+    impl EnvGuard {
+        fn acquire() -> Self {
+            let lock = ENV_TEST_LOCK
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let prev = std::env::var("ICN_GOVERNANCE_BUILD_MODE").ok();
+            std::env::remove_var("ICN_GOVERNANCE_BUILD_MODE");
+            EnvGuard { prev, _lock: lock }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match self.prev.take() {
+                Some(v) => std::env::set_var("ICN_GOVERNANCE_BUILD_MODE", v),
+                None => std::env::remove_var("ICN_GOVERNANCE_BUILD_MODE"),
+            }
+        }
+    }
+
+    #[test]
+    fn from_env_falls_back_to_bootstrap_when_unset() {
+        let _g = EnvGuard::acquire();
+        // EnvGuard already removed the var; assert the unset path.
+        assert_eq!(
+            GovernanceContextBuildMode::from_env(),
+            GovernanceContextBuildMode::Bootstrap
+        );
+    }
+
+    #[test]
+    fn from_env_parses_production() {
+        let _g = EnvGuard::acquire();
+        std::env::set_var("ICN_GOVERNANCE_BUILD_MODE", "production");
+        assert_eq!(
+            GovernanceContextBuildMode::from_env(),
+            GovernanceContextBuildMode::Production
+        );
+        std::env::set_var("ICN_GOVERNANCE_BUILD_MODE", "PRODUCTION");
+        assert_eq!(
+            GovernanceContextBuildMode::from_env(),
+            GovernanceContextBuildMode::Production
+        );
+    }
+
+    #[test]
+    fn from_env_falls_back_on_unknown_value() {
+        let _g = EnvGuard::acquire();
+        std::env::set_var("ICN_GOVERNANCE_BUILD_MODE", "garbage");
+        assert_eq!(
+            GovernanceContextBuildMode::from_env(),
+            GovernanceContextBuildMode::Bootstrap
+        );
+    }
 }

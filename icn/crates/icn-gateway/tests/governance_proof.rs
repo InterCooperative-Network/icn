@@ -78,6 +78,7 @@ async fn test_governance_proposal_full_lifecycle_with_real_auth() {
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
     // Build test app — mirrors the governance-relevant subset of server.rs:
@@ -396,6 +397,7 @@ async fn test_governance_endpoints_require_auth() {
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
