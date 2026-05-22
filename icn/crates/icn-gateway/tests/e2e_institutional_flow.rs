@@ -312,6 +312,7 @@ async fn test_e2e_freeze_member_suspends_commons_affiliation() {
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
@@ -569,6 +570,7 @@ async fn test_e2e_unfreeze_member_reinstates_commons_affiliation() {
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
@@ -918,6 +920,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: Some(sdis_svc),
+        build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);

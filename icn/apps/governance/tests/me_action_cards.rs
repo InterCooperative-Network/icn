@@ -52,6 +52,7 @@ fn make_ctx() -> GovernanceContext<NoopEventEmitter> {
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     }
 }
 
