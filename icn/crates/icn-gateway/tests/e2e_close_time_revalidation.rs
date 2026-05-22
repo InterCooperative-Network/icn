@@ -226,6 +226,7 @@ async fn build_app_with_proposal(
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);

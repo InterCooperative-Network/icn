@@ -1416,7 +1416,27 @@ impl GatewayServer {
             // Daemon mode: SDIS execution goes through the actor event system
             // (KernelGovernanceExecutor → SdisServiceImpl). HTTP path leaves this None.
             sdis_service: None,
+            // Deployment posture for the governance HTTP context.
+            //
+            // Resolved from the `ICN_GOVERNANCE_BUILD_MODE` environment variable
+            // (matching the existing `ICN_DEV_MODE` convention). When set to
+            // `production`, missing standing checkers/membership resolver below
+            // become a hard configuration error that prevents the gateway from
+            // starting — see `GovernanceContext::validate`. When unset, defaults
+            // to `Bootstrap` so existing dev/devnet behavior is preserved.
+            //
+            // A daemon-level config field is the obvious next step; see PR body
+            // for follow-up notes.
+            build_mode: icn_governance_actor::http::GovernanceContextBuildMode::from_env(),
         };
+
+        // Fail fast at startup if the governance context is missing required
+        // production dependencies in `Production` mode. Bootstrap/Test mode
+        // logs warnings via `tracing::warn!` but does not reject startup,
+        // preserving current dev/devnet behavior.
+        if let Err(err) = gov_ctx.validate() {
+            return Err(GatewayError::InternalError(err.to_string()));
+        }
 
         // Create rate limiter with configured or default config
         let rate_limit_config = self.rate_limit_config.unwrap_or_default();

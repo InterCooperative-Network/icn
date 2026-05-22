@@ -180,6 +180,7 @@ async fn build_app_with_trust_resolver(
         // Live production resolver — NOT a TrackingResolver mock
         membership_resolver: Some(resolver),
         sdis_service: None,
+        build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
     let auth_mw = actix_web_httpauth::middleware::HttpAuthentication::bearer(jwt_auth);

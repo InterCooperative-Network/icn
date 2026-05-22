@@ -228,6 +228,7 @@ async fn test_freeze_member_blocks_ledger_entries_after_governance_acceptance() 
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
