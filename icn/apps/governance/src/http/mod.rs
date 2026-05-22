@@ -10,4 +10,6 @@ pub mod handlers;
 pub mod models;
 pub mod validation;
 
-pub use configure::{configure, GovernanceContext};
+pub use configure::{
+    configure, GovernanceContext, GovernanceContextBuildMode, GovernanceContextValidationError,
+};

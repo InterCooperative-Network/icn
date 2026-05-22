@@ -1745,6 +1745,7 @@ mod tests {
                 suspension_checker: None,
                 membership_resolver: None,
                 sdis_service: None,
+                build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
             };
 
             let auth_mgr2 = auth_mgr.clone();
