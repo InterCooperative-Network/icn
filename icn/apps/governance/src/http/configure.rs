@@ -508,13 +508,24 @@ pub fn configure<E>(cfg: &mut web::ServiceConfig, ctx: GovernanceContext<E>)
 where
     E: GovernanceEventEmitter + Clone + 'static,
 {
-    // Validate before route registration so missing production dependencies
-    // surface at startup rather than at first request. Callers in production
-    // (daemon/gateway) are expected to call `ctx.validate()` themselves and
-    // propagate the error up — reaching here in Production with missing
-    // dependencies is a programmer bug, so we fail fast and loud.
-    if let Err(err) = ctx.validate() {
-        panic!("{}", err);
+    // Defensive Production-only check: callers (daemon/gateway) are expected
+    // to call `ctx.validate()` themselves and propagate the error up before
+    // reaching this point, so reaching here in `Production` with missing
+    // standing/resolver deps means a programmer skipped that step. We do NOT
+    // call `validate()` here because that would duplicate the Bootstrap/Test
+    // warning logs already emitted by the caller. We only enforce the
+    // Production invariant.
+    if ctx.build_mode == GovernanceContextBuildMode::Production {
+        let missing = ctx.missing_production_dependencies();
+        if !missing.is_empty() {
+            panic!(
+                "{}",
+                GovernanceContextValidationError {
+                    mode: ctx.build_mode,
+                    missing,
+                }
+            );
+        }
     }
 
     let data = web::Data::new(ctx);
@@ -980,28 +991,58 @@ mod build_mode_tests {
         assert_is_error(&err);
     }
 
-    #[test]
-    fn from_env_falls_back_to_bootstrap_when_unset() {
-        // Save and restore env to avoid cross-test contamination. This
-        // also defends against the env var being set by the harness.
-        let prev = std::env::var("ICN_GOVERNANCE_BUILD_MODE").ok();
-        // SAFETY: unit tests are single-threaded for env access; the
-        // assertion only inspects this single var.
-        std::env::remove_var("ICN_GOVERNANCE_BUILD_MODE");
+    /// Serialize the `from_env_*` tests against each other.
+    ///
+    /// Rust's test harness runs unit tests in parallel by default and these
+    /// three tests mutate `ICN_GOVERNANCE_BUILD_MODE` via `set_var` /
+    /// `remove_var` — without serialization they race on process-wide state
+    /// and assertions become flaky depending on scheduling. A single static
+    /// `Mutex` makes the env-mutating section single-threaded across the
+    /// crate's lib-test process. We poison-tolerate (via `.unwrap_or_else`)
+    /// so a panic in one test does not cascade into the others.
+    static ENV_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-        assert_eq!(
-            GovernanceContextBuildMode::from_env(),
-            GovernanceContextBuildMode::Bootstrap
-        );
+    /// Acquire the env-test lock and restore the previous value of
+    /// `ICN_GOVERNANCE_BUILD_MODE` when the guard drops. This keeps
+    /// each test hermetic regardless of order or external env state.
+    struct EnvGuard {
+        prev: Option<String>,
+        _lock: std::sync::MutexGuard<'static, ()>,
+    }
 
-        if let Some(v) = prev {
-            std::env::set_var("ICN_GOVERNANCE_BUILD_MODE", v);
+    impl EnvGuard {
+        fn acquire() -> Self {
+            let lock = ENV_TEST_LOCK
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let prev = std::env::var("ICN_GOVERNANCE_BUILD_MODE").ok();
+            std::env::remove_var("ICN_GOVERNANCE_BUILD_MODE");
+            EnvGuard { prev, _lock: lock }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match self.prev.take() {
+                Some(v) => std::env::set_var("ICN_GOVERNANCE_BUILD_MODE", v),
+                None => std::env::remove_var("ICN_GOVERNANCE_BUILD_MODE"),
+            }
         }
     }
 
     #[test]
+    fn from_env_falls_back_to_bootstrap_when_unset() {
+        let _g = EnvGuard::acquire();
+        // EnvGuard already removed the var; assert the unset path.
+        assert_eq!(
+            GovernanceContextBuildMode::from_env(),
+            GovernanceContextBuildMode::Bootstrap
+        );
+    }
+
+    #[test]
     fn from_env_parses_production() {
-        let prev = std::env::var("ICN_GOVERNANCE_BUILD_MODE").ok();
+        let _g = EnvGuard::acquire();
         std::env::set_var("ICN_GOVERNANCE_BUILD_MODE", "production");
         assert_eq!(
             GovernanceContextBuildMode::from_env(),
@@ -1012,24 +1053,15 @@ mod build_mode_tests {
             GovernanceContextBuildMode::from_env(),
             GovernanceContextBuildMode::Production
         );
-
-        match prev {
-            Some(v) => std::env::set_var("ICN_GOVERNANCE_BUILD_MODE", v),
-            None => std::env::remove_var("ICN_GOVERNANCE_BUILD_MODE"),
-        }
     }
 
     #[test]
     fn from_env_falls_back_on_unknown_value() {
-        let prev = std::env::var("ICN_GOVERNANCE_BUILD_MODE").ok();
+        let _g = EnvGuard::acquire();
         std::env::set_var("ICN_GOVERNANCE_BUILD_MODE", "garbage");
         assert_eq!(
             GovernanceContextBuildMode::from_env(),
             GovernanceContextBuildMode::Bootstrap
         );
-        match prev {
-            Some(v) => std::env::set_var("ICN_GOVERNANCE_BUILD_MODE", v),
-            None => std::env::remove_var("ICN_GOVERNANCE_BUILD_MODE"),
-        }
     }
 }
