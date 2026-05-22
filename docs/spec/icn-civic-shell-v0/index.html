@@ -1,0 +1,375 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Civic Shell v0 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>icn civic shell v0</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/icn-civic-shell-v0.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Civic Shell v0</h1>
+<blockquote>
+<p><strong>Status: spec, v0, design / composition only.</strong> This document defines the <strong>ICN Civic Shell</strong>: the top-level public-plus-logged-in institutional operating surface that composes existing ICN surfaces into one recognizable place. No implementation. No new endpoint. No new auth system. No deployment. No production-readiness claim. No live federation claim. No formal NYCN pilot claim. No Phase 2 completion claim. The PR introducing this doc opens a composition contract; it does not close any sibling issue and does not authorize infrastructure change.</p>
+</blockquote>
+<!-- truth-class: normative -->
+
+<h2>Naming correction</h2>
+<p>The first draft called this surface <strong>ICN Headquarters</strong>. That metaphor is rejected here.</p>
+<p>ICN is not building a command center, executive office, admin console, or single place where institutional power lives. A headquarters implies central command. ICN needs the opposite: a legible civic entry point that routes people into bounded, authority-aware surfaces without collapsing the institution into an administrator&#39;s dashboard.</p>
+<p>The correct v0 name is <strong>ICN Civic Shell</strong>.</p>
+<p>A Civic Shell is the public and logged-in <strong>wayfinding layer</strong> for an ICN institution. It gives people a recognizable place to enter, understand, participate, build, steward, communicate, and review records. It does not become the source of authority. Authority remains in standing, mandates, governance decisions, receipts, and the underlying ICN substrate.</p>
+<p>The file, registry key, and index entries for this document have been renamed from the draft <code>headquarters</code> name to <code>icn-civic-shell-v0.md</code> in the same PR series. This section is retained to record that the first draft used the rejected metaphor so reviewers can audit the corrected frame in the diff.</p>
+<h2>Purpose</h2>
+<p>A cooperative substrate needs recognizable civic places, not scattered tools and not command headquarters. Today, ICN surfaces are spread across:</p>
+<ul>
+<li>the public website at <code>intercooperative.network</code>,</li>
+<li>the per-domain member shell (<code>docs/spec/member-shell-v0.md</code>),</li>
+<li>the per-domain steward cockpit (<code>docs/spec/steward-cockpit-v0.md</code>),</li>
+<li>the no-CLI organizer/member rehearsal path (<code>docs/pilots/no-cli-organizer-member-rehearsal-workflow.md</code>),</li>
+<li>the forge / repository / project-record layer (<code>docs/strategy/SOVEREIGN_FORGE.md</code>, <code>docs/ops/FORGEJO_DEPLOYMENT_PLAN.md</code>),</li>
+<li>the service-hosting and operational-governance layer (<code>docs/architecture/SERVICE_HOSTING_MODEL.md</code>, <code>docs/ops/SERVICE_GOVERNANCE_TEMPLATE.md</code>),</li>
+<li>and the auth/session bridge (<code>docs/architecture/AUTH_BRIDGE_AND_DID_LOGIN.md</code>).</li>
+</ul>
+<p>The <strong>ICN Civic Shell</strong> composes those surfaces into one navigable civic operating space for ICN itself.</p>
+<p>Publicly, it shows truth-bounded status, development updates, service-health posture, the current phase, the roadmap, public forge/project windows, docs, and onboarding routes.</p>
+<p>Privately, it gives members, organizers, developers, stewards, and operators context-aware access to their standing, active domain, active role, authority scope, action cards, records, forge/work surfaces, communications, operations posture, and privacy posture.</p>
+<p>This spec defines that composition. It does <strong>not</strong> redefine the member shell, steward cockpit, public website, forge, auth bridge, service-hosting model, or any operational system. The Civic Shell routes into them, references them, and summarizes them; it never replaces them.</p>
+<h2>Civic-place metaphor</h2>
+<p>The Civic Shell uses a spatial metaphor because institutions are easier to understand when people know where they are and what kind of action belongs there.</p>
+<pre><code class="language-text">Public Window  →  Civic Lobby  →  Member Desk
+                                 Governance Room
+                                 Workroom
+                                 Records Room
+                                 Forge Room
+                                 Operations Control Room
+                                 Communications Room
+                                 Vault / Privacy Posture
+                                 Settings / Identity
+</code></pre>
+<p>The Civic Shell is <strong>not</strong> the government, not the co-op, not the federation, not the forge, and not the operator cockpit. It is the entry hall and wayfinding layer that makes the institution legible.</p>
+<p>The <strong>Forge Room</strong> is where infrastructure, code, technical artifacts, implementation work, templates, reviews, RFCs, ADRs, and shared systems are built. It is one civic space inside the shell, not the universal center of every cooperative, community, or federation.</p>
+<p>Different institutional forms may eventually have their own named civic places. A cooperative, a community, and a federation do not have to share one generic building metaphor. This spec only names the ICN-level shell that composes ICN&#39;s current public, member, steward, forge, communication, and operational surfaces.</p>
+<h2>Scope and non-goals</h2>
+<h3>In scope</h3>
+<ul>
+<li>A composition contract that ties the public site, per-domain member shell, per-domain steward cockpit, no-CLI organizer/member path, forge room, operations control room, communications room, and vault/privacy posture into one ICN civic shell concept.</li>
+<li>A bounded space model that gives each major function a named place without creating a command center.</li>
+<li>Public/private boundary rules anchored to ADR-0032 (Website Truth Boundary) and ADR-0033 (Public Maturity Claims and Evidence Links).</li>
+<li>A domain/route doctrine for <code>intercooperative.network</code> (canonical public truth) vs <code>icn.zone</code> (short operational/access/discovery), without turning the short domain into a second marketing site.</li>
+<li>An explicit non-replacement contract against <code>docs/spec/member-shell-v0.md</code> and <code>docs/spec/steward-cockpit-v0.md</code>.</li>
+<li>A v0 status/proof-label discipline that hooks into the proof-level taxonomy and capability matrix tracked in <code>#1796</code>.</li>
+<li>Follow-up issue suggestions only. No issues are opened by this PR.</li>
+</ul>
+<h3>Not in scope</h3>
+<ul>
+<li>Not a public-website rebuild, redesign, or new content set.</li>
+<li>Not a member-shell redefinition.</li>
+<li>Not a steward-cockpit redefinition.</li>
+<li>Not a node-operator civic-role surface (<code>#1613</code>).</li>
+<li>Not a sovereign-forge canonical-cutover decision.</li>
+<li>Not a Forgejo deployment.</li>
+<li>Not a Keycloak/authentik/Ory/ZITADEL/Kanidm deployment or auth implementation.</li>
+<li>Not an n8n workflow build.</li>
+<li>Not a Matrix launch or bridge deployment.</li>
+<li>Not a Uptime Kuma policy change.</li>
+<li>Not a <code>network-ops</code> mutation.</li>
+<li>Not a DNS, K3s, VLAN, firewall, or public-edge mutation.</li>
+<li>Not a private-data ingestion path.</li>
+<li>Not a NYCN-specific or named-partner framing.</li>
+<li>Not a closure of <code>#1724</code>, <code>#1726</code>, <code>#1710</code>, <code>#1613</code>, <code>#1796</code>, <code>#1779</code>, <code>#1837</code>, or <code>#1873</code>.</li>
+<li>Not a Phase 2 completion claim.</li>
+<li>Not a production-readiness claim, live-federation claim, or formal-pilot claim.</li>
+</ul>
+<h2>Domain and route doctrine</h2>
+<blockquote>
+<p><strong>Operational context, not ICN product doctrine.</strong> The points below summarize safe architectural facts about how ICN domains and segmented network concepts are currently and prospectively used. <code>network-ops</code> was not read locally for the original PR. Nothing here makes <code>network-ops</code> public ICN truth.</p>
+</blockquote>
+<ul>
+<li><strong><code>intercooperative.network</code></strong> is ICN&#39;s canonical public identity and truth domain. It remains the truth boundary defined by ADR-0032.</li>
+<li><strong><code>icn.zone</code></strong> is the short operational/access/discovery domain. It is not a second marketing site. Its job is fast routing into action surfaces, not republishing ICN&#39;s public narrative.</li>
+<li>Conceptual routes such as <code>/status</code>, <code>/forge</code>, <code>/dev</code>, <code>/docs</code>, <code>/join</code>, and <code>/dashboard</code> are examples only until a separate PR proves any route live.</li>
+<li><strong>ICN-PRIVATE</strong> and <strong>ICN-EDGE</strong> segmentation are operational context, not product doctrine. The public Civic Shell does not depend on any specific VLAN number.</li>
+<li>Admin and control-plane surfaces remain private overlay. The public site never carries an admin login flow.</li>
+<li>No DNS record is created or changed by this spec.</li>
+</ul>
+<h2>Public exterior</h2>
+<p>Unauthenticated visitors see the public website plus a small, truthful set of civic status surfaces:</p>
+<ul>
+<li><strong>What is real now</strong> — maturity-banded subsystem claims per ADR-0032. No unbanded &quot;working&quot; claims.</li>
+<li><strong>Development updates</strong> — phase/status summaries derived from <code>docs/PHASE_PROGRESS.md</code> and <code>docs/STATE.md</code>.</li>
+<li><strong>Public roadmap and current phase</strong> — the existing website roadmap/status model, not a parallel roadmap.</li>
+<li><strong>Public service-health posture</strong> — public-impact health summaries only; no private node-state dump.</li>
+<li><strong>Incidents and maintenance notices</strong> — only when they affect public or member-facing surfaces; no private incident bodies.</li>
+<li><strong>Public forge window</strong> — a read-only project-record window. GitHub is the current external adapter where true; Forgejo is the target only when its cutover gates are met.</li>
+<li><strong>Documentation and onboarding routes</strong> — docs, get-involved paths, community links, and truth-boundary explanation.</li>
+</ul>
+<p>The public exterior is not a brochure pretending to be an institution. It is ICN&#39;s public truth surface made navigable.</p>
+<h2>Logged-in interior</h2>
+<p>The logged-in Civic Shell is <strong>read-first</strong> and <strong>coordination-first</strong>. Mutation paths route into existing v0-conformant surfaces rather than being reinvented here.</p>
+<p>A logged-in visitor sees:</p>
+<ul>
+<li><strong>Identity</strong> — DID/member/session projection; OIDC session is not authority.</li>
+<li><strong>Active domain / organization</strong> — the <code>InstitutionalDomain</code> currently in scope.</li>
+<li><strong>Active role</strong> — Representation / Execution / Attestation role context where applicable.</li>
+<li><strong>Authority scope</strong> — a visible summary of what the viewer can do, with routes into the authoritative member/steward surfaces.</li>
+<li><strong>Member dashboard</strong> — composed from the member shell, not duplicated.</li>
+<li><strong>Action cards</strong> — count and summary only at the shell layer; full action happens in the member shell.</li>
+<li><strong>Governance room</strong> — proposals, decisions, mandates, challenge windows, and accepted-vs-applied status.</li>
+<li><strong>Workroom</strong> — action items, assignments, completion status, receipts, and evidence.</li>
+<li><strong>Records room</strong> — receipts, documents, evidence packets, artifact references, and access/challenge paths.</li>
+<li><strong>Forge room</strong> — repositories, issues, reviews, CI, ADRs, RFCs, releases, and implementation work.</li>
+<li><strong>Operations control room</strong> — steward-only cockpit route, never a public admin panel.</li>
+<li><strong>Communications room</strong> — Matrix/community/chat/announcement surfaces as coordination, not governance.</li>
+<li><strong>Vault / privacy posture</strong> — existence, scope, access path, and redaction/export posture, never private object bodies.</li>
+<li><strong>Settings / identity</strong> — devices, key status, language/accessibility preferences, and private-overlay-bound accommodation posture.</li>
+</ul>
+<h2>Relationship to Member Shell v0</h2>
+<p><code>docs/spec/member-shell-v0.md</code> is the primary participation surface. The Civic Shell may contain or route into it, but must not duplicate or redefine:</p>
+<ul>
+<li><code>/me/standing</code>,</li>
+<li><code>/me/action-cards</code>,</li>
+<li>the signing/confirmation flow,</li>
+<li>receipt rendering tiers,</li>
+<li>offline/draft-intent/sent/confirmed labeling,</li>
+<li>closed member-facing vocabularies,</li>
+<li>the accessibility gate.</li>
+</ul>
+<p>When a member acts, the action goes through the member shell contract. The Civic Shell provides orientation and routing, not a parallel participation protocol.</p>
+<h2>Relationship to Steward Cockpit v0</h2>
+<p><code>docs/spec/steward-cockpit-v0.md</code> is the steward/operator complement. The Civic Shell may route qualified viewers into it as the Operations Control Room, but must not redefine:</p>
+<ul>
+<li>the cockpit&#39;s twelve surfaces,</li>
+<li>closed operator-state vocabulary,</li>
+<li>fourteen operator scenarios,</li>
+<li>member-impact summary mapping,</li>
+<li>technical detail boundaries.</li>
+</ul>
+<p>No steward action surfaced in the Civic Shell becomes a god-mode admin button. Every steward-visible action must preserve authority basis, expected receipt/evidence class, member-impact summary, and reversibility/challenge posture where applicable.</p>
+<p>A viewer without steward standing in the active domain must not see steward-only surfaces or actions.</p>
+<h2>Relationship to the no-CLI organizer/member workflow</h2>
+<p>The no-CLI organizer/member workflow remains the guided browser/mobile-first workflow for organizers and members. The Civic Shell is the long-term home for that experience, but does not implement it in this PR.</p>
+<p>The shell preserves the workflow&#39;s hard boundaries:</p>
+<ul>
+<li>Organizer, steward/operator, and future-member paths stay distinct.</li>
+<li>Preview/review happens before mutation.</li>
+<li>Mutation comes last.</li>
+<li>CLI remains steward/operator backend and verifier tooling, not the default member path.</li>
+<li>Evidence packets are repo-safe by default.</li>
+</ul>
+<h2>Relationship to service hosting</h2>
+<p>The Civic Shell surfaces services without laundering their stage.</p>
+<ul>
+<li><strong>Hosted</strong> means a service runs.</li>
+<li><strong>Governed</strong> means service admin, backups, upgrades, routes, and transitions are subject to institutional policy/receipts.</li>
+<li><strong>ICN-native</strong> means the service participates in ICN primitives and emits ICN-native receipts.</li>
+</ul>
+<p>The Civic Shell must name each visible service with its stage. Service-local admin panels are not institutional authority. A service is not ICN-native until it actually emits ICN-native receipts according to the service-hosting model.</p>
+<h2>Relationship to auth bridge and DID login</h2>
+<p>The Civic Shell reaffirms the auth bridge rule:</p>
+<pre><code class="language-text">OIDC authenticates sessions.
+ICN authorizes institutional power.
+Receipts prove institutional transitions.
+</code></pre>
+<p>Keycloak, authentik, Ory, ZITADEL, Kanidm, or any other IdP may carry browser-session state where operationally used. None of them grants ICN authority by itself.</p>
+<p>Groups are projection state, not authority. The correct direction is:</p>
+<pre><code class="language-text">DID / ICN standing / mandate → short-lived service/session claim
+</code></pre>
+<p>The forbidden direction is:</p>
+<pre><code class="language-text">IdP group → ICN authority
+</code></pre>
+<p>The long-term target is local-device key unlock: biometric/PIN/passkey unlocks the device; the device protects the private key; the private key signs the action; the network verifies the signature. Biometrics and PINs are never identity themselves.</p>
+<h2>Civic spaces</h2>
+<h3>Public Window</h3>
+<p>Public truth, status, updates, docs, roadmap, public forge window, and onboarding. ADR-0032 and ADR-0033 apply.</p>
+<h3>Civic Lobby</h3>
+<p>Logged-in landing space: who am I, what domain am I in, what role am I acting under, what needs attention.</p>
+<h3>Member Desk</h3>
+<p>Standing, action cards, votes, assignments, receipts, and signing flow, all composed from Member Shell v0.</p>
+<h3>Governance Room</h3>
+<p>Proposals, decisions, mandates, challenge windows, accepted-vs-applied status, and dispatch/application evidence.</p>
+<h3>Workroom</h3>
+<p>Action items, assignments, work status, completion receipts, and evidence. No &quot;mark complete without receipt&quot; shortcut.</p>
+<h3>Records Room</h3>
+<p>Documents, policies, receipts, evidence packets, signed objects, artifact references, access paths, and challenge paths. Private body bytes never render.</p>
+<h3>Forge Room</h3>
+<p>Infrastructure-building space: repositories, issues, pull/merge requests, reviews, CI, releases, RFCs, ADRs, maintainership authority, and shared implementation work. GitHub is current adapter where true; Forgejo is future canonical work-record target only after cutover gates land.</p>
+<h3>Operations Control Room</h3>
+<p>Steward-only. Composes Steward Cockpit v0. No public admin endpoints. No surveillance console. No private content previews.</p>
+<h3>Communications Room</h3>
+<p>Matrix, chat, announcements, onboarding discussions, and bridge boundaries. Matrix is real-time coordination, not governance authority. A room cannot ratify a proposal, mutate a mandate, or close an action item.</p>
+<h3>Vault / Privacy Posture</h3>
+<p>Private overlay posture, scoped vault posture, access receipts, export receipts, redaction state, and challenge/access path. Posture, not content.</p>
+<h2>Notifications and action cards</h2>
+<p>Notifications in the Civic Shell are institutional notices, not social-media noise. Every notification must carry:</p>
+<ol>
+<li>what happened,</li>
+<li>why the viewer is notified,</li>
+<li>which domain/role/context applies,</li>
+<li>whether action is required,</li>
+<li>what receipt/evidence exists where applicable.</li>
+</ol>
+<p>Action Cards remain the primary actionable primitive for members, defined by ADR-0027 and rendered per Member Shell v0. The Civic Shell does not define a parallel ActionCard schema or mutation surface.</p>
+<p>Steward required-action surfaces are related but not ADR-0027 ActionCards. The wire-stable steward required-action shape remains forward-direction under <code>#1837</code>.</p>
+<h2>Status and proof labels</h2>
+<p>The Civic Shell must not say &quot;working,&quot; &quot;done,&quot; or &quot;live&quot; without a proof level. Status labels must align with the proof-level taxonomy and capability matrix tracked in <code>#1796</code>.</p>
+<p>Expected distinctions include:</p>
+<ul>
+<li>design,</li>
+<li>schema,</li>
+<li>unit-tested,</li>
+<li>integration-tested,</li>
+<li>local proof loop,</li>
+<li>K3s proof loop,</li>
+<li>devnet / multi-node proof,</li>
+<li>partner rehearsal,</li>
+<li>pilot production candidate,</li>
+<li>production hardened.</li>
+</ul>
+<p>The public exterior must not imply production readiness. The logged-in interior must not imply ICN-native receipt emission where the underlying service is only hosted or governed.</p>
+<h2>v0 scope</h2>
+<p>The Civic Shell v0 is only a composition spec:</p>
+<ul>
+<li>public status/development-updates concept,</li>
+<li>authenticated shell concept,</li>
+<li>civic-space composition model,</li>
+<li>conceptual forge/status/community routes,</li>
+<li>identity/context concepts,</li>
+<li>proof/truth-label discipline,</li>
+<li>no dangerous controls,</li>
+<li>no new write path,</li>
+<li>no live mutation surface.</li>
+</ul>
+<h2>Follow-up issue suggestions</h2>
+<p>These are suggestions only. The PR introducing this doc does not open them.</p>
+<ul>
+<li><code>spec(product): define ICN Civic Shell authenticated route map</code></li>
+<li><code>web(status): define public ICN status / development updates surface</code></li>
+<li><code>ux(shell): define member dashboard and notification model</code></li>
+<li><code>ux(shell): define Forge Room adapter over GitHub / Forgejo</code></li>
+<li><code>ux(shell): define Operations Control Room authority model</code></li>
+<li><code>docs(project-index): integrate Civic Shell surfaces with proof-level taxonomy</code></li>
+<li><code>ops(hosting): reconcile Civic Shell service list with service-hosting definitions</code></li>
+<li><code>ux(shell): define Communications Room boundary for Matrix, bridge, and announcements</code></li>
+<li><del><code>docs(spec): rename Civic Shell file and registry/index entries away from headquarters draft path</code></del> (completed in this PR — file renamed to <code>docs/spec/icn-civic-shell-v0.md</code>; registry key, title, and INDEX entry updated)</li>
+</ul>
+<h2>Review checklist</h2>
+<p>Reviewers should confirm:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Does not reintroduce the headquarters/command-center metaphor.</li>
+<li><input disabled="" type="checkbox"> Does not turn GitHub into the center; GitHub remains current adapter where true.</li>
+<li><input disabled="" type="checkbox"> Does not make Matrix governance.</li>
+<li><input disabled="" type="checkbox"> Does not make OIDC/Keycloak authority.</li>
+<li><input disabled="" type="checkbox"> Does not make n8n privileged authority.</li>
+<li><input disabled="" type="checkbox"> Does not expose private data.</li>
+<li><input disabled="" type="checkbox"> Does not claim Forgejo canonical before cutover gates land.</li>
+<li><input disabled="" type="checkbox"> Does not claim ICN-EDGE deployed.</li>
+<li><input disabled="" type="checkbox"> Does not overclaim production readiness, live federation, or formal pilot status.</li>
+<li><input disabled="" type="checkbox"> Does not duplicate member-shell or steward-cockpit contracts.</li>
+<li><input disabled="" type="checkbox"> Keeps CLI as steward/operator backend, not member default.</li>
+<li><input disabled="" type="checkbox"> Preserves regulatory-safe vocabulary: settlement, position, obligation, allocation, receipt, provenance. Avoids payment, wallet, balance, currency, token, crypto, blockchain, and timebank as ICN-native framing except in explicit negation.</li>
+</ul>
+<h2>Non-claims</h2>
+<ul>
+<li>This spec does not implement the Civic Shell.</li>
+<li>This spec does not define a new endpoint.</li>
+<li>This spec does not implement authentication.</li>
+<li>This spec does not deploy Forgejo, Keycloak, Matrix, n8n, or any service.</li>
+<li>This spec does not mutate DNS, K3s, VLANs, firewall rules, or <code>network-ops</code>.</li>
+<li>This spec does not expose any public admin surface.</li>
+<li>This spec does not move, expose, preview, or cache private vault contents.</li>
+<li>This spec does not redefine Member Shell v0, Steward Cockpit v0, ActionCard, receipt envelope, accessibility baseline, website truth boundary, public maturity claims, service hosting, auth bridge, or sovereign forge strategy.</li>
+<li>This spec does not introduce a new receipt class.</li>
+<li>This spec does not close sibling issues.</li>
+<li>This spec does not claim production readiness, live federation, formal NYCN pilot, Phase 2 completion, or operation under this contract by any real institution today.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
